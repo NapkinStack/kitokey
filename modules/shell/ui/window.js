@@ -2698,7 +2698,111 @@ function showSmall(words) {
   keys.id = "small-keys";
   const last = element("div", "small-last");
   const foot = element("div", "small-foot");
-  rest.append(restTop, start, keys, last, foot);
+  // Which microphone the next recording takes (D74): the name, opened on Auto and what capture lists,
+  // over what is under it, as a menu is. Nothing is offered where capture lists none. Read when it
+  // opens, never watched: a device arriving opens nothing.
+  const microphone = element("div", "small-microphone");
+  microphone.hidden = true;
+  const pick = element("button", "open disclose");
+  pick.type = "button";
+  pick.id = "small-microphone";
+  pick.setAttribute("aria-expanded", "false");
+  pick.setAttribute("aria-controls", "small-microphones");
+  const pickName = element("span", "named");
+  pick.append(pickName, element("span", "chevron", "▾"));
+  const picks = element("div", "small-microphones");
+  picks.id = "small-microphones";
+  picks.setAttribute("role", "radiogroup");
+  picks.setAttribute("aria-label", words.small_microphones);
+  picks.hidden = true;
+  microphone.append(pick, picks);
+  let known = { chosen: null, list: [], unread: false };
+  const paintPick = () => {
+    const name = fill(words.small_microphone, known.chosen?.description ?? words.microphone_auto);
+    pickName.textContent = name;
+    pick.title = name;
+  };
+  const focusPick = () => picks.querySelector("input:checked")?.focus();
+  const drawPicks = () => {
+    const absent = known.chosen !== null && !known.list.some((one) => one.name === known.chosen.name);
+    const each = [
+      [null, words.microphone_auto, words.microphone_auto_says],
+      ...known.list.map((one) => [one, one.description, ""]),
+      ...(absent ? [[known.chosen, known.chosen.description, words.microphone_absent]] : []),
+    ];
+    picks.replaceChildren(...each.map(([one, label, says]) => {
+      const option = choice("small-microphone-choice", one?.name ?? "", [label, says], (one?.name ?? null) === (known.chosen?.name ?? null), false);
+      option.querySelector("input").addEventListener("change", () => choosePick(one));
+      return option;
+    }));
+    if (known.unread) {
+      const said = element("p", "says", words.microphones_unread);
+      said.setAttribute("role", "status");
+      picks.append(said);
+    }
+  };
+  const choosePick = async (one) => {
+    const before = known.chosen;
+    known = { ...known, chosen: one };
+    paintPick();
+    try {
+      await invoke("microphone_chosen", { name: one?.name ?? null, description: one?.description ?? null });
+      smallSaid("microphone", null);
+    } catch {
+      known = { ...known, chosen: before };
+      paintPick();
+      drawPicks();
+      smallSaid("microphone", words.microphone_not_kept);
+    }
+  };
+  const closePicks = (back) => {
+    if (picks.hidden) return;
+    picks.hidden = true;
+    pick.setAttribute("aria-expanded", "false");
+    pick.lastChild.textContent = "▾";
+    if (back) pick.focus();
+  };
+  const readPicks = async () => {
+    const read = await invoke("microphones_listed").catch(() => null);
+    if (read === null) return;
+    const same = JSON.stringify(read.list) === JSON.stringify(known.list) && read.unread === known.unread;
+    // A choice made while this was being read stands.
+    known = { ...read, chosen: picks.hidden ? read.chosen : known.chosen };
+    microphone.hidden = known.list.length === 0 && !known.unread && known.chosen === null;
+    paintPick();
+    if (!picks.hidden && !same) {
+      drawPicks();
+      focusPick();
+    }
+  };
+  pick.addEventListener("click", () => {
+    if (!picks.hidden) return closePicks(true);
+    picks.hidden = false;
+    pick.setAttribute("aria-expanded", "true");
+    pick.lastChild.textContent = "▴";
+    // Down to the window's edge: what does not fit scrolls inside, nothing is cut.
+    picks.style.maxHeight = `${innerHeight - pick.getBoundingClientRect().bottom - 12}px`;
+    drawPicks();
+    focusPick();
+    readPicks();
+  });
+  picks.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" && event.key !== "Enter") return;
+    event.preventDefault();
+    closePicks(true);
+  });
+  // A press keeps the focus here until its click has chosen; a click chooses and closes, as a menu does.
+  picks.addEventListener("mousedown", (event) => event.preventDefault());
+  picks.addEventListener("click", (event) => {
+    if (event.detail > 0 && event.target.closest(".choice")) setTimeout(() => closePicks(true));
+  });
+  microphone.addEventListener("focusout", (event) => {
+    if (!microphone.contains(event.relatedTarget)) closePicks(false);
+  });
+  document.addEventListener("click", (event) => {
+    if (!microphone.contains(event.target)) closePicks(false);
+  });
+  rest.append(restTop, start, keys, microphone, last, foot);
 
   const live = element("div", "small-live");
   const time = element("span", "time", "00:00:00");
@@ -2924,6 +3028,9 @@ function showSmall(words) {
         smallSaid("context", null);
         smallSaid("mark", null);
       }
+      closePicks(false);
+      // Back at rest, and the first time: what capture lists now.
+      if (!now.recording) readPicks();
       // Under the switch while recording, *Arrêter* staying where it is; first of all at rest.
       if (now.recording) secret.row.after(unkeptSaid);
       else page.prepend(unkeptSaid);
@@ -2976,8 +3083,10 @@ function showSmall(words) {
         check.slot.dataset.check = state;
         check.since = performance.now();
         check.status.textContent = state === "heard" ? check.heard : "";
-        check.sentence.textContent = check.says[state] ?? "";
       }
+      // Under its check, in the room kept there; the microphone chosen gone says more than its silence (D74).
+      const says = index === 0 && now.microphone_gone ? words.small_microphone_gone : check.says[state] ?? "";
+      if (check.sentence.textContent !== says) check.sentence.textContent = says;
       check.slot.classList.toggle("faded", state === "heard" && performance.now() - check.since >= CHECK_SHOWN);
     }
     announcement = now.announcement;

@@ -132,6 +132,10 @@ pub struct Settings {
     pub folded: bool,
     /// The language Wholeheard speaks, chosen by the user (D64); none, the system's.
     pub language: Option<Language>,
+    /// The microphone recordings take, as capture names it — it may hold a Bluetooth address: never
+    /// logged —, and as a person reads it (D74). None: Auto.
+    pub microphone: Option<String>,
+    pub microphone_description: Option<String>,
 }
 
 /// The model a transcript is heard with when the settings name none (ADR-0003).
@@ -163,6 +167,8 @@ impl Default for Settings {
             welcomed: false,
             folded: false,
             language: None,
+            microphone: None,
+            microphone_description: None,
         }
     }
 }
@@ -234,6 +240,8 @@ struct Written {
     welcomed: Option<bool>,
     folded: Option<bool>,
     language: Option<String>,
+    microphone: Option<String>,
+    microphone_description: Option<String>,
 }
 
 /// Reads the settings. No file is no choice made: the defaults. A file that cannot be read as
@@ -284,6 +292,8 @@ pub fn read(path: &Path) -> Result<Settings, String> {
     settings.minutes_provider = written.minutes_provider.filter(|named| !named.trim().is_empty());
     settings.minutes_model = written.minutes_model.filter(|named| !named.trim().is_empty());
     settings.meeting_language = written.meeting_language.as_deref().and_then(crate::spoken::code);
+    settings.microphone = written.microphone.filter(|named| !named.trim().is_empty());
+    settings.microphone_description = written.microphone_description.filter(|named| !named.trim().is_empty());
     settings.minutes_agreed = written.minutes_agreed.filter(|named| !named.trim().is_empty());
     settings.transcription_provider = written.transcription_provider.filter(|named| !named.trim().is_empty());
     settings.transcription_model = written.transcription_model.filter(|named| !named.trim().is_empty());
@@ -419,6 +429,12 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
         ),
         ("transcription_model", &settings.transcription_model, &before.transcription_model),
         ("transcription_agreed", &settings.transcription_agreed, &before.transcription_agreed),
+        ("microphone", &settings.microphone, &before.microphone),
+        (
+            "microphone_description",
+            &settings.microphone_description,
+            &before.microphone_description,
+        ),
     ] {
         match named {
             Some(named) if named != was.as_deref().unwrap_or_default() => set(&mut document, key, Value::from(named.as_str())),

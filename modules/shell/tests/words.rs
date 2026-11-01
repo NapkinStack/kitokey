@@ -1608,3 +1608,22 @@ fn a_test_with_a_cause_says_it_alone_the_raw_text_only_in_developer_mode() {
     let developer = serde_json::to_string(&words::test_caused(Cause::Down, "raw", Language::French, true)).unwrap();
     assert!(developer.contains("raw"), "{developer}");
 }
+
+#[test]
+fn a_microphone_gone_is_told_once_and_what_stands_in_is_no_change_of_its_own() {
+    for language in [Language::English, Language::French] {
+        let mut sides = words::Sides::default();
+        let folder = PathBuf::from("f");
+        sides.told(
+            &Said::Started(folder, Some("Chosen".into()), Some("Speaker".into())),
+            false,
+            language,
+        );
+        let told = sides.told(&Said::MicrophoneGone, false, language).unwrap();
+        assert!(
+            !told.title.is_empty() && !told.body.is_empty() && !told.body.contains('\''),
+            "{told:?}"
+        );
+        assert_eq!(sides.told(&Said::Moved(Source::Me, Some("Default".into())), false, language), None);
+    }
+}
