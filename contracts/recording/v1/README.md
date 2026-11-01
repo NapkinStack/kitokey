@@ -5,7 +5,8 @@ text per event, for whoever started it.
 
 ```mermaid
 flowchart LR
-    S["shell — or a script,<br/>a terminal"]:::consumer -->|"starts: wholeheard-capture record <sessions-folder>, or the same with --as v1"| C["capture"]:::producer
+    S["shell — or a script,<br/>a terminal"]:::consumer -->|"starts: wholeheard-capture record <sessions-folder>, with --microphone <name>, or with --as v1"| C["capture"]:::producer
+    S -->|"asks: wholeheard-capture microphones"| C
     C -->|"its output: one JSON object per line"| S
     S -->|"its input: the line stop"| C
     S -.->|"its environment: WHOLEHEARD_TRACE, its log's id"| C
@@ -35,12 +36,14 @@ order of the events, and what each means, are said here and nowhere else.
 | `event` | Other fields | Says |
 |---|---|---|
 | `unavailable` | `source`: `me` or `others`; `reason`: a sentence, free: for a person or a log, no consumer reads a meaning from its words | This source could not be opened: in a session of `session-audio/v2` it has no track — in one of `session-audio/v1`, its file is silence. Said before `started`; the other source is still recorded. It is not always for good: *A microphone that waits*, below |
-| `started` | `folder`: the session's folder, a path; `sources`: for `me` and `others`, the name the system gave it, or `unavailable` | The recording runs, and `session.json` is in the folder. **Once**, and first unless `unavailable` came before |
+| `started` | `folder`: the session's folder, a path; `sources`: for `me` and `others`, the name the system gave it, or `unavailable` | The recording runs, and `session.json` is in the folder. **Once**, and first unless `unavailable` or `microphone_gone` came before |
 | `silent` | `source`; `nothing`: `true` when not one sample other than an exact zero came — optional | This source has given no sound for ten seconds. Said once per silence. `nothing`: the device delivers nothing at all — no microphone at rest gives exact zeros —, not a quiet room (#361); absent, unknown |
 | `heard` | `source` | A source that was said `silent` gives sound again |
 | `level` | `source`; `level`: how loud it is now, from 0 (silence) to 1 (the loudest it can be), a number | About ten times a second for each source being recorded, after `started` and before `stopped`: for a meter that moves as sound comes (cycle 03, D22) |
+| `microphone_gone` | none | The microphone named at the start (*A microphone named*, below) is not there, or could not be looked for: `me` is recorded as with no name. Before `started`, or after it each time the one named goes |
 | `device` | `source`; `device`: the name the system gives the device, or `null` | This source is now recorded from another device: the user chose another default, or the one recorded was taken away and the system named another — or, for `others`, a call plays on an output other than the default, or left it for the default (cycle 04, D41) — or, for `me`, a call holds a microphone other than the one recorded, or no longer does (cycle 05, D66). Its track goes on, in the form it opened with (`session-audio`). `null`: the system names no device for it, or the call let go of it, and nothing comes from it before a `device` names one. Said at each change, after `started` and before `stopped`; of a source said `unavailable`, as *A microphone that waits* says, below |
 | `stopped` | `folder`; `seconds`: the recording's length, a number | The session's files are whole and `session.json` says `stopped`. **Last**, and only when the recording was stopped as below |
+| `microphone` | `name`: what the start takes; `description`: as a person reads it | One microphone of what `microphones` lists (*A microphone named*, below). Never said by a recording |
 
 **Stopping**: the line `stop` on the program's input, an interrupt or a termination signal.
 All three end the same way: `stopped`, then the program ends well. Closing its input stops
@@ -70,6 +73,29 @@ or what the program leaves — with one exception: a run that crosses midnight U
 next day's file cannot be created has the logging library say so once on the error stream.
 The log is not what the program leaves. What the log holds is not this
 contract: it is read by people, never by a consumer.
+
+## A microphone named
+
+Cycle 06, D74; additive: a consumer that names none, and asks nothing, sees no change.
+
+**The list.** `wholeheard-capture microphones` prints one `microphone` line for each microphone the
+system offers by name, then ends well. No line: nothing to choose from — the system has no such list
+(today, all but Linux with PipeWire), or no microphone: no list is offered. It reads the system and opens nothing. It fails as
+*Failing* says, when the list could not be read. `name` is the system's own and may hold a Bluetooth
+address: a consumer keeps it where the user's settings are, and never logs it, nor shows it;
+`description` holds no address.
+
+**The start.** `wholeheard-capture record <sessions-folder> --microphone <name>`, a `name` of that
+list. With `--as v1`, the program refuses it as it refuses any other wrong use, and records nothing:
+the first form follows nothing.
+
+| Named at the start | `me` records | Said |
+|---|---|---|
+| Nothing | The microphone a call holds, otherwise the default input: as above | As above |
+| A microphone that is there | That one for the whole recording: neither a call holding another nor a new default moves it | `started`, its description |
+| A headset's, that a stream would switch to another profile | That one, only while a call holds it, listened to without ever making it run (ADR-0015); no stream otherwise, whatever else a call holds. No profile is ever asked for, even for a name the user chose | `unavailable` at the start, as *A microphone that waits* says, unless a call already holds it; `device` once it comes, `device: null` when the call lets go |
+| A name that is not there, at the start or later | As with nothing named, its track going on | `microphone_gone`, then what is recorded by `started` or `device`, as above |
+| A name gone that comes back | That one again, its track going on | `device` |
 
 ## What it never does
 
@@ -150,6 +176,20 @@ Valid — a microphone that waits, taken by a call, let go, taken again, let go:
 {"event":"device","source":"me","device":"Headset Microphone"}
 {"event":"device","source":"me","device":null}
 {"event":"stopped","folder":"<sessions-folder>/2026-10-13_14-05","seconds":70.1}
+```
+
+Valid — a microphone named that is not there, the recording going on with what the system offers:
+
+```text
+{"event":"microphone_gone"}
+{"event":"started","folder":"<sessions-folder>/2026-10-13_14-05","sources":{"me":"Digital Microphone","others":"Speaker"}}
+```
+
+Valid — what `microphones` prints:
+
+```text
+{"event":"microphone","name":"alsa_input.pci-0000_00_1f.3.analog-stereo","description":"Digital Microphone"}
+{"event":"microphone","name":"bluez_input.unknown","description":"Headset Microphone"}
 ```
 
 To refuse: a line that is not a JSON object with an `event`.

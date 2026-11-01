@@ -152,6 +152,39 @@
       ]
     },
     {
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "microphone_gone"
+        }
+      },
+      "required": [
+        "event"
+      ]
+    },
+    {
+      "description": "Printed by `microphones`, never by a recording.",
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "microphone"
+        },
+        "name": {
+          "description": "What `--microphone` takes: the system's own, which may hold a Bluetooth address. Never logged, never shown.",
+          "type": "string"
+        },
+        "description": {
+          "description": "As a person reads it; never an address.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event",
+        "name",
+        "description"
+      ]
+    },
+    {
       "description": "An event this version does not name: a consumer ignores it.",
       "type": "object",
       "properties": {
@@ -165,7 +198,9 @@
               "heard",
               "stopped",
               "level",
-              "device"
+              "device",
+              "microphone_gone",
+              "microphone"
             ]
           }
         }
