@@ -37,6 +37,18 @@ fn a_refusal_is_logged_with_its_detail_under_the_makings_id() {
 }
 
 #[test]
+fn a_microphone_named_is_refused_with_the_first_form_which_follows_nothing() {
+    let logs = tempfile::tempdir().unwrap();
+    let sessions = tempfile::tempdir().unwrap();
+    let (err, _, _) = refused(
+        &["record", sessions.path().to_str().unwrap(), "--as", "v1", "--microphone", "any"],
+        logs.path(),
+    );
+    assert!(err.contains("usage: wholeheard-capture"), "{err}");
+    assert_eq!(fs::read_dir(sessions.path()).unwrap().count(), 0);
+}
+
+#[test]
 fn a_sessions_folder_that_cannot_hold_one_is_logged_without_its_path() {
     let logs = tempfile::tempdir().unwrap();
     // A file where the sessions' folder should be: refused before any device is opened.

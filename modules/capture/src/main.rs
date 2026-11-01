@@ -3,6 +3,8 @@
 //!     wholeheard-capture record <sessions-folder>     each source as delivered, until Ctrl-C, a TERM
 //!                                                 signal, or "stop" on its input
 //!     wholeheard-capture record <sessions-folder> --as v1     the same, in the first form
+//!     wholeheard-capture record <sessions-folder> --microphone <name>     `me` from that one
+//!     wholeheard-capture microphones                  what can be named, one JSON object per line
 //!     wholeheard-capture devices                      what the system offers
 //!
 //! It says what happens as one JSON object per line on its output: `started`, `unavailable`,
@@ -60,6 +62,8 @@ pub(crate) type Sound = (usize, f64, Vec<f32>);
 type Form = (u32, u16);
 /// Said of a microphone not opened, for it is a headset's and nothing has taken it (ADR-0015).
 const WAITS: &str = "the default input is a Bluetooth headset's: the microphone waits for a call to take it";
+/// The same, of the one named at the start (D74).
+const WAITS_NAMED: &str = "the microphone chosen is a Bluetooth headset's: the microphone waits for a call to take it";
 /// Said of a headset's microphone a call holds and does not run yet.
 const WAITS_NOT_RUNNING: &str = "the call holds a Bluetooth headset's microphone, not running yet: the microphone waits for it";
 /// How long a recording's start waits for a source that runs to negotiate.
@@ -91,7 +95,9 @@ fn say(event: Event) {
         Event::Heard { source } => info!(source = SOURCES[source], "capture.heard"),
         Event::Stopped { folder, seconds } => info!(session = %session(folder), seconds, "capture.stopped"),
         Event::Device { source, device } => info!(source = SOURCES[source], device, "capture.device"),
-        Event::Level { .. } => {}
+        // Its name may hold an address: never in a log.
+        Event::MicrophoneGone => warn!("capture.microphone_gone"),
+        Event::Level { .. } | Event::Microphone { .. } => {}
     }
 }
 
@@ -99,10 +105,17 @@ fn main() -> ExitCode {
     let _run = log::start("capture");
     let args: Vec<String> = std::env::args().skip(1).collect();
     let outcome = match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
-        ["record", sessions] | ["record", sessions, "--as", "v2"] => record_v2(Path::new(sessions)),
+        ["record", sessions] | ["record", sessions, "--as", "v2"] => record_v2(Path::new(sessions), None),
+        ["record", sessions, "--microphone", name]
+        | ["record", sessions, "--as", "v2", "--microphone", name]
+        | ["record", sessions, "--microphone", name, "--as", "v2"] => record_v2(Path::new(sessions), Some(name)),
         ["record", sessions, "--as", "v1"] => record(Path::new(sessions)),
+        ["microphones"] => microphones(),
         ["devices"] => devices(),
-        _ => Err("usage: wholeheard-capture record <sessions-folder> [--as v1|v2] | wholeheard-capture devices".into()),
+        _ => Err(
+            "usage: wholeheard-capture record <sessions-folder> [--as v1|v2] [--microphone <name>, not with v1] | wholeheard-capture microphones | wholeheard-capture devices"
+                .into(),
+        ),
     };
     match outcome {
         Ok(()) => ExitCode::SUCCESS,
@@ -133,6 +146,23 @@ fn devices() -> Result<(), String> {
         if used != line["device"] {
             line["stands_for"] = used.into();
         }
+        println!("{line}");
+    }
+    Ok(())
+}
+
+/// What can be named at the start: nothing, and no failure, where the system has no such list.
+fn microphones() -> Result<(), String> {
+    if host().id().name() != "PipeWire" {
+        return Ok(());
+    }
+    let dump = graph().ok_or("the system's microphones could not be read")?;
+    for microphone in call::microphones(&dump)? {
+        let line = Event::Microphone {
+            name: &microphone.name,
+            description: &microphone.description,
+        }
+        .line();
         println!("{line}");
     }
     Ok(())
@@ -207,7 +237,7 @@ fn naming(moves: Receiver<Move>) -> (Receiver<Moved>, Sender<Moved>) {
 /// leaves it. Each move is told as the system's are, from `zero`. A graph that does not read, or
 /// a stream that cannot be moved, leaves the default, said once. Each reading also says what the
 /// local side should record, to `me`: nothing, when the graph does not read (ADR-0015).
-fn follow(tell: Sender<Moved>, me: Option<Sender<Me>>, zero: Instant, stop: Arc<AtomicBool>) {
+fn follow(tell: Sender<Moved>, me: Option<(Sender<Wanted>, Option<String>)>, zero: Instant, stop: Arc<AtomicBool>) {
     let run = tracing::Span::current();
     std::thread::spawn(move || {
         let _run = run.enter();
@@ -239,8 +269,8 @@ fn follow(tell: Sender<Moved>, me: Option<Sender<Me>>, zero: Instant, stop: Arc<
                 }
             }
             fed = Some(now);
-            if let Some(me) = &me
-                && let Ok(wanted) = call::me(&dump, ours)
+            if let Some((me, name)) = &me
+                && let Ok(wanted) = wanted_me(&dump, ours, name.as_deref())
             {
                 let _ = me.send(wanted);
             }
@@ -382,14 +412,23 @@ fn metadata(key: &str) -> Option<String> {
     Some(printed)
 }
 
-/// What the local side should record now. Where PipeWire is not, the default, as ever. Where the
-/// graph does not read, the default input's name alone decides: a headset's is not opened.
-fn me_now(host: &Host) -> Me {
-    if host.id().name() != "PipeWire" {
-        return Me::Default;
+/// What the graph says the local side should record, and whether a name given is there.
+fn wanted_me(dump: &str, ours: u64, name: Option<&str>) -> Result<Wanted, String> {
+    match name {
+        Some(name) => call::named(dump, ours, name),
+        None => call::me(dump, ours).map(|me| (me, true)),
     }
-    let read = graph().and_then(|dump| call::me(&dump, u64::from(std::process::id())).ok());
-    read.unwrap_or_else(unread_me)
+}
+
+/// What the local side should record now. Where PipeWire is not, the default, as ever; a name is
+/// not there. Where the graph does not read, the default input's name alone decides: a headset's is
+/// not opened, and a name was not found.
+fn me_now(host: &Host, name: Option<&str>) -> Wanted {
+    if host.id().name() != "PipeWire" {
+        return (Me::Default, name.is_none());
+    }
+    let read = graph().and_then(|dump| wanted_me(&dump, u64::from(std::process::id()), name).ok());
+    read.unwrap_or_else(|| (unread_me(), name.is_none()))
 }
 
 /// The same, with no graph: the default input's name alone.
@@ -406,6 +445,9 @@ fn default_is_a_headset(host: &Host) -> bool {
             .and_then(|dump| call::default_waits(&dump).ok())
             .unwrap_or_else(|| unread_me() == Me::Wait)
 }
+
+/// What the local side should record, and whether what was named is there; none named, it is.
+type Wanted = (Me, bool);
 
 /// What feeds the second form's tracks.
 enum Feed {
@@ -933,7 +975,7 @@ impl Delivered {
 }
 
 /// Records each source as the system delivers it, with the session's clock beside (ADR-0004).
-fn record_v2(sessions: &Path) -> Result<(), String> {
+fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
     let host = host();
     let (sound, heard) = mpsc::channel::<Sound>();
     let (moved, moves) = mpsc::channel::<Move>();
@@ -946,7 +988,10 @@ fn record_v2(sessions: &Path) -> Result<(), String> {
     // local side is what the graph says (ADR-0015): it may wait, and gets its track when it is taken.
     let stop = stop_asked()?;
     let opening = Opening { zero, sound, moved };
-    let me_first = me_now(&host);
+    let (me_first, mut named_there) = me_now(&host, microphone);
+    if !named_there {
+        say(Event::MicrophoneGone);
+    }
     let mut me_opened = false;
     let mut names = Vec::new();
     let mut sources = Vec::new();
@@ -955,6 +1000,13 @@ fn record_v2(sessions: &Path) -> Result<(), String> {
             open_me(&host, &me_first, None, &opening)
                 .and_then(|opened| formed_at_the_start(opened, &stop))
                 .map(|(feed, name, (rate, channels))| (name, feed, rate, channels))
+                .map_err(|reason| {
+                    if microphone.is_some() && named_there && reason == WAITS {
+                        WAITS_NAMED.to_string()
+                    } else {
+                        reason
+                    }
+                })
         } else {
             host.default_output_device()
                 .ok_or_else(|| "the system names no default device".to_string())
@@ -1013,7 +1065,7 @@ fn record_v2(sessions: &Path) -> Result<(), String> {
         sources: [&names[0], &names[1]],
     });
 
-    let (wants, wanted_me) = mpsc::channel::<Me>();
+    let (wants, wanted) = mpsc::channel::<Wanted>();
     let mut following = Following {
         // A default that could not be opened stays as it was; anything else is asked again.
         on: if me_opened || me_first == Me::Default { me_first } else { Me::Wait },
@@ -1028,7 +1080,7 @@ fn record_v2(sessions: &Path) -> Result<(), String> {
     // A call heard on another output than the default is followed there, where PipeWire is; the
     // microphone it holds, too.
     if host.id().name() == "PipeWire" {
-        follow(follower, Some(wants), zero, stop.clone());
+        follow(follower, Some((wants, microphone.map(str::to_string))), zero, stop.clone());
     } else {
         drop((follower, wants));
     }
@@ -1044,7 +1096,12 @@ fn record_v2(sessions: &Path) -> Result<(), String> {
             track.moved(at, name);
             session(&held)
         })?;
-        while let Ok(want) = wanted_me.try_recv() {
+        while let Ok((want, there)) = wanted.try_recv() {
+            // Said before what takes over from it is named.
+            if named_there && !there {
+                say(Event::MicrophoneGone);
+            }
+            named_there = there;
             following.heed(want, &mut sources[0]);
         }
         following.settle(&mut sources[0], &mut held, &mut clock, &folder, session)?;

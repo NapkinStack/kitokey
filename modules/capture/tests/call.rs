@@ -738,3 +738,130 @@ fn a_device_said_is_closed_once_when_its_stream_goes() {
 fn a_stream_that_never_had_a_track_owes_no_null() {
     assert!(!Local::started(false).gone());
 }
+
+fn named(graph: Vec<Value>, name: &str) -> (Me, bool) {
+    call::named(&Value::Array(graph).to_string(), OURS, name).unwrap()
+}
+
+#[test]
+fn a_microphone_named_is_recorded_though_a_call_holds_another() {
+    let mut graph = sources();
+    graph.extend([stream(131, 143), link(3, 134, 131), default_source(AIRPODS)]);
+    assert_eq!(
+        named(graph, "alsa_input.laptop"),
+        (held("alsa_input.laptop", "Digital Microphone", false), true)
+    );
+}
+
+#[test]
+fn a_microphone_named_that_is_the_default_is_still_held_by_its_name() {
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    assert_eq!(
+        named(graph, "alsa_input.laptop"),
+        (held("alsa_input.laptop", "Digital Microphone", false), true)
+    );
+}
+
+#[test]
+fn a_headset_named_waits_until_a_call_holds_it_and_is_then_listened_to_passively() {
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    assert_eq!(named(graph.clone(), AIRPODS), (Me::Wait, true));
+    // A call on another microphone runs nothing of it.
+    graph.extend([stream(131, 143), link(3, 50, 131)]);
+    assert_eq!(named(graph.clone(), AIRPODS), (Me::Wait, true));
+    graph.push(link(4, 134, 131));
+    assert_eq!(named(graph, AIRPODS), (held(AIRPODS, "AirPods", true), true));
+}
+
+#[test]
+fn a_headset_named_is_not_held_by_capture_s_own_stream() {
+    let mut graph = sources();
+    graph.extend([link(4, 134, 501), default_source("alsa_input.laptop")]);
+    assert_eq!(named(graph, AIRPODS), (Me::Wait, true));
+}
+
+#[test]
+fn a_filter_fed_by_a_headset_named_waits_as_the_headset_does() {
+    let mut graph = sources();
+    graph.extend([
+        node(
+            60,
+            "Audio/Source",
+            json!({ "node.name": "noise", "node.description": "Noise", "node.link-group": "g" }),
+        ),
+        node(
+            61,
+            "Stream/Input/Audio/Internal",
+            json!({ "node.name": "noise_in", "node.link-group": "g" }),
+        ),
+        link(5, 134, 61),
+        default_source("alsa_input.laptop"),
+    ]);
+    assert_eq!(named(graph, "noise"), (Me::Wait, true));
+}
+
+#[test]
+fn a_name_that_is_not_there_is_auto_and_said_missing() {
+    let mut graph = sources();
+    graph.extend([stream(131, 143), link(3, 134, 131), default_source("alsa_input.laptop")]);
+    assert_eq!(named(graph.clone(), "gone"), (me(graph), false));
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    assert_eq!(named(graph, "gone"), (Me::Default, false));
+}
+
+#[test]
+fn only_what_records_can_be_named_a_speaker_and_a_stream_cannot() {
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    assert!(!named(graph.clone(), "alsa_speaker").1);
+    graph.push(node(
+        70,
+        "Audio/Source/Internal",
+        json!({ "node.name": "inside", "node.description": "Inside" }),
+    ));
+    graph.push(node(
+        73,
+        "Audio/Source/Virtual",
+        json!({ "node.name": "virtual", "node.description": "Virtual" }),
+    ));
+    assert!(!named(graph.clone(), "inside").1);
+    assert!(!named(graph, "virtual").1);
+}
+
+#[test]
+fn the_microphones_listed_are_the_sources_that_open_by_description_never_with_an_address() {
+    let mut graph = sources();
+    graph.extend([
+        node(
+            70,
+            "Audio/Source/Internal",
+            json!({ "node.name": "inside", "node.description": "Inside" }),
+        ),
+        node(71, "Audio/Source", json!({ "node.name": "noise", "node.description": "A filter" })),
+        node(
+            72,
+            "Audio/Duplex",
+            json!({ "node.name": "pro", "node.description": "Bud AA:BB:CC:DD:EE:FF" }),
+        ),
+    ]);
+    let listed = call::microphones(&Value::Array(graph).to_string()).unwrap();
+    let names: Vec<(&str, &str)> = listed.iter().map(|one| (one.name.as_str(), one.description.as_str())).collect();
+    assert_eq!(
+        names,
+        [
+            ("noise", "A filter"),
+            (AIRPODS, "AirPods"),
+            ("pro", "Bud unknown"),
+            ("alsa_input.laptop", "Digital Microphone"),
+        ]
+    );
+}
+
+#[test]
+fn a_list_of_a_graph_that_does_not_read_is_said_so() {
+    assert!(call::microphones("not json").is_err());
+    assert!(call::named("not json", OURS, "any").is_err());
+}
