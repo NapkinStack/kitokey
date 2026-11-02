@@ -99,7 +99,8 @@ pub enum Me {
     Default,
     /// The microphone a call holds, when it is not simply the default.
     Hold(Microphone),
-    /// No call, and the default input is a headset's virtual input: nothing is opened.
+    /// No call, and the default input — or the headset named at the start — is a headset's virtual
+    /// input: nothing is opened.
     Wait,
 }
 
@@ -183,26 +184,7 @@ const OWN: [&str; 2] = ["wholeheard-capture", "wholeheard"];
 /// takes nothing from one already recorded.
 pub fn me(dump: &str, ours: u64) -> Result<Me, String> {
     let graph = Graph::read(dump)?;
-    let mut calls: Vec<(&u64, &Node)> = graph
-        .nodes
-        .iter()
-        .filter(|(_, node)| {
-            node.class == "Stream/Input/Audio"
-                && !node.records_an_output
-                && !node.monitor
-                && !node.loopback
-                && node.link_group.is_none()
-                && !node.own
-                && node.process != Some(ours)
-        })
-        .collect();
-    calls.sort_by_key(|(id, node)| (!node.running, **id));
-    let held = calls.iter().find_map(|(id, _)| {
-        let mut froms: Vec<u64> = graph.links.iter().filter(|(_, to)| to == *id).map(|(from, _)| *from).collect();
-        froms.sort_unstable();
-        froms.into_iter().find_map(|from| graph.source_behind(from, &mut BTreeSet::new()))
-    });
-    let Some(source) = held else {
+    let Some(source) = graph.held(ours).first().copied() else {
         return Ok(if graph.default_waits() { Me::Wait } else { Me::Default });
     };
     let node = &graph.nodes[&source];
@@ -215,6 +197,108 @@ pub fn me(dump: &str, ours: u64) -> Result<Me, String> {
         description: node.named(),
         passive: loopback.then(|| passive_value(graph.version.as_deref())),
     }))
+}
+
+/// What `microphones` calls a node, and `--microphone` takes back: its name, or, where that holds a
+/// Bluetooth address, the name without it and a digest of it (FNV-1a, fixed: the user's settings keep
+/// the result). So no line, setting or process argument holds an address.
+pub fn microphone_id(node: &str) -> String {
+    let kept = without_address(node);
+    if kept == node {
+        return kept;
+    }
+    let digest = node.bytes().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+    });
+    format!("{kept}#{digest:016x}")
+}
+
+/// What is said of the microphone named, as readings of the graph find it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Named {
+    Gone,
+    Back,
+}
+
+/// Whether the microphone named was last there: a change is said once, and only a change.
+#[derive(Debug)]
+pub struct Presence {
+    there: bool,
+}
+
+impl Presence {
+    /// `there`: what the start found, and said.
+    pub fn new(there: bool) -> Presence {
+        Presence { there }
+    }
+
+    pub fn read(&mut self, there: bool) -> Option<Named> {
+        (std::mem::replace(&mut self.there, there) != there).then_some(if there { Named::Back } else { Named::Gone })
+    }
+}
+
+/// What the local side should record with the microphone `name` named at the start (D74), and
+/// whether it is there. There: that one, whatever a call holds and whatever the default becomes — a
+/// headset's only while a call holds it, passively, for nothing else may make it run (ADR-0015).
+/// Not there: what [`me`] says.
+pub fn named(dump: &str, ours: u64, name: &str) -> Result<(Me, bool), String> {
+    let graph = Graph::read(dump)?;
+    let Some((id, node)) = graph
+        .nodes
+        .iter()
+        .find(|(_, node)| node.opens() && microphone_id(&node.name) == name)
+    else {
+        return me(dump, ours).map(|me| (me, false));
+    };
+    let loopback = graph.loopback_behind(*id, &mut BTreeSet::new());
+    if loopback && !graph.held(ours).contains(id) {
+        return Ok((Me::Wait, true));
+    }
+    let microphone = Microphone {
+        name: node.name.clone(),
+        description: node.named(),
+        passive: loopback.then(|| passive_value(graph.version.as_deref())),
+    };
+    Ok((Me::Hold(microphone), true))
+}
+
+/// The microphones that can be named at the start, each its id and what a person reads, by what a
+/// person reads, then by id.
+pub fn microphones(dump: &str) -> Result<Vec<(String, String)>, String> {
+    let graph = Graph::read(dump)?;
+    let mut listed: Vec<(String, String)> = graph
+        .nodes
+        .values()
+        .filter(|node| node.opens())
+        .map(|node| (microphone_id(&node.name), node.named()))
+        .collect();
+    listed.sort_by(|one, other| (&one.1, &one.0).cmp(&(&other.1, &other.0)));
+    Ok(listed)
+}
+
+/// What the local side should record at the start, and whether the microphone `name` named is there:
+/// `dump`, the graph as read, none when it could not be — on PipeWire; `default`, the default input's
+/// name, asked only then. Not read, a name is not found, and said so: the start never waits on it.
+pub fn at_the_start(
+    pipewire: bool,
+    dump: Option<&str>,
+    ours: u64,
+    name: Option<&str>,
+    default: impl FnOnce() -> Option<String>,
+) -> (Me, bool) {
+    if !pipewire {
+        return (Me::Default, name.is_none());
+    }
+    let read = dump.and_then(|dump| wanted(dump, ours, name).ok());
+    read.unwrap_or_else(|| (me_unread(default().as_deref()), name.is_none()))
+}
+
+/// What the graph says the local side should record, and whether a name given is there; none given, it is.
+pub fn wanted(dump: &str, ours: u64, name: Option<&str>) -> Result<(Me, bool), String> {
+    match name {
+        Some(name) => named(dump, ours, name),
+        None => me(dump, ours).map(|me| (me, true)),
+    }
 }
 
 /// The same, when the graph does not read: only the default input's name is left, if that. A
@@ -297,6 +381,12 @@ impl Node {
     fn named(&self) -> String {
         without_address(self.description.as_deref().unwrap_or("unknown"))
     }
+
+    /// A source a person can name and cpal can open (cpal-0.18.2, host/pipewire/device.rs): not a
+    /// filter's insides, nor another class it does not know.
+    fn opens(&self) -> bool {
+        matches!(self.class.as_str(), "Audio/Source" | "Audio/Duplex")
+    }
 }
 
 struct Graph {
@@ -309,6 +399,33 @@ struct Graph {
 }
 
 impl Graph {
+    /// The sources calls hold, by what comes first for the local side: the one a running stream
+    /// holds, then the oldest stream's.
+    fn held(&self, ours: u64) -> Vec<u64> {
+        let mut calls: Vec<(&u64, &Node)> = self
+            .nodes
+            .iter()
+            .filter(|(_, node)| {
+                node.class == "Stream/Input/Audio"
+                    && !node.records_an_output
+                    && !node.monitor
+                    && !node.loopback
+                    && node.link_group.is_none()
+                    && !node.own
+                    && node.process != Some(ours)
+            })
+            .collect();
+        calls.sort_by_key(|(id, node)| (!node.running, **id));
+        calls
+            .into_iter()
+            .flat_map(|(id, _)| {
+                let mut froms: Vec<u64> = self.links.iter().filter(|(_, to)| to == id).map(|(from, _)| *from).collect();
+                froms.sort_unstable();
+                froms.into_iter().filter_map(|from| self.source_behind(from, &mut BTreeSet::new()))
+            })
+            .collect()
+    }
+
     /// Whether opening the default input could wake a headset's, read as WirePlumber's script reads
     /// it, through the filters. A name with no node is judged by the name; no name at all, by
     /// whether there is a headset's input for the system to choose.

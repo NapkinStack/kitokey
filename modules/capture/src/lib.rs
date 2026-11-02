@@ -64,6 +64,15 @@ pub enum Event<'a> {
         folder: &'a Path,
         seconds: f64,
     },
+    /// The microphone named at the start is not there: `me` is recorded as with none named.
+    MicrophoneGone,
+    /// The microphone said gone is there again, a stream following or not.
+    MicrophoneBack,
+    /// One microphone that can be named at the start, as `microphones` lists it; never of a recording.
+    Microphone {
+        name: &'a str,
+        description: &'a str,
+    },
 }
 
 impl Event<'_> {
@@ -85,6 +94,9 @@ impl Event<'_> {
                 json!({ "event": "level", "source": SOURCES[source], "level": (f64::from(level.clamp(0.0, 1.0)) * 100.0).round() / 100.0 })
             }
             Event::Stopped { folder, seconds } => json!({ "event": "stopped", "folder": folder, "seconds": seconds }),
+            Event::MicrophoneGone => json!({ "event": "microphone_gone" }),
+            Event::MicrophoneBack => json!({ "event": "microphone_back" }),
+            Event::Microphone { name, description } => json!({ "event": "microphone", "name": name, "description": description }),
         }
     }
 }

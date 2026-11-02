@@ -9,7 +9,7 @@ use wholeheard_capture::Event;
 const SCHEMA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/recording/v1/event.schema.json");
 
 #[test]
-fn every_event_the_program_says_is_one_the_contracts_schema_allows_and_there_are_seven() {
+fn every_event_the_program_says_is_one_the_contracts_schema_allows_and_there_are_ten() {
     let schema: serde_json::Value = serde_json::from_str(&fs::read_to_string(SCHEMA).unwrap()).unwrap();
     let allows = jsonschema::validator_for(&schema).unwrap();
     let folder = Path::new("sessions/2026-10-14_14-05");
@@ -43,6 +43,12 @@ fn every_event_the_program_says_is_one_the_contracts_schema_allows_and_there_are
         Event::Device { source: 1, device: None },
         Event::Stopped { folder, seconds: 0.0 },
         Event::Stopped { folder, seconds: 1912.4 },
+        Event::MicrophoneGone,
+        Event::MicrophoneBack,
+        Event::Microphone {
+            name: "alsa_input.analog-stereo",
+            description: "Digital Microphone",
+        },
     ];
     let mut said = BTreeSet::new();
     for event in &events {
@@ -52,13 +58,24 @@ fn every_event_the_program_says_is_one_the_contracts_schema_allows_and_there_are
         assert!(!line.to_string().contains('\n'), "{line}");
         said.insert(line["event"].as_str().unwrap().to_string());
     }
-    // The seven the contract names, and no other: an event renamed would still be a line the
+    // The ten the contract names, and no other: an event renamed would still be a line the
     // schema allows — one of a name it does not know, which a consumer ignores.
     assert_eq!(
         said,
-        ["device", "heard", "level", "silent", "started", "stopped", "unavailable"]
-            .map(String::from)
-            .into()
+        [
+            "device",
+            "heard",
+            "level",
+            "microphone",
+            "microphone_back",
+            "microphone_gone",
+            "silent",
+            "started",
+            "stopped",
+            "unavailable"
+        ]
+        .map(String::from)
+        .into()
     );
 }
 

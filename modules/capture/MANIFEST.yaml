@@ -138,6 +138,14 @@ evidence:
     - pattern: '"message":"capture\.unavailable"'
       level: warning
       scenario: M
+    # The microphone named taken away during a recording (O): its stream says "target not found".
+    - pattern: '"message":"capture\.stream_error"'
+      level: warning
+      scenario: O
+    # A microphone named that is not there, at the start and during a recording (O).
+    - pattern: '"message":"capture\.microphone_gone"'
+      level: warning
+      scenario: O
 
 docs:
   readme: README.md

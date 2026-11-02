@@ -26,7 +26,7 @@ Logs are one JSON line per event, never a word of a meeting:
 | macOS | `~/Library/Logs/Wholeheard/` |
 
 ```bash
-grep -E '"capture\.(failed|stream_error|unavailable|zeros|not_followed|silent|me_lost|me_not_attached|me_not_closed|me_form_changed)"' "${XDG_STATE_HOME:-$HOME/.local/state}"/wholeheard/logs/capture.*.jsonl
+grep -E '"capture\.(failed|stream_error|unavailable|zeros|not_followed|silent|me_lost|me_not_attached|me_not_closed|me_form_changed|microphone_gone)"' "${XDG_STATE_HOME:-$HOME/.local/state}"/wholeheard/logs/capture.*.jsonl
 ```
 
 | Message | Means | Level |
@@ -40,6 +40,8 @@ grep -E '"capture\.(failed|stream_error|unavailable|zeros|not_followed|silent|me
 | `capture.me_not_attached` | The microphone a call holds could not be opened; tried again, said once | warning |
 | `capture.me_not_closed` | A stream's thread had not ended when it was let go: it is left to end by itself; the recording goes on | warning |
 | `capture.me_form_changed` | The call's microphone came in another form than the track's: that stream ends, and the graph is asked again with the track's | warning |
+| `capture.microphone_gone` | The microphone chosen is not there: the recording goes on as on *Auto*, and takes it again if it comes back | warning |
+| `capture.microphone_back` | It is there again, a stream following or not | info |
 | `capture.zeros` | A track holds exact zeros at `at` seconds: a device sent nothing | warning |
 | `capture.silent` | A source stayed silent; `nothing` true: it sends nothing at all | info |
 

@@ -236,6 +236,13 @@ def waited(folder):
     print(f"    local opens on {silences[0][1] / one['rate']:.1f} s of zeros said, then the call's note")
 
 
+def local_pitch(folder, hertz):
+    """What the local track holds is that note, whichever other a source carries."""
+    held = pitch(track(folder, "local"))
+    assert abs(held - float(hertz)) < 40, f"local holds {held:.0f} Hz, not {hertz}"
+    print(f"    local holds {held:.0f} Hz")
+
+
 def said(events, source, *expected):
     """What `device` said of a source, in order: each a name it starts with, or `null`."""
     told = [json.loads(line) for line in open(events)]
@@ -347,6 +354,8 @@ def main(what, folder, *args):
         return moves_said(folder, *args)
     if what == "passive":
         return passive(folder)
+    if what == "local-pitch":
+        return local_pitch(folder, args[0])
     if what == "not-running":
         return not_running(folder, float(args[0]))
     if what == "running":

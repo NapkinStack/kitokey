@@ -54,7 +54,7 @@ restore() {
   pactl unload-module "$out" 2>/dev/null || true
   pactl unload-module "$mic" 2>/dev/null || true
   # Scenario J's own, when it was stopped before it took them away.
-  for module in ${mic_b:-} ${out_b:-} ${out_c:-} ${mic_c:-}; do pactl unload-module "$module" 2>/dev/null || true; done
+  for module in ${mic_b:-} ${out_b:-} ${out_c:-} ${mic_c:-} ${mic_d:-}; do pactl unload-module "$module" 2>/dev/null || true; done
   rm -rf "$work"
 }
 trap restore EXIT
@@ -291,7 +291,7 @@ say "L. the microphone a call holds, and a headset's never opened actively (D66,
 mic_c=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_mic_c)
 stand_in() {
   pw-loopback --name="$1-loopback" \
-    --capture-props="{ node.name=$1_in media.class=Stream/Input/Audio/Internal target.object=wholeheard_e2e_mic_c stream.capture.sink=true node.passive=true node.dont-fallback=true node.linger=true ${2:-} }" \
+    --capture-props="{ node.name=$1_in media.class=Stream/Input/Audio/Internal target.object=${feed:-wholeheard_e2e_mic_c} stream.capture.sink=true node.passive=true node.dont-fallback=true node.linger=true ${2:-} }" \
     --playback-props="{ node.name=$1 node.description=$1 media.class=Audio/Source ${2:-} }" &
 }
 call_on() { pw-record --target "$1" "$work/call-$$.wav" & }
@@ -363,6 +363,163 @@ check test -z "$(grep -lE '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/m.even
 
 say "N. what takes the session manager away, on a private graph of its own (D66)"
 check bash scripts/private_graph.sh "$bin"
+
+say "O. a microphone named at the start (D74)"
+mic_c=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_mic_c)
+mic_d=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_mic_d)
+tone 1100 30 "$work/1100-long.wav"
+stand_in wholeheard_e2e_named; named=$!
+feed=wholeheard_e2e_mic_d stand_in wholeheard_e2e_other; other=$!
+stand_in wholeheard_e2e_headset "bluez5.loopback=true"; headset=$!
+feed=wholeheard_e2e_mic_d stand_in wholeheard_e2e_x_AA_BB_CC_DD_EE_FF; addressed=$!
+sleep 1
+
+# The list: every source, by its name and description; no output, nothing opened; no address in any line.
+listed_as=0; "$bin" microphones > "$work/o.list" 2> "$work/o.list-errors" || listed_as=$?
+# The run's own alone in the evidence: the computer's microphones are named after its owner at times.
+grep 'wholeheard_e2e_' "$work/o.list" | sed 's/^/    /' >> .evidence/e2e.txt
+check test "$listed_as" = 0 -a ! -s "$work/o.list-errors"
+check grep -q '"name":"wholeheard_e2e_named"' "$work/o.list"
+check grep -q '"name":"wholeheard_e2e_headset"' "$work/o.list"
+check grep -q '"description":"wholeheard_e2e_x_unknown"' "$work/o.list"
+check test -z "$(grep 'wholeheard_e2e_out' "$work/o.list")"
+check test -z "$(grep -E '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/o.list")"
+check test -z "$(pactl list short source-outputs)"
+
+# Named: recorded from its start; neither a call holding another nor a new default moves it.
+pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & named_player=$!
+pw-play --target wholeheard_e2e_mic_d "$work/1100-long.wav" & other_player=$!
+WHOLEHEARD_TRACE=e2e-o1 "$bin" record "$work/v2-named" --microphone wholeheard_e2e_named > "$work/o1.events" 2> "$work/o1.errors" &
+recorder=$!
+sleep 2; call_on wholeheard_e2e_other; call=$!
+sleep 3; pactl set-default-source wholeheard_e2e_other
+sleep 3
+folder=$(ls -d "$work"/v2-named/*/ | head -1)
+kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
+pactl set-default-source wholeheard_e2e_mic.monitor
+kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
+grep -v '"level"' "$work/o1.events" | sed 's/^/    /' >> .evidence/e2e.txt
+sed 's/^/    /' "$work/o1.errors" >> .evidence/e2e.txt
+check test "$stopped_as" = 0 -a ! -s "$work/o1.errors"
+check grep -q '"me":"wholeheard_e2e_named"' "$work/o1.events"
+check measure2 said "$work/o1.events" me
+check measure2 changes "$folder"
+check measure2 local-pitch "$folder" 660
+check test -z "$(grep microphone_gone "$work/o1.events")"
+kill "$named_player" "$other_player" 2>/dev/null || true; wait "$named_player" "$other_player" 2>/dev/null || true
+
+# A headset's named: no stream at all while nothing runs it, a call on another none the less; the
+# sentence says so. A call takes it: a passive stream. It leaves: let go (ADR-0015).
+WHOLEHEARD_TRACE=e2e-o2 "$bin" record "$work/v2-named-headset" --microphone wholeheard_e2e_headset > "$work/o2.events" 2> "$work/o2.errors" &
+recorder=$!
+sleep 2; call_on wholeheard_e2e_other; call=$!
+sleep 2
+folder=$(ls -d "$work"/v2-named-headset/*/ | head -1)
+check grep -q 'unavailable.*chosen.*waits' "$work/o2.events"
+check test ! -e "$folder/local.wav"
+check measure2 not-following "$recorder"
+check measure2 not-running wholeheard_e2e_headset 2
+kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
+call_on wholeheard_e2e_headset; call=$!
+pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & named_player=$!
+sleep 3
+check grep -q '"device":"wholeheard_e2e_headset"' "$work/o2.events"
+check measure2 passive "$recorder"
+check measure2 running wholeheard_e2e_headset
+sleep 2
+kill "$named_player" 2>/dev/null || true; wait "$named_player" 2>/dev/null || true
+kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
+sleep 3
+check measure2 not-following "$recorder"
+check measure2 not-running wholeheard_e2e_headset 2
+check grep -q '"device":null' "$work/o2.events"
+pw-play --target wholeheard_e2e_out "$work/880.wav"
+kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
+grep -v '"level"' "$work/o2.events" | sed 's/^/    /' >> .evidence/e2e.txt
+sed 's/^/    /' "$work/o2.errors" >> .evidence/e2e.txt
+check test "$stopped_as" = 0 -a ! -s "$work/o2.errors"
+check measure2 waited "$folder"
+check test -z "$(grep microphone_gone "$work/o2.events")"
+
+# A name not there at the start: said, then Auto as if none were named.
+WHOLEHEARD_TRACE=e2e-o3 "$bin" record "$work/v2-named-none" --microphone wholeheard_e2e_nobody > "$work/o3.events" 2> "$work/o3.errors" &
+recorder=$!
+sleep 3
+kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
+folder=$(ls -d "$work"/v2-named-none/*/ | head -1)
+grep -v '"level"' "$work/o3.events" | sed 's/^/    /' >> .evidence/e2e.txt
+sed 's/^/    /' "$work/o3.errors" >> .evidence/e2e.txt
+check test "$stopped_as" = 0 -a ! -s "$work/o3.errors"
+check test "$(head -1 "$work/o3.events" | grep -c microphone_gone)" = 1
+check grep -q '"me":"wholeheard_e2e_mic' "$work/o3.events"
+check test -s "$folder/local.wav"
+check logged e2e-o3 capture.microphone_gone capture.started capture.stopped
+
+# A name that goes during the recording: said, Auto takes over, the track going on; back, taken again.
+pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & named_player=$!
+WHOLEHEARD_TRACE=e2e-o4 "$bin" record "$work/v2-named-gone" --microphone wholeheard_e2e_named > "$work/o4.events" 2> "$work/o4.errors" &
+recorder=$!
+sleep 3
+kill "$named" 2>/dev/null || true; wait "$named" 2>/dev/null || true
+sleep 4
+check test "$(grep -c microphone_gone "$work/o4.events")" = 1
+check grep -q '"device":"wholeheard_e2e_mic' "$work/o4.events"
+stand_in wholeheard_e2e_named; named=$!
+sleep 4
+kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
+folder=$(ls -d "$work"/v2-named-gone/*/ | head -1)
+kill "$named_player" 2>/dev/null || true; wait "$named_player" 2>/dev/null || true
+grep -v '"level"' "$work/o4.events" | sed 's/^/    /' >> .evidence/e2e.txt
+sed 's/^/    /' "$work/o4.errors" >> .evidence/e2e.txt
+check test "$stopped_as" = 0
+check test "$(grep -c microphone_gone "$work/o4.events")" = 1
+check test "$(grep -c microphone_back "$work/o4.events")" = 1
+check measure2 said "$work/o4.events" me wholeheard_e2e_mic wholeheard_e2e_named
+check measure2 changes "$folder" wholeheard_e2e_mic wholeheard_e2e_named
+check test -s "$folder/local.wav"
+check logged e2e-o4 capture.started capture.microphone_gone capture.device capture.microphone_back capture.device capture.stopped
+
+# A headset's named, gone, back with no call on it: said back, what stood in closes, no stream, the
+# source not running. A call takes it then: passive, as ever.
+WHOLEHEARD_TRACE=e2e-o6 "$bin" record "$work/v2-named-back" --microphone wholeheard_e2e_headset > "$work/o6.events" 2> "$work/o6.errors" &
+recorder=$!
+sleep 2
+kill "$headset" 2>/dev/null || true; wait "$headset" 2>/dev/null || true
+sleep 3
+check test "$(grep -c microphone_gone "$work/o6.events")" = 1
+check grep -q '"device":"wholeheard_e2e_mic' "$work/o6.events"
+stand_in wholeheard_e2e_headset "bluez5.loopback=true"; headset=$!
+sleep 3
+check test "$(grep -c microphone_back "$work/o6.events")" = 1
+check measure2 said "$work/o6.events" me wholeheard_e2e_mic null
+check measure2 not-following "$recorder"
+check measure2 not-running wholeheard_e2e_headset 2
+call_on wholeheard_e2e_headset; call=$!
+pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & named_player=$!
+sleep 3
+check grep -q '"device":"wholeheard_e2e_headset"' "$work/o6.events"
+check measure2 passive "$recorder"
+kill "$named_player" 2>/dev/null || true; wait "$named_player" 2>/dev/null || true
+kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
+kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
+grep -v '"level"' "$work/o6.events" | sed 's/^/    /' >> .evidence/e2e.txt
+sed 's/^/    /' "$work/o6.errors" >> .evidence/e2e.txt
+check test "$stopped_as" = 0
+
+# A source whose name holds an address: the list gives an id without it, and the start takes it back.
+addressed_id=$(python3 -c 'import json, sys; print(next(line["name"] for line in map(json.loads, open(sys.argv[1])) if line["description"] == "wholeheard_e2e_x_unknown"))' "$work/o.list")
+WHOLEHEARD_TRACE=e2e-o5 "$bin" record "$work/v2-named-address" --microphone "$addressed_id" > "$work/o5.events" 2> "$work/o5.errors" &
+recorder=$!
+sleep 2
+kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
+folder=$(ls -d "$work"/v2-named-address/*/ | head -1)
+check test "$stopped_as" = 0 -a ! -s "$work/o5.errors"
+check grep -q '"me":"wholeheard_e2e_x_unknown"' "$work/o5.events"
+check test -z "$(grep -lE '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/o5.events" "$folder/session.json" "$WHOLEHEARD_LOG_DIR"/capture.*.jsonl 2>/dev/null)"
+
+kill "$named" "$other" "$headset" "$addressed" 2>/dev/null || true; wait "$named" "$other" "$headset" "$addressed" 2>/dev/null || true
+pactl unload-module "$mic_c"; mic_c=
+pactl unload-module "$mic_d"; mic_d=
 
 [ "$failed" = 0 ] && say "e2e: passed" || say "e2e: FAILED"
 exit "$failed"

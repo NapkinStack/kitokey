@@ -62,6 +62,8 @@ One JSON object per line on its output; errors go to the error stream.
 | `silent` | A source has given no sound for ten seconds | `source` |
 | `heard` | A source told silent gives sound again | `source` |
 | `stopped` | The files are finished and `session.json` says so | `folder`, `seconds` |
+| `microphone_gone` | The microphone named at the start is not there: `me` goes on as with none named | |
+| `microphone_back` | It is there again, a stream following or not | |
 
 A source is named for the device the system's default stands for when the recording starts — read from PipeWire's metadata — so that a microphone other than the call's shows at once; `wholeheard-capture devices` prints it as `stands_for`. Unread, the default's own name.
 
@@ -80,6 +82,16 @@ answer, read from the same reading of the graph as below:
 | That source is a headset's virtual input (`bluez5.loopback=true`), or a filter fed by one | The same, on a passive stream (`src/passive.rs`, its `node.passive` the one the running PipeWire reads as such: `call::passive_value`): it never makes the source run, so never asks for the headset's profile; a stream linked to a source that does not run receives no form, holds no track and is not named | `device`, once it received its form |
 | Nobody, and another default input | The default, as above | As above |
 | Nobody, and the default is a headset's | Nothing: no stream at all, until a call takes it | `unavailable` at the start; later, `device: null`, if a device was said |
+
+A microphone can be named at the start (D74, `recording/v1`): `wholeheard-capture microphones` lists them,
+`record … --microphone <name>` takes one, and neither a call nor a new default moves it.
+
+| Named | `me` records | Said |
+|---|---|---|
+| A source that is there | That one, the whole recording | `started`, its description |
+| A headset's virtual input, or a filter fed by one | As above: no stream at all but while a call holds it, then passive; a profile is never asked for | `unavailable` with the sentence that it waits; `device`, then `device: null` |
+| A name not found at the start, or seen to have gone | As with none named, the track going on | `microphone_gone`, then as above. A graph that does not read during a recording says nothing and moves nothing |
+| A name gone that is there again | As above: an ordinary source at once; a headset's only with a call on it | `microphone_back`, a stream following or not |
 
 A track that waits from the start has no file until it is taken, in the form then negotiated, opening on
 zeros the clock names; never taken, it has no track, as a source that could not be opened. Taken back, it
