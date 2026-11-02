@@ -59,11 +59,13 @@ telemetry ever exist, it will be off until you turn it on, and will show what it
 - A meeting, or its sound alone: from its page, to your system's trash. You can have the sound
   go to the trash by itself after a number of days, in Settings.
 - Everything: uninstall Wholeheard, then delete your meetings folder and Wholeheard's folders:
-  - Linux: `~/.config/wholeheard`, `~/.local/share/wholeheard`, `~/.local/state/wholeheard`;
+  - Linux: `~/.config/wholeheard`, `~/.local/share/wholeheard`, `~/.local/state/wholeheard`,
+    and the start-at-login entry `~/.config/autostart/dev.wholeheard.Wholeheard.desktop`;
   - Windows, from the Store's package: removing it removes settings, models and logs; your
     meetings stay in `Documents\Wholeheard` until you delete them;
   - macOS: `~/Library/Application Support/wholeheard` and `~/Library/Logs/Wholeheard`.
 - Keys are also revoked at the service that issued them.
+- A model downloaded through Ollama is kept by Ollama: remove it there (`ollama rm <model>`).
 
 ### Contact
 
@@ -118,11 +120,13 @@ montrerait ce qu'elle envoie et où.
   Réglages, le son peut partir à la corbeille de lui-même après un nombre de jours.
 - Tout : désinstallez Wholeheard, puis supprimez votre dossier de réunions et les dossiers de
   Wholeheard :
-  - Linux : `~/.config/wholeheard`, `~/.local/share/wholeheard`, `~/.local/state/wholeheard` ;
+  - Linux : `~/.config/wholeheard`, `~/.local/share/wholeheard`, `~/.local/state/wholeheard`,
+    et l'entrée de démarrage à l'ouverture de session `~/.config/autostart/dev.wholeheard.Wholeheard.desktop` ;
   - Windows, depuis le paquet du Store : le retirer retire réglages, modèles et journaux ; vos
     réunions restent dans `Documents\Wholeheard` jusqu'à ce que vous les supprimiez ;
   - macOS : `~/Library/Application Support/wholeheard` et `~/Library/Logs/Wholeheard`.
 - Les clés se révoquent aussi auprès du service qui les a émises.
+- Un modèle téléchargé par Ollama est gardé par Ollama : retirez-le là (`ollama rm <modèle>`).
 
 ### Contact
 
