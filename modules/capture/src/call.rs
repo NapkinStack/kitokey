@@ -199,13 +199,55 @@ pub fn me(dump: &str, ours: u64) -> Result<Me, String> {
     }))
 }
 
+/// What `microphones` calls a node, and `--microphone` takes back: its name, or, where that holds a
+/// Bluetooth address, the name without it and a digest of it (FNV-1a, fixed: the user's settings keep
+/// the result). So no line, setting or process argument holds an address.
+pub fn microphone_id(node: &str) -> String {
+    let kept = without_address(node);
+    if kept == node {
+        return kept;
+    }
+    let digest = node.bytes().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+    });
+    format!("{kept}#{digest:016x}")
+}
+
+/// What is said of the microphone named, as readings of the graph find it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Named {
+    Gone,
+    Back,
+}
+
+/// Whether the microphone named was last there: a change is said once, and only a change.
+#[derive(Debug)]
+pub struct Presence {
+    there: bool,
+}
+
+impl Presence {
+    /// `there`: what the start found, and said.
+    pub fn new(there: bool) -> Presence {
+        Presence { there }
+    }
+
+    pub fn read(&mut self, there: bool) -> Option<Named> {
+        (std::mem::replace(&mut self.there, there) != there).then_some(if there { Named::Back } else { Named::Gone })
+    }
+}
+
 /// What the local side should record with the microphone `name` named at the start (D74), and
 /// whether it is there. There: that one, whatever a call holds and whatever the default becomes — a
 /// headset's only while a call holds it, passively, for nothing else may make it run (ADR-0015).
 /// Not there: what [`me`] says.
 pub fn named(dump: &str, ours: u64, name: &str) -> Result<(Me, bool), String> {
     let graph = Graph::read(dump)?;
-    let Some((id, node)) = graph.nodes.iter().find(|(_, node)| node.opens() && node.name == name) else {
+    let Some((id, node)) = graph
+        .nodes
+        .iter()
+        .find(|(_, node)| node.opens() && microphone_id(&node.name) == name)
+    else {
         return me(dump, ours).map(|me| (me, false));
     };
     let loopback = graph.loopback_behind(*id, &mut BTreeSet::new());
@@ -220,22 +262,17 @@ pub fn named(dump: &str, ours: u64, name: &str) -> Result<(Me, bool), String> {
     Ok((Me::Hold(microphone), true))
 }
 
-/// The microphones that can be named at the start, by what a person reads, then by name.
-pub fn microphones(dump: &str) -> Result<Vec<Microphone>, String> {
+/// The microphones that can be named at the start, each its id and what a person reads, by what a
+/// person reads, then by id.
+pub fn microphones(dump: &str) -> Result<Vec<(String, String)>, String> {
     let graph = Graph::read(dump)?;
-    let mut listed: Vec<Microphone> = graph
+    let mut listed: Vec<(String, String)> = graph
         .nodes
-        .iter()
-        .filter(|(_, node)| node.opens())
-        .map(|(id, node)| Microphone {
-            name: node.name.clone(),
-            description: node.named(),
-            passive: graph
-                .loopback_behind(*id, &mut BTreeSet::new())
-                .then(|| passive_value(graph.version.as_deref())),
-        })
+        .values()
+        .filter(|node| node.opens())
+        .map(|node| (microphone_id(&node.name), node.named()))
         .collect();
-    listed.sort_by(|one, other| (&one.description, &one.name).cmp(&(&other.description, &other.name)));
+    listed.sort_by(|one, other| (&one.1, &one.0).cmp(&(&other.1, &other.0)));
     Ok(listed)
 }
 

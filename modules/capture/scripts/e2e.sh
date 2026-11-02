@@ -382,6 +382,7 @@ check grep -q '"name":"wholeheard_e2e_named"' "$work/o.list"
 check grep -q '"name":"wholeheard_e2e_headset"' "$work/o.list"
 check grep -q '"description":"wholeheard_e2e_x_unknown"' "$work/o.list"
 check test -z "$(grep 'wholeheard_e2e_out' "$work/o.list")"
+check test -z "$(grep -E '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/o.list")"
 check test -z "$(pactl list short source-outputs)"
 
 # Named: recorded from its start; neither a call holding another nor a new default moves it.
@@ -471,13 +472,42 @@ grep -v '"level"' "$work/o4.events" | sed 's/^/    /' >> .evidence/e2e.txt
 sed 's/^/    /' "$work/o4.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0
 check test "$(grep -c microphone_gone "$work/o4.events")" = 1
+check test "$(grep -c microphone_back "$work/o4.events")" = 1
 check measure2 said "$work/o4.events" me wholeheard_e2e_mic wholeheard_e2e_named
 check measure2 changes "$folder" wholeheard_e2e_mic wholeheard_e2e_named
 check test -s "$folder/local.wav"
-check logged e2e-o4 capture.started capture.microphone_gone capture.device capture.device capture.stopped
+check logged e2e-o4 capture.started capture.microphone_gone capture.device capture.microphone_back capture.device capture.stopped
 
-# A name holding an address: the list alone says it, in the name the start takes.
-WHOLEHEARD_TRACE=e2e-o5 "$bin" record "$work/v2-named-address" --microphone wholeheard_e2e_x_AA_BB_CC_DD_EE_FF > "$work/o5.events" 2> "$work/o5.errors" &
+# A headset's named, gone, back with no call on it: said back, what stood in closes, no stream, the
+# source not running. A call takes it then: passive, as ever.
+WHOLEHEARD_TRACE=e2e-o6 "$bin" record "$work/v2-named-back" --microphone wholeheard_e2e_headset > "$work/o6.events" 2> "$work/o6.errors" &
+recorder=$!
+sleep 2
+kill "$headset" 2>/dev/null || true; wait "$headset" 2>/dev/null || true
+sleep 3
+check test "$(grep -c microphone_gone "$work/o6.events")" = 1
+check grep -q '"device":"wholeheard_e2e_mic' "$work/o6.events"
+stand_in wholeheard_e2e_headset "bluez5.loopback=true"; headset=$!
+sleep 3
+check test "$(grep -c microphone_back "$work/o6.events")" = 1
+check measure2 said "$work/o6.events" me wholeheard_e2e_mic null
+check measure2 not-following "$recorder"
+check measure2 not-running wholeheard_e2e_headset 2
+call_on wholeheard_e2e_headset; call=$!
+pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & named_player=$!
+sleep 3
+check grep -q '"device":"wholeheard_e2e_headset"' "$work/o6.events"
+check measure2 passive "$recorder"
+kill "$named_player" 2>/dev/null || true; wait "$named_player" 2>/dev/null || true
+kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
+kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
+grep -v '"level"' "$work/o6.events" | sed 's/^/    /' >> .evidence/e2e.txt
+sed 's/^/    /' "$work/o6.errors" >> .evidence/e2e.txt
+check test "$stopped_as" = 0
+
+# A source whose name holds an address: the list gives an id without it, and the start takes it back.
+addressed_id=$(python3 -c 'import json, sys; print(next(line["name"] for line in map(json.loads, open(sys.argv[1])) if line["description"] == "wholeheard_e2e_x_unknown"))' "$work/o.list")
+WHOLEHEARD_TRACE=e2e-o5 "$bin" record "$work/v2-named-address" --microphone "$addressed_id" > "$work/o5.events" 2> "$work/o5.errors" &
 recorder=$!
 sleep 2
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?

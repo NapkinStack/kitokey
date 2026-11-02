@@ -66,6 +66,8 @@ pub enum Event<'a> {
     },
     /// The microphone named at the start is not there: `me` is recorded as with none named.
     MicrophoneGone,
+    /// The microphone said gone is there again, a stream following or not.
+    MicrophoneBack,
     /// One microphone that can be named at the start, as `microphones` lists it; never of a recording.
     Microphone {
         name: &'a str,
@@ -93,6 +95,7 @@ impl Event<'_> {
             }
             Event::Stopped { folder, seconds } => json!({ "event": "stopped", "folder": folder, "seconds": seconds }),
             Event::MicrophoneGone => json!({ "event": "microphone_gone" }),
+            Event::MicrophoneBack => json!({ "event": "microphone_back" }),
             Event::Microphone { name, description } => json!({ "event": "microphone", "name": name, "description": description }),
         }
     }

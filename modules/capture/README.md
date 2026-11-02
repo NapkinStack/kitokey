@@ -63,6 +63,7 @@ One JSON object per line on its output; errors go to the error stream.
 | `heard` | A source told silent gives sound again | `source` |
 | `stopped` | The files are finished and `session.json` says so | `folder`, `seconds` |
 | `microphone_gone` | The microphone named at the start is not there: `me` goes on as with none named | |
+| `microphone_back` | It is there again, a stream following or not | |
 
 A source is named for the device the system's default stands for when the recording starts — read from PipeWire's metadata — so that a microphone other than the call's shows at once; `wholeheard-capture devices` prints it as `stands_for`. Unread, the default's own name.
 
@@ -89,7 +90,8 @@ A microphone can be named at the start (D74, `recording/v1`): `wholeheard-captur
 |---|---|---|
 | A source that is there | That one, the whole recording | `started`, its description |
 | A headset's virtual input, or a filter fed by one | As above: no stream at all but while a call holds it, then passive; a profile is never asked for | `unavailable` with the sentence that it waits; `device`, then `device: null` |
-| A name not there | As with none named, the track going on; there again, that one | `microphone_gone`, then as above |
+| A name not found at the start, or seen to have gone | As with none named, the track going on | `microphone_gone`, then as above. A graph that does not read during a recording says nothing and moves nothing |
+| A name gone that is there again | As above: an ordinary source at once; a headset's only with a call on it | `microphone_back`, a stream following or not |
 
 A track that waits from the start has no file until it is taken, in the form then negotiated, opening on
 zeros the clock names; never taken, it has no track, as a source that could not be opened. Taken back, it

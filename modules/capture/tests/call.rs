@@ -767,19 +767,19 @@ fn a_microphone_named_that_is_the_default_is_still_held_by_its_name() {
 fn a_headset_named_waits_until_a_call_holds_it_and_is_then_listened_to_passively() {
     let mut graph = sources();
     graph.push(default_source("alsa_input.laptop"));
-    assert_eq!(named(graph.clone(), AIRPODS), (Me::Wait, true));
+    assert_eq!(named(graph.clone(), &call::microphone_id(AIRPODS)), (Me::Wait, true));
     // A call on another microphone runs nothing of it.
     graph.extend([stream(131, 143), link(3, 50, 131)]);
-    assert_eq!(named(graph.clone(), AIRPODS), (Me::Wait, true));
+    assert_eq!(named(graph.clone(), &call::microphone_id(AIRPODS)), (Me::Wait, true));
     graph.push(link(4, 134, 131));
-    assert_eq!(named(graph, AIRPODS), (held(AIRPODS, "AirPods", true), true));
+    assert_eq!(named(graph, &call::microphone_id(AIRPODS)), (held(AIRPODS, "AirPods", true), true));
 }
 
 #[test]
 fn a_headset_named_is_not_held_by_capture_s_own_stream() {
     let mut graph = sources();
     graph.extend([link(4, 134, 501), default_source("alsa_input.laptop")]);
-    assert_eq!(named(graph, AIRPODS), (Me::Wait, true));
+    assert_eq!(named(graph, &call::microphone_id(AIRPODS)), (Me::Wait, true));
 }
 
 #[test]
@@ -848,12 +848,12 @@ fn the_microphones_listed_are_the_sources_that_open_by_description_never_with_an
         ),
     ]);
     let listed = call::microphones(&Value::Array(graph).to_string()).unwrap();
-    let names: Vec<(&str, &str)> = listed.iter().map(|one| (one.name.as_str(), one.description.as_str())).collect();
+    let names: Vec<(&str, &str)> = listed.iter().map(|(id, description)| (id.as_str(), description.as_str())).collect();
     assert_eq!(
         names,
         [
             ("noise", "A filter"),
-            (AIRPODS, "AirPods"),
+            (call::microphone_id(AIRPODS).as_str(), "AirPods"),
             ("pro", "Bud unknown"),
             ("alsa_input.laptop", "Digital Microphone"),
         ]
@@ -864,4 +864,59 @@ fn the_microphones_listed_are_the_sources_that_open_by_description_never_with_an
 fn a_list_of_a_graph_that_does_not_read_is_said_so() {
     assert!(call::microphones("not json").is_err());
     assert!(call::named("not json", OURS, "any").is_err());
+}
+
+#[test]
+fn a_microphone_s_id_holds_no_address_and_is_the_same_from_one_version_to_the_next() {
+    assert_eq!(call::microphone_id("alsa_input.laptop"), "alsa_input.laptop");
+    // Kept in the user's settings: a change of this digest is a choice lost.
+    assert_eq!(
+        call::microphone_id("bluez_input.AA_BB_CC_DD_EE_FF.0"),
+        "bluez_input.unknown.0#7f4e863c7ad48039"
+    );
+    assert_ne!(
+        call::microphone_id("bluez_input.AA_BB_CC_DD_EE_FF.0"),
+        call::microphone_id("bluez_input.AA_BB_CC_DD_EE_00.0")
+    );
+}
+
+#[test]
+fn a_name_is_found_by_its_id_never_by_what_the_system_calls_it() {
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    assert!(!named(graph.clone(), AIRPODS).1);
+    assert!(named(graph, &call::microphone_id(AIRPODS)).1);
+}
+
+#[test]
+fn what_is_said_of_a_name_is_each_change_and_only_a_change() {
+    use call::{Named, Presence};
+    let mut there = Presence::new(true);
+    assert_eq!(there.read(true), None);
+    assert_eq!(there.read(false), Some(Named::Gone));
+    assert_eq!(there.read(false), None);
+    assert_eq!(there.read(true), Some(Named::Back));
+    assert_eq!(there.read(true), None);
+    // Not found at the start, said there: the first news is its coming.
+    let mut absent = Presence::new(false);
+    assert_eq!(absent.read(false), None);
+    assert_eq!(absent.read(true), Some(Named::Back));
+}
+
+#[test]
+fn a_headset_named_gone_then_back_with_no_call_is_said_back_and_waits() {
+    use call::{Named, Presence};
+    let id = call::microphone_id(AIRPODS);
+    let with = |graph: &mut Vec<Value>| graph.push(default_source("alsa_input.laptop"));
+    let mut there_graph = sources();
+    with(&mut there_graph);
+    let mut gone_graph: Vec<Value> = sources().into_iter().filter(|object| object["id"] != 134).collect();
+    with(&mut gone_graph);
+    let mut said = Presence::new(true);
+    let (want, present) = named(there_graph.clone(), &id);
+    assert_eq!((want, said.read(present)), (Me::Wait, None));
+    let (want, present) = named(gone_graph, &id);
+    assert_eq!((want, said.read(present)), (Me::Default, Some(Named::Gone)));
+    let (want, present) = named(there_graph, &id);
+    assert_eq!((want, said.read(present)), (Me::Wait, Some(Named::Back)));
 }

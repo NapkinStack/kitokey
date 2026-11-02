@@ -95,8 +95,8 @@ fn say(event: Event) {
         Event::Heard { source } => info!(source = SOURCES[source], "capture.heard"),
         Event::Stopped { folder, seconds } => info!(session = %session(folder), seconds, "capture.stopped"),
         Event::Device { source, device } => info!(source = SOURCES[source], device, "capture.device"),
-        // Its name may hold an address: never in a log.
         Event::MicrophoneGone => warn!("capture.microphone_gone"),
+        Event::MicrophoneBack => info!("capture.microphone_back"),
         Event::Level { .. } | Event::Microphone { .. } => {}
     }
 }
@@ -157,13 +157,15 @@ fn microphones() -> Result<(), String> {
         return Ok(());
     }
     let dump = graph().ok_or("the system's microphones could not be read")?;
-    for microphone in call::microphones(&dump)? {
-        let line = Event::Microphone {
-            name: &microphone.name,
-            description: &microphone.description,
-        }
-        .line();
-        println!("{line}");
+    for (name, description) in call::microphones(&dump)? {
+        println!(
+            "{}",
+            Event::Microphone {
+                name: &name,
+                description: &description
+            }
+            .line()
+        );
     }
     Ok(())
 }
@@ -988,7 +990,7 @@ fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
     // local side is what the graph says (ADR-0015): it may wait, and gets its track when it is taken.
     let stop = stop_asked()?;
     let opening = Opening { zero, sound, moved };
-    let (me_first, mut named_there) = me_now(&host, microphone);
+    let (me_first, named_there) = me_now(&host, microphone);
     if !named_there {
         say(Event::MicrophoneGone);
     }
@@ -1065,6 +1067,7 @@ fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
         sources: [&names[0], &names[1]],
     });
 
+    let mut named = call::Presence::new(named_there);
     let (wants, wanted) = mpsc::channel::<Wanted>();
     let mut following = Following {
         // A default that could not be opened stays as it was; anything else is asked again.
@@ -1097,11 +1100,12 @@ fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
             session(&held)
         })?;
         while let Ok((want, there)) = wanted.try_recv() {
-            // Said before what takes over from it is named.
-            if named_there && !there {
-                say(Event::MicrophoneGone);
+            // Said before what takes over is named.
+            match named.read(there) {
+                Some(call::Named::Gone) => say(Event::MicrophoneGone),
+                Some(call::Named::Back) => say(Event::MicrophoneBack),
+                None => {}
             }
-            named_there = there;
             following.heed(want, &mut sources[0]);
         }
         following.settle(&mut sources[0], &mut held, &mut clock, &folder, session)?;
