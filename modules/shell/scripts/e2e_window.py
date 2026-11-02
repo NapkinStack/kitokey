@@ -3624,6 +3624,18 @@ def press_on_the_page_left(now: dt.datetime) -> None:
             free_back = wait_for(browser, lambda b: b.find_elements(By.ID, "free-do"), 5)
             browser.execute_script("location.hash = '#/settings'")
             check("left, then back: Libérer and Réglages are drawn again", free_back and wait_for(browser, lambda b: b.find_elements(By.ID, "reminder"), 5))
+    # A name that needs encoding, at its own address as its row writes it: kept all the same.
+    accented = WORK / "pressed-accented"
+    named_so = "Réunion d'été (1) été"
+    session(accented / named_so, now - dt.timedelta(days=1), 0.1, {"local.wav": 1000})
+    with Window(accented, "fr_FR.UTF-8", "reminder = false\n") as browser:
+        browser.set_window_size(1100, 800)
+        wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == named_so and b.find_elements(By.ID, "context-text"), 10)
+        written_so = browser.execute_script("return document.querySelector('#groups .session').getAttribute('href')")
+        browser.execute_script("window.__kept = document.getElementById('context-text'); window.__kept.focus(); location.hash = arguments[0]", written_so)
+        same = wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.at === location.hash"), 5)
+        check("a name that needs encoding, at its own address: the page kept, its field and the focus with it",
+              same and written_so != f"#/meeting/{named_so}" and browser.execute_script("return window.__kept.isConnected && document.activeElement === window.__kept"), (written_so, browser.execute_script("return location.hash")))
     # What is agreed to names its meeting, as its page and the list do.
     for language, says, sentence in (("fr_FR.UTF-8", "Le texte de « {} » va quitter votre ordinateur", not_shown), ("en_US.UTF-8", "The text of “{}” is about to leave your computer", "This page could not be shown: try again.")):
         with Window(meetings, language, service) as browser:
