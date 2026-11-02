@@ -386,6 +386,8 @@ fn the_microphones_are_what_the_program_lists_each_made_fit_to_show() {
     let got = listed(
         r#"echo '{"event":"microphone","name":"alsa","description":"Digital   Microphone"}'
 echo '{"event":"an event of a later version"}'
+echo '{"event":"device","source":"me","name":"device_name","description":"A device"}'
+echo '{"event":"started","name":"started_name","description":"A start"}'
 echo 'no event'
 echo '{"event":"microphone","name":"","description":"No name"}'
 echo '{"event":"microphone","name":"odd","description":"unnamed"}'"#,

@@ -2786,11 +2786,30 @@ function showSmall(words) {
     focusPick();
     readPicks();
   });
+  // As a menu button's list, or a select: the arrows, Home and End move the focus alone; Enter, Space or
+  // a click chooses, and closes; Escape closes, the choice as it was.
   picks.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" && event.key !== "Enter") return;
-    event.preventDefault();
-    closePicks(true);
+    const inputs = [...picks.querySelectorAll("input")];
+    const at = inputs.indexOf(document.activeElement);
+    const to = { ArrowDown: at + 1, ArrowRight: at + 1, ArrowUp: at - 1, ArrowLeft: at - 1, Home: 0, End: inputs.length - 1 }[event.key];
+    if (to !== undefined) {
+      event.preventDefault();
+      inputs[Math.max(0, Math.min(inputs.length - 1, to))]?.focus();
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (at >= 0 && !inputs[at].checked) inputs[at].click();
+      closePicks(true);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePicks(true);
+    }
   });
+  // The row the focus is on, seen whole: the list scrolls to it.
+  picks.addEventListener("focusin", (event) => event.target.closest(".choice")?.scrollIntoView({ block: "nearest" }));
   // A press keeps the focus here until its click has chosen; a click chooses and closes, as a menu does.
   picks.addEventListener("mousedown", (event) => event.preventDefault());
   picks.addEventListener("click", (event) => {
