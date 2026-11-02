@@ -978,8 +978,7 @@ async fn microphones_listed(app: AppHandle) -> Microphones {
     }
 }
 
-/// The microphone the next recordings take: one capture listed, or none for Auto. Its name is never
-/// logged: it may hold a Bluetooth address.
+/// The microphone the next recordings take: one capture listed, or none for Auto.
 #[tauri::command]
 fn microphone_chosen(shell: State<'_, Shell>, name: Option<String>, description: Option<String>) -> Result<(), Told> {
     let _saving = shell.saving.lock().unwrap();
@@ -2711,9 +2710,7 @@ fn listen(app: &AppHandle, said: &Receiver<Said>) {
         shell.checks.lock().unwrap().heard(&event);
         match &event {
             Said::MicrophoneGone => *shell.microphone_gone.lock().unwrap() = true,
-            Said::Moved(Source::Me, name) if *name == shell.settings().microphone_description => {
-                *shell.microphone_gone.lock().unwrap() = false;
-            }
+            Said::MicrophoneBack => *shell.microphone_gone.lock().unwrap() = false,
             _ => {}
         }
         if let Said::Started(folder, ..) = &event {

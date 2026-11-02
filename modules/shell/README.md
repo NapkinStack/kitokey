@@ -87,7 +87,7 @@ On Linux, its name of the microphone opens *Auto* and what capture lists (D74, `
 alone, inside the window: the choice is kept (`microphone` in the settings) and applies to the next
 recording; a device arriving opens nothing, and is there when the name is opened. Where capture lists none
 — macOS, Windows — no list is offered. A name gone: capture says so and Auto stands in, the window and a
-notification say it.
+notification say it, until capture says it is back.
 
 **The first start** (D58, [its board](../../docs/project/drawings/d58-the-first-run/)) opens the
 full window on a short assistant, once — with `--window` or not, started with the session too: one

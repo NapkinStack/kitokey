@@ -107,7 +107,8 @@ pub fn of(said: &Said, reminder: bool, language: Language) -> Option<Notice> {
     use Language::{English, French};
     let (title, body) = match (said, language) {
         (Said::Started(..), _) if !reminder => return None,
-        (Said::Heard(_) | Said::Level(..), _) => return None,
+        // What follows says it: the device named, or the side with none.
+        (Said::Heard(_) | Said::Level(..) | Said::MicrophoneBack, _) => return None,
         // The microphone is named, so that one other than the call's shows at once.
         (Said::Started(_, microphone, _), English) => {
             let named = microphone

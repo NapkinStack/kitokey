@@ -132,8 +132,7 @@ pub struct Settings {
     pub folded: bool,
     /// The language Wholeheard speaks, chosen by the user (D64); none, the system's.
     pub language: Option<Language>,
-    /// The microphone recordings take, as capture names it — it may hold a Bluetooth address: never
-    /// logged —, and as a person reads it (D74). None: Auto.
+    /// The microphone recordings take, as capture names it, and as a person reads it (D74). None: Auto.
     pub microphone: Option<String>,
     pub microphone_description: Option<String>,
 }

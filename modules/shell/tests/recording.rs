@@ -365,6 +365,7 @@ fn a_microphone_named_is_given_to_the_program_as_the_contract_says() {
 #[test]
 fn a_microphone_gone_is_read_and_a_microphone_line_is_no_event_of_a_recording() {
     assert_eq!(recording::read(r#"{"event":"microphone_gone"}"#), Some(Said::MicrophoneGone));
+    assert_eq!(recording::read(r#"{"event":"microphone_back"}"#), Some(Said::MicrophoneBack));
     assert_eq!(recording::read(r#"{"event":"microphone","name":"a","description":"b"}"#), None);
 }
 

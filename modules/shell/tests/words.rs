@@ -1625,5 +1625,7 @@ fn a_microphone_gone_is_told_once_and_what_stands_in_is_no_change_of_its_own() {
             "{told:?}"
         );
         assert_eq!(sides.told(&Said::Moved(Source::Me, Some("Default".into())), false, language), None);
+        // Its return is said by what follows: the device named, or the side with none.
+        assert_eq!(sides.told(&Said::MicrophoneBack, false, language), None);
     }
 }

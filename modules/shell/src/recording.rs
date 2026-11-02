@@ -46,6 +46,8 @@ pub enum Said {
     Lost(Source),
     /// The microphone named at the start is not there: the recording goes on as with none (D74).
     MicrophoneGone,
+    /// The microphone said gone is there again, a stream following or not (D74).
+    MicrophoneBack,
     /// The recording was stopped: its folder, and its length in seconds.
     Stopped(PathBuf, f64),
     /// The program ended without having said it stopped: its own sentence, when it gave one.
@@ -86,6 +88,7 @@ pub fn read(line: &str) -> Option<Said> {
         "level" => Some(Said::Level(source()?, event["level"].as_f64()?.clamp(0.0, 1.0) as f32)),
         "stopped" => Some(Said::Stopped(folder()?, event["seconds"].as_f64().unwrap_or(0.0))),
         "microphone_gone" => Some(Said::MicrophoneGone),
+        "microphone_back" => Some(Said::MicrophoneBack),
         _ => None,
     }
 }
@@ -209,8 +212,8 @@ fn lines(stream: impl Read) -> impl Iterator<Item = String> {
     lines.map(|line| String::from_utf8_lossy(&line).trim_end_matches('\r').to_string())
 }
 
-/// A microphone the program lists: its `name` is what it takes back, and may hold a Bluetooth address
-/// (`recording/v1`), so is never logged, nor shown; its `description` is what a person reads.
+/// A microphone the program lists: its `name` is what it takes back, nothing to show; its `description`
+/// is what a person reads (`recording/v1`).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Listed {
     pub name: String,
@@ -309,6 +312,7 @@ impl Recording {
                     Said::Lost(source) => warn!(source = ?source, "shell.recording_lost"),
                     Said::Stopped(_, seconds) => info!(seconds, "shell.recording_stopped"),
                     Said::MicrophoneGone => warn!("shell.recording_microphone_gone"),
+                    Said::MicrophoneBack => info!("shell.recording_microphone_back"),
                     _ => {}
                 }
                 if let Some(listener) = if last { tell.take() } else { tell.clone() } {

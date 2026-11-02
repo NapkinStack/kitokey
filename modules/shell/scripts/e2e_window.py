@@ -149,7 +149,11 @@ while ! read -t 0.1 line; do
   if [ -e "$2/lose" ]; then rm "$2/lose"; echo '{"event":"device","source":"others","device":null}'; fi
   # The microphone named gone, Auto taking over, and back (D74).
   if [ -e "$2/mic-gone" ]; then rm "$2/mic-gone"; echo '{"event":"microphone_gone"}'; echo '{"event":"device","source":"me","device":"Default"}'; fi
-  if [ -e "$2/mic-back" ]; then d=$(cat "$2/mic-back"); rm "$2/mic-back"; echo '{"event":"device","source":"me","device":"'"$d"'"}'; fi
+  if [ -e "$2/mic-back" ]; then d=$(cat "$2/mic-back"); rm "$2/mic-back"; echo '{"event":"microphone_back"}'; echo '{"event":"device","source":"me","device":"'"$d"'"}'; fi
+  # A headset's back with no call on it: said back, what stood in closes, no stream.
+  if [ -e "$2/mic-back-waits" ]; then rm "$2/mic-back-waits"; echo '{"event":"microphone_back"}'; echo '{"event":"device","source":"me","device":null}'; fi
+  # Another device that reads as the one chosen, which is not back.
+  if [ -e "$2/mic-same" ]; then d=$(cat "$2/mic-same"); rm "$2/mic-same"; echo '{"event":"device","source":"me","device":"'"$d"'"}'; fi
 done
 printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"
 echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'
@@ -2121,9 +2125,9 @@ def microphone_chosen(now: dt.datetime) -> None:
             if browser.execute_script("return document.activeElement.id") == "small-microphone":
                 return
             keys(browser, Keys.TAB)
-    for language, (short, auto, title, gone) in {
-        "fr_FR.UTF-8": ("fr", "Micro\u00a0: Auto", "Micro\u00a0: Digital Microphone", "Le micro choisi n’est pas là\u00a0: Auto le remplace."),
-        "en_US.UTF-8": ("en", "Microphone: Auto", "Microphone: Digital Microphone", "The microphone you chose is not there: Auto stands in."),
+    for language, (short, auto, title, gone, waits) in {
+        "fr_FR.UTF-8": ("fr", "Micro\u00a0: Auto", "Micro\u00a0: Digital Microphone", "Le micro choisi n’est pas là\u00a0: Auto le remplace.", "Votre micro n’est pas enregistré pour l’instant."),
+        "en_US.UTF-8": ("en", "Microphone: Auto", "Microphone: Digital Microphone", "The microphone you chose is not there: Auto stands in.", "Your microphone is not recorded for now."),
     }.items():
         for theme in ("light", "dark"):
             listed.write_text(lines(*two))
@@ -2176,9 +2180,19 @@ def microphone_chosen(now: dt.datetime) -> None:
                 got = browser.execute_script(live)
                 check(f"{short} {theme}: said with the context open, nothing overflows or is cut", got["scroll"][0] <= got["scroll"][1] and got["scroll"][2] <= got["scroll"][3] and not got["out"], got)
                 shot_themed(browser, f"d74-gone-{short}-{theme}", theme)
+                # Another of the same description is no return: the sentence stays, and it is true.
+                (taping / "mic-same").write_text("Digital Microphone")
+                time.sleep(0.6)
+                check(f"{short} {theme}: a device of the same description is not the return", browser.execute_script(said) == gone, browser.execute_script(said))
                 (taping / "mic-back").write_text("Digital Microphone")
-                wait_for(browser, lambda b: b.execute_script(said) == "", 5)
+                wait_for(browser, lambda b: b.execute_script(said) != gone, 5)
                 check(f"{short} {theme}: back, it says so no more", browser.execute_script(said) == "", browser.execute_script(said))
+                # A headset's, back with no call on it: not « not there », nor Auto: what is so.
+                (taping / "mic-gone").touch()
+                wait_for(browser, lambda b: b.execute_script(said) == gone, 5)
+                (taping / "mic-back-waits").touch()
+                wait_for(browser, lambda b: b.execute_script(said) != gone, 5)
+                check(f"{short} {theme}: back with no call, it says the microphone is not recorded for now", browser.execute_script(said) == waits, browser.execute_script(said))
                 stop_from_small(browser)
                 wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8)
             # Kept for another start; Auto again takes the name away, from the file and the next start.
