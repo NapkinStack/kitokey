@@ -93,6 +93,8 @@ struct Shell {
     meter: Mutex<(Option<Instant>, [f32; 2])>,
     /// Whether each side of the recording was heard (D49).
     checks: Mutex<recording::Checks>,
+    /// The microphone named is not there, as the recording last said (D74).
+    microphone_gone: Mutex<bool>,
     /// What the recording running is recorded from, for the small window (D33).
     devices: Mutex<recording::Devices>,
     /// The list's small reliefs, by transcript, kept until it changes.
@@ -259,6 +261,8 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             listed,
+            microphones_listed,
+            microphone_chosen,
             model_fetch,
             model_offered_fetch,
             registry_refresh,
@@ -397,6 +401,7 @@ fn main() {
                 shapes: Mutex::new(HashMap::new()),
                 meter: Mutex::new((None, [0.0, 0.0])),
                 checks: Mutex::default(),
+                microphone_gone: Mutex::default(),
                 devices: Mutex::new(recording::Devices::default()),
                 redoing: Mutex::new(None),
                 hearing: Mutex::new(None),
@@ -900,6 +905,8 @@ struct Now {
     devices: [Option<String>; 2],
     /// Whether each side was heard, or why not (D49).
     checks: [recording::Check; 2],
+    /// The microphone chosen is not there: Auto stands in (D74).
+    microphone_gone: bool,
     /// Whether the transcript is made at the stop, by itself: the small window says so then only.
     transcript_follows: bool,
     /// The meeting being recorded, once its folder holds its session: its context can be written
@@ -932,11 +939,57 @@ fn recording_now(shell: State<'_, Shell>) -> Now {
         levels,
         devices: shell.devices.lock().unwrap().names(),
         checks: shell.checks.lock().unwrap().now(),
+        microphone_gone: *shell.microphone_gone.lock().unwrap(),
         transcript_follows: shell.settings.lock().unwrap().after != settings::After::Nothing,
         meeting,
         confidential,
         announcement,
     }
+}
+
+/// The microphone chosen and what the system offers, as the small window's list shows them (D74).
+#[derive(serde::Serialize)]
+struct Microphones {
+    chosen: Option<recording::Listed>,
+    list: Vec<recording::Listed>,
+    /// The list could not be read: said, Auto still there.
+    unread: bool,
+}
+
+/// What capture lists now, on demand: nothing watches for a device, so that one arriving opens nothing.
+/// Asynchronous: it waits on a program, up to some seconds.
+#[tauri::command]
+async fn microphones_listed(app: AppHandle) -> Microphones {
+    // The choice as it is when asked: the page knows a choice made since, and keeps its own (D74).
+    let settings = app.state::<Shell>().settings();
+    let program = program("wholeheard-capture", "WHOLEHEARD_CAPTURE");
+    let list = tauri::async_runtime::spawn_blocking(move || recording::microphones(&program)).await;
+    let list = list.unwrap_or_else(|error| Err(std::io::Error::other(error.to_string())));
+    let chosen = settings.microphone.map(|name| recording::Listed {
+        description: settings.microphone_description.unwrap_or_else(|| name.clone()),
+        name,
+    });
+    if let Err(error) = &list {
+        tracing::warn!(detail = %error, "shell.microphones_unread");
+    }
+    Microphones {
+        chosen,
+        unread: list.is_err(),
+        list: list.unwrap_or_default(),
+    }
+}
+
+/// The microphone the next recordings take: one capture listed, or none for Auto.
+#[tauri::command]
+fn microphone_chosen(shell: State<'_, Shell>, name: Option<String>, description: Option<String>) -> Result<(), Told> {
+    let _saving = shell.saving.lock().unwrap();
+    let mut settings = shell.read_or_told()?;
+    settings.microphone = name;
+    settings.microphone_description = description.filter(|_| settings.microphone.is_some());
+    shell.write_or_told(&settings)?;
+    tracing::info!(auto = settings.microphone.is_none(), "shell.microphone_chosen");
+    *shell.settings.lock().unwrap() = settings;
+    Ok(())
 }
 
 /// From the full window to the small one, at rest or recording (D35). Asynchronous, as is
@@ -2621,7 +2674,7 @@ fn toggle_recording(app: &AppHandle) {
     }
     // The settings as the file says them now: the user may have changed it by hand.
     let _ = shell.reread();
-    let sessions = shell.settings().sessions;
+    let Settings { sessions, microphone, .. } = shell.settings();
     if let Err(error) = sessions::writable(&sessions) {
         tracing::error!(detail = %error, "shell.sessions_refused");
         return tell(
@@ -2629,7 +2682,11 @@ fn toggle_recording(app: &AppHandle) {
             &words::trouble(&Trouble::NoFolder(sessions.display().to_string()), shell.language()),
         );
     }
-    let started = Recording::start(&program("wholeheard-capture", "WHOLEHEARD_CAPTURE"), &sessions);
+    let started = Recording::start(
+        &program("wholeheard-capture", "WHOLEHEARD_CAPTURE"),
+        &sessions,
+        microphone.as_deref(),
+    );
     match started {
         Ok((running, said)) => {
             *recording = Some(running);
@@ -2652,6 +2709,11 @@ fn listen(app: &AppHandle, said: &Receiver<Said>) {
         started |= matches!(event, Said::Started(..));
         shell.devices.lock().unwrap().heard(&event);
         shell.checks.lock().unwrap().heard(&event);
+        match &event {
+            Said::MicrophoneGone => *shell.microphone_gone.lock().unwrap() = true,
+            Said::MicrophoneBack => *shell.microphone_gone.lock().unwrap() = false,
+            _ => {}
+        }
         if let Said::Started(folder, ..) = &event {
             *shell.recorded.lock().unwrap() = Some(folder.clone());
             *shell.meter.lock().unwrap() = (Some(Instant::now()), [0.0, 0.0]);
@@ -2687,6 +2749,7 @@ fn listen(app: &AppHandle, said: &Receiver<Said>) {
     *shell.meter.lock().unwrap() = (None, [0.0, 0.0]);
     *shell.devices.lock().unwrap() = recording::Devices::default();
     *shell.checks.lock().unwrap() = recording::Checks::default();
+    *shell.microphone_gone.lock().unwrap() = false;
     // The small window comes back to rest, below the other windows again (D35).
     small_recording(app, false);
     let ended = shell.recording.lock().unwrap().take();

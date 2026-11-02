@@ -107,7 +107,8 @@ pub fn of(said: &Said, reminder: bool, language: Language) -> Option<Notice> {
     use Language::{English, French};
     let (title, body) = match (said, language) {
         (Said::Started(..), _) if !reminder => return None,
-        (Said::Heard(_) | Said::Level(..), _) => return None,
+        // What follows says it: the device named, or the side with none.
+        (Said::Heard(_) | Said::Level(..) | Said::MicrophoneBack, _) => return None,
         // The microphone is named, so that one other than the call's shows at once.
         (Said::Started(_, microphone, _), English) => {
             let named = microphone
@@ -135,6 +136,14 @@ pub fn of(said: &Said, reminder: bool, language: Language) -> Option<Notice> {
         (Said::Unavailable(Source::Me, _), French) => (
             "Votre micro n’est pas enregistré pour l’instant",
             "Le son de la réunion est toujours enregistré.",
+        ),
+        (Said::MicrophoneGone, English) => (
+            "The microphone you chose is not there",
+            "Your microphone is recorded as on Auto for now, and the one you chose as soon as it is back.",
+        ),
+        (Said::MicrophoneGone, French) => (
+            "Le micro choisi n’est pas là",
+            "Votre micro est enregistré comme sur Auto pour l’instant, et celui choisi dès qu’il revient.",
         ),
         (Said::Unavailable(Source::Others, _), English) => ("The meeting’s sound is not recorded", "Your microphone is still recorded."),
         (Said::Unavailable(Source::Others, _), French) => {
@@ -513,6 +522,14 @@ pub struct Window {
     pub small_read: &'static str,
     pub small_open: &'static str,
     pub small_all: &'static str,
+    pub small_microphone: &'static str,
+    pub small_microphones: &'static str,
+    pub microphone_auto: &'static str,
+    pub microphone_auto_says: &'static str,
+    pub microphone_absent: &'static str,
+    pub microphones_unread: &'static str,
+    pub microphone_not_kept: &'static str,
+    pub small_microphone_gone: &'static str,
     pub small_count: &'static str,
     pub small_count_one: &'static str,
     pub small_keys: &'static str,
@@ -909,6 +926,14 @@ pub fn window(language: Language) -> Window {
             small_read: "Read the minutes",
             small_open: "Open the meeting",
             small_all: "All meetings",
+            small_microphone: "Microphone: {}",
+            small_microphones: "The microphone of the next recording",
+            microphone_auto: "Auto",
+            microphone_auto_says: "The one your call holds, otherwise your computer’s.",
+            microphone_absent: "It is absent for now: Auto stands in.",
+            microphones_unread: "The list cannot be read for now: Auto still works. Open it again in a moment.",
+            microphone_not_kept: "Your choice of microphone could not be kept: choose it again.",
+            small_microphone_gone: "The microphone you chose is not there: Auto stands in.",
             small_count: "{} meetings · {}",
             small_count_one: "{} meeting · {}",
             small_keys: "or {}, from anywhere",
@@ -1296,6 +1321,14 @@ pub fn window(language: Language) -> Window {
             small_read: "Lire le compte rendu",
             small_open: "Ouvrir la réunion",
             small_all: "Toutes les réunions",
+            small_microphone: "Micro\u{a0}: {}",
+            small_microphones: "Le micro du prochain enregistrement",
+            microphone_auto: "Auto",
+            microphone_auto_says: "Celui que tient votre appel, sinon celui de votre ordinateur.",
+            microphone_absent: "Il est absent pour l’instant\u{a0}: Auto le remplace.",
+            microphones_unread: "La liste ne peut pas être lue pour l’instant\u{a0}: Auto fonctionne toujours. Rouvrez-la dans un instant.",
+            microphone_not_kept: "Votre choix de micro n’a pas pu être gardé\u{a0}: choisissez-le de nouveau.",
+            small_microphone_gone: "Le micro choisi n’est pas là\u{a0}: Auto le remplace.",
             small_count: "{} réunions · {}",
             small_count_one: "{} réunion · {}",
             small_keys: "ou {}, de n’importe où",
@@ -2062,6 +2095,8 @@ impl Sides {
             Said::Nothing if self.gone[0] => return None,
             Said::Nothing => return sends_nothing(self.devices.names()[0].as_deref(), language),
             Said::Started(_, me, _) => self.me_last = me.clone(),
+            // What stands in comes next: the notice says it already. Before the start, `Started` names it.
+            Said::MicrophoneGone => self.me_waited = self.me_last.is_some(),
             Said::Unavailable(Source::Me, _) | Said::Lost(Source::Me) => {
                 self.gone[0] = true;
                 self.me_waited |= matches!(said, Said::Unavailable(..));

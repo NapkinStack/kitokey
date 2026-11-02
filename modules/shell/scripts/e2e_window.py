@@ -117,6 +117,16 @@ os.environ["SEND"] = "import sys, urllib.request; urllib.request.urlopen(urllib.
 RECORDER = WORK / "wholeheard-capture"
 RECORDER.write_text(
     """#!/bin/bash
+here=$(dirname "$0")
+# The system's microphones, as the scenario lists them (D74): none, the list is not offered.
+if [ "$1" = microphones ]; then
+  # Slow to answer, when the scenario says so: a choice is made before the list is read (D74).
+  [ -e "$here/microphones-slow" ] && sleep 1
+  if [ -e "$here/microphones-unread" ]; then echo "the system's microphones could not be read" >&2; exit 1; fi
+  [ -e "$here/microphones" ] && cat "$here/microphones"
+  exit 0
+fi
+printf '%s\\n' "$*" > "$here/recorder-args"
 folder="$2/2026-10-18_12-00"; mkdir -p "$folder"
 printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","tracks":{}}' > "$folder/session.json"
 me='"Mic"'
@@ -139,6 +149,13 @@ while ! read -t 0.1 line; do
   # A device changed, or gone, when the scenario says so (D31, D33).
   if [ -e "$2/move" ]; then rm "$2/move"; echo '{"event":"device","source":"me","device":"AirPods Pro"}'; fi
   if [ -e "$2/lose" ]; then rm "$2/lose"; echo '{"event":"device","source":"others","device":null}'; fi
+  # The microphone named gone, Auto taking over, and back (D74).
+  if [ -e "$2/mic-gone" ]; then rm "$2/mic-gone"; echo '{"event":"microphone_gone"}'; echo '{"event":"device","source":"me","device":"Default"}'; fi
+  if [ -e "$2/mic-back" ]; then d=$(cat "$2/mic-back"); rm "$2/mic-back"; echo '{"event":"microphone_back"}'; echo '{"event":"device","source":"me","device":"'"$d"'"}'; fi
+  # A headset's back with no call on it: said back, what stood in closes, no stream.
+  if [ -e "$2/mic-back-waits" ]; then rm "$2/mic-back-waits"; echo '{"event":"microphone_back"}'; echo '{"event":"device","source":"me","device":null}'; fi
+  # Another device that reads as the one chosen, which is not back.
+  if [ -e "$2/mic-same" ]; then d=$(cat "$2/mic-same"); rm "$2/mic-same"; echo '{"event":"device","source":"me","device":"'"$d"'"}'; fi
 done
 printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"
 echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'
@@ -2077,6 +2094,247 @@ def heard_checked(now: dt.datetime) -> None:
         named = browser.execute_script("return ['.slot[data-check] .check', '.check-says'].map(q => [...document.querySelectorAll(q)].map(e => { const c = getComputedStyle(e); return [c.animationName, c.transitionDuration]; }))")
         check("less motion asked: neither pulse, pop nor fade", all(found and all(said == ["none", "0s"] for said in found) for found in named), named)
         check("less motion asked: nothing in the recording moves", browser.execute_script(MOVING) == [], browser.execute_script(MOVING))
+        stop_from_small(browser)
+
+
+def microphone_chosen(now: dt.datetime) -> None:
+    """AO. The microphone chosen by hand beside Auto, in the small window at rest (D74)."""
+    print("AO. Auto and the system's microphones, keyboard alone, either theme, inside 380 × 400; kept, for the next recording; none offered where capture lists none; a new device opens nothing (D74)")
+    listed = WORK / "microphones"
+    unread = WORK / "microphones-unread"
+    slow = WORK / "microphones-slow"
+    args = WORK / "recorder-args"
+    def lines(*pairs) -> str:
+        return "".join(json.dumps({"event": "microphone", "name": name, "description": said}) + "\n" for name, said in pairs)
+    long_name = "Ryzen HD Audio Controller Digital Microphone with a very long name indeed that goes on and on"
+    two = [("alsa_laptop", "Digital Microphone"), ("bluez_input.AA_BB", long_name)]
+    choices = "return [...document.querySelectorAll('#small-microphones .choice')].map(c => [c.querySelector('.name').textContent, c.querySelector('input').value, c.querySelector('input').checked])"
+    state = ("const b = document.getElementById('small-microphone'); const p = document.getElementById('small-microphones'); const a = document.activeElement;"
+             "return {shown: !!b && b.getClientRects().length > 0, open: !!b && b.getAttribute('aria-expanded') === 'true', panel: !!p && !p.hidden, name: b && b.textContent, active: a.id,"
+             " value: a.matches('#small-microphones input') ? a.value : null}")
+    # The row the keyboard is on lies inside the list, whole.
+    whole = ("const a = document.activeElement.closest('.choice'); const r = document.getElementById('small-microphones').getBoundingClientRect();"
+             "if (!a) return null; const b = a.getBoundingClientRect(); return [b.top >= r.top - 0.5 && b.bottom <= r.bottom + 0.5, b.top, b.bottom, r.top, r.bottom]")
+    fits = ("const e = document.scrollingElement; const p = document.getElementById('small-microphones'); const r = p.getBoundingClientRect();"
+            "const inside = r.left >= -0.5 && r.right <= innerWidth + 0.5 && r.top >= -0.5 && r.bottom <= innerHeight + 0.5;"
+            "const cut = [...p.querySelectorAll('.name, .says')].filter(x => x.scrollWidth > x.clientWidth + 1 || x.getBoundingClientRect().right > r.right + 0.5).map(x => x.textContent);"
+            "return {scroll: [e.scrollHeight, e.clientHeight, e.scrollWidth, e.clientWidth], inside, cut, wide: [p.scrollWidth, p.clientWidth], size: [innerWidth, innerHeight], rect: [r.left, r.top, r.right, r.bottom]}")
+    def fit(browser, what: str) -> None:
+        got = browser.execute_script(fits)
+        ok = got["scroll"][0] <= got["scroll"][1] and got["scroll"][2] <= got["scroll"][3] and got["inside"] and not got["cut"] and got["wide"][0] <= got["wide"][1]
+        check(f"{what}: nothing overflows or is cut, at {got['size']}", ok, got)
+    def keys(browser, *pressed) -> None:
+        ActionChains(browser).send_keys(*pressed).perform()
+        time.sleep(0.2)
+    def to_the_name(browser) -> None:
+        """By Tab alone, from where the window opened: the recording's gesture."""
+        for _ in range(6):
+            if browser.execute_script("return document.activeElement.id") == "small-microphone":
+                return
+            keys(browser, Keys.TAB)
+    for language, (short, auto, title, gone, waits) in {
+        "fr_FR.UTF-8": ("fr", "Micro\u00a0: Auto", "Micro\u00a0: Digital Microphone", "Le micro choisi n’est pas là\u00a0: Auto le remplace.", "Votre micro n’est pas enregistré pour l’instant."),
+        "en_US.UTF-8": ("en", "Microphone: Auto", "Microphone: Digital Microphone", "The microphone you chose is not there: Auto stands in.", "Your microphone is not recorded for now."),
+    }.items():
+        for theme in ("light", "dark"):
+            listed.write_text(lines(*two))
+            args.unlink(missing_ok=True)
+            taping = WORK / f"microphones-{short}-{theme}"
+            taping.mkdir()
+            window = Window(taping, language, 'after = "nothing"\n', small=True)
+            if theme == "dark":
+                window.env.update(GTK_THEME="Adwaita:dark")
+            with window as browser:
+                wait_for(browser, lambda b: b.execute_script(state)["shown"], 8)
+                got = browser.execute_script(state)
+                check(f"{short} {theme}: at rest the name says Auto, closed", auto in got["name"] and not got["panel"], got)
+                to_the_name(browser)
+                keys(browser, Keys.ENTER)
+                wait_for(browser, lambda b: len(b.execute_script(choices)) == 3, 5)
+                got = browser.execute_script(state)
+                shown = browser.execute_script(choices)
+                check(f"{short} {theme}: Enter opens Auto and the system's microphones, Auto checked and focused",
+                      got["open"] and got["panel"] and [c[1] for c in shown] == ["", "alsa_laptop", "bluez_input.AA_BB"] and shown[0][0] == "Auto" and shown[0][2] and got["value"] == "", [got, shown])
+                check(f"{short} {theme}: the focus is Auto's own row, not the name", browser.execute_script("return document.activeElement === document.querySelector('#small-microphones input[value=\\'\\']')"))
+                fit(browser, f"{short} {theme}: the list open")
+                shot_themed(browser, f"d74-list-{short}-{theme}", theme)
+                keys(browser, Keys.ARROW_DOWN)
+                check(f"{short} {theme}: an arrow moves to the next", browser.execute_script(state)["value"] == "alsa_laptop", browser.execute_script(state))
+                keys(browser, Keys.ENTER)
+                got = browser.execute_script(state)
+                check(f"{short} {theme}: Enter closes, the focus back on the name, which says the choice",
+                      not got["panel"] and got["active"] == "small-microphone" and title in got["name"], got)
+                wait_for(browser, lambda b: 'microphone = "alsa_laptop"' in window.file.read_text(), 3)
+                check(f"{short} {theme}: the choice is kept in the settings", 'microphone_description = "Digital Microphone"' in window.file.read_text(), window.file.read_text())
+                # Escape leaves as it was; opened again, the choice is the one checked.
+                keys(browser, Keys.ENTER)
+                wait_for(browser, lambda b: b.execute_script(state)["panel"], 3)
+                check(f"{short} {theme}: opened again, the one kept is checked", browser.execute_script(state)["value"] == "alsa_laptop", browser.execute_script(state))
+                # Arrows only move: Escape after them keeps the choice as it was.
+                keys(browser, Keys.ARROW_UP)
+                check(f"{short} {theme}: an arrow moves back to Auto", browser.execute_script(state)["value"] == "", browser.execute_script(state))
+                keys(browser, Keys.ESCAPE)
+                got = browser.execute_script(state)
+                check(f"{short} {theme}: Escape closes, the focus back on the name", not got["panel"] and got["active"] == "small-microphone", got)
+                time.sleep(0.5)
+                check(f"{short} {theme}: arrows then Escape leave the choice as it was", 'microphone = "alsa_laptop"' in window.file.read_text() and title in browser.execute_script(state)["name"], window.file.read_text())
+                # Home and End move alone; Space chooses, keeps and closes, as Enter does.
+                keys(browser, Keys.ENTER)
+                check(f"{short} {theme}: opened for Home and End", wait_for(browser, lambda b: b.execute_script(state)["panel"], 3))
+                keys(browser, Keys.END)
+                check(f"{short} {theme}: End reaches the last row", browser.execute_script(state)["value"] == "bluez_input.AA_BB", browser.execute_script(state))
+                keys(browser, Keys.HOME)
+                check(f"{short} {theme}: Home reaches Auto", browser.execute_script(state)["value"] == "", browser.execute_script(state))
+                time.sleep(0.5)
+                check(f"{short} {theme}: Home and End choose nothing", 'microphone = "alsa_laptop"' in window.file.read_text() and browser.execute_script(state)["panel"], window.file.read_text())
+                keys(browser, Keys.END, Keys.SPACE)
+                got = browser.execute_script(state)
+                check(f"{short} {theme}: Space chooses the row and closes, the focus on the name", not got["panel"] and got["active"] == "small-microphone" and long_name[:20] in got["name"], got)
+                check(f"{short} {theme}: what Space chose is kept", wait_for(browser, lambda b: 'microphone = "bluez_input.AA_BB"' in window.file.read_text(), 3), window.file.read_text())
+                keys(browser, Keys.ENTER)
+                wait_for(browser, lambda b: b.execute_script(state)["panel"], 3)
+                keys(browser, Keys.HOME, Keys.ARROW_DOWN, Keys.SPACE)
+                check(f"{short} {theme}: Space chooses again the first microphone", wait_for(browser, lambda b: 'microphone = "alsa_laptop"' in window.file.read_text(), 3), window.file.read_text())
+                # So many that they scroll: each row the keyboard reaches is seen whole, short names and long.
+                for count, length in ((14, 0), (20, 100)):
+                    many = [(f"m{n}", f"Microphone {n} " + "x" * max(0, length - 14)) for n in range(count)]
+                    listed.write_text(lines(*two, *many))
+                    keys(browser, Keys.ENTER)
+                    check(f"{short} {theme}: {count} more listed", wait_for(browser, lambda b: len(b.execute_script(choices)) == count + 3, 5), browser.execute_script(choices))
+                    cut = []
+                    for _ in range(count + 2):
+                        keys(browser, Keys.ARROW_DOWN)
+                        seen = browser.execute_script(whole)
+                        if not seen or not seen[0]:
+                            cut.append([browser.execute_script(state)["value"], seen])
+                    check(f"{short} {theme}: {count} names of {length or 'a few'} characters: each row reached by the keyboard is seen whole", not cut and browser.execute_script(state)["value"] == f"m{count - 1}", cut)
+                    keys(browser, Keys.ESCAPE)
+                    time.sleep(0.5)
+                    check(f"{short} {theme}: {count} names gone through, Escape leaves the choice as it was", 'microphone = "alsa_laptop"' in window.file.read_text(), window.file.read_text())
+                listed.write_text(lines(*two))
+                # The next recording takes it; capture says it gone: said, inside the window, the context open.
+                press(browser, "small-record")
+                wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8)
+                check(f"{short} {theme}: the next recording names it", "--microphone alsa_laptop" in args.read_text(), args.read_text())
+                (taping / "mic-gone").touch()
+                press(browser, "small-context-toggle")
+                said = "return document.querySelector('.check-says').textContent"
+                wait_for(browser, lambda b: b.execute_script(said) != "", 5)
+                check(f"{short} {theme}: gone, the small window says so", browser.execute_script(said) == gone, browser.execute_script(said))
+                live = ("const e = document.scrollingElement; const out = [...document.querySelectorAll('.small-live > *')].filter(x => { const b = x.getBoundingClientRect(); return b.height > 0 && (b.right > innerWidth + 0.5 || b.bottom > innerHeight + 0.5); }).map(x => x.id || x.className);"
+                        "const says = document.querySelector('.check-says').getBoundingClientRect().bottom; if (says > document.getElementById('small-stop').getBoundingClientRect().top + 0.5) out.push('under Arrêter');"
+                        "return {scroll: [e.scrollHeight, e.clientHeight, e.scrollWidth, e.clientWidth], out}")
+                got = browser.execute_script(live)
+                check(f"{short} {theme}: said with the context open, nothing overflows or is cut", got["scroll"][0] <= got["scroll"][1] and got["scroll"][2] <= got["scroll"][3] and not got["out"], got)
+                shot_themed(browser, f"d74-gone-{short}-{theme}", theme)
+                # Another of the same description is no return: the sentence stays, and it is true.
+                (taping / "mic-same").write_text("Digital Microphone")
+                time.sleep(0.6)
+                check(f"{short} {theme}: a device of the same description is not the return", browser.execute_script(said) == gone, browser.execute_script(said))
+                (taping / "mic-back").write_text("Digital Microphone")
+                wait_for(browser, lambda b: b.execute_script(said) != gone, 5)
+                check(f"{short} {theme}: back, it says so no more", browser.execute_script(said) == "", browser.execute_script(said))
+                # A headset's, back with no call on it: not « not there », nor Auto: what is so.
+                (taping / "mic-gone").touch()
+                check(f"{short} {theme}: gone again, said again", wait_for(browser, lambda b: b.execute_script(said) == gone, 5), browser.execute_script(said))
+                (taping / "mic-back-waits").touch()
+                wait_for(browser, lambda b: b.execute_script(said) != gone, 5)
+                check(f"{short} {theme}: back with no call, it says the microphone is not recorded for now", browser.execute_script(said) == waits, browser.execute_script(said))
+                # Gone, and the recording ends so: the next one does not begin by saying it.
+                (taping / "mic-gone").touch()
+                check(f"{short} {theme}: gone a third time, said", wait_for(browser, lambda b: b.execute_script(said) == gone, 5), browser.execute_script(said))
+                stop_from_small(browser)
+                check(f"{short} {theme}: stopped, at rest", wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8))
+                # A press within half a second of the last is the same one, for the shell.
+                time.sleep(0.8)
+                press(browser, "small-record")
+                check(f"{short} {theme}: the next recording runs", wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8))
+                time.sleep(1)
+                check(f"{short} {theme}: the next recording does not say the last one's gone", browser.execute_script(said) != gone, browser.execute_script(said))
+                stop_from_small(browser)
+                wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8)
+            # Kept for another start; Auto again takes the name away, from the file and the next start.
+            with window as browser:
+                wait_for(browser, lambda b: b.execute_script(state)["shown"], 8)
+                check(f"{short} {theme}: started again, the name says the choice kept", title in browser.execute_script(state)["name"], browser.execute_script(state))
+                # A click chooses and closes, as a menu does — before the list read at the opening answers:
+                # that answer, older than the choice, never takes it back.
+                slow.touch()
+                def click_row(index: int) -> None:
+                    press(browser, "small-microphone")
+                    wait_for(browser, lambda b: b.execute_script(state)["panel"], 3)
+                    browser.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")[index].click()
+                    wait_for(browser, lambda b: not b.execute_script(state)["panel"], 3)
+                    time.sleep(1.6)
+                click_row(0)
+                check(f"{short} {theme}: a click on Auto chooses it and closes, still Auto once the list has answered", auto in browser.execute_script(state)["name"], browser.execute_script(state))
+                click_row(1)
+                check(f"{short} {theme}: a click on a microphone before the list answers: still its name once it has", title in browser.execute_script(state)["name"], browser.execute_script(state))
+                click_row(0)
+                slow.unlink()
+                check(f"{short} {theme}: Auto again, still Auto once the list has answered", auto in browser.execute_script(state)["name"], browser.execute_script(state))
+                check(f"{short} {theme}: Auto takes the microphone out of the settings", wait_for(browser, lambda b: 'microphone = ' not in window.file.read_text(), 3), window.file.read_text())
+                args.unlink(missing_ok=True)
+                press(browser, "small-record")
+                wait_for(browser, lambda b: args.exists(), 8)
+                check(f"{short} {theme}: on Auto the recording names none", "--microphone" not in args.read_text(), args.read_text())
+                wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8)
+                stop_from_small(browser)
+                wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8)
+
+    # What the fr light window above does not need twice: the other states, once.
+    taping = WORK / "microphones-states"
+    taping.mkdir()
+    listed.write_text(lines(*two))
+    with Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nmicrophone = "gone_one"\nmicrophone_description = "Casque parti"\n', small=True) as browser:
+        wait_for(browser, lambda b: b.execute_script(state)["shown"], 8)
+        press(browser, "small-microphone")
+        wait_for(browser, lambda b: len(b.execute_script(choices)) == 4, 5)
+        shown = browser.execute_script(choices)
+        check("a choice no longer listed stays shown, checked, and says it is absent",
+              shown[-1][:2] == ["Casque parti", "gone_one"] and shown[-1][2] and "absent" in browser.execute_script("return [...document.querySelectorAll('#small-microphones .choice')].at(-1).textContent"), shown)
+        # A new device, the list open and closed: nothing opens, nothing moves; it is there next time.
+        keys(browser, Keys.ESCAPE)
+        handles = len(browser.window_handles)
+        listed.write_text(lines(*two, ("usb_new", "USB Headset")))
+        time.sleep(3)
+        got = browser.execute_script(state)
+        check("a new device arriving opens no window, no dialog, no list", len(browser.window_handles) == handles and not got["panel"] and not browser.find_elements(By.CSS_SELECTOR, "dialog, [role=dialog], [role=alertdialog]"), got)
+        press(browser, "small-microphone")
+        wait_for(browser, lambda b: any(c[1] == "usb_new" for c in b.execute_script(choices)), 5)
+        check("the new device is there when the name is opened", any(c[1] == "usb_new" for c in browser.execute_script(choices)), browser.execute_script(choices))
+        keys(browser, Keys.ESCAPE)
+        # So many that they scroll inside the list, the last one reached by the keyboard.
+        listed.write_text(lines(*[(f"mic{n}", f"Microphone {n}") for n in range(14)]))
+        press(browser, "small-microphone")
+        wait_for(browser, lambda b: len(b.execute_script(choices)) == 16, 5)
+        fit(browser, "fifteen microphones")
+        reach = "const p = document.getElementById('small-microphones'); return [p.scrollHeight > p.clientHeight, getComputedStyle(p).overflowY]"
+        check("fifteen microphones scroll inside the list", browser.execute_script(reach) == [True, "auto"], browser.execute_script(reach))
+        keys(browser, Keys.ESCAPE)
+    # The list that cannot be read: said, Auto still there; none at all: nothing offered.
+    taping = WORK / "microphones-unread-folder"
+    taping.mkdir()
+    unread.touch()
+    with Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n', small=True) as browser:
+        wait_for(browser, lambda b: b.execute_script(state)["shown"], 8)
+        press(browser, "small-microphone")
+        wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#small-microphones [role=status]"), 5)
+        said = browser.execute_script("return document.querySelector('#small-microphones [role=status]')?.textContent ?? ''")
+        check("a list that cannot be read is said, Auto still offered", "Auto" in browser.execute_script(choices)[0][0] and "ne peut pas être lue" in said, said)
+        fit(browser, "the list unread")
+    unread.unlink()
+    listed.unlink()
+    taping = WORK / "microphones-none"
+    taping.mkdir()
+    args.unlink(missing_ok=True)
+    with Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n', small=True) as browser:
+        time.sleep(1.5)
+        check("where capture lists none — macOS, Windows —, no list is offered", not browser.execute_script(state)["shown"], browser.execute_script(state))
+        press(browser, "small-record")
+        wait_for(browser, lambda b: args.exists(), 8)
+        check("and the recording names none", "--microphone" not in args.read_text(), args.read_text())
+        wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8)
         stop_from_small(browser)
 
 
@@ -6272,6 +6530,7 @@ def main() -> int:
     actions_rows(now)
     announced(now)
     heard_checked(now)
+    microphone_chosen(now)
     meeting_named(now)
     word_after_a_gap(now)
     minutes_checked(now)

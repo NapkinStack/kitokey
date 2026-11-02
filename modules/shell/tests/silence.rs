@@ -15,6 +15,11 @@ const SILENT: &[(&str, usize, &str)] = &[
     ("page_failed", 1, "the log itself: nowhere left to say it"),
     ("makings", 2, "returns no `Result`: it cannot fail"),
     ("header", 1, "returns no `Result`: it cannot fail"),
+    (
+        "microphones_listed",
+        1,
+        "it returns a failed reading as `unread`, which the list says; the command itself cannot fail, and a later opening reads again",
+    ),
     ("recording_now", 1, "returns no `Result`: it cannot fail"),
     (
         "model_fetch",

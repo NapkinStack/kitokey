@@ -262,6 +262,13 @@ evidence:
     - pattern: '"message":"shell\.recording_lost"'
       level: warning
       scenario: A
+    # The window's AO: capture says the microphone chosen is gone, and its list cannot be read (D74).
+    - pattern: '"message":"shell\.recording_microphone_gone"'
+      level: warning
+      scenario: AO
+    - pattern: '"message":"shell\.microphones_unread"'
+      level: warning
+      scenario: AO
     # The window's AN starts a recording with no microphone to open, its side said waiting (D49).
     - pattern: '"message":"shell\.recording_unavailable"'
       level: warning

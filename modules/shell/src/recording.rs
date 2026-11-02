@@ -8,6 +8,7 @@ use std::{
     process::{Child, ChildStdin, Command, Stdio},
     sync::mpsc::{self, Receiver},
     thread,
+    time::{Duration, Instant},
 };
 
 use serde_json::Value;
@@ -43,6 +44,10 @@ pub enum Said {
     /// No device for a source: the system names none or, for the microphone, a call let go of it,
     /// never said which. Nothing of it is recorded until one comes.
     Lost(Source),
+    /// The microphone named at the start is not there: the recording goes on as with none (D74).
+    MicrophoneGone,
+    /// The microphone said gone is there again, a stream following or not (D74).
+    MicrophoneBack,
     /// The recording was stopped: its folder, and its length in seconds.
     Stopped(PathBuf, f64),
     /// The program ended without having said it stopped: its own sentence, when it gave one.
@@ -82,6 +87,8 @@ pub fn read(line: &str) -> Option<Said> {
         },
         "level" => Some(Said::Level(source()?, event["level"].as_f64()?.clamp(0.0, 1.0) as f32)),
         "stopped" => Some(Said::Stopped(folder()?, event["seconds"].as_f64().unwrap_or(0.0))),
+        "microphone_gone" => Some(Said::MicrophoneGone),
+        "microphone_back" => Some(Said::MicrophoneBack),
         _ => None,
     }
 }
@@ -205,6 +212,57 @@ fn lines(stream: impl Read) -> impl Iterator<Item = String> {
     lines.map(|line| String::from_utf8_lossy(&line).trim_end_matches('\r').to_string())
 }
 
+/// A microphone the program lists: its `name` is what it takes back, nothing to show; its `description`
+/// is what a person reads (`recording/v1`).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Listed {
+    pub name: String,
+    pub description: String,
+}
+
+/// How long the program is given to list them: it reads a graph it gives two seconds.
+const LISTED_WITHIN: Duration = Duration::from_secs(5);
+
+/// The microphones the system offers by name, as the program lists them (`recording/v1`); none, nothing
+/// to choose from. It reads the system and opens nothing. One that fails, or does not answer, is an error.
+pub fn microphones(program: &Path) -> io::Result<Vec<Listed>> {
+    let mut asked = Command::new(program)
+        .arg("microphones")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()?;
+    let given = Instant::now();
+    let done = loop {
+        if let Some(status) = asked.try_wait()? {
+            break status;
+        }
+        if given.elapsed() > LISTED_WITHIN {
+            let _ = asked.kill();
+            let _ = asked.wait();
+            return Err(io::Error::new(io::ErrorKind::TimedOut, "the program did not list the microphones"));
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    if !done.success() {
+        return Err(io::Error::other("the program could not list the microphones"));
+    }
+    let Some(output) = asked.stdout.take() else {
+        return Err(io::Error::other("the program could not be listened to"));
+    };
+    Ok(lines(output)
+        .filter_map(|line| {
+            let event: Value = serde_json::from_str(&line).ok()?;
+            if event["event"] != "microphone" {
+                return None;
+            }
+            let name = event["name"].as_str().filter(|name| !name.is_empty())?.to_string();
+            let description = device(event["description"].as_str()?)?;
+            Some(Listed { name, description })
+        })
+        .collect())
+}
+
 /// A recording in progress: the program, and what it says. Dropped, it stops nothing: the
 /// program records on, and is stopped by a signal.
 pub struct Recording {
@@ -216,13 +274,15 @@ impl Recording {
     /// Starts the program that records, into a new session of this folder of sessions. What
     /// it says comes apart from the hold on it, so that one may listen while another stops
     /// it: it ends on `Stopped` or `Failed`, then closes.
-    pub fn start(program: &Path, sessions: &Path) -> io::Result<(Self, Receiver<Said>)> {
+    /// `microphone`: the one the user named (D74); none, Auto.
+    pub fn start(program: &Path, sessions: &Path, microphone: Option<&str>) -> io::Result<(Self, Receiver<Said>)> {
         let (trace, making) = crate::log::making();
         let _making = making.enter();
         info!("shell.recording");
         let mut program = Command::new(program)
             .arg("record")
             .arg(sessions)
+            .args(microphone.into_iter().flat_map(|name| ["--microphone", name]))
             .env("WHOLEHEARD_TRACE", &trace)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -251,6 +311,8 @@ impl Recording {
                     Said::Moved(source, _) => info!(source = ?source, "shell.recording_moved"),
                     Said::Lost(source) => warn!(source = ?source, "shell.recording_lost"),
                     Said::Stopped(_, seconds) => info!(seconds, "shell.recording_stopped"),
+                    Said::MicrophoneGone => warn!("shell.recording_microphone_gone"),
+                    Said::MicrophoneBack => info!("shell.recording_microphone_back"),
                     _ => {}
                 }
                 if let Some(listener) = if last { tell.take() } else { tell.clone() } {

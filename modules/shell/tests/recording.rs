@@ -10,18 +10,19 @@ use std::{
     time::Duration,
 };
 
-use wholeheard_shell::recording::{Check, Checks, Devices, Recording, Said, Source, read};
+use wholeheard_shell::recording::{self, Check, Checks, Devices, Recording, Said, Source, read};
+
+static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
 /// A recording by a program played here: a script given the same arguments, `record
 /// <sessions>`. One at a time: a script still open for writing in one thread while another
 /// starts a program cannot be run — "text file busy".
 fn played(folder: &Path, script: &str) -> (Recording, Receiver<Said>) {
-    static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
     let _held = ONE_AT_A_TIME.lock().unwrap();
     let path = folder.join("wholeheard-capture");
     fs::write(&path, format!("#!/bin/sh\nsessions=\"$2\"\n{script}\n")).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
-    Recording::start(&path, folder).unwrap()
+    Recording::start(&path, folder, None).unwrap()
 }
 
 /// Everything a recording says until it closes — a test that waits ten seconds has failed.
@@ -106,7 +107,7 @@ exit 1"#,
     );
 
     // A program that is not there is an error at once, not a recording.
-    assert!(Recording::start(&folder.path().join("nowhere"), folder.path()).is_err());
+    assert!(Recording::start(&folder.path().join("nowhere"), folder.path(), None).is_err());
 }
 
 #[test]
@@ -333,4 +334,83 @@ fn a_call_taking_and_leaving_the_microphone_turns_the_check_each_time() {
 fn a_level_under_a_voice_is_no_sound_yet() {
     assert_eq!(checked(&[Said::Level(Source::Me, 0.2)])[0], Check::Listening);
     assert_eq!(checked(&[Said::Level(Source::Me, 0.4)])[0], Check::Heard);
+}
+
+#[test]
+fn a_microphone_named_is_given_to_the_program_as_the_contract_says() {
+    let folder = tempfile::tempdir().unwrap();
+    let held = ONE_AT_A_TIME.lock().unwrap();
+    let path = folder.path().join("wholeheard-capture");
+    fs::write(&path, "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$2/args\"\n").unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    let (mut started, said) = Recording::start(&path, folder.path(), Some("-a name with spaces")).unwrap();
+    drop(held);
+    while said.recv_timeout(Duration::from_secs(5)).is_ok() {}
+    assert!(
+        started.ended() || {
+            std::thread::sleep(Duration::from_millis(200));
+            started.ended()
+        }
+    );
+    assert_eq!(
+        fs::read_to_string(folder.path().join("args"))
+            .unwrap()
+            .lines()
+            .skip(2)
+            .collect::<Vec<_>>(),
+        ["--microphone", "-a name with spaces"]
+    );
+}
+
+#[test]
+fn a_microphone_gone_is_read_and_a_microphone_line_is_no_event_of_a_recording() {
+    assert_eq!(recording::read(r#"{"event":"microphone_gone"}"#), Some(Said::MicrophoneGone));
+    assert_eq!(recording::read(r#"{"event":"microphone_back"}"#), Some(Said::MicrophoneBack));
+    assert_eq!(recording::read(r#"{"event":"microphone","name":"a","description":"b"}"#), None);
+}
+
+/// What `microphones` answers, by a program played here.
+fn listed(script: &str) -> std::io::Result<Vec<recording::Listed>> {
+    let folder = tempfile::tempdir().unwrap();
+    let path = folder.path().join("wholeheard-capture");
+    let held = ONE_AT_A_TIME.lock().unwrap();
+    fs::write(&path, format!("#!/bin/sh\n[ \"$1\" = microphones ] || exit 9\n{script}\n")).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    let listed = recording::microphones(&path);
+    drop(held);
+    listed
+}
+
+#[test]
+fn the_microphones_are_what_the_program_lists_each_made_fit_to_show() {
+    let got = listed(
+        r#"echo '{"event":"microphone","name":"alsa","description":"Digital   Microphone"}'
+echo '{"event":"an event of a later version"}'
+echo '{"event":"device","source":"me","name":"device_name","description":"A device"}'
+echo '{"event":"started","name":"started_name","description":"A start"}'
+echo 'no event'
+echo '{"event":"microphone","name":"","description":"No name"}'
+echo '{"event":"microphone","name":"odd","description":"unnamed"}'"#,
+    )
+    .unwrap();
+    assert_eq!(
+        got,
+        [recording::Listed {
+            name: "alsa".into(),
+            description: "Digital Microphone".into()
+        }]
+    );
+}
+
+#[test]
+fn no_line_is_nothing_to_choose_from_and_a_failure_is_said() {
+    assert_eq!(listed("").unwrap(), []);
+    assert!(listed("echo cannot >&2; exit 1").is_err());
+}
+
+#[test]
+fn a_program_that_does_not_answer_the_list_is_given_up_on() {
+    let started = std::time::Instant::now();
+    assert!(listed("sleep 30").is_err());
+    assert!(started.elapsed() < Duration::from_secs(10), "{:?}", started.elapsed());
 }

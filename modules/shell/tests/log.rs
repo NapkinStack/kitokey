@@ -104,7 +104,7 @@ exit 1"#,
     );
     let sessions = folder.path().join("sessions");
     fs::create_dir(&sessions).unwrap();
-    let (_recording, said) = Recording::start(&records, &sessions).unwrap();
+    let (_recording, said) = Recording::start(&records, &sessions, None).unwrap();
     while !matches!(said.recv_timeout(Duration::from_secs(10)).unwrap(), Said::Failed(_)) {}
 
     // A program that is not there: the making is said to have failed, not left begun.
@@ -117,7 +117,7 @@ exit 1"#,
         .is_err()
     );
     assert!(Summarising::start(&folder.path().join("nowhere"), &session, "http://127.0.0.1:9/v1", "m", None).is_err());
-    assert!(Recording::start(&folder.path().join("nowhere"), &sessions).is_err());
+    assert!(Recording::start(&folder.path().join("nowhere"), &sessions, None).is_err());
 
     // A command refused by a settings file broken by hand: `settings::read` names its whole path.
     let broken = folder.path().join("settings.toml");

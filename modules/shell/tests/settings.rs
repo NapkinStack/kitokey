@@ -618,3 +618,33 @@ fn a_failure_of_the_settings_file_names_it_without_its_path_even_through_a_link(
         );
     }
 }
+
+#[test]
+fn a_microphone_chosen_is_kept_and_auto_takes_it_away() {
+    let folder = tempfile::tempdir().unwrap();
+    let path = folder.path().join("settings.toml");
+    fs::write(&path, "reminder = false # mine\n").unwrap();
+    let mut settings = read(&path).unwrap();
+    assert_eq!(settings.microphone, None);
+    settings.microphone = Some("alsa_laptop".into());
+    settings.microphone_description = Some("Digital Microphone".into());
+    write(&path, &settings).unwrap();
+    let again = read(&path).unwrap();
+    assert_eq!(again.microphone.as_deref(), Some("alsa_laptop"));
+    assert_eq!(again.microphone_description.as_deref(), Some("Digital Microphone"));
+    let mut auto = again;
+    auto.microphone = None;
+    auto.microphone_description = None;
+    write(&path, &auto).unwrap();
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(!text.contains("microphone"), "{text}");
+    assert!(text.contains("# mine"), "{text}");
+}
+
+#[test]
+fn a_microphone_written_blank_is_auto() {
+    let folder = tempfile::tempdir().unwrap();
+    let path = folder.path().join("settings.toml");
+    fs::write(&path, "microphone = \"  \"\n").unwrap();
+    assert_eq!(read(&path).unwrap().microphone, None);
+}
