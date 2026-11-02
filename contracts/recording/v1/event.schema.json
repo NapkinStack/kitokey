@@ -170,18 +170,31 @@
           "const": "microphone"
         },
         "name": {
-          "description": "What `--microphone` takes: the system's own, which may hold a Bluetooth address. Never logged, never shown.",
-          "type": "string"
+          "description": "What `--microphone` takes back: an id of capture's, stable, holding no Bluetooth address.",
+          "type": "string",
+          "minLength": 1
         },
         "description": {
           "description": "As a person reads it; never an address.",
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
         "event",
         "name",
         "description"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "microphone_back"
+        }
+      },
+      "required": [
+        "event"
       ]
     },
     {
@@ -200,7 +213,8 @@
               "level",
               "device",
               "microphone_gone",
-              "microphone"
+              "microphone",
+              "microphone_back"
             ]
           }
         }

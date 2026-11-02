@@ -40,7 +40,8 @@ order of the events, and what each means, are said here and nowhere else.
 | `silent` | `source`; `nothing`: `true` when not one sample other than an exact zero came — optional | This source has given no sound for ten seconds. Said once per silence. `nothing`: the device delivers nothing at all — no microphone at rest gives exact zeros —, not a quiet room (#361); absent, unknown |
 | `heard` | `source` | A source that was said `silent` gives sound again |
 | `level` | `source`; `level`: how loud it is now, from 0 (silence) to 1 (the loudest it can be), a number | About ten times a second for each source being recorded, after `started` and before `stopped`: for a meter that moves as sound comes (cycle 03, D22) |
-| `microphone_gone` | none | The microphone named at the start (*A microphone named*, below) is not there, or could not be looked for: `me` is recorded as with no name. Before `started`, or after it each time the one named goes |
+| `microphone_gone` | none | The microphone named at the start (*A microphone named*, below) was not found or could not be looked for, before `started`; or, after it, was seen to have gone: `me` is recorded as with no name |
+| `microphone_back` | none | The microphone said gone is there again, whether a stream follows or not (*A microphone named*, below) |
 | `device` | `source`; `device`: the name the system gives the device, or `null` | This source is now recorded from another device: the user chose another default, or the one recorded was taken away and the system named another — or, for `others`, a call plays on an output other than the default, or left it for the default (cycle 04, D41) — or, for `me`, a call holds a microphone other than the one recorded, or no longer does (cycle 05, D66). Its track goes on, in the form it opened with (`session-audio`). `null`: the system names no device for it, or the call let go of it, and nothing comes from it before a `device` names one. Said at each change, after `started` and before `stopped`; of a source said `unavailable`, as *A microphone that waits* says, below |
 | `stopped` | `folder`; `seconds`: the recording's length, a number | The session's files are whole and `session.json` says `stopped`. **Last**, and only when the recording was stopped as below |
 | `microphone` | `name`: what the start takes; `description`: as a person reads it | One microphone of what `microphones` lists (*A microphone named*, below). Never said by a recording |
@@ -79,23 +80,31 @@ contract: it is read by people, never by a consumer.
 Cycle 06, D74; additive: a consumer that names none, and asks nothing, sees no change.
 
 **The list.** `wholeheard-capture microphones` prints one `microphone` line for each microphone the
-system offers by name, then ends well. No line: nothing to choose from — the system has no such list
-(today, all but Linux with PipeWire), or no microphone: no list is offered. It reads the system and opens nothing. It fails as
-*Failing* says, when the list could not be read. `name` is the system's own and may hold a Bluetooth
-address: a consumer keeps it where the user's settings are, and never logs it, nor shows it;
-`description` holds no address.
+system offers by name, then ends well. It reads the system and opens nothing. It fails as *Failing*
+says, when the list could not be read. No line: nothing to choose from — the system has no such list
+(today, all but Linux with PipeWire), or no microphone: no list is offered. A choice the user already
+kept is still shown, so that they can go back to Auto.
+
+`name` is capture's id for a microphone: stable from one run to the next, to be kept and given back
+as it is, its form meaning nothing to a consumer. No line of this page holds a Bluetooth address:
+`name` holds a digest in its place, `description` none. `device` and `started`'s `sources` carry the
+`description`, never `name`, and neither they nor anything else says which id a recording is on.
 
 **The start.** `wholeheard-capture record <sessions-folder> --microphone <name>`, a `name` of that
 list. With `--as v1`, the program refuses it as it refuses any other wrong use, and records nothing:
-the first form follows nothing.
+the first form never follows a microphone, as *A microphone that waits* says of it.
 
 | Named at the start | `me` records | Said |
 |---|---|---|
 | Nothing | The microphone a call holds, otherwise the default input: as above | As above |
 | A microphone that is there | That one for the whole recording: neither a call holding another nor a new default moves it | `started`, its description |
-| A headset's, that a stream would switch to another profile | That one, only while a call holds it, listened to without ever making it run (ADR-0015); no stream otherwise, whatever else a call holds. No profile is ever asked for, even for a name the user chose | `unavailable` at the start, as *A microphone that waits* says, unless a call already holds it; `device` once it comes, `device: null` when the call lets go |
-| A name that is not there, at the start or later | As with nothing named, its track going on | `microphone_gone`, then what is recorded by `started` or `device`, as above |
-| A name gone that comes back | That one again, its track going on | `device` |
+| A headset's, that a stream would switch to another profile | That one, only while a call holds it, listened to without ever making it run (ADR-0015); no stream otherwise, whatever else a call holds. No profile is ever asked for, even for a name the user chose | A call already running it at the start: `started`, its description. Otherwise `unavailable`, as *A microphone that waits* says — no call on it, or one that holds it and does not run it yet —, and `device` once a stream has its form. `device: null` when the call lets go |
+| A name not found at the start, or that could not be looked for | As with nothing named, its track going on | `microphone_gone` before `started`, which names what is recorded |
+| A name seen to have gone during the recording | As with nothing named, its track going on | `microphone_gone`, then `device` as above. The graph not read during a recording says nothing and moves nothing: the stream named goes on |
+| A name said gone that is there again | What the second and third rows say of it: an ordinary microphone at once, its track going on; a headset's with no call on it, no stream | `microphone_back`, whether or not a stream follows; then `device` with its description, or `device: null` at most when what stood in closes |
+
+`microphone_gone` and `microphone_back` alternate, the first of them `microphone_gone`. Whether
+`me` is recorded, and from what, is never read from them: it is `device`'s to say.
 
 ## What it never does
 
@@ -189,7 +198,18 @@ Valid — what `microphones` prints:
 
 ```text
 {"event":"microphone","name":"alsa_input.pci-0000_00_1f.3.analog-stereo","description":"Digital Microphone"}
-{"event":"microphone","name":"bluez_input.unknown","description":"Headset Microphone"}
+{"event":"microphone","name":"bluez_input.unknown.0#3f6a91c2d07e4b18","description":"Headset Microphone"}
+```
+
+Valid — a headset's microphone named, gone, then back with no call on it:
+
+```text
+{"event":"unavailable","source":"me","reason":"the microphone chosen is a Bluetooth headset's: the microphone waits for a call to take it"}
+{"event":"started","folder":"<sessions-folder>/2026-10-13_14-05","sources":{"me":"unavailable","others":"Speaker"}}
+{"event":"microphone_gone"}
+{"event":"device","source":"me","device":"Digital Microphone"}
+{"event":"microphone_back"}
+{"event":"device","source":"me","device":null}
 ```
 
 To refuse: a line that is not a JSON object with an `event`.
