@@ -10,9 +10,12 @@ use std::{
 
 /// A run refused before any device is opened, and the lines of its log.
 fn refused(args: &[&str], logs: &Path) -> (String, Vec<serde_json::Value>, String) {
-    // No sound server within its reach, and a short time: were a guard to fail, it opens no real device
-    // and does not stay (seen: ALSA's `Host is down`, no source-output, "no source could be opened").
+    // No sound server within its reach, no ALSA device defined, and a short time: were a guard to fail,
+    // it opens no real device and does not stay (seen under strace: no `/dev/snd` opened, no
+    // source-output, "no source could be opened").
     let nowhere = tempfile::tempdir().unwrap();
+    let alsa = nowhere.path().join("alsa.conf");
+    fs::write(&alsa, "").unwrap();
     let mut run = Command::new(env!("CARGO_BIN_EXE_wholeheard-capture"))
         .args(args)
         .env("WHOLEHEARD_LOG_DIR", logs)
@@ -22,6 +25,7 @@ fn refused(args: &[&str], logs: &Path) -> (String, Vec<serde_json::Value>, Strin
         .env("PIPEWIRE_REMOTE", "wholeheard-none")
         .env("PULSE_SERVER", format!("unix:{}/none", nowhere.path().display()))
         .env("XDG_RUNTIME_DIR", nowhere.path())
+        .env("ALSA_CONFIG_PATH", &alsa)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

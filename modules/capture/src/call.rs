@@ -276,6 +276,31 @@ pub fn microphones(dump: &str) -> Result<Vec<(String, String)>, String> {
     Ok(listed)
 }
 
+/// What the local side should record at the start, and whether the microphone `name` named is there:
+/// `dump`, the graph as read, none when it could not be — on PipeWire; `default`, the default input's
+/// name, asked only then. Not read, a name is not found, and said so: the start never waits on it.
+pub fn at_the_start(
+    pipewire: bool,
+    dump: Option<&str>,
+    ours: u64,
+    name: Option<&str>,
+    default: impl FnOnce() -> Option<String>,
+) -> (Me, bool) {
+    if !pipewire {
+        return (Me::Default, name.is_none());
+    }
+    let read = dump.and_then(|dump| wanted(dump, ours, name).ok());
+    read.unwrap_or_else(|| (me_unread(default().as_deref()), name.is_none()))
+}
+
+/// What the graph says the local side should record, and whether a name given is there; none given, it is.
+pub fn wanted(dump: &str, ours: u64, name: Option<&str>) -> Result<(Me, bool), String> {
+    match name {
+        Some(name) => named(dump, ours, name),
+        None => me(dump, ours).map(|me| (me, true)),
+    }
+}
+
 /// The same, when the graph does not read: only the default input's name is left, if that. A
 /// headset's is never opened actively, and a default not named may be one.
 pub fn me_unread(default: Option<&str>) -> Me {

@@ -374,9 +374,10 @@ stand_in wholeheard_e2e_headset "bluez5.loopback=true"; headset=$!
 feed=wholeheard_e2e_mic_d stand_in wholeheard_e2e_x_AA_BB_CC_DD_EE_FF; addressed=$!
 sleep 1
 
-# The list: every source, by its name and description; no output, nothing opened.
+# The list: every source, by its name and description; no output, nothing opened; no address in any line.
 listed_as=0; "$bin" microphones > "$work/o.list" 2> "$work/o.list-errors" || listed_as=$?
-sed 's/^/    /' "$work/o.list" >> .evidence/e2e.txt
+# The run's own alone in the evidence: the computer's microphones are named after its owner at times.
+grep 'wholeheard_e2e_' "$work/o.list" | sed 's/^/    /' >> .evidence/e2e.txt
 check test "$listed_as" = 0 -a ! -s "$work/o.list-errors"
 check grep -q '"name":"wholeheard_e2e_named"' "$work/o.list"
 check grep -q '"name":"wholeheard_e2e_headset"' "$work/o.list"

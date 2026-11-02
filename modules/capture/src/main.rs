@@ -272,7 +272,7 @@ fn follow(tell: Sender<Moved>, me: Option<(Sender<Wanted>, Option<String>)>, zer
             }
             fed = Some(now);
             if let Some((me, name)) = &me
-                && let Ok(wanted) = wanted_me(&dump, ours, name.as_deref())
+                && let Ok(wanted) = call::wanted(&dump, ours, name.as_deref())
             {
                 let _ = me.send(wanted);
             }
@@ -414,23 +414,21 @@ fn metadata(key: &str) -> Option<String> {
     Some(printed)
 }
 
-/// What the graph says the local side should record, and whether a name given is there.
-fn wanted_me(dump: &str, ours: u64, name: Option<&str>) -> Result<Wanted, String> {
-    match name {
-        Some(name) => call::named(dump, ours, name),
-        None => call::me(dump, ours).map(|me| (me, true)),
-    }
-}
-
-/// What the local side should record now. Where PipeWire is not, the default, as ever; a name is
-/// not there. Where the graph does not read, the default input's name alone decides: a headset's is
-/// not opened, and a name was not found.
+/// What the local side should record now (`call::at_the_start`). Where PipeWire is not, the default, as
+/// ever. Where the graph does not read, the default input's name alone decides: a headset's is not opened.
 fn me_now(host: &Host, name: Option<&str>) -> Wanted {
-    if host.id().name() != "PipeWire" {
-        return (Me::Default, name.is_none());
-    }
-    let read = graph().and_then(|dump| wanted_me(&dump, u64::from(std::process::id()), name).ok());
-    read.unwrap_or_else(|| (unread_me(), name.is_none()))
+    let pipewire = host.id().name() == "PipeWire";
+    let default = || {
+        let key = "default.audio.source";
+        metadata(key).and_then(|printed| wholeheard_capture::standing_for(&printed, key))
+    };
+    call::at_the_start(
+        pipewire,
+        graph().filter(|_| pipewire).as_deref(),
+        u64::from(std::process::id()),
+        name,
+        default,
+    )
 }
 
 /// The same, with no graph: the default input's name alone.

@@ -920,3 +920,36 @@ fn a_headset_named_gone_then_back_with_no_call_is_said_back_and_waits() {
     let (want, present) = named(there_graph, &id);
     assert_eq!((want, said.read(present)), (Me::Wait, Some(Named::Back)));
 }
+
+#[test]
+fn a_name_given_is_said_not_found_when_the_graph_cannot_be_read_at_the_start() {
+    let laptop = || Some("alsa_input.laptop".to_string());
+    assert_eq!(call::at_the_start(true, None, OURS, Some("any"), laptop), (Me::Default, false));
+    assert_eq!(call::at_the_start(true, None, OURS, None, laptop), (Me::Default, true));
+    // Unread, a headset's default is never opened, a name given or not.
+    let headset = || Some(AIRPODS.to_string());
+    assert_eq!(call::at_the_start(true, None, OURS, Some("any"), headset), (Me::Wait, false));
+}
+
+#[test]
+fn a_name_given_where_pipewire_is_not_is_said_not_found_and_the_default_recorded() {
+    let never = || -> Option<String> { panic!("no default is asked where PipeWire is not") };
+    assert_eq!(call::at_the_start(false, None, OURS, Some("any"), never), (Me::Default, false));
+    assert_eq!(call::at_the_start(false, None, OURS, None, never), (Me::Default, true));
+}
+
+#[test]
+fn a_graph_read_at_the_start_decides_by_the_name_given() {
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    let dump = Value::Array(graph).to_string();
+    let unasked = || -> Option<String> { panic!("the default is asked only of a graph unread") };
+    assert_eq!(
+        call::at_the_start(true, Some(&dump), OURS, Some("alsa_input.laptop"), unasked),
+        (held("alsa_input.laptop", "Digital Microphone", false), true)
+    );
+    assert_eq!(
+        call::at_the_start(true, Some(&dump), OURS, Some("gone"), unasked),
+        (Me::Default, false)
+    );
+}
