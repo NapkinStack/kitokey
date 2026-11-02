@@ -120,6 +120,8 @@ RECORDER.write_text(
 here=$(dirname "$0")
 # The system's microphones, as the scenario lists them (D74): none, the list is not offered.
 if [ "$1" = microphones ]; then
+  # Slow to answer, when the scenario says so: a choice is made before the list is read (D74).
+  [ -e "$here/microphones-slow" ] && sleep 1
   if [ -e "$here/microphones-unread" ]; then echo "the system's microphones could not be read" >&2; exit 1; fi
   [ -e "$here/microphones" ] && cat "$here/microphones"
   exit 0
@@ -2100,6 +2102,7 @@ def microphone_chosen(now: dt.datetime) -> None:
     print("AO. Auto and the system's microphones, keyboard alone, either theme, inside 380 × 400; kept, for the next recording; none offered where capture lists none; a new device opens nothing (D74)")
     listed = WORK / "microphones"
     unread = WORK / "microphones-unread"
+    slow = WORK / "microphones-slow"
     args = WORK / "recorder-args"
     def lines(*pairs) -> str:
         return "".join(json.dumps({"event": "microphone", "name": name, "description": said}) + "\n" for name, said in pairs)
@@ -2175,6 +2178,23 @@ def microphone_chosen(now: dt.datetime) -> None:
                 check(f"{short} {theme}: Escape closes, the focus back on the name", not got["panel"] and got["active"] == "small-microphone", got)
                 time.sleep(0.5)
                 check(f"{short} {theme}: arrows then Escape leave the choice as it was", 'microphone = "alsa_laptop"' in window.file.read_text() and title in browser.execute_script(state)["name"], window.file.read_text())
+                # Home and End move alone; Space chooses, keeps and closes, as Enter does.
+                keys(browser, Keys.ENTER)
+                check(f"{short} {theme}: opened for Home and End", wait_for(browser, lambda b: b.execute_script(state)["panel"], 3))
+                keys(browser, Keys.END)
+                check(f"{short} {theme}: End reaches the last row", browser.execute_script(state)["value"] == "bluez_input.AA_BB", browser.execute_script(state))
+                keys(browser, Keys.HOME)
+                check(f"{short} {theme}: Home reaches Auto", browser.execute_script(state)["value"] == "", browser.execute_script(state))
+                time.sleep(0.5)
+                check(f"{short} {theme}: Home and End choose nothing", 'microphone = "alsa_laptop"' in window.file.read_text() and browser.execute_script(state)["panel"], window.file.read_text())
+                keys(browser, Keys.END, Keys.SPACE)
+                got = browser.execute_script(state)
+                check(f"{short} {theme}: Space chooses the row and closes, the focus on the name", not got["panel"] and got["active"] == "small-microphone" and long_name[:20] in got["name"], got)
+                check(f"{short} {theme}: what Space chose is kept", wait_for(browser, lambda b: 'microphone = "bluez_input.AA_BB"' in window.file.read_text(), 3), window.file.read_text())
+                keys(browser, Keys.ENTER)
+                wait_for(browser, lambda b: b.execute_script(state)["panel"], 3)
+                keys(browser, Keys.HOME, Keys.ARROW_DOWN, Keys.SPACE)
+                check(f"{short} {theme}: Space chooses again the first microphone", wait_for(browser, lambda b: 'microphone = "alsa_laptop"' in window.file.read_text(), 3), window.file.read_text())
                 # So many that they scroll: each row the keyboard reaches is seen whole, short names and long.
                 for count, length in ((14, 0), (20, 100)):
                     many = [(f"m{n}", f"Microphone {n} " + "x" * max(0, length - 14)) for n in range(count)]
@@ -2237,12 +2257,22 @@ def microphone_chosen(now: dt.datetime) -> None:
             with window as browser:
                 wait_for(browser, lambda b: b.execute_script(state)["shown"], 8)
                 check(f"{short} {theme}: started again, the name says the choice kept", title in browser.execute_script(state)["name"], browser.execute_script(state))
-                press(browser, "small-microphone")
-                wait_for(browser, lambda b: b.execute_script(state)["panel"], 3)
-                # A click chooses and closes, as a menu does.
-                browser.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")[0].click()
-                wait_for(browser, lambda b: not b.execute_script(state)["panel"], 3)
-                check(f"{short} {theme}: a click on Auto chooses it and closes", auto in browser.execute_script(state)["name"], browser.execute_script(state))
+                # A click chooses and closes, as a menu does — before the list read at the opening answers:
+                # that answer, older than the choice, never takes it back.
+                slow.touch()
+                def click_row(index: int) -> None:
+                    press(browser, "small-microphone")
+                    wait_for(browser, lambda b: b.execute_script(state)["panel"], 3)
+                    browser.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")[index].click()
+                    wait_for(browser, lambda b: not b.execute_script(state)["panel"], 3)
+                    time.sleep(1.6)
+                click_row(0)
+                check(f"{short} {theme}: a click on Auto chooses it and closes, still Auto once the list has answered", auto in browser.execute_script(state)["name"], browser.execute_script(state))
+                click_row(1)
+                check(f"{short} {theme}: a click on a microphone before the list answers: still its name once it has", title in browser.execute_script(state)["name"], browser.execute_script(state))
+                click_row(0)
+                slow.unlink()
+                check(f"{short} {theme}: Auto again, still Auto once the list has answered", auto in browser.execute_script(state)["name"], browser.execute_script(state))
                 check(f"{short} {theme}: Auto takes the microphone out of the settings", wait_for(browser, lambda b: 'microphone = ' not in window.file.read_text(), 3), window.file.read_text())
                 args.unlink(missing_ok=True)
                 press(browser, "small-record")

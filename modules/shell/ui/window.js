@@ -2741,7 +2741,10 @@ function showSmall(words) {
       picks.append(said);
     }
   };
+  // Each choice made: a list asked before it answers with the choice as it was then, never taken.
+  let choicesMade = 0;
   const choosePick = async (one) => {
+    choicesMade += 1;
     const before = known.chosen;
     known = { ...known, chosen: one };
     paintPick();
@@ -2763,11 +2766,12 @@ function showSmall(words) {
     if (back) pick.focus();
   };
   const readPicks = async () => {
+    const asked = choicesMade;
     const read = await invoke("microphones_listed").catch(() => null);
     if (read === null) return;
     const same = JSON.stringify(read.list) === JSON.stringify(known.list) && read.unread === known.unread;
-    // A choice made while this was being read stands.
-    known = { ...read, chosen: picks.hidden ? read.chosen : known.chosen };
+    // The list and whether it read are taken; the choice, only if none was made since it was asked.
+    known = { ...read, chosen: asked === choicesMade ? read.chosen : known.chosen };
     microphone.hidden = known.list.length === 0 && !known.unread && known.chosen === null;
     paintPick();
     if (!picks.hidden && !same) {

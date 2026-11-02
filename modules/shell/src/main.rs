@@ -960,10 +960,11 @@ struct Microphones {
 /// Asynchronous: it waits on a program, up to some seconds.
 #[tauri::command]
 async fn microphones_listed(app: AppHandle) -> Microphones {
+    // The choice as it is when asked: the page knows a choice made since, and keeps its own (D74).
+    let settings = app.state::<Shell>().settings();
     let program = program("wholeheard-capture", "WHOLEHEARD_CAPTURE");
     let list = tauri::async_runtime::spawn_blocking(move || recording::microphones(&program)).await;
     let list = list.unwrap_or_else(|error| Err(std::io::Error::other(error.to_string())));
-    let settings = app.state::<Shell>().settings();
     let chosen = settings.microphone.map(|name| recording::Listed {
         description: settings.microphone_description.unwrap_or_else(|| name.clone()),
         name,
