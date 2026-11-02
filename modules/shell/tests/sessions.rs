@@ -103,7 +103,7 @@ fn each_session_says_its_day_length_state_what_it_holds_and_weighs_newest_first(
     fs::create_dir_all(root.join("notes")).unwrap();
     session(
         &root.join("2026-10-15_10-00"),
-        r#"{"contract":"session-audio/v9","started":"2026-10-15T10:00:00+02:00"}"#,
+        r#"{"contract":"session-audio/vnext","started":"2026-10-15T10:00:00+02:00"}"#,
         &[],
     );
     session(&root.join("2026-10-14_10-00"), "not json", &[]);

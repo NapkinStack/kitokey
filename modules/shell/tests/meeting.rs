@@ -85,7 +85,7 @@ fn transcript_lines_the_contract_does_not_allow_are_left_out_and_counted() {
     assert_eq!(said, ["local", "remote"]);
 
     // A header that is not the first line, or of another version: not a transcript of this one.
-    for first in [lines[6].to_string(), header.replace("transcript/v1", "transcript/v2")] {
+    for first in [lines[6].to_string(), header.replace("transcript/v1", "transcript/vnext")] {
         fs::write(folder.path().join("transcript.jsonl"), format!("{first}\n{header}\n")).unwrap();
         assert_eq!(meeting::transcript(folder.path()), Read::Unreadable, "{first}");
     }
