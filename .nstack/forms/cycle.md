@@ -41,6 +41,15 @@ project's log issue (`.nstack/handbook/06-decisions.md` §9).
 
 <What binds this deliverable that the front matter cannot hold.>
 
+## What needs a person
+
+<What only a person can do in this cycle: a trial, a word, a gesture. `nstack plan` opens with it; a row goes
+once its deliverables are done. Everything else, agents carry. Delete the rows you do not need.>
+
+| Deliverable | Who | The literal gesture |
+|---|---|---|
+| <D1> | <who> | <the literal gesture> |
+
 ## Out of scope
 
 <Not done in this cycle, even if time remains.>
