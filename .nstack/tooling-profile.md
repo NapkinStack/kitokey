@@ -13,7 +13,7 @@
 | Access to official sources | Versions, APIs, real constraints | | |
 | Running commands and tests | Making the oracle actually executable | uv (`uv tool install`) | NapkinStack foundation |
 | Git, issue and pull request interaction | Traceability, small batches | | |
-| Agent identity | Changes arrive under the agent's own name, behind the approval the project asks for | | |
+| Agent identity | Changes arrive under the agent's own name, behind the approval the project asks for | `nstack agent add` (one GitHub App per agent, a clone of its own), `nstack agent run` | NapkinStack foundation |
 | UI inspection and screenshots | UX validation beyond "it compiles" | | |
 | Driving a browser or an emulator | Explored scenarios of a test sheet, with their evidence | | |
 | Security analysis | Integrated automated checks | gitleaks (hook and CI), GitHub push protection; zizmor and actionlint for the workflows | NapkinStack foundation |

@@ -281,7 +281,8 @@ What the skeleton and its engine provide from day one:
   another module's data, contract compatibility and consumers, lifecycle statuses and
   dates, one pull request one module, the module envelope;
 - CI with the checks of the `standard` level;
-- CODEOWNERS, and the checklist of forge settings, which the engine verifies read-only;
+- CODEOWNERS, and the checklist of forge settings, which the engine verifies read-only (`doctor`) and
+  applies under the owner's own credential (`settings --apply`);
 - module creation;
 - new skeleton versions, offered as a reviewed pull request and merged with the project's
   adaptations.

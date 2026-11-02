@@ -12,11 +12,11 @@
 
 | # | Rule |
 |---|---|
-| E1 | **Never an automatic retry without analysing the side effects.** |
-| E2 | **Every external call has an explicit timeout.** A call without one is an outage waiting to happen. |
-| E3 | **No secret and no personal data in the logs.** |
-| E4 | **An error quietly swallowed is a future incident.** |
-| E5 | **A module in production with no way of knowing it is unwell is not ready.** |
+| OPS1 | **Never an automatic retry without analysing the side effects.** |
+| OPS2 | **Every external call has an explicit timeout.** A call without one is an outage waiting to happen. |
+| OPS3 | **No secret and no personal data in the logs.** |
+| OPS4 | **An error quietly swallowed is a future incident.** |
+| OPS5 | **A module in production with no way of knowing it is unwell is not ready.** |
 
 ---
 

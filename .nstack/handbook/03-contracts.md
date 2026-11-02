@@ -161,7 +161,7 @@ test naming `minutes/v3` fails the producer's declaration of v3, and costs the c
 ### The three guardrails
 
 **① The deprecation date is a check.** From PR 1 onwards, v1 carries a removal date. A
-check fails once the date has passed and consumers remain. Without it, you accumulate
+check fails once the date has passed while the version is still provided (M6). Without it, you accumulate
 versions nobody dares remove.
 
 **② The contraction is mandatory.** Step 4 is the most often forgotten, and it is

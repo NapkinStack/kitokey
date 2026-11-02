@@ -44,7 +44,8 @@ preserving them.
 | **An AI agent** | `AGENTS.md` (kernel) + the module's local `AGENTS.md` + the triggered playbooks |
 | **A new developer** | `00-overview.md` → `02-modules.md` → `05-workflow.md` |
 | **A tech lead / architect** | `00-overview.md` → `02` → `03` → `07` |
-| **A product owner** | `00-overview.md` → `06-decisions.md` |
+| **The decider** | `project.md` (what needs a person, the closure) → `06-decisions.md` |
+| **Joining, with an agent** | `CONTRIBUTING.md` → `glossary.md` → `project.md` → `05-workflow.md` |
 | **Whoever creates the project** | `INSTALL.md`, then `09-platform.md` |
 
 ### Project contents
@@ -94,11 +95,7 @@ preserving them.
 The documents in `.nstack/handbook/` are **the reference**: they explain, justify and detail. They
 are **not** meant to be loaded into an agent's context.
 
-What an agent loads is:
-
-- `AGENTS.md` (the kernel, always);
-- the `AGENTS.md` of the module concerned (always);
-- one or more `.nstack/playbooks/` (only when triggered).
+What an agent loads, and in which order, is said once: the kernel's §4.
 
 If you need to put a rule in the kernel, re-read `07-governance.md` § "Where does this
 rule live?" first. The answer is very often "in CI", not "in the prompt".

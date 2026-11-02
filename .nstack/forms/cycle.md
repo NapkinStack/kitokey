@@ -8,7 +8,7 @@ deliverables:
   - id: D1
     title: "<An outcome a user can observe; for a spike, the question it answers>"
     module: "<module name>"   # null for a spike run outside the code
-    state: proposed       # proposed | ready (testable criteria) | in-progress | accepted | deferred | dropped
+    state: proposed       # proposed | ready (testable criteria) | in-progress (older, still read) | accepted (at the closure: nstack deliver --write-states) | deferred | dropped — held and delivered are read from records, never written
     acceptance:           # given · when · then, required from ready on: the test sheet starts here
       - "Given <context>, when <action>, then <observable result>"
 # outcome: completed      # closed: completed | shipped — stopped: reframed | stopped
@@ -43,8 +43,9 @@ project's log issue (`.nstack/handbook/06-decisions.md` §9).
 
 ## What needs a person
 
-<What only a person can do in this cycle: a trial, a word, a gesture. `nstack plan` opens with it; a row goes
-once its deliverables are done. Everything else, agents carry. Delete the rows you do not need.>
+<What only a person can do in this cycle: a trial, a word, a gesture. `nstack plan` opens with it and stops
+showing a row once its deliverables are done: never delete one by hand. Everything else, agents carry.
+At framing, delete the rows you do not need.>
 
 | Deliverable | Who | The literal gesture |
 |---|---|---|

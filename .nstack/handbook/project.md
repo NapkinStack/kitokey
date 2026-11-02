@@ -63,12 +63,12 @@ missing.
 
 ## A cycle's progress
 
-`nstack plan` opens with what needs a person: a charter or a cycle waiting for the decider's word, a cycle at its end
-or with nothing left to deliver, and each row of the cycle's *What needs a person* still open. A row goes when its
-deliverables are accepted, deferred or dropped; delivered, only a plain row whose gesture names what the record
-answers with. A row saying more than its ids (`D66, trial`) stays until then: a delivery proves a merge, never a
-person's answer. It says *Nothing needs you* only when that is certain: with no such section, or checks that fail,
-it says it cannot say. It reads the repository: a pull request waiting for a human approver is not in it yet.
+`nstack plan` opens with what needs a person — `Needs you (n):`, one line each: a charter or a cycle waiting for
+the decider's word, a cycle at its end or with nothing left to deliver, and each open row of the cycle's *What needs a
+person*. A row closes when its deliverables are accepted, deferred or dropped. A delivery record closes it only when
+the row names nothing but ids and its gesture cites what the record cites; a row saying more (`D66, trial`) waits for
+the person: a delivery proves a merge, never a person's answer. *Nothing needs you* is said only when certain; a
+cycle with no such section, or checks that fail, gives `Needs you: cannot say`. It reads the repository: a pull request waiting for a human approver is not in it yet.
 A decision whose criterion is due stays a warning below: an agent reads it, and only a missed one comes to a person.
 
 Read, never kept: `nstack plan` computes the progress from the accepted cycle's front matter and says it in
@@ -83,8 +83,8 @@ Nobody writes progress down during a cycle. Once a deliverable's work is merged 
 the agent records it, with no pull request and nothing under `docs/`, and the plan computes `delivered`:
 
 ```bash
-nstack deliver D30 --held '#412'                 # every criterion held by that pull request
-nstack deliver D30 --held '1=#412' --held '2=#415'   # criterion by criterion; an acceptance issue the cycle names counts
+nstack deliver D30 --held '#412' --session alice-d30                   # every criterion held by that pull request
+nstack deliver D30 --held '1=#412' --held '2=#415' --session alice-d30   # criterion by criterion; an acceptance issue the cycle names counts
 ```
 
 It is refused with no merge of the deliverable on the default branch since the cycle started, with a criterion
@@ -94,7 +94,8 @@ being taken over first. A delivered deliverable is not held, never goes stale, c
 closes; its recorder or the decider withdraws a record found wrong with `nstack unclaim`, and once a merge it names or every merge is seen reverted it reads as back in work; a revert that names nothing it undoes is not seen.
 The rule sees that a merge exists, never that a criterion is really met: the closure's reading is what
 catches a false record. Below the holds, `nstack plan` names what is merged and not recorded, read from commit
-titles, no approval checked. The closure writes the states, in one pull request: `nstack deliver --write-states`.
+titles, no approval checked. At the closure, `nstack deliver --write-states` writes each recorded deliverable as `accepted` in the cycle file,
+for the closure's one pull request: its approval is the acceptance (`.nstack/playbooks/framing.md` §5).
 
 *Accepted* counts what the decider accepted; a `dropped` deliverable counts in nothing. From its
 end date — the first day the cycle is over — the line says the circuit breaker fell and the

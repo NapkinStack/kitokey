@@ -6,8 +6,9 @@ body:
     attributes:
       value: |
         An acceptance **tracks** a deliverable; it does not describe it. The criteria are in
-        the cycle and are not copied here; the deliverable's state is set there, in a reviewed
-        pull request. This issue holds what a file holds badly: who runs what, on what, and
+        the cycle and are not copied here; the deliverable's state is never read from this issue:
+        `nstack deliver D<n> --held '<criterion>=#<this issue>'` records what it answers, and the
+        closure writes the state into the cycle. This issue holds what a file holds badly: who runs what, on what, and
         what they saw (.nstack/handbook/06-decisions.md §9). Each answer is a comment; a test
         sheet cites it as its evidence.
 

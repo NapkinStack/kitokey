@@ -25,7 +25,7 @@ organise deployment.
 flowchart TD
     T["Incoming task"] --> S{"Scope<br/>identifiable?"}
     S -->|No| S2["Clarify, or state<br/>an explicit assumption"] --> S
-    S -->|Yes| U["Load: the kernel<br/>+ the module's AGENTS.md and MANIFEST"]
+    S -->|Yes| U["Load in the kernel's §4 order: charter, your cycle section,<br/>project rules, the module's MANIFEST and AGENTS.md"]
 
     U --> N["+ the playbooks the task triggers:<br/>the kernel's table, §4 — the only list"]
     N --> V["LOCAL inventory:<br/>code, tests, contracts, decisions"]

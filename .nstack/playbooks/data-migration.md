@@ -12,11 +12,11 @@
 
 | # | Rule |
 |---|---|
-| D1 | **A migration is a production change**, not a code change. It falls under high-risk actions (kernel §5). |
-| D2 | **Each module owns its data.** No direct access to another module's database — you go through its contract. |
-| D3 | **Never rename or delete in place.** You add, you let both coexist, you migrate, you remove. |
-| D4 | **Every migration has a rollback plan**, or a written justification for not having one. |
-| D5 | **Never run a destructive migration without explicit confirmation.** |
+| DM1 | **A migration is a production change**, not a code change. It falls under high-risk actions (kernel §5). |
+| DM2 | **Each module owns its data.** No direct access to another module's database — you go through its contract. |
+| DM3 | **Never rename or delete in place.** You add, you let both coexist, you migrate, you remove. |
+| DM4 | **Every migration has a rollback plan**, or a written justification for not having one. |
+| DM5 | **Never run a destructive migration without explicit confirmation.** |
 
 ---
 
@@ -47,8 +47,8 @@ red: the irreversible step, the one that gets forgotten.
 Each step is **a pull request deployable on its own**. At no point is the system in a
 state where a rollback would break the data.
 
-Step 6 is the most forgotten. As with contracts: it carries a date, and a check fails
-once that date has passed.
+Step 6 is the most forgotten. It carries a date and an owner, in a *Technical debt*
+issue: no check reads a schema's dates, so the contraction is the project's to track.
 
 ---
 
