@@ -152,6 +152,52 @@
       ]
     },
     {
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "microphone_gone"
+        }
+      },
+      "required": [
+        "event"
+      ]
+    },
+    {
+      "description": "Printed by `microphones`, never by a recording.",
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "microphone"
+        },
+        "name": {
+          "description": "What `--microphone` takes back: an id of capture's, stable, holding no Bluetooth address.",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "description": "As a person reads it; never an address.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "event",
+        "name",
+        "description"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "microphone_back"
+        }
+      },
+      "required": [
+        "event"
+      ]
+    },
+    {
       "description": "An event this version does not name: a consumer ignores it.",
       "type": "object",
       "properties": {
@@ -165,7 +211,10 @@
               "heard",
               "stopped",
               "level",
-              "device"
+              "device",
+              "microphone_gone",
+              "microphone",
+              "microphone_back"
             ]
           }
         }
