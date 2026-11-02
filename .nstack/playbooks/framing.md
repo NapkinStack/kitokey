@@ -119,6 +119,9 @@ Write `docs/project/cycles/NN-<slug>.md` from `.nstack/forms/cycle.md`, with
 
 ## 3. Hand over to the decider
 
+A cycle's *What needs a person* holds what only a person can do, each with its literal gesture: fill it
+while framing, and keep it true. It is what `nstack plan` opens with.
+
 Present the charter, the cycle, the open questions, what went to *later*, and what you are
 unsure of. The decider amends, then sets `status: accepted` — on the charter, then on the
 cycle — in a pull request they approve; accepted after `start`, the cycle's `start` and `end`

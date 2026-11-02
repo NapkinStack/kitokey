@@ -63,7 +63,15 @@ missing.
 
 ## A cycle's progress
 
-Read, never kept: `nstack plan` computes it from the accepted cycle's front matter and says it in
+`nstack plan` opens with what needs a person: a charter or a cycle waiting for the decider's word, a cycle at its end
+or with nothing left to deliver, and each row of the cycle's *What needs a person* still open. A row goes when its
+deliverables are accepted, deferred or dropped; delivered, only a plain row whose gesture names what the record
+answers with. A row saying more than its ids (`D66, trial`) stays until then: a delivery proves a merge, never a
+person's answer. It says *Nothing needs you* only when that is certain: with no such section, or checks that fail,
+it says it cannot say. It reads the repository: a pull request waiting for a human approver is not in it yet.
+A decision whose criterion is due stays a warning below: an agent reads it, and only a missed one comes to a person.
+
+Read, never kept: `nstack plan` computes the progress from the accepted cycle's front matter and says it in
 one line, then who holds each deliverable.
 
 ```

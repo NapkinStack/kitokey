@@ -154,6 +154,10 @@ order, in separate pull requests, within the four steps above:
 Each step passes B1 and B6 on its own: no consumer names a version before it is declared, and
 nothing asks both manifests in one pull request.
 
+**A test that a consumer refuses a later version** names one that will never be declared —
+`minutes/vnext` — never the next number. B1 reads any declared version a module names, refused or not: a
+test naming `minutes/v3` fails the producer's declaration of v3, and costs the consumer a pull request of its own.
+
 ### The three guardrails
 
 **① The deprecation date is a check.** From PR 1 onwards, v1 carries a removal date. A
