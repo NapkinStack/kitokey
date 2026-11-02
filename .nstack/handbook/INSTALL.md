@@ -204,15 +204,32 @@ Issues → Labels:
   the ones the issue templates put on an issue, which GitHub drops without a word when the
   label does not exist
 
-Settings → Developer settings → GitHub Apps → New GitHub App, then install it on this
-repository — **the identity your agents work under** (`.nstack/handbook/07-governance.md` §7):
+A GitHub App per agent, installed on this repository — **the identity your agents work under**
+(`.nstack/handbook/07-governance.md` §7). One command, in your own terminal beside your browser,
+and two clicks at the forge — *Create GitHub App*, then *Install* on this repository:
+
+```bash
+nstack agent add scout                   # scout: your agent's name on this workstation
+nstack agent run scout -- claude         # then, every time: your agent, in its clone, as the App
+```
+
+It makes the App from a manifest, keeps its key in a folder of the agent's own
+(`~/.config/nstack/agents/scout/`, readable by you alone; on Windows under `%APPDATA%`, as your account's permissions there allow), and clones the project beside this one,
+`<project>-scout`, configured to commit and push as the App, with tokens minted per call for
+this repository alone and valid one hour. `nstack agent run` starts the agent there without
+your tokens, your SSH agent or your git configuration — and refuses to start it while your
+`~/.netrc` holds a login for the forge, which git would hand over whatever its configuration. It is not a sandbox: an agent that
+looks for your files can still read them — a container or a system user of its own closes that.
+When you cannot create an App for this repository's owner, `--mine` makes it on your account and
+asks the owner to approve its installation. What the App gets — set by the command, and read
+by no check afterwards:
 
 - [ ] Permissions: Contents, Pull requests and Issues read and write; Actions and Checks
-      read; Workflows write only when agents maintain CI; never Administration
-- [ ] No webhook; installable only on this account
-- [ ] Its private key stored outside any repository: the workstation's secret store, or
-      the CI's secrets
-- [ ] The agent's session reaches no human credential
+      read; Workflows write only when agents maintain CI (`--workflows`); never Administration
+- [ ] No webhook; private, unless `--mine`
+- [ ] Its private key stored outside any repository; in CI, the CI's secrets
+- [ ] The agent's session reaches no human credential: `nstack agent run` keeps them out of its
+      environment; keeping it out of your files is a sandbox's work
 - [ ] On `approval: agent`, one App per agent: an App never approves what it pushed
 
 Rather than click through these pages, print the calls that close the distance and run them
@@ -271,9 +288,9 @@ token, the GitHub part stays "not verified", never compliant.
 | `.copier-answers.yml` | The NapkinStack version and the creation answers | `nstack update`, the only thing that changes it |
 | `.github/` | What makes the rules non-bypassable | GitHub |
 
-> **`.nstack/handbook/` is never loaded into an agent's context.** It is the human reference. An
-> agent loads: the kernel, the module's `AGENTS.md`, a playbook when triggered. That is
-> the whole difference between a handbook and an operating system.
+> **`.nstack/handbook/` is never loaded into an agent's context.** It is the human reference.
+> What an agent loads, and in which order, is said once: the kernel's §4. That is the whole
+> difference between a handbook and an operating system.
 
 ---
 
@@ -283,8 +300,10 @@ token, the GitHub part stays "not verified", never compliant.
 nstack --help        # lists the commands
 nstack fitness       # manifests + boundaries + skills + plan + hygiene — before every commit
 nstack discover <idea-file>   # starts a discovery, for your agent
-nstack plan          # the discovery, the charter and the cycles (docs/project/), the decisions due at a closure, the project across its cycles, who holds what
+nstack plan          # what needs a person first; then the discovery, the charter and the cycles (docs/project/), the decisions due at a closure, the project across its cycles, who holds what
 nstack claim D<n> --session <s> --person @<you>   # takes a deliverable before its first change; nstack unclaim gives it back
+nstack deliver D<n> --held '#<pr>' --session <s>   # records a merged deliverable delivered; --write-states at the closure
+nstack agent add <name> · nstack agent run <name> -- <command>   # an agent's own App and clone; add is a person's
 nstack board [--dry-run]   # the cycles shown on GitHub as milestones and issues — CI runs it on every merge
 nstack skills        # generates the Claude Code skills from the playbooks
 nstack doctor        # the workstation and the forge's settings, read-only

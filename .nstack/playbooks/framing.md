@@ -104,8 +104,7 @@ on.
    and that answer is reviewed and merged like the rest.
 3. **Unknowns** — a blocking unknown becomes a *spike* deliverable, whose output is
    knowledge (`.nstack/handbook/05-workflow.md` §3). After a discovery's go, the tests the decider kept
-   are the first cycle's spikes. A spike's criteria name what is recorded and the threshold it
-   is read against; a refuted result is still a delivered one.
+   are the first cycle's spikes.
 4. **Modules** — name each deliverable's module; a spike run outside the code — a sign-up
    form, interviews — has none (`module: null`). Propose a new module only against the tree of
    `.nstack/handbook/02-modules.md` §3: one module is often enough to start.
@@ -123,8 +122,8 @@ A cycle's *What needs a person* holds what only a person can do, each with its l
 while framing, and keep it true. It is what `nstack plan` opens with.
 
 Present the charter, the cycle, the open questions, what went to *later*, and what you are
-unsure of. The decider amends, then sets `status: accepted` — on the charter, then on the
-cycle — in a pull request they approve; accepted after `start`, the cycle's `start` and `end`
+unsure of. The decider amends; the framer sets `status: accepted` — on the charter, then on the
+cycle — in a pull request the decider approves, and that approval is their gesture; accepted after `start`, the cycle's `start` and `end`
 move in the same pull request. The modules accepted there are created with the engine's
 module scaffolding, declared user-facing when a user sees them.
 
@@ -148,21 +147,21 @@ from then on the plan check refuses an accepted charter over a form left as it c
   criteria like the others, and its section says on whose word and on what it entered.
 - **An urgent fix** outside the cycle — an incident, a production defect — goes in a pull
   request with the `out-of-cycle` label and the line `Out of cycle: <reason>`.
-- **A deliverable** moves `proposed` → `ready` (testable acceptance criteria, set by the
-  framer, confirmed when the decider accepts the cycle) → `in-progress` — its hold says so the
-  moment it is claimed; the cycle file never follows in a delivery's pull request — → `delivered`, computed from
-  a record, below → `accepted`, written at the closure: its
-  test sheet run and its pull request approved, or, where approval is waived (§3), the decider's
-  word quoted once, at that closure, for the cycle — or, for a spike outside the code, its result
-  approved by the decider: a decision record when it binds the project (*Decisions* below),
-  otherwise a line in the project's log issue, which the deliverable's section links. A deliverable that several pull requests
-  deliver, or that a person must try, is `accepted` when **each of its criteria** is held by a
-  scenario of one of their sheets or by an answer in its acceptance issue
-  (`.nstack/handbook/05-workflow.md` §7); the cycle names that issue beside the state.
-  During the cycle, nobody writes that state: the agent records the delivery (`nstack deliver`,
-  `.nstack/handbook/project.md`), and the plan computes `delivered`. It asks the decider nothing.
-  A criterion only a person can try waits for their answer. The closure writes `accepted`, from the
-  records, in one pull request, reading them: a rule sees that a merge exists, not that a criterion holds.
+- **A deliverable's state** is written in the cycle file at framing (`proposed`, then `ready`:
+  testable criteria, set by the framer, confirmed when the decider accepts the cycle), on a
+  re-framing (`deferred`, `dropped`), and at the closure (`accepted`, by
+  `nstack deliver --write-states`) — never during delivery, and never in a delivery's pull request.
+  In between, `nstack plan` reads it: *held* from its claim, *delivered* from its record
+  (`nstack deliver D<n> --held '#<pull request>'`, kernel §2 step 12, `.nstack/handbook/project.md`);
+  it asks the decider nothing. It is accepted when each of its criteria is held by a scenario of a merged sheet, or by an
+  answer in the acceptance issue the cycle names beside the state (`.nstack/handbook/05-workflow.md`
+  §7); a criterion only a person can try waits for that answer. A spike outside the code is held
+  by a decision record when it binds the project (*Decisions* below), otherwise by a line of the
+  project's log issue, which its section links: with no merge it has no record, and the closure
+  writes its `accepted` by hand beside the states `--write-states` wrote, citing that line. Where
+  approval is waived (§3), the decider's word is quoted once, at the closure, for the cycle. A rule
+  sees that a merge exists, not that a criterion holds: the closure reads the records before it
+  writes.
 
 ## 5. The end of a cycle
 

@@ -28,7 +28,7 @@ flowchart TB
         K1["5 laws"]
         K2["Working loop"]
         K3["Stopping rules"]
-        K4["Uncertainty<br/>protocol"]
+        K4["Stop · Hold · Close"]
     end
 
     subgraph L1["PLAYBOOKS — loaded by trigger"]

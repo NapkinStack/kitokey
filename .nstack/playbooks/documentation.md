@@ -38,7 +38,8 @@ follows it · red: the document that no longer says what is true.
 4. **Current, or deleted.** A stale page costs more than a missing one, because it is
    believed.
 5. **A fact has one home.** Its home is the file a check or a command reads — a module's
-   manifest for its responsibility, owner and criticality; the cycle for a deliverable's state;
+   manifest for its responsibility, owner and criticality; the cycle for a deliverable's criteria, and its state once the cycle is closed — during it, the
+   hold and the delivery record, which `nstack plan` reads;
    the charter for the decider. Every other document that needs the fact links to it, never
    copies it: two copies agree on the day they are written, and only on that day.
 

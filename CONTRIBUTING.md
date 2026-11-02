@@ -23,14 +23,17 @@ Once per person, before a first deliverable. Each step says where it is said in 
    follows it. It works under an identity of its own — a GitHub App (`.nstack/handbook/INSTALL.md`,
    *the identity your agents work under*) — never with your credentials. Creating it and installing it on
    the repository is a person's act: yours where you may, else the decider's on your
-   request; its key stays outside any repository. Each session your agent runs has a name — any
-   opaque label, `alice-d30` — that goes on its commits (`Agent-Session:`) and its holds (`--session`).
+   request; its key stays outside any repository. One command makes it, and the forge
+   asks you for two clicks: `nstack agent add <name>`; then start your agent with
+   `nstack agent run <name> -- <its command>`. Where you cannot create an App for the
+   repository's owner, add `--mine`: the owner approves its installation. Each session your agent runs has a name — any
+   opaque label, `alice-d30` — that goes on its commits (`Agent-Session:`), its holds and its delivery records (`--session`).
    Where the project answers `approval: agent`, each agent needs an identity of its
    own (step 6).
 4. **Check the workstation**: `nstack doctor` — the engine, the hooks, the project's version. The
    forge's settings stay *not verified* without a token that may read them: that part is the
    decider's.
-5. **See the work**: `nstack plan` — the cycle, its ready deliverables, who holds what. Then
+5. **See the work**: `nstack plan` — what needs you first, then the cycle, its ready deliverables, who holds what. Then
    *Before you start*.
 6. **Know who approves your changes**: the module's owner, a human — or, where the project
    answers `approval: agent`, for a `prototype` or `standard` module, a human or another
@@ -46,7 +49,8 @@ Once per person, before a first deliverable. Each step says where it is said in 
 ## Before you start
 
 1. Pick a **ready** deliverable of the current cycle (`docs/project/cycles/`) and **take it**:
-   `nstack claim D<n> --person @you --session <its session>` — or an issue, for what nobody planned: a defect, a debt. A project
+   `nstack claim D<n> --person @you --session <its session>` — or, for an incident or a production defect, an issue and a pull request labelled
+   `out-of-cycle` with `Out of cycle: <reason>`; a debt is an issue a later cycle frames. A project
    with no accepted charter has no cycle yet: pick the work, the other rules apply
    (`.nstack/handbook/project.md`).
 2. Identify **the** target module — exactly one.
@@ -78,7 +82,7 @@ flowchart LR
   says who holds what; two agents of one person are two holders; a hold nobody works on goes stale and may be taken over
   (`.nstack/handbook/project.md`, *Who holds a deliverable*).
 - **Delivered is recorded, not requested**: once merged and each criterion held,
-  `nstack deliver D30 --held '#412'`. No pull request, and the plan says it.
+  `nstack deliver D30 --held '#412'` — and an agent adds `--session <its session>`. No pull request, and the plan says it.
 - **Any coding agent works**, under an identity of its own (*Joining the project*); the skills
   `nstack skills` makes under `.claude/skills/` are one tool's shortcut to the same playbooks
   (`.nstack/playbooks/`).

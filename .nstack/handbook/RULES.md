@@ -2,7 +2,9 @@
 
 Every refusal starts with a code between brackets — `FAIL [K1]`. This page says what each code
 refuses and where its reason is written. It defines nothing: the reasons are in the pages it
-points at, and the checks are the engine's.
+points at, and the checks are the engine's. A command's own name between brackets —
+`FAIL [deliver]`, `FAIL [agent]` — is that command refusing what it was asked: its message says
+why, and the action.
 
 ```mermaid
 flowchart LR
