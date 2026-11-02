@@ -1,18 +1,42 @@
 //! The program as a shell starts it, where it opens no device: what it refuses is logged,
 //! never with a session's path. What a recording logs is the e2e's (scripts/e2e.sh).
 
-use std::{fs, path::Path, process::Command};
+use std::{
+    fs,
+    path::Path,
+    process::{Command, Stdio},
+    time::{Duration, Instant},
+};
 
 /// A run refused before any device is opened, and the lines of its log.
 fn refused(args: &[&str], logs: &Path) -> (String, Vec<serde_json::Value>, String) {
-    let output = Command::new(env!("CARGO_BIN_EXE_wholeheard-capture"))
+    // No sound server within its reach, no ALSA device defined, and a short time: were a guard to fail,
+    // it opens no real device and does not stay (seen under strace: no `/dev/snd` opened, no
+    // source-output, "no source could be opened").
+    let nowhere = tempfile::tempdir().unwrap();
+    let alsa = nowhere.path().join("alsa.conf");
+    fs::write(&alsa, "").unwrap();
+    let mut run = Command::new(env!("CARGO_BIN_EXE_wholeheard-capture"))
         .args(args)
         .env("WHOLEHEARD_LOG_DIR", logs)
         .env("WHOLEHEARD_TRACE", "making-9")
         // The lowest level a user may ask: a failure is logged, with its id.
         .env("WHOLEHEARD_LOG", "error")
-        .output()
+        .env("PIPEWIRE_REMOTE", "wholeheard-none")
+        .env("PULSE_SERVER", format!("unix:{}/none", nowhere.path().display()))
+        .env("XDG_RUNTIME_DIR", nowhere.path())
+        .env("ALSA_CONFIG_PATH", &alsa)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .unwrap();
+    let asked = Instant::now();
+    while run.try_wait().unwrap().is_none() && asked.elapsed() < Duration::from_secs(5) {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let _ = run.kill();
+    let output = run.wait_with_output().unwrap();
     assert!(!output.status.success() && output.stdout.is_empty());
     let files: Vec<_> = fs::read_dir(logs).unwrap().map(|entry| entry.unwrap().path()).collect();
     assert_eq!(files.len(), 1, "{files:?}");
@@ -34,6 +58,18 @@ fn a_refusal_is_logged_with_its_detail_under_the_makings_id() {
     assert_eq!(lines[0]["span"]["trace"], "making-9");
     assert_eq!(lines[0]["span"]["program"], "capture");
     assert!(lines[0]["detail"].as_str().unwrap().starts_with("usage: wholeheard-capture"));
+}
+
+#[test]
+fn a_microphone_named_is_refused_with_the_first_form_which_follows_nothing() {
+    let logs = tempfile::tempdir().unwrap();
+    let sessions = tempfile::tempdir().unwrap();
+    let (err, _, _) = refused(
+        &["record", sessions.path().to_str().unwrap(), "--as", "v1", "--microphone", "any"],
+        logs.path(),
+    );
+    assert!(err.contains("usage: wholeheard-capture"), "{err}");
+    assert_eq!(fs::read_dir(sessions.path()).unwrap().count(), 0);
 }
 
 #[test]

@@ -38,8 +38,9 @@ Records the audio sources of a conversation into a session.
 
 - A `bluez5.loopback=true` source, or a filter fed by one, is never opened actively: `me` is
   passive on it (`call::passive_value`, by the running PipeWire's version: `in` to 1.6, `in-follow`
-  from 1.7) while a call holds it, and has no stream otherwise (ADR-0015). A Bluetooth address
-  reaches no log, event or session: `call::without_address`.
+  from 1.7) while a call holds it, and has no stream otherwise (ADR-0015), named at the start or not
+  (D74). A Bluetooth address reaches no log, event or session: `call::without_address`; a
+  microphone's name to `microphones` and `--microphone` is `call::microphone_id`, which holds none.
 - The recording's loop never waits on the system: `Following` opens on a thread and polls.
 
 - What was heard is on disk when `Track::push` returns: no buffer between a sample and the file.

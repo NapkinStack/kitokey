@@ -738,3 +738,218 @@ fn a_device_said_is_closed_once_when_its_stream_goes() {
 fn a_stream_that_never_had_a_track_owes_no_null() {
     assert!(!Local::started(false).gone());
 }
+
+fn named(graph: Vec<Value>, name: &str) -> (Me, bool) {
+    call::named(&Value::Array(graph).to_string(), OURS, name).unwrap()
+}
+
+#[test]
+fn a_microphone_named_is_recorded_though_a_call_holds_another() {
+    let mut graph = sources();
+    graph.extend([stream(131, 143), link(3, 134, 131), default_source(AIRPODS)]);
+    assert_eq!(
+        named(graph, "alsa_input.laptop"),
+        (held("alsa_input.laptop", "Digital Microphone", false), true)
+    );
+}
+
+#[test]
+fn a_microphone_named_that_is_the_default_is_still_held_by_its_name() {
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    assert_eq!(
+        named(graph, "alsa_input.laptop"),
+        (held("alsa_input.laptop", "Digital Microphone", false), true)
+    );
+}
+
+#[test]
+fn a_headset_named_waits_until_a_call_holds_it_and_is_then_listened_to_passively() {
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    assert_eq!(named(graph.clone(), &call::microphone_id(AIRPODS)), (Me::Wait, true));
+    // A call on another microphone runs nothing of it.
+    graph.extend([stream(131, 143), link(3, 50, 131)]);
+    assert_eq!(named(graph.clone(), &call::microphone_id(AIRPODS)), (Me::Wait, true));
+    graph.push(link(4, 134, 131));
+    assert_eq!(named(graph, &call::microphone_id(AIRPODS)), (held(AIRPODS, "AirPods", true), true));
+}
+
+#[test]
+fn a_headset_named_is_not_held_by_capture_s_own_stream() {
+    let mut graph = sources();
+    graph.extend([link(4, 134, 501), default_source("alsa_input.laptop")]);
+    assert_eq!(named(graph, &call::microphone_id(AIRPODS)), (Me::Wait, true));
+}
+
+#[test]
+fn a_filter_fed_by_a_headset_named_waits_as_the_headset_does() {
+    let mut graph = sources();
+    graph.extend([
+        node(
+            60,
+            "Audio/Source",
+            json!({ "node.name": "noise", "node.description": "Noise", "node.link-group": "g" }),
+        ),
+        node(
+            61,
+            "Stream/Input/Audio/Internal",
+            json!({ "node.name": "noise_in", "node.link-group": "g" }),
+        ),
+        link(5, 134, 61),
+        default_source("alsa_input.laptop"),
+    ]);
+    assert_eq!(named(graph, "noise"), (Me::Wait, true));
+}
+
+#[test]
+fn a_name_that_is_not_there_is_auto_and_said_missing() {
+    let mut graph = sources();
+    graph.extend([stream(131, 143), link(3, 134, 131), default_source("alsa_input.laptop")]);
+    assert_eq!(named(graph.clone(), "gone"), (me(graph), false));
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    assert_eq!(named(graph, "gone"), (Me::Default, false));
+}
+
+#[test]
+fn only_what_records_can_be_named_a_speaker_and_a_stream_cannot() {
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    assert!(!named(graph.clone(), "alsa_speaker").1);
+    graph.push(node(
+        70,
+        "Audio/Source/Internal",
+        json!({ "node.name": "inside", "node.description": "Inside" }),
+    ));
+    graph.push(node(
+        73,
+        "Audio/Source/Virtual",
+        json!({ "node.name": "virtual", "node.description": "Virtual" }),
+    ));
+    assert!(!named(graph.clone(), "inside").1);
+    assert!(!named(graph, "virtual").1);
+}
+
+#[test]
+fn the_microphones_listed_are_the_sources_that_open_by_description_never_with_an_address() {
+    let mut graph = sources();
+    graph.extend([
+        node(
+            70,
+            "Audio/Source/Internal",
+            json!({ "node.name": "inside", "node.description": "Inside" }),
+        ),
+        node(71, "Audio/Source", json!({ "node.name": "noise", "node.description": "A filter" })),
+        node(
+            72,
+            "Audio/Duplex",
+            json!({ "node.name": "pro", "node.description": "Bud AA:BB:CC:DD:EE:FF" }),
+        ),
+    ]);
+    let listed = call::microphones(&Value::Array(graph).to_string()).unwrap();
+    let names: Vec<(&str, &str)> = listed.iter().map(|(id, description)| (id.as_str(), description.as_str())).collect();
+    assert_eq!(
+        names,
+        [
+            ("noise", "A filter"),
+            (call::microphone_id(AIRPODS).as_str(), "AirPods"),
+            ("pro", "Bud unknown"),
+            ("alsa_input.laptop", "Digital Microphone"),
+        ]
+    );
+}
+
+#[test]
+fn a_list_of_a_graph_that_does_not_read_is_said_so() {
+    assert!(call::microphones("not json").is_err());
+    assert!(call::named("not json", OURS, "any").is_err());
+}
+
+#[test]
+fn a_microphone_s_id_holds_no_address_and_is_the_same_from_one_version_to_the_next() {
+    assert_eq!(call::microphone_id("alsa_input.laptop"), "alsa_input.laptop");
+    // Kept in the user's settings: a change of this digest is a choice lost.
+    assert_eq!(
+        call::microphone_id("bluez_input.AA_BB_CC_DD_EE_FF.0"),
+        "bluez_input.unknown.0#7f4e863c7ad48039"
+    );
+    assert_ne!(
+        call::microphone_id("bluez_input.AA_BB_CC_DD_EE_FF.0"),
+        call::microphone_id("bluez_input.AA_BB_CC_DD_EE_00.0")
+    );
+}
+
+#[test]
+fn a_name_is_found_by_its_id_never_by_what_the_system_calls_it() {
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    assert!(!named(graph.clone(), AIRPODS).1);
+    assert!(named(graph, &call::microphone_id(AIRPODS)).1);
+}
+
+#[test]
+fn what_is_said_of_a_name_is_each_change_and_only_a_change() {
+    use call::{Named, Presence};
+    let mut there = Presence::new(true);
+    assert_eq!(there.read(true), None);
+    assert_eq!(there.read(false), Some(Named::Gone));
+    assert_eq!(there.read(false), None);
+    assert_eq!(there.read(true), Some(Named::Back));
+    assert_eq!(there.read(true), None);
+    // Not found at the start, said there: the first news is its coming.
+    let mut absent = Presence::new(false);
+    assert_eq!(absent.read(false), None);
+    assert_eq!(absent.read(true), Some(Named::Back));
+}
+
+#[test]
+fn a_headset_named_gone_then_back_with_no_call_is_said_back_and_waits() {
+    use call::{Named, Presence};
+    let id = call::microphone_id(AIRPODS);
+    let with = |graph: &mut Vec<Value>| graph.push(default_source("alsa_input.laptop"));
+    let mut there_graph = sources();
+    with(&mut there_graph);
+    let mut gone_graph: Vec<Value> = sources().into_iter().filter(|object| object["id"] != 134).collect();
+    with(&mut gone_graph);
+    let mut said = Presence::new(true);
+    let (want, present) = named(there_graph.clone(), &id);
+    assert_eq!((want, said.read(present)), (Me::Wait, None));
+    let (want, present) = named(gone_graph, &id);
+    assert_eq!((want, said.read(present)), (Me::Default, Some(Named::Gone)));
+    let (want, present) = named(there_graph, &id);
+    assert_eq!((want, said.read(present)), (Me::Wait, Some(Named::Back)));
+}
+
+#[test]
+fn a_name_given_is_said_not_found_when_the_graph_cannot_be_read_at_the_start() {
+    let laptop = || Some("alsa_input.laptop".to_string());
+    assert_eq!(call::at_the_start(true, None, OURS, Some("any"), laptop), (Me::Default, false));
+    assert_eq!(call::at_the_start(true, None, OURS, None, laptop), (Me::Default, true));
+    // Unread, a headset's default is never opened, a name given or not.
+    let headset = || Some(AIRPODS.to_string());
+    assert_eq!(call::at_the_start(true, None, OURS, Some("any"), headset), (Me::Wait, false));
+}
+
+#[test]
+fn a_name_given_where_pipewire_is_not_is_said_not_found_and_the_default_recorded() {
+    let never = || -> Option<String> { panic!("no default is asked where PipeWire is not") };
+    assert_eq!(call::at_the_start(false, None, OURS, Some("any"), never), (Me::Default, false));
+    assert_eq!(call::at_the_start(false, None, OURS, None, never), (Me::Default, true));
+}
+
+#[test]
+fn a_graph_read_at_the_start_decides_by_the_name_given() {
+    let mut graph = sources();
+    graph.push(default_source("alsa_input.laptop"));
+    let dump = Value::Array(graph).to_string();
+    let unasked = || -> Option<String> { panic!("the default is asked only of a graph unread") };
+    assert_eq!(
+        call::at_the_start(true, Some(&dump), OURS, Some("alsa_input.laptop"), unasked),
+        (held("alsa_input.laptop", "Digital Microphone", false), true)
+    );
+    assert_eq!(
+        call::at_the_start(true, Some(&dump), OURS, Some("gone"), unasked),
+        (Me::Default, false)
+    );
+}
