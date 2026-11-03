@@ -339,7 +339,12 @@ settings close that door, and they only hold together:
    with the same limits. Its session reaches no human credential — no SSH key, token or
    command-line login of a human: `nstack agent run` keeps the person's tokens, SSH agent and
    git configuration out of its environment; a sandbox, a container or a dedicated system user
-   keeps it out of their files.
+   keeps it out of their files. The agent's tool still reads the person's own configuration — its
+   sandbox, hooks and permissions: for Claude Code, the command adds settings of the agent's own
+   that open the forge to its sandbox, nothing else. A person's hook that refuses `gh`, against
+   their own account, lets an agent's session through on one test only — its `gh` is the App's:
+   `[[ -n "${NSTACK_AGENT:-}" && "$(command -v gh)" == "$(dirname "$GH_CONFIG_DIR")/bin/gh" ]] && exit 0`
+   — the agent's `gh` folder sits beside its shim, wherever the agents' folder is.
 2. **The merge requires a human code owner's approval**, and `CODEOWNERS` starts with a
    default owner: an App can approve, but it is never a code owner. On `approval: agent`, below,
    the code owners file names a human only where one must approve.
