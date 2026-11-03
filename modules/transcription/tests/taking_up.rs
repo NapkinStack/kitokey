@@ -196,7 +196,7 @@ fn a_file_that_is_refused_is_left_exactly_as_it_is() {
         ("not text, no line feed", vec![0xff; 512], &making()),
         (
             "a later version of the contract",
-            theirs.replace("transcript/v1", "transcript/v2").into_bytes(),
+            theirs.replace("transcript/v1", "transcript/vnext").into_bytes(),
             &other,
         ),
     ];
