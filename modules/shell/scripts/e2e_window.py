@@ -2312,6 +2312,45 @@ def microphone_chosen(now: dt.datetime) -> None:
         reach = "const p = document.getElementById('small-microphones'); return [p.scrollHeight > p.clientHeight, getComputedStyle(p).overflowY]"
         check("fifteen microphones scroll inside the list", browser.execute_script(reach) == [True, "auto"], browser.execute_script(reach))
         keys(browser, Keys.ESCAPE)
+    # Settings that cannot be written (D82): the choice is said not kept, and the earlier one stays —
+    # in the name, in the list opened again, and for the next recording.
+    taping = WORK / "microphones-unwritten"
+    taping.mkdir()
+    listed.write_text(lines(*two))
+    args.unlink(missing_ok=True)
+    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nmicrophone = "alsa_laptop"\nmicrophone_description = "Digital Microphone"\n', small=True)
+    said = "return document.querySelector('.small-said').textContent"
+    with window as browser:
+        wait_for(browser, lambda b: b.execute_script(state)["shown"], 8)
+        kept = window.file.read_text()
+        window.file.chmod(0o444)
+        window.file.parent.chmod(0o555)
+        try:
+            press(browser, "small-microphone")
+            wait_for(browser, lambda b: len(b.execute_script(choices)) == 3, 5)
+            # The list read at the opening answered first: it never paints the name after the refusal.
+            time.sleep(1.6)
+            browser.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")[2].click()
+            check("a choice the settings cannot keep is said not kept",
+                  wait_for(browser, lambda b: "n’a pas pu être gardé" in b.execute_script(said), 5), browser.execute_script(said))
+            named = browser.execute_script(state)["name"]
+            check("the name shows the earlier choice again", "Digital Microphone" in named and "Ryzen" not in named, named)
+            if not browser.execute_script(state)["panel"]:
+                press(browser, "small-microphone")
+            wait_for(browser, lambda b: len(b.execute_script(choices)) == 3, 5)
+            checked = [one[1] for one in browser.execute_script(choices) if one[2]]
+            check("the list opened again checks the earlier choice", checked == ["alsa_laptop"], browser.execute_script(choices))
+            keys(browser, Keys.ESCAPE)
+            check("the settings are as they were", window.file.read_text() == kept, window.file.read_text())
+            press(browser, "small-record")
+            wait_for(browser, lambda b: args.exists(), 8)
+            check("the next recording takes the earlier choice", "--microphone alsa_laptop" in args.read_text(), args.read_text())
+            wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8)
+            stop_from_small(browser)
+            wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8)
+        finally:
+            window.file.parent.chmod(0o755)
+            window.file.chmod(0o644)
     # The list that cannot be read: said, Auto still there; none at all: nothing offered.
     taping = WORK / "microphones-unread-folder"
     taping.mkdir()
