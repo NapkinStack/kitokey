@@ -2328,6 +2328,8 @@ def microphone_chosen(now: dt.datetime) -> None:
         try:
             press(browser, "small-microphone")
             wait_for(browser, lambda b: len(b.execute_script(choices)) == 3, 5)
+            # The list read at the opening answered first: it never paints the name after the refusal.
+            time.sleep(1.6)
             browser.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")[2].click()
             check("a choice the settings cannot keep is said not kept",
                   wait_for(browser, lambda b: "n’a pas pu être gardé" in b.execute_script(said), 5), browser.execute_script(said))
