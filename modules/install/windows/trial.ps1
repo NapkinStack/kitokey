@@ -80,6 +80,15 @@ try {
     New-Item -ItemType Directory -Force (Split-Path $settings) | Out-Null
     Set-Content $settings 'welcomed = true'
 
+    # Stop all processes from the package family before upgrading to avoid 0x80073D02 (app in use)
+    $installedFamily = $installed.PackageFamilyName
+    Get-Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -like "*\Packages\$installedFamily\*" } |
+        ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+    Wait-For 'all package processes stopped before upgrade' 30 {
+        -not (Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*\Packages\$installedFamily\*" })
+    } | Out-Null
+
     Add-AppxPackage -Path $second
     $installed = Get-AppxPackage -Name $identity.name
     Check "upgraded over it, version $later.0" ($installed.Version -eq "$later.0")
