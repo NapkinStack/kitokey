@@ -42,24 +42,24 @@ case $target in
     scripts='ls /var/lib/dpkg/info/wholeheard.preinst /var/lib/dpkg/info/wholeheard.postinst /var/lib/dpkg/info/wholeheard.prerm /var/lib/dpkg/info/wholeheard.postrm' ;;
   *) echo "e2e: no package is made for '$target'" >&2; exit 2 ;;
 esac
-podman run --rm --security-opt label=disable -e HOME=/home/testuser -v "$package:$file:ro" -v "$here/scripts/judge-installed.sh:/judge.sh:ro" -e add="$add" -e remove="$remove" -e listed="$listed" -e scripts="$scripts" -e expected="$expected" "$image" bash -euo pipefail -c '
+podman run --rm --security-opt label=disable -e TEST_HOME=/home/testuser -v "$package:$file:ro" -v "$here/scripts/judge-installed.sh:/judge.sh:ro" -e add="$add" -e remove="$remove" -e listed="$listed" -e scripts="$scripts" -e expected="$expected" "$image" bash -euo pipefail -c '
 failed=0
 check() { if eval "$2"; then echo "  ok    $1"; else echo "  FAIL  $1"; failed=1; fi; }
 
 # Create testuser with home directory
-id -u testuser >/dev/null 2>&1 || useradd -m -d /home/testuser -s /bin/bash testuser
+id -u testuser >/dev/null 2>&1 || useradd -m -d "$TEST_HOME" -s /bin/bash testuser
 
 # Snapshot home BEFORE install — what the user already has
-mkdir -p "$HOME/.config/wholeheard" "$HOME/.local/share/wholeheard" "$HOME/.local/state/wholeheard" "$HOME/.config/autostart"
-pre_config=$(ls -1 "$HOME/.config/wholeheard" 2>/dev/null | sort)
-pre_share=$(ls -1 "$HOME/.local/share/wholeheard" 2>/dev/null | sort)
-pre_state=$(ls -1 "$HOME/.local/state/wholeheard" 2>/dev/null | sort)
-pre_autostart=$(ls -1 "$HOME/.config/autostart" 2>/dev/null | sort)
+mkdir -p "$TEST_HOME/.config/wholeheard" "$TEST_HOME/.local/share/wholeheard" "$TEST_HOME/.local/state/wholeheard" "$TEST_HOME/.config/autostart"
+pre_config=$(ls -1 "$TEST_HOME/.config/wholeheard" 2>/dev/null | sort)
+pre_share=$(ls -1 "$TEST_HOME/.local/share/wholeheard" 2>/dev/null | sort)
+pre_state=$(ls -1 "$TEST_HOME/.local/state/wholeheard" 2>/dev/null | sort)
+pre_autostart=$(ls -1 "$TEST_HOME/.config/autostart" 2>/dev/null | sort)
 
 # Create pre-existing settings and meetings (simulate S1: user already has data)
-mkdir -p "$HOME/Wholeheard/2026-10-18_10-00"
-echo "sessions = \"$HOME/Wholeheard\"" > "$HOME/.config/wholeheard/settings.toml"
-echo '{"id": "2026-10-18_10-00"}' > "$HOME/Wholeheard/2026-10-18_10-00/session.json"
+mkdir -p "$TEST_HOME/Wholeheard/2026-10-18_10-00"
+echo "sessions = \\\"$TEST_HOME/Wholeheard\\\"" > "$TEST_HOME/.config/wholeheard/settings.toml"
+echo '{"id": "2026-10-18_10-00"}' > "$TEST_HOME/Wholeheard/2026-10-18_10-00/session.json"
 
 check "installed, every dependency found" "eval \"\$add\" >/tmp/add.log 2>&1 || { tail -5 /tmp/add.log; false; }"
 for program in wholeheard wholeheard-capture wholeheard-transcription wholeheard-summary; do
@@ -83,18 +83,18 @@ check "desktop entry removed" "! test -f /usr/share/applications/dev.wholeheard.
 check "icon removed" "! test -f /usr/share/icons/hicolor/512x512/apps/dev.wholeheard.Wholeheard.png"
 
 # Compare leftover with docs/privacy.md — only these user dirs should remain
-post_config=$(ls -1 "$HOME/.config/wholeheard" 2>/dev/null | sort)
-post_share=$(ls -1 "$HOME/.local/share/wholeheard" 2>/dev/null | sort)
-post_state=$(ls -1 "$HOME/.local/state/wholeheard" 2>/dev/null | sort)
-post_autostart=$(ls -1 "$HOME/.config/autostart" 2>/dev/null | sort)
+post_config=$(ls -1 "$TEST_HOME/.config/wholeheard" 2>/dev/null | sort)
+post_share=$(ls -1 "$TEST_HOME/.local/share/wholeheard" 2>/dev/null | sort)
+post_state=$(ls -1 "$TEST_HOME/.local/state/wholeheard" 2>/dev/null | sort)
+post_autostart=$(ls -1 "$TEST_HOME/.config/autostart" 2>/dev/null | sort)
 
-check "~/.config/wholeheard unchanged (privacy.md)" "[ \"$pre_config\" = \"$post_config\" ]"
-check "~/.local/share/wholeheard unchanged (privacy.md)" "[ \"$pre_share\" = \"$post_share\" ]"
-check "~/.local/state/wholeheard unchanged (privacy.md)" "[ \"$pre_state\" = \"$post_state\" ]"
-check "~/.config/autostart unchanged (privacy.md)" "[ \"$pre_autostart\" = \"$post_autostart\" ]"
+check "~/.config/wholeheard unchanged (privacy.md)" "[ \"\$pre_config\" = \"\$post_config\" ]"
+check "~/.local/share/wholeheard unchanged (privacy.md)" "[ \"\$pre_share\" = \"\$post_share\" ]"
+check "~/.local/state/wholeheard unchanged (privacy.md)" "[ \"\$pre_state\" = \"\$post_state\" ]"
+check "~/.config/autostart unchanged (privacy.md)" "[ \"\$pre_autostart\" = \"\$post_autostart\" ]"
 
 # The meetings and the settings stay
-check "the meetings and the settings stay" "test -f $HOME/.config/wholeheard/settings.toml && test -f $HOME/Wholeheard/2026-10-18_10-00/session.json"
+check "the meetings and the settings stay" "test -f \$TEST_HOME/.config/wholeheard/settings.toml && test -f \$TEST_HOME/Wholeheard/2026-10-18_10-00/session.json"
 
 # S2: Re-install and verify it reads settings/meetings
 check "re-installed, every dependency found" "eval \"\$add\" >/tmp/add2.log 2>&1 || { tail -5 /tmp/add2.log; false; }"
@@ -103,8 +103,8 @@ for program in wholeheard wholeheard-capture wholeheard-transcription wholeheard
   check "$program answers as itself after re-install" "{ timeout 10 $program 2>&1 || true; } | grep -qE \"^$program: usage|initialize GTK\""
 done
 # Verify it reads the pre-existing settings and meetings
-check "reads pre-existing settings" "grep -q \"sessions = \\\"$HOME/Wholeheard\\\"\" $HOME/.config/wholeheard/settings.toml"
-check "reads pre-existing meetings" "test -f $HOME/Wholeheard/2026-10-18_10-00/session.json"
+check "reads pre-existing settings" "grep -q \"sessions = \\\\\\\"\$TEST_HOME/Wholeheard\\\\\\\"\" \$TEST_HOME/.config/wholeheard/settings.toml"
+check "reads pre-existing meetings" "test -f \$TEST_HOME/Wholeheard/2026-10-18_10-00/session.json"
 
-[ "$failed" = 0 ] && echo "e2e: passed" || { echo "e2e: FAILED"; exit 1; }
+[ "\$failed" = 0 ] && echo "e2e: passed" || { echo "e2e: FAILED"; exit 1; }
 '
