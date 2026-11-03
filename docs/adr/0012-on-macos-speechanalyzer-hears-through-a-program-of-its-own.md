@@ -130,7 +130,9 @@ meeting-notes app, Lyonesse. On one file MacStories timed Yap at 45 s, Whisper L
 
 Read at 05-best-of-its-kind-to-use's closure, 2026-10-31: not met, no Mac has run it. Its date moved to the end of cycle 06, the framer's default in the decider's word of that day; the rest unchanged.
 
-> We will consider this was the right call if, **by the end of cycle 06, 2026-11-14**, the
+Read at 06-the-minutes-you-can-check's closure, 2026-11-03: not met, no Mac has run it. Its date moved to the end of the cycle that carries the Mac's trials, the framer's default; the rest unchanged.
+
+> We will consider this was the right call if, **by the end of the cycle that carries the Mac's trials**, the
 > colleague's real call is transcribed on their Mac by SpeechAnalyzer, in less time than the call
 > lasted, and if no line of the step changed to add it.
 
