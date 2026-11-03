@@ -248,7 +248,7 @@ def test_a_transcript_that_is_not_one_whole_transcript_of_that_meeting_is_refuse
     assert count(*read(tmp_path)) == NOTHING
     refused = {
         "not one whole transcript": [whole[:-1], whole[1:], whole + whole],
-        "this reads transcript/v1": [[{"type": "header", "contract": "transcript/v2"}, *whole[1:]]],
+        "this reads transcript/v1": [[{"type": "header", "contract": "transcript/vnext"}, *whole[1:]]],
         "a speaker this does not know": [[whole[0], {**whole[1], "speaker": "local"}, *whole[2:]]],
         "the meeting of": [[*whole[:-1], {"type": "complete", "duration": 256.0}]],
     }
