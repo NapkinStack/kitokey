@@ -2,8 +2,8 @@
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
-- **Status**: Proposed — by the framer of cycle 08, 2026-11-03; the decider accepts, amends or refuses it
-  with the cycle.
+- **Status**: Accepted — by the decider, 2026-11-03, in the session that proposed it, with cycle 08:
+  « 08 accepté, défauts du cadreur ». Proposed by the framer of cycle 08 that day.
 - **Date**: 2026-11-03
 - **Decision makers**: the decider, `@napkinstack-admin`
 - **Modules affected**: `shell` (it starts a recording); `install` (the trial is set in Partner Center, not in
@@ -40,7 +40,9 @@ expired before the application starts: "your app won't launch. Instead, users se
 the option to purchase your app from the Store"
 ([*Implement a trial version of your app*](https://learn.microsoft.com/en-us/windows/uwp/monetize/implement-a-trial-version-of-your-app),
 read 2026-11-03). A Windows user whose trial ended would lose access to their meetings in Wholeheard, the
-exact case PDR-0001 rules out. PDR-0004 also gave up PDR-0001's "or 10 meetings": someone who records once a
+exact case PDR-0001 rules out. The sentence is on a page written for UWP; that it holds for a full-trust
+package like Wholeheard's is an assumption, not verified. The decision holds either way: an unlimited trial
+never blocks the launch. PDR-0004 also gave up PDR-0001's "or 10 meetings": someone who records once a
 week would see the trial end after two meetings.
 
 ## Goal
@@ -86,14 +88,17 @@ locks the meetings, which PDR-0001 forbids.
 ## Decision
 
 On Windows, Wholeheard is offered in the Store with an **unlimited** trial. Wholeheard itself counts the trial,
-as PDR-0001 says: it is over once **14 days have passed since the first meeting and 10 meetings have been
-made**, whichever comes last. After that, the user cannot start a new recording, and the window says so with
+as PDR-0001 says: it counts from the day Wholeheard first started on a trial licence, that day kept in a
+file of the folder of meetings, and it is over once **14 days have passed since that day and 10 meetings made
+since are there**, whichever comes last. Meetings copied from elsewhere — from Linux, or synced from another
+computer — count for nothing. After that, the user cannot start a new recording, and the window says so with
 a button to buy in the Store. Everything already made can still be read, played, corrected and exported.
 A purchase takes effect without restarting.
 
-The count is read from the meetings in `Documents\Wholeheard`, which survive the package's removal
-(`modules/install/windows/certification.md`). Reinstalling does not start a new trial. A user who deletes
-their meetings does start one; that is accepted, see *Out of scope*.
+The count is read from `Documents\Wholeheard`, which survives the package's removal
+(`modules/install/windows/certification.md`): reinstalling does not start a new trial in the default folder.
+A user who deletes meetings or that file, or moves the folder of meetings — a setting, removed with the
+package —, gets more trial; that is accepted, see *Out of scope*.
 
 ---
 
@@ -104,14 +109,15 @@ the trial is left, in days and in meetings.
 
 **Edge cases and degraded states:**
 - A recording in progress when the limit is reached is never cut. The trial is judged when a recording starts.
-- The licence cannot be read (no network the first time, or an error from the Store): Wholeheard records. It
+- The licence cannot be read (no network the first time, or an error from the Store), or is not active:
+  Wholeheard records. It
   never refuses a recording on a doubt, and it says the error once in the log.
 - Not installed from the Store (the zip, the package signed for a run), and on Linux: nothing is limited.
 
 **Acceptance criteria:**
 
-- [ ] Given Wholeheard from the Store on a trial licence, fewer than 10 meetings or fewer than 14 days since
-      the first one, when the user starts a recording, then it records as a bought copy does
+- [ ] Given Wholeheard from the Store on a trial licence, fewer than 10 meetings made since its first start
+      on that licence, or fewer than 14 days since then, when the user starts a recording, then it records as a bought copy does
 - [ ] Given the trial over, when the user starts a recording from the window, the tray or a call's offer, then
       nothing is recorded, the window says why in one sentence and offers « Acheter », and every meeting can
       still be read, played and exported (PDR-0001)

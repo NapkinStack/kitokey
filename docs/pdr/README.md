@@ -5,7 +5,7 @@ What this product must do, and why — never how. What a record holds and how it
 
 | No. | Title | Status | Criterion to check on |
 |---|---|---|---|
-| [0005](./0005-on-windows-the-trial-ends-without-locking-the-meetings.md) | On Windows, the trial ends without locking the meetings: the Store's unlimited trial, limited by Wholeheard | Proposed (2026-11-03) | 2027-06-30: a purchase made after the trial ended, and no report of meetings locked |
+| [0005](./0005-on-windows-the-trial-ends-without-locking-the-meetings.md) | On Windows, the trial ends without locking the meetings: the Store's unlimited trial, limited by Wholeheard | Accepted (2026-11-03) | 2027-06-30: a purchase made after the trial ended, and no report of meetings locked |
 | [0004](./0004-windows-through-the-microsoft-store.md) | Windows through the Microsoft Store; macOS a notarised download, its store later | Accepted (2026-10-27) | 2027-06-30: in the Microsoft Store, its first copy sold there, no certificate bought for Windows |
 | [0003](./0003-telemetry-only-if-the-user-turns-it-on.md) | Telemetry, only if the user turns it on | Accepted (2026-10-26) | 2027-06-30: nothing reported sent that the user did not turn on, and the project has decided whether to build it |
 | [0002](./0002-the-repository-opened-the-pace-kept.md) | The repository opened now, without slowing the work that finishes the project | Accepted (2026-10-25) | 2026-12-31: a macOS build made by the hosted runners, and the project still merging at today's pace |
