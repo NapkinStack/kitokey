@@ -40,11 +40,6 @@ jobs:
 
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
-      - name: Install Podman for e2e tests
-        uses: redhat-actions/podman-install@4a5b244246ee7d71f896e53bbde9d98a503ddb9b # v1
-        with:
-          start-service: 'true'
-
       - name: NapkinStack, the project version
         run: bash .nstack/install-engine.sh
 
