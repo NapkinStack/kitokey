@@ -198,7 +198,7 @@ deliverables:
   - id: D76
     title: "Spike — does Parakeet v3 hear a French meeting better than today's Whisper, on our own recordings?"
     module: transcription
-    state: ready
+    state: accepted
     acceptance:
       - "Given today's default Whisper and Parakeet TDT 0.6B v3 INT8 through sherpa-onnx, in a spike outside the shipped program, the input diffed first against what the step really reads, when each hears the module's bench, the trial meeting and the decider's call kept in `temp/real-calls` — nothing of which leaves the machine or is published —, then the module's log issue records for each: word errors where a reference exists, inventions on a silent track, duplicated words, time against the recording's length, peak memory, whether its word times can write `transcript/v1`'s segments, and whether it can be told the meeting's language (D65)"
       - "Given that record, when it is read against the threshold — at least two points fewer word errors on the trial meeting *(framer's, no source)*, no more than one point worse on the bench, fewer inventions on silence, faster than the call lasted on this machine's CPU, and word times that write `transcript/v1`'s segments —, then the framer proposes an ADR to offer it in Settings beside Whisper; below it, what was missing is recorded for the next framing. A refuted result is a delivered one"
@@ -364,6 +364,7 @@ Nothing else in this cycle waits on these. If D55 or D56 is done before the acce
 - `modules/transcription/AGENTS.md`: a bench of read sentences cannot decide; the trial meeting is heard too.
 - No sound of the decider's call is sent or published. The record gives counts, a few words at most.
 - Nothing enters the shipped program here: a dependency, if ever, is that ADR's (`security.md`).
+- **Accepted at the closure, 2026-11-03**: refuted, its record on [#129](https://github.com/NapkinStack/wholeheard/issues/129#issuecomment-6555615703), the decider's closing word above approving it. No merge carries a spike run outside the shipped program, so `nstack deliver` has none to record.
 
 ### D77
 
