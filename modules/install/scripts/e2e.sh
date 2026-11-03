@@ -46,10 +46,9 @@ podman run --rm --security-opt label=disable -v "$package:$file:ro" -v "$here/sc
 failed=0
 check() { if eval "$2"; then echo "  ok    $1"; else echo "  FAIL  $1"; failed=1; fi; }
 
-# Create testuser with home directory (avoid literal home path for hygiene)
-TEST_HOME="$(getent passwd testuser 2>/dev/null | cut -d: -f6)"
-[ -z "$TEST_HOME" ] && TEST_HOME="/home/testuser"
-id -u testuser >/dev/null 2>&1 || useradd -m -d "$TEST_HOME" -s /bin/bash testuser
+# Create testuser, then get its home directory (no literal home path in source)
+id -u testuser >/dev/null 2>&1 || useradd -m -s /bin/bash testuser
+TEST_HOME="$(getent passwd testuser | cut -d: -f6)"
 
 # Snapshot home BEFORE install — what the user already has
 mkdir -p "$TEST_HOME/.config/wholeheard" "$TEST_HOME/.local/share/wholeheard" "$TEST_HOME/.local/state/wholeheard" "$TEST_HOME/.config/autostart"
