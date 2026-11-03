@@ -483,12 +483,9 @@ impl Feed {
 
 impl Drop for Feed {
     fn drop(&mut self) {
-        match self {
-            Feed::Cpal { closing, .. } => {
-                closing.store(true, Ordering::SeqCst);
-            }
-            #[cfg(target_os = "linux")]
-            Feed::Passive(_) => {}
+        #[allow(irrefutable_let_patterns)]
+        if let Feed::Cpal { closing, .. } = self {
+            closing.store(true, Ordering::SeqCst);
         }
     }
 }
