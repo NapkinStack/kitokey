@@ -220,6 +220,18 @@ this repository alone and valid one hour. `nstack agent run` starts the agent th
 your tokens, your SSH agent or your git configuration — and refuses to start it while your
 `~/.netrc` holds a login for the forge, which git would hand over whatever its configuration. It is not a sandbox: an agent that
 looks for your files can still read them — a container or a system user of its own closes that.
+It says so as it starts, in a few lines on the error output — the agent's own output is untouched.
+
+**Your agent tool's configuration is still yours.** The tool you start — Claude Code, another —
+reads its own configuration from your home (`~/.claude` for Claude Code): your sandbox, your
+hooks, your permissions apply to the agent too. For Claude Code, `nstack agent run <name> -- claude`
+adds `--settings` with a file of the agent's own: when your sandbox is on, it lets the agent reach
+the forge — on github.com, the host of a run's logs too — and write its `gh` folder, and sets `GIT_HTTP_PROXY_AUTHMETHOD=basic` for git behind the
+sandbox's proxy — nothing more; it never turns the sandbox off, and settings your organisation
+manages still win over it. Given your own `--settings`, it adds none and says so. A hook of yours that refuses `gh` — against your own
+account — lets an agent's session through only when its `gh` is the App's
+(`.nstack/handbook/07-governance.md` §7 has the test). The agent checks who it is with
+`nstack agent status`; you list the agents of this workstation with the same command.
 When you cannot create an App for this repository's owner, `--mine` makes it on your account and
 asks the owner to approve its installation. What the App gets — set by the command, and read
 by no check afterwards:
