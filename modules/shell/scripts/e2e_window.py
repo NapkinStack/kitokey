@@ -4904,15 +4904,26 @@ def gestures_answer(now: dt.datetime) -> None:
         browser.execute_script("location.hash = '#/settings'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "reminder"), 10)
         time.sleep(0.5)
+        # How long it is said is timed by the page itself, from the sentence put there to the sentence
+        # gone: a WebDriver round trip on a loaded machine never counts against it (#634).
+        browser.execute_script("""
+            window.said = {};
+            window.saidWatch = new MutationObserver(() => {
+              const sentence = document.getElementById('saved-said');
+              if (sentence && !window.said.node) window.said = { node: sentence, shown: performance.now() };
+              if (window.said.node && !window.said.node.isConnected && window.said.gone === undefined) window.said.gone = performance.now();
+            });
+            window.saidWatch.observe(document.body, { childList: true, subtree: true });""")
         browser.execute_script("document.getElementById('reminder').click()")
         here = lambda b: b.find_elements(By.ID, "saved-said")
         told = wait_for(browser, here, 3)
         check("a setting written says Enregistré, under it", told and here(browser)[0].text == "Enregistré"
               and here(browser)[0].get_attribute("role") == "status"
               and browser.execute_script("const s = document.getElementById('saved-said'), r = document.getElementById('reminder').closest('label, .row, .field'); return r.nextElementSibling === s"))
-        time.sleep(1)
-        check("still said after a second", here(browser))
-        check("gone at a second and a half", wait_for(browser, lambda b: not here(b), 1.5))
+        wait_for(browser, lambda b: b.execute_script("return window.said.gone !== undefined"), 4)
+        said_for = browser.execute_script("window.saidWatch.disconnect(); return window.said.gone === undefined ? null : window.said.gone - window.said.shown")
+        check("still said after a second", said_for is not None and said_for >= 1000, said_for)
+        check("gone at a second and a half", said_for is not None and said_for <= 2500, said_for)
         refuse = "const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'settings_saved' ? Promise.reject('REFUS') : real.invoke(asked, ...rest) }; window.restore = () => { window.__TAURI__.core = real; };"
         browser.execute_script(refuse)
         browser.execute_script("document.getElementById('reminder').click()")
