@@ -38,11 +38,11 @@ WHOLEHEARD_TARGET=ubuntu-24.04 nstack release         # Ubuntu: built in its con
 sudo apt install ./dist/install/wholeheard_*_amd64.deb
 ```
 
-Needs `podman` ([`modules/install`](modules/install/)). Ubuntu's package is being tried on a
-colleague's machine. On macOS, GitHub's runner makes the app on every change to a program on `main`, signed ad
-hoc, not by Apple. On Windows, it makes a zip and an MSIX package for the Microsoft Store, not submitted yet. Each
-waits on a colleague's trial and is not published either
-([cycle 06](docs/project/cycles/06-the-minutes-you-can-check.md)). What a build holds and what leaves your
+Needs `podman` ([`modules/install`](modules/install/)). Fedora's package from Copr, with dnf and the system's
+updates, is [cycle 07](docs/project/cycles/07-wholeheard-from-the-systems-updater.md)'s, and nothing is published
+yet. On macOS, GitHub's runner makes the app on every change to a program on `main`, signed ad hoc, not by Apple.
+On Windows, it makes a zip and an MSIX package for the Microsoft Store, not submitted yet. Each waits on a
+colleague's trial, in the cycles after it. What a build holds and what leaves your
 machine: [`docs/privacy.md`](docs/privacy.md).
 
 | What runs | Its page |
