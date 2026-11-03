@@ -62,7 +62,7 @@ fn what_is_not_a_transcript_of_this_version_is_refused_with_its_reason() {
     for (text, expected) in [
         (format!("{segment}\n"), "does not name transcript/v1"),
         (
-            HEADER.replace("transcript/v1", "transcript/v2") + "\n" + segment + "\n",
+            HEADER.replace("transcript/v1", "transcript/vnext") + "\n" + segment + "\n",
             "does not name transcript/v1",
         ),
         (
