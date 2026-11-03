@@ -42,11 +42,12 @@ case $target in
     scripts='ls /var/lib/dpkg/info/wholeheard.preinst /var/lib/dpkg/info/wholeheard.postinst /var/lib/dpkg/info/wholeheard.prerm /var/lib/dpkg/info/wholeheard.postrm' ;;
   *) echo "e2e: no package is made for '$target'" >&2; exit 2 ;;
 esac
-podman run --rm --security-opt label=disable -e TEST_HOME="\$(getent passwd testuser | cut -d: -f6)" -v "$package:$file:ro" -v "$here/scripts/judge-installed.sh:/judge.sh:ro" -e add="$add" -e remove="$remove" -e listed="$listed" -e scripts="$scripts" -e expected="$expected" "$image" bash -euo pipefail -c '
+podman run --rm --security-opt label=disable -v "$package:$file:ro" -v "$here/scripts/judge-installed.sh:/judge.sh:ro" -e add="$add" -e remove="$remove" -e listed="$listed" -e scripts="$scripts" -e expected="$expected" "$image" bash -euo pipefail -c '
 failed=0
 check() { if eval "$2"; then echo "  ok    $1"; else echo "  FAIL  $1"; failed=1; fi; }
 
 # Create testuser with home directory
+TEST_HOME="/home/testuser"
 id -u testuser >/dev/null 2>&1 || useradd -m -d "$TEST_HOME" -s /bin/bash testuser
 
 # Snapshot home BEFORE install — what the user already has
