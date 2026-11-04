@@ -265,6 +265,11 @@ fn what_is_not_text_or_cannot_be_read_is_refused_in_one_sentence_and_nothing_lea
         program().arg("a-model").env("KITOKEY_PROVIDER_KEY", not_text).output().unwrap(),
         "KITOKEY_PROVIDER_KEY is not text",
     );
+    // Under the name before D86 too: refused, never dropped.
+    refused(
+        program().arg("a-model").env("WHOLEHEARD_PROVIDER_KEY", not_text).output().unwrap(),
+        "is not text",
+    );
     // A context that is there and cannot be read is not the same as no context.
     fs::create_dir(folder.path().join("context.txt")).unwrap();
     refused(
@@ -298,6 +303,29 @@ fn tested(address: &str, key: Option<&str>) -> Output {
         command.env("KITOKEY_PROVIDER_KEY", key);
     }
     command.output().unwrap()
+}
+
+/// The key a test sends, the environment naming it under either name.
+fn key_sent(keys: &[(&str, &str)]) -> String {
+    let (address, received) = provider("200 OK", answering("OK", "stop"));
+    let mut command = program();
+    command
+        .args(["--test", "--provider", &address, "--model", "a-model"])
+        .env_remove("KITOKEY_PROVIDER_KEY");
+    for (name, key) in keys {
+        command.env(name, key);
+    }
+    let output = command.output().unwrap();
+    assert!(output.status.success(), "{}", said(&output).1);
+    received.recv().unwrap().0.to_ascii_lowercase()
+}
+
+#[test]
+fn the_new_keys_name_wins_and_set_empty_sends_none_whatever_the_old_one_holds() {
+    let head = key_sent(&[("KITOKEY_PROVIDER_KEY", "new-key"), ("WHOLEHEARD_PROVIDER_KEY", "old-key")]);
+    assert!(head.contains("bearer new-key") && !head.contains("old-key"), "{head}");
+    let head = key_sent(&[("KITOKEY_PROVIDER_KEY", ""), ("WHOLEHEARD_PROVIDER_KEY", "old-key")]);
+    assert!(!head.contains("authorization"), "{head}");
 }
 
 #[test]
