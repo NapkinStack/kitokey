@@ -43,7 +43,8 @@ case $target in
     image="registry.fedoraproject.org/fedora:${target#fedora-}"
     add='dnf install -y -q /tmp/kitokey.rpm'; remove='dnf remove -y -q kitokey'; file=/tmp/kitokey.rpm
     listed='rpm -ql kitokey'; scripts='rpm -q --scripts kitokey'
-    old='dnf install -y -q rpm-build && mkdir -p /tmp/old && printf "%s\n" "Name: wholeheard" "Version: 0.2.0" "Release: 2" "Summary: x" "License: x" "BuildArch: noarch" "%description" "x" "%install" "install -Dm755 /dev/null %{buildroot}/usr/bin/wholeheard" "%files" "/usr/bin/wholeheard" > /tmp/old/w.spec && rpmbuild -bb --quiet --define "_rpmdir /tmp/old" /tmp/old/w.spec && rpm -i /tmp/old/noarch/wholeheard-0.2.0-2.noarch.rpm'
+    # The stand-in Wholeheard is made here, so signed by nobody: Fedora 45's rpm refuses that unless told.
+    old='dnf install -y -q rpm-build && mkdir -p /tmp/old && printf "%s\n" "Name: wholeheard" "Version: 0.2.0" "Release: 2" "Summary: x" "License: x" "BuildArch: noarch" "%description" "x" "%install" "install -Dm755 /dev/null %{buildroot}/usr/bin/wholeheard" "%files" "/usr/bin/wholeheard" > /tmp/old/w.spec && rpmbuild -bb --quiet --define "_rpmdir /tmp/old" /tmp/old/w.spec && rpm -i --nosignature /tmp/old/noarch/wholeheard-0.2.0-2.noarch.rpm'
     gone='! rpm -q wholeheard >/dev/null'
     # What drives the window: a display, a session bus, WebKit's driver (GTK 4's drives 4.1's, as on the workstation).
     tools='dnf install -y -q xorg-x11-server-Xvfb xorg-x11-xauth webkitgtk6.0 dbus-daemon python3 procps-ng findutils'
