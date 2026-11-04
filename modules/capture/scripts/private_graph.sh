@@ -12,7 +12,7 @@
 #   the healthy track gets no false zeros, and the stop is prompt.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-bin=$(realpath "${1:-${CARGO_TARGET_DIR:-$PWD/target}/release/wholeheard-capture}")
+bin=$(realpath "${1:-${CARGO_TARGET_DIR:-$PWD/target}/release/kitokey-capture}")
 for tool in pipewire wireplumber pw-cli pw-dump pw-metadata pw-loopback pw-record pw-play ffmpeg python3; do
   command -v "$tool" >/dev/null || { echo "private graph: NOT RUN — $tool is missing"; exit 77; }
 done
@@ -20,7 +20,7 @@ done
 work=$(mktemp -d /tmp/wh-XXXXXX)
 real_dump=$(command -v pw-dump)
 export XDG_RUNTIME_DIR=$work/rt PIPEWIRE_RUNTIME_DIR=$work/rt XDG_CONFIG_HOME=$work/cfg XDG_STATE_HOME=$work/state
-export XDG_CACHE_HOME=$work/cache XDG_DATA_HOME=$work/data WHOLEHEARD_LOG_DIR=$work/logs DBUS_SESSION_BUS_ADDRESS=disabled:
+export XDG_CACHE_HOME=$work/cache XDG_DATA_HOME=$work/data KITOKEY_LOG_DIR=$work/logs DBUS_SESSION_BUS_ADDRESS=disabled:
 unset PIPEWIRE_REMOTE DISPLAY WAYLAND_DISPLAY
 mkdir -p "$work/rt" "$work/cfg/wireplumber/wireplumber.conf.d" "$work/shim" "$work/logs"
 chmod 700 "$work/rt"
@@ -50,67 +50,67 @@ sink() { pw-cli create-node adapter factory.name=support.null-audio-sink node.na
 default_source() { pw-metadata -n default 0 default.configured.audio.source "{ \"name\": \"$1\" }" Spa:String:JSON > /dev/null; }
 stand_in() {
   pw-loopback --name="$1-loopback" \
-    --capture-props="{ node.name=$1_in media.class=Stream/Input/Audio/Internal target.object=wholeheard_e2e_mic_c stream.capture.sink=true node.passive=true node.dont-fallback=true node.linger=true ${2:-} }" \
+    --capture-props="{ node.name=$1_in media.class=Stream/Input/Audio/Internal target.object=kitokey_e2e_mic_c stream.capture.sink=true node.passive=true node.dont-fallback=true node.linger=true ${2:-} }" \
     --playback-props="{ node.name=$1 node.description=$1 media.class=Audio/Source ${2:-} }" &
   others+=($!)
 }
 ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=660:duration=30" -af volume=0.5 -ar 48000 -ac 2 "$work/660.wav"
 ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=880:duration=30" -af volume=0.5 -ar 48000 -ac 2 "$work/880.wav"
-sink wholeheard_e2e_out; sink wholeheard_e2e_mic_c
-stand_in wholeheard_e2e_headset "bluez5.loopback=true"
-stand_in wholeheard_e2e_plain
-stand_in wholeheard_e2e_other
+sink kitokey_e2e_out; sink kitokey_e2e_mic_c
+stand_in kitokey_e2e_headset "bluez5.loopback=true"
+stand_in kitokey_e2e_plain
+stand_in kitokey_e2e_other
 sleep 2
 
 say "Passive: the source, capture's stream, and a call"
-default_source wholeheard_e2e_headset
+default_source kitokey_e2e_headset
 sleep 1
 "$bin" record "$work/passive" --as v2 > "$work/p.events" 2> "$work/p.errors" & recorder=$!
 sleep 3
 folder=$(ls -d "$work"/passive/*/ | head -1)
 check grep -q 'unavailable.*waits' "$work/p.events"
 check test ! -e "$folder/local.wav"
-check measure2 not-running wholeheard_e2e_headset 2
+check measure2 not-running kitokey_e2e_headset 2
 # A call linked but not running, as a browser holding the microphone idle: capture's stream is
 # linked, alone in asking nothing of the source.
-pw-record --target wholeheard_e2e_headset -P '{ node.passive=in node.name=call-idle }' "$work/idle.wav" & idle=$!
+pw-record --target kitokey_e2e_headset -P '{ node.passive=in node.name=call-idle }' "$work/idle.wav" & idle=$!
 sleep 3
 check measure2 passive "$recorder"
-check measure2 not-running wholeheard_e2e_headset 3
+check measure2 not-running kitokey_e2e_headset 3
 check test ! -e "$folder/local.wav"    # linked, and no form before the source runs
 check measure2 said "$work/p.events" me    # and nothing said: no track, no device
 check measure2 no-local "$folder"
 # It runs: capture hears it.
-pw-record --target wholeheard_e2e_headset -P '{ node.name=call-active }' "$work/call.wav" & call=$!
-pw-play --target wholeheard_e2e_mic_c "$work/660.wav" & player=$!
-check said_within "$work/p.events" wholeheard_e2e_headset
+pw-record --target kitokey_e2e_headset -P '{ node.name=call-active }' "$work/call.wav" & call=$!
+pw-play --target kitokey_e2e_mic_c "$work/660.wav" & player=$!
+check said_within "$work/p.events" kitokey_e2e_headset
 check measure2 has-local "$folder"    # in session.json as soon as it is said
 check test -e "$folder/local.wav"
 sleep 2
-check measure2 running wholeheard_e2e_headset
+check measure2 running kitokey_e2e_headset
 sleep 2
 kill "$player" "$call" 2>/dev/null || true; wait "$player" "$call" 2>/dev/null || true
 # It stops: capture's stream still linked, the source does not stay up for it.
 sleep 1
 check measure2 passive "$recorder"
-check measure2 not-running wholeheard_e2e_headset 3
+check measure2 not-running kitokey_e2e_headset 3
 kill "$idle" 2>/dev/null || true; wait "$idle" 2>/dev/null || true
 sleep 3
 check measure2 not-following "$recorder"
-check measure2 said "$work/p.events" me wholeheard_e2e_headset null
-check measure2 not-running wholeheard_e2e_headset 2
+check measure2 said "$work/p.events" me kitokey_e2e_headset null
+check measure2 not-running kitokey_e2e_headset 2
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 check test "$stopped_as" = 0 -a ! -s "$work/p.errors"
 check measure2 waited "$folder"
 
 say "Started during a call: the track at once, from the headset, passive"
-pw-record --target wholeheard_e2e_headset -P '{ node.name=call-active }' "$work/call2.wav" & call=$!
-pw-play --target wholeheard_e2e_mic_c "$work/660.wav" & player=$!
+pw-record --target kitokey_e2e_headset -P '{ node.name=call-active }' "$work/call2.wav" & call=$!
+pw-play --target kitokey_e2e_mic_c "$work/660.wav" & player=$!
 sleep 2
 "$bin" record "$work/during" --as v2 > "$work/d.events" 2> "$work/d.errors" & recorder=$!
 sleep 3
 folder=$(ls -d "$work"/during/*/ | head -1)
-check grep -q '"me":"wholeheard_e2e_headset"' "$work/d.events"
+check grep -q '"me":"kitokey_e2e_headset"' "$work/d.events"
 check test -e "$folder/local.wav"
 check measure2 passive "$recorder"
 kill "$player" "$call" 2>/dev/null || true; wait "$player" "$call" 2>/dev/null || true
@@ -119,10 +119,10 @@ kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 check test "$stopped_as" = 0 -a ! -s "$work/d.errors"
 
 say "Never run: a call that holds the headset and never runs it, to the stop"
-default_source wholeheard_e2e_headset
+default_source kitokey_e2e_headset
 sleep 1
 "$bin" record "$work/never" --as v2 > "$work/n.events" 2> "$work/n.errors" & recorder=$!
-pw-record --target wholeheard_e2e_headset -P '{ node.passive=in node.name=call-idle }' "$work/idle3.wav" & idle=$!
+pw-record --target kitokey_e2e_headset -P '{ node.passive=in node.name=call-idle }' "$work/idle3.wav" & idle=$!
 sleep 5
 folder=$(ls -d "$work"/never/*/ | head -1)
 check measure2 passive "$recorder"
@@ -138,41 +138,41 @@ check test ! -e "$folder/local.wav"
 check measure2 no-local "$folder"
 
 say "Under a track: a stream that goes with none to take over says null, one that has not run says nothing"
-default_source wholeheard_e2e_plain
+default_source kitokey_e2e_plain
 sleep 1
 "$bin" record "$work/under" --as v2 > "$work/u.events" 2> "$work/u.errors" & recorder=$!
 sleep 2
 folder=$(ls -d "$work"/under/*/ | head -1)
-pw-record --target wholeheard_e2e_headset -P '{ node.passive=in node.name=call-idle }' "$work/idle4.wav" & idle=$!
+pw-record --target kitokey_e2e_headset -P '{ node.passive=in node.name=call-idle }' "$work/idle4.wav" & idle=$!
 sleep 4
 check measure2 passive "$recorder"
 check measure2 said "$work/u.events" me null    # the default closed; the headset, not running, unnamed
-pw-record --target wholeheard_e2e_headset -P '{ node.name=call-active }' "$work/call4.wav" & call=$!
-pw-play --target wholeheard_e2e_mic_c "$work/660.wav" & player=$!
-check said_within "$work/u.events" wholeheard_e2e_headset
+pw-record --target kitokey_e2e_headset -P '{ node.name=call-active }' "$work/call4.wav" & call=$!
+pw-play --target kitokey_e2e_mic_c "$work/660.wav" & player=$!
+check said_within "$work/u.events" kitokey_e2e_headset
 sleep 2
 kill "$player" "$call" "$idle" 2>/dev/null || true; wait "$player" "$call" "$idle" 2>/dev/null || true
 sleep 4
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 check test "$stopped_as" = 0 -a ! -s "$work/u.errors"
-check measure2 said "$work/u.events" me null wholeheard_e2e_headset wholeheard_e2e_plain
-check measure2 changes "$folder" null wholeheard_e2e_headset wholeheard_e2e_plain
+check measure2 said "$work/u.events" me null kitokey_e2e_headset kitokey_e2e_plain
+check measure2 changes "$folder" null kitokey_e2e_headset kitokey_e2e_plain
 
 say "Followed: a stream another takes over from at once is no device lost"
-default_source wholeheard_e2e_plain
+default_source kitokey_e2e_plain
 sleep 1
 "$bin" record "$work/followed" --as v2 > "$work/f.events" 2> "$work/f.errors" & recorder=$!
 sleep 2
-pw-record --target wholeheard_e2e_other -P '{ node.name=call-active }' "$work/call3.wav" & call=$!
+pw-record --target kitokey_e2e_other -P '{ node.name=call-active }' "$work/call3.wav" & call=$!
 sleep 3
-check grep -q '"device":"wholeheard_e2e_other"' "$work/f.events"
+check grep -q '"device":"kitokey_e2e_other"' "$work/f.events"
 kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
 sleep 3
-check measure2 said "$work/f.events" me wholeheard_e2e_other wholeheard_e2e_plain
+check measure2 said "$work/f.events" me kitokey_e2e_other kitokey_e2e_plain
 kill -INT "$recorder"; wait "$recorder" || true
 
 say "Starved: the session manager stuck, a stream that never negotiates"
-default_source wholeheard_e2e_plain
+default_source kitokey_e2e_plain
 cat > "$work/shim/pw-dump" <<SHIM
 #!/bin/sh
 [ -f "$work/hold.json" ] && exec cat "$work/hold.json"
@@ -181,13 +181,13 @@ SHIM
 chmod +x "$work/shim/pw-dump"
 sleep 1
 # What the graph is said to be, later: a call holding the stand-in headset.
-pw-record --target wholeheard_e2e_headset -P '{ node.passive=in node.name=call-idle }' "$work/idle2.wav" & idle=$!
+pw-record --target kitokey_e2e_headset -P '{ node.passive=in node.name=call-idle }' "$work/idle2.wav" & idle=$!
 sleep 2
 "$real_dump" > "$work/hold.tmp"
 kill "$idle" 2>/dev/null || true; wait "$idle" 2>/dev/null || true
 sleep 1
 PATH="$work/shim:$PATH" "$bin" record "$work/starved" --as v2 > "$work/s.events" 2> "$work/s.errors" & recorder=$!
-pw-play --target wholeheard_e2e_out "$work/880.wav" & player=$!
+pw-play --target kitokey_e2e_out "$work/880.wav" & player=$!
 sleep 3
 kill -STOP "$manager"
 before=$(grep -c '"level"' "$work/s.events" || true)
@@ -209,8 +209,8 @@ check test "$stopped_as" = 0
 check test "$((after - before))" -ge 60
 check python3 -c "assert $took < 3.5, 'the stop took $took s'"
 # It was truly in that state: capture's stream in the graph, and no session manager to link it.
-check grep -q 'node.name = "wholeheard-capture-me"' "$work/nodes.txt"
-capture_me=$(awk '/^\tid /{id=$2} /node.name = "wholeheard-capture-me"/{print id}' "$work/nodes.txt" | tr -d ,)
+check grep -q 'node.name = "kitokey-capture-me"' "$work/nodes.txt"
+capture_me=$(awk '/^\tid /{id=$2} /node.name = "kitokey-capture-me"/{print id}' "$work/nodes.txt" | tr -d ,)
 check test -z "$(grep -E "link.input.node = \"$capture_me\"" "$work/links.txt")"
 # The healthy track, the remote, was delivered all along: no zeros said for it.
 check python3 - "$folder/clock.jsonl" <<'PY'

@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
-# What this module ships: wholeheard-capture, into $NSTACK_DIST. Built for the system WHOLEHEARD_TARGET
+# What this module ships: kitokey-capture, into $NSTACK_DIST. Built for the system KITOKEY_TARGET
 # names — in a container of that system (containers/<target>.Containerfile), so that it links the
 # libraries that system has, never this machine's (D27); unset, for this machine.
 set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 dist=${NSTACK_DIST:?run through nstack release, which names this module\'s artefacts folder}
-target=${WHOLEHEARD_TARGET:-}
+target=${KITOKEY_TARGET:-${WHOLEHEARD_TARGET:-}}   # WHOLEHEARD_TARGET: its name before D86, until every module reads the new one
 # Windows names a program with its .exe (D53).
 exe=; [ "${OS:-}" = Windows_NT ] && exe=.exe
 if [ -z "$target" ]; then
   (cd "$here" && cargo build --locked --release)
-  cp "${CARGO_TARGET_DIR:-$here/target}/release/wholeheard-capture$exe" "$dist/"
+  cp "${CARGO_TARGET_DIR:-$here/target}/release/kitokey-capture$exe" "$dist/"
   exit 0
 fi
 recipe=$here/containers/$target.Containerfile
-[ -f "$recipe" ] || { echo "release: wholeheard-capture is not built for '$target' (containers/*.Containerfile)" >&2; exit 2; }
-image=wholeheard-build-capture:$target
+[ -f "$recipe" ] || { echo "release: kitokey-capture is not built for '$target' (containers/*.Containerfile)" >&2; exit 2; }
+image=kitokey-build-capture:$target
 podman build -q -t "$image" -f "$recipe" "$here/containers" >/dev/null
 # Kept between releases, outside the repository: the build — one per image, so that another
 # recipe (headers, compilers) builds again from nothing — and the crates fetched.
-cache=${XDG_CACHE_HOME:-$HOME/.cache}/wholeheard-build/$target
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/kitokey-build/$target
 built=$cache/capture-$(podman image inspect -f '{{.Id}}' "$image" | cut -c1-12)
 mkdir -p "$built" "$cache/registry"
 # No relabelling of what is mounted (`:Z` would relabel the files in place): labels left alone.
 podman run --rm --security-opt label=disable -v "$here:/src:ro" -v "$built:/target" \
   -v "$cache/registry:/opt/cargo/registry" -e CARGO_TARGET_DIR=/target -w /src "$image" \
   cargo build --locked --release -q
-cp "$built/release/wholeheard-capture" "$dist/"
+cp "$built/release/kitokey-capture" "$dist/"

@@ -176,8 +176,8 @@ pub fn retry_after(tries: u32) -> std::time::Duration {
     std::time::Duration::from_secs(2u64.saturating_pow(tries).min(8))
 }
 
-/// Programs whose streams are Wholeheard's own — as the shell's offer reads them.
-const OWN: [&str; 2] = ["wholeheard-capture", "wholeheard"];
+/// Programs whose streams are Kitokey's own — as the shell's offer reads them.
+const OWN: [&str; 2] = ["kitokey-capture", "kitokey"];
 
 /// What the local side should record, the graph being what it is. Of several calls, the one whose
 /// stream is `running` wins, then the lowest node id — the oldest: a stream that comes later

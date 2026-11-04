@@ -10,19 +10,24 @@ use std::{
 
 /// A run refused before any device is opened, and the lines of its log.
 fn refused(args: &[&str], logs: &Path) -> (String, Vec<serde_json::Value>, String) {
+    refused_under("KITOKEY", args, logs)
+}
+
+/// The same, the environment named with `prefix`: a shell still under the name before D86 passes `WHOLEHEARD_…`.
+fn refused_under(prefix: &str, args: &[&str], logs: &Path) -> (String, Vec<serde_json::Value>, String) {
     // No sound server within its reach, no ALSA device defined, and a short time: were a guard to fail,
     // it opens no real device and does not stay (seen under strace: no `/dev/snd` opened, no
     // source-output, "no source could be opened").
     let nowhere = tempfile::tempdir().unwrap();
     let alsa = nowhere.path().join("alsa.conf");
     fs::write(&alsa, "").unwrap();
-    let mut run = Command::new(env!("CARGO_BIN_EXE_wholeheard-capture"))
+    let mut run = Command::new(env!("CARGO_BIN_EXE_kitokey-capture"))
         .args(args)
-        .env("WHOLEHEARD_LOG_DIR", logs)
-        .env("WHOLEHEARD_TRACE", "making-9")
+        .env(format!("{prefix}_LOG_DIR"), logs)
+        .env(format!("{prefix}_TRACE"), "making-9")
         // The lowest level a user may ask: a failure is logged, with its id.
-        .env("WHOLEHEARD_LOG", "error")
-        .env("PIPEWIRE_REMOTE", "wholeheard-none")
+        .env(format!("{prefix}_LOG"), "error")
+        .env("PIPEWIRE_REMOTE", "kitokey-none")
         .env("PULSE_SERVER", format!("unix:{}/none", nowhere.path().display()))
         .env("XDG_RUNTIME_DIR", nowhere.path())
         .env("ALSA_CONFIG_PATH", &alsa)
@@ -48,16 +53,28 @@ fn refused(args: &[&str], logs: &Path) -> (String, Vec<serde_json::Value>, Strin
 }
 
 #[test]
+fn a_shell_still_named_wholeheard_is_heard_until_it_passes_the_new_names() {
+    let logs = tempfile::tempdir().unwrap();
+    let (_, lines, _) = refused_under("WHOLEHEARD", &["listen"], logs.path());
+    assert_eq!(
+        lines.len(),
+        1,
+        "the log is where WHOLEHEARD_LOG_DIR says, at the level WHOLEHEARD_LOG asks"
+    );
+    assert_eq!(lines[0]["span"]["trace"], "making-9", "the making's id read from WHOLEHEARD_TRACE");
+}
+
+#[test]
 fn a_refusal_is_logged_with_its_detail_under_the_makings_id() {
     let logs = tempfile::tempdir().unwrap();
     let (err, lines, _) = refused(&["listen"], logs.path());
-    assert!(err.contains("usage: wholeheard-capture"), "{err}");
+    assert!(err.contains("usage: kitokey-capture"), "{err}");
     assert_eq!(lines.len(), 1);
     assert_eq!(lines[0]["message"], "capture.failed");
     assert_eq!(lines[0]["level"], "ERROR");
     assert_eq!(lines[0]["span"]["trace"], "making-9");
     assert_eq!(lines[0]["span"]["program"], "capture");
-    assert!(lines[0]["detail"].as_str().unwrap().starts_with("usage: wholeheard-capture"));
+    assert!(lines[0]["detail"].as_str().unwrap().starts_with("usage: kitokey-capture"));
 }
 
 #[test]
@@ -68,7 +85,7 @@ fn a_microphone_named_is_refused_with_the_first_form_which_follows_nothing() {
         &["record", sessions.path().to_str().unwrap(), "--as", "v1", "--microphone", "any"],
         logs.path(),
     );
-    assert!(err.contains("usage: wholeheard-capture"), "{err}");
+    assert!(err.contains("usage: kitokey-capture"), "{err}");
     assert_eq!(fs::read_dir(sessions.path()).unwrap().count(), 0);
 }
 
@@ -97,13 +114,13 @@ fn full_logs(program: &str) -> tempfile::TempDir {
 #[test]
 fn a_log_that_cannot_be_written_says_nothing_on_the_error_stream() {
     let logs = full_logs("capture");
-    let output = Command::new(env!("CARGO_BIN_EXE_wholeheard-capture"))
+    let output = Command::new(env!("CARGO_BIN_EXE_kitokey-capture"))
         .arg("listen")
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
+        .env("KITOKEY_LOG_DIR", logs.path())
         .output()
         .unwrap();
     let err = String::from_utf8_lossy(&output.stderr);
     assert!(!output.status.success());
     assert_eq!(err.lines().count(), 1, "{err}");
-    assert!(err.starts_with("wholeheard-capture: usage"), "{err}");
+    assert!(err.starts_with("kitokey-capture: usage"), "{err}");
 }

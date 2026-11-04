@@ -3,7 +3,7 @@
 
 use std::{f32::consts::TAU, fs, path::Path};
 
-use wholeheard_capture::{Heard, RATE, SILENCE, Track, Watch, new_folder, write_session};
+use kitokey_capture::{Heard, RATE, SILENCE, Track, Watch, new_folder, write_session};
 
 /// A tone of `hertz` at `level` of full scale, resting at `rest`, as a source would deliver it.
 fn tone(rate: u32, channels: usize, seconds: f32, hertz: f32, level: f32, rest: f32) -> Vec<f32> {
@@ -327,7 +327,7 @@ fn a_track_of_the_first_form_says_whether_anything_but_zero_came() {
 #[test]
 fn a_track_says_whether_anything_but_zero_came() {
     let folder = tempfile::tempdir().unwrap();
-    let mut track = wholeheard_capture::v2::Track::create(&folder.path().join("t.wav"), 48_000, 2).unwrap();
+    let mut track = kitokey_capture::v2::Track::create(&folder.path().join("t.wav"), 48_000, 2).unwrap();
     track.push(&[0.0; 960]).unwrap();
     assert!(!track.stirred(), "exact zeros stir nothing");
     track.push(&[0.0, -0.19, 0.0, -0.35]).unwrap();

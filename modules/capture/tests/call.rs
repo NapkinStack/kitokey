@@ -1,8 +1,8 @@
 //! Where a call plays, read from PipeWire's graph as `pw-dump` prints it (D41, ADR-0011): the
 //! graphs here are written for the test, shaped as the decider's of #436 was — no device opened.
 
+use kitokey_capture::call::{self, Output};
 use serde_json::{Value, json};
-use wholeheard_capture::call::{self, Output};
 
 const OURS: u64 = 999;
 
@@ -234,7 +234,7 @@ fn each_of_capture_s_streams_is_named_by_the_node_it_is_fed_from() {
 
 // ---- The microphone a call holds, and what `me` records (D66, ADR-0015).
 
-use wholeheard_capture::call::{Me, Microphone, Step};
+use kitokey_capture::call::{Me, Microphone, Step};
 
 const AIRPODS: &str = "bluez_input.00:00:5E:00:53:01";
 
@@ -380,24 +380,24 @@ fn what_is_no_call_holds_no_microphone() {
         "the loopback's own input"
     );
     assert_eq!(
-        not_a_call(json!({ "application.process.binary": "wholeheard" })),
+        not_a_call(json!({ "application.process.binary": "kitokey" })),
         Me::Default,
-        "Wholeheard's own"
+        "Kitokey's own"
     );
     // This process's own: capture linked to the headset is not a call taking it.
     let mut graph = sources();
     graph.extend([link(3, 134, 501), default_source("alsa_input.laptop")]);
     assert_eq!(me(graph), Me::Default);
-    // Wholeheard's own named on its client alone, as a native client does.
+    // Kitokey's own named on its client alone, as a native client does.
     let mut graph = sources();
     let mut own = node(131, "Stream/Input/Audio", json!({ "client.id": 70 }));
-    own["info"]["props"]["application.name"] = "wholeheard".into();
+    own["info"]["props"]["application.name"] = "kitokey".into();
     graph.extend([
         own,
         link(3, 134, 131),
         default_source("alsa_input.laptop"),
         json!({ "id": 70, "type": "PipeWire:Interface:Client", "info": { "props": {
-            "application.process.id": 77, "application.process.binary": "wholeheard-capture" } } }),
+            "application.process.id": 77, "application.process.binary": "kitokey-capture" } } }),
     ]);
     assert_eq!(me(graph), Me::Default);
     // What reads an output's monitor takes no microphone.
@@ -708,7 +708,7 @@ fn the_passive_stream_says_its_value_and_is_never_moved_elsewhere() {
 
 // ---- What `device` says of the local side: what is being recorded now (D66).
 
-use wholeheard_capture::call::Local;
+use kitokey_capture::call::Local;
 
 #[test]
 fn a_stream_with_no_track_is_not_named_whatever_the_graph_links() {

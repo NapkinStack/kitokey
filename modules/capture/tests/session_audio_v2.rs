@@ -3,7 +3,7 @@
 
 use std::{f32::consts::TAU, fs, path::Path};
 
-use wholeheard_capture::v2::{CONTRACT, Clock, Held, Track, write_session};
+use kitokey_capture::v2::{CONTRACT, Clock, Held, Track, write_session};
 
 const SESSION: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/session-audio/v2/session.schema.json");
 

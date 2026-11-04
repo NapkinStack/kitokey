@@ -225,7 +225,7 @@ def waited(folder):
     """The track of a microphone that waited: zeros said from its first frame, the note after."""
     read, one = session(folder), track(folder, "local")
     assert "local" in read["tracks"], "session.json holds no local track"
-    assert read["tracks"]["local"]["device"] == "wholeheard_e2e_headset", f"local recorded from {read['tracks']['local']['device']}"
+    assert read["tracks"]["local"]["device"] == "kitokey_e2e_headset", f"local recorded from {read['tracks']['local']['device']}"
     assert read["tracks"]["local"]["changed"][-1]["device"] is None, "the call left, and no change says so"
     lines = [line for line in clock(folder) if line["track"] == "local"]
     silences = [line["silence"] for line in lines if "silence" in line]
