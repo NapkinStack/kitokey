@@ -25,9 +25,11 @@ server of ours, and it sends nothing anywhere unless you chose to.
 |---|---|
 | The sound of a meeting: your microphone and what your computer plays, as two tracks | Your meetings folder: `Documents/Kitokey` unless you choose another; if you used Kitokey under its earlier name, Wholeheard, they stay in `Documents/Wholeheard` |
 | Its transcript, its minutes, the context you wrote for it, its language, your corrections | The same folder, beside the sound |
-| Your settings, and the key of a service if you gave one | Your user's configuration folder |
+| Your settings | Your user's configuration folder |
+| The key of a service, if you gave one | Your system's keyring, under `com.napkinstack.Kitokey`: never in a file |
 | Downloaded speech models | Your user's data folder |
 | Logs: steps, durations, hosts, models and failures — never a word of a meeting, nor a key | Your user's state folder (on Windows, the application's data) |
+| What the window's web engine keeps for itself: its cache and its own storage — no meeting, no setting | On Linux, `~/.local/share/com.napkinstack.Kitokey` |
 
 Nothing is recorded until you start a recording. Telling the other participants that you are
 recording is yours to do: Kitokey shows them nothing. It reminds you, and you may turn the
@@ -60,11 +62,13 @@ telemetry ever exist, it will be off until you turn it on, and will show what it
   go to the trash by itself after a number of days, in Settings.
 - Everything: uninstall Kitokey, then delete your meetings folder and Kitokey's folders:
   - Linux: `~/.config/kitokey`, `~/.local/share/kitokey`, `~/.local/state/kitokey`,
+    the window's web cache `~/.local/share/com.napkinstack.Kitokey`,
     and the start-at-login entry `~/.config/autostart/com.napkinstack.Kitokey.desktop`;
   - Windows, from the Store's package: removing it removes settings, models and logs; your
     meetings stay in `Documents\Kitokey` until you delete them;
   - macOS: `~/Library/Application Support/kitokey` and `~/Library/Logs/Kitokey`.
-- Keys are also revoked at the service that issued them.
+- A key you gave stays in your system's keyring until you delete it there (under
+  `com.napkinstack.Kitokey`); revoke it also at the service that issued it.
 - A model downloaded through Ollama is kept by Ollama: remove it there (`ollama rm <model>`).
 
 ### Contact
@@ -83,9 +87,11 @@ Changes to this policy are in this file's history.
 |---|---|
 | Le son d'une réunion : votre micro et ce que votre ordinateur joue, en deux pistes | Votre dossier de réunions : `Documents/Kitokey`, sauf si vous en choisissez un autre ; si vous utilisiez Kitokey sous son ancien nom, Wholeheard, elles restent dans `Documents/Wholeheard` |
 | Sa transcription, son compte rendu, le contexte que vous avez écrit, sa langue, vos corrections | Le même dossier, à côté du son |
-| Vos réglages, et la clé d'un service si vous en avez donné une | Le dossier de configuration de votre utilisateur |
+| Vos réglages | Le dossier de configuration de votre utilisateur |
+| La clé d'un service, si vous en avez donné une | Le trousseau de votre système, sous `com.napkinstack.Kitokey` : jamais dans un fichier |
 | Les modèles de parole téléchargés | Le dossier de données de votre utilisateur |
 | Les journaux : étapes, durées, hôtes, modèles et échecs — jamais un mot d'une réunion, ni une clé | Le dossier d'état de votre utilisateur (sous Windows, les données de l'application) |
+| Ce que le moteur web de la fenêtre garde pour lui : son cache et son propre stockage — aucune réunion, aucun réglage | Sous Linux, `~/.local/share/com.napkinstack.Kitokey` |
 
 Rien n'est enregistré tant que vous ne lancez pas un enregistrement. Prévenir les autres
 participants que vous enregistrez vous revient : Kitokey ne leur montre rien. Il vous le
@@ -121,11 +127,13 @@ montrerait ce qu'elle envoie et où.
 - Tout : désinstallez Kitokey, puis supprimez votre dossier de réunions et les dossiers de
   Kitokey :
   - Linux : `~/.config/kitokey`, `~/.local/share/kitokey`, `~/.local/state/kitokey`,
+    le cache web de la fenêtre `~/.local/share/com.napkinstack.Kitokey`,
     et l'entrée de démarrage à l'ouverture de session `~/.config/autostart/com.napkinstack.Kitokey.desktop` ;
   - Windows, depuis le paquet du Store : le retirer retire réglages, modèles et journaux ; vos
     réunions restent dans `Documents\Kitokey` jusqu'à ce que vous les supprimiez ;
   - macOS : `~/Library/Application Support/kitokey` et `~/Library/Logs/Kitokey`.
-- Les clés se révoquent aussi auprès du service qui les a émises.
+- Une clé donnée reste dans le trousseau de votre système jusqu'à ce que vous l'y supprimiez
+  (sous `com.napkinstack.Kitokey`) ; révoquez-la aussi auprès du service qui l'a émise.
 - Un modèle téléchargé par Ollama est gardé par Ollama : retirez-le là (`ollama rm <modèle>`).
 
 ### Contact

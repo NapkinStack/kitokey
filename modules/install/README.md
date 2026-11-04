@@ -34,6 +34,22 @@ sudo apt install ./dist/install/kitokey_*_amd64.deb
 module at once: each program is built in a container of that system, so that it links what that
 system has (D27).
 
+Removing it keeps what is yours (D80). `bash modules/install/scripts/e2e.sh <the package>`, with
+`KITOKEY_TARGET` naming its system, installs it in a throwaway container, starts Kitokey as a user,
+writes a meeting, removes the package, then installs it again:
+
+```mermaid
+flowchart LR
+    I["installed"]:::step --> F["first start, as a user<br/>a meeting written"]:::step --> R["removed"]:::step
+    R --> C{"its files gone ·<br/>the home as it was ·<br/>new there: privacy.md's paths"}:::check
+    C --> A["installed again,<br/>started: the meeting listed,<br/>no welcome again"]:::check
+    classDef step fill:#374151,color:#fff
+    classDef check fill:#065f46,color:#fff
+```
+
+**Legend** — grey: what the e2e does · green: what it holds. The paths Kitokey may leave are read
+from [`docs/privacy.md`](../../docs/privacy.md)'s Linux line.
+
 On a Mac, `nstack release` makes `dist/install/Kitokey-<version>-macos-arm64.zip`: the app,
 its four programs in `Contents/MacOS` and transcription's `kitokey-speech` (D42), signed ad hoc, not by Apple. GitHub's macOS runner makes
 it on every change to a program on `main` (`.github/workflows/macos-app.yml`, the job *the app*; on a pull request only when it changes install) and keeps it 7

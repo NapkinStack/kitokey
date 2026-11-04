@@ -47,3 +47,9 @@
 - `e2e` needs `podman` and the network; for the system `KITOKEY_TARGET` names (unset: the
   system it runs on), with no argument it packs stand-in programs, given a package (`dist/install/…`) it
   installs that one. On Ubuntu, apt fetches GTK for the tray's library: count ten minutes.
+- Given a package, the e2e also holds D80 (`scripts/removal.sh`): Kitokey started as a user under
+  Xvfb, driven by WebKitWebDriver (`scripts/start-as-user.py`), a meeting written, the package
+  removed and installed again. Run it once per system, each with its own package:
+  `KITOKEY_TARGET=fedora-44 bash scripts/e2e.sh dist/install/kitokey-<version>-1.fc44.x86_64.rpm`,
+  then `KITOKEY_TARGET=ubuntu-24.04 bash scripts/e2e.sh <the .deb>`. What may stay in the home is read
+  from `docs/privacy.md`'s Linux paths: a folder Kitokey starts writing is named there first.
