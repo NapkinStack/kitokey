@@ -1,4 +1,4 @@
-"""Run on Windows by scripts/release.sh, and by trial.ps1 for a later version: Wholeheard-<version>-x64.msix,
+"""Run on Windows by scripts/release.sh, and by trial.ps1 for a later version: Kitokey-<version>-x64.msix,
 made with the Windows SDK's MakeAppx from AppxManifest.xml.in, identity.json, the four programs and
 Assets/ (D54). Unsigned: the Store signs what it publishes; outside it, whoever installs it signs it.
 
@@ -13,8 +13,8 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROGRAMS = ("shell/wholeheard.exe", "capture/wholeheard-capture.exe",
-            "transcription/wholeheard-transcription.exe", "summary/wholeheard-summary.exe")
+PROGRAMS = ("shell/kitokey.exe", "capture/kitokey-capture.exe",
+            "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe")
 
 
 def four_parts(version):
@@ -71,7 +71,7 @@ def main(artefacts, version, out):
     folder = os.path.join(out, f"msix-{version}")
     shutil.rmtree(folder, ignore_errors=True)
     stage(artefacts, version, folder)
-    path = os.path.join(out, f"Wholeheard-{version}-x64.msix")
+    path = os.path.join(out, f"Kitokey-{version}-x64.msix")
     subprocess.run([makeappx(), "pack", "/o", "/h", "SHA256", "/d", folder, "/p", path], check=True, timeout=600)
     shutil.rmtree(folder)
     for line in notices(version, identity()):

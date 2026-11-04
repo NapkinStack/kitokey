@@ -6,7 +6,7 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
   <Identity Name="@NAME@" Version="@VERSION@" Publisher="@PUBLISHER@" ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>Wholeheard</DisplayName>
+    <DisplayName>Kitokey</DisplayName>
     <PublisherDisplayName>@PUBLISHER_DISPLAY_NAME@</PublisherDisplayName>
     <Description>Records a conversation, transcribes it and writes its minutes, on your machine by default.</Description>
     <Logo>Assets\StoreLogo.png</Logo>
@@ -23,11 +23,11 @@
     <DeviceCapability Name="microphone" />
   </Capabilities>
   <Applications>
-    <Application Id="Wholeheard" Executable="wholeheard.exe"
+    <Application Id="Kitokey" Executable="kitokey.exe"
       uap10:RuntimeBehavior="packagedClassicApp"
       uap10:TrustLevel="mediumIL"
       uap10:Parameters="--window">
-      <uap:VisualElements DisplayName="Wholeheard"
+      <uap:VisualElements DisplayName="Kitokey"
         Description="Records a conversation, transcribes it and writes its minutes."
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"

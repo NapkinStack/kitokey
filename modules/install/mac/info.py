@@ -1,4 +1,4 @@
-"""Writes Wholeheard.app's Info.plist and its French strings into <app>/Contents, for <version>.
+"""Writes Kitokey.app's Info.plist and its French strings into <app>/Contents, for <version>.
 
 What macOS shows when it asks for the microphone and for the sound the Mac plays is the
 product's words (rule 1): English in the Info.plist, French in fr.lproj, both from words.json.
@@ -13,15 +13,15 @@ words = json.load(open(os.path.join(os.path.dirname(__file__), "words.json"), en
 contents = os.path.join(app, "Contents")
 os.makedirs(os.path.join(contents, "Resources", "fr.lproj"), exist_ok=True)
 info = {
-    "CFBundleName": "Wholeheard",
+    "CFBundleName": "Kitokey",
     "CFBundleInfoDictionaryVersion": "6.0",
-    "CFBundleDisplayName": "Wholeheard",
-    "CFBundleIdentifier": "dev.wholeheard.Wholeheard",
-    "CFBundleExecutable": "wholeheard",
+    "CFBundleDisplayName": "Kitokey",
+    "CFBundleIdentifier": "com.napkinstack.Kitokey",
+    "CFBundleExecutable": "kitokey",
     "CFBundlePackageType": "APPL",
     "CFBundleShortVersionString": version,
     "CFBundleVersion": version,
-    "CFBundleIconFile": "Wholeheard",
+    "CFBundleIconFile": "Kitokey",
     "CFBundleDevelopmentRegion": "en",
     "CFBundleLocalizations": sorted(words),
     "NSHighResolutionCapable": True,

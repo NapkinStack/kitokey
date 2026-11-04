@@ -7,16 +7,16 @@ apt-get update -qq
 apt-get install -y -qq --no-install-recommends dpkg-dev binutils \
   libwebkit2gtk-4.1-0 libgtk-3-0t64 librsvg2-2 libpipewire-0.3-0t64 libasound2t64 libvulkan1 >/dev/null
 root=/tmp/package
-for program in shell/wholeheard capture/wholeheard-capture transcription/wholeheard-transcription summary/wholeheard-summary; do
+for program in shell/kitokey capture/kitokey-capture transcription/kitokey-transcription summary/kitokey-summary; do
   install -Dm755 "/artefacts/$program" "$root/usr/bin/${program#*/}"
 done
 # Lighter without their symbols; a program that is no binary is left as it is.
 for program in "$root"/usr/bin/*; do strip --strip-unneeded "$program" 2>/dev/null || :; done
-install -Dm644 /artefacts/shell/dev.wholeheard.Wholeheard.desktop "$root/usr/share/applications/dev.wholeheard.Wholeheard.desktop"
-install -Dm644 /artefacts/shell/dev.wholeheard.Wholeheard.png "$root/usr/share/icons/hicolor/512x512/apps/dev.wholeheard.Wholeheard.png"
+install -Dm644 /artefacts/shell/com.napkinstack.Kitokey.desktop "$root/usr/share/applications/com.napkinstack.Kitokey.desktop"
+install -Dm644 /artefacts/shell/com.napkinstack.Kitokey.png "$root/usr/share/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png"
 # dpkg-shlibdeps reads a source package's control file where it runs: one is made for it.
 mkdir -p /tmp/shlibs/debian
-printf 'Source: wholeheard\n\nPackage: wholeheard\nArchitecture: any\n' > /tmp/shlibs/debian/control
+printf 'Source: kitokey\n\nPackage: kitokey\nArchitecture: any\n' > /tmp/shlibs/debian/control
 binaries=()
 for program in "$root"/usr/bin/*; do
   [ "$(head -c 4 "$program")" = $'\x7fELF' ] && binaries+=("$program")
@@ -35,4 +35,4 @@ control=${control//@ARCH@/$(dpkg --print-architecture)}
 control=${control//@SIZE@/$(du -sk "$root/usr" | cut -f1)}
 control=${control//@DEPENDS@/$depends}
 printf '%s\n' "$control" > "$root/DEBIAN/control"
-dpkg-deb --build --root-owner-group "$root" "/out/wholeheard_${version}_$(dpkg --print-architecture).deb" >/dev/null
+dpkg-deb --build --root-owner-group "$root" "/out/kitokey_${version}_$(dpkg --print-architecture).deb" >/dev/null

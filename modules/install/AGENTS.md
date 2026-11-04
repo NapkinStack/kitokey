@@ -8,14 +8,14 @@
 
 ## Internal conventions nobody could guess
 
-- `scripts/release.sh` makes the package of the system `WHOLEHEARD_TARGET` names: `fedora-<n>` an rpm
-  (`wholeheard.spec`), `ubuntu-<n>.<n>` a .deb (`deb/build.sh`, `deb/control.in`); unset, the package
+- `scripts/release.sh` makes the package of the system `KITOKEY_TARGET` names: `fedora-<n>` an rpm
+  (`kitokey.spec`), `ubuntu-<n>.<n>` a .deb (`deb/build.sh`, `deb/control.in`); unset, the package
   of the system it runs on (`/etc/os-release`; on a Mac, `macos-<processor>`). `macos-arm64`:
-  `Wholeheard.app`, zipped (`mac/build.sh`), made on a Mac — GitHub's runner, `macos-app.yml`'s job
+  `Kitokey.app`, zipped (`mac/build.sh`), made on a Mac — GitHub's runner, `macos-app.yml`'s job
   *the app* — never in a container. Its Info.plist and French strings: `mac/info.py`, from
   `mac/words.json`, the sentences macOS shows when it asks for the microphone and the sound the
   Mac plays.
-- `windows-x64`: the zip (`windows/build.py`) and `Wholeheard-<version>-x64.msix` (`windows/msix.py`,
+- `windows-x64`: the zip (`windows/build.py`) and `Kitokey-<version>-x64.msix` (`windows/msix.py`,
   from `AppxManifest.xml.in`, `identity.json` and `Assets/`), made on Windows. `windows/trial.ps1`,
   run by `windows-app.yml`, signs it for the run and installs, upgrades and removes it; `windows/certify.ps1`
   has the certification kit test it, `windows/appcert.py` says its report — read in `scripts/test.sh` from
@@ -27,8 +27,8 @@
 
 - Nothing outside `/usr`: removing the package never touches a user's meetings or settings
   (`scripts/test.sh`).
-- The desktop entry the menu shows is `dev.wholeheard.Wholeheard.desktop`, the application's id: GNOME's
-  shortcut portal finds Wholeheard by it.
+- The desktop entry the menu shows is `com.napkinstack.Kitokey.desktop`, the application's id: GNOME's
+  shortcut portal finds Kitokey by it.
 
 ## Known traps
 
@@ -44,6 +44,6 @@
 
 ## Non-standard commands
 
-- `e2e` needs `podman` and the network; for the system `WHOLEHEARD_TARGET` names (unset: the
+- `e2e` needs `podman` and the network; for the system `KITOKEY_TARGET` names (unset: the
   system it runs on), with no argument it packs stand-in programs, given a package (`dist/install/…`) it
   installs that one. On Ubuntu, apt fetches GTK for the tray's library: count ten minutes.
