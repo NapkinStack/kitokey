@@ -3,8 +3,8 @@
 > The framework's words: `.nstack/handbook/glossary.md`.
 
 - **Status**: Accepted — by the decider, 2026-11-04, in the session that studied the name:
-  « mon preferé: kitokey », then « ok, écris le PDR pour kitokey ». Effective once the trademark search below
-  finds nothing in the way.
+  « mon preferé: kitokey », then « ok, écris le PDR pour kitokey ». Effective the same day: the trademark
+  search done and the domains bought, on the decider's word « Déjà fait ». The rename is cycle 07's D86.
 - **Date**: 2026-11-04
 - **Decision makers**: the decider, `@napkinstack-admin`
 - **Modules affected**: all — the name. `install` (packages, the Store's listing), `shell` (what the user
