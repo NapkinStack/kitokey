@@ -9,7 +9,7 @@ use std::{
 };
 
 use common::{MINUTES, answering, answering_natively, ollama, played, provider};
-use wholeheard_summary::{
+use kitokey_summary::{
     Refused,
     provider::{Provider, patience},
 };

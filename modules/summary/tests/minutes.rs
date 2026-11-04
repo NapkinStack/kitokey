@@ -3,8 +3,8 @@
 
 use std::fs;
 
+use kitokey_summary::{Made, Minutes, Refused, Segment, minutes, read_transcript, reported, request, write_minutes};
 use serde_json::json;
-use wholeheard_summary::{Made, Minutes, Refused, Segment, minutes, read_transcript, reported, request, write_minutes};
 
 const HEADER: &str =
     r#"{"type": "header", "contract": "transcript/v1", "engine": "an-engine", "model": "a-model", "language": "fr", "context": null}"#;
@@ -827,7 +827,7 @@ fn a_time_alone_on_a_line_goes_and_a_section_left_empty_is_no_minutes() {
     assert_eq!(refused.1, Some("answer.not_minutes"));
 }
 
-fn priced() -> wholeheard_summary::Cost {
+fn priced() -> kitokey_summary::Cost {
     reported("openrouter.ai", &json!({ "cost": 0.012 })).unwrap().unwrap()
 }
 

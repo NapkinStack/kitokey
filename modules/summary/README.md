@@ -8,7 +8,7 @@ Writes the minutes of a transcript.
 
 ```mermaid
 flowchart LR
-    T["transcript.jsonl<br/>context.txt"]:::file --> P["wholeheard-summary<br/>a program, no window"]:::mod
+    T["transcript.jsonl<br/>context.txt"]:::file --> P["kitokey-summary<br/>a program, no window"]:::mod
     P -->|"one request"| V["The provider the user configured:<br/>a model on the machine, or online"]:::ext
     V --> P
     P -->|"minutes/v3, whole or not at all"| M["minutes.md"]:::file
@@ -26,14 +26,14 @@ it contacts · orange: who reads its events, one JSON object per line.
 ```bash
 # The example: an online provider and a large model — the one that kept every action of the
 # meeting it was tried on (cycle 01, D5). The key is read from the environment, written nowhere.
-wholeheard-summary <session-folder> --provider https://openrouter.ai/api/v1 --model anthropic/claude-sonnet-5.5
+kitokey-summary <session-folder> --provider https://openrouter.ai/api/v1 --model anthropic/claude-sonnet-5.5
 
 # A model on the machine: nothing leaves it, no key — and, on a laptop, fewer of the actions.
-wholeheard-summary <session-folder> --provider http://localhost:11434/v1 --model mistral
+kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mistral
 
 # Whether a model answers, before any meeting: one sentence of the program's own is sent,
 # `sending` then `answered` said, or why not in one sentence. What the settings' Tester runs.
-wholeheard-summary --test --provider http://localhost:11434/v1 --model mistral
+kitokey-summary --test --provider http://localhost:11434/v1 --model mistral
 ```
 
 | Tried on one meeting, with its context | Of seven actions agreed: missing | Time |
@@ -70,7 +70,7 @@ form, without a key, whose host answers `GET /api/version` as Ollama does, is as
 own `/api/chat`, with a window sized to the request, an answer of at most 4096 tokens, and a
 patience that grows with what it has to read: 600 s, and a second for each 20 bytes.
 
-A key, when the provider wants one, is read from `WHOLEHEARD_PROVIDER_KEY` and written nowhere.
+A key, when the provider wants one, is read from `KITOKEY_PROVIDER_KEY` and written nowhere.
 Whatever fails — no network, a refused key, no credit left with the provider, an unknown
 model, an answer cut short or that is not minutes — the reason is one sentence on the error
 stream, the transcript is untouched and the minutes that were there are still there. An answer
@@ -79,8 +79,8 @@ laptop, one answer in eleven had another form (#366).
 
 What it does is logged — each step and each failure with its detail, never a word of the
 meeting, its context or a key (ADR-0007): one JSON line per step in
-`$XDG_STATE_HOME/wholeheard/logs/summary.<date>.jsonl` (UTC), fourteen days kept and the folder
-under 50 MB. `WHOLEHEARD_LOG_DIR`, an absolute path, puts them elsewhere, `WHOLEHEARD_LOG=debug` asks for more, and `WHOLEHEARD_TRACE` is the id of
+`$XDG_STATE_HOME/kitokey/logs/summary.<date>.jsonl` (UTC), fourteen days kept and the folder
+under 50 MB. `KITOKEY_LOG_DIR`, an absolute path, puts them elsewhere, `KITOKEY_LOG=debug` asks for more, and `KITOKEY_TRACE` is the id of
 the making the shell passes, so that its lines and the shell's read together.
 
 ## Getting started

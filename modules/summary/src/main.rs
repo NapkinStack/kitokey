@@ -1,13 +1,13 @@
-//! `wholeheard-summary` — writes the minutes of a session from its transcript, with no window.
+//! `kitokey-summary` — writes the minutes of a session from its transcript, with no window.
 //!
-//!     wholeheard-summary <session-folder> --provider <address> --model <name>
-//!     wholeheard-summary --test --provider <address> --model <name>
+//!     kitokey-summary <session-folder> --provider <address> --model <name>
+//!     kitokey-summary --test --provider <address> --model <name>
 //!
 //! The second asks the provider one sentence of its own, nothing of a meeting, and says
 //! whether the model answered: what the settings' *Tester* runs.
 //!
 //! The address speaks the OpenAI protocol: a model on the machine or an online one. A key,
-//! when the provider wants one, is read from `WHOLEHEARD_PROVIDER_KEY` and written nowhere.
+//! when the provider wants one, is read from `KITOKEY_PROVIDER_KEY` and written nowhere.
 //!
 //! It says what happens as one JSON object per line on its output — `sending`, then
 //! `written` — and what failed in one sentence on the error stream. Whatever fails, the
@@ -23,9 +23,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+use kitokey_summary::{Made, Refused, TEST, log, minutes, provider::Provider, read_transcript, reported, request, write_minutes};
 use serde_json::json;
 use tracing::{error, info, warn};
-use wholeheard_summary::{Made, Refused, TEST, log, minutes, provider::Provider, read_transcript, reported, request, write_minutes};
 
 fn main() -> ExitCode {
     let _run = log::start("summary");
@@ -39,8 +39,8 @@ fn main() -> ExitCode {
             summarise(Path::new(folder), address, model)
         }
         _ => Err(Refused(
-            "usage: wholeheard-summary <session-folder> --provider <address> --model <name>, \
-             or wholeheard-summary --test --provider <address> --model <name>"
+            "usage: kitokey-summary <session-folder> --provider <address> --model <name>, \
+             or kitokey-summary --test --provider <address> --model <name>"
                 .into(),
             None,
         )),
@@ -53,7 +53,7 @@ fn main() -> ExitCode {
             if let Some(code) = code {
                 let _ = writeln!(std::io::stdout(), "{}", json!({ "event": "failed", "code": code }));
             }
-            eprintln!("wholeheard-summary: {why}");
+            eprintln!("kitokey-summary: {why}");
             ExitCode::FAILURE
         }
     }
@@ -80,13 +80,13 @@ fn test(address: &str, model: &str) -> Result<(), Refused> {
     Ok(())
 }
 
-/// The key, when the provider wants one: from `WHOLEHEARD_PROVIDER_KEY`, written nowhere.
+/// The key, when the provider wants one: from `KITOKEY_PROVIDER_KEY`, written nowhere.
 fn key() -> Result<Option<String>, Refused> {
-    match std::env::var("WHOLEHEARD_PROVIDER_KEY") {
-        Ok(key) => Ok(Some(key)),
-        Err(std::env::VarError::NotPresent) => Ok(None),
-        Err(_) => Err(Refused(
-            "the key in WHOLEHEARD_PROVIDER_KEY is not text".into(),
+    match kitokey_summary::log::env_os("PROVIDER_KEY").map(std::ffi::OsString::into_string) {
+        Some(Ok(key)) => Ok(Some(key)),
+        None => Ok(None),
+        Some(Err(_)) => Err(Refused(
+            "the key in KITOKEY_PROVIDER_KEY is not text".into(),
             Some("settings.invalid"),
         )),
     }
