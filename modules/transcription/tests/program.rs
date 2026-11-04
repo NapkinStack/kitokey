@@ -195,3 +195,61 @@ fn a_log_that_cannot_be_written_says_nothing_on_the_error_stream() {
     assert_eq!(err.lines().count(), 1, "{err}");
     assert!(err.starts_with("kitokey-transcription: this folder is not a session"), "{err}");
 }
+
+/// A refusal's run with this environment, nothing else of the machine's: where its log went.
+fn logged_with(env: &[(&str, &std::path::Path)], texts: &[(&str, &str)]) -> Vec<std::path::PathBuf> {
+    let place = tempfile::tempdir().unwrap();
+    std::fs::write(place.path().join("session.json"), r#"{"contract":"session-audio/v0"}"#).unwrap();
+    let mut run = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"));
+    run.args([place.path().to_str().unwrap(), "--model", "/nowhere/a-model.bin"])
+        .env_clear();
+    for (name, value) in env {
+        run.env(name, value);
+    }
+    for (name, value) in texts {
+        run.env(name, value);
+    }
+    assert!(!run.output().unwrap().status.success());
+    let mut files: Vec<_> = env.iter().flat_map(|(_, folder)| walk(folder)).collect();
+    files.sort();
+    files.dedup();
+    files
+}
+
+fn walk(folder: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return Vec::new();
+    };
+    entries
+        .flat_map(|entry| {
+            let path = entry.unwrap().path();
+            if path.is_dir() { walk(&path) } else { vec![path] }
+        })
+        .collect()
+}
+
+#[test]
+fn the_new_names_win_over_the_names_before_d86() {
+    let (new, old) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let files = logged_with(
+        &[("KITOKEY_LOG_DIR", new.path()), ("WHOLEHEARD_LOG_DIR", old.path())],
+        &[
+            ("KITOKEY_TRACE", "new-1"),
+            ("WHOLEHEARD_TRACE", "old-1"),
+            ("KITOKEY_LOG", "error"),
+            ("WHOLEHEARD_LOG", "off"),
+        ],
+    );
+    assert_eq!(files.len(), 1, "{files:?}");
+    assert!(files[0].starts_with(new.path()), "the log is where KITOKEY_LOG_DIR says: {files:?}");
+    assert!(std::fs::read_to_string(&files[0]).unwrap().contains(r#""trace":"new-1""#));
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn unasked_the_log_is_in_kitokeys_folder_of_the_systems_state() {
+    let state = tempfile::tempdir().unwrap();
+    let files = logged_with(&[("XDG_STATE_HOME", state.path()), ("HOME", state.path())], &[]);
+    assert_eq!(files.len(), 1, "{files:?}");
+    assert_eq!(files[0].parent().unwrap(), state.path().join("kitokey/logs"), "{files:?}");
+}
