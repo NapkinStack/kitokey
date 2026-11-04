@@ -101,7 +101,19 @@ fn say(event: Event) {
     }
 }
 
+/// The version this program says (`--version`): the package's, named when it is built
+/// (`KITOKEY_VERSION`, D78), Cargo's otherwise.
+const VERSION: &str = match option_env!("KITOKEY_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+};
+
 fn main() -> ExitCode {
+    // Asked by a package or a person, answered before anything is logged or read.
+    if std::env::args_os().skip(1).eq(["--version"]) {
+        println!("kitokey-capture {VERSION}");
+        return ExitCode::SUCCESS;
+    }
     let _run = log::start("capture");
     let args: Vec<String> = std::env::args().skip(1).collect();
     let outcome = match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
