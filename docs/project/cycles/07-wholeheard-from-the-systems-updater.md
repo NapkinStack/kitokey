@@ -13,6 +13,15 @@ deliverables:
       - "Given the .rpm on Fedora 44 and the .deb on Ubuntu 24.04, each in a throwaway container, when Wholeheard is installed, its first start run as a user, a meeting written, then the package removed (`dnf remove`, `apt remove`), then no file the package installed is left, the user's meetings and settings are as they were, and what is left in the user's home is exactly what `docs/privacy.md` names"
       - "Given the same package installed again, when Wholeheard starts, then it reads the meetings and settings it left"
       - "Given the install module's e2e, when it runs, then both systems' removals above are held"
+  - id: D86
+    title: "Wholeheard becomes Kitokey, and nothing of the user's is lost on the way"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given Wholeheard installed and used — settings, meetings, the Whisper model, keys in the keyring —, when the user installs Kitokey's package over it (`dnf install` of the .rpm, `apt install` of the .deb), then it replaces Wholeheard's, and Kitokey starts with the same settings, the same meetings where they were, the model not fetched again and the keys kept; a carrying over cut halfway resumes at the next start and never loses a meeting"
+      - "Given the repository, when it is searched for Wholeheard, then the product, its programs, its packages, its application id, its folders and its variables are named Kitokey; Wholeheard and Summit are named only where history is told and in the code that carries over what the user held under them"
+      - "Given the window, the tray, the applications menu and the notifications, in French and in English, when they are read, then they say Kitokey; the promise's sentence is PDR-0001's, unchanged"
+      - "Given D78, when its source package is made and built, then the package is `kitokey` and the Copr project `kitokey`: `dnf copr enable <owner>/kitokey` then `dnf install kitokey`"
   - id: D82
     title: "A microphone chosen that cannot be kept says so, and the earlier choice stays"
     module: shell
@@ -102,6 +111,7 @@ system: Linux first, then Windows, then macOS. This is Linux's.
 ```mermaid
 flowchart LR
     R["D80 removing it<br/>keeps the meetings"]:::own --> C["D78 Copr,<br/>dnf and its updates"]:::pub
+    N["D86 the name<br/>Kitokey"]:::own --> C
     M["D82 a choice not kept,<br/>said"]:::own
     P["D79 spike:<br/>a PPA for Ubuntu?"]:::spike
     T["Trials moved:<br/>D66 D41 D63 D27 · D56's key"]:::wait
@@ -119,7 +129,7 @@ amber: moved, a person's trial or key left · teal: the outcome.
 ## Deliverables
 
 **Cut first** if the breaker nears: D79, then D82. Never D80: Copr does not publish a package whose
-removal is untested.
+removal is untested. Never D86 while D78 publishes: nothing is published under the name PDR-0006 replaced.
 
 ### Moved from cycle 06
 
@@ -134,6 +144,24 @@ an Ubuntu 24.04 machine can take it with `nstack claim D27`, for one short real 
   after the package is removed. [`docs/privacy.md`](../../privacy.md) (#624) names what stays in the user's home:
   the start-at-login entry, the meetings, the settings, and Ollama's models.
 - In throwaway containers, as the module's e2e already runs. Nothing is installed on the workstation.
+
+### D86
+
+**Added on the decider's word, 2026-11-04**, in the session that wrote
+[PDR-0006](../../pdr/0006-the-product-is-named-kitokey.md): « cadre le livrable de renommage en kitokey », in
+this cycle, before D78 (« Cycle 07, avant D78 »). The trademark search done and the domains bought, the same
+day: « Déjà fait ». The end date does not move.
+
+- **Prior Art Gate.** D28 renamed Summit to Wholeheard on 2026-10-20 ([cycle 03](03-the-window.md#d28)): one
+  pull request per program, the shell's carrying over, the package taking the old one's place, the
+  contracts' prose and the repository's pages, each verified by another session. Its lessons stand: a step
+  of the carrying over does what is left of it at every start; a settings file with no line end stays
+  readable. The keys already move from `dev.summit.Summit` (`modules/shell/src/keys.rs`): Wholeheard's
+  become one more name to read from.
+- **Before D78 publishes**, so that the first users of Copr install Kitokey and never change repository.
+- **The pull requests in flight** (D80, D27, D56, D41, D66, D63) are not waited for: each takes the default
+  branch in before its own merge and settles its conflicts, as any pull request does (kernel §2, step 10).
+- The repository's name on GitHub is the decider's gesture, once D86 is merged (*What needs a person*).
 
 ### D82
 
@@ -162,7 +190,8 @@ an Ubuntu 24.04 machine can take it with `nstack claim D27`, for one short real 
 
 | Deliverable | Who | The literal gesture |
 |---|---|---|
-| D78 | The decider | Sign in to [Copr](https://copr.fedorainfracloud.org/) with a Fedora account and create the project `wholeheard`. Copy the text [its API page](https://copr.fedorainfracloud.org/api/) gives into a file `copr`, then, at the root of a checkout: `gh secret set COPR_CONFIG < copr` and delete the file. Tell an agent the owner's name |
+| D86 | The decider | Once D86 is merged: on GitHub, the repository's *Settings* → *General* → *Repository name*: `kitokey`, then *Rename*. GitHub redirects the old address |
+| D78 | The decider | Sign in to [Copr](https://copr.fedorainfracloud.org/) with a Fedora account and create the project `kitokey` (D86; a project already made as `wholeheard` is deleted from its *Settings*). Copy the text [its API page](https://copr.fedorainfracloud.org/api/) gives into a file `copr`, then, at the root of a checkout: `gh secret set COPR_CONFIG < copr` and delete the file. Tell an agent the owner's name |
 | D66, trial | The decider | As cycle 06 says, on the build of this cycle's first tag: AirPods, a WhatsApp Web call, five starts and stops, the answers on [#494](https://github.com/NapkinStack/wholeheard/issues/494) |
 | ADR-0015 | The decider | After that trial, say « ADR-0015 acceptée », or what falls |
 | D41 | The decider | [#449](https://github.com/NapkinStack/wholeheard/issues/449): a call on the earbuds, the default on the speaker |
