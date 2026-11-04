@@ -21,12 +21,12 @@ Logs are one JSON line per event, never a word of a meeting:
 
 | System | Where |
 |---|---|
-| Linux | `$XDG_STATE_HOME/wholeheard/logs/capture.<date>.jsonl` (`~/.local/state/…` by default) |
-| Windows | `%LOCALAPPDATA%\Wholeheard\logs\` |
-| macOS | `~/Library/Logs/Wholeheard/` |
+| Linux | `$XDG_STATE_HOME/kitokey/logs/capture.<date>.jsonl` (`~/.local/state/…` by default) |
+| Windows | `%LOCALAPPDATA%\Kitokey\logs\` |
+| macOS | `~/Library/Logs/Kitokey/` |
 
 ```bash
-grep -E '"capture\.(failed|stream_error|unavailable|zeros|not_followed|silent|me_lost|me_not_attached|me_not_closed|me_form_changed|microphone_gone)"' "${XDG_STATE_HOME:-$HOME/.local/state}"/wholeheard/logs/capture.*.jsonl
+grep -E '"capture\.(failed|stream_error|unavailable|zeros|not_followed|silent|me_lost|me_not_attached|me_not_closed|me_form_changed|microphone_gone)"' "${XDG_STATE_HOME:-$HOME/.local/state}"/kitokey/logs/capture.*.jsonl
 ```
 
 | Message | Means | Level |
@@ -45,7 +45,7 @@ grep -E '"capture\.(failed|stream_error|unavailable|zeros|not_followed|silent|me
 | `capture.zeros` | A track holds exact zeros at `at` seconds: a device sent nothing | warning |
 | `capture.silent` | A source stayed silent; `nothing` true: it sends nothing at all | info |
 
-Logs are kept fourteen days and under 50 MB; `WHOLEHEARD_LOG=off` turns them off.
+Logs are kept fourteen days and under 50 MB; `KITOKEY_LOG=off` turns them off.
 
 A session left without its end (`stopped` absent in `session.json`) is one being recorded, or one
 that was cut: the machine went off, the program was killed, or `capture.failed` ended it. What was
@@ -55,7 +55,7 @@ written up to then is kept.
 
 - [#494](https://github.com/NapkinStack/wholeheard/issues/494): on Bluetooth earbuds, most
   `Failure in Bluetooth audio transport` lines are WirePlumber's profile switches, made by whichever
-  program runs the earbuds' input: a call's browser, with or without Wholeheard. Since D66, capture
+  program runs the earbuds' input: a call's browser, with or without Kitokey. Since D66, capture
   makes none of its own, but within a few seconds of a default turning into a headset during a
   recording (ADR-0015). Real disconnections remain unexplained. The trial on real earbuds is the
   decider's.
@@ -72,8 +72,8 @@ no word of a meeting.
 
 | Where | How | Tried |
 |---|---|---|
-| Fedora | `sudo dnf downgrade ./wholeheard-<previous>.rpm`, the previous package kept beside the release | 2026-10-30, by the framer, on a Fedora 44 container: 0.2.0-2 back to 0.2.0-1, a meeting's folder untouched, the four programs there. A rebuilt package stood in for the later release |
-| Ubuntu | `sudo apt install --allow-downgrades ./wholeheard_<previous>_amd64.deb` | Not tried |
+| Fedora | `sudo dnf downgrade ./kitokey-<previous>.rpm`, the previous package kept beside the release | 2026-10-30, by the framer, on a Fedora 44 container: 0.2.0-2 back to 0.2.0-1, a meeting's folder untouched, the four programs there. A rebuilt package stood in for the later release |
+| Ubuntu | `sudo apt install --allow-downgrades ./kitokey_<previous>_amd64.deb` | Not tried |
 | The Microsoft Store | It takes no lower version: the previous code is submitted again under a higher one | Not tried: nothing is submitted yet |
 
 Meetings are the user's files: no rollback touches them. A session's contract version a previous

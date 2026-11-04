@@ -34,19 +34,19 @@ for _ in $(seq 60); do [ "$(cut -d. -f1 /proc/loadavg)" -lt "$quiet" ] && break;
 if [ "$(cut -d. -f1 /proc/loadavg)" -ge "$quiet" ]; then
   say "e2e: NOT RUN — the machine is busy (load $(cut -d' ' -f1 /proc/loadavg), $(nproc) processors): a clock cannot be measured on it"; exit 77
 fi
-bin=${CARGO_TARGET_DIR:-$PWD/target}/release/wholeheard-capture   # where cargo built it
+bin=${CARGO_TARGET_DIR:-$PWD/target}/release/kitokey-capture   # where cargo built it
 work=$(mktemp -d)
 # Its logs in the run's evidence, this run's alone, never the user's (ADR-0007).
-export WHOLEHEARD_LOG_DIR="$evidence/logs"
-rm -rf "$WHOLEHEARD_LOG_DIR"
+export KITOKEY_LOG_DIR="$evidence/logs"
+rm -rf "$KITOKEY_LOG_DIR"
 # A run that was killed outright could not put anything back: its devices are removed first,
 # and the system falls back on its own.
-for stale in $(pactl list short modules | awk '/wholeheard_e2e_/ {print $1}'); do
+for stale in $(pactl list short modules | awk '/(kitokey|wholeheard)_e2e_/ {print $1}'); do
   say "e2e: a device of an earlier run that was killed is removed"; pactl unload-module "$stale" || true
 done
 old_sink=$(pactl get-default-sink); old_source=$(pactl get-default-source)
-out=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_out)
-mic=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_mic)
+out=$(pactl load-module module-null-sink sink_name=kitokey_e2e_out)
+mic=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic)
 restore() {
   pkill -P $$ 2>/dev/null || true
   pactl set-default-sink "$old_sink" 2>/dev/null || true
@@ -58,8 +58,8 @@ restore() {
   rm -rf "$work"
 }
 trap restore EXIT
-pactl set-default-sink wholeheard_e2e_out
-pactl set-default-source wholeheard_e2e_mic.monitor
+pactl set-default-sink kitokey_e2e_out
+pactl set-default-source kitokey_e2e_mic.monitor
 
 # "me" is a 440 Hz note; "others" is an 880 Hz one, with fourteen seconds of nothing in it.
 tone() { ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=$1:duration=$2" -af volume=0.5 -ar 48000 -ac 2 "$3"; }
@@ -71,7 +71,7 @@ logged() {
   python3 - "$work" "$@" <<'PY'
 import json, os, pathlib, sys
 work, trace, wanted = sys.argv[1], sys.argv[2], sys.argv[3:]
-text = "".join(path.read_text() for path in sorted(pathlib.Path(os.environ["WHOLEHEARD_LOG_DIR"]).glob("capture.*.jsonl")))
+text = "".join(path.read_text() for path in sorted(pathlib.Path(os.environ["KITOKEY_LOG_DIR"]).glob("capture.*.jsonl")))
 steps = [line["message"] for line in map(json.loads, text.splitlines()) if line.get("span", {}).get("trace") == trace]
 mine = iter(steps)
 # The levels, ten a second, are said to the shell and never logged.
@@ -82,7 +82,7 @@ failed=0
 check() { if "$@"; then say "  ok    $*"; else say "  FAIL  $*"; failed=1; fi; }
 
 say "A. a recording stopped as a user stops it"
-pw-play --target wholeheard_e2e_mic "$work/me.wav" & mic_player=$!
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
 sleep 0.5
 "$bin" record "$work/sessions" --as v1 > "$work/a.events" 2> "$work/a.errors" &
 recorder=$!
@@ -98,12 +98,12 @@ check measure events "$work/a.events"
 check measure stopped "$folder" 440 880
 check measure read-while-written "$work/copy.wav" "$folder/session.json" "$copied_at" 5
 # Each default is named for the device it stands for, not as "default_input" or "default_output".
-check grep -q '"me":"wholeheard_e2e_mic' "$work/a.events"
-check grep -q '"others":"wholeheard_e2e_out' "$work/a.events"
+check grep -q '"me":"kitokey_e2e_mic' "$work/a.events"
+check grep -q '"others":"kitokey_e2e_out' "$work/a.events"
 
 say "B. a recording killed"
 kill "$mic_player" 2>/dev/null || true
-pw-play --target wholeheard_e2e_mic "$work/me.wav" & mic_player=$!
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
 sleep 0.5
 "$bin" record "$work/killed" --as v1 > "$work/b.events" 2>/dev/null &
 recorder=$!
@@ -117,7 +117,7 @@ check measure killed "$folder" "$killed_at" 5
 
 say "C. the two files on one clock"
 # The same sound into both sources: what differs between the two files is the program's doing.
-pactl set-default-source wholeheard_e2e_out.monitor
+pactl set-default-source kitokey_e2e_out.monitor
 "$bin" record "$work/clock" --as v1 > "$work/c.events" 2>/dev/null &
 recorder=$!
 sleep 2; pw-play "$work/others-a.wav"; sleep 1
@@ -148,7 +148,7 @@ zeros() {
   python3 - "$work" "$@" <<'PY'
 import json, os, pathlib, sys
 work, trace, count = sys.argv[1], sys.argv[2], int(sys.argv[3])
-lines = [json.loads(line) for path in pathlib.Path(os.environ["WHOLEHEARD_LOG_DIR"]).glob("capture.*.jsonl") for line in path.read_text().splitlines()]
+lines = [json.loads(line) for path in pathlib.Path(os.environ["KITOKEY_LOG_DIR"]).glob("capture.*.jsonl") for line in path.read_text().splitlines()]
 gaps = [line for line in lines if line.get("span", {}).get("trace") == trace and line["message"] == "capture.zeros"]
 first = float(sys.argv[4]) if len(sys.argv) > 4 else None
 ok = len(gaps) == count and all(gap["track"] == "remote" for gap in gaps) and (first is None or abs(gaps[0]["at"] - first) < 0.5)
@@ -156,12 +156,12 @@ sys.exit(0 if ok else f"{trace}: {gaps}")
 PY
 }
 measure2() { python3 scripts/e2e_measure_v2.py "$@" 2>&1 | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"; }
-pactl set-default-source wholeheard_e2e_mic.monitor
+pactl set-default-source kitokey_e2e_mic.monitor
 
 say "E. each source as delivered: a recording stopped as a user stops it"
-pw-play --target wholeheard_e2e_mic "$work/me.wav" & mic_player=$!
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
 sleep 0.5
-WHOLEHEARD_TRACE=e2e-e "$bin" record "$work/v2" > "$work/e.events" 2> "$work/e.errors" &
+KITOKEY_TRACE=e2e-e "$bin" record "$work/v2" > "$work/e.events" 2> "$work/e.errors" &
 recorder=$!
 sleep 1; pw-play "$work/others-a.wav"
 sleep 14                                                 # nothing plays: "silent" is owed
@@ -179,7 +179,7 @@ for name in local remote; do
 done
 
 say "F. each source as delivered: a recording killed"
-pw-play --target wholeheard_e2e_mic "$work/me.wav" & mic_player=$!
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
 sleep 0.5
 "$bin" record "$work/v2-killed" --as v2 > /dev/null 2>&1 &
 recorder=$!
@@ -190,7 +190,7 @@ kill "$mic_player" "$others_player" 2>/dev/null || true
 check measure2 killed "$(ls -d "$work"/v2-killed/*/ | head -1)" "$killed_at" 5
 
 say "G. each source as delivered: the clock places the same sound at the same instant"
-pactl set-default-source wholeheard_e2e_out.monitor
+pactl set-default-source kitokey_e2e_out.monitor
 "$bin" record "$work/v2-clock" --as v2 > /dev/null 2>&1 &
 recorder=$!
 sleep 2; pw-play "$work/others-a.wav"; sleep 1
@@ -198,12 +198,12 @@ kill -INT "$recorder"; wait "$recorder" || true
 check measure2 same-instant "$(ls -d "$work"/v2-clock/*/ | head -1)" 0.005
 
 say "H. each source as delivered: a source that stops, and comes back — twice"
-pactl set-default-source wholeheard_e2e_mic.monitor
+pactl set-default-source kitokey_e2e_mic.monitor
 tone 880 30 "$work/others-long.wav"
-pw-play --target wholeheard_e2e_mic "$work/me.wav" & mic_player=$!
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
 pw-play "$work/others-long.wav" & others_player=$!
 sleep 0.5
-WHOLEHEARD_TRACE=e2e-h "$bin" record "$work/v2-stops" --as v2 > /dev/null 2>&1 &
+KITOKEY_TRACE=e2e-h "$bin" record "$work/v2-stops" --as v2 > /dev/null 2>&1 &
 recorder=$!
 sleep 4; python3 scripts/e2e_measure_v2.py pause "$recorder" remote 6   # six seconds without the remote source
 # Back for three seconds, then gone again: each gap is logged, the second as the first (#285).
@@ -217,9 +217,9 @@ check zeros e2e-h 2
 
 say "I. each source as delivered: a source mute from its start"
 # Its stream paused as soon as it is there: it delivers nothing, and its zeros are logged once.
-pw-play --target wholeheard_e2e_mic "$work/me.wav" & mic_player=$!
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
 sleep 0.5
-WHOLEHEARD_TRACE=e2e-i "$bin" record "$work/v2-mute" --as v2 > /dev/null 2>&1 &
+KITOKEY_TRACE=e2e-i "$bin" record "$work/v2-mute" --as v2 > /dev/null 2>&1 &
 recorder=$!
 for _ in $(seq 40); do python3 scripts/e2e_measure_v2.py pause "$recorder" remote 5 2>/dev/null && break; sleep 0.05; done
 pw-play "$work/others-a.wav" & others_player=$!
@@ -231,50 +231,50 @@ check zeros e2e-i 1 0
 say "J. a recording that follows the devices (D31): switched to others of their own form, and one taken away"
 # A microphone of one channel at 16 kHz and an output of six at 44.1 kHz: the tracks keep the
 # form they opened with. Every note is played on a device of the run, never on the system's.
-mic_b=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_mic_b rate=16000 channels=1)
-out_b=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_out_b rate=44100 channels=6 channel_map=surround-51)
+mic_b=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic_b rate=16000 channels=1)
+out_b=$(pactl load-module module-null-sink sink_name=kitokey_e2e_out_b rate=44100 channels=6 channel_map=surround-51)
 tone 660 4 "$work/660.wav"; tone 1320 4 "$work/1320.wav"; tone 440 4 "$work/440.wav"; tone 880 4 "$work/880.wav"
 both() { pw-play --target "$1" "$work/$2.wav" & local p=$!; pw-play --target "$3" "$work/$4.wav"; wait "$p"; }
-WHOLEHEARD_TRACE=e2e-j "$bin" record "$work/v2-moved" --as v2 > "$work/j.events" 2> "$work/j.errors" &
+KITOKEY_TRACE=e2e-j "$bin" record "$work/v2-moved" --as v2 > "$work/j.events" 2> "$work/j.errors" &
 recorder=$!
 # The first form, beside it: its lines are the same.
 "$bin" record "$work/v1-moved" --as v1 > "$work/j1.events" 2> /dev/null &
 recorder_v1=$!
-sleep 1; both wholeheard_e2e_mic 440 wholeheard_e2e_out 880
-pactl set-default-source wholeheard_e2e_mic_b.monitor; pactl set-default-sink wholeheard_e2e_out_b
-sleep 1; both wholeheard_e2e_mic_b 660 wholeheard_e2e_out_b 1320
+sleep 1; both kitokey_e2e_mic 440 kitokey_e2e_out 880
+pactl set-default-source kitokey_e2e_mic_b.monitor; pactl set-default-sink kitokey_e2e_out_b
+sleep 1; both kitokey_e2e_mic_b 660 kitokey_e2e_out_b 1320
 cp "$(ls -d "$work"/v2-moved/*/ | head -1)session.json" "$work/j-during.json"   # read while it records
 # The microphone chosen back; the output recorded taken away: the system names the next.
-pactl set-default-source wholeheard_e2e_mic.monitor
+pactl set-default-source kitokey_e2e_mic.monitor
 pactl unload-module "$mic_b"
 pactl unload-module "$out_b"
-sleep 1; pactl set-default-sink wholeheard_e2e_out
-sleep 1; both wholeheard_e2e_mic 440 wholeheard_e2e_out 880
+sleep 1; pactl set-default-sink kitokey_e2e_out
+sleep 1; both kitokey_e2e_mic 440 kitokey_e2e_out 880
 sleep 1
 kill -INT "$recorder" "$recorder_v1"; stopped_as=0; wait "$recorder" || stopped_as=$?; wait "$recorder_v1" || true
 grep -v '"level"' "$work/j.events" | sed 's/^/    /' >> .evidence/e2e.txt
 sed 's/^/    /' "$work/j.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0 -a ! -s "$work/j.errors"
 check measure2 followed "$(ls -d "$work"/v2-moved/*/ | head -1)" "$work/j.events" \
-  "wholeheard_e2e_mic_b:660,wholeheard_e2e_mic:440" "wholeheard_e2e_out_b:1320,wholeheard_e2e_out:880" "$work/j-during.json"
-check measure2 moves-said "$work/j1.events" "wholeheard_e2e_mic_b,wholeheard_e2e_mic" "wholeheard_e2e_out_b,wholeheard_e2e_out"
+  "kitokey_e2e_mic_b:660,kitokey_e2e_mic:440" "kitokey_e2e_out_b:1320,kitokey_e2e_out:880" "$work/j-during.json"
+check measure2 moves-said "$work/j1.events" "kitokey_e2e_mic_b,kitokey_e2e_mic" "kitokey_e2e_out_b,kitokey_e2e_out"
 check logged e2e-j capture.started capture.device capture.device capture.stopped
 
 say "K. a call heard on an output other than the default is recorded there (D41)"
 # The call's own output, beside the default; the stand-in call, one process as a call is: it
 # records the microphone and plays what it hears on that output. Nobody is recorded.
-out_c=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_call)
+out_c=$(pactl load-module module-null-sink sink_name=kitokey_e2e_call)
 tone 1100 4 "$work/1100.wav"; tone 660 4 "$work/660.wav"; tone 440 4 "$work/440.wav"
-pw-loopback --capture=wholeheard_e2e_mic.monitor --playback=wholeheard_e2e_call --name=wholeheard-e2e-call & call=$!
+pw-loopback --capture=kitokey_e2e_mic.monitor --playback=kitokey_e2e_call --name=kitokey-e2e-call & call=$!
 sleep 1
-WHOLEHEARD_TRACE=e2e-k "$bin" record "$work/v2-call" --as v2 > "$work/k.events" 2> "$work/k.errors" &
+KITOKEY_TRACE=e2e-k "$bin" record "$work/v2-call" --as v2 > "$work/k.events" 2> "$work/k.errors" &
 recorder=$!
-sleep 3; pw-play --target wholeheard_e2e_mic "$work/1100.wav"   # heard by the call, played on its output
+sleep 3; pw-play --target kitokey_e2e_mic "$work/1100.wav"   # heard by the call, played on its output
 # The call goes back to the default output: so does the remote side, within two seconds.
 playing=$(python3 scripts/e2e_measure_v2.py playing "$call")
-pw-metadata -n default "$playing" target.object wholeheard_e2e_out > /dev/null
-sleep 2; pw-play --target wholeheard_e2e_call "$work/660.wav"   # two seconds after: the remote side followed, not on it
-sleep 1; pw-play --target wholeheard_e2e_out "$work/440.wav"
+pw-metadata -n default "$playing" target.object kitokey_e2e_out > /dev/null
+sleep 2; pw-play --target kitokey_e2e_call "$work/660.wav"   # two seconds after: the remote side followed, not on it
+sleep 1; pw-play --target kitokey_e2e_out "$work/440.wav"
 sleep 1
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
@@ -282,28 +282,28 @@ pactl unload-module "$out_c"
 grep -v '"level"' "$work/k.events" | sed 's/^/    /' >> .evidence/e2e.txt
 sed 's/^/    /' "$work/k.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0 -a ! -s "$work/k.errors"
-check measure2 call-followed "$(ls -d "$work"/v2-call/*/ | head -1)" "$work/k.events" wholeheard_e2e_call wholeheard_e2e_out 1100 660 440
+check measure2 call-followed "$(ls -d "$work"/v2-call/*/ | head -1)" "$work/k.events" kitokey_e2e_call kitokey_e2e_out 1100 660 440
 check logged e2e-k capture.started capture.device capture.device capture.stopped
 
 say "L. the microphone a call holds, and a headset's never opened actively (D66, ADR-0015)"
 # A source of the run's, fed by a device of the run's, made as WirePlumber makes a headset's virtual
 # input: stand_in NAME [more properties of the source]. No Bluetooth card: its script is not at work.
-mic_c=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_mic_c)
+mic_c=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic_c)
 stand_in() {
   pw-loopback --name="$1-loopback" \
-    --capture-props="{ node.name=$1_in media.class=Stream/Input/Audio/Internal target.object=${feed:-wholeheard_e2e_mic_c} stream.capture.sink=true node.passive=true node.dont-fallback=true node.linger=true ${2:-} }" \
+    --capture-props="{ node.name=$1_in media.class=Stream/Input/Audio/Internal target.object=${feed:-kitokey_e2e_mic_c} stream.capture.sink=true node.passive=true node.dont-fallback=true node.linger=true ${2:-} }" \
     --playback-props="{ node.name=$1 node.description=$1 media.class=Audio/Source ${2:-} }" &
 }
 call_on() { pw-record --target "$1" "$work/call-$$.wav" & }
 tone 660 30 "$work/660-long.wav"
-pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & mic_player=$!
+pw-play --target kitokey_e2e_mic_c "$work/660-long.wav" & mic_player=$!
 
 # A call on a microphone other than the default: recorded, named, and left when it leaves.
-stand_in wholeheard_e2e_other; other=$!
+stand_in kitokey_e2e_other; other=$!
 sleep 1
-WHOLEHEARD_TRACE=e2e-l "$bin" record "$work/v2-mic" --as v2 > "$work/l.events" 2> "$work/l.errors" &
+KITOKEY_TRACE=e2e-l "$bin" record "$work/v2-mic" --as v2 > "$work/l.events" 2> "$work/l.errors" &
 recorder=$!
-sleep 2; call_on wholeheard_e2e_other; call=$!
+sleep 2; call_on kitokey_e2e_other; call=$!
 sleep 4; folder=$(ls -d "$work"/v2-mic/*/ | head -1); cp "$folder/session.json" "$work/l-during.json"
 kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
 sleep 3
@@ -312,10 +312,10 @@ kill "$other" 2>/dev/null || true; wait "$other" 2>/dev/null || true
 grep -v '"level"' "$work/l.events" | sed 's/^/    /' >> .evidence/e2e.txt
 sed 's/^/    /' "$work/l.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0 -a ! -s "$work/l.errors"
-check grep -q '"device":"wholeheard_e2e_other"' "$work/l.events"
-check grep -q 'wholeheard_e2e_other' "$work/l-during.json"
-check grep -q '"device":"wholeheard_e2e_mic' "$work/l.events"    # back on the default when it left
-check measure2 said "$work/l.events" me wholeheard_e2e_other wholeheard_e2e_mic    # another takes over at once: no device lost
+check grep -q '"device":"kitokey_e2e_other"' "$work/l.events"
+check grep -q 'kitokey_e2e_other' "$work/l-during.json"
+check grep -q '"device":"kitokey_e2e_mic' "$work/l.events"    # back on the default when it left
+check measure2 said "$work/l.events" me kitokey_e2e_other kitokey_e2e_mic    # another takes over at once: no device lost
 
 # The default is a headset's, and no call: the microphone waits, nothing opens it. A call takes it:
 # a passive stream, which it carries. It leaves: capture lets go, and the source no longer runs.
@@ -323,35 +323,35 @@ check measure2 said "$work/l.events" me wholeheard_e2e_other wholeheard_e2e_mic 
 # runs whenever it is, and a real headset does not. WirePlumber's own script, and the profile it would
 # switch, are judged on real AirPods alone (D66).
 kill "$mic_player" 2>/dev/null || true; wait "$mic_player" 2>/dev/null || true
-stand_in wholeheard_e2e_headset "bluez5.loopback=true"; headset=$!
+stand_in kitokey_e2e_headset "bluez5.loopback=true"; headset=$!
 sleep 1
-pactl set-default-source wholeheard_e2e_headset
-WHOLEHEARD_TRACE=e2e-m "$bin" record "$work/v2-headset" --as v2 > "$work/m.events" 2> "$work/m.errors" &
+pactl set-default-source kitokey_e2e_headset
+KITOKEY_TRACE=e2e-m "$bin" record "$work/v2-headset" --as v2 > "$work/m.events" 2> "$work/m.errors" &
 recorder=$!
 sleep 3
 folder=$(ls -d "$work"/v2-headset/*/ | head -1)
 check grep -q 'unavailable.*waits' "$work/m.events"
 check test ! -e "$folder/local.wav"
 check measure2 not-following "$recorder"
-check measure2 not-running wholeheard_e2e_headset 2
-call_on wholeheard_e2e_headset; call=$!
-pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & mic_player=$!
+check measure2 not-running kitokey_e2e_headset 2
+call_on kitokey_e2e_headset; call=$!
+pw-play --target kitokey_e2e_mic_c "$work/660-long.wav" & mic_player=$!
 sleep 3
-check grep -q '"device":"wholeheard_e2e_headset"' "$work/m.events"
+check grep -q '"device":"kitokey_e2e_headset"' "$work/m.events"
 check measure2 passive "$recorder"
-check measure2 running wholeheard_e2e_headset
+check measure2 running kitokey_e2e_headset
 check test -e "$folder/local.wav"
 sleep 2
 kill "$mic_player" 2>/dev/null || true; wait "$mic_player" 2>/dev/null || true
 kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
 sleep 3     # what WirePlumber's restore takes, 2 s, and a reading of the graph
 check measure2 not-following "$recorder"
-check measure2 not-running wholeheard_e2e_headset 2
+check measure2 not-running kitokey_e2e_headset 2
 check grep -q '"device":null' "$work/m.events"
-pw-play --target wholeheard_e2e_out "$work/880.wav"
+pw-play --target kitokey_e2e_out "$work/880.wav"
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 kill "$headset" 2>/dev/null || true; wait "$headset" 2>/dev/null || true
-pactl set-default-source wholeheard_e2e_mic.monitor
+pactl set-default-source kitokey_e2e_mic.monitor
 pactl unload-module "$mic_c"; mic_c=
 grep -v '"level"' "$work/m.events" | sed 's/^/    /' >> .evidence/e2e.txt
 sed 's/^/    /' "$work/m.errors" >> .evidence/e2e.txt
@@ -359,49 +359,49 @@ check test "$stopped_as" = 0 -a ! -s "$work/m.errors"
 check measure2 waited "$folder"
 check logged e2e-m capture.unavailable capture.started capture.opened capture.device capture.me_waits capture.stopped
 # Never an address, in a line of the output, a session or a log: a stand-in has none, this holds the path.
-check test -z "$(grep -lE '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/m.events" "$folder/session.json" "$WHOLEHEARD_LOG_DIR"/capture.*.jsonl 2>/dev/null)"
+check test -z "$(grep -lE '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/m.events" "$folder/session.json" "$KITOKEY_LOG_DIR"/capture.*.jsonl 2>/dev/null)"
 
 say "N. what takes the session manager away, on a private graph of its own (D66)"
 check bash scripts/private_graph.sh "$bin"
 
 say "O. a microphone named at the start (D74)"
-mic_c=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_mic_c)
-mic_d=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_mic_d)
+mic_c=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic_c)
+mic_d=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic_d)
 tone 1100 30 "$work/1100-long.wav"
-stand_in wholeheard_e2e_named; named=$!
-feed=wholeheard_e2e_mic_d stand_in wholeheard_e2e_other; other=$!
-stand_in wholeheard_e2e_headset "bluez5.loopback=true"; headset=$!
-feed=wholeheard_e2e_mic_d stand_in wholeheard_e2e_x_AA_BB_CC_DD_EE_FF; addressed=$!
+stand_in kitokey_e2e_named; named=$!
+feed=kitokey_e2e_mic_d stand_in kitokey_e2e_other; other=$!
+stand_in kitokey_e2e_headset "bluez5.loopback=true"; headset=$!
+feed=kitokey_e2e_mic_d stand_in kitokey_e2e_x_AA_BB_CC_DD_EE_FF; addressed=$!
 sleep 1
 
 # The list: every source, by its name and description; no output, nothing opened; no address in any line.
 listed_as=0; "$bin" microphones > "$work/o.list" 2> "$work/o.list-errors" || listed_as=$?
 # The run's own alone in the evidence: the computer's microphones are named after its owner at times.
-grep 'wholeheard_e2e_' "$work/o.list" | sed 's/^/    /' >> .evidence/e2e.txt
+grep 'kitokey_e2e_' "$work/o.list" | sed 's/^/    /' >> .evidence/e2e.txt
 check test "$listed_as" = 0 -a ! -s "$work/o.list-errors"
-check grep -q '"name":"wholeheard_e2e_named"' "$work/o.list"
-check grep -q '"name":"wholeheard_e2e_headset"' "$work/o.list"
-check grep -q '"description":"wholeheard_e2e_x_unknown"' "$work/o.list"
-check test -z "$(grep 'wholeheard_e2e_out' "$work/o.list")"
+check grep -q '"name":"kitokey_e2e_named"' "$work/o.list"
+check grep -q '"name":"kitokey_e2e_headset"' "$work/o.list"
+check grep -q '"description":"kitokey_e2e_x_unknown"' "$work/o.list"
+check test -z "$(grep 'kitokey_e2e_out' "$work/o.list")"
 check test -z "$(grep -E '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/o.list")"
 check test -z "$(pactl list short source-outputs)"
 
 # Named: recorded from its start; neither a call holding another nor a new default moves it.
-pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & named_player=$!
-pw-play --target wholeheard_e2e_mic_d "$work/1100-long.wav" & other_player=$!
-WHOLEHEARD_TRACE=e2e-o1 "$bin" record "$work/v2-named" --microphone wholeheard_e2e_named > "$work/o1.events" 2> "$work/o1.errors" &
+pw-play --target kitokey_e2e_mic_c "$work/660-long.wav" & named_player=$!
+pw-play --target kitokey_e2e_mic_d "$work/1100-long.wav" & other_player=$!
+KITOKEY_TRACE=e2e-o1 "$bin" record "$work/v2-named" --microphone kitokey_e2e_named > "$work/o1.events" 2> "$work/o1.errors" &
 recorder=$!
-sleep 2; call_on wholeheard_e2e_other; call=$!
-sleep 3; pactl set-default-source wholeheard_e2e_other
+sleep 2; call_on kitokey_e2e_other; call=$!
+sleep 3; pactl set-default-source kitokey_e2e_other
 sleep 3
 folder=$(ls -d "$work"/v2-named/*/ | head -1)
 kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
-pactl set-default-source wholeheard_e2e_mic.monitor
+pactl set-default-source kitokey_e2e_mic.monitor
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 grep -v '"level"' "$work/o1.events" | sed 's/^/    /' >> .evidence/e2e.txt
 sed 's/^/    /' "$work/o1.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0 -a ! -s "$work/o1.errors"
-check grep -q '"me":"wholeheard_e2e_named"' "$work/o1.events"
+check grep -q '"me":"kitokey_e2e_named"' "$work/o1.events"
 check measure2 said "$work/o1.events" me
 check measure2 changes "$folder"
 check measure2 local-pitch "$folder" 660
@@ -410,30 +410,30 @@ kill "$named_player" "$other_player" 2>/dev/null || true; wait "$named_player" "
 
 # A headset's named: no stream at all while nothing runs it, a call on another none the less; the
 # sentence says so. A call takes it: a passive stream. It leaves: let go (ADR-0015).
-WHOLEHEARD_TRACE=e2e-o2 "$bin" record "$work/v2-named-headset" --microphone wholeheard_e2e_headset > "$work/o2.events" 2> "$work/o2.errors" &
+KITOKEY_TRACE=e2e-o2 "$bin" record "$work/v2-named-headset" --microphone kitokey_e2e_headset > "$work/o2.events" 2> "$work/o2.errors" &
 recorder=$!
-sleep 2; call_on wholeheard_e2e_other; call=$!
+sleep 2; call_on kitokey_e2e_other; call=$!
 sleep 2
 folder=$(ls -d "$work"/v2-named-headset/*/ | head -1)
 check grep -q 'unavailable.*chosen.*waits' "$work/o2.events"
 check test ! -e "$folder/local.wav"
 check measure2 not-following "$recorder"
-check measure2 not-running wholeheard_e2e_headset 2
+check measure2 not-running kitokey_e2e_headset 2
 kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
-call_on wholeheard_e2e_headset; call=$!
-pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & named_player=$!
+call_on kitokey_e2e_headset; call=$!
+pw-play --target kitokey_e2e_mic_c "$work/660-long.wav" & named_player=$!
 sleep 3
-check grep -q '"device":"wholeheard_e2e_headset"' "$work/o2.events"
+check grep -q '"device":"kitokey_e2e_headset"' "$work/o2.events"
 check measure2 passive "$recorder"
-check measure2 running wholeheard_e2e_headset
+check measure2 running kitokey_e2e_headset
 sleep 2
 kill "$named_player" 2>/dev/null || true; wait "$named_player" 2>/dev/null || true
 kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
 sleep 3
 check measure2 not-following "$recorder"
-check measure2 not-running wholeheard_e2e_headset 2
+check measure2 not-running kitokey_e2e_headset 2
 check grep -q '"device":null' "$work/o2.events"
-pw-play --target wholeheard_e2e_out "$work/880.wav"
+pw-play --target kitokey_e2e_out "$work/880.wav"
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 grep -v '"level"' "$work/o2.events" | sed 's/^/    /' >> .evidence/e2e.txt
 sed 's/^/    /' "$work/o2.errors" >> .evidence/e2e.txt
@@ -442,7 +442,7 @@ check measure2 waited "$folder"
 check test -z "$(grep microphone_gone "$work/o2.events")"
 
 # A name not there at the start: said, then Auto as if none were named.
-WHOLEHEARD_TRACE=e2e-o3 "$bin" record "$work/v2-named-none" --microphone wholeheard_e2e_nobody > "$work/o3.events" 2> "$work/o3.errors" &
+KITOKEY_TRACE=e2e-o3 "$bin" record "$work/v2-named-none" --microphone kitokey_e2e_nobody > "$work/o3.events" 2> "$work/o3.errors" &
 recorder=$!
 sleep 3
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
@@ -451,20 +451,20 @@ grep -v '"level"' "$work/o3.events" | sed 's/^/    /' >> .evidence/e2e.txt
 sed 's/^/    /' "$work/o3.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0 -a ! -s "$work/o3.errors"
 check test "$(head -1 "$work/o3.events" | grep -c microphone_gone)" = 1
-check grep -q '"me":"wholeheard_e2e_mic' "$work/o3.events"
+check grep -q '"me":"kitokey_e2e_mic' "$work/o3.events"
 check test -s "$folder/local.wav"
 check logged e2e-o3 capture.microphone_gone capture.started capture.stopped
 
 # A name that goes during the recording: said, Auto takes over, the track going on; back, taken again.
-pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & named_player=$!
-WHOLEHEARD_TRACE=e2e-o4 "$bin" record "$work/v2-named-gone" --microphone wholeheard_e2e_named > "$work/o4.events" 2> "$work/o4.errors" &
+pw-play --target kitokey_e2e_mic_c "$work/660-long.wav" & named_player=$!
+KITOKEY_TRACE=e2e-o4 "$bin" record "$work/v2-named-gone" --microphone kitokey_e2e_named > "$work/o4.events" 2> "$work/o4.errors" &
 recorder=$!
 sleep 3
 kill "$named" 2>/dev/null || true; wait "$named" 2>/dev/null || true
 sleep 4
 check test "$(grep -c microphone_gone "$work/o4.events")" = 1
-check grep -q '"device":"wholeheard_e2e_mic' "$work/o4.events"
-stand_in wholeheard_e2e_named; named=$!
+check grep -q '"device":"kitokey_e2e_mic' "$work/o4.events"
+stand_in kitokey_e2e_named; named=$!
 sleep 4
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 folder=$(ls -d "$work"/v2-named-gone/*/ | head -1)
@@ -474,30 +474,30 @@ sed 's/^/    /' "$work/o4.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0
 check test "$(grep -c microphone_gone "$work/o4.events")" = 1
 check test "$(grep -c microphone_back "$work/o4.events")" = 1
-check measure2 said "$work/o4.events" me wholeheard_e2e_mic wholeheard_e2e_named
-check measure2 changes "$folder" wholeheard_e2e_mic wholeheard_e2e_named
+check measure2 said "$work/o4.events" me kitokey_e2e_mic kitokey_e2e_named
+check measure2 changes "$folder" kitokey_e2e_mic kitokey_e2e_named
 check test -s "$folder/local.wav"
 check logged e2e-o4 capture.started capture.microphone_gone capture.device capture.microphone_back capture.device capture.stopped
 
 # A headset's named, gone, back with no call on it: said back, what stood in closes, no stream, the
 # source not running. A call takes it then: passive, as ever.
-WHOLEHEARD_TRACE=e2e-o6 "$bin" record "$work/v2-named-back" --microphone wholeheard_e2e_headset > "$work/o6.events" 2> "$work/o6.errors" &
+KITOKEY_TRACE=e2e-o6 "$bin" record "$work/v2-named-back" --microphone kitokey_e2e_headset > "$work/o6.events" 2> "$work/o6.errors" &
 recorder=$!
 sleep 2
 kill "$headset" 2>/dev/null || true; wait "$headset" 2>/dev/null || true
 sleep 3
 check test "$(grep -c microphone_gone "$work/o6.events")" = 1
-check grep -q '"device":"wholeheard_e2e_mic' "$work/o6.events"
-stand_in wholeheard_e2e_headset "bluez5.loopback=true"; headset=$!
+check grep -q '"device":"kitokey_e2e_mic' "$work/o6.events"
+stand_in kitokey_e2e_headset "bluez5.loopback=true"; headset=$!
 sleep 3
 check test "$(grep -c microphone_back "$work/o6.events")" = 1
-check measure2 said "$work/o6.events" me wholeheard_e2e_mic null
+check measure2 said "$work/o6.events" me kitokey_e2e_mic null
 check measure2 not-following "$recorder"
-check measure2 not-running wholeheard_e2e_headset 2
-call_on wholeheard_e2e_headset; call=$!
-pw-play --target wholeheard_e2e_mic_c "$work/660-long.wav" & named_player=$!
+check measure2 not-running kitokey_e2e_headset 2
+call_on kitokey_e2e_headset; call=$!
+pw-play --target kitokey_e2e_mic_c "$work/660-long.wav" & named_player=$!
 sleep 3
-check grep -q '"device":"wholeheard_e2e_headset"' "$work/o6.events"
+check grep -q '"device":"kitokey_e2e_headset"' "$work/o6.events"
 check measure2 passive "$recorder"
 kill "$named_player" 2>/dev/null || true; wait "$named_player" 2>/dev/null || true
 kill "$call" 2>/dev/null || true; wait "$call" 2>/dev/null || true
@@ -507,15 +507,15 @@ sed 's/^/    /' "$work/o6.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0
 
 # A source whose name holds an address: the list gives an id without it, and the start takes it back.
-addressed_id=$(python3 -c 'import json, sys; print(next(line["name"] for line in map(json.loads, open(sys.argv[1])) if line["description"] == "wholeheard_e2e_x_unknown"))' "$work/o.list")
-WHOLEHEARD_TRACE=e2e-o5 "$bin" record "$work/v2-named-address" --microphone "$addressed_id" > "$work/o5.events" 2> "$work/o5.errors" &
+addressed_id=$(python3 -c 'import json, sys; print(next(line["name"] for line in map(json.loads, open(sys.argv[1])) if line["description"] == "kitokey_e2e_x_unknown"))' "$work/o.list")
+KITOKEY_TRACE=e2e-o5 "$bin" record "$work/v2-named-address" --microphone "$addressed_id" > "$work/o5.events" 2> "$work/o5.errors" &
 recorder=$!
 sleep 2
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 folder=$(ls -d "$work"/v2-named-address/*/ | head -1)
 check test "$stopped_as" = 0 -a ! -s "$work/o5.errors"
-check grep -q '"me":"wholeheard_e2e_x_unknown"' "$work/o5.events"
-check test -z "$(grep -lE '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/o5.events" "$folder/session.json" "$WHOLEHEARD_LOG_DIR"/capture.*.jsonl 2>/dev/null)"
+check grep -q '"me":"kitokey_e2e_x_unknown"' "$work/o5.events"
+check test -z "$(grep -lE '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/o5.events" "$folder/session.json" "$KITOKEY_LOG_DIR"/capture.*.jsonl 2>/dev/null)"
 
 kill "$named" "$other" "$headset" "$addressed" 2>/dev/null || true; wait "$named" "$other" "$headset" "$addressed" 2>/dev/null || true
 pactl unload-module "$mic_c"; mic_c=

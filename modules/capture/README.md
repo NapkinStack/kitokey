@@ -8,7 +8,7 @@ Records the audio sources of a conversation into a session.
 
 ```mermaid
 flowchart LR
-    M["The microphone"]:::src --> P["wholeheard-capture<br/>a program, no window"]:::mod
+    M["The microphone"]:::src --> P["kitokey-capture<br/>a program, no window"]:::mod
     O["What the system plays"]:::src --> P
     P -->|"session-audio/v2"| F["The session's folder<br/>session.json · local.wav · remote.wav · clock.jsonl"]:::file
     P -.->|"one line per event"| W["Whoever started it:<br/>the shell, a terminal"]:::user
@@ -65,7 +65,7 @@ One JSON object per line on its output; errors go to the error stream.
 | `microphone_gone` | The microphone named at the start is not there: `me` goes on as with none named | |
 | `microphone_back` | It is there again, a stream following or not | |
 
-A source is named for the device the system's default stands for when the recording starts — read from PipeWire's metadata — so that a microphone other than the call's shows at once; `wholeheard-capture devices` prints it as `stands_for`. Unread, the default's own name.
+A source is named for the device the system's default stands for when the recording starts — read from PipeWire's metadata — so that a microphone other than the call's shows at once; `kitokey-capture devices` prints it as `stands_for`. Unread, the default's own name.
 
 A recording follows the user's devices (D31): when the default changes — another chosen, a headset
 unplugged — the system moves the stream, and the track goes on in the form it opened with, the
@@ -78,12 +78,12 @@ answer, read from the same reading of the graph as below:
 
 | In the graph | `me` records | Said |
 |---|---|---|
-| An application other than Wholeheard holds a source, not simply the default | That source, under the track's form; of several, the one running, then the oldest stream | `device`, with its description |
+| An application other than Kitokey holds a source, not simply the default | That source, under the track's form; of several, the one running, then the oldest stream | `device`, with its description |
 | That source is a headset's virtual input (`bluez5.loopback=true`), or a filter fed by one | The same, on a passive stream (`src/passive.rs`, its `node.passive` the one the running PipeWire reads as such: `call::passive_value`): it never makes the source run, so never asks for the headset's profile; a stream linked to a source that does not run receives no form, holds no track and is not named | `device`, once it received its form |
 | Nobody, and another default input | The default, as above | As above |
 | Nobody, and the default is a headset's | Nothing: no stream at all, until a call takes it | `unavailable` at the start; later, `device: null`, if a device was said |
 
-A microphone can be named at the start (D74, `recording/v1`): `wholeheard-capture microphones` lists them,
+A microphone can be named at the start (D74, `recording/v1`): `kitokey-capture microphones` lists them,
 `record … --microphone <name>` takes one, and neither a call nor a new default moves it.
 
 | Named | `me` records | Said |
@@ -121,9 +121,9 @@ cannot be moved, leaves the default, logged once (`capture.not_followed`).
 What it does is logged too — each event but the levels, each source opened with its device,
 rate and channels, a gap of zeros written for a mute source, a stream's error, a failure with its
 detail; never a sound, nor a session's path (ADR-0007): one JSON line per step in
-`$XDG_STATE_HOME/wholeheard/logs/capture.<date>.jsonl` (UTC), fourteen days kept and the folder
-under 50 MB. `WHOLEHEARD_LOG_DIR`, an absolute path, puts them elsewhere; `WHOLEHEARD_LOG=debug`
-asks for more; `WHOLEHEARD_TRACE` is the id of the making the shell passes.
+`$XDG_STATE_HOME/kitokey/logs/capture.<date>.jsonl` (UTC), fourteen days kept and the folder
+under 50 MB. `KITOKEY_LOG_DIR`, an absolute path, puts them elsewhere; `KITOKEY_LOG=debug`
+asks for more; `KITOKEY_TRACE` is the id of the making the shell passes.
 
 These lines are a contract: [`recording/v1`](../../contracts/recording/v1/README.md), which the shell reads. They are the same lines in both forms, and still name the sources `me` and `others` where the second form's files are `local` and `remote`.
 

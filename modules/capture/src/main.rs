@@ -1,11 +1,11 @@
-//! `wholeheard-capture` — records a conversation into a session's folder, with no window.
+//! `kitokey-capture` — records a conversation into a session's folder, with no window.
 //!
-//!     wholeheard-capture record <sessions-folder>     each source as delivered, until Ctrl-C, a TERM
+//!     kitokey-capture record <sessions-folder>     each source as delivered, until Ctrl-C, a TERM
 //!                                                 signal, or "stop" on its input
-//!     wholeheard-capture record <sessions-folder> --as v1     the same, in the first form
-//!     wholeheard-capture record <sessions-folder> --microphone <name>     `me` from that one
-//!     wholeheard-capture microphones                  what can be named, one JSON object per line
-//!     wholeheard-capture devices                      what the system offers
+//!     kitokey-capture record <sessions-folder> --as v1     the same, in the first form
+//!     kitokey-capture record <sessions-folder> --microphone <name>     `me` from that one
+//!     kitokey-capture microphones                  what can be named, one JSON object per line
+//!     kitokey-capture devices                      what the system offers
 //!
 //! It says what happens as one JSON object per line on its output: `started`, `unavailable`,
 //! `silent`, `heard`, `stopped`. Whoever started it reads them; nothing else is printed there.
@@ -31,9 +31,9 @@ use cpal::{
     Device, FromSample, Host, Sample, SampleFormat, SizedSample, Stream,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
+use kitokey_capture::{Event, Heard, RATE, SOURCES, Track, Watch, call, call::Me, log, new_folder, v2, write_session};
 use serde_json::json;
 use tracing::{error, info, warn};
-use wholeheard_capture::{Event, Heard, RATE, SOURCES, Track, Watch, call, call::Me, log, new_folder, v2, write_session};
 
 #[cfg(target_os = "linux")]
 mod passive;
@@ -113,7 +113,7 @@ fn main() -> ExitCode {
         ["microphones"] => microphones(),
         ["devices"] => devices(),
         _ => Err(
-            "usage: wholeheard-capture record <sessions-folder> [--as v1|v2] [--microphone <name>, not with v1] | wholeheard-capture microphones | wholeheard-capture devices"
+            "usage: kitokey-capture record <sessions-folder> [--as v1|v2] [--microphone <name>, not with v1] | kitokey-capture microphones | kitokey-capture devices"
                 .into(),
         ),
     };
@@ -121,7 +121,7 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(reason) => {
             error!(detail = %reason, "capture.failed");
-            eprintln!("wholeheard-capture: {reason}");
+            eprintln!("kitokey-capture: {reason}");
             ExitCode::FAILURE
         }
     }
@@ -190,7 +190,7 @@ fn named_as_used(host: &Host, device: &Device) -> String {
         _ => return named(device),
     };
     let standing = || {
-        let node = wholeheard_capture::standing_for(&metadata(key)?, key)?;
+        let node = kitokey_capture::standing_for(&metadata(key)?, key)?;
         host.devices().ok()?.find(|other| other.id().is_ok_and(|id| id.id() == node))
     };
     standing().map_or_else(|| named(device), |stood_for| named(&stood_for))
@@ -420,7 +420,7 @@ fn me_now(host: &Host, name: Option<&str>) -> Wanted {
     let pipewire = host.id().name() == "PipeWire";
     let default = || {
         let key = "default.audio.source";
-        metadata(key).and_then(|printed| wholeheard_capture::standing_for(&printed, key))
+        metadata(key).and_then(|printed| kitokey_capture::standing_for(&printed, key))
     };
     call::at_the_start(
         pipewire,
@@ -434,7 +434,7 @@ fn me_now(host: &Host, name: Option<&str>) -> Wanted {
 /// The same, with no graph: the default input's name alone.
 fn unread_me() -> Me {
     let key = "default.audio.source";
-    let default = metadata(key).and_then(|printed| wholeheard_capture::standing_for(&printed, key));
+    let default = metadata(key).and_then(|printed| kitokey_capture::standing_for(&printed, key));
     call::me_unread(default.as_deref())
 }
 
@@ -1268,10 +1268,10 @@ where
                 if closing.load(Ordering::SeqCst) {
                     return;
                 }
-                let Some(left) = wholeheard_capture::moved(error.kind()) else {
+                let Some(left) = kitokey_capture::moved(error.kind()) else {
                     let error = call::without_address(&error.to_string());
                     run.in_scope(|| warn!(source = name, detail = %error, "capture.stream_error"));
-                    drop(writeln!(std::io::stderr(), "wholeheard-capture: [{name}] {error}"));
+                    drop(writeln!(std::io::stderr(), "kitokey-capture: [{name}] {error}"));
                     return;
                 };
                 let _ = moved.send((index, zero.elapsed().as_secs_f64(), left));

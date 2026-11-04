@@ -20,6 +20,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use kitokey_capture::call;
 use pipewire as pw;
 use pw::spa::{
     self,
@@ -31,7 +32,6 @@ use pw::spa::{
     pod::Pod,
 };
 use tracing::warn;
-use wholeheard_capture::call;
 
 use crate::Sound;
 
@@ -142,13 +142,13 @@ fn listen(
         *pw::keys::MEDIA_TYPE => "Audio",
         *pw::keys::MEDIA_CATEGORY => "Capture",
         // Its own name; the shell knows capture's streams by their program, not by this.
-        *pw::keys::NODE_NAME => "wholeheard-capture-me",
+        *pw::keys::NODE_NAME => "kitokey-capture-me",
         *pw::keys::TARGET_OBJECT => target,
     };
     for (key, value) in call::passive_props(passive) {
         props.insert(key, value);
     }
-    let stream = pw::stream::StreamRc::new(core, "wholeheard-capture-me", props).map_err(|e| failed("no stream", e))?;
+    let stream = pw::stream::StreamRc::new(core, "kitokey-capture-me", props).map_err(|e| failed("no stream", e))?;
     let _listener = stream
         .add_local_listener_with_user_data(listening)
         .param_changed({

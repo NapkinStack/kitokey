@@ -1802,7 +1802,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wholeheard-capture"
+name = "kitokey-capture"
 version = "0.1.0"
 dependencies = [
  "chrono",

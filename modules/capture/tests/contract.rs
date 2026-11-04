@@ -4,7 +4,7 @@
 
 use std::{collections::BTreeSet, fs, path::Path};
 
-use wholeheard_capture::Event;
+use kitokey_capture::Event;
 
 const SCHEMA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/recording/v1/event.schema.json");
 
@@ -87,11 +87,11 @@ fn a_silence_says_whether_nothing_came() {
 
 #[test]
 fn a_level_is_the_peak_on_a_meter_s_scale_rounded_to_a_hundredth() {
-    assert_eq!(wholeheard_capture::level(0.0), 0.0);
-    assert_eq!(wholeheard_capture::level(0.0005), 0.0);
-    assert_eq!(wholeheard_capture::level(1.0), 1.0);
-    assert!((wholeheard_capture::level(0.1) - 2.0 / 3.0).abs() < 1e-4, "-20 dB is two thirds up");
-    assert!((wholeheard_capture::level(0.01) - 1.0 / 3.0).abs() < 1e-4, "-40 dB is a third up");
+    assert_eq!(kitokey_capture::level(0.0), 0.0);
+    assert_eq!(kitokey_capture::level(0.0005), 0.0);
+    assert_eq!(kitokey_capture::level(1.0), 1.0);
+    assert!((kitokey_capture::level(0.1) - 2.0 / 3.0).abs() < 1e-4, "-20 dB is two thirds up");
+    assert!((kitokey_capture::level(0.01) - 1.0 / 3.0).abs() < 1e-4, "-40 dB is a third up");
     assert_eq!(Event::Level { source: 1, level: 0.4251 }.line()["level"], 0.43);
     assert_eq!(Event::Level { source: 0, level: 1.7 }.line()["level"], 1.0);
 }
@@ -100,10 +100,10 @@ fn a_level_is_the_peak_on_a_meter_s_scale_rounded_to_a_hundredth() {
 fn a_device_changed_is_another_recorded_and_one_gone_is_none_left() {
     use cpal::ErrorKind;
     // D31: what the system says of a stream's device is a move — to another, or to none.
-    assert_eq!(wholeheard_capture::moved(ErrorKind::DeviceChanged), Some(true));
-    assert_eq!(wholeheard_capture::moved(ErrorKind::DeviceNotAvailable), Some(false));
+    assert_eq!(kitokey_capture::moved(ErrorKind::DeviceChanged), Some(true));
+    assert_eq!(kitokey_capture::moved(ErrorKind::DeviceNotAvailable), Some(false));
     // Any other trouble of the stream is no move.
     for other in [ErrorKind::DeviceBusy, ErrorKind::BackendError] {
-        assert_eq!(wholeheard_capture::moved(other), None, "{other:?}");
+        assert_eq!(kitokey_capture::moved(other), None, "{other:?}");
     }
 }
