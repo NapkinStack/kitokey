@@ -18,11 +18,11 @@
 ```mermaid
 flowchart LR
     F["modules/shell/registry/models.json<br/>on main, written by NapkinStack"]:::repo
-    F -->|"built in"| S["The list shipped<br/>with Wholeheard"]:::app
+    F -->|"built in"| S["The list shipped<br/>with Kitokey"]:::app
     K["The decider's key<br/>models.json.minisig beside it,<br/>the private key in no repository"]:::repo
     K -.->|"the public key built in"| V{"Its signature<br/>verifies?"}:::app
     F -.->|"on the user's gesture,<br/>its host shown"| V
-    V -.->|"yes"| U["The list up to date<br/>until Wholeheard quits"]:::app
+    V -.->|"yes"| U["The list up to date<br/>until Kitokey quits"]:::app
     V -.->|"no: refused, said once"| S
     S --> P["Settings: the models offered"]:::user
     U --> P
@@ -33,7 +33,7 @@ flowchart LR
     classDef out fill:#7c2d12,color:#fff
 ```
 
-**Legend** — grey: the repository and the decider's signature · green: what Wholeheard holds · blue: what the user sees ·
+**Legend** — grey: the repository and the decider's signature · green: what Kitokey holds · blue: what the user sees ·
 red: outside the machine, reached on the user's word · dotted: only when asked.
 
 ## Context
@@ -88,7 +88,7 @@ repository, read by the application, each entry with its address, size and check
   own tests before it is merged.
 - Cost of getting out: drop the fetch; the file stays the shipped list.
 
-### Option 3 — A repository of its own (`NapkinStack/wholeheard-registry`)
+### Option 3 — A repository of its own (`NapkinStack/kitokey-registry`)
 - Drawbacks: a second place to keep current, its own checks and settings to set by hand, for
   one file.
 
@@ -123,10 +123,10 @@ repository, read by the application, each entry with its address, size and check
    settings. Version 1 holds the Whisper models offered: for each, its address, its size, its
    SHA-256, and what it is good for as a key whose sentence is in `src/words.rs` (`recommended`,
    `faster`). A key unknown to a build shows the model without a sentence.
-2. **The shipped list is that file**, built into Wholeheard: no list of models remains in the code.
+2. **The shipped list is that file**, built into Kitokey: no list of models remains in the code.
 3. **Read again only on the user's gesture**, in Settings, its host shown
    (`raw.githubusercontent.com`), from `main`. What it gives replaces the shipped list until
-   Wholeheard quits. Never at the start, never in the background.
+   Kitokey quits. Never at the start, never in the background.
 4. **Refused, the shipped list stays**: a list that does not answer, is larger than 64 KB, does
    not read, says a version the build does not know, or names a model's host other than
    `huggingface.co` — nor one whose first model is not the build's default (`model::DEFAULT`),
@@ -165,7 +165,7 @@ list holds what the shell downloads itself.
 ## Success criterion
 
 > We will consider this was the right call if, **by 2027-06-30**, a model has been added to or
-> removed from the list without a release of Wholeheard, and no list refused by the shell's tests
+> removed from the list without a release of Kitokey, and no list refused by the shell's tests
 > has reached `main`.
 
 What we do if it is not: if nothing changed without a release, the fetch is removed and the
@@ -178,7 +178,7 @@ file stays the shipped list.
 **Positive:** one file to change; the list kept with the code that reads it.
 
 **Negative and accepted debt:** ~~the list is as safe as the forge's write access.~~ Since D56,
-taking that access no longer writes a list Wholeheard takes; the list is as safe as the decider's
+taking that access no longer writes a list Kitokey takes; the list is as safe as the decider's
 private key. Each change to the list waits on their gesture, and without the key's being given no
 list is read again at all: colleagues' builds lose that reading until then.
 

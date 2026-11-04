@@ -50,7 +50,7 @@ deciding anything (green), or what this decision removes (red).
   HFP when a `bluez5.loopback=true` node is `running` **and** linked to a `Stream/Input/Audio` with
   neither `stream.monitor=true` nor `node.link-group`; otherwise it restores the profile. 500 ms to HFP,
   2 s back (`PROFILE_SWITCH_TIMEOUT_MSEC`, `PROFILE_RESTORE_TIMEOUT_MSEC`). A link to a sink's monitor
-  is not counted. The browser switches by taking the microphone, Wholeheard or not.
+  is not counted. The browser switches by taking the microphone, Kitokey or not.
 - **What the failure is.** `Failure in Bluetooth audio transport` means a started node saw its transport
   idle — mostly these switches: 19 of 35 A2DP failures came 0.51–0.65 s after an event, 10 of 25 HFP
   failures 1.2–2 s after one. On 2026-10-27, capture on the AirPods: 8 of 9 openings followed by one; on
@@ -97,7 +97,7 @@ never changes the call's devices?
 
 ## Constraints
 
-- The charter's promise: Wholeheard stays out of the meeting. A recording never changes a device, a
+- The charter's promise: Kitokey stays out of the meeting. A recording never changes a device, a
   profile or a route of another application (#494).
 - ADR-0004 still holds: a track is as delivered, one form from first frame to last, each frame placed by
   `clock.jsonl`. An instant is when the system handed the frame to the capture.

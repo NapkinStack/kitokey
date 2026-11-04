@@ -16,8 +16,8 @@
 ```mermaid
 flowchart LR
     U["the user's gesture<br/>a making, an id"]:::ui --> S["shell<br/>logs, passes the id"]:::prog
-    S -->|"WHOLEHEARD_TRACE · WHOLEHEARD_LOG"| P["capture · transcription · summary<br/>log under the same id"]:::prog
-    S & P --> L["~/.local/state/wholeheard/logs/<br/>one JSON line per event, a file a day, 14 days"]:::log
+    S -->|"KITOKEY_TRACE · KITOKEY_LOG"| P["capture · transcription · summary<br/>log under the same id"]:::prog
+    S & P --> L["~/.local/state/kitokey/logs/<br/>one JSON line per event, a file a day, 14 days"]:::log
     P -->|"a failure: its code + its detail"| S
     S -->|"the code, as a sentence"| W["the page, the notification<br/>plain words, never the detail"]:::ui
     S -.->|"developer mode"| D["the detail under the sentence<br/>open the logs · copy a diagnostic"]:::dev
@@ -63,7 +63,7 @@ correlation id carried across processes; user-facing messages separate from diag
 |---|---|---|
 | Rust's `tracing` + `tracing-subscriber` (`json`, `EnvFilter`) + `tracing-appender` (rolling) | Spans and events, filtered by `RUST_LOG`-like strings, written as JSON to daily files | Yes: the de-facto Rust stack, no runtime cost when a level is off |
 | OpenTelemetry's trace context | A trace id passed from process to process | The idea, not the dependency: an id in an environment variable is enough for four local programs |
-| XDG Base Directory, `$XDG_STATE_HOME` | Logs and history belong in state, not data or cache | Yes: `~/.local/state/wholeheard/logs/` |
+| XDG Base Directory, `$XDG_STATE_HOME` | Logs and history belong in state, not data or cache | Yes: `~/.local/state/kitokey/logs/` |
 | Apple / GNOME HIG on errors | A message says what happened and what to do, in the user's words; details on demand | Yes: the code mapped to a sentence; the detail in developer mode |
 
 ## Options considered
@@ -78,7 +78,7 @@ correlation id carried across processes; user-facing messages separate from diag
 
 Option 1.
 
-- **Where:** `$XDG_STATE_HOME/wholeheard/logs/<program>.<YYYY-MM-DD>.jsonl` — one file per program
+- **Where:** `$XDG_STATE_HOME/kitokey/logs/<program>.<YYYY-MM-DD>.jsonl` — one file per program
   and day; files older than 14 days removed at start, and the folder kept under 50 MB.
 - **What:** each event a JSON line — time, level, program, version, the id of the making it
   belongs to, the step (`capture.started`, `transcription.model_loaded`, `summary.sent`,
@@ -86,9 +86,9 @@ Option 1.
   codes and their technical detail. **Never** a text of the meeting, a context, a path to a
   meeting beyond its folder's name, nor a key; a test of each program reads its own log after a
   run on a known meeting and finds none of its words.
-- **Levels:** `info` by default; `WHOLEHEARD_LOG=debug` (or a filter string) for more.
+- **Levels:** `info` by default; `KITOKEY_LOG=debug` (or a filter string) for more.
 - **One id per making:** the shell makes one for each recording, transcript or minutes asked,
-  logs under it and passes it as `WHOLEHEARD_TRACE`; each program logs under it.
+  logs under it and passes it as `KITOKEY_TRACE`; each program logs under it.
 - **Errors:** each program ends a failure with a stable code (`provider.unreachable`,
   `provider.refused_key`, `model.missing`, …) and its technical detail on the error stream; the
   shell logs both, and says the code to the user as a sentence of `words` — plain, in their
@@ -97,7 +97,7 @@ Option 1.
   stream. It is a `failed` event, the last line of the program's output, beside the sentence,
   which stays as it was. The reasons: the output is already a contract judged by its schema,
   and the shell already reads the sentence. A line the contract adds is additive; a sentence
-  that changes form is not. Codes start with `wholeheard-summary` (`summarising/v1`). Capture's
+  that changes form is not. Codes start with `kitokey-summary` (`summarising/v1`). Capture's
   and transcription's come later: transcription has no contract for how it runs.
 - **Developer mode:** Settings → Advanced, off by default. On: the detail under the sentence, a
   log level chosen, *Open the logs*, *Copy a diagnostic* — the last day's logs of a meeting's

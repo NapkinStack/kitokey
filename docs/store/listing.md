@@ -1,9 +1,9 @@
-# Wholeheard — the Microsoft Store's listing
+# Kitokey — the Microsoft Store's listing
 
 The words Partner Center is given, kept here (D57, [PDR-0004](../pdr/0004-windows-through-the-microsoft-store.md)).
 They say [PDR-0001](../pdr/0001-wholeheard-open-on-linux-paid-on-macos-and-windows.md)'s promise,
 and claim only what the product does today. Privacy policy's URL:
-<https://github.com/NapkinStack/wholeheard/blob/main/docs/privacy.md>.
+<https://github.com/NapkinStack/kitokey/blob/main/docs/privacy.md>.
 
 ## Screenshots
 
@@ -19,19 +19,19 @@ Taken from the window as the e2e draws it, at 1366×768 or more, in French and i
 
 ## English
 
-**Name.** Wholeheard
+**Name.** Kitokey
 
 **Short description.** Be in the meeting. The minutes write themselves, on your computer.
 
 **Description.**
-Stay in the conversation: Wholeheard records your call, transcribes it and writes its minutes —
+Stay in the conversation: Kitokey records your call, transcribes it and writes its minutes —
 highlights, actions, key points. No bot joins your meeting, and no account is asked for.
 
 Your meetings stay on your computer. Transcript and minutes are made there by default. If you
 prefer a service you trust, you choose it, with your own key, and you see where a meeting goes
 before anything is sent. A meeting you say confidential never leaves.
 
-You tell the other participants that you are recording: Wholeheard shows them nothing, and reminds
+You tell the other participants that you are recording: Kitokey shows them nothing, and reminds
 you to.
 
 **Features.**
@@ -45,13 +45,13 @@ you to.
 
 ## Français
 
-**Nom.** Wholeheard
+**Nom.** Kitokey
 
 **Description courte.** Soyez dans la réunion. Le compte rendu s'écrit tout seul, sur votre
 ordinateur.
 
 **Description.**
-Restez dans la conversation : Wholeheard enregistre votre appel, le transcrit et en écrit le compte
+Restez dans la conversation : Kitokey enregistre votre appel, le transcrit et en écrit le compte
 rendu — points saillants, actions, points clés. Aucun robot ne rejoint votre réunion, et aucun
 compte n'est demandé.
 
@@ -59,7 +59,7 @@ Vos réunions restent sur votre ordinateur. La transcription et le compte rendu 
 Si vous préférez un service en qui vous avez confiance, vous le choisissez, avec votre propre clé,
 et vous voyez où part une réunion avant tout envoi. Une réunion dite confidentielle ne part jamais.
 
-C'est à vous de prévenir les autres participants que vous enregistrez : Wholeheard ne leur montre
+C'est à vous de prévenir les autres participants que vous enregistrez : Kitokey ne leur montre
 rien, et vous le rappelle.
 
 **Fonctionnalités.**

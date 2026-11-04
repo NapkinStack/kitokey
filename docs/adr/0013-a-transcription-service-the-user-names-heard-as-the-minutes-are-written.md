@@ -16,7 +16,7 @@
 ```mermaid
 flowchart LR
     S["Settings: who hears<br/>on this computer · a service"]:::user --> H["The shell<br/>the host agreed first, the key from the keyring"]:::mod
-    H -->|"--provider · --model<br/>WHOLEHEARD_PROVIDER_KEY"| T["wholeheard-transcription<br/>the step, unchanged"]:::mod
+    H -->|"--provider · --model<br/>KITOKEY_PROVIDER_KEY"| T["kitokey-transcription<br/>the step, unchanged"]:::mod
     T -->|"each span: POST /audio/transcriptions"| P["The service the user named"]:::out
     P -->|"segments, their times"| T
     classDef user fill:#1e3a8a,color:#fff
@@ -24,7 +24,7 @@ flowchart LR
     classDef out fill:#7c2d12,color:#fff
 ```
 
-**Legend** — blue: the user's choice · green: Wholeheard · red: outside the machine, only once chosen
+**Legend** — blue: the user's choice · green: Kitokey · red: outside the machine, only once chosen
 and agreed.
 
 ## Context
@@ -32,7 +32,7 @@ and agreed.
 The minutes are written on this computer (Ollama) or by a service the user names at an address
 that speaks OpenAI's protocol, with their model and key: the host agreed before the first
 sending, the key in the system's keyring, *Tester* (cycle 03; `modules/summary`, which reads the
-key from `WHOLEHEARD_PROVIDER_KEY` and writes it nowhere). The transcript is heard on this computer
+key from `KITOKEY_PROVIDER_KEY` and writes it nowhere). The transcript is heard on this computer
 only: a Whisper model, or SpeechAnalyzer on a Mac (D42). The charter drew a transcription service
 from the start, "only if the user chose it". D43 asks for the minutes' way.
 
@@ -63,7 +63,7 @@ their times — spoken by most services and by local servers alike.
 |---|---|---|
 | OpenAI's audio API (its specification, [`openai/openai-openapi`](https://github.com/openai/openai-openapi), `AudioResponseFormat` and `timestamp_granularities`, read by the verifier of #450, 2026-10-26) | `file`, `model`, `language`, `prompt`, `response_format`; segments with their times only with `verbose_json`; for `gpt-4o-transcribe` and `gpt-4o-mini-transcribe` "the only supported format is `json`" — text without times; `gpt-4o-transcribe-diarize` answers `diarized_json`, with times | Yes: the protocol; a service that answers no times is refused or said, never timed by guess |
 | Groq, Mistral and local servers (faster-whisper's OpenAI-compatible servers, LocalAI), not read again here | The same route and fields, as their documentation says | Yes: one engine reaches them all, as the minutes' one does |
-| Wholeheard's own minutes (`modules/summary`, cycle 03) | The address, the model, the key from `WHOLEHEARD_PROVIDER_KEY`, the host agreed first, *Tester* | Yes: the user's way, kept as it is |
+| Kitokey's own minutes (`modules/summary`, cycle 03) | The address, the model, the key from `KITOKEY_PROVIDER_KEY`, the host agreed first, *Tester* | Yes: the user's way, kept as it is |
 
 ---
 
@@ -73,9 +73,9 @@ their times — spoken by most services and by local servers alike.
 - On this computer alone; the charter's service never offered.
 
 ### Option 2 — An engine of transcription's that speaks the audio route
-- `wholeheard-transcription <session> --provider <address> --model <name> [--language <code>]` —
+- `kitokey-transcription <session> --provider <address> --model <name> [--language <code>]` —
   with `--provider`, `--model` names the service's model, not a file —, the key from
-  `WHOLEHEARD_PROVIDER_KEY` as `summary` reads it; each span sent as one 16 kHz file,
+  `KITOKEY_PROVIDER_KEY` as `summary` reads it; each span sent as one 16 kHz file,
   `response_format=verbose_json`, the context the user attached as `prompt`; its `segments` the
   span's segments. `--test --provider … --model …` sends a sound of the program's own, nothing of
   a meeting, as `summary --test` does.
@@ -97,7 +97,7 @@ their times — spoken by most services and by local servers alike.
    sentence: "this service gives no times: choose another model" — a transcript is never timed by
    guess. A service that refuses `verbose_json` itself (an HTTP 400, as OpenAI's newer models
    may) is said the same way. Other formats with times (`diarized_json`): later, once asked.
-3. **The key** is read from `WHOLEHEARD_PROVIDER_KEY`, as `summary` reads it; the shell hands it
+3. **The key** is read from `KITOKEY_PROVIDER_KEY`, as `summary` reads it; the shell hands it
    from the keyring under its own account, the transcription's apart from the minutes'.
 4. **Nothing is sent before the user agreed to the host**, as for the minutes
    (`transcription_agreed` beside `minutes_agreed`); a host on this computer never asks.
