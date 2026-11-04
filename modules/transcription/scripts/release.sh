@@ -5,7 +5,7 @@
 set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 dist=${NSTACK_DIST:?run through nstack release, which names this module\'s artefacts folder}
-target=${KITOKEY_TARGET:-}
+target=${KITOKEY_TARGET:-${WHOLEHEARD_TARGET:-}}   # WHOLEHEARD_TARGET: its name before D86, until every module reads the new one
 # Windows names a program with its .exe (D53).
 exe=; [ "${OS:-}" = Windows_NT ] && exe=.exe
 # The processors it is built for: .cargo/config.toml, read by every build of the module.
