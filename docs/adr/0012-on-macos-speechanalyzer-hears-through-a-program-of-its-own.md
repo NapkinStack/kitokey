@@ -15,7 +15,7 @@
 
 ```mermaid
 flowchart LR
-    T["wholeheard-transcription<br/>the step, unchanged"]:::mod -->|"each span, a 16 kHz file"| S["wholeheard-speech<br/>Swift, macOS 26"]:::new
+    T["kitokey-transcription<br/>the step, unchanged"]:::mod -->|"each span, a 16 kHz file"| S["kitokey-speech<br/>Swift, macOS 26"]:::new
     S -->|"SpeechTranscriber,<br/>on the Mac"| A["Apple's model<br/>of the language"]:::apple
     S -->|"one JSON line a segment:<br/>start · end · text"| T
     W["Whisper"]:::mod -.->|"elsewhere, and the default"| T
@@ -37,7 +37,7 @@ macOS 26 (the decider, 2026-10-26): with it, they try the whole chain on their M
 
 ## Problem
 
-How does Wholeheard hear with SpeechAnalyzer, an API in Swift alone, from a step written in Rust,
+How does Kitokey hear with SpeechAnalyzer, an API in Swift alone, from a step written in Rust,
 without changing the step?
 
 ## Constraints
@@ -84,8 +84,8 @@ meeting-notes app, Lyonesse. On one file MacStories timed Yap at 45 s, Whisper L
 - `whisper-rs`'s Metal feature: the same engine, faster. Still a model of 874 MB to download.
 - Left for later: it does not answer what the decider asked, and is no second engine.
 
-### Option 3 — A Swift program of its own, `wholeheard-speech`, behind the interface
-- `wholeheard-speech transcribe <file> <language>` prints one JSON line a segment; `status` and
+### Option 3 — A Swift program of its own, `kitokey-speech`, behind the interface
+- `kitokey-speech transcribe <file> <language>` prints one JSON line a segment; `status` and
   `install` say and fetch Apple's model of a language. A Rust engine (`speechanalyzer`) writes
   each span to a file, runs it, and reads its lines into segments.
 - Advantages: the step does not change (ADR-0003's criterion); no Swift in the Rust programs; the
@@ -100,9 +100,9 @@ meeting-notes app, Lyonesse. On one file MacStories timed Yap at 45 s, Whisper L
 **Option 3.**
 
 - `modules/transcription/speech/`: a Swift package, macOS 26, no dependency. Built by
-  transcription's release on a Mac, beside `wholeheard-transcription`; installed in
-  `Wholeheard.app/Contents/MacOS` by `install`.
-- `wholeheard-transcription <session> --engine speechanalyzer [--language fr]`: the step, as
+  transcription's release on a Mac, beside `kitokey-transcription`; installed in
+  `Kitokey.app/Contents/MacOS` by `install`.
+- `kitokey-transcription <session> --engine speechanalyzer [--language fr]`: the step, as
   ever; the transcript's header names the engine `SpeechAnalyzer` and Apple's model.
 - **Offered only where it answers**: macOS 26 or later, SpeechTranscriber available, the
   language supported. Elsewhere, and out of the box, Whisper.
@@ -112,8 +112,8 @@ meeting-notes app, Lyonesse. On one file MacStories timed Yap at 45 s, Whisper L
   follows it): SpeechTranscriber hears one locale, never a guess. Its model is that language's.
 - **The context the user attached** is given as SpeechAnalyzer's contextual strings where the
   API takes them; otherwise it is not used, and the log says so once.
-- **Found beside** `wholeheard-transcription`, as the shell finds its programs, or where
-  `WHOLEHEARD_SPEECH` names it, for the tests.
+- **Found beside** `kitokey-transcription`, as the shell finds its programs, or where
+  `KITOKEY_SPEECH` names it, for the tests.
 - **What it prints is the meeting's text, on its output to the engine alone**: its errors go to
   its error stream without a word of the meeting, and the engine logs steps, never text
   (ADR-0007).
@@ -153,7 +153,7 @@ contract does not require.
 offers the engine in Settings. `transcript/v1` unchanged: its header already names an engine and
 a model.
 
-**Rule to automate:** the macOS workflow builds `wholeheard-speech` and transcribes a sentence
+**Rule to automate:** the macOS workflow builds `kitokey-speech` and transcribes a sentence
 `say` speaks, where the runner's SpeechTranscriber is available — otherwise it says it was not
 run. ADR-0003's own rule, the same sheet for every engine on D4's sample, is owed on a Mac: none of
 the project's runs one; it is debt, said here.

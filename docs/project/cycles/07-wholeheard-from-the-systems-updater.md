@@ -196,7 +196,7 @@ day: « Déjà fait ». The end date does not move.
 | ADR-0015 | The decider | After that trial, say « ADR-0015 acceptée », or what falls |
 | D41 | The decider | [#449](https://github.com/NapkinStack/wholeheard/issues/449): a call on the earbuds, the default on the speaker |
 | D63 | The decider | [#463](https://github.com/NapkinStack/wholeheard/issues/463): a real service heard, with their key |
-| D56 | The decider | As cycle 06 says: `sudo dnf install minisign`, then `minisign -G -p wholeheard-models.pub -s ~/.minisign/wholeheard-models.key` at the root of a checkout of `main`, and give an agent `wholeheard-models.pub` |
+| D56 | The decider | In a terminal of your own, never through an agent: `sudo dnf install minisign`, then `minisign -G -p kitokey-models.pub -s ~/.minisign/kitokey-models.key` at the root of a checkout of `main` (named after D86), a passphrase kept in your password manager, the `.key` file copied offline; never `-W`, which keeps it without a passphrase. Give an agent `kitokey-models.pub` alone |
 | D27 | Anyone on Ubuntu 24.04 | `nstack claim D27`, then [#255](https://github.com/NapkinStack/wholeheard/issues/255): `sudo apt install ./wholeheard_<version>_amd64.deb`, one real call of five minutes, the answer there |
 
 ## Dependency with a date

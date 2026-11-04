@@ -4,7 +4,7 @@
   reste en autonomie… continue"); the criticality is the decider's to settle
 - **Read at cycle 03's closure, 2026-10-26**: Met: the module's e2e installs and removes the package in a Fedora that never saw it (D24); the decider installed it with `dnf` on 2026-10-19 (#241) and went through a real meeting with the window on 2026-10-24 (D23). The record stays *Proposed*: accepting it is
   the decider's.
-- **Amended**: 2026-10-26, D38 — on a Mac, no container: `install` assembles `Wholeheard.app` from
+- **Amended**: 2026-10-26, D38 — on a Mac, no container: `install` assembles `Kitokey.app` from
   the same artefacts, signs it ad hoc and zips it, on GitHub's macOS runner; Tauri's bundler left
   for the reason it was left for the rpm (*Prior art*)
 - **Date**: 2026-10-18
@@ -18,9 +18,9 @@
 ```mermaid
 flowchart LR
     C["capture · transcription · summary<br/>their release"]:::mod --> D["dist/&lt;module&gt;/<br/>each one's program"]:::art
-    H["shell<br/>its release"]:::mod --> DS["dist/shell/<br/>wholeheard, its desktop entry,<br/>its icon, VERSION"]:::art
+    H["shell<br/>its release"]:::mod --> DS["dist/shell/<br/>kitokey, its desktop entry,<br/>its icon, VERSION"]:::art
     D & DS --> P["install<br/>assembles them · rpmbuild<br/>in a Fedora container"]:::new
-    P --> R["dist/install/wholeheard-‹version›.x86_64.rpm<br/>/usr/bin: the four programs side by side"]:::out
+    P --> R["dist/install/kitokey-‹version›.x86_64.rpm<br/>/usr/bin: the four programs side by side"]:::out
     classDef mod fill:#374151,color:#fff
     classDef art fill:#92400e,color:#fff
     classDef new fill:#065f46,color:#fff
@@ -32,9 +32,9 @@ green: the new module · blue: what a user installs.
 
 ## Context
 
-The charter's success criteria start "from the day Wholeheard installs on the decider's Fedora";
-Wholeheard was built from the repository. Cycle 03 takes D24 on the decider's word: one package,
-installed with `dnf`, running with nothing built and no variable set. Wholeheard is to follow on
+The charter's success criteria start "from the day Kitokey installs on the decider's Fedora";
+Kitokey was built from the repository. Cycle 03 takes D24 on the decider's word: one package,
+installed with `dnf`, running with nothing built and no variable set. Kitokey is to follow on
 macOS, then Windows.
 
 The shell already finds the other programs beside its own executable when no variable names
@@ -74,15 +74,15 @@ assembles (NapkinStack ≥ 0.9.6: `nstack release`, `dist/<module>/`, `assembles
 
 Option 1. Each program's module declares `release`, leaving what it ships in its folder of
 `dist/` — the shell its program, its desktop entry and icon under the application's id
-(`dev.wholeheard.Wholeheard`, which GNOME's shortcut portal needs) and its version. `modules/install`
+(`com.napkinstack.Kitokey`, which GNOME's shortcut portal needs) and its version. `modules/install`
 declares `assembles: [shell, capture, transcription, summary]` and its release
-(`scripts/release.sh rpm`) builds `wholeheard.spec` in a Fedora of this system's release. A program
+(`scripts/release.sh rpm`) builds `kitokey.spec` in a Fedora of this system's release. A program
 *run* rather than linked is required by name (`pw-metadata`, for capture).
 
-The next system adds its format to the same release — ~~a `dmg`~~ on a Mac, `Wholeheard.app`
+The next system adds its format to the same release — ~~a `dmg`~~ on a Mac, `Kitokey.app`
 zipped (D38, 2026-10-26: the zip a colleague opens, a `.dmg` out of cycle 04) — from the same
 artefacts. **The
-target is one for every module, named in the environment** (`WHOLEHEARD_TARGET`, D27, 2026-10-19):
+target is one for every module, named in the environment** (`KITOKEY_TARGET`, D27, 2026-10-19):
 each program's release builds in a container of that system, from its module's own
 `containers/<target>.Containerfile`, and `install` makes that system's package — `fedora-44`
 an rpm, `ubuntu-24.04` a `.deb` read by `dpkg-shlibdeps` — in a container of it too. A program
@@ -95,9 +95,9 @@ weeks run on it.
 
 ## Success criterion
 
-By the end of cycle 03 (2026-11-07): the decider installs Wholeheard from `dist/install/` with `dnf`
+By the end of cycle 03 (2026-11-07): the decider installs Kitokey from `dist/install/` with `dnf`
 and goes through a meeting with nothing built; the module's e2e installs and removes the package
-in a Fedora that never saw Wholeheard.
+in a Fedora that never saw Kitokey.
 
 ## Consequences
 

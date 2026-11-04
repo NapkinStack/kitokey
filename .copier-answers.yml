@@ -7,7 +7,7 @@ _src_path: https://github.com/NapkinStack/engineering-os.git
 approval: agent
 checks: attested
 forge: github
-github_repo: NapkinStack/wholeheard
+github_repo: NapkinStack/kitokey
 hold_days: 7
 owner_team: NapkinStack/maintainers
-project_name: Wholeheard
+project_name: Kitokey

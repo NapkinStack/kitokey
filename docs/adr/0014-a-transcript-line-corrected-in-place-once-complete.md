@@ -23,7 +23,7 @@ flowchart LR
     classDef file fill:#374151,color:#fff
 ```
 
-**Legend** — green: Wholeheard's programs · blue: the user · grey: the file in the meeting's folder.
+**Legend** — green: Kitokey's programs · blue: the user · grey: the file in the meeting's folder.
 
 ## Context
 
