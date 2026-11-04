@@ -34,13 +34,13 @@ install -Dm755 %{artefacts}/transcription/kitokey-transcription %{buildroot}%{_b
 install -Dm755 %{artefacts}/summary/kitokey-summary %{buildroot}%{_bindir}/kitokey-summary
 # Lighter without their symbols; a program that is no binary is left as it is.
 for program in %{buildroot}%{_bindir}/*; do strip "$program" 2>/dev/null || :; done
-install -Dm644 %{artefacts}/shell/com.kitokey.Kitokey.desktop %{buildroot}%{_datadir}/applications/com.kitokey.Kitokey.desktop
-install -Dm644 %{artefacts}/shell/com.kitokey.Kitokey.png %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/com.kitokey.Kitokey.png
+install -Dm644 %{artefacts}/shell/com.napkinstack.Kitokey.desktop %{buildroot}%{_datadir}/applications/com.napkinstack.Kitokey.desktop
+install -Dm644 %{artefacts}/shell/com.napkinstack.Kitokey.png %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png
 
 %files
 %{_bindir}/kitokey
 %{_bindir}/kitokey-capture
 %{_bindir}/kitokey-transcription
 %{_bindir}/kitokey-summary
-%{_datadir}/applications/com.kitokey.Kitokey.desktop
-%{_datadir}/icons/hicolor/512x512/apps/com.kitokey.Kitokey.png
+%{_datadir}/applications/com.napkinstack.Kitokey.desktop
+%{_datadir}/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png

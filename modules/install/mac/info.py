@@ -16,7 +16,7 @@ info = {
     "CFBundleName": "Kitokey",
     "CFBundleInfoDictionaryVersion": "6.0",
     "CFBundleDisplayName": "Kitokey",
-    "CFBundleIdentifier": "com.kitokey.Kitokey",
+    "CFBundleIdentifier": "com.napkinstack.Kitokey",
     "CFBundleExecutable": "kitokey",
     "CFBundlePackageType": "APPL",
     "CFBundleShortVersionString": version,

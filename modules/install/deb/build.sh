@@ -12,8 +12,8 @@ for program in shell/kitokey capture/kitokey-capture transcription/kitokey-trans
 done
 # Lighter without their symbols; a program that is no binary is left as it is.
 for program in "$root"/usr/bin/*; do strip --strip-unneeded "$program" 2>/dev/null || :; done
-install -Dm644 /artefacts/shell/com.kitokey.Kitokey.desktop "$root/usr/share/applications/com.kitokey.Kitokey.desktop"
-install -Dm644 /artefacts/shell/com.kitokey.Kitokey.png "$root/usr/share/icons/hicolor/512x512/apps/com.kitokey.Kitokey.png"
+install -Dm644 /artefacts/shell/com.napkinstack.Kitokey.desktop "$root/usr/share/applications/com.napkinstack.Kitokey.desktop"
+install -Dm644 /artefacts/shell/com.napkinstack.Kitokey.png "$root/usr/share/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png"
 # dpkg-shlibdeps reads a source package's control file where it runs: one is made for it.
 mkdir -p /tmp/shlibs/debian
 printf 'Source: kitokey\n\nPackage: kitokey\nArchitecture: any\n' > /tmp/shlibs/debian/control

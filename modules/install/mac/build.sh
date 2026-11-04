@@ -19,9 +19,9 @@ python3 "$here/info.py" "$app" "$version"
 icons=$work/Kitokey.iconset
 mkdir "$icons"
 for size in 16 32 128 256 512; do
-  sips -z $size $size "$artefacts/shell/com.kitokey.Kitokey.png" --out "$icons/icon_${size}x${size}.png" >/dev/null
+  sips -z $size $size "$artefacts/shell/com.napkinstack.Kitokey.png" --out "$icons/icon_${size}x${size}.png" >/dev/null
   double=$((size * 2))
-  [ $double -le 512 ] && sips -z $double $double "$artefacts/shell/com.kitokey.Kitokey.png" --out "$icons/icon_${size}x${size}@2x.png" >/dev/null
+  [ $double -le 512 ] && sips -z $double $double "$artefacts/shell/com.napkinstack.Kitokey.png" --out "$icons/icon_${size}x${size}@2x.png" >/dev/null
 done
 iconutil -c icns "$icons" -o "$app/Contents/Resources/Kitokey.icns"
 # Each program, then the bundle: its seal covers the Info.plist and the resources added above.

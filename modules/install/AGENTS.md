@@ -27,7 +27,7 @@
 
 - Nothing outside `/usr`: removing the package never touches a user's meetings or settings
   (`scripts/test.sh`).
-- The desktop entry the menu shows is `com.kitokey.Kitokey.desktop`, the application's id: GNOME's
+- The desktop entry the menu shows is `com.napkinstack.Kitokey.desktop`, the application's id: GNOME's
   shortcut portal finds Kitokey by it.
 
 ## Known traps

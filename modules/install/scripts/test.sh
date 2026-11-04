@@ -22,8 +22,8 @@ def check(what, held, got=""):
 check("what is installed is what %files lists", installed == files, installed ^ files)
 for program in ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary"):
     check(f"{program} in /usr/bin, beside the others", f"/usr/bin/{program}" in files)
-check("the desktop entry is named as the application's id", "/usr/share/applications/com.kitokey.Kitokey.desktop" in files)
-check("its icon, under the same name", "/usr/share/icons/hicolor/512x512/apps/com.kitokey.Kitokey.png" in files)
+check("the desktop entry is named as the application's id", "/usr/share/applications/com.napkinstack.Kitokey.desktop" in files)
+check("its icon, under the same name", "/usr/share/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png" in files)
 check("nothing outside /usr: the user's meetings and settings are never the package's", all(f.startswith("/usr/") for f in files), files)
 check("pw-metadata required: capture runs it, no library names it", re.search(r"^Requires:\s+pipewire-utils$", spec, re.M) is not None)
 check("the tray's library required: the shell opens it at run time, no link names it",
@@ -67,7 +67,7 @@ with tempfile.TemporaryDirectory() as work:
     subprocess.run([sys.executable, os.path.join(mac, "info.py"), app, "1.2.3"], check=True)
     info = plistlib.load(open(os.path.join(app, "Contents", "Info.plist"), "rb"))
     check("the Info.plist names the application, its id and its version",
-          info.get("CFBundleName") == "Kitokey" and info.get("CFBundleIdentifier") == "com.kitokey.Kitokey"
+          info.get("CFBundleName") == "Kitokey" and info.get("CFBundleIdentifier") == "com.napkinstack.Kitokey"
           and info.get("CFBundleShortVersionString") == "1.2.3", info)
     check("it opens the shell, the program that finds the others beside it", info.get("CFBundleExecutable") == "kitokey", info)
     words = json.load(open(os.path.join(mac, "words.json"), encoding="utf-8"))

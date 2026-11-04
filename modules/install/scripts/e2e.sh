@@ -19,8 +19,8 @@ if [ -z "$package" ]; then
     printf '#!/bin/sh\necho "%s: usage: …" >&2\nexit 2\n' "$(basename "$program")" > "$work/$program"
     chmod +x "$work/$program"
   done
-  printf '[Desktop Entry]\nType=Application\nName=Kitokey\nComment[fr]=x\nExec=kitokey\nIcon=com.kitokey.Kitokey\n' > "$work/shell/com.kitokey.Kitokey.desktop"
-  printf 'png' > "$work/shell/com.kitokey.Kitokey.png"
+  printf '[Desktop Entry]\nType=Application\nName=Kitokey\nComment[fr]=x\nExec=kitokey\nIcon=com.napkinstack.Kitokey\n' > "$work/shell/com.napkinstack.Kitokey.desktop"
+  printf 'png' > "$work/shell/com.napkinstack.Kitokey.png"
   echo 0.0.0 > "$work/shell/VERSION"
   mkdir -p "$work/install"
   KITOKEY_TARGET=$target NSTACK_DIST="$work/install" bash "$here/scripts/release.sh" >/dev/null
@@ -64,7 +64,7 @@ done
 check "the tray'"'"'s library is installed with it — the shell opens it at run time" "ldconfig -p | grep -E \"lib(ayatana-)?appindicator3\.so\.1\" >/dev/null"
 check "pw-metadata is installed with it — capture runs it" "command -v pw-metadata >/dev/null"
 check "it installs the spec'"'"'s files and the directories above them, nothing else, and runs no script" "bash /judge.sh \"\$listed\" \"\$scripts\""
-check "the menu sees Kitokey, under its id" "grep -q ^Exec=kitokey /usr/share/applications/com.kitokey.Kitokey.desktop"
+check "the menu sees Kitokey, under its id" "grep -q ^Exec=kitokey /usr/share/applications/com.napkinstack.Kitokey.desktop"
 check "removed" "eval \"\$remove\" >/dev/null 2>&1 && ! command -v kitokey >/dev/null"
 check "the meetings and the settings stay" "test -f $HOME/.config/kitokey/settings.toml && test -f $HOME/Kitokey/2026-10-18_10-00/session.json"
 [ "$failed" = 0 ] && echo "e2e: passed" || { echo "e2e: FAILED"; exit 1; }
