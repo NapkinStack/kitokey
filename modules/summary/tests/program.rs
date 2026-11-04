@@ -27,9 +27,9 @@ fn run(folder: &Path, address: &str, key: Option<&str>) -> Output {
     command
         .arg(folder)
         .args(["--provider", address, "--model", "a-model"])
-        .env_remove("WHOLEHEARD_PROVIDER_KEY");
+        .env_remove("KITOKEY_PROVIDER_KEY");
     if let Some(key) = key {
-        command.env("WHOLEHEARD_PROVIDER_KEY", key);
+        command.env("KITOKEY_PROVIDER_KEY", key);
     }
     command.output().unwrap()
 }
@@ -162,9 +162,9 @@ fn what_cannot_be_sent_as_it_is_is_refused_before_anything_leaves() {
         command
             .arg(folder.path())
             .args(["--provider", &address, "--model", model])
-            .env_remove("WHOLEHEARD_PROVIDER_KEY");
+            .env_remove("KITOKEY_PROVIDER_KEY");
         if let Some(key) = key {
-            command.env("WHOLEHEARD_PROVIDER_KEY", key);
+            command.env("KITOKEY_PROVIDER_KEY", key);
         }
         let output = command.output().unwrap();
         let (out, err) = said(&output);
@@ -190,7 +190,7 @@ fn a_proxy_named_by_the_environment_is_never_used() {
     let output = program()
         .arg(folder.path())
         .args(["--provider", &address, "--model", "a-model"])
-        .env_remove("WHOLEHEARD_PROVIDER_KEY")
+        .env_remove("KITOKEY_PROVIDER_KEY")
         .env_remove("NO_PROXY")
         .env_remove("no_proxy")
         .envs([
@@ -249,7 +249,7 @@ fn what_is_not_text_or_cannot_be_read_is_refused_in_one_sentence_and_nothing_lea
         command
             .arg(folder.path())
             .args(["--provider", &address, "--model"])
-            .env_remove("WHOLEHEARD_PROVIDER_KEY");
+            .env_remove("KITOKEY_PROVIDER_KEY");
         command
     };
     let refused = |output: Output, expected: &str| {
@@ -262,8 +262,8 @@ fn what_is_not_text_or_cannot_be_read_is_refused_in_one_sentence_and_nothing_lea
     };
     refused(program().arg(not_text).output().unwrap(), "an argument is not text");
     refused(
-        program().arg("a-model").env("WHOLEHEARD_PROVIDER_KEY", not_text).output().unwrap(),
-        "WHOLEHEARD_PROVIDER_KEY is not text",
+        program().arg("a-model").env("KITOKEY_PROVIDER_KEY", not_text).output().unwrap(),
+        "KITOKEY_PROVIDER_KEY is not text",
     );
     // A context that is there and cannot be read is not the same as no context.
     fs::create_dir(folder.path().join("context.txt")).unwrap();
@@ -281,7 +281,7 @@ fn what_is_not_text_or_cannot_be_read_is_refused_in_one_sentence_and_nothing_lea
     fs::remove_file(folder.path().join("context.txt")).unwrap();
     for key in ["a-key-for-the-test ", " a-key-for-the-test", "a key"] {
         refused(
-            program().arg("a-model").env("WHOLEHEARD_PROVIDER_KEY", key).output().unwrap(),
+            program().arg("a-model").env("KITOKEY_PROVIDER_KEY", key).output().unwrap(),
             "the key holds a space",
         );
     }
@@ -293,9 +293,9 @@ fn tested(address: &str, key: Option<&str>) -> Output {
     let mut command = program();
     command
         .args(["--test", "--provider", address, "--model", "a-model"])
-        .env_remove("WHOLEHEARD_PROVIDER_KEY");
+        .env_remove("KITOKEY_PROVIDER_KEY");
     if let Some(key) = key {
-        command.env("WHOLEHEARD_PROVIDER_KEY", key);
+        command.env("KITOKEY_PROVIDER_KEY", key);
     }
     command.output().unwrap()
 }
@@ -313,24 +313,24 @@ fn a_test_sends_one_fixed_sentence_and_says_the_model_answered() {
     // Nothing of a meeting: one sentence of the program's own.
     assert_eq!(
         asked["messages"].to_string(),
-        serde_json::json!([{"role": "user", "content": wholeheard_summary::TEST}]).to_string()
+        serde_json::json!([{"role": "user", "content": kitokey_summary::TEST}]).to_string()
     );
     let lines: Vec<serde_json::Value> = out.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
     assert_eq!(lines.len(), 2, "{out}");
     assert_eq!(lines[0]["event"], "sending");
-    assert_eq!(lines[0]["characters"], wholeheard_summary::TEST.chars().count());
+    assert_eq!(lines[0]["characters"], kitokey_summary::TEST.chars().count());
     assert_eq!(lines[1]["event"], "answered");
     assert_eq!(lines[1]["model"], "a-model");
     // The model named first is the same test.
     let (address, received) = provider("200 OK", answering("OK", "stop"));
     let output = program()
         .args(["--test", "--model", "a-model", "--provider", &address])
-        .env_remove("WHOLEHEARD_PROVIDER_KEY")
+        .env_remove("KITOKEY_PROVIDER_KEY")
         .output()
         .unwrap();
     assert!(output.status.success(), "{}", said(&output).1);
     let (_, asked) = received.recv().unwrap();
-    assert!(asked.contains(wholeheard_summary::TEST), "{asked}");
+    assert!(asked.contains(kitokey_summary::TEST), "{asked}");
 }
 
 #[test]
@@ -376,10 +376,10 @@ fn the_log_says_each_step_under_the_makings_id_and_nothing_of_the_meeting() {
     let output = program()
         .arg(folder.path())
         .args(["--provider", &address, "--model", "a-model"])
-        .env("WHOLEHEARD_PROVIDER_KEY", "a-key-for-the-test")
-        .env("WHOLEHEARD_TRACE", "making-42")
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
-        .env_remove("WHOLEHEARD_LOG")
+        .env("KITOKEY_PROVIDER_KEY", "a-key-for-the-test")
+        .env("KITOKEY_TRACE", "making-42")
+        .env("KITOKEY_LOG_DIR", logs.path())
+        .env_remove("KITOKEY_LOG")
         .output()
         .unwrap();
     assert!(output.status.success(), "{}", said(&output).1);
@@ -418,6 +418,34 @@ fn the_log_says_each_step_under_the_makings_id_and_nothing_of_the_meeting() {
 }
 
 #[test]
+fn a_shell_still_named_wholeheard_is_heard_until_it_passes_the_new_names() {
+    let folder = session(None);
+    let logs = tempfile::tempdir().unwrap();
+    let (address, received) = provider("200 OK", answering(MINUTES, "stop"));
+    let output = program()
+        .arg(folder.path())
+        .args(["--provider", &address, "--model", "a-model"])
+        .env_remove("KITOKEY_LOG_DIR")
+        .env("WHOLEHEARD_PROVIDER_KEY", "a-key-for-the-test")
+        .env("WHOLEHEARD_TRACE", "making-43")
+        .env("WHOLEHEARD_LOG_DIR", logs.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", said(&output).1);
+    let (head, _) = received.recv().unwrap();
+    assert!(
+        head.to_ascii_lowercase().contains("bearer a-key-for-the-test"),
+        "the key read from WHOLEHEARD_PROVIDER_KEY: {head}"
+    );
+    let lines = logged(logs.path());
+    assert!(!lines.is_empty(), "the log is where WHOLEHEARD_LOG_DIR says");
+    assert!(
+        lines.iter().all(|line| line["span"]["trace"] == "making-43"),
+        "the making's id read from WHOLEHEARD_TRACE"
+    );
+}
+
+#[test]
 fn a_failure_is_logged_with_its_detail() {
     let folder = session(None);
     let logs = tempfile::tempdir().unwrap();
@@ -425,7 +453,7 @@ fn a_failure_is_logged_with_its_detail() {
     let output = program()
         .arg(folder.path())
         .args(["--provider", &address, "--model", "a-model"])
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
+        .env("KITOKEY_LOG_DIR", logs.path())
         .output()
         .unwrap();
     assert!(!output.status.success());
@@ -449,7 +477,7 @@ fn a_log_that_cannot_be_written_loses_nothing() {
     let output = program()
         .arg(folder.path())
         .args(["--provider", &address, "--model", "a-model"])
-        .env("WHOLEHEARD_LOG_DIR", not_a_folder.path())
+        .env("KITOKEY_LOG_DIR", not_a_folder.path())
         .output()
         .unwrap();
     let (out, err) = said(&output);
@@ -463,8 +491,8 @@ fn a_level_asked_shows_more_and_a_library_says_nothing() {
     let (address, _received) = provider("200 OK", answering("Bonjour.", "stop"));
     let output = program()
         .args(["--test", "--provider", &address, "--model", "a-model"])
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
-        .env("WHOLEHEARD_LOG", "debug")
+        .env("KITOKEY_LOG_DIR", logs.path())
+        .env("KITOKEY_LOG", "debug")
         .output()
         .unwrap();
     assert!(output.status.success(), "{}", said(&output).1);
@@ -487,9 +515,9 @@ fn a_failure_says_nothing_of_the_meeting_and_keeps_its_id_at_any_level() {
         let output = program()
             .arg(folder)
             .args(["--provider", "http://127.0.0.1:9/v1", "--model", "a-model"])
-            .env("WHOLEHEARD_LOG_DIR", logs.path())
-            .env("WHOLEHEARD_LOG", "error")
-            .env("WHOLEHEARD_TRACE", "making-43")
+            .env("KITOKEY_LOG_DIR", logs.path())
+            .env("KITOKEY_LOG", "error")
+            .env("KITOKEY_TRACE", "making-43")
             .output()
             .unwrap();
         assert!(!output.status.success());
@@ -521,7 +549,7 @@ fn a_run_removes_the_day_files_of_more_than_fourteen_days() {
     let (address, _received) = provider("200 OK", answering("Bonjour.", "stop"));
     let output = program()
         .args(["--test", "--provider", &address, "--model", "a-model"])
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
+        .env("KITOKEY_LOG_DIR", logs.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -548,13 +576,13 @@ fn a_log_that_cannot_be_written_says_nothing_on_the_error_stream() {
     let output = program()
         .arg(folder.path())
         .args(["--provider", &address, "--model", "a-model"])
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
+        .env("KITOKEY_LOG_DIR", logs.path())
         .output()
         .unwrap();
     let (_, err) = said(&output);
     assert!(!output.status.success());
     assert_eq!(err.lines().collect::<Vec<_>>().len(), 1, "{err}");
-    assert!(err.starts_with("wholeheard-summary: ") && err.contains("refused the key"), "{err}");
+    assert!(err.starts_with("kitokey-summary: ") && err.contains("refused the key"), "{err}");
 }
 
 #[test]
@@ -563,8 +591,8 @@ fn a_log_turned_off_leaves_nothing() {
     let (address, _received) = provider("200 OK", answering("Bonjour.", "stop"));
     let output = program()
         .args(["--test", "--provider", &address, "--model", "a-model"])
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
-        .env("WHOLEHEARD_LOG", "off")
+        .env("KITOKEY_LOG_DIR", logs.path())
+        .env("KITOKEY_LOG", "off")
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -666,7 +694,7 @@ fn a_failure_a_person_acts_on_differently_ends_the_output_with_its_code() {
         let output = program()
             .arg(folder.path())
             .args(["--provider", "http://127.0.0.1:9/v1", "--model", "a-model"])
-            .env("WHOLEHEARD_PROVIDER_KEY", std::ffi::OsStr::from_bytes(&[0xff, 0xfe]))
+            .env("KITOKEY_PROVIDER_KEY", std::ffi::OsStr::from_bytes(&[0xff, 0xfe]))
             .output()
             .unwrap();
         assert_eq!(coded(&output), "settings.invalid");
@@ -749,9 +777,9 @@ fn warned(body: String) -> (String, Vec<serde_json::Value>) {
     let output = program()
         .arg(folder.path())
         .args(["--provider", &address, "--model", "a-model"])
-        .env_remove("WHOLEHEARD_PROVIDER_KEY")
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
-        .env_remove("WHOLEHEARD_LOG")
+        .env_remove("KITOKEY_PROVIDER_KEY")
+        .env("KITOKEY_LOG_DIR", logs.path())
+        .env_remove("KITOKEY_LOG")
         .output()
         .unwrap();
     assert!(output.status.success(), "{}", said(&output).1);
@@ -784,9 +812,9 @@ fn an_answer_asked_again_warns_for_the_one_written_only() {
     let output = program()
         .arg(folder.path())
         .args(["--provider", &address, "--model", "a-model"])
-        .env_remove("WHOLEHEARD_PROVIDER_KEY")
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
-        .env_remove("WHOLEHEARD_LOG")
+        .env_remove("KITOKEY_PROVIDER_KEY")
+        .env("KITOKEY_LOG_DIR", logs.path())
+        .env_remove("KITOKEY_LOG")
         .output()
         .unwrap();
     assert!(output.status.success(), "{}", said(&output).1);
@@ -821,12 +849,12 @@ fn at_openrouter(answers: Vec<String>) -> Option<(String, Vec<serde_json::Value>
     let output = std::process::Command::new("unshare")
         .args(["-Urm", "sh", "-c", r#"mount --bind "$1" /etc/hosts && shift && exec "$@""#, "sh"])
         .arg(&hosts)
-        .arg(env!("CARGO_BIN_EXE_wholeheard-summary"))
+        .arg(env!("CARGO_BIN_EXE_kitokey-summary"))
         .arg(folder.path())
         .args(["--provider", &address, "--model", "a-model"])
-        .env_remove("WHOLEHEARD_PROVIDER_KEY")
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
-        .env_remove("WHOLEHEARD_LOG")
+        .env_remove("KITOKEY_PROVIDER_KEY")
+        .env("KITOKEY_LOG_DIR", logs.path())
+        .env_remove("KITOKEY_LOG")
         .output()
         .unwrap();
     if !output.status.success() && said(&output).1.contains("mount") {

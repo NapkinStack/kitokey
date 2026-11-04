@@ -1096,7 +1096,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wholeheard-summary"
+name = "kitokey-summary"
 version = "0.1.0"
 dependencies = [
  "chrono",
