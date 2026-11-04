@@ -4,6 +4,7 @@
 # was, and what Kitokey left there is what docs/privacy.md names —; installed again, Kitokey
 # reads the meetings and the settings it left. Run as root by e2e.sh, which passes:
 #   $add $remove $listed  the system's commands      $kept  privacy.md's paths, `~/…`, one a line
+#                                                    $kept_fr  the same, read from its French part
 #   $tools                what drives the window     $driver  WebKitWebDriver's path
 set -uo pipefail
 failed=0
@@ -18,9 +19,9 @@ start() {
     xvfb-run -a dbus-run-session -- timeout 180 python3 /start-as-user.py "$driver" >/tmp/start.out 2>/tmp/start.log
   grep '^{' /tmp/start.out | tail -1
 }
-# The home as a list: each path, its kind, and each file's content.
+# The home as a list: each path, its kind, owner, group and mode, and each file's content.
 snapshot() {
-  (cd "$home" && find . -mindepth 1 -printf '%p %y\n' | sort && find . -type f -exec sha256sum {} + | sort -k2)
+  (cd "$home" && find . -mindepth 1 -printf '%p %y %u %g %m\n' | sort && find . -type f -exec sha256sum {} + | sort -k2)
 }
 welcomes() { cat "$home"/.local/state/kitokey/logs/shell.*.jsonl 2>/dev/null | grep -c '"shell.welcome_shown"'; }
 before=$(cd "$home" && find . -mindepth 1 | sort)
@@ -40,6 +41,7 @@ runuser -u meet -- mkdir -p "$meeting"
 runuser -u meet -- sh -c "printf '%s\n' '{\"contract\": \"session-audio/v2\", \"started\": \"2026-11-04T10:00:00+01:00\", \"stopped\": \"2026-11-04T10:30:00+01:00\", \"tracks\": {\"local\": {\"device\": \"Mic\"}}}' > '$meeting/session.json'
 printf '# A meeting\n' > '$meeting/minutes.md'"
 kept_then=$(snapshot)
+check "Kitokey is not running when the package is removed" "! pgrep -x kitokey >/dev/null"
 files=$(eval "$listed" | while read -r path; do [ -d "$path" ] || echo "$path"; done)
 
 check "removed" "eval \"\$remove\" >/tmp/remove.log 2>&1 || { tail -5 /tmp/remove.log; false; }"
@@ -49,19 +51,22 @@ check "the user's home is as it was: the meetings and the settings, untouched" "
 # What is new in the home since Kitokey came: under a path privacy.md names, or the meetings'
 # folder the user chose (« your meetings folder »), or the desktop's own folders any program with a window makes
 # — the caches of Mesa's shaders, fontconfig and GStreamer, dconf, accessibility's bus, the
-# document portal, GVfs, IBus — and the system's keyring, which Kitokey opens at its start: none
-# is Kitokey's own (privacy.md names its key there).
-allowed=$(printf '%s\n' "$kept" | sed "s|^~|.|"; echo ".${chosen#"$home"}"; printf '%s\n' ./.cache/mesa_shader_cache ./.cache/fontconfig ./.cache/gstreamer-1.0 ./.cache/dconf ./.cache/at-spi ./.cache/doc ./.cache/gvfsd ./.gvfs ./.config/ibus ./.local/share/keyrings)
+# document portal, GVfs, IBus —, everything under each; and the system's keyring's folder, which
+# Kitokey's start makes open, itself alone — empty: no key was given (privacy.md names its key there).
+allowed=$(printf '%s\n' "$kept" | sed "s|^~|.|"; echo ".${chosen#"$home"}"; printf '%s\n' ./.cache/mesa_shader_cache ./.cache/fontconfig ./.cache/gstreamer-1.0 ./.cache/dconf ./.cache/at-spi ./.cache/doc ./.cache/gvfsd ./.gvfs ./.config/ibus)
+alone=./.local/share/keyrings
 new=$(comm -13 <(echo "$before") <(cd "$home" && find . -mindepth 1 | sort))
 stray=$(while read -r path; do
   [ -n "$path" ] || continue
   named=no
+  [ "$path" = "$alone" ] && named=yes
   while read -r name; do
     case $path/ in "$name"/* ) named=yes ;; esac
     case $name/ in "$path"/* ) named=yes ;; esac   # a folder above a named one
   done <<< "$allowed"
   [ $named = yes ] || echo "$path"
 done <<< "$new")
+check "docs/privacy.md names the same Linux paths in French as in English" "test \"\$kept\" = \"\$kept_fr\" || { echo \"        got: \$kept_fr\"; false; }"
 check "what Kitokey left in the home is what docs/privacy.md names" "test -z \"\$stray\" || { echo \"        got: \$stray\" | head -12; false; }"
 
 check "installed again" "eval \"\$add\" >/tmp/add-again.log 2>&1 || { tail -5 /tmp/add-again.log; false; }"

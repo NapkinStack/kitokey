@@ -31,8 +31,13 @@ if [ -z "$package" ]; then
 fi
 # What any package must install, and nothing else: the spec's %files, its macros expanded.
 expected=$(sed -n '/^%files/,$p' "$here/kitokey.spec" | sed '1d; /^$/d; s|%{_bindir}|/usr/bin|; s|%{_datadir}|/usr/share|' | sort | tr '\n' ' ')
-# What Kitokey may leave in a user's home on Linux, as docs/privacy.md says it: its Linux paths.
-kept=$(awk '/^  - Linux:/ {on = 1} on && /^  - / && !/Linux:/ {on = 0} on' "$here/../../docs/privacy.md" | grep -o '`~[^`]*`' | tr -d '`')
+# What Kitokey may leave in a user's home on Linux, as docs/privacy.md says it: its Linux paths,
+# in English, then in French — the same, or one of the two pages is wrong.
+privacy=$here/../../docs/privacy.md
+# The bullet that starts with its words, and the lines that carry it on; the paths it names.
+linux() { awk -v line="$1" 'index($0, line) == 1 {on = 1; print; next} on && /^    / {print; next} {on = 0}' "$privacy" | grep -o '`~[^`]*`' | tr -d '`' | sort -u; }
+kept=$(linux '  - Linux:')
+kept_fr=$(linux '  - Linux :')
 case $target in
   fedora-[0-9]*)
     image="registry.fedoraproject.org/fedora:${target#fedora-}"
@@ -58,7 +63,7 @@ esac
 podman run --rm --security-opt label=disable -v "$package:$file:ro" -v "$here/scripts/judge-installed.sh:/judge.sh:ro" \
   -v "$here/scripts/removal.sh:/removal.sh:ro" -v "$here/scripts/start-as-user.py:/start-as-user.py:ro" \
   -e add="$add" -e remove="$remove" -e listed="$listed" -e scripts="$scripts" -e expected="$expected" -e old="$old" -e gone="$gone" \
-  -e real="$real" -e kept="$kept" -e tools="$tools" -e driver="$driver" "$image" bash -euo pipefail -c '
+  -e real="$real" -e kept="$kept" -e kept_fr="$kept_fr" -e tools="$tools" -e driver="$driver" "$image" bash -euo pipefail -c '
 failed=0
 check() { if eval "$2"; then echo "  ok    $1"; else echo "  FAIL  $1"; failed=1; fi; }
 mkdir -p $HOME/.config/kitokey $HOME/Kitokey/2026-10-18_10-00
