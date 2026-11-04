@@ -24,7 +24,7 @@ ExclusiveArch:  x86_64 aarch64
 %if 0%{?from_source}
 Source0:        kitokey-%{version}.tar.xz
 # What each module's containers/fedora-*.Containerfile builds it with, Rust from Fedora's.
-BuildRequires:  cargo rust gcc gcc-c++ make cmake clang clang-devel pkgconf-pkg-config
+BuildRequires:  python3 cargo rust gcc gcc-c++ make cmake clang clang-devel pkgconf-pkg-config
 BuildRequires:  webkit2gtk4.1-devel gtk3-devel libayatana-appindicator-gtk3-devel librsvg2-devel
 BuildRequires:  pipewire-devel alsa-lib-devel vulkan-headers vulkan-loader-devel glslc
 %endif
@@ -47,16 +47,9 @@ Whisper, and writes its minutes with the model you choose. Your meetings stay in
 %autosetup
 
 %build
-# The version each program says (`--version`): the package's.
-export KITOKEY_VERSION=%{version}
-for module in shell capture transcription summary; do
-  features=; [ $module = transcription ] && features='--features vulkan'
-  (cd modules/$module && cargo build --release --locked --offline $features)
-  mkdir -p dist/$module
-done
-cp modules/shell/target/release/kitokey modules/shell/linux/com.napkinstack.Kitokey.desktop dist/shell/
-cp modules/shell/icons/icon.png dist/shell/com.napkinstack.Kitokey.png
-for module in capture transcription summary; do cp modules/$module/target/release/kitokey-$module dist/$module/; done
+# Each program as its module releases it (`commands.release`, as `nstack release` runs it), into
+# dist/<module>: assemble.sh, written by copr/srpm.sh. Each says the package's version (`--version`).
+KITOKEY_VERSION=%{version} CARGO_NET_OFFLINE=true bash assemble.sh
 %endif
 
 %install

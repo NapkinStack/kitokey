@@ -71,15 +71,17 @@ flowchart LR
 **Legend** — grey: made by the forge's workflow · blue: Copr · green: what it holds.
 
 `.github/workflows/copr.yml` runs on a tag `v‹version›` on `main`, the shell's version. With no
-artefacts given, `kitokey.spec` builds the four programs from the source package (`from_source`),
-each saying its version (`--version`, `KITOKEY_VERSION`), and ships `LICENSE`. The project
+artefacts given, `kitokey.spec` builds from the source package (`from_source`): each module this
+one assembles released by its own `release` command, as `nstack release` does (`assemble.sh`,
+written by `srpm.sh`), each program saying the tag's version (`--version`, `KITOKEY_VERSION`); it
+ships `LICENSE`. The project
 `@napkinstack/kitokey` belongs to a Fedora group, so that installing names no person; the token is
 the forge's secret `COPR_CONFIG`. Copr builds on x86_64 only: transcription's whisper.cpp is built
 for x86-64-v3 (`modules/transcription/.cargo/config.toml`). By hand, from the repository's root:
 
 ```bash
-bash modules/install/copr/srpm.sh <ref> dist/copr                    # the source package, in a Fedora container
-KITOKEY_TARGET=fedora-44 bash modules/install/scripts/e2e.sh copr:@napkinstack/kitokey
+bash modules/install/copr/srpm.sh v0.2.0 0.2.0 dist/copr             # the source package, in a Fedora container
+KITOKEY_TARGET=fedora-44 KITOKEY_VERSION=0.2.0 bash modules/install/scripts/e2e.sh copr:@napkinstack/kitokey
 ```
 
 On a Mac, `nstack release` makes `dist/install/Kitokey-<version>-macos-arm64.zip`: the app,

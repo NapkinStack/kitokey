@@ -2,8 +2,8 @@
 # The package as a user meets it, for the system KITOKEY_TARGET names (unset: the system it runs on): installed
 # with dnf or apt in a container of that system that never saw Kitokey, each program run, removed —
 # meetings and settings stay. With no argument, made from stand-in programs (no other module
-# built); given a package, that one; given `copr:<owner>/kitokey`, the one Copr built, installed
-# with `dnf copr enable` (D78) — on Fedora alone. Needs podman and the network.
+# built); given a package, that one; given `copr:<project>`, the one Copr built, installed with
+# `dnf copr enable` (D78) — on Fedora alone, KITOKEY_VERSION naming its version. Needs podman and the network.
 set -euo pipefail
 shopt -s nullglob
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -18,8 +18,9 @@ case ${1:-} in
 esac
 # Given a package, Kitokey itself is started in the container, as its user (D80): stand-ins cannot be.
 real=${package:+1}${copr:+1}
-# Copr's is built from this checkout's source, the release tag's: each program says its version (D78).
-version=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$here/../shell/tauri.conf.json")
+# Copr's: each program says the release tag's version, which KITOKEY_VERSION names (D78).
+version=${KITOKEY_VERSION:-}
+[ -z "$copr" ] || [ -n "$version" ] || { echo "e2e: given Copr, KITOKEY_VERSION names the version it built" >&2; exit 2; }
 if [ -z "$package$copr" ]; then
   work=$(mktemp -d)
   trap 'rm -rf "$work"' EXIT

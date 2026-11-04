@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # D78's fourth criterion, around Copr's build of the next version (.github/workflows/copr.yml):
 # `before`, the version Copr holds now, installed from it in a Fedora 44 container that stays, and
-# used as a user does; `after`, once Copr built this checkout's version, `dnf upgrade` to it — the
+# used as a user does; `after`, once Copr built KITOKEY_VERSION, `dnf upgrade` to it — the
 # meetings and settings stay. Copr holding no version yet, there is nothing to upgrade from: said,
-# and not run. Usage: copr/upgrade.sh before|after <owner>/kitokey
+# and not run. Usage: copr/upgrade.sh before|after <project>
 set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
-phase=${1:?usage: copr/upgrade.sh before|after <owner>/kitokey}
-copr=${2:?usage: copr/upgrade.sh before|after <owner>/kitokey}
+phase=${1:?usage: copr/upgrade.sh before|after <project>}
+copr=${2:?usage: copr/upgrade.sh before|after <project>}
 name=kitokey-upgrade
-version=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$here/../shell/tauri.conf.json")
+# The next version, the one Copr builds: the release tag's.
+version=${KITOKEY_VERSION:?KITOKEY_VERSION names the version Copr builds}
 # What drives the window, as e2e.sh installs it on Fedora.
 tools='dnf install -y -q xorg-x11-server-Xvfb xorg-x11-xauth webkitgtk6.0 dbus-daemon python3 procps-ng findutils'
 inside() { podman exec -e tools="$tools" -e driver=/usr/bin/WebKitWebDriver -e version="$version" "$name" "$@"; }
@@ -34,5 +35,5 @@ case $phase in
     inside bash /upgrade-inside.sh after || status=$?
     podman rm -f "$name" >/dev/null
     exit $status ;;
-  *) echo "usage: copr/upgrade.sh before|after <owner>/kitokey" >&2; exit 2 ;;
+  *) echo "usage: copr/upgrade.sh before|after <project>" >&2; exit 2 ;;
 esac

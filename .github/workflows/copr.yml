@@ -37,11 +37,13 @@ jobs:
         run: |
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
           test "$TAG" = "v$(jq -r .version modules/shell/tauri.conf.json)"
+          # The version Copr builds, upgraded to and installed: the tag's.
+          echo "KITOKEY_VERSION=${TAG#v}" >> "$GITHUB_ENV"
 
       - name: The source package
         env:
           TAG: ${{ github.ref_name }}
-        run: bash modules/install/copr/srpm.sh "$TAG" dist/copr
+        run: bash modules/install/copr/srpm.sh "$TAG" "$KITOKEY_VERSION" dist/copr
 
       - name: The version Copr holds, installed and used
         run: bash modules/install/copr/upgrade.sh before "$COPR_PROJECT"
