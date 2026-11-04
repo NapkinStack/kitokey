@@ -191,7 +191,7 @@ day: « Déjà fait ». The end date does not move.
 | Deliverable | Who | The literal gesture |
 |---|---|---|
 | D86 | The decider | Done on 2026-11-04: the repository is `NapkinStack/kitokey`, GitHub redirecting the old address |
-| D78 | The decider | Sign in to [Copr](https://copr.fedorainfracloud.org/) with a Fedora account and create the project `kitokey` (D86; a project already made as `wholeheard` is deleted from its *Settings*). Copy the text [its API page](https://copr.fedorainfracloud.org/api/) gives into a file `copr`, then, at the root of a checkout: `gh secret set COPR_CONFIG < copr` and delete the file. Tell an agent the owner's name |
+| D78 | The decider | Done on 2026-11-04: a Copr token in the forge's secret `COPR_CONFIG`. Left: a Fedora group `napkinstack`, asked on [Fedora's infrastructure tickets](https://forge.fedoraproject.org/infra/tickets/issues), so that the install command names no person; once made, activated in Copr (*My Groups*) and its project `kitokey` created there; the project under the decider's own account deleted from its *Settings*. Then a tag `v<version>` on `main`, given by the decider's word |
 | D66, trial | The decider | As cycle 06 says, on the build of this cycle's first tag: AirPods, a WhatsApp Web call, five starts and stops, the answers on [#494](https://github.com/NapkinStack/wholeheard/issues/494) |
 | ADR-0015 | The decider | After that trial, say « ADR-0015 acceptée », or what falls |
 | D41 | The decider | [#449](https://github.com/NapkinStack/wholeheard/issues/449): a call on the earbuds, the default on the speaker |

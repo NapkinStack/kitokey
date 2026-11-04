@@ -2,7 +2,8 @@
 # The package as a user meets it, for the system KITOKEY_TARGET names (unset: the system it runs on): installed
 # with dnf or apt in a container of that system that never saw Kitokey, each program run, removed —
 # meetings and settings stay. With no argument, made from stand-in programs (no other module
-# built); given a package, that one. Needs podman and the network.
+# built); given a package, that one; given `copr:<owner>/kitokey`, the one Copr built, installed
+# with `dnf copr enable` (D78) — on Fedora alone. Needs podman and the network.
 set -euo pipefail
 shopt -s nullglob
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -10,10 +11,16 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 command -v podman >/dev/null || { echo "e2e: NOT RUN — podman is missing here"; exit 77; }
 # Unset, the system this runs on, as it names itself (fedora-44, ubuntu-24.04).
 target=${KITOKEY_TARGET:-$(. /etc/os-release && echo "$ID-$VERSION_ID")}
-package=${1:+$(realpath "$1")}
+copr=
+case ${1:-} in
+  copr:*/*) copr=${1#copr:}; package= ;;
+  *) package=${1:+$(realpath "$1")} ;;
+esac
 # Given a package, Kitokey itself is started in the container, as its user (D80): stand-ins cannot be.
-real=${package:+1}
-if [ -z "$package" ]; then
+real=${package:+1}${copr:+1}
+# Copr's is built from this checkout's source, the release tag's: each program says its version (D78).
+version=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$here/../shell/tauri.conf.json")
+if [ -z "$package$copr" ]; then
   work=$(mktemp -d)
   trap 'rm -rf "$work"' EXIT
   for program in shell/kitokey capture/kitokey-capture transcription/kitokey-transcription summary/kitokey-summary; do
@@ -29,8 +36,14 @@ if [ -z "$package" ]; then
   made=("$work"/install/*.rpm "$work"/install/*.deb)
   package=${made[0]}
 fi
-# What any package must install, and nothing else: the spec's %files, its macros expanded.
-expected=$(sed -n '/^%files/,$p' "$here/kitokey.spec" | sed '1d; /^$/d; s|%{_bindir}|/usr/bin|; s|%{_datadir}|/usr/share|' | sort | tr '\n' ' ')
+# What any package must install, and nothing else: the spec's %files, its macros expanded. The
+# licence is shipped by a package built from source (`from_source`): Copr's must hold it; a package
+# given may — one made from the artefacts does not.
+files=$(sed -n '/^%files/,$p' "$here/kitokey.spec" \
+  | sed '1d; /^$/d; /^%if/d; /^%endif/d; s|%{_bindir}|/usr/bin|; s|%{_datadir}|/usr/share|; s|^%license LICENSE$|/usr/share/licenses/kitokey/LICENSE|' | sort)
+licence=/usr/share/licenses/kitokey/LICENSE
+if [ -n "$copr" ]; then optional=; else optional=$licence; files=$(grep -vx "$licence" <<< "$files"); fi
+expected=$(tr '\n' ' ' <<< "$files")
 # What Kitokey may leave in a user's home on Linux, as docs/privacy.md says it: its Linux paths,
 # in English, then in French — the same, or one of the two pages is wrong.
 privacy=$here/../../docs/privacy.md
@@ -42,6 +55,7 @@ case $target in
   fedora-[0-9]*)
     image="registry.fedoraproject.org/fedora:${target#fedora-}"
     add='dnf install -y -q /tmp/kitokey.rpm'; remove='dnf remove -y -q kitokey'; file=/tmp/kitokey.rpm
+    [ -z "$copr" ] || add="dnf install -y -q dnf-plugins-core && dnf copr enable -y $copr && dnf install -y -q kitokey"
     listed='rpm -ql kitokey'; scripts='rpm -q --scripts kitokey'
     # The stand-in Wholeheard is made here, so signed by nobody: Fedora 45's rpm refuses that unless told.
     old='dnf install -y -q rpm-build && mkdir -p /tmp/old && printf "%s\n" "Name: wholeheard" "Version: 0.2.0" "Release: 2" "Summary: x" "License: x" "BuildArch: noarch" "%description" "x" "%install" "install -Dm755 /dev/null %{buildroot}/usr/bin/wholeheard" "%files" "/usr/bin/wholeheard" > /tmp/old/w.spec && rpmbuild -bb --quiet --define "_rpmdir /tmp/old" /tmp/old/w.spec && rpm -i --nosignature /tmp/old/noarch/wholeheard-0.2.0-2.noarch.rpm'
@@ -50,6 +64,7 @@ case $target in
     tools='dnf install -y -q xorg-x11-server-Xvfb xorg-x11-xauth webkitgtk6.0 dbus-daemon python3 procps-ng findutils'
     driver=/usr/bin/WebKitWebDriver ;;
   ubuntu-[0-9]*)
+    [ -z "$copr" ] || { echo "e2e: Copr builds for Fedora only" >&2; exit 2; }
     image="docker.io/library/ubuntu:${target#ubuntu-}"
     add='apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/kitokey.deb'
     remove='apt-get remove -y -qq kitokey'; file=/tmp/kitokey.deb
@@ -61,10 +76,11 @@ case $target in
     driver=/usr/bin/WebKitWebDriver ;;
   *) echo "e2e: no package is made for '$target'" >&2; exit 2 ;;
 esac
-podman run --rm --security-opt label=disable -v "$package:$file:ro" -v "$here/scripts/judge-installed.sh:/judge.sh:ro" \
-  -v "$here/scripts/removal.sh:/removal.sh:ro" -v "$here/scripts/start-as-user.py:/start-as-user.py:ro" \
-  -e add="$add" -e remove="$remove" -e listed="$listed" -e scripts="$scripts" -e expected="$expected" -e old="$old" -e gone="$gone" \
-  -e real="$real" -e kept="$kept" -e kept_fr="$kept_fr" -e tools="$tools" -e driver="$driver" "$image" bash -euo pipefail -c '
+given=(); [ -z "$package" ] || given=(-v "$package:$file:ro")
+podman run --rm --security-opt label=disable ${given[@]+"${given[@]}"} -v "$here/scripts/judge-installed.sh:/judge.sh:ro" \
+  -v "$here/scripts/removal.sh:/removal.sh:ro" -v "$here/scripts/as-user.sh:/as-user.sh:ro" -v "$here/scripts/start-as-user.py:/start-as-user.py:ro" \
+  -e add="$add" -e remove="$remove" -e listed="$listed" -e scripts="$scripts" -e expected="$expected" -e optional="$optional" -e old="$old" -e gone="$gone" \
+  -e real="$real" -e copr="$copr" -e version="$version" -e kept="$kept" -e kept_fr="$kept_fr" -e tools="$tools" -e driver="$driver" "$image" bash -euo pipefail -c '
 failed=0
 check() { if eval "$2"; then echo "  ok    $1"; else echo "  FAIL  $1"; failed=1; fi; }
 mkdir -p $HOME/.config/kitokey $HOME/Kitokey/2026-10-18_10-00
@@ -78,6 +94,7 @@ for program in kitokey kitokey-capture kitokey-transcription kitokey-summary; do
   check "$program on the path, every library found" "command -v $program >/dev/null && ! ldd \$(command -v $program) 2>/dev/null | grep -q \"not found\""
   # A program says its usage; the shell, a window with no display here, goes as far as GTK.
   check "$program answers as itself" "{ timeout 10 $program 2>&1 || true; } | grep -qE \"^$program: usage|initialize GTK\""
+  [ -z "$copr" ] || check "$program says the tag'"'"'s version, $version" "test \"\$($program --version)\" = \"$program $version\""
 done
 check "the tray'"'"'s library is installed with it — the shell opens it at run time" "ldconfig -p | grep -E \"lib(ayatana-)?appindicator3\.so\.1\" >/dev/null"
 check "pw-metadata is installed with it — capture runs it" "command -v pw-metadata >/dev/null"

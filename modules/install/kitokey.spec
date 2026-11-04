@@ -1,5 +1,13 @@
-# Kitokey's package for Fedora, made from the artefacts each module's release left in dist/.
+# Kitokey's package for Fedora. Two ways, one header: given `artefacts`, it packs what each module's
+# release left in dist/ (scripts/release.sh); not given, it builds the four programs from the source
+# package copr/srpm.sh makes — the crates vendored in it, no network —, as Copr does (D78).
 # rpmbuild finds the libraries every program links and requires their packages itself.
+%if %{undefined artefacts}
+%global artefacts dist
+%global from_source 1
+# Built in release mode, without symbols to gather: no debuginfo package.
+%global debug_package %{nil}
+%endif
 Name:           kitokey
 Version:        %{kitokey_version}
 Release:        1%{?dist}
@@ -11,8 +19,15 @@ Provides:       wholeheard = %{version}-%{release}
 Obsoletes:      summit < 0.2.0
 Provides:       summit = %{version}-%{release}
 Summary:        Records a meeting, transcribes it and writes its minutes, on your machine
-License:        LicenseRef-Proprietary
+License:        GPL-3.0-only
 ExclusiveArch:  x86_64 aarch64
+%if 0%{?from_source}
+Source0:        kitokey-%{version}.tar.xz
+# What each module's containers/fedora-*.Containerfile builds it with, Rust from Fedora's.
+BuildRequires:  cargo rust gcc gcc-c++ make cmake clang clang-devel pkgconf-pkg-config
+BuildRequires:  webkit2gtk4.1-devel gtk3-devel libayatana-appindicator-gtk3-devel librsvg2-devel
+BuildRequires:  pipewire-devel alsa-lib-devel vulkan-headers vulkan-loader-devel glslc
+%endif
 # Run, not linked: capture asks PipeWire which device the default stands for.
 Requires:       pipewire-utils
 # Opened at run time, never linked: the shell's tray icon (ayatana's first, the older one else).
@@ -27,6 +42,23 @@ Recommends:     mesa-vulkan-drivers
 Kitokey records both sides of a call from the system tray, transcribes it on the machine with
 Whisper, and writes its minutes with the model you choose. Your meetings stay in your folder.
 
+%if 0%{?from_source}
+%prep
+%autosetup
+
+%build
+# The version each program says (`--version`): the package's.
+export KITOKEY_VERSION=%{version}
+for module in shell capture transcription summary; do
+  features=; [ $module = transcription ] && features='--features vulkan'
+  (cd modules/$module && cargo build --release --locked --offline $features)
+  mkdir -p dist/$module
+done
+cp modules/shell/target/release/kitokey modules/shell/linux/com.napkinstack.Kitokey.desktop dist/shell/
+cp modules/shell/icons/icon.png dist/shell/com.napkinstack.Kitokey.png
+for module in capture transcription summary; do cp modules/$module/target/release/kitokey-$module dist/$module/; done
+%endif
+
 %install
 install -Dm755 %{artefacts}/shell/kitokey %{buildroot}%{_bindir}/kitokey
 install -Dm755 %{artefacts}/capture/kitokey-capture %{buildroot}%{_bindir}/kitokey-capture
@@ -38,6 +70,9 @@ install -Dm644 %{artefacts}/shell/com.napkinstack.Kitokey.desktop %{buildroot}%{
 install -Dm644 %{artefacts}/shell/com.napkinstack.Kitokey.png %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png
 
 %files
+%if 0%{?from_source}
+%license LICENSE
+%endif
 %{_bindir}/kitokey
 %{_bindir}/kitokey-capture
 %{_bindir}/kitokey-transcription
