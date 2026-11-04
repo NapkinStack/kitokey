@@ -310,7 +310,7 @@ wheels = [
 ]
 
 [[package]]
-name = "wholeheard-contracts"
+name = "kitokey-contracts"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

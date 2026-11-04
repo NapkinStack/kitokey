@@ -5,9 +5,9 @@ it is asked whether a model answers: one line of text per event, for whoever sta
 
 ```mermaid
 flowchart LR
-    S["shell — or a script,<br/>a terminal"]:::consumer -->|"starts: wholeheard-summary <session-folder> --provider <address> --model <name>"| M["summary"]:::producer
-    S -->|"or: wholeheard-summary --test --provider <address> --model <name>"| M
-    S -.->|"its environment: WHOLEHEARD_PROVIDER_KEY, when the provider wants a key; WHOLEHEARD_TRACE, its log's id"| M
+    S["shell — or a script,<br/>a terminal"]:::consumer -->|"starts: kitokey-summary <session-folder> --provider <address> --model <name>"| M["summary"]:::producer
+    S -->|"or: kitokey-summary --test --provider <address> --model <name>"| M
+    S -.->|"its environment: KITOKEY_PROVIDER_KEY, when the provider wants a key; KITOKEY_TRACE, its log's id"| M
     M -->|"its output: one JSON object per line"| S
     M -.->|"its error stream: one sentence, when it fails"| S
     M -->|"sends: the request, to the provider's host"| P["The provider<br/>(OpenAI's protocol)"]:::outside
@@ -29,12 +29,12 @@ order of the events, and what each means, are said here and nowhere else.
 
 ## How it is started
 
-- **Minutes**: `wholeheard-summary <session-folder> --provider <address> --model <name>`, the two
+- **Minutes**: `kitokey-summary <session-folder> --provider <address> --model <name>`, the two
   options in either order. It reads the folder's `transcript.jsonl` (`transcript/v1`) and its
   `context.txt`, when there is one, and writes the folder's `minutes.md` (`minutes/v1`).
-- **A test**: `wholeheard-summary --test --provider <address> --model <name>`, the options in either
+- **A test**: `kitokey-summary --test --provider <address> --model <name>`, the options in either
   order. It sends one sentence of its own — nothing of a meeting — and writes nothing.
-- **The key**, when the provider wants one, is in its environment as `WHOLEHEARD_PROVIDER_KEY`,
+- **The key**, when the provider wants one, is in its environment as `KITOKEY_PROVIDER_KEY`,
   never in its arguments. It is sent to the provider's host and written nowhere: not on the
   output, not on the error stream, not in the minutes.
 - **The address** speaks OpenAI's protocol (`…/v1`); it is followed nowhere else — no
@@ -52,7 +52,7 @@ order of the events, and what each means, are said here and nowhere else.
 | `failed` | `code`: the cause, one of the codes below, on one line | The program is ending in failure. **Last**, minutes or a test — and the only line when it fails before `sending` |
 
 **Failing**: the program ends in failure with one sentence on its error stream, starting
-`wholeheard-summary: `, and no `written` or `answered`. When the cause is one a person acts on
+`kitokey-summary: `, and no `written` or `answered`. When the cause is one a person acts on
 differently, the output's last line names it as well: `failed`, with its `code` — the only line
 when nothing was sent, as in `{"event": "failed", "code": "settings.invalid"}`. Otherwise no
 line names it, and the sentence alone does: wrong arguments, a `context.txt` that cannot be
@@ -83,18 +83,20 @@ and the minutes that were there are still there — nothing half-written is left
 
 **Its log**: the program logs what it does ([ADR-0007](../../../docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md)),
 at `info`, under an id of its own, in the user's folder for logs — on Linux
-`$XDG_STATE_HOME/wholeheard/logs`, or `~/.local/state/wholeheard/logs`; on macOS
-`~/Library/Logs/Wholeheard`; on Windows `%LOCALAPPDATA%\Wholeheard\logs`. There it also removes
+`$XDG_STATE_HOME/kitokey/logs`, or `~/.local/state/kitokey/logs`; on macOS
+`~/Library/Logs/Kitokey`; on Windows `%LOCALAPPDATA%\Kitokey\logs`. There it also removes
 the day files written more than fourteen days ago, then the oldest until the folder weighs
 under 50 MB — every program's day files, nothing else.
 Whoever starts it may set, in its environment:
 
-- `WHOLEHEARD_TRACE` — the making's id: ASCII letters, digits and dashes, 64 at most. Any other value
+- `KITOKEY_TRACE` — the making's id: ASCII letters, digits and dashes, 64 at most. Any other value
   is replaced by an id of the run's own, without a word;
-- `WHOLEHEARD_LOG` — `off`, `error`, `warn`, `info`, `debug` or `trace`, in lower case; a value
+- `KITOKEY_LOG` — `off`, `error`, `warn`, `info`, `debug` or `trace`, in lower case; a value
   holding `=` is read as a `tracing` filter, for whoever knows them; any other value is `info`. Turned `off`, the log leaves nothing: no file, no day file removed;
-- `WHOLEHEARD_LOG_DIR` — an absolute folder; a relative one is ignored. A folder that cannot be
+- `KITOKEY_LOG_DIR` — an absolute folder; a relative one is ignored. A folder that cannot be
   made or written leaves no log, and changes nothing else.
+
+Until D86's last pull request, the program also reads these and `KITOKEY_PROVIDER_KEY` under the names before D86 — `WHOLEHEARD_` in place of `KITOKEY_` — when the new one is not set: a shell not yet renamed passes them.
 
 None is required. None, and no state of the log, changes a line of the output, the error stream
 or what the program leaves — with one exception: a run that crosses midnight UTC while the
