@@ -200,8 +200,8 @@ first run's assistant opening once — is asked on #482 with D53's. D57's privac
 - **Cycle 09, macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation. Also the start with the
   session on macOS, today written where macOS never reads it (D84's note), and Foresight read again (the market
   review of 2026-11-03, row 6).
-- **The name**: onote or beebrief, the decider's choice. Whichever is chosen needs a PDR superseding
-  PDR-0001's name before the Store's reservation and Copr's first publication.
+- **The name**: Kitokey, chosen by the decider on 2026-11-04 ([PDR-0006](../../pdr/0006-the-product-is-named-kitokey.md)).
+  The decider's trademark search and domains come before the Store's reservation and Copr's first publication.
 - Everything in cycle 07's *Later*, unchanged, and the market review's rows 1, 2, 4, 5, 7 and 8.
 
 ## Open questions
