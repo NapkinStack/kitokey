@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use wholeheard_shell::summarising::{Event, Summarising};
+use kitokey_shell::summarising::{Event, Summarising};
 
 /// Where the log is written, for the test to read.
 #[derive(Clone, Default)]
@@ -39,10 +39,10 @@ fn minutes_that_fail_leave_their_programs_sentence_in_the_log_under_their_id() {
     let folder = tempfile::tempdir().unwrap();
     let session = folder.path().join("2026-10-20_10-00");
     fs::create_dir(&session).unwrap();
-    let program = folder.path().join("wholeheard-summary");
+    let program = folder.path().join("kitokey-summary");
     fs::write(
         &program,
-        "#!/bin/sh\nprintf %s \"$WHOLEHEARD_TRACE\" > \"$1/../minutes.trace\"\necho \"wholeheard-summary: the provider's answer is not minutes\" >&2\nexit 1\n",
+        "#!/bin/sh\nprintf %s \"$KITOKEY_TRACE\" > \"$1/../minutes.trace\"\necho \"kitokey-summary: the provider's answer is not minutes\" >&2\nexit 1\n",
     )
     .unwrap();
     fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The module's end-to-end scenarios (cycle 01, D3): Wholeheard started for real, its tray's menu
+# The module's end-to-end scenarios (cycle 01, D3): Kitokey started for real, its tray's menu
 # driven as a click drives it — over the desktop's bus — with a recorder played here: a
 # script that says what contracts/recording/v1 describes. No sound, nobody recorded.
 #
@@ -19,13 +19,13 @@ watcher="org.kde.StatusNotifierWatcher /StatusNotifierWatcher org.kde.StatusNoti
 if ! command -v busctl >/dev/null || ! busctl --user get-property $watcher RegisteredStatusNotifierItems >/dev/null 2>&1; then
   say "e2e: NOT RUN — no desktop session that shows tray items here"; exit 77
 fi
-# The user's own Wholeheard shares the desktop's bus and microphones: it would be offered the
+# The user's own Kitokey shares the desktop's bus and microphones: it would be offered the
 # run's calls, and take its clicks into its own settings (D23's trial, 2026-10-24).
-if pgrep -x wholeheard >/dev/null; then
-  say "e2e: NOT RUN — a Wholeheard is running outside the run: quit it first (its menu, Quitter Wholeheard)"; exit 1
+if pgrep -x kitokey >/dev/null; then
+  say "e2e: NOT RUN — a Kitokey is running outside the run: quit it first (its menu, Quitter Kitokey)"; exit 1
 fi
 cargo build --locked 2>&1 | tail -1 >> .evidence/e2e.txt
-bin=${CARGO_TARGET_DIR:-$PWD/target}/debug/wholeheard
+bin=${CARGO_TARGET_DIR:-$PWD/target}/debug/kitokey
 work=$(mktemp -d)
 app=""
 mic_module=""; old_source=""; quiet_module=""
@@ -44,7 +44,7 @@ trap ended EXIT
 
 # The recorder, played: it notes what it was given and told, says a source is silent, and
 # stops when told — or, named "deaf", never says it stopped.
-cat > "$work/wholeheard-capture" <<'PLAYED'
+cat > "$work/kitokey-capture" <<'PLAYED'
 #!/bin/sh
 echo "$1 $2" > "$2/given"
 echo "{\"event\":\"started\",\"folder\":\"$2/2026-10-13_14-05\"}"
@@ -58,10 +58,10 @@ read line || exec sleep 20
 echo "$line" > "$2/told"
 echo "{\"event\":\"stopped\",\"folder\":\"$2/2026-10-13_14-05\",\"seconds\":1912.4}"
 PLAYED
-chmod +x "$work/wholeheard-capture"
+chmod +x "$work/kitokey-capture"
 
 # What the desktop is asked to show, kept. The desktop passes each request on to itself: only
-# those addressed to it by name are Wholeheard's own.
+# those addressed to it by name are Kitokey's own.
 dbus-monitor --session "interface='org.freedesktop.Notifications',member='Notify'" > "$work/notified" 2>/dev/null &
 monitor=$!
 titles() {
@@ -69,17 +69,22 @@ titles() {
 }
 
 start() { # the language, the settings file's text, the recorder
-  mkdir -p "$work/config/wholeheard" "$work/sessions"; rm -f "$work/sessions/given" "$work/sessions/told"
+  mkdir -p "$work/config/kitokey" "$work/sessions"; rm -f "$work/sessions/given" "$work/sessions/told"
   # Set up already (D58): the first run's assistant is the window's scenario's, never these.
-  printf 'sessions = "%s"\nwelcomed = true\n%b\n' "$work/sessions" "$2" > "$work/config/wholeheard/settings.toml"
-  LANGUAGE= LC_ALL="$1" LANG="$1" XDG_CONFIG_HOME="$work/config" XDG_DATA_HOME="$work/data" XDG_STATE_HOME="$work/state" WHOLEHEARD_CAPTURE="$3" \
-    WHOLEHEARD_TRANSCRIPTION="$work/wholeheard-transcription" WHOLEHEARD_MODEL_PUBLISHED="$published" WHOLEHEARD_SUMMARY="$work/wholeheard-summary" WHOLEHEARD_KEYRING=memory "$bin" 2>> "$work/errors" &
+  printf 'sessions = "%s"\nwelcomed = true\n%b\n' "$work/sessions" "$2" > "$work/config/kitokey/settings.toml"
+  LANGUAGE= LC_ALL="$1" LANG="$1" XDG_CONFIG_HOME="$work/config" XDG_DATA_HOME="$work/data" XDG_STATE_HOME="$work/state" KITOKEY_CAPTURE="$3" \
+    KITOKEY_TRANSCRIPTION="$work/kitokey-transcription" KITOKEY_MODEL_PUBLISHED="$published" KITOKEY_SUMMARY="$work/kitokey-summary" KITOKEY_KEYRING=memory "$bin" 2>> "$work/errors" &
   app=$!
-  # Its own tray item, found by its program's number: a Wholeheard the user runs has one too.
+  # Its own tray item, found by its program's number: a Kitokey the user runs has one too. The
+  # watcher lists an item as `bus@path`, or since GNOME's AppIndicator 66 as its path alone: the
+  # bus is the one of the program's own that answers for that path's menu.
   item=""
   for _ in $(seq 100); do
-    for one in $(busctl --user get-property $watcher RegisteredStatusNotifierItems | grep -o ':[0-9.]*@[^" ]*wholeheard[^" ]*'); do
-      [ "$(busctl --user status "${one%@*}" 2>/dev/null | awk -F= '/^PID=/ {print $2}')" = "$app" ] && item=$one
+    for one in $(busctl --user get-property $watcher RegisteredStatusNotifierItems | grep -o '[^" ]*kitokey[^" ]*'); do
+      for name in $(busctl --user list --no-legend 2>/dev/null | awk -v pid="$app" '$2 == pid && $1 ~ /^:/ {print $1}'); do
+        busctl --user call "$name" "${one#*@}/Menu" com.canonical.dbusmenu GetLayout iias 0 -- -1 0 >/dev/null 2>&1 &&
+          item="$name@${one#*@}"
+      done
     done
     [ -n "$item" ] && break
     sleep 0.1
@@ -88,7 +93,7 @@ start() { # the language, the settings file's text, the recorder
 }
 again() { # a second start, the first one's settings: it hands over to the running one and leaves
   LANGUAGE= LC_ALL=fr_FR.UTF-8 LANG=fr_FR.UTF-8 XDG_CONFIG_HOME="$work/config" XDG_DATA_HOME="$work/data" XDG_STATE_HOME="$work/state" \
-    WHOLEHEARD_KEYRING=memory timeout 10 "$bin" "$@" 2>> "$work/errors" && left=0 || left=$?
+    KITOKEY_KEYRING=memory timeout 10 "$bin" "$@" 2>> "$work/errors" && left=0 || left=$?
   check is "$left" 0
   check is "$(pgrep -c -f "^$bin" || true)" 1
 }
@@ -118,31 +123,31 @@ check() { if "$@"; then say "  ok    $*"; else say "  FAIL  $*"; failed=1; fi; }
 is() { [ "$1" = "$2" ] || { say "        got: $1"; return 1; }; }
 
 # The program that hears, played: it notes what it was given, fails, is slow or stuck when told.
-cat > "$work/wholeheard-transcription" <<'PLAYED'
+cat > "$work/kitokey-transcription" <<'PLAYED'
 #!/bin/sh
-here=$(dirname "$1"); echo "$*" >> "$here/heard"; echo "${WHOLEHEARD_LOG:-unset}" >> "$here/log-level"
-if [ -e "$here/fail-once" ]; then rm "$here/fail-once"; echo "wholeheard-transcription: the engine stopped" >&2; exit 1; fi
+here=$(dirname "$1"); echo "$*" >> "$here/heard"; echo "${KITOKEY_LOG:-unset}" >> "$here/log-level"
+if [ -e "$here/fail-once" ]; then rm "$here/fail-once"; echo "kitokey-transcription: the engine stopped" >&2; exit 1; fi
 if [ -e "$here/slow" ]; then rm "$here/slow"; sleep 3; fi
 if [ -e "$here/stuck" ]; then echo $$ > "$here/hearing"; sleep 30; fi
 mkdir -p "$1" && printf '{"type":"header","contract":"transcript/v1","engine":"e","model":"m","language":null,"context":null}\n{"type":"complete","duration":1.0}\n' > "$1/transcript.jsonl"
 PLAYED
-chmod +x "$work/wholeheard-transcription"
+chmod +x "$work/kitokey-transcription"
 : > "$work/model.bin"
 
 say "A. in French: start from the menu, the reminder, a silent source, stop"
-start fr_FR.UTF-8 "transcript = false" "$work/wholeheard-capture"
-check is "$(labels)" "Ouvrir Wholeheard|Démarrer un enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Wholeheard"
-# A window is a web view, a process of WebKit's under Wholeheard: none before the user asks.
+start fr_FR.UTF-8 "transcript = false" "$work/kitokey-capture"
+check is "$(labels)" "Ouvrir Kitokey|Démarrer un enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Kitokey"
+# A window is a web view, a process of WebKit's under Kitokey: none before the user asks.
 check is "$(windows)" 0
 # Started with the user's session from its first start, in the tray alone (D32).
-check grep -qx 'Exec=wholeheard' "$work/config/autostart/dev.wholeheard.Wholeheard.desktop"
-check grep -qx 'autostart = true' "$work/config/wholeheard/settings.toml"
-# Started again that way while it runs: one Wholeheard, and still no window (D35, #386).
+check grep -qx 'Exec=kitokey' "$work/config/autostart/com.napkinstack.Kitokey.desktop"
+check grep -qx 'autostart = true' "$work/config/kitokey/settings.toml"
+# Started again that way while it runs: one Kitokey, and still no window (D35, #386).
 again
 sleep 2                                           # as long as a window takes to open, below
 check is "$(windows)" 0
 # From the applications' menu, while it runs: the running one shows its window, the second leaves.
-check grep -qx 'Exec=wholeheard --window' linux/dev.wholeheard.Wholeheard.desktop
+check grep -qx 'Exec=kitokey --window' linux/com.napkinstack.Kitokey.desktop
 again --window
 for _ in $(seq 50); do [ "$(windows)" -ge 1 ] && break; sleep 0.1; done
 check test "$(windows)" -ge 1
@@ -151,7 +156,7 @@ check test "$(windows)" -ge 1
 click 4                                           # no session yet: said, nothing heard
 check is "$(titles 'Aucun enregistrement à transcrire')" 1
 click 3
-check is "$(labels)" "Ouvrir Wholeheard|Arrêter l’enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Wholeheard"
+check is "$(labels)" "Ouvrir Kitokey|Arrêter l’enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Kitokey"
 check is "$(cat "$work/sessions/given")" "record $work/sessions"
 check is "$(titles 'Enregistrement en cours')" 1
 check is "$(titles 'Aucun son venant de la réunion')" 1
@@ -162,25 +167,25 @@ check grep -q 'Votre micro est toujours enregistré, et une sortie branchée' "$
 check is "$(titles 'Le son de la réunion est de nouveau enregistré')" 1
 click 3
 check is "$(cat "$work/sessions/told")" "stop"
-check is "$(labels)" "Ouvrir Wholeheard|Démarrer un enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Wholeheard"
+check is "$(labels)" "Ouvrir Kitokey|Démarrer un enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Kitokey"
 # The window opened above is seen: the stop is not told, the window says it (D44); with none
 # seen, it is told with its length (M, below).
 check is "$(titles 'Enregistrement arrêté')" 0
 check test ! -e "$work/sessions/heard"
 check is "$(grep -c 'La transcription suit' "$work/notified")" 0
 
-say "B. quit while recording: the recording is stopped first, then Wholeheard leaves"
+say "B. quit while recording: the recording is stopped first, then Kitokey leaves"
 click 3; rm -f "$work/sessions/told"
 click 6; sleep 1
 check is "$(cat "$work/sessions/told")" "stop"
 check is "$(kill -0 "$app" 2>/dev/null && echo running || echo gone)" "gone"
 
-say "C. in English, the reminder switched off; Wholeheard killed while recording"
-start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/wholeheard-capture"
-check is "$(labels)" "Open Wholeheard|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Wholeheard"
+say "C. in English, the reminder switched off; Kitokey killed while recording"
+start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/kitokey-capture"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
 click 3
 check is "$(titles 'Recording')" 0
-recorder=$(pgrep -P "$app" -f wholeheard-capture || true)
+recorder=$(pgrep -P "$app" -f kitokey-capture || true)
 kill -KILL "$app"; sleep 1
 check test ! -e "$work/sessions/told"          # the recorder was not told to stop
 check kill -0 "$recorder"                       # and it records on
@@ -188,15 +193,15 @@ check kill -0 "$recorder"                       # and it records on
 say "D. no recorder, or one that ends before it starts: said, and the menu still offers to start"
 start en_GB.UTF-8 "transcript = false" "$work/nowhere"
 click 3
-check is "$(titles 'Wholeheard cannot record')" 1
-check is "$(labels)" "Open Wholeheard|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Wholeheard"
+check is "$(titles 'Kitokey cannot record')" 1
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
 click 6
-printf '#!/bin/sh\necho "wholeheard-capture: no source could be opened: nothing to record" >&2\nexit 1\n' > "$work/refuses"; chmod +x "$work/refuses"
+printf '#!/bin/sh\necho "kitokey-capture: no source could be opened: nothing to record" >&2\nexit 1\n' > "$work/refuses"; chmod +x "$work/refuses"
 start en_GB.UTF-8 "transcript = false" "$work/refuses"
 click 3
-check is "$(titles 'Wholeheard cannot record')" 2
+check is "$(titles 'Kitokey cannot record')" 2
 check is "$(titles 'The recording stopped by itself')" 0
-check grep -q 'Installing Wholeheard again puts it back.' "$work/notified"
+check grep -q 'Installing Kitokey again puts it back.' "$work/notified"
 # What the program said is the log's, never a notification's (D29).
 check is "$(grep -c 'nothing to record' "$work/notified")" 0
 click 6
@@ -208,7 +213,7 @@ busctl --user call "$bus" "$menu" com.canonical.dbusmenu Event isvu 3 clicked s 
 click 3
 check is "$(wc -l < "$work/sessions/starts")" 1
 check is "$(windows)" 0                           # both presses on the recording's entry
-check is "$(labels)" "Open Wholeheard|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Wholeheard"
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
 click 6
 check is "$(cat "$work/sessions/told")" "stop"
 check is "$(kill -0 "$app" 2>/dev/null && echo waiting || echo gone)" "waiting"
@@ -216,8 +221,8 @@ click 6
 check is "$(kill -0 "$app" 2>/dev/null && echo waiting || echo gone)" "gone"
 
 say "F. the transcript follows the stop; a failed one is made again from the menu; no model is said"
-# The logs' level chosen in the developer mode reaches the programs Wholeheard starts (D29).
-start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"\nlog = \"debug\"" "$work/wholeheard-capture"
+# The logs' level chosen in the developer mode reaches the programs Kitokey starts (D29).
+start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"\nlog = \"debug\"" "$work/kitokey-capture"
 click 3; click 3; sleep 1
 check is "$(head -1 "$work/sessions/log-level")" "debug"
 check grep -q '32 min recorded. The transcript follows.' "$work/notified"
@@ -251,11 +256,11 @@ click 4; sleep 1; hearing=$(cat "$work/sessions/hearing"); click 6; sleep 1
 check is "$(kill -0 "$hearing" 2>/dev/null && echo hearing || echo ended)" "ended"
 check is "$(kill -0 "$app" 2>/dev/null && echo running || echo gone)" "gone"
 rm "$work/sessions/stuck"
-start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"" "$work/wholeheard-capture"
+start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"" "$work/kitokey-capture"
 click 3; click 6; sleep 1
 check is "$(cat "$work/sessions/told") $(kill -0 "$app" 2>/dev/null || echo gone)" "stop gone"
 check is "$(wc -l < "$work/sessions/heard")" 7
-start en_GB.UTF-8 "reminder = false\nmodel = \"$work/no-model.bin\"" "$work/wholeheard-capture"
+start en_GB.UTF-8 "reminder = false\nmodel = \"$work/no-model.bin\"" "$work/kitokey-capture"
 click 3; click 3; sleep 1
 check is "$(titles 'No transcript: the model is missing')" 1
 check is "$(wc -l < "$work/sessions/heard")" 7
@@ -276,19 +281,19 @@ for _ in $(seq 50); do port=$(grep -o 'port [0-9]*' "$work/server" | cut -d' ' -
 published="http://127.0.0.1:$port/model.bin 300000 $(sha256sum "$work/right.bin" | cut -d' ' -f1)"
 # A recorder that names each session anew, so that several wait in line.
 { echo '#!/bin/sh'; echo 'n=$(( $(cat "$2/numbered" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$2/numbered"'
-  sed '1d; s#2026-10-13_14-05#2026-10-17_09-0$n#g' "$work/wholeheard-capture"; } > "$work/numbering"
+  sed '1d; s#2026-10-13_14-05#2026-10-17_09-0$n#g' "$work/kitokey-capture"; } > "$work/numbering"
 chmod +x "$work/numbering"
 start en_GB.UTF-8 "reminder = false" "$work/numbering"
 before=$(wc -l < "$work/sessions/heard")
 click 3; click 3; sleep 1; click 3; click 3; sleep 1    # two sessions, both waiting for the model
 check is "$(titles 'The transcription model is needed')" 2
-check is "$(labels)" "Open Wholeheard|Start recording|Transcribe the last recording|Download the model (0 MB, 127.0.0.1:$port)|Write the minutes of the last recording|Quit Wholeheard"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Download the model (0 MB, 127.0.0.1:$port)|Write the minutes of the last recording|Quit Kitokey"
 check is "$(grep -c 'GET' "$work/server")" 0      # nothing fetched before the click
 # Served first is not the published file: refused, nothing in place, and the entry tries again.
 click "$(entry Download)"; sleep 7
 check is "$(titles 'The model was not downloaded')" 1
-check test ! -e "$work/data/wholeheard/models/ggml-large-v3-turbo-q8_0.bin"
-check test ! -e "$work/data/wholeheard/models/ggml-large-v3-turbo-q8_0.bin.part"
+check test ! -e "$work/data/kitokey/models/ggml-large-v3-turbo-q8_0.bin"
+check test ! -e "$work/data/kitokey/models/ggml-large-v3-turbo-q8_0.bin.part"
 check is "$(greyed)" 0
 cp "$work/right.bin" "$work/served/model.bin"
 # A third stop during the fetch: it waits in line, nothing is offered again, the entry stays greyed.
@@ -298,12 +303,12 @@ check is "$(greyed)" 1
 sleep 5
 check is "$(titles 'Model ready')" 1
 check is "$(titles 'The transcription model is needed')" 2    # nor later in the fetch
-check cmp -s "$work/right.bin" "$work/data/wholeheard/models/ggml-large-v3-turbo-q8_0.bin"
+check cmp -s "$work/right.bin" "$work/data/kitokey/models/ggml-large-v3-turbo-q8_0.bin"
 check is "$(wc -l < "$work/sessions/heard")" "$((before + 3))"
 # No level chosen, none is named: the programs log at their usual one.
 check is "$(tail -3 "$work/sessions/log-level" | sort -u)" "unset"
 check is "$(tail -3 "$work/sessions/heard" | grep -o '2026-10-17_09-0[0-9]' | paste -sd' ')" "2026-10-17_09-01 2026-10-17_09-02 2026-10-17_09-03"   # in the order stopped
-check is "$(labels)" "Open Wholeheard|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Wholeheard"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
 click 6
 published=""
 
@@ -315,7 +320,7 @@ printf '{"type":"header","contract":"transcript/v1","engine":"e","model":"m","la
 head -c 1000 /dev/zero > "$old/local.wav"; head -c 1000 /dev/zero > "$old/derived/local.wav"
 # A trash that cannot be made: the audio stays, and the refusal is said.
 mkdir -p "$work/data"; : > "$work/data/Trash"
-start fr_FR.UTF-8 "keep_audio = 1" "$work/wholeheard-capture"
+start fr_FR.UTF-8 "keep_audio = 1" "$work/kitokey-capture"
 sleep 3
 check test -e "$old/local.wav" -a -e "$old/derived/local.wav"
 check is "$(titles 'L’audio n’a pas été entièrement mis à la corbeille')" 1
@@ -323,7 +328,7 @@ check grep -q "rien n.a .t. supprim" "$work/notified"
 check test -z "$(grep -E 'trash. operation|FileSystem|Os \{' "$work/notified")"
 click 6
 rm "$work/data/Trash"
-start fr_FR.UTF-8 "keep_audio = 1" "$work/wholeheard-capture"
+start fr_FR.UTF-8 "keep_audio = 1" "$work/kitokey-capture"
 sleep 3
 check test ! -e "$old/local.wav" -a ! -e "$old/derived/local.wav"
 check test -s "$old/transcript.jsonl" -a -s "$old/session.json"
@@ -333,35 +338,35 @@ check is "$(titles 'Audio mis à la corbeille')" 1
 click 6
 
 say "M. the minutes from the tray: on this computer at once; online only once agreed, nothing sent before"
-# wholeheard-summary played here: it says what it was given and writes the minutes.
-cat > "$work/wholeheard-summary" <<'PLAYED'
+# kitokey-summary played here: it says what it was given and writes the minutes.
+cat > "$work/kitokey-summary" <<'PLAYED'
 #!/bin/sh
 here=$(dirname "$0")
 echo "$*" >> "$here/summarised"
-printf '%s\n' "${WHOLEHEARD_PROVIDER_KEY:-none}" >> "$here/summary-keys"
+printf '%s\n' "${KITOKEY_PROVIDER_KEY:-none}" >> "$here/summary-keys"
 echo '{"event":"sending","host":"h","model":"m","characters":1}'
 printf -- '---\ncontract: minutes/v1\n---\n\n## A\n\n## B\n\n## C\n' > "$1/minutes.md"
 echo "{\"event\":\"written\",\"file\":\"$1/minutes.md\"}"
 PLAYED
-chmod +x "$work/wholeheard-summary"
+chmod +x "$work/kitokey-summary"
 rm -rf "$work/sessions"; meeting="$work/sessions/2026-10-18_10-00"; mkdir -p "$meeting"
 printf '{"contract":"session-audio/v2","started":"2026-10-18T10:00:00+02:00","stopped":"2026-10-18T10:30:00+02:00","tracks":{}}' > "$meeting/session.json"
 printf '{"type":"header","contract":"transcript/v1","engine":"e","model":"m","language":null,"context":null}\n{"type":"segment","speaker":"others","track":"remote","start":0.0,"end":2.0,"text":"On confirme le 3 juin."}\n{"type":"complete","duration":1800.0}\n' > "$meeting/transcript.jsonl"
-start fr_FR.UTF-8 "minutes_provider = \"http://127.0.0.1:9/v1\"\nminutes_model = \"mistral\"" "$work/wholeheard-capture"
+start fr_FR.UTF-8 "minutes_provider = \"http://127.0.0.1:9/v1\"\nminutes_model = \"mistral\"" "$work/kitokey-capture"
 click 5; sleep 2
 check test -s "$meeting/minutes.md"
 check is "$(cat "$work/summarised")" "$meeting --provider http://127.0.0.1:9/v1 --model mistral"
 check is "$(titles 'Compte rendu prêt')" 1
 click 6
 # An address that names no host: said, nothing run.
-start fr_FR.UTF-8 "minutes_provider = \"nowhere\"\nminutes_model = \"m\"" "$work/wholeheard-capture"
+start fr_FR.UTF-8 "minutes_provider = \"nowhere\"\nminutes_model = \"m\"" "$work/kitokey-capture"
 click 5; sleep 2
 check is "$(titles 'Le compte rendu n’a pas été fait')" 1
 check is "$(wc -l < "$work/summarised")" 1
 click 6
 # Online, not agreed: nothing is sent, the window opens to ask.
 rm "$meeting/minutes.md"
-start fr_FR.UTF-8 "minutes_provider = \"https://openrouter.ai/api/v1\"\nminutes_model = \"a-model\"" "$work/wholeheard-capture"
+start fr_FR.UTF-8 "minutes_provider = \"https://openrouter.ai/api/v1\"\nminutes_model = \"a-model\"" "$work/kitokey-capture"
 click 5; sleep 3
 check is "$(titles 'Le compte rendu attend votre accord')" 1
 check is "$(wc -l < "$work/summarised")" 1
@@ -369,7 +374,7 @@ check test ! -e "$meeting/minutes.md"
 check is "$(windows)" 1
 click 6
 # Agreed to that host: sent, with no key kept.
-start fr_FR.UTF-8 "minutes_provider = \"https://openrouter.ai/api/v1\"\nminutes_model = \"a-model\"\nminutes_agreed = \"openrouter.ai\"" "$work/wholeheard-capture"
+start fr_FR.UTF-8 "minutes_provider = \"https://openrouter.ai/api/v1\"\nminutes_model = \"a-model\"\nminutes_agreed = \"openrouter.ai\"" "$work/kitokey-capture"
 click 5; sleep 2
 check is "$(tail -1 "$work/summarised")" "$meeting --provider https://openrouter.ai/api/v1 --model a-model"
 check is "$(tail -1 "$work/summary-keys")" none
@@ -378,7 +383,7 @@ click 6
 # Chained: a recording stopped, its transcript, then its minutes — no other gesture. No window
 # seen: the reminder, the stop and the minutes ready, three notifications and no more (D44).
 reminded=$(titles 'Enregistrement en cours'); ended=$(titles 'Enregistrement arrêté'); heard=$(titles 'Transcription prête')
-start fr_FR.UTF-8 "after = \"minutes\"\nmodel = \"$work/model.bin\"\nminutes_provider = \"http://127.0.0.1:9/v1\"\nminutes_model = \"mistral\"" "$work/wholeheard-capture"
+start fr_FR.UTF-8 "after = \"minutes\"\nmodel = \"$work/model.bin\"\nminutes_provider = \"http://127.0.0.1:9/v1\"\nminutes_model = \"mistral\"" "$work/kitokey-capture"
 click 3; click 3; sleep 4
 check test -s "$work/sessions/2026-10-13_14-05/minutes.md"
 check is "$(tail -1 "$work/summarised")" "$work/sessions/2026-10-13_14-05 --provider http://127.0.0.1:9/v1 --model mistral"
@@ -396,12 +401,12 @@ if ! command -v pw-record >/dev/null || [ -n "$(pactl list short source-outputs 
   failed=1
 else
   old_source=$(pactl get-default-source)
-  mic_module=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_offer media.class=Audio/Source/Virtual)
-  pactl set-default-source wholeheard_e2e_offer
-  call() { timeout "$1" pw-record --target wholeheard_e2e_offer /dev/null || true; }
+  mic_module=$(pactl load-module module-null-sink sink_name=kitokey_e2e_offer media.class=Audio/Source/Virtual)
+  pactl set-default-source kitokey_e2e_offer
+  call() { timeout "$1" pw-record --target kitokey_e2e_offer /dev/null || true; }
   offers() { titles 'pw-cat utilise votre micro'; }
   offered() { for _ in $(seq 30); do [ "$(offers)" -ge "$1" ] && return 0; sleep 0.1; done; return 1; }
-  # The desktop's answers to Wholeheard: each notification's number, for its gestures to be
+  # The desktop's answers to Kitokey: each notification's number, for its gestures to be
   # pressed as a click presses them — the signal the desktop sends, typed as it types it (u, s).
   dbus-monitor --session "type='method_return',sender='org.freedesktop.Notifications'" > "$work/answered" 2>/dev/null &
   answers=$!
@@ -410,8 +415,8 @@ else
       org.freedesktop.Notifications.ActionInvoked "uint32 $(grep -oE '^ +uint32 [0-9]+' "$work/answered" | tail -1 | awk '{print $2}')" "'$1'" >/dev/null
     sleep 1
   }
-  settings_file="$work/config/wholeheard/settings.toml"
-  start fr_FR.UTF-8 "transcript = false" "$work/wholeheard-capture"
+  settings_file="$work/config/kitokey/settings.toml"
+  start fr_FR.UTF-8 "transcript = false" "$work/kitokey-capture"
   sleep 1
   reminded=$(titles 'Enregistrement en cours')
   call 4 & calling=$!
@@ -436,7 +441,7 @@ else
   call 2
   check is "$(offers)" 4
   # What was seen is the notification's alone: the log says each gesture, never the application.
-  shell_logged=$(cat "$work"/state/wholeheard/logs/shell.*.jsonl 2>/dev/null || true)
+  shell_logged=$(cat "$work"/state/kitokey/logs/shell.*.jsonl 2>/dev/null || true)
   for step in made taken declined off; do check grep -q "\"message\":\"shell.offer_$step\"" <<< "$shell_logged"; done
   check is "$(grep -c 'pw-cat' <<< "$shell_logged" || true)" 0
   watching=$(pgrep -P "$app" -x pw-dump || true)
@@ -446,7 +451,7 @@ else
   check test -z "$(ps -o pid= -p "$watching" 2>/dev/null || true)"
   kill "$answers" 2>/dev/null || true; answers=""
   # Off in the file from the start: none.
-  start fr_FR.UTF-8 "reminder = false\ntranscript = false\noffer = false" "$work/wholeheard-capture"
+  start fr_FR.UTF-8 "reminder = false\ntranscript = false\noffer = false" "$work/kitokey-capture"
   sleep 1
   call 2
   check is "$(offers)" 4
@@ -455,7 +460,7 @@ else
   pactl unload-module "$mic_module"; mic_module=""
 fi
 
-# The window (cycle 03): Wholeheard started with --window by tauri-driver, its page read over
+# The window (cycle 03): Kitokey started with --window by tauri-driver, its page read over
 # WebDriver (scripts/e2e_window.py). For a few seconds a window appears, twice.
 if ! command -v WebKitWebDriver >/dev/null; then
   say "H. the window: NOT RUN — WebKitGTK's WebDriver is missing (Fedora: webkit2gtk4.1-devel)"
@@ -465,14 +470,14 @@ else
   mkdir -p "$work/window"
   # Its pages as they were drawn, kept for an eye against D11's boards — the author's first.
   # Kept where the user says, untouched; by default in the evidence, this run's alone.
-  if [ -z "${WHOLEHEARD_SCREENSHOTS:-}" ]; then
-    export WHOLEHEARD_SCREENSHOTS="$evidence/shots"
-    rm -rf "$WHOLEHEARD_SCREENSHOTS"
+  if [ -z "${KITOKEY_SCREENSHOTS:-}" ]; then
+    export KITOKEY_SCREENSHOTS="$evidence/shots"
+    rm -rf "$KITOKEY_SCREENSHOTS"
   fi
   # The window plays a meeting (D26) to an output made for the run, never the speakers: its
-  # volume left alone, as the system remembers it for the user's own Wholeheard.
-  quiet_module=$(pactl load-module module-null-sink sink_name=wholeheard_e2e_quiet)
-  export PULSE_SINK=wholeheard_e2e_quiet
+  # volume left alone, as the system remembers it for the user's own Kitokey.
+  quiet_module=$(pactl load-module module-null-sink sink_name=kitokey_e2e_quiet)
+  export PULSE_SINK=kitokey_e2e_quiet
   # A window that stops answering fails the run, never holds it: it takes about 6 minutes.
   if ! timeout --kill-after=30 1200 uv run --quiet --with selenium==4.51.0 --with jsonschema==4.23.0 --with rfc3339-validator==0.1.4 python -u scripts/e2e_window.py "$bin" "$work/window" | tee -a .evidence/e2e.txt; then
     failed=1
@@ -480,7 +485,7 @@ else
 fi
 
 # Its log (ADR-0007): each recording and making under an id, never a path of the run's folder.
-shell_log=$(cat "$work"/state/wholeheard/logs/shell.*.jsonl 2>/dev/null || true)
+shell_log=$(cat "$work"/state/kitokey/logs/shell.*.jsonl 2>/dev/null || true)
 check grep -q '"message":"shell.recording_started"' <<< "$shell_log"
 check grep -q '"message":"shell.minutes_written"' <<< "$shell_log"
 check test -z "$(grep -F "$work" <<< "$shell_log")"

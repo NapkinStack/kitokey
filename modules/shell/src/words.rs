@@ -81,7 +81,7 @@ pub fn length(seconds: f64) -> String {
 /// gives nothing.
 fn detail(said: &str) -> String {
     let said = said.trim();
-    let said = ["wholeheard-capture:", "wholeheard-transcription:"]
+    let said = ["kitokey-capture:", "kitokey-transcription:"]
         .iter()
         .find_map(|name| said.strip_prefix(name))
         .unwrap_or(said)
@@ -270,9 +270,9 @@ pub fn menu(language: Language) -> Menu {
             start: "Start recording",
             stop: "Stop recording",
             stopping: "Stopping…",
-            quit: "Quit Wholeheard",
-            open: "Open Wholeheard",
-            recording: "Wholeheard — recording",
+            quit: "Quit Kitokey",
+            open: "Open Kitokey",
+            recording: "Kitokey — recording",
             transcribe: "Transcribe the last recording",
             transcribing: "Transcribing…",
             minutes: "Write the minutes of the last recording",
@@ -282,9 +282,9 @@ pub fn menu(language: Language) -> Menu {
             start: "Démarrer un enregistrement",
             stop: "Arrêter l’enregistrement",
             stopping: "Arrêt en cours…",
-            quit: "Quitter Wholeheard",
-            open: "Ouvrir Wholeheard",
-            recording: "Wholeheard — enregistrement en cours",
+            quit: "Quitter Kitokey",
+            open: "Ouvrir Kitokey",
+            recording: "Kitokey — enregistrement en cours",
             transcribe: "Transcrire le dernier enregistrement",
             transcribing: "Transcription en cours…",
             minutes: "Rédiger le compte rendu de la dernière réunion",
@@ -443,7 +443,7 @@ pub struct Window {
     /// Another number of days, typed; and what is said of one that is none.
     pub keep_other: &'static str,
     pub keep_not_days: &'static str,
-    /// The engine that hears, shipped with Wholeheard; and the user's home, as a folder is said.
+    /// The engine that hears, shipped with Kitokey; and the user's home, as a folder is said.
     pub builtin: &'static str,
     pub home: &'static str,
     pub transcription: &'static str,
@@ -709,7 +709,7 @@ pub struct Window {
     pub language_as_system: &'static str,
     /// A meeting's own language SpeechAnalyzer does not hear: the one it hears in, said (D65).
     pub language_heard_as: &'static str,
-    /// The language Wholeheard speaks (D64): its row in Settings, and the system's, its default.
+    /// The language Kitokey speaks (D64): its row in Settings, and the system's, its default.
     pub app_language: [&'static str; 2],
     pub app_language_system: &'static str,
     /// A transcript's line corrected by whoever listens (D62).
@@ -800,7 +800,7 @@ pub fn window(language: Language) -> Window {
             no_transcript: "No transcript yet.",
             no_minutes: "No minutes yet.",
             being_made: "Being written — what is here is true all the same.",
-            unreadable: "This file cannot be read by this version of Wholeheard.",
+            unreadable: "This file cannot be read by this version of Kitokey.",
             unread: "{} line(s) of the file could not be read and are left out.",
             no_match: "Nothing said matches.",
             settings: "Settings",
@@ -813,7 +813,7 @@ pub fn window(language: Language) -> Window {
             ],
             models_title: "Models",
             models_intro: "For each step, you choose who works: a model on this computer, an online service, or your own address.",
-            models_note: "The models “on this computer” are those Wholeheard finds installed. A key is kept in your system’s keyring, never in a file. Nothing leaves this computer without your agreement: a transcription service you name receives your meetings’ sound and their context, a service that writes the minutes their text and context only.",
+            models_note: "The models “on this computer” are those Kitokey finds installed. A key is kept in your system’s keyring, never in a file. Nothing leaves this computer without your agreement: a transcription service you name receives your meetings’ sound and their context, a service that writes the minutes their text and context only.",
             model_state: "Transcription model",
             model_ready: "Ready",
             model_here: "Installed · {} · runs on this computer, with no network",
@@ -845,7 +845,7 @@ pub fn window(language: Language) -> Window {
             service_agree: "I agree that my meetings’ sound is sent to {}",
             service_save: "Save",
             service_test: "Test",
-            service_tested: "It hears, with each segment’s times: a sound of Wholeheard’s own was transcribed.",
+            service_tested: "It hears, with each segment’s times: a sound of Kitokey’s own was transcribed.",
             service_saved: "Saved: {} hears your next meetings.",
             service_agree_first: "Nothing is saved: agree first that your meetings’ sound is sent to {}.",
             service_address_bad: "Nothing is saved: the address starts with https:// or http://, then the service’s host — for example https://api.groq.com/openai/v1.",
@@ -853,7 +853,7 @@ pub fn window(language: Language) -> Window {
             installed: "installed, {}",
             keep_other: "Another number of days…",
             keep_not_days: "{} is not a number of days: from 1 to 36,500",
-            builtin: "built into Wholeheard",
+            builtin: "built into Kitokey",
             home: "Home folder",
             transcription: "Transcription",
             on_this_computer: "On this computer — nothing leaves it",
@@ -863,17 +863,17 @@ pub fn window(language: Language) -> Window {
             ],
             offer: [
                 "When an application takes the microphone",
-                "A call starting, most often. Wholeheard never records without you knowing.",
+                "A call starting, most often. Kitokey never records without you knowing.",
             ],
             offer_choices: ["Offer to record", "Do nothing"],
             autostart: [
-                "Start Wholeheard when you log in",
+                "Start Kitokey when you log in",
                 "In the tray, no window: a call is offered even after a restart.",
             ],
             advanced_title: "Advanced",
             developer: [
                 "Developer mode",
-                "Under a failure, shows what Wholeheard’s program said of it — for whoever looks into it.",
+                "Under a failure, shows what Kitokey’s program said of it — for whoever looks into it.",
             ],
             program_said: "What the program said: {}",
             minutes_sections: ["Highlights", "Actions", "Key points"],
@@ -888,12 +888,12 @@ pub fn window(language: Language) -> Window {
             not_played: "This meeting could not be played here. “Open the folder” shows its tracks, which another player reads.",
             playback: "Where the meeting is played from",
             no_player: "Its audio was freed: the meeting can no longer be listened to. Its transcript and minutes stay.",
-            log_level: ["Logs’ level", "Read at Wholeheard’s next start, by it and its programs."],
+            log_level: ["Logs’ level", "Read at Kitokey’s next start, by it and its programs."],
             log_info: "Usual",
             log_debug: "Detailed",
             logs: [
                 "Logs",
-                "What Wholeheard did, one file a day, kept fourteen days — never a word of a meeting.",
+                "What Kitokey did, one file a day, kept fourteen days — never a word of a meeting.",
             ],
             open_logs: "Open the logs",
             logs_not_opened: "The logs’ folder could not be opened.",
@@ -992,7 +992,7 @@ pub fn window(language: Language) -> Window {
             record_stop: "Stop the recording",
             agree_eyebrow: "Before the first minutes online",
             agree_title: "The text of “{}” is about to leave your computer",
-            agree_lead: "To write the minutes, Wholeheard sends the transcript to the service you chose. Here is exactly what leaves.",
+            agree_lead: "To write the minutes, Kitokey sends the transcript to the service you chose. Here is exactly what leaves.",
             agree_leaves: [
                 "Leaves: the transcript",
                 "The words spoken, on your side and remote — {} minutes, about {} words.",
@@ -1011,7 +1011,7 @@ pub fn window(language: Language) -> Window {
             shortcut_where: "The desktop grants it: it changes in the desktop's keyboard settings.",
             shortcut_open: "Keyboard settings",
             test: "Test",
-            test_sends: "Test sends {} one sentence of Wholeheard's, nothing of a meeting.",
+            test_sends: "Test sends {} one sentence of Kitokey's, nothing of a meeting.",
             testing: "Testing…",
             test_answered: "The model answers.",
             test_failed: "The model does not answer: {}",
@@ -1037,12 +1037,12 @@ pub fn window(language: Language) -> Window {
             ollama_lacks: "Ollama, on this computer, has no model named {}: choose one in the list, or fetch it with Ollama.",
             ollama_silent: "Ollama, on this computer, does not answer, or has no model: start it, or fetch a model with it.",
             not_chosen: "Not chosen yet",
-            welcome_title: "Let’s set Wholeheard up with one question.",
+            welcome_title: "Let’s set Kitokey up with one question.",
             welcome_question: "Do your meetings discuss confidential matters?",
             welcome_examples: "Clients, human resources, health, legal matters, unpublished figures…",
             welcome_often: ["Yes, often", "Nothing must leave this computer."],
             welcome_rarely: ["Rarely or never", "I can trust a service I choose with a meeting’s text."],
-            welcome_unsure: ["I don’t know", "Wholeheard will choose the most discreet."],
+            welcome_unsure: ["I don’t know", "Kitokey will choose the most discreet."],
             welcome_skip: "Skip — everything on this computer",
             welcome_cancel: "Cancel",
             welcome_next: "Next",
@@ -1108,7 +1108,7 @@ pub fn window(language: Language) -> Window {
             language_as_system: "The system’s",
             language_heard_as: "{} — SpeechAnalyzer hears {}",
             app_language: [
-                "Language of Wholeheard",
+                "Language of Kitokey",
                 "Its window, its menu and its notifications; what the system draws itself keeps the system’s.",
             ],
             app_language_system: "The system’s language",
@@ -1192,7 +1192,7 @@ pub fn window(language: Language) -> Window {
             no_transcript: "Pas encore de transcription.",
             no_minutes: "Pas encore de compte rendu.",
             being_made: "En cours d’écriture — ce qui est là est vrai quand même.",
-            unreadable: "Ce fichier ne peut pas être lu par cette version de Wholeheard.",
+            unreadable: "Ce fichier ne peut pas être lu par cette version de Kitokey.",
             unread: "{} ligne(s) du fichier n’ont pas pu être lues et sont laissées de côté.",
             no_match: "Aucun passage ne correspond.",
             settings: "Réglages",
@@ -1208,7 +1208,7 @@ pub fn window(language: Language) -> Window {
             ],
             models_title: "Modèles",
             models_intro: "Pour chaque étape, vous choisissez qui travaille\u{a0}: un modèle sur cet ordinateur, un service en ligne, ou votre propre adresse.",
-            models_note: "Les modèles «\u{a0}sur cet ordinateur\u{a0}» sont ceux que Wholeheard trouve installés. Une clé est gardée dans le trousseau de votre système, jamais dans un fichier. Rien ne quitte cet ordinateur sans votre accord\u{a0}: un service de transcription que vous choisissez reçoit le son de vos réunions et leur contexte, un service de compte rendu leur texte et leur contexte seulement.",
+            models_note: "Les modèles «\u{a0}sur cet ordinateur\u{a0}» sont ceux que Kitokey trouve installés. Une clé est gardée dans le trousseau de votre système, jamais dans un fichier. Rien ne quitte cet ordinateur sans votre accord\u{a0}: un service de transcription que vous choisissez reçoit le son de vos réunions et leur contexte, un service de compte rendu leur texte et leur contexte seulement.",
             model_state: "Modèle de transcription",
             model_ready: "Prêt",
             model_here: "Installé · {} · tourne sur cet ordinateur, sans réseau",
@@ -1240,7 +1240,7 @@ pub fn window(language: Language) -> Window {
             service_agree: "J’accepte que le son de mes réunions soit envoyé à {}",
             service_save: "Enregistrer",
             service_test: "Tester",
-            service_tested: "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Wholeheard a été transcrit.",
+            service_tested: "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit.",
             service_saved: "Enregistré\u{a0}: {} transcrira vos prochaines réunions.",
             service_agree_first: "Rien n’est enregistré\u{a0}: acceptez d’abord que le son de vos réunions soit envoyé à {}.",
             service_address_bad: "Rien n’est enregistré\u{a0}: l’adresse commence par https:// ou http://, puis l’hôte du service — par exemple https://api.groq.com/openai/v1.",
@@ -1248,7 +1248,7 @@ pub fn window(language: Language) -> Window {
             installed: "installé, {}",
             keep_other: "Autre nombre de jours…",
             keep_not_days: "{} n’est pas un nombre de jours\u{a0}: de 1 à 36 500",
-            builtin: "intégré à Wholeheard",
+            builtin: "intégré à Kitokey",
             home: "Dossier personnel",
             transcription: "Transcription",
             on_this_computer: "Sur cet ordinateur — rien ne sort",
@@ -1258,11 +1258,11 @@ pub fn window(language: Language) -> Window {
             ],
             offer: [
                 "Quand une application prend le micro",
-                "Un appel qui commence, le plus souvent. Wholeheard n’enregistre jamais sans que vous le sachiez.",
+                "Un appel qui commence, le plus souvent. Kitokey n’enregistre jamais sans que vous le sachiez.",
             ],
             offer_choices: ["Proposer d’enregistrer", "Ne rien faire"],
             autostart: [
-                "Lancer Wholeheard à l’ouverture de session",
+                "Lancer Kitokey à l’ouverture de session",
                 "Dans la barre système, sans fenêtre\u{a0}: un appel vous est proposé même après un redémarrage.",
             ],
             advanced_title: "Avancé",
@@ -1279,16 +1279,16 @@ pub fn window(language: Language) -> Window {
             pause: "Pause",
             time_listen: "Écouter depuis {}",
             time_passage: "Voir le passage de {}",
-            not_playable: "Cette version de Wholeheard ne peut pas lire cet audio.",
+            not_playable: "Cette version de Kitokey ne peut pas lire cet audio.",
             not_played: "Lecture impossible ici. Ouvrez le dossier pour l’écouter avec un autre lecteur.",
             playback: "Position de lecture",
             no_player: "L’audio a été supprimé pour faire de la place. La transcription et le compte rendu restent.",
-            log_level: ["Niveau des journaux", "S’applique au prochain lancement de Wholeheard."],
+            log_level: ["Niveau des journaux", "S’applique au prochain lancement de Kitokey."],
             log_info: "Habituel",
             log_debug: "Détaillé",
             logs: [
                 "Journaux",
-                "Ce que Wholeheard a fait, un fichier par jour, gardé quatorze jours — jamais un mot d’une réunion.",
+                "Ce que Kitokey a fait, un fichier par jour, gardé quatorze jours — jamais un mot d’une réunion.",
             ],
             open_logs: "Ouvrir les journaux",
             logs_not_opened: "Le dossier des journaux n’a pas pu être ouvert.",
@@ -1387,7 +1387,7 @@ pub fn window(language: Language) -> Window {
             record_stop: "Arrêter l’enregistrement",
             agree_eyebrow: "Avant le premier compte rendu en ligne",
             agree_title: "Le texte de «\u{a0}{}\u{a0}» va quitter votre ordinateur",
-            agree_lead: "Pour écrire le compte rendu, Wholeheard envoie la transcription au service que vous avez choisi. Voici exactement ce qui part.",
+            agree_lead: "Pour écrire le compte rendu, Kitokey envoie la transcription au service que vous avez choisi. Voici exactement ce qui part.",
             agree_leaves: [
                 "Part\u{a0}: la transcription",
                 "Les mots prononcés, de votre côté et à distance — {} minutes, environ {} mots.",
@@ -1432,7 +1432,7 @@ pub fn window(language: Language) -> Window {
             ollama_lacks: "Ollama, sur cet ordinateur, n’a pas de modèle nommé {}\u{a0}: choisissez-en un dans la liste, ou téléchargez-le avec Ollama.",
             ollama_silent: "Ollama ne répond pas ou n’a aucun modèle\u{a0}: lancez Ollama, puis téléchargez un modèle.",
             not_chosen: "Pas encore choisi",
-            welcome_title: "Réglons Wholeheard en une question.",
+            welcome_title: "Réglons Kitokey en une question.",
             welcome_question: "Vos réunions parlent-elles de sujets confidentiels\u{202f}?",
             welcome_examples: "Clients, ressources humaines, santé, juridique, chiffres non publiés…",
             welcome_often: ["Oui, souvent", "Rien ne doit quitter cet ordinateur."],
@@ -1440,7 +1440,7 @@ pub fn window(language: Language) -> Window {
                 "Rarement ou jamais",
                 "Je peux confier le texte d’une réunion à un service que je choisis.",
             ],
-            welcome_unsure: ["Je ne sais pas", "Wholeheard choisira le plus discret."],
+            welcome_unsure: ["Je ne sais pas", "Kitokey choisira le plus discret."],
             welcome_skip: "Passer — tout sur cet ordinateur",
             welcome_cancel: "Annuler",
             welcome_next: "Suivant",
@@ -1503,7 +1503,7 @@ pub fn window(language: Language) -> Window {
             language_as_system: "Celle du système",
             language_heard_as: "{} — SpeechAnalyzer entend {}",
             app_language: [
-                "Langue de Wholeheard",
+                "Langue de Kitokey",
                 "Sa fenêtre, son menu et ses notifications\u{202f}; ce que le système dessine lui-même garde la sienne.",
             ],
             app_language_system: "Langue du système",
@@ -1595,8 +1595,8 @@ pub fn failure(failure: Failure, language: Language) -> String {
     use Language::*;
     match (failure, language) {
         (Failure::Trash(refusal), _) => return audio_trashed(language, &Err(refusal)).body,
-        (Failure::Unexpected, English) => "Wholeheard could not do this: try again, and restart it if it happens again.",
-        (Failure::Unexpected, French) => "Wholeheard n’a pas pu le faire\u{a0}: réessayez, et redémarrez-le si cela se reproduit.",
+        (Failure::Unexpected, English) => "Kitokey could not do this: try again, and restart it if it happens again.",
+        (Failure::Unexpected, French) => "Kitokey n’a pas pu le faire\u{a0}: réessayez, et redémarrez-le si cela se reproduit.",
         (Failure::MeetingGone, English) => "this meeting is no longer in the meetings’ folder.",
         (Failure::MeetingGone, French) => "cette réunion n’est plus dans le dossier des réunions.",
         (Failure::NoMeeting, English) => "this meeting is no longer in the meetings’ folder: go back to the list.",
@@ -1637,9 +1637,9 @@ pub fn failure(failure: Failure, language: Language) -> String {
         }
         (Failure::SettingsUnread, English) => "the settings file cannot be read: correct it, then try again.",
         (Failure::SettingsUnread, French) => "le fichier des réglages ne peut pas être lu\u{a0}: corrigez-le, puis réessayez.",
-        (Failure::SettingsLocked, English) => "The settings file cannot be read: Wholeheard does not write over it until it is corrected.",
+        (Failure::SettingsLocked, English) => "The settings file cannot be read: Kitokey does not write over it until it is corrected.",
         (Failure::SettingsLocked, French) => {
-            "Le fichier des réglages ne peut pas être lu\u{a0}: Wholeheard ne l’écrit pas tant qu’il n’est pas corrigé."
+            "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé."
         }
         (Failure::SettingsUnwritten, English) => "the settings file could not be written: check that the disk has room, then try again.",
         (Failure::SettingsUnwritten, French) => {
@@ -1653,8 +1653,8 @@ pub fn failure(failure: Failure, language: Language) -> String {
         }
         (Failure::Keyring, English) => "the system’s keyring does not answer: unlock it, then try again.",
         (Failure::Keyring, French) => "le trousseau du système ne répond pas\u{a0}: déverrouillez-le, puis réessayez.",
-        (Failure::ProgramNotStarted, English) => "a program of Wholeheard’s could not be started: install Wholeheard again.",
-        (Failure::ProgramNotStarted, French) => "un programme de Wholeheard n’a pas pu démarrer\u{a0}: réinstallez Wholeheard.",
+        (Failure::ProgramNotStarted, English) => "a program of Kitokey’s could not be started: install Kitokey again.",
+        (Failure::ProgramNotStarted, French) => "un programme de Kitokey n’a pas pu démarrer\u{a0}: réinstallez Kitokey.",
         (Failure::TestRefused, English) => "check its address, its name and its key, then try again.",
         (Failure::TestRefused, French) => "vérifiez son adresse, son nom et sa clé, puis réessayez.",
     }
@@ -1694,27 +1694,25 @@ pub fn test_caused(which: Cause, detail: &str, language: Language, developer: bo
     })
 }
 
-/// Why minutes were not made, and what to do, as wholeheard-summary coded it (summarising/v1).
+/// Why minutes were not made, and what to do, as kitokey-summary coded it (summarising/v1).
 pub fn cause(cause: Cause, language: Language) -> &'static str {
     use Language::{English, French};
     match (cause, language) {
         (Cause::Unreachable, English) => "The provider could not be reached: check that it runs, or the network, then try again.",
         (Cause::Unreachable, French) => "Le fournisseur n’a pas pu être joint\u{a0}: vérifiez qu’il tourne, ou le réseau, puis réessayez.",
         (Cause::TooSlow, English) => {
-            "The provider did not answer in time: try again later, or choose a faster model in Wholeheard’s settings."
+            "The provider did not answer in time: try again later, or choose a faster model in Kitokey’s settings."
         }
         (Cause::TooSlow, French) => {
-            "Le fournisseur n’a pas répondu à temps\u{a0}: réessayez plus tard, ou choisissez un modèle plus rapide dans les réglages de Wholeheard."
+            "Le fournisseur n’a pas répondu à temps\u{a0}: réessayez plus tard, ou choisissez un modèle plus rapide dans les réglages de Kitokey."
         }
-        (Cause::RefusedKey, English) => "The provider refused the key: give it again in Wholeheard’s settings.",
-        (Cause::RefusedKey, French) => "Le fournisseur a refusé la clé\u{a0}: saisissez-la de nouveau dans les réglages de Wholeheard.",
+        (Cause::RefusedKey, English) => "The provider refused the key: give it again in Kitokey’s settings.",
+        (Cause::RefusedKey, French) => "Le fournisseur a refusé la clé\u{a0}: saisissez-la de nouveau dans les réglages de Kitokey.",
         (Cause::NoCredit, English) => "The provider refused for lack of credit: add credit with it, then try again.",
         (Cause::NoCredit, French) => "Le fournisseur a refusé faute de crédit\u{a0}: ajoutez du crédit chez lui, puis réessayez.",
-        (Cause::UnknownModel, English) => {
-            "The provider does not know this model or this address: choose them again in Wholeheard’s settings."
-        }
+        (Cause::UnknownModel, English) => "The provider does not know this model or this address: choose them again in Kitokey’s settings.",
         (Cause::UnknownModel, French) => {
-            "Le fournisseur ne connaît pas ce modèle ou cette adresse\u{a0}: choisissez-les de nouveau dans les réglages de Wholeheard."
+            "Le fournisseur ne connaît pas ce modèle ou cette adresse\u{a0}: choisissez-les de nouveau dans les réglages de Kitokey."
         }
         (Cause::TooMany, English) => "The provider refuses for too many requests, or a quota used up: wait, or check your plan with it.",
         (Cause::TooMany, French) => {
@@ -1727,24 +1725,24 @@ pub fn cause(cause: Cause, language: Language) -> &'static str {
             "Le fournisseur répond qu’il est en panne\u{a0}: réessayez plus tard. Sur cet ordinateur, ce modèle est peut-être trop gros pour la mémoire\u{a0}: choisissez-en un plus petit."
         }
         (Cause::NoTimes, English) => {
-            "This model gives no times for what it hears: choose one that gives each segment’s times in Wholeheard’s settings."
+            "This model gives no times for what it hears: choose one that gives each segment’s times in Kitokey’s settings."
         }
         (Cause::NoTimes, French) => {
-            "Ce modèle ne donne pas les temps de ce qu’il entend\u{a0}: choisissez-en un qui donne ceux de chaque segment dans les réglages de Wholeheard."
+            "Ce modèle ne donne pas les temps de ce qu’il entend\u{a0}: choisissez-en un qui donne ceux de chaque segment dans les réglages de Kitokey."
         }
-        (Cause::Redirected, English) => "The provider sends the request to another address: check the address in Wholeheard’s settings.",
+        (Cause::Redirected, English) => "The provider sends the request to another address: check the address in Kitokey’s settings.",
         (Cause::Redirected, French) => {
-            "Le fournisseur renvoie la demande vers une autre adresse\u{a0}: vérifiez l’adresse dans les réglages de Wholeheard."
+            "Le fournisseur renvoie la demande vers une autre adresse\u{a0}: vérifiez l’adresse dans les réglages de Kitokey."
         }
         (Cause::ProviderFailed, English) => "The provider failed to answer: try again later.",
         (Cause::ProviderFailed, French) => "Le fournisseur n’a pas su répondre\u{a0}: réessayez plus tard.",
-        (Cause::CutShort, English) => "The model stopped before the end: choose one that writes longer answers in Wholeheard’s settings.",
+        (Cause::CutShort, English) => "The model stopped before the end: choose one that writes longer answers in Kitokey’s settings.",
         (Cause::CutShort, French) => {
-            "Le modèle s’est arrêté avant la fin\u{a0}: choisissez-en un qui écrit plus long dans les réglages de Wholeheard."
+            "Le modèle s’est arrêté avant la fin\u{a0}: choisissez-en un qui écrit plus long dans les réglages de Kitokey."
         }
-        (Cause::NotMinutes, English) => "The model did not write minutes: try again, or choose another model in Wholeheard’s settings.",
+        (Cause::NotMinutes, English) => "The model did not write minutes: try again, or choose another model in Kitokey’s settings.",
         (Cause::NotMinutes, French) => {
-            "Le modèle n’a pas écrit de compte rendu\u{a0}: réessayez, ou choisissez un autre modèle dans les réglages de Wholeheard."
+            "Le modèle n’a pas écrit de compte rendu\u{a0}: réessayez, ou choisissez un autre modèle dans les réglages de Kitokey."
         }
         (Cause::TranscriptUnusable, English) => "The transcript cannot be read: make it again first.",
         (Cause::TranscriptUnusable, French) => "La transcription ne peut pas être lue\u{a0}: refaites-la d’abord.",
@@ -1752,11 +1750,9 @@ pub fn cause(cause: Cause, language: Language) -> &'static str {
         (Cause::NoSpeech, French) => {
             "La transcription ne contient aucune parole\u{a0}: il n’y a rien à résumer. Vérifiez l’enregistrement."
         }
-        (Cause::Settings, English) => {
-            "The provider’s address, model or key cannot be used as given: correct them in Wholeheard’s settings."
-        }
+        (Cause::Settings, English) => "The provider’s address, model or key cannot be used as given: correct them in Kitokey’s settings.",
         (Cause::Settings, French) => {
-            "L’adresse, le modèle ou la clé du fournisseur ne peuvent pas être utilisés tels quels\u{a0}: corrigez-les dans les réglages de Wholeheard."
+            "L’adresse, le modèle ou la clé du fournisseur ne peuvent pas être utilisés tels quels\u{a0}: corrigez-les dans les réglages de Kitokey."
         }
         (Cause::Unwritable, English) => "The minutes could not be written in the meeting’s folder: free space, or check the folder.",
         (Cause::Unwritable, French) => {
@@ -1773,35 +1769,35 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
     let said = |title: &str, body: String| notice(title, body).expect("a trouble is always said");
     let (title, body) = match (trouble, language) {
         (Trouble::NoRecorder(_), English) => (
-            "Wholeheard cannot record",
-            "Its recording program could not be started. Installing Wholeheard again puts it back.",
+            "Kitokey cannot record",
+            "Its recording program could not be started. Installing Kitokey again puts it back.",
         ),
         (Trouble::NoRecorder(_), French) => (
-            "Wholeheard ne peut pas enregistrer",
-            "Son programme d’enregistrement n’a pas pu démarrer. Réinstaller Wholeheard le remet en place.",
+            "Kitokey ne peut pas enregistrer",
+            "Son programme d’enregistrement n’a pas pu démarrer. Réinstaller Kitokey le remet en place.",
         ),
         (Trouble::Settings(why), English) => {
             return said(
                 "Your settings were not read",
-                format!("Wholeheard runs with its defaults until the file is corrected: {}.", detail(why)),
+                format!("Kitokey runs with its defaults until the file is corrected: {}.", detail(why)),
             );
         }
         (Trouble::Settings(why), French) => {
             return said(
                 "Vos réglages n’ont pas été lus",
                 format!(
-                    "Wholeheard fonctionne avec ses réglages par défaut tant que le fichier n’est pas corrigé\u{a0}: {}.",
+                    "Kitokey fonctionne avec ses réglages par défaut tant que le fichier n’est pas corrigé\u{a0}: {}.",
                     detail(why)
                 ),
             );
         }
         (Trouble::Shortcut(_), English) => (
             "The keyboard shortcut is not set",
-            "The menu of Wholeheard’s icon still starts and stops a recording.",
+            "The menu of Kitokey’s icon still starts and stops a recording.",
         ),
         (Trouble::Shortcut(_), French) => (
             "Le raccourci clavier n’est pas actif",
-            "Le menu de l’icône Wholeheard permet toujours de démarrer et d’arrêter un enregistrement.",
+            "Le menu de l’icône Kitokey permet toujours de démarrer et d’arrêter un enregistrement.",
         ),
         (Trouble::NoModel(at), English) => {
             return said(
@@ -1818,20 +1814,20 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
             );
         }
         (Trouble::NoTranscriber(_), English) => (
-            "Wholeheard cannot transcribe",
-            "Its transcription program could not be started. The recording is kept; installing Wholeheard again puts the program back.",
+            "Kitokey cannot transcribe",
+            "Its transcription program could not be started. The recording is kept; installing Kitokey again puts the program back.",
         ),
         (Trouble::NoFolder(at), English) => {
             return said(
-                "Wholeheard cannot record",
-                format!("Its meetings folder cannot be written: {at}. Choose another one in Wholeheard’s settings."),
+                "Kitokey cannot record",
+                format!("Its meetings folder cannot be written: {at}. Choose another one in Kitokey’s settings."),
             );
         }
         (Trouble::NoFolder(at), French) => {
             return said(
-                "Wholeheard ne peut pas enregistrer",
+                "Kitokey ne peut pas enregistrer",
                 format!(
-                    "Son dossier des réunions ne peut pas être écrit\u{a0}: {at}. Choisissez-en un autre dans les réglages de Wholeheard."
+                    "Son dossier des réunions ne peut pas être écrit\u{a0}: {at}. Choisissez-en un autre dans les réglages de Kitokey."
                 ),
             );
         }
@@ -1844,8 +1840,8 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
             "Enregistrez d’abord une réunion\u{a0}: sa transcription suit l’arrêt.",
         ),
         (Trouble::NoTranscriber(_), French) => (
-            "Wholeheard ne peut pas transcrire",
-            "Son programme de transcription n’a pas pu démarrer. L’enregistrement est conservé\u{202f}; réinstaller Wholeheard remet le programme en place.",
+            "Kitokey ne peut pas transcrire",
+            "Son programme de transcription n’a pas pu démarrer. L’enregistrement est conservé\u{202f}; réinstaller Kitokey remet le programme en place.",
         ),
     };
     said(title, body.to_string())
@@ -1856,13 +1852,13 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
 pub fn made(made: &Made, language: Language) -> Notice {
     use Language::{English, French};
     let (title, body) = match (made, language) {
-        // A click opens the meeting in Wholeheard where the desktop says it was clicked (D44).
+        // A click opens the meeting in Kitokey where the desktop says it was clicked (D44).
         (Made::Written(_), English) => (
             "Transcript ready",
             if CLICKED {
                 "Click to open it."
             } else {
-                "It is in Wholeheard’s window."
+                "It is in Kitokey’s window."
             },
         ),
         (Made::Written(_), French) => (
@@ -1870,16 +1866,16 @@ pub fn made(made: &Made, language: Language) -> Notice {
             if CLICKED {
                 "Cliquez pour l’ouvrir."
             } else {
-                "Elle est dans la fenêtre de Wholeheard."
+                "Elle est dans la fenêtre de Kitokey."
             },
         ),
         (Made::Failed(_), English) => (
             "The transcript was not made",
-            "The recording is untouched. “Transcribe the last recording” in Wholeheard’s menu tries again from where it stopped.",
+            "The recording is untouched. “Transcribe the last recording” in Kitokey’s menu tries again from where it stopped.",
         ),
         (Made::Failed(_), French) => (
             "La transcription n’a pas été faite",
-            "L’enregistrement est intact. «\u{a0}Transcrire le dernier enregistrement\u{a0}», dans le menu de Wholeheard, reprend là où elle s’est arrêtée.",
+            "L’enregistrement est intact. «\u{a0}Transcrire le dernier enregistrement\u{a0}», dans le menu de Kitokey, reprend là où elle s’est arrêtée.",
         ),
     };
     notice(title, body.to_string()).expect("a transcript's end is always said")
@@ -1891,7 +1887,7 @@ pub enum Minutes {
     Ready,
     /// Ready, and the minutes they replace could not go to the trash: kept beside them, by this name.
     ReadyKeptBeside(String),
-    /// Not made, and why when wholeheard-summary named a cause this version knows.
+    /// Not made, and why when kitokey-summary named a cause this version knows.
     Failed(Option<Cause>),
     /// Made again (*Refaire…*) and not made: the ones there stayed; and why, as above.
     RedoFailed(Option<Cause>),
@@ -1929,7 +1925,7 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
             if CLICKED {
                 "Click to open it."
             } else {
-                "They are in Wholeheard’s window, beside the transcript."
+                "They are in Kitokey’s window, beside the transcript."
             }
             .to_string(),
         ),
@@ -1946,7 +1942,7 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
             if CLICKED {
                 "Cliquez pour l’ouvrir."
             } else {
-                "Il est dans la fenêtre de Wholeheard, à côté de la transcription."
+                "Il est dans la fenêtre de Kitokey, à côté de la transcription."
             }
             .to_string(),
         ),
@@ -1961,11 +1957,11 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
         ),
         (Minutes::Failed(None), English) => (
             "The minutes were not written",
-            format!("The transcript is untouched. “{entry}”, in Wholeheard’s menu, tries again."),
+            format!("The transcript is untouched. “{entry}”, in Kitokey’s menu, tries again."),
         ),
         (Minutes::Failed(None), French) => (
             "Le compte rendu n’a pas été fait",
-            format!("La transcription est intacte. «\u{a0}{entry}\u{a0}», dans le menu de Wholeheard, le refait."),
+            format!("La transcription est intacte. «\u{a0}{entry}\u{a0}», dans le menu de Kitokey, le refait."),
         ),
         (Minutes::RedoFailed(cause), English) => (
             "The minutes were not made again",
@@ -1983,28 +1979,25 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
         ),
         (Minutes::Waiting(host), English) => (
             "The minutes wait for your agreement",
-            format!("Nothing is sent to {host} before you agree, in Wholeheard’s window."),
+            format!("Nothing is sent to {host} before you agree, in Kitokey’s window."),
         ),
         (Minutes::Waiting(host), French) => (
             "Le compte rendu attend votre accord",
-            format!("Rien n’est envoyé à {host} avant votre accord, dans la fenêtre de Wholeheard."),
+            format!("Rien n’est envoyé à {host} avant votre accord, dans la fenêtre de Kitokey."),
         ),
-        (Minutes::Unchosen, English) => (
-            "No one is chosen to write the minutes",
-            "Choose in Wholeheard’s settings.".to_string(),
-        ),
+        (Minutes::Unchosen, English) => ("No one is chosen to write the minutes", "Choose in Kitokey’s settings.".to_string()),
         (Minutes::Unchosen, French) => (
             "Aucun modèle choisi pour les comptes rendus",
-            "Choisissez-le dans les réglages de Wholeheard.".to_string(),
+            "Choisissez-le dans les réglages de Kitokey.".to_string(),
         ),
         (Minutes::NoProvider(address), English) => (
             "The minutes were not written",
-            format!("“{address}” is not a provider’s address: choose who writes the minutes in Wholeheard’s settings."),
+            format!("“{address}” is not a provider’s address: choose who writes the minutes in Kitokey’s settings."),
         ),
         (Minutes::NoProvider(address), French) => (
             "Le compte rendu n’a pas été fait",
             format!(
-                "«\u{a0}{address}\u{a0}» n’est pas l’adresse d’un fournisseur\u{a0}: choisissez qui écrit le compte rendu dans les réglages de Wholeheard."
+                "«\u{a0}{address}\u{a0}» n’est pas l’adresse d’un fournisseur\u{a0}: choisissez qui écrit le compte rendu dans les réglages de Kitokey."
             ),
         ),
         (Minutes::NoTranscript, English) => (
@@ -2029,14 +2022,14 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
         (Minutes::OllamaWaits { silent: false }, English) => (
             "The minutes wait for Ollama",
             format!(
-                "The meeting is confidential, and Ollama holds no model yet: Wholeheard’s window fetches {} in one click.",
+                "The meeting is confidential, and Ollama holds no model yet: Kitokey’s window fetches {} in one click.",
                 crate::providers::RECOMMENDED
             ),
         ),
         (Minutes::OllamaWaits { silent: false }, French) => (
             "Le compte rendu attend Ollama",
             format!(
-                "La réunion est confidentielle, et Ollama n’a encore aucun modèle\u{a0}: la fenêtre de Wholeheard télécharge {} en un clic.",
+                "La réunion est confidentielle, et Ollama n’a encore aucun modèle\u{a0}: la fenêtre de Kitokey télécharge {} en un clic.",
                 crate::providers::RECOMMENDED
             ),
         ),
@@ -2200,14 +2193,14 @@ pub fn offer(application: &str, language: Language) -> (Notice, [&'static str; 3
         Language::English => (
             Notice {
                 title: format!("{application} is using your microphone"),
-                body: "Record this call with Wholeheard?".into(),
+                body: "Record this call with Kitokey?".into(),
             },
             ["Record", "Not this time", "Never offer"],
         ),
         Language::French => (
             Notice {
                 title: format!("{application} utilise votre micro"),
-                body: "Enregistrer cet appel avec Wholeheard\u{202f}?".into(),
+                body: "Enregistrer cet appel avec Kitokey\u{202f}?".into(),
             },
             ["Enregistrer", "Pas cette fois", "Ne plus proposer"],
         ),
@@ -2333,15 +2326,15 @@ fn french_days(days: u32) -> String {
 
 /// Said when a transcript needs the default model and it is not on the machine: nothing is
 /// fetched until the user chooses the menu's entry.
-/// Summit became Wholeheard (D28): said once, at the first start, when something was carried over.
+/// Wholeheard became Kitokey (D86), as Summit became Wholeheard (D28): said once, at the first start, when something was carried over.
 pub fn carried_over(language: Language) -> Notice {
     let (title, body) = match language {
         Language::English => (
-            "Summit is now Wholeheard",
+            "Wholeheard is now Kitokey",
             "Your settings, your meetings and the transcription model are carried over; the keyboard shortcut may be asked once more.",
         ),
         Language::French => (
-            "Summit s’appelle maintenant Wholeheard",
+            "Wholeheard s’appelle maintenant Kitokey",
             "Vos réglages, vos réunions et le modèle de transcription sont repris\u{202f}; le raccourci clavier peut être redemandé une fois.",
         ),
     };
@@ -2351,16 +2344,16 @@ pub fn carried_over(language: Language) -> Notice {
     }
 }
 
-/// Summit's things could not all be carried over: left where they were, tried again next start.
-/// Said in plain words: the technical reason goes to what Wholeheard writes for whoever debugs it.
+/// What the user held under an earlier name could not all be carried over: left where they were, tried again next start.
+/// Said in plain words: the technical reason goes to what Kitokey writes for whoever debugs it.
 pub fn carry_failed(language: Language) -> Notice {
     let (title, body) = match language {
         Language::English => (
-            "Summit’s settings were not all carried over",
+            "Wholeheard’s settings were not all carried over",
             "Nothing is lost: they stay where they were, and it is tried again at the next start.",
         ),
         Language::French => (
-            "Les réglages de Summit n’ont pas tous été repris",
+            "Les réglages de Wholeheard n’ont pas tous été repris",
             "Rien n’est perdu\u{a0}: ils restent où ils étaient, et la reprise est tentée de nouveau au prochain démarrage.",
         ),
     };
@@ -2375,12 +2368,12 @@ pub fn model_needed(language: Language, size: &str, host: &str) -> Notice {
     let (title, body) = match language {
         Language::English => (
             "The transcription model is needed",
-            format!("It is fetched once, on your word: choose “{entry}” in Wholeheard’s menu. The recording is kept."),
+            format!("It is fetched once, on your word: choose “{entry}” in Kitokey’s menu. The recording is kept."),
         ),
         Language::French => (
             "Le modèle de transcription est nécessaire",
             format!(
-                "Il est téléchargé une fois, sur votre accord\u{a0}: choisissez «\u{a0}{entry}\u{a0}» dans le menu de Wholeheard. L’enregistrement est conservé."
+                "Il est téléchargé une fois, sur votre accord\u{a0}: choisissez «\u{a0}{entry}\u{a0}» dans le menu de Kitokey. L’enregistrement est conservé."
             ),
         ),
     };

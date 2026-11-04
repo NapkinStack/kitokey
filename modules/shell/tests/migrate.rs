@@ -1,13 +1,13 @@
-//! Summit became Wholeheard (D28): what a user held under the old name is carried over, nothing
-//! lost, nothing overwritten; a step interrupted is done at the next start.
+//! Summit became Wholeheard (D28), then Wholeheard Kitokey (D86): what a user held under an earlier
+//! name is carried over, nothing lost, nothing overwritten; a step interrupted is done at the next start.
 
 use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-use wholeheard_shell::migrate::{Carried, Places, carry_over};
-use wholeheard_shell::settings;
+use kitokey_shell::migrate::{Carried, Places, carry_over};
+use kitokey_shell::settings;
 
 fn places(root: &Path) -> Places {
     Places {
@@ -28,7 +28,7 @@ fn a_meeting_in(folder: &Path) {
 }
 
 fn now(here: &Places) -> settings::Settings {
-    settings::read(&here.config.join("wholeheard/settings.toml")).unwrap()
+    settings::read(&here.config.join("kitokey/settings.toml")).unwrap()
 }
 
 #[test]
@@ -47,13 +47,13 @@ fn summits_folders_are_moved_and_the_meetings_kept_where_they_were() {
 
     assert!(carried.settings && carried.data && carried.model_named, "{carried:?}");
     assert!(!here.config.join("summit").exists() && !here.data.join("summit").exists());
-    let moved = here.data.join("wholeheard/models/ggml-large-v3-turbo-q8_0.bin");
+    let moved = here.data.join("kitokey/models/ggml-large-v3-turbo-q8_0.bin");
     assert_eq!(
         fs::read_to_string(&moved).unwrap(),
         "a model of 874 MB",
         "the model is moved, never fetched again"
     );
-    let text = fs::read_to_string(here.config.join("wholeheard/settings.toml")).unwrap();
+    let text = fs::read_to_string(here.config.join("kitokey/settings.toml")).unwrap();
     assert!(text.starts_with("# mine\n"), "what the user wrote stays: {text}");
     let meetings = here.documents.join("Summit");
     assert_eq!(carried.meetings_kept.as_deref(), Some(meetings.as_path()));
@@ -61,7 +61,7 @@ fn summits_folders_are_moved_and_the_meetings_kept_where_they_were() {
     assert_eq!(
         (read.sessions, read.model),
         (meetings.clone(), moved),
-        "Wholeheard reads Summit's meetings and model"
+        "Kitokey reads Summit’s meetings and model"
     );
     assert!(
         meetings.join("2026-10-18_10-00/session.json").is_file(),
@@ -103,7 +103,7 @@ fn a_move_that_failed_is_done_at_the_next_start_and_the_meetings_never_lost() {
     fs::set_permissions(&here.data, data_mode).unwrap();
     let carried = carry_over(&here).unwrap();
     assert!(carried.data && !carried.settings, "{carried:?}");
-    assert_eq!(fs::read_to_string(here.data.join("wholeheard/models/a.bin")).unwrap(), "a model");
+    assert_eq!(fs::read_to_string(here.data.join("kitokey/models/a.bin")).unwrap(), "a model");
     assert_eq!(now(&here).sessions, here.documents.join("Summit"));
 }
 
@@ -116,7 +116,7 @@ fn an_empty_folder_under_the_new_name_gives_way() {
         &here.config.join("summit/settings.toml"),
         &format!("sessions = '{}'\n", mine.display()),
     );
-    fs::create_dir_all(here.config.join("wholeheard")).unwrap();
+    fs::create_dir_all(here.config.join("kitokey")).unwrap();
     a_meeting_in(&here.documents.join("Summit"));
 
     let carried = carry_over(&here).unwrap();
@@ -143,7 +143,7 @@ fn a_model_written_from_home_is_named_where_it_went() {
     let carried = carry_over(&here).unwrap();
 
     assert!(carried.model_named, "{carried:?}");
-    assert_eq!(now(&here).model, here.data.join("wholeheard/models/a.bin"));
+    assert_eq!(now(&here).model, here.data.join("kitokey/models/a.bin"));
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn a_folder_named_summit_with_no_meeting_is_not_taken() {
     write(&here.documents.join("Summit/holiday.jpg"), "a photo");
 
     assert_eq!(carry_over(&here).unwrap(), Carried::default());
-    assert!(!here.config.join("wholeheard").exists());
+    assert!(!here.config.join("kitokey").exists());
 }
 
 #[test]
@@ -187,22 +187,22 @@ fn meetings_made_with_no_settings_saved_are_found() {
 }
 
 #[test]
-fn nothing_of_wholeheards_is_overwritten() {
+fn nothing_of_kitokeys_is_overwritten() {
     let root = tempfile::tempdir().unwrap();
     let here = places(root.path());
     write(&here.config.join("summit/settings.toml"), "reminder = false\n");
-    write(&here.config.join("wholeheard/settings.toml"), "reminder = true\n");
+    write(&here.config.join("kitokey/settings.toml"), "reminder = true\n");
     write(&here.data.join("summit/models/a.bin"), "old");
-    write(&here.data.join("wholeheard/models/a.bin"), "new");
+    write(&here.data.join("kitokey/models/a.bin"), "new");
 
     let carried = carry_over(&here).unwrap();
 
     assert_eq!(carried, Carried::default());
     assert_eq!(
-        fs::read_to_string(here.config.join("wholeheard/settings.toml")).unwrap(),
+        fs::read_to_string(here.config.join("kitokey/settings.toml")).unwrap(),
         "reminder = true\n"
     );
-    assert_eq!(fs::read_to_string(here.data.join("wholeheard/models/a.bin")).unwrap(), "new");
+    assert_eq!(fs::read_to_string(here.data.join("kitokey/models/a.bin")).unwrap(), "new");
     assert!(here.config.join("summit/settings.toml").is_file(), "Summit's is left as it is");
 }
 
@@ -214,14 +214,11 @@ fn carried_once_then_nothing_more() {
     a_meeting_in(&here.documents.join("Summit"));
 
     carry_over(&here).unwrap();
-    let after_first = fs::read_to_string(here.config.join("wholeheard/settings.toml")).unwrap();
+    let after_first = fs::read_to_string(here.config.join("kitokey/settings.toml")).unwrap();
     let second = carry_over(&here).unwrap();
 
     assert_eq!(second, Carried::default());
-    assert_eq!(
-        fs::read_to_string(here.config.join("wholeheard/settings.toml")).unwrap(),
-        after_first
-    );
+    assert_eq!(fs::read_to_string(here.config.join("kitokey/settings.toml")).unwrap(), after_first);
 }
 
 #[test]
@@ -230,7 +227,7 @@ fn a_user_who_never_had_summit_gets_nothing_written() {
     let here = places(root.path());
 
     assert_eq!(carry_over(&here).unwrap(), Carried::default());
-    assert!(!here.config.join("wholeheard").exists());
+    assert!(!here.config.join("kitokey").exists());
 }
 
 #[test]
@@ -240,13 +237,13 @@ fn a_folder_the_user_took_out_of_their_settings_stays_out() {
     write(&here.config.join("summit/settings.toml"), "reminder = false\n");
     a_meeting_in(&here.documents.join("Summit"));
     carry_over(&here).unwrap();
-    // The user takes the folder out, on purpose: back to Wholeheard's own.
-    write(&here.config.join("wholeheard/settings.toml"), "reminder = false\n");
+    // The user takes the folder out, on purpose: back to Kitokey's own.
+    write(&here.config.join("kitokey/settings.toml"), "reminder = false\n");
 
     carry_over(&here).unwrap();
 
     assert_eq!(
-        fs::read_to_string(here.config.join("wholeheard/settings.toml")).unwrap(),
+        fs::read_to_string(here.config.join("kitokey/settings.toml")).unwrap(),
         "reminder = false\n"
     );
 }
@@ -265,7 +262,7 @@ fn a_settings_file_kept_elsewhere_by_a_link_is_written_there_with_its_permission
 
     carry_over(&here).unwrap();
 
-    let link = here.config.join("wholeheard/settings.toml");
+    let link = here.config.join("kitokey/settings.toml");
     assert!(
         fs::symlink_metadata(&link).unwrap().file_type().is_symlink(),
         "the link stays a link"
@@ -275,4 +272,218 @@ fn a_settings_file_kept_elsewhere_by_a_link_is_written_there_with_its_permission
         "written where it leads"
     );
     assert_eq!(fs::metadata(&dotfiles).unwrap().permissions().mode() & 0o777, 0o600);
+}
+
+// Wholeheard became Kitokey (D86): the same carrying over, from Wholeheard's names.
+
+#[test]
+fn wholeheards_folders_are_moved_and_the_meetings_kept_where_they_were() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    let model = here.data.join("wholeheard/models/ggml-large-v3-turbo-q8_0.bin");
+    write(&model, "a model of 874 MB");
+    write(
+        &here.config.join("wholeheard/settings.toml"),
+        &format!("# mine\nmodel = '{}'\n", model.display()),
+    );
+    a_meeting_in(&here.documents.join("Wholeheard"));
+
+    let carried = carry_over(&here).unwrap();
+
+    assert!(carried.settings && carried.data && carried.model_named, "{carried:?}");
+    assert!(!here.config.join("wholeheard").exists() && !here.data.join("wholeheard").exists());
+    let moved = here.data.join("kitokey/models/ggml-large-v3-turbo-q8_0.bin");
+    assert_eq!(fs::read_to_string(&moved).unwrap(), "a model of 874 MB", "never fetched again");
+    let text = fs::read_to_string(here.config.join("kitokey/settings.toml")).unwrap();
+    assert!(text.starts_with("# mine\n"), "what the user wrote stays: {text}");
+    let meetings = here.documents.join("Wholeheard");
+    assert_eq!(carried.meetings_kept.as_deref(), Some(meetings.as_path()));
+    let read = now(&here);
+    assert_eq!(
+        (read.sessions, read.model),
+        (meetings.clone(), moved),
+        "Kitokey reads Wholeheard's meetings and model"
+    );
+    assert!(
+        meetings.join("2026-10-18_10-00/session.json").is_file(),
+        "the meetings are not moved"
+    );
+}
+
+#[test]
+fn a_folder_of_meetings_named_in_wholeheards_settings_is_kept() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    // As D28 left a user of Summit: the meetings in Summit's folder, named in the settings.
+    let summits = here.documents.join("Summit");
+    a_meeting_in(&summits);
+    write(
+        &here.config.join("wholeheard/settings.toml"),
+        &format!("sessions = '{}'\n", summits.display()),
+    );
+    a_meeting_in(&here.documents.join("Wholeheard"));
+
+    let carried = carry_over(&here).unwrap();
+
+    assert!(carried.settings && carried.meetings_kept.is_none(), "{carried:?}");
+    assert_eq!(now(&here).sessions, summits, "the folder the settings named is kept");
+}
+
+#[test]
+fn wholeheards_are_carried_before_summits_leftovers() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    // Summit's folders left beside Wholeheard's: D28 leaves the old one when the new holds something.
+    write(&here.config.join("summit/settings.toml"), "reminder = true\n");
+    write(&here.data.join("summit/models/a.bin"), "old");
+    write(&here.config.join("wholeheard/settings.toml"), "reminder = false\n");
+    write(&here.data.join("wholeheard/models/a.bin"), "new");
+
+    carry_over(&here).unwrap();
+
+    assert_eq!(
+        fs::read_to_string(here.config.join("kitokey/settings.toml")).unwrap(),
+        "reminder = false\n"
+    );
+    assert_eq!(fs::read_to_string(here.data.join("kitokey/models/a.bin")).unwrap(), "new");
+    assert!(here.config.join("summit/settings.toml").is_file(), "Summit's is left as it is");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_move_from_wholeheard_that_failed_is_done_at_the_next_start() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    write(&here.config.join("wholeheard/settings.toml"), "reminder = false\n");
+    write(&here.data.join("wholeheard/models/a.bin"), "a model");
+    a_meeting_in(&here.documents.join("Wholeheard"));
+    let data_mode = fs::metadata(&here.data).unwrap().permissions();
+    fs::set_permissions(&here.data, fs::Permissions::from_mode(0o500)).unwrap();
+
+    assert!(carry_over(&here).is_err());
+    assert_eq!(
+        now(&here).sessions,
+        here.documents.join("Wholeheard"),
+        "the meetings were named first"
+    );
+
+    fs::set_permissions(&here.data, data_mode).unwrap();
+    let carried = carry_over(&here).unwrap();
+    assert!(carried.data && !carried.settings, "{carried:?}");
+    assert_eq!(fs::read_to_string(here.data.join("kitokey/models/a.bin")).unwrap(), "a model");
+    assert_eq!(now(&here).sessions, here.documents.join("Wholeheard"));
+}
+
+#[test]
+fn a_folder_named_wholeheard_with_no_meeting_is_not_taken() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    write(&here.documents.join("Wholeheard/holiday.jpg"), "a photo");
+
+    assert_eq!(carry_over(&here).unwrap(), Carried::default());
+    assert!(!here.config.join("kitokey").exists());
+}
+
+// What #651's verifier found held by no test (its mutants M3, M8, M9, M13, M16).
+
+#[test]
+fn with_kitokeys_settings_there_the_meetings_are_named_in_them_not_in_wholeheards() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    write(&here.config.join("wholeheard/settings.toml"), "reminder = true\n");
+    write(&here.config.join("kitokey/settings.toml"), "reminder = false\n");
+    a_meeting_in(&here.documents.join("Wholeheard"));
+
+    carry_over(&here).unwrap();
+
+    assert_eq!(now(&here).sessions, here.documents.join("Wholeheard"), "named where Kitokey reads");
+    assert_eq!(
+        fs::read_to_string(here.config.join("wholeheard/settings.toml")).unwrap(),
+        "reminder = true\n",
+        "Wholeheard's, left as it is"
+    );
+}
+
+#[test]
+fn a_folder_holding_only_folders_without_a_session_is_not_taken_for_meetings() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    fs::create_dir_all(here.documents.join("Wholeheard/holidays")).unwrap();
+
+    assert_eq!(carry_over(&here).unwrap(), Carried::default());
+}
+
+#[test]
+fn the_meetings_are_named_while_wholeheards_data_is_still_to_move() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    // The settings moved already and name no folder; the data not yet.
+    write(&here.config.join("kitokey/settings.toml"), "reminder = false\n");
+    write(&here.data.join("wholeheard/models/a.bin"), "a model");
+    a_meeting_in(&here.documents.join("Wholeheard"));
+
+    carry_over(&here).unwrap();
+
+    assert_eq!(now(&here).sessions, here.documents.join("Wholeheard"));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_model_is_named_where_it_went_only_once_it_went_there() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    let model = here.data.join("wholeheard/models/a.bin");
+    write(&model, "a model");
+    write(
+        &here.config.join("wholeheard/settings.toml"),
+        &format!("model = '{}'\n", model.display()),
+    );
+    let data_mode = fs::metadata(&here.data).unwrap().permissions();
+    fs::set_permissions(&here.data, fs::Permissions::from_mode(0o500)).unwrap();
+
+    let first = carry_over(&here);
+
+    fs::set_permissions(&here.data, data_mode).unwrap();
+    assert!(first.is_err());
+    assert_eq!(now(&here).model, model, "still named where it is");
+    carry_over(&here).unwrap();
+    assert_eq!(now(&here).model, here.data.join("kitokey/models/a.bin"));
+}
+
+#[cfg(unix)]
+#[test]
+fn settings_that_cannot_be_moved_are_said_and_moved_at_the_next_start() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    write(&here.config.join("wholeheard/settings.toml"), "reminder = false\n");
+    let config_mode = fs::metadata(&here.config).unwrap().permissions();
+    fs::set_permissions(&here.config, fs::Permissions::from_mode(0o500)).unwrap();
+
+    let first = carry_over(&here);
+
+    fs::set_permissions(&here.config, config_mode).unwrap();
+    assert!(first.is_err(), "said, never taken for nothing to do");
+    assert!(carry_over(&here).unwrap().settings);
+    assert!(here.config.join("kitokey/settings.toml").is_file());
+}
+
+#[test]
+fn a_model_left_in_wholeheards_data_beside_kitokeys_is_not_named_where_it_is_not() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    let model = here.data.join("wholeheard/models/a.bin");
+    write(&model, "a model");
+    write(&here.data.join("kitokey/models/other.bin"), "Kitokey's own");
+    write(
+        &here.config.join("wholeheard/settings.toml"),
+        &format!("model = '{}'\n", model.display()),
+    );
+
+    carry_over(&here).unwrap();
+
+    assert_eq!(
+        now(&here).model,
+        model,
+        "Wholeheard's data was not moved: the model is where it was"
+    );
 }

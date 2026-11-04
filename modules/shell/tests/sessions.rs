@@ -2,7 +2,7 @@
 
 use std::{fs, path::Path};
 
-use wholeheard_shell::sessions::{self, State, instant};
+use kitokey_shell::sessions::{self, State, instant};
 
 fn session(folder: &Path, json: &str, files: &[(&str, usize)]) {
     fs::create_dir_all(folder).unwrap();
@@ -367,19 +367,19 @@ fn a_folder_of_sessions_is_writable_or_said_not_to_be_and_nothing_is_left_in_it(
     use std::os::unix::fs::PermissionsExt;
     let root = tempfile::tempdir().unwrap();
     // Not there yet: made, written, left empty.
-    let new = root.path().join("Wholeheard");
-    assert!(wholeheard_shell::sessions::writable(&new).is_ok());
+    let new = root.path().join("Kitokey");
+    assert!(kitokey_shell::sessions::writable(&new).is_ok());
     assert_eq!(std::fs::read_dir(&new).unwrap().count(), 0);
     // There, and refusing to be written: said, before any recorder is started.
     let locked = root.path().join("locked");
     std::fs::create_dir(&locked).unwrap();
     std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o555)).unwrap();
-    let refused = wholeheard_shell::sessions::writable(&locked);
+    let refused = kitokey_shell::sessions::writable(&locked);
     std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert!(refused.is_err());
     // Under a file: not made.
     std::fs::write(root.path().join("a-file"), "").unwrap();
-    assert!(wholeheard_shell::sessions::writable(&root.path().join("a-file").join("Wholeheard")).is_err());
+    assert!(kitokey_shell::sessions::writable(&root.path().join("a-file").join("Kitokey")).is_err());
 }
 
 #[test]
@@ -435,9 +435,9 @@ fn a_folder_that_cannot_be_read_is_no_empty_list_and_one_not_made_yet_is() {
     std::fs::write(&file, "").unwrap();
     assert!(sessions::unreadable(&file, false));
     // Its disk gone, its mount point with it.
-    assert!(sessions::unreadable(&root.path().join("no disk").join("Wholeheard"), false));
+    assert!(sessions::unreadable(&root.path().join("no disk").join("Kitokey"), false));
     // The default folder, under a Documents not made yet: an empty list.
-    assert!(!sessions::unreadable(&root.path().join("no Documents").join("Wholeheard"), true));
+    assert!(!sessions::unreadable(&root.path().join("no Documents").join("Kitokey"), true));
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

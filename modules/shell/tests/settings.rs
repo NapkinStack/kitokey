@@ -2,7 +2,7 @@
 
 use std::{fs, path::Path};
 
-use wholeheard_shell::{
+use kitokey_shell::{
     settings::{After, Engine, KeepAudio, Log, Settings, Window, file, read, welcome_due, whisper_models, write},
     words::Language,
 };
@@ -23,13 +23,13 @@ fn the_reminder_is_on_unless_the_file_says_otherwise() {
 #[test]
 fn no_file_and_an_empty_one_are_every_default() {
     let defaults = Settings::default();
-    // The reminder is shown unless the user says otherwise; sessions go to a folder named Wholeheard.
-    assert!(defaults.reminder && defaults.sessions.is_absolute() && defaults.sessions.ends_with("Wholeheard"));
+    // The reminder is shown unless the user says otherwise; sessions go to a folder named Kitokey.
+    assert!(defaults.reminder && defaults.sessions.is_absolute() && defaults.sessions.ends_with("Kitokey"));
     assert_eq!(read(Path::new("/nowhere/settings.toml")), Ok(defaults.clone()));
     for nothing in ["", "\n\n", "# only a comment\n"] {
         assert_eq!(written(nothing), Ok(defaults.clone()), "{nothing:?}");
     }
-    assert!(file().is_some_and(|path| path.ends_with("wholeheard/settings.toml")));
+    assert!(file().is_some_and(|path| path.ends_with("kitokey/settings.toml")));
 }
 
 #[test]
@@ -46,8 +46,8 @@ fn a_file_names_what_it_changes_and_leaves_the_rest() {
         Ok(Settings::default())
     );
     // A folder from the user's home, as people write it.
-    let home = written(&format!("sessions = \"{}/Réunions/Wholeheard\"\n", '~')).unwrap().sessions;
-    assert!(home.is_absolute() && home.ends_with("Réunions/Wholeheard") && !home.to_string_lossy().contains('~'));
+    let home = written(&format!("sessions = \"{}/Réunions/Kitokey\"\n", '~')).unwrap().sessions;
+    assert!(home.is_absolute() && home.ends_with("Réunions/Kitokey") && !home.to_string_lossy().contains('~'));
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn a_file_that_is_not_settings_is_said_in_one_sentence_and_not_used() {
         ("# é\r\nreminder = true\r\n\r\n[sessions]\r\nx = 1\r\n", "<file>, line 4: "),
         // A folder that is not a whole path is said where it is written.
         (
-            "reminder = false\nsessions = \"Wholeheard\"\n",
+            "reminder = false\nsessions = \"Kitokey\"\n",
             "<file>, line 2: sessions is the folder's whole path",
         ),
         ("sessions = \"\"\n", "<file>, line 1: sessions is the folder's whole path"),
@@ -79,13 +79,13 @@ fn a_file_that_is_not_settings_is_said_in_one_sentence_and_not_used() {
 
 #[test]
 fn the_transcript_follows_a_recording_with_the_model_the_settings_name() {
-    // Out of the box the transcript is made, with the default model in Wholeheard's data folder.
+    // Out of the box the transcript is made, with the default model in Kitokey's data folder.
     let defaults = Settings::default();
     assert!(defaults.after == After::Transcript && defaults.model.is_absolute());
     assert!(
         defaults
             .model
-            .ends_with(format!("wholeheard/models/{}", wholeheard_shell::settings::MODEL))
+            .ends_with(format!("kitokey/models/{}", kitokey_shell::settings::MODEL))
     );
     let chosen = written(&format!("transcript = false\nmodel = \"{}/models/ggml-small.bin\"\n", '~')).unwrap();
     // Written before `after`: `transcript = false` is "nothing follows".
@@ -135,7 +135,7 @@ fn what_follows_a_recording_who_writes_the_minutes_and_how_long_audio_is_kept() 
 #[test]
 fn the_settings_written_read_back_as_they_were_the_user_s_lines_kept() {
     let folder = tempfile::tempdir().unwrap();
-    let path = folder.path().join("wholeheard").join("settings.toml");
+    let path = folder.path().join("kitokey").join("settings.toml");
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(
         &path,
@@ -168,7 +168,7 @@ fn writing_touches_only_what_changed_and_keeps_each_line_s_comment() {
     let folder = tempfile::tempdir().unwrap();
     let path = folder.path().join("settings.toml");
     let mine = format!(
-        "sessions = \"{}/Wholeheard\" # where they go\nreminder = true # said at each start\n",
+        "sessions = \"{}/Kitokey\" # where they go\nreminder = true # said at each start\n",
         '~'
     );
     fs::write(&path, &mine).unwrap();
@@ -181,10 +181,7 @@ fn writing_touches_only_what_changed_and_keeps_each_line_s_comment() {
     write(&path, &settings).unwrap();
     let text = fs::read_to_string(&path).unwrap();
     assert!(text.contains("reminder = false # said at each start"), "{text}");
-    assert!(
-        text.contains(&format!("sessions = \"{}/Wholeheard\" # where they go", '~')),
-        "{text}"
-    );
+    assert!(text.contains(&format!("sessions = \"{}/Kitokey\" # where they go", '~')), "{text}");
     assert!(!text.contains("model") && !text.contains("keep_audio"), "{text}");
 }
 
@@ -192,7 +189,7 @@ fn writing_touches_only_what_changed_and_keeps_each_line_s_comment() {
 fn a_file_that_cannot_be_read_as_settings_is_never_written_over() {
     let folder = tempfile::tempdir().unwrap();
     let path = folder.path().join("settings.toml");
-    for refused in ["keep_audio = 0\n", "reminder = \"yes\"\n", "sessions = \"Wholeheard\"\n"] {
+    for refused in ["keep_audio = 0\n", "reminder = \"yes\"\n", "sessions = \"Kitokey\"\n"] {
         fs::write(&path, refused).unwrap();
         assert!(write(&path, &Settings::default()).is_err(), "{refused}");
         assert_eq!(fs::read_to_string(&path).unwrap(), refused);
@@ -266,7 +263,7 @@ fn the_old_key_stays_until_after_is_written() {
 fn the_models_on_this_computer_are_the_folder_s_and_the_one_named_each_once_by_name() {
     // A folder of the test's own: no model of the user's is read.
     let data = tempfile::tempdir().unwrap();
-    let models = data.path().join("wholeheard").join("models");
+    let models = data.path().join("kitokey").join("models");
     fs::create_dir_all(&models).unwrap();
     // Made in an order that is not their names'.
     for name in [
@@ -379,7 +376,7 @@ fn the_logs_level_is_the_usual_one_until_the_user_asks_for_more() {
     assert_eq!(Settings::default().log, Log::Info);
     assert_eq!(written("log = \"debug\"\n").unwrap().log, Log::Debug);
     assert!(written("log = \"loud\"\n").unwrap_err().starts_with("<file>, line 1: "));
-    // As the programs read it in WHOLEHEARD_LOG.
+    // As the programs read it in KITOKEY_LOG.
     assert_eq!((Log::Info.as_str(), Log::Debug.as_str()), ("info", "debug"));
     let folder = tempfile::tempdir().unwrap();
     let path = folder.path().join("settings.toml");
@@ -409,7 +406,7 @@ fn a_call_is_offered_to_be_recorded_unless_the_user_said_nothing_is() {
 }
 
 #[test]
-fn wholeheard_opens_the_window_it_was_left_in_the_small_one_first() {
+fn kitokey_opens_the_window_it_was_left_in_the_small_one_first() {
     // D35: small by default, `window = "full"` when the full one was left; written back as left.
     assert_eq!(Settings::default().window, Window::Small);
     assert_eq!(written("window = \"full\"\n").unwrap().window, Window::Full);
@@ -510,7 +507,7 @@ fn the_sidebar_is_open_until_folded_and_kept_folded_by_every_other_write() {
 fn the_assistant_is_due_only_with_no_meeting_and_not_welcomed() {
     let folder = tempfile::tempdir().unwrap();
     let mut settings = Settings {
-        sessions: folder.path().join("Wholeheard"),
+        sessions: folder.path().join("Kitokey"),
         ..Settings::default()
     };
     // No folder yet, or an empty one, or one holding no session: due.
@@ -595,7 +592,7 @@ fn the_app_speaks_the_system_s_language_until_one_is_chosen_and_keeps_the_one_ch
 
 #[test]
 fn a_failure_of_the_settings_file_names_it_without_its_path_even_through_a_link() {
-    use wholeheard_shell::settings::unnamed;
+    use kitokey_shell::settings::unnamed;
     let folder = tempfile::tempdir().unwrap();
     let file = folder.path().join("settings.toml");
     fs::write(&file, "keep_audio = 0\n").unwrap();

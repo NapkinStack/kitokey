@@ -1,20 +1,21 @@
 //! A provider's key, kept in the system's keyring — the Secret Service under a Linux desktop, the
-//! Keychain on macOS, the Credential Manager on Windows — under Wholeheard's name and the provider's
-//! host. Never in a file, never in what Wholeheard says.
+//! Keychain on macOS, the Credential Manager on Windows — under Kitokey's name and the provider's
+//! host. Never in a file, never in what Kitokey says.
 
 use keyring_core::{Entry, Error};
 
-/// What Wholeheard's keys are filed under, in the keyring.
-const SERVICE: &str = "dev.wholeheard.Wholeheard";
-/// What they were filed under before D28, when the product was named Summit.
-const SERVICE_BEFORE: &str = "dev.summit.Summit";
+/// What Kitokey's keys are filed under, in the keyring.
+const SERVICE: &str = "com.napkinstack.Kitokey";
+/// What they were filed under before, the latest first: before D86, when the product was named
+/// Wholeheard; before D28, Summit.
+const SERVICES_BEFORE: [&str; 2] = ["dev.wholeheard.Wholeheard", "dev.summit.Summit"];
 
 /// Opens the system's keyring for this process, once, before a key is read or kept. Refused —
-/// no keyring service on this desktop — the sentence says why. With `WHOLEHEARD_KEYRING=memory`, in
-/// a build for trying Wholeheard only, a keyring that lives as long as the program instead: a scenario
+/// no keyring service on this desktop — the sentence says why. With `KITOKEY_KEYRING=memory`, in
+/// a build for trying Kitokey only, a keyring that lives as long as the program instead: a scenario
 /// never reads nor writes the user's, and a release never keeps a key where it does not last.
 pub fn open_system_keyring() -> Result<(), String> {
-    if cfg!(debug_assertions) && std::env::var("WHOLEHEARD_KEYRING").as_deref() == Ok("memory") {
+    if cfg!(debug_assertions) && std::env::var("KITOKEY_KEYRING").as_deref() == Ok("memory") {
         keyring_core::set_default_store(keyring_core::mock::Store::new().map_err(|error| error.to_string())?);
         return Ok(());
     }
@@ -37,33 +38,38 @@ pub fn keep(host: &str, key: &str) -> Result<(), String> {
     entry(host)?.set_password(key).map_err(|error| error.to_string())
 }
 
-/// The key kept for a provider's host; none when none is. One kept under Summit's name (before
-/// D28) is moved under Wholeheard's as it is read: kept anew, then forgotten there.
+/// The key kept for a provider's host; none when none is. One kept under an earlier name is moved
+/// under Kitokey's as it is read: kept anew, then forgotten there.
 pub fn key(host: &str) -> Result<Option<String>, String> {
     match entry(host)?.get_password() {
         Ok(key) => return Ok(Some(key)),
         Err(Error::NoEntry) => {}
         Err(error) => return Err(error.to_string()),
     }
-    let before = Entry::new(SERVICE_BEFORE, host).map_err(|error| error.to_string())?;
-    match before.get_password() {
-        // Kept anew, then forgotten there; kept or not, the key read is the key.
-        Ok(key) => {
-            if keep(host, &key).is_ok() {
-                let _ = before.delete_credential();
+    for service in SERVICES_BEFORE {
+        let before = Entry::new(service, host).map_err(|error| error.to_string())?;
+        match before.get_password() {
+            // Kept anew, then forgotten there; kept or not, the key read is the key.
+            Ok(key) => {
+                if keep(host, &key).is_ok() {
+                    let _ = before.delete_credential();
+                }
+                return Ok(Some(key));
             }
-            Ok(Some(key))
+            Err(Error::NoEntry) => {}
+            Err(error) => return Err(error.to_string()),
         }
-        Err(Error::NoEntry) => Ok(None),
-        Err(error) => Err(error.to_string()),
     }
+    Ok(None)
 }
 
-/// Forgets the key kept for a provider's host — under Summit's name too, so that it never comes
-/// back; nothing kept is nothing to forget.
+/// Forgets the key kept for a provider's host — under the earlier names too, so that it never
+/// comes back; nothing kept is nothing to forget.
 pub fn forget(host: &str) -> Result<(), String> {
-    if let Ok(before) = Entry::new(SERVICE_BEFORE, host) {
-        let _ = before.delete_credential();
+    for service in SERVICES_BEFORE {
+        if let Ok(before) = Entry::new(service, host) {
+            let _ = before.delete_credential();
+        }
     }
     match entry(host)?.delete_credential() {
         Ok(()) | Err(Error::NoEntry) => Ok(()),

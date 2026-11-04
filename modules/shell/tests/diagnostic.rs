@@ -4,7 +4,7 @@
 
 use std::fs;
 
-use wholeheard_shell::log::diagnostic;
+use kitokey_shell::log::diagnostic;
 
 const MEETING: &str = "2026-10-18_11-00";
 

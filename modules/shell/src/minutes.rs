@@ -59,7 +59,7 @@ fn within(title: String) -> Option<String> {
     (one_line && title.chars().any(char::is_alphanumeric) && title.chars().count() <= TITLE_MOST).then_some(title)
 }
 
-/// A front matter value as `wholeheard-summary` writes it: `null`, a plain value, or a string in
+/// A front matter value as `kitokey-summary` writes it: `null`, a plain value, or a string in
 /// double quotes whose escapes — `\"`, `\\`, `\n`, `\t`, `\uXXXX` — are JSON's too.
 fn value(written: &str) -> Option<String> {
     let written = written.trim();

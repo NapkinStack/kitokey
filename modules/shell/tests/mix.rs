@@ -4,7 +4,7 @@
 
 use std::{f64::consts::TAU, fs, path::Path};
 
-use wholeheard_shell::{meeting, mix::Mix};
+use kitokey_shell::{meeting, mix::Mix};
 
 /// A WAV file: PCM of `bits` (16, 24 or 32), or 32-bit float when `bits` is 0; `frames`
 /// interleaved; its lengths said as given, or as a recording killed leaves them.

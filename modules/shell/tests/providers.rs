@@ -6,7 +6,7 @@ use std::{
     thread,
 };
 
-use wholeheard_shell::providers::{
+use kitokey_shell::providers::{
     self, ONLINE, hearing, hearing_listed, host, local, ollama_address, ollama_listed, ollama_models, ollama_pull,
 };
 
@@ -41,7 +41,7 @@ fn the_models_ollama_holds_are_offered_by_name_and_none_when_it_does_not_answer(
     assert!(ollama_models(&format!("http://{closed}")).is_empty());
     assert!(ollama_models(&answering("not json", 1)).is_empty());
     assert!(ollama_models(&answering(r#"{"other":1}"#, 1)).is_empty());
-    // A name `wholeheard-summary` would refuse is not offered.
+    // A name `kitokey-summary` would refuse is not offered.
     let odd = answering(r#"{"models":[{"name":""},{"name":"  "},{"name":"a\u0000b"},{"name":"ok"}]}"#, 1);
     assert_eq!(ollama_models(&odd), ["ok"]);
     assert_eq!(ollama_address(&format!("{}/", providers::OLLAMA)), "http://localhost:11434/v1");
@@ -100,8 +100,8 @@ fn a_provider_s_host_is_what_its_key_is_filed_under() {
 }
 
 #[test]
-fn an_address_is_local_exactly_when_wholeheard_summary_reads_it_as_this_machine() {
-    // Each address as wholeheard-summary reads it — accepted as this machine, accepted as another, or
+fn an_address_is_local_exactly_when_kitokey_summary_reads_it_as_this_machine() {
+    // Each address as kitokey-summary reads it — accepted as this machine, accepted as another, or
     // refused before anything is sent —; only the first are local.
     for here in [
         "http://localhost:11434/v1",

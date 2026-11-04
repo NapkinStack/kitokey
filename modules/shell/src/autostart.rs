@@ -1,6 +1,6 @@
-//! Wholeheard started with the user's session (D32), as the desktop's convention has it: an
+//! Kitokey started with the user's session (D32), as the desktop's convention has it: an
 //! entry in the user's autostart folder ([XDG Autostart]). The file is the setting — what the
-//! desktop's own tools change of it is what Settings show. Wholeheard writes it once by itself,
+//! desktop's own tools change of it is what Settings show. Kitokey writes it once by itself,
 //! at its first start, and never again: once turned off, it stays off.
 //!
 //! [XDG Autostart]: https://specifications.freedesktop.org/autostart-spec/latest/
@@ -13,17 +13,20 @@ use std::{
 use crate::settings;
 
 /// The entry's name: the package's own desktop entry's.
-pub const NAME: &str = "dev.wholeheard.Wholeheard.desktop";
+pub const NAME: &str = "com.napkinstack.Kitokey.desktop";
+
+/// Wholeheard's entry, before D86: its program gone with its package, it starts nothing.
+pub const NAME_BEFORE: &str = "dev.wholeheard.Wholeheard.desktop";
 
 /// The tray alone, no window (D17); `TryExec`: a removed package starts nothing.
 const ENTRY: &str = "[Desktop Entry]\n\
     Type=Application\n\
-    Name=Wholeheard\n\
+    Name=Kitokey\n\
     Comment=Offers to record a call as it starts\n\
     Comment[fr]=Propose d’enregistrer un appel dès qu’il commence\n\
-    Exec=wholeheard\n\
-    TryExec=wholeheard\n\
-    Icon=dev.wholeheard.Wholeheard\n\
+    Exec=kitokey\n\
+    TryExec=kitokey\n\
+    Icon=com.napkinstack.Kitokey\n\
     Terminal=false\n";
 
 /// Where the entry is on this system: the user's configuration's `autostart` folder.
@@ -31,7 +34,7 @@ pub fn file() -> Option<PathBuf> {
     dirs::config_dir().map(|folder| folder.join("autostart").join(NAME))
 }
 
-/// Whether the session starts Wholeheard: the entry is there, and neither hidden nor turned off
+/// Whether the session starts Kitokey: the entry is there, and neither hidden nor turned off
 /// by GNOME's key.
 pub fn on(entry: &Path) -> bool {
     let Ok(text) = fs::read_to_string(entry) else {
@@ -74,6 +77,19 @@ pub fn set(entry: &Path, on: bool) -> io::Result<()> {
     })
 }
 
+/// At a start, before `first`: Wholeheard's entry, when there is one, becomes Kitokey's — on if it
+/// was on, off if it was turned off — and is taken away. True when there was one.
+pub fn carry_over(before: &Path, entry: &Path) -> io::Result<bool> {
+    if !before.exists() {
+        return Ok(false);
+    }
+    if on(before) {
+        set(entry, true)?;
+    }
+    set(before, false)?;
+    Ok(true)
+}
+
 /// At a start: the entry written when the settings say it never was, and that it was, kept in
 /// them. True when it was written now. A settings file that cannot be read writes nothing.
 pub fn first(entry: &Path, settings_file: &Path) -> io::Result<bool> {
@@ -85,4 +101,23 @@ pub fn first(entry: &Path, settings_file: &Path) -> io::Result<bool> {
     settings.autostart = Some(true);
     settings::write(settings_file, &settings)?;
     Ok(true)
+}
+
+/// What the start did of the entry: Wholeheard's carried over, then Kitokey's written once.
+#[derive(Debug)]
+pub struct AtStart {
+    /// `carry_over`'s answer: true when Wholeheard's entry was there.
+    pub carried: io::Result<bool>,
+    /// `first`'s answer: true when Kitokey's was written now.
+    pub written: io::Result<bool>,
+}
+
+/// At a start, in this order: Wholeheard's entry carried over (D86), then Kitokey's written when
+/// the settings say it never was (D32). The carrying over comes first: the settings carried from
+/// Wholeheard say its entry was written once, so `first` alone would leave the session starting
+/// nothing.
+pub fn at_start(entry: &Path, settings_file: &Path) -> AtStart {
+    let carried = carry_over(&entry.with_file_name(NAME_BEFORE), entry);
+    let written = first(entry, settings_file);
+    AtStart { carried, written }
 }

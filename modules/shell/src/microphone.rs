@@ -3,7 +3,7 @@
 //!
 //! An application takes a microphone when one of its streams that records is linked to a device
 //! that is no output: a stream reading what the computer plays — a sink's monitor —, a level
-//! meter, and Wholeheard's own capture take none. An application is known by its process, so that
+//! meter, and Kitokey's own capture take none. An application is known by its process, so that
 //! a browser's tabs and its many streams are one; it is named as it names itself. Nothing of this
 //! is kept beyond what the graph holds now.
 
@@ -16,7 +16,7 @@ use std::{
 
 use serde_json::Value;
 
-/// Watches PipeWire's graph for as long as Wholeheard runs, and tells each change, on a thread of
+/// Watches PipeWire's graph for as long as Kitokey runs, and tells each change, on a thread of
 /// its own. `pw-dump` missing, or ended, is started again a minute later; what it said before
 /// stands, and an application still holding a microphone is not said again.
 pub fn watch(tell: impl Fn(Change) + Send + 'static) {
@@ -29,7 +29,7 @@ pub fn watch(tell: impl Fn(Change) + Send + 'static) {
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null());
-            // It ends with Wholeheard: on Linux, the system ends it when its parent goes.
+            // It ends with Kitokey: on Linux, the system ends it when its parent goes.
             #[cfg(target_os = "linux")]
             unsafe {
                 use std::os::unix::process::CommandExt;
@@ -68,7 +68,7 @@ pub enum Change {
 }
 
 /// Which application is offered to be recorded: once while it holds a microphone, never while
-/// Wholeheard records, never with offers off. "Not this time" lasts until it lets go.
+/// Kitokey records, never with offers off. "Not this time" lasts until it lets go.
 #[derive(Default)]
 pub struct Offers {
     offered: HashSet<u64>,
@@ -105,15 +105,15 @@ pub struct Takers {
     taking: BTreeMap<u64, String>,
 }
 
-/// The application a stream belongs to, and whether it is Wholeheard's own.
+/// The application a stream belongs to, and whether it is Kitokey's own.
 struct Owner {
     key: u64,
     name: String,
     own: bool,
 }
 
-/// Programs whose streams are Wholeheard's own.
-const OWN: [&str; 2] = ["wholeheard-capture", "wholeheard"];
+/// Programs whose streams are Kitokey's own.
+const OWN: [&str; 2] = ["kitokey-capture", "kitokey"];
 
 impl Takers {
     /// The graph forgotten, to be read whole again; who takes a microphone is kept, so that the

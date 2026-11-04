@@ -1,11 +1,11 @@
 [package]
-name = "wholeheard-shell"
+name = "kitokey-shell"
 version = "0.2.0"
 edition = "2024"
 publish = false
 
 [[bin]]
-name = "wholeheard"
+name = "kitokey"
 path = "src/main.rs"
 
 [dependencies]

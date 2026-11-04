@@ -1,10 +1,10 @@
-//! What Apple's SpeechAnalyzer offers on this Mac (D42), as `wholeheard-speech status` says it,
+//! What Apple's SpeechAnalyzer offers on this Mac (D42), as `kitokey-speech status` says it,
 //! tried with a program played in its place: on Linux, and anywhere it is not, nothing is offered.
 #![cfg(unix)]
 
 use std::{fs, os::unix::fs::PermissionsExt, path::Path, sync::Mutex};
 
-use wholeheard_shell::speech::{self, Status};
+use kitokey_shell::speech::{self, Status};
 
 /// One test at a time: a script written here while another test's program is being started
 /// is held open for writing in that child until it executes, and starting it then fails
@@ -12,7 +12,7 @@ use wholeheard_shell::speech::{self, Status};
 static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
 fn played(folder: &Path, answer: &str) -> std::path::PathBuf {
-    let program = folder.join("wholeheard-speech");
+    let program = folder.join("kitokey-speech");
     fs::write(
         &program,
         format!("#!/bin/sh\necho \"$@\" >> '{}/asked'\n{answer}\n", folder.display()),
@@ -44,7 +44,7 @@ fn nothing_is_offered_where_it_is_not_heard() {
     for answer in [
         r#"echo '{"available":false,"installed":false,"supported":false}'"#,
         r#"echo '{"available":true,"installed":false,"supported":false}'"#,
-        "echo 'wholeheard-speech: SpeechTranscriber is not available on this Mac' >&2; exit 1",
+        "echo 'kitokey-speech: SpeechTranscriber is not available on this Mac' >&2; exit 1",
         "echo 'not json'",
         "sleep 30",
     ] {
@@ -62,6 +62,6 @@ fn apple_s_model_is_installed_only_when_asked_and_its_refusal_is_said() {
     let program = played(folder.path(), r#"echo '{"installed":true}'"#);
     assert_eq!(speech::install(&program, "en"), Ok(()));
     assert_eq!(fs::read_to_string(folder.path().join("asked")).unwrap().trim(), "install en-US");
-    let refused = played(folder.path(), "echo 'wholeheard-speech: the download was refused' >&2; exit 1");
+    let refused = played(folder.path(), "echo 'kitokey-speech: the download was refused' >&2; exit 1");
     assert!(speech::install(&refused, "fr").unwrap_err().contains("the download was refused"));
 }

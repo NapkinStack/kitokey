@@ -1,10 +1,10 @@
 //! A transcript made, tried with a program played here: a script given the same arguments as
-//! `wholeheard-transcription`. No sound, no model, nobody heard.
+//! `kitokey-transcription`. No sound, no model, nobody heard.
 #![cfg(unix)]
 
 use std::{fs, os::unix::fs::PermissionsExt, path::Path, sync::Mutex, time::Duration};
 
-use wholeheard_shell::transcription::{Hearer, Made, Transcription};
+use kitokey_shell::transcription::{Hearer, Made, Transcription};
 
 /// The end of a transcript made by a script — a test that waits ten seconds has failed. One
 /// at a time: a script still open for writing while another starts cannot be run.
@@ -32,7 +32,7 @@ fn made_spoken(
 ) -> (Transcription, std::sync::mpsc::Receiver<Made>) {
     static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
     let _held = ONE_AT_A_TIME.lock().unwrap();
-    let path = folder.join("wholeheard-transcription");
+    let path = folder.join("kitokey-transcription");
     fs::write(&path, format!("#!/bin/sh\n{script}\n")).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
     Transcription::start_with(&path, &folder.join("session"), hearer, key, spoken).unwrap()
@@ -63,12 +63,9 @@ fn a_transcript_that_failed_says_the_programs_last_sentence() {
     fs::create_dir(folder.path().join("session")).unwrap();
     let (_, said) = made(
         folder.path(),
-        "echo 'loading' >&2\necho 'wholeheard-transcription: the model cannot be loaded' >&2\necho '' >&2\nexit 1",
+        "echo 'loading' >&2\necho 'kitokey-transcription: the model cannot be loaded' >&2\necho '' >&2\nexit 1",
     );
-    assert_eq!(
-        end(&said),
-        Made::Failed("wholeheard-transcription: the model cannot be loaded".into())
-    );
+    assert_eq!(end(&said), Made::Failed("kitokey-transcription: the model cannot be loaded".into()));
     // A transcript only grows: one that failed halfway is there, and is not whole.
     let (_, said) = made(
         folder.path(),
@@ -91,7 +88,7 @@ fn alive(pid: &str) -> bool {
 }
 
 #[test]
-fn a_transcript_ended_by_wholeheard_ends_with_what_it_started_and_is_not_written() {
+fn a_transcript_ended_by_kitokey_ends_with_what_it_started_and_is_not_written() {
     let folder = tempfile::tempdir().unwrap();
     fs::create_dir(folder.path().join("session")).unwrap();
     let started = folder.path().join("started");
@@ -126,7 +123,7 @@ fn what_the_program_said_last_is_kept_when_what_it_started_holds_its_error_strea
 #[test]
 fn the_last_recording_is_the_latest_session_of_the_folder() {
     let sessions = tempfile::tempdir().unwrap();
-    assert_eq!(wholeheard_shell::transcription::latest(sessions.path()), None);
+    assert_eq!(kitokey_shell::transcription::latest(sessions.path()), None);
     for name in ["2026-10-13_14-05", "2026-10-16_09-30", "2026-10-14_11-00"] {
         fs::create_dir(sessions.path().join(name)).unwrap();
         fs::write(sessions.path().join(name).join("session.json"), "{}").unwrap();
@@ -135,10 +132,10 @@ fn the_last_recording_is_the_latest_session_of_the_folder() {
     fs::create_dir(sessions.path().join("2027-notes")).unwrap();
     fs::write(sessions.path().join("zz.txt"), "").unwrap();
     assert_eq!(
-        wholeheard_shell::transcription::latest(sessions.path()),
+        kitokey_shell::transcription::latest(sessions.path()),
         Some(sessions.path().join("2026-10-16_09-30"))
     );
-    assert_eq!(wholeheard_shell::transcription::latest(Path::new("/nowhere")), None);
+    assert_eq!(kitokey_shell::transcription::latest(Path::new("/nowhere")), None);
 }
 
 #[test]
@@ -159,7 +156,7 @@ fn apple_s_speechanalyzer_is_asked_for_by_name_in_the_language_of_the_interface(
 
 #[test]
 fn speechanalyzer_hears_only_while_this_mac_offers_it_with_its_model() {
-    use wholeheard_shell::settings::Engine;
+    use kitokey_shell::settings::Engine;
     let model = Path::new("/models/ggml.bin");
     let whisper = Hearer::Model(model.to_path_buf());
     assert_eq!(
@@ -184,9 +181,9 @@ fn speechanalyzer_hears_only_while_this_mac_offers_it_with_its_model() {
     assert_eq!(whisper.name(), "ggml.bin");
 }
 
-fn with_service(provider: &str, agreed: Option<&str>) -> wholeheard_shell::settings::Settings {
-    wholeheard_shell::settings::Settings {
-        engine: wholeheard_shell::settings::Engine::Service,
+fn with_service(provider: &str, agreed: Option<&str>) -> kitokey_shell::settings::Settings {
+    kitokey_shell::settings::Settings {
+        engine: kitokey_shell::settings::Engine::Service,
         transcription_provider: Some(provider.into()),
         transcription_model: Some("whisper-large-v3".into()),
         transcription_agreed: agreed.map(str::to_string),
@@ -233,7 +230,7 @@ fn a_service_is_asked_for_with_its_address_and_model_its_key_in_the_environment(
     let (_running, made) = made_with(
         folder.path(),
         &format!(
-            "echo \"$@ key=$WHOLEHEARD_PROVIDER_KEY\" > '{}'\ntouch \"$1/transcript.jsonl\"",
+            "echo \"$@ key=$KITOKEY_PROVIDER_KEY\" > '{}'\ntouch \"$1/transcript.jsonl\"",
             asked.display()
         ),
         &hearer,
@@ -252,7 +249,7 @@ fn a_service_is_asked_for_with_its_address_and_model_its_key_in_the_environment(
 
 #[test]
 fn a_service_is_saved_only_once_its_host_elsewhere_is_agreed_to() {
-    use wholeheard_shell::transcription::{Refused, key_account, service_named};
+    use kitokey_shell::transcription::{Refused, key_account, service_named};
     // Elsewhere: refused without the agreement, its host named; agreed, that host kept.
     assert_eq!(
         service_named("https://api.groq.com/openai/v1", "whisper-large-v3", false),

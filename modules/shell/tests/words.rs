@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use wholeheard_shell::{
+use kitokey_shell::{
     recording::{Said, Source},
     words::{self, Failure, Language, Notice, Refusal},
 };
@@ -218,7 +218,7 @@ fn a_failure_never_says_what_the_program_said_of_it() {
     let said = |sentence: &str, language| told(&Said::Failed(sentence.into()), false, language).1;
     // The sentence is the user's; what the program said is the log's, and the developer mode's (D29).
     for sentence in [
-        "wholeheard-capture: no source could be opened: nothing to record",
+        "kitokey-capture: no source could be opened: nothing to record",
         "Timeout: no sound for 30 s",
         "(os error 28)",
         &"é".repeat(5000),
@@ -232,7 +232,7 @@ fn a_failure_never_says_what_the_program_said_of_it() {
         }
     }
     // A program that said nothing — or its name and nothing — is said to have said nothing.
-    for nothing in ["", "   ", "wholeheard-capture:", " wholeheard-capture: \t", "()"] {
+    for nothing in ["", "   ", "kitokey-capture:", " kitokey-capture: \t", "()"] {
         for language in BOTH {
             let body = said(nothing, language);
             assert!(
@@ -245,11 +245,11 @@ fn a_failure_never_says_what_the_program_said_of_it() {
 
 #[test]
 fn no_notice_of_a_failure_carries_what_a_program_or_the_system_said() {
-    use wholeheard_shell::{
+    use kitokey_shell::{
         transcription::Made,
         words::{Minutes, Trouble},
     };
-    const SAID: &str = "wholeheard-summary: CANARY (os error 2)";
+    const SAID: &str = "kitokey-summary: CANARY (os error 2)";
     for language in BOTH {
         let mut notices = vec![
             words::trouble(&Trouble::NoRecorder(SAID.into()), language),
@@ -282,7 +282,7 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
     let (english, french) = (words::menu(Language::English), words::menu(Language::French));
     assert_eq!(
         (english.start, english.stop, english.quit),
-        ("Start recording", "Stop recording", "Quit Wholeheard")
+        ("Start recording", "Stop recording", "Quit Kitokey")
     );
     assert_eq!(
         (french.start, french.stop),
@@ -310,7 +310,7 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
             Trouble::NoRecorder(String::new()),
             Trouble::Settings("settings.toml, line 3: invalid boolean".into()),
             Trouble::Shortcut(String::new()),
-            Trouble::NoModel("<data>/wholeheard/models/ggml.bin".into()),
+            Trouble::NoModel("<data>/kitokey/models/ggml.bin".into()),
             Trouble::NoTranscriber(String::new()),
         ] {
             let Notice { title, body } = words::trouble(&trouble, language);
@@ -321,13 +321,13 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
         }
         let settings = words::trouble(&Trouble::Settings("settings.toml, line 3: invalid boolean".into()), language).body;
         assert!(settings.contains("settings.toml, line 3: invalid boolean"), "{settings}");
-        let model = words::trouble(&Trouble::NoModel("<data>/wholeheard/models/ggml.bin".into()), language).body;
-        assert!(model.contains("<data>/wholeheard/models/ggml.bin"), "{model}");
+        let model = words::trouble(&Trouble::NoModel("<data>/kitokey/models/ggml.bin".into()), language).body;
+        assert!(model.contains("<data>/kitokey/models/ggml.bin"), "{model}");
     }
     // Each says what still works, or what to do — not the trouble a second time.
     let body = |trouble, language| words::trouble(&trouble, language).body;
-    assert!(body(Trouble::NoRecorder(String::new()), Language::English).ends_with("Installing Wholeheard again puts it back."));
-    assert!(body(Trouble::NoRecorder(String::new()), Language::French).ends_with("Réinstaller Wholeheard le remet en place."));
+    assert!(body(Trouble::NoRecorder(String::new()), Language::English).ends_with("Installing Kitokey again puts it back."));
+    assert!(body(Trouble::NoRecorder(String::new()), Language::French).ends_with("Réinstaller Kitokey le remet en place."));
     assert!(body(Trouble::Settings(String::new()), Language::English).contains("runs with its defaults"));
     assert!(body(Trouble::Shortcut(String::new()), Language::French).contains("permet toujours de démarrer"));
     // What the settings file holds wrong comes out on one line.
@@ -336,13 +336,13 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
 
 #[test]
 fn a_transcript_is_said_ready_or_not_with_how_to_have_it_again() {
-    use wholeheard_shell::{
+    use kitokey_shell::{
         transcription::Made,
         words::{Minutes, Trouble},
     };
     let ready = |language| words::made(&Made::Written("/s/2026-10-16_09-30".into()), language);
     assert_eq!(ready(Language::English).title, "Transcript ready");
-    // D44: on Linux a click opens the meeting in Wholeheard, and says so; elsewhere no click is
+    // D44: on Linux a click opens the meeting in Kitokey, and says so; elsewhere no click is
     // promised — the notification is said, and the window holds the meeting.
     if cfg!(target_os = "linux") {
         assert_eq!(ready(Language::French).body, "Cliquez pour l’ouvrir.");
@@ -355,7 +355,7 @@ fn a_transcript_is_said_ready_or_not_with_how_to_have_it_again() {
     assert!(!ready(Language::French).body.contains("dossier"));
     // Failed: the recording untouched, the menu's entry — never what the program said.
     let failed = words::made(
-        &Made::Failed("wholeheard-transcription: the model cannot be loaded".into()),
+        &Made::Failed("kitokey-transcription: the model cannot be loaded".into()),
         Language::English,
     );
     assert!(
@@ -466,7 +466,7 @@ fn audio_sent_to_the_trash_is_said_with_its_counts_and_a_refusal_never_claims_to
 
 #[test]
 fn the_minutes_are_said_ready_waiting_or_not_made_with_what_to_do() {
-    use wholeheard_shell::words::Minutes;
+    use kitokey_shell::words::Minutes;
     for language in BOTH {
         let entry = words::menu(language).minutes;
         let ready = words::minutes(&Minutes::Ready, language);
@@ -532,18 +532,18 @@ fn the_minutes_are_said_ready_waiting_or_not_made_with_what_to_do() {
     );
     assert_eq!(
         words::minutes(&Minutes::Waiting("openrouter.ai".into()), Language::French).body,
-        "Rien n’est envoyé à openrouter.ai avant votre accord, dans la fenêtre de Wholeheard."
+        "Rien n’est envoyé à openrouter.ai avant votre accord, dans la fenêtre de Kitokey."
     );
 }
 
 #[test]
 fn a_failure_the_user_can_put_right_says_where_and_the_gesture() {
-    use wholeheard_shell::words::{Minutes, Trouble};
+    use kitokey_shell::words::{Minutes, Trouble};
     for language in BOTH {
         // The meetings' folder cannot be made: the settings choose another, reinstalling does not.
-        let folder = words::trouble(&Trouble::NoFolder("/media/gone/Wholeheard".into()), language).body;
+        let folder = words::trouble(&Trouble::NoFolder("/media/gone/Kitokey".into()), language).body;
         assert!(
-            folder.contains("/media/gone/Wholeheard") && !folder.contains("nstall") && !folder.contains("éinstall"),
+            folder.contains("/media/gone/Kitokey") && !folder.contains("nstall") && !folder.contains("éinstall"),
             "{folder}"
         );
         // Who writes the minutes is no provider's address: the settings, not a try again.
@@ -557,16 +557,16 @@ fn a_failure_the_user_can_put_right_says_where_and_the_gesture() {
 
 #[test]
 fn the_page_has_what_a_program_said_only_in_developer_mode() {
-    assert_eq!(words::shown_detail("wholeheard-summary: the key was refused", false), "");
+    assert_eq!(words::shown_detail("kitokey-summary: the key was refused", false), "");
     assert_eq!(
-        words::shown_detail("wholeheard-summary: the key was refused", true),
-        "wholeheard-summary: the key was refused"
+        words::shown_detail("kitokey-summary: the key was refused", true),
+        "kitokey-summary: the key was refused"
     );
 }
 
 #[test]
 fn minutes_not_made_say_their_cause_and_its_gesture_when_the_program_named_one() {
-    use wholeheard_shell::{summarising::Cause, words::Minutes};
+    use kitokey_shell::{summarising::Cause, words::Minutes};
     const ALL: [Cause; 16] = [
         Cause::TooMany,
         Cause::Down,
@@ -1063,12 +1063,7 @@ fn a_confidential_meeting_s_words_are_said_in_both_languages_french_typeset_as_f
         for silent in [true, false] {
             let said = words::minutes(&words::Minutes::OllamaWaits { silent }, language);
             assert!(said.body.contains("Ollama"), "{}", said.body);
-            assert_eq!(
-                said.body.contains(wholeheard_shell::providers::RECOMMENDED),
-                !silent,
-                "{}",
-                said.body
-            );
+            assert_eq!(said.body.contains(kitokey_shell::providers::RECOMMENDED), !silent, "{}", said.body);
         }
     }
     let said = words::minutes(&words::Minutes::OllamaWaits { silent: false }, Language::French);
@@ -1100,7 +1095,7 @@ fn every_french_word_of_the_window_is_typeset_as_french() {
 
 #[test]
 fn the_announcement_is_in_the_meetings_language_when_it_says_french_or_english_else_the_windows() {
-    use wholeheard_shell::words::{Language, announcement};
+    use kitokey_shell::words::{Language, announcement};
     let french = "J’enregistre cette réunion pour en faire le compte rendu. Dites-le-moi si vous préférez que je ne le fasse pas.";
     let english = "I’m recording this meeting to write up its minutes. Tell me if you’d rather I didn’t.";
     assert_eq!(announcement(Some("fr"), Language::English), french);
@@ -1189,7 +1184,7 @@ fn every_french_sentence_has_its_spaces_before_the_tall_signs() {
     let mut wrong = Vec::new();
     for text in literals_by_language().0 {
         // A program's name, as its own messages open: no sentence. What is filled in neither.
-        if matches!(text.as_str(), "wholeheard-capture:" | "wholeheard-transcription:") {
+        if matches!(text.as_str(), "kitokey-capture:" | "kitokey-transcription:") {
             continue;
         }
         let chars: Vec<char> = text.chars().collect();
@@ -1308,9 +1303,9 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
             french.developer[1],
             "Affiche le détail technique sous chaque erreur, pour aider au diagnostic.",
         ),
-        (french.log_level[1], "S’applique au prochain lancement de Wholeheard."),
+        (french.log_level[1], "S’applique au prochain lancement de Kitokey."),
         (french.playback, "Position de lecture"),
-        (french.not_playable, "Cette version de Wholeheard ne peut pas lire cet audio."),
+        (french.not_playable, "Cette version de Kitokey ne peut pas lire cet audio."),
         (
             french.not_played,
             "Lecture impossible ici. Ouvrez le dossier pour l’écouter avec un autre lecteur.",
@@ -1550,15 +1545,15 @@ fn a_settings_file_that_cannot_be_read_is_said_whole_its_raw_text_under_it_only_
     let page = |language, developer| serde_json::to_value(words::told(Failure::SettingsLocked, raw, language, developer)).unwrap();
     assert_eq!(
         page(Language::French, false),
-        "Le fichier des réglages ne peut pas être lu\u{a0}: Wholeheard ne l’écrit pas tant qu’il n’est pas corrigé."
+        "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé."
     );
     assert_eq!(
         page(Language::English, false),
-        "The settings file cannot be read: Wholeheard does not write over it until it is corrected."
+        "The settings file cannot be read: Kitokey does not write over it until it is corrected."
     );
     assert_eq!(
         page(Language::English, true),
-        format!("The settings file cannot be read: Wholeheard does not write over it until it is corrected.\n{raw}").as_str()
+        format!("The settings file cannot be read: Kitokey does not write over it until it is corrected.\n{raw}").as_str()
     );
 }
 
@@ -1586,17 +1581,14 @@ fn a_command_that_failed_says_its_sentence_and_the_raw_text_only_in_developer_mo
 
 #[test]
 fn a_test_with_a_cause_says_it_alone_the_raw_text_only_in_developer_mode() {
-    use wholeheard_shell::{summarising::Cause, words};
+    use kitokey_shell::{summarising::Cause, words};
     for (cause, advice) in [
         (Cause::TooMany, "wait, or check your plan with it"),
         (
             Cause::Down,
             "try again later. On this computer, this model may be too large for the memory: choose a smaller one",
         ),
-        (
-            Cause::NoTimes,
-            "choose one that gives each segment’s times in Wholeheard’s settings",
-        ),
+        (Cause::NoTimes, "choose one that gives each segment’s times in Kitokey’s settings"),
     ] {
         assert!(words::cause(cause, Language::English).contains(advice), "{cause:?}");
     }

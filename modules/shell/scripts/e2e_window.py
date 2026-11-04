@@ -1,7 +1,7 @@
-"""The window's end-to-end scenario: Wholeheard started with `--window` by tauri-driver, the page
+"""The window's end-to-end scenario: Kitokey started with `--window` by tauri-driver, the page
 read as WebKitGTK shows it, over WebDriver. Sessions are made here; nothing is recorded.
 
-    python3 scripts/e2e_window.py <wholeheard-binary> <work-folder>
+    python3 scripts/e2e_window.py <kitokey-binary> <work-folder>
 
 Prints one line per check, `ok` or `FAIL`, and exits 1 on any failure.
 """
@@ -43,24 +43,24 @@ from selenium.webdriver.support.wait import WebDriverWait
 from urllib3.exceptions import HTTPError, ReadTimeoutError
 
 BINARY, WORK = Path(sys.argv[1]), Path(sys.argv[2])
-# wholeheard-summary played here: it says what it was given — its arguments, the key in its
+# kitokey-summary played here: it says what it was given — its arguments, the key in its
 # environment, the context it would send (D59), read where the real one reads it. A test refuses a
 # key at openrouter.ai and answers elsewhere; minutes are written, naming their context as the
 # real ones do, the way it was called kept beside them. Nothing leaves the machine. Where a scenario
 # stands a service in ($STANDIN, D60), a request for a provider elsewhere than this computer is sent
 # to it, as the real one would send it there, and the minutes name the host that answered.
-SUMMARY = WORK / "wholeheard-summary"
+SUMMARY = WORK / "kitokey-summary"
 SUMMARY.write_text(
     """#!/bin/sh
 here=$(dirname "$0")
 printf '%s\\n' "$*" > "$here/summary-args"
-printf '%s' "${WHOLEHEARD_PROVIDER_KEY:-none}" > "$here/summary-key"
+printf '%s' "${KITOKEY_PROVIDER_KEY:-none}" > "$here/summary-key"
 if [ "$1" != --test ]; then
   provider=local
   case "$3" in http://127.0.0.1*|http://localhost*) ;; *) provider=$(python3 -c "$HOST" "$3"); [ -n "$STANDIN" ] && python3 -c "$SEND" "$STANDIN/write";; esac
   [ -e "$here/slow-minutes" ] && sleep 3
-  [ -e "$here/fail-minutes" ] && { echo '{"event": "failed", "code": "answer.not_minutes"}'; echo "wholeheard-summary: the provider's answer is not minutes" >&2; exit 1; }
-  [ -e "$here/fail-plainly" ] && { echo "wholeheard-summary: a failure no code names" >&2; exit 1; }
+  [ -e "$here/fail-minutes" ] && { echo '{"event": "failed", "code": "answer.not_minutes"}'; echo "kitokey-summary: the provider's answer is not minutes" >&2; exit 1; }
+  [ -e "$here/fail-plainly" ] && { echo "kitokey-summary: a failure no code names" >&2; exit 1; }
   context=$(python3 -c "$CONTEXT" "$1")
   printf '%s' "$context" > "$here/summary-context"
   echo '{"event": "sending", "host": "h", "model": "m", "characters": 1}'
@@ -69,27 +69,27 @@ if [ "$1" != --test ]; then
   echo '{"event": "written", "file": "x"}'
   exit 0
 fi
-[ -e "$here/test-code" ] && { echo '{"event": "sending", "host": "h", "model": "m", "characters": 1}'; echo '{"event": "failed", "code": "'"$(cat "$here/test-code")"'"}'; echo; echo "an earlier line" >&2; echo "wholeheard-summary: raw words of the provider" >&2; exit 1; }
-case "$*" in *openrouter.ai*) echo "wholeheard-summary: the provider at openrouter.ai refused the key" >&2; exit 1;; esac
+[ -e "$here/test-code" ] && { echo '{"event": "sending", "host": "h", "model": "m", "characters": 1}'; echo '{"event": "failed", "code": "'"$(cat "$here/test-code")"'"}'; echo; echo "an earlier line" >&2; echo "kitokey-summary: raw words of the provider" >&2; exit 1; }
+case "$*" in *openrouter.ai*) echo "kitokey-summary: the provider at openrouter.ai refused the key" >&2; exit 1;; esac
 echo '{"event": "sending"}'
 echo '{"event": "answered"}'
 """
 )
 SUMMARY.chmod(0o755)
-# wholeheard-transcription played here: a whole transcript, naming the model it was given — a
+# kitokey-transcription played here: a whole transcript, naming the model it was given — a
 # service's by its host, as the real one names it; where a scenario stands the service in
 # ($STANDIN, D60), its request is sent to it, as the real one would send the sound there.
-HEARING = WORK / "wholeheard-transcription"
+HEARING = WORK / "kitokey-transcription"
 HEARING.write_text(
     """#!/bin/sh
 printf '%s\\n' "$*" > "$(dirname "$0")/hearing-args"
 # Tester (D43, D63): the key it was given kept beside; a model that gives no times refused, as the real one says it.
 if [ "$1" = --test ]; then
-  printf '%s' "${WHOLEHEARD_PROVIDER_KEY:-none}" > "$(dirname "$0")/hearing-key"
-  [ -e "$(dirname "$0")/test-code" ] && { echo '{"event": "started"}'; echo '{"event": "failed", "code": "'"$(cat "$(dirname "$0")/test-code")"'"}'; echo; echo "an earlier line" >&2; echo "wholeheard-transcription: raw words of the service" >&2; exit 1; }
+  printf '%s' "${KITOKEY_PROVIDER_KEY:-none}" > "$(dirname "$0")/hearing-key"
+  [ -e "$(dirname "$0")/test-code" ] && { echo '{"event": "started"}'; echo '{"event": "failed", "code": "'"$(cat "$(dirname "$0")/test-code")"'"}'; echo; echo "an earlier line" >&2; echo "kitokey-transcription: raw words of the service" >&2; exit 1; }
   exit 0
 fi
-[ -e "$(dirname "$0")/fail-hearing" ] && { echo "wholeheard-transcription: the engine stopped" >&2; exit 1; }
+[ -e "$(dirname "$0")/fail-hearing" ] && { echo "kitokey-transcription: the engine stopped" >&2; exit 1; }
 engine=whisper.cpp
 model=$(basename "$3" .bin)
 if [ "$2" = --provider ]; then
@@ -112,9 +112,9 @@ os.environ["CONTEXT"] = (
 os.environ["HOST"] = "import sys, urllib.parse; print(urllib.parse.urlsplit(sys.argv[1]).hostname)"
 os.environ["SEND"] = "import sys, urllib.request; urllib.request.urlopen(urllib.request.Request(sys.argv[1], data=b'x', method='POST'), timeout=5)"
 
-# wholeheard-capture played here: it says it started, then each source's level ten times a second,
+# kitokey-capture played here: it says it started, then each source's level ten times a second,
 # until it is told to stop. No device, nobody recorded.
-RECORDER = WORK / "wholeheard-capture"
+RECORDER = WORK / "kitokey-capture"
 RECORDER.write_text(
     """#!/bin/bash
 here=$(dirname "$0")
@@ -165,9 +165,9 @@ RECORDER.chmod(0o755)
 FAILED = []
 # What Tester says of each cause its program names (D72), as `src/words.rs` says it in French.
 TEST_CAUSES = [
-    ("provider.refused_key", "Le fournisseur a refusé la clé\u00a0: saisissez-la de nouveau dans les réglages de Wholeheard."),
-    ("provider.unknown_model", "Le fournisseur ne connaît pas ce modèle ou cette adresse\u00a0: choisissez-les de nouveau dans les réglages de Wholeheard."),
-    ("provider.no_times", "Ce modèle ne donne pas les temps de ce qu’il entend\u00a0: choisissez-en un qui donne ceux de chaque segment dans les réglages de Wholeheard."),
+    ("provider.refused_key", "Le fournisseur a refusé la clé\u00a0: saisissez-la de nouveau dans les réglages de Kitokey."),
+    ("provider.unknown_model", "Le fournisseur ne connaît pas ce modèle ou cette adresse\u00a0: choisissez-les de nouveau dans les réglages de Kitokey."),
+    ("provider.no_times", "Ce modèle ne donne pas les temps de ce qu’il entend\u00a0: choisissez-en un qui donne ceux de chaque segment dans les réglages de Kitokey."),
     ("provider.no_credit", "Le fournisseur a refusé faute de crédit\u00a0: ajoutez du crédit chez lui, puis réessayez."),
     ("provider.too_many", "Le fournisseur refuse pour trop de demandes, ou un quota épuisé\u00a0: patientez, ou vérifiez votre forfait chez lui."),
     ("provider.down", "Le fournisseur répond qu’il est en panne\u00a0: réessayez plus tard. Sur cet ordinateur, ce modèle est peut-être trop gros pour la mémoire\u00a0: choisissez-en un plus petit."),
@@ -185,8 +185,8 @@ def check(what: str, held: bool, got: object = "") -> None:
 
 
 def shot(browser, name: str) -> None:
-    """The page as it is, saved where WHOLEHEARD_SCREENSHOTS says: for an eye against D11's boards."""
-    folder = os.environ.get("WHOLEHEARD_SCREENSHOTS")
+    """The page as it is, saved where KITOKEY_SCREENSHOTS says: for an eye against D11's boards."""
+    folder = os.environ.get("KITOKEY_SCREENSHOTS")
     if folder:
         Path(folder).mkdir(parents=True, exist_ok=True)
         browser.save_screenshot(str(Path(folder) / f"{name}.png"))
@@ -287,7 +287,7 @@ def session(folder: Path, started: dt.datetime, minutes: float | None, files: di
 
 
 def instances() -> list[int]:
-    """The processes of the Wholeheard under test."""
+    """The processes of the Kitokey under test."""
     found = []
     for process in Path("/proc").iterdir():
         try:
@@ -299,19 +299,27 @@ def instances() -> list[int]:
 
 
 def tray_entries() -> tuple[str, str, list[tuple[int, str]]]:
-    """The tray's menu of the Wholeheard under test, as the desktop reads it: its bus, its path, and
+    """The tray's menu of the Kitokey under test, as the desktop reads it: its bus, its path, and
     each entry's number and words (D64)."""
     watcher = ["org.kde.StatusNotifierWatcher", "/StatusNotifierWatcher", "org.kde.StatusNotifierWatcher"]
     listed = subprocess.run(["busctl", "--user", "get-property", *watcher, "RegisteredStatusNotifierItems"],
                             capture_output=True, text=True).stdout
-    ours = set(instances())
-    for item in (word.strip('"') for word in listed.split() if "@" in word and "wholeheard" in word):
-        bus, path = item.split("@", 1)
-        status = subprocess.run(["busctl", "--user", "status", bus], capture_output=True, text=True).stdout
-        if not any(line == f"PID={pid}" for pid in ours for line in status.splitlines()):
+    ours = {str(pid) for pid in instances()}
+    # The program's own buses: the watcher lists an item as `bus@path`, or since GNOME's
+    # AppIndicator 66 as its path alone; the bus is the one of ours that answers for its menu.
+    names = subprocess.run(["busctl", "--user", "list", "--no-legend"], capture_output=True, text=True).stdout
+    buses = [words[0] for words in (line.split() for line in names.splitlines())
+             if len(words) > 1 and words[0].startswith(":") and words[1] in ours]
+    for item in (word.strip('"') for word in listed.split() if "kitokey" in word):
+        path = item.split("@", 1)[-1]
+        for bus in buses:
+            answered = subprocess.run(["busctl", "--user", "--json=short", "call", bus, f"{path}/Menu", "com.canonical.dbusmenu",
+                                       "GetLayout", "iias", "0", "--", "-1", "0"], capture_output=True, text=True)
+            if answered.returncode == 0:
+                break
+        else:
             continue
-        layout = subprocess.run(["busctl", "--user", "--json=short", "call", bus, f"{path}/Menu", "com.canonical.dbusmenu",
-                                 "GetLayout", "iias", "0", "--", "-1", "0"], capture_output=True, text=True).stdout
+        layout = answered.stdout
         entries: list[tuple[int, str]] = []
 
         def walk(node) -> None:
@@ -328,7 +336,7 @@ def tray_entries() -> tuple[str, str, list[tuple[int, str]]]:
 
 
 def tray_labels() -> list[str]:
-    """The words of the tray's menu of the Wholeheard under test (D64)."""
+    """The words of the tray's menu of the Kitokey under test (D64)."""
     return [label for _, label in tray_entries()[2]]
 
 
@@ -342,13 +350,13 @@ def tray_click(words: str) -> bool:
                            str(number), "clicked", "s", "", "0"], capture_output=True).returncode == 0
 
 class Window:
-    """Wholeheard with its window, for as long as the `with` lasts."""
+    """Kitokey with its window, for as long as the `with` lasts."""
 
     def __init__(self, sessions: Path, language: str, more: str = "", ollama: str = "http://127.0.0.1:9", small: bool = False,
                  welcomed: bool = True, args: tuple[str, ...] = ("--window",)) -> None:
         config = WORK / f"config-{language}-{sessions.name}"
-        (config / "wholeheard").mkdir(parents=True, exist_ok=True)
-        self.file = config / "wholeheard" / "settings.toml"
+        (config / "kitokey").mkdir(parents=True, exist_ok=True)
+        self.file = config / "kitokey" / "settings.toml"
         # The full window, as the scenarios before D35 knew it; the small one, opened first, where asked.
         self.small = small
         opened = "" if small else 'window = "full"\n'
@@ -358,10 +366,10 @@ class Window:
         self.file.write_text(f'sessions = "{sessions}"\n{opened}{greeted}{more}')
         self.env = dict(os.environ, XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
         # An Ollama and a keyring of the scenario's, never the user's own.
-        self.env.update(LANG=language, LC_ALL=language, WHOLEHEARD_OLLAMA=ollama, WHOLEHEARD_KEYRING="memory", WHOLEHEARD_SUMMARY=str(SUMMARY), WHOLEHEARD_TRANSCRIPTION=str(HEARING), WHOLEHEARD_CAPTURE=str(RECORDER))
+        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER))
 
     def __enter__(self) -> webdriver.Remote:
-        # One Wholeheard per session: one still leaving takes this start's arguments and this one
+        # One Kitokey per session: one still leaving takes this start's arguments and this one
         # leaves, its session never opened (#510). Waited for.
         until = time.monotonic() + 10
         while instances() and time.monotonic() < until:
@@ -388,7 +396,7 @@ class Window:
             except ReadTimeoutError:
                 self.driver_process.terminate()
                 self.driver_process.wait(timeout=10)
-                raise RuntimeError(f"tauri-driver opened no session in a minute; Wholeheard's processes: {instances()}") from None
+                raise RuntimeError(f"tauri-driver opened no session in a minute; Kitokey's processes: {instances()}") from None
             except (WebDriverException, HTTPError):
                 time.sleep(0.2)
         else:
@@ -405,7 +413,7 @@ class Window:
         finally:
             self.driver_process.terminate()
             self.driver_process.wait(timeout=10)
-            # A session that never answered leaves the Wholeheard under test behind: ended, or it takes
+            # A session that never answered leaves the Kitokey under test behind: ended, or it takes
             # the next start's arguments and the next session never opens (#510). Only this binary's.
             for pid in instances():
                 try:
@@ -440,16 +448,16 @@ MOVING = ("const moves = [...window.__moved], some = (t) => t.split(',').some((d
 
 # The run's own output, made by e2e.sh: the window's sound goes there, never to the speakers.
 QUIET = os.environ.get("PULSE_SINK", "")
-# What WirePlumber remembers of an application's sound, by its name: the user's own Wholeheard
+# What WirePlumber remembers of an application's sound, by its name: the user's own Kitokey
 # shares it, so a run that changes a volume there changes theirs.
 REMEMBERED = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "wireplumber" / "stream-properties"
 
 
 def remembered() -> str | None:
-    """The volume the system keeps for Wholeheard's sound, as its line says it."""
+    """The volume the system keeps for Kitokey's sound, as its line says it."""
     if not REMEMBERED.exists():
         return None
-    return next((line for line in REMEMBERED.read_text().splitlines() if line.startswith("Output/Audio:application.name:wholeheard=")), None)
+    return next((line for line in REMEMBERED.read_text().splitlines() if line.startswith("Output/Audio:application.name:kitokey=")), None)
 
 
 def same_volume(one: str | None, other: str | None) -> bool:
@@ -535,9 +543,9 @@ def model_offered(now: dt.datetime) -> None:
     meetings, data = WORK / "fetching", WORK / "data-fetching"
     session(meetings / "2026-10-25_10-00", now - dt.timedelta(hours=1), 5, {"local.wav": 2000})
     heard = meetings / "2026-10-25_10-00" / "transcript.jsonl"
-    fetched = data / "wholeheard" / "models" / "ggml-large-v3-turbo-q8_0.bin"
+    fetched = data / "kitokey" / "models" / "ggml-large-v3-turbo-q8_0.bin"
     window = Window(meetings, "fr_FR.UTF-8")
-    window.env.update(XDG_DATA_HOME=str(data), WHOLEHEARD_MODEL_PUBLISHED=f"http://{host}/model.bin 300000 {hashlib.sha256(right).hexdigest()}")
+    window.env.update(XDG_DATA_HOME=str(data), KITOKEY_MODEL_PUBLISHED=f"http://{host}/model.bin 300000 {hashlib.sha256(right).hexdigest()}")
     said = "return document.getElementById('model-state')?.innerText || ''"
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
@@ -591,7 +599,7 @@ def model_offered(now: dt.datetime) -> None:
         check("fetched from the meeting, its transcript is made", made and fetched.read_bytes() == right)
     # A model the user named, not on this computer: theirs, nothing offered.
     named = Window(meetings, "fr_FR.UTF-8", f'model = "{WORK / "mine.bin"}"\n')
-    named.env.update(XDG_DATA_HOME=str(WORK / "data-named"), WHOLEHEARD_MODEL_PUBLISHED=window.env["WHOLEHEARD_MODEL_PUBLISHED"])
+    named.env.update(XDG_DATA_HOME=str(WORK / "data-named"), KITOKEY_MODEL_PUBLISHED=window.env["KITOKEY_MODEL_PUBLISHED"])
     with named as browser:
         browser.find_element(By.ID, "settings-link").click()
         drawn = wait_for(browser, lambda b: "Pas sur cet ordinateur" in b.execute_script(said))
@@ -601,7 +609,7 @@ def model_offered(now: dt.datetime) -> None:
         before = len(asked)
         browser.execute_script("window.__TAURI__.core.invoke('model_fetch')")
         time.sleep(1.5)
-        check("asked all the same, nothing is fetched for it", len(asked) == before and not (WORK / "data-named" / "wholeheard" / "models").exists(), asked)
+        check("asked all the same, nothing is fetched for it", len(asked) == before and not (WORK / "data-named" / "kitokey" / "models").exists(), asked)
     server.shutdown()
 
 
@@ -634,9 +642,9 @@ def models_listed(now: dt.datetime) -> None:
     meetings, data = WORK / "listing", WORK / "data-listing"
     session(meetings / "2026-10-25_11-00", now - dt.timedelta(hours=1), 5, {"local.wav": 2000})
     heard = meetings / "2026-10-25_11-00" / "transcript.jsonl"
-    models = data / "wholeheard" / "models"
+    models = data / "kitokey" / "models"
     window = Window(meetings, "fr_FR.UTF-8")
-    window.env.update(XDG_DATA_HOME=str(data), WHOLEHEARD_MODEL_PUBLISHED=";".join([
+    window.env.update(XDG_DATA_HOME=str(data), KITOKEY_MODEL_PUBLISHED=";".join([
         f"{at}/turbo.bin 200000 {hashlib.sha256(turbo).hexdigest()}",
         f"{at}/small.bin 100000 {hashlib.sha256(small).hexdigest()}",
     ]))
@@ -729,7 +737,7 @@ def list_refreshed(now: dt.datetime) -> None:
     meetings.mkdir()
     said = "return document.getElementById('offered-refreshed')?.innerText || ''"
     window = Window(meetings, "fr_FR.UTF-8")
-    window.env.update(WHOLEHEARD_REGISTRY=f"http://{at}/models.json")
+    window.env.update(KITOKEY_REGISTRY=f"http://{at}/models.json")
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
         waits = wait_for(browser, lambda b: "attend la clé qui la signe" in b.execute_script(said), 10)
@@ -750,8 +758,8 @@ def list_refreshed(now: dt.datetime) -> None:
 def speech_offered(now: dt.datetime) -> None:
     """X. On a Mac, Apple's SpeechAnalyzer is offered among who hears, its model fetched on the click (D42)."""
     print("X. Settings: Apple's SpeechAnalyzer offered where this Mac offers it, its model fetched on the click (D42)")
-    # A program in place of wholeheard-speech: this Mac offers it, Apple's model not here yet.
-    program, asked = WORK / "wholeheard-speech", WORK / "speech-asked"
+    # A program in place of kitokey-speech: this Mac offers it, Apple's model not here yet.
+    program, asked = WORK / "kitokey-speech", WORK / "speech-asked"
     program.write_text(f"""#!/bin/sh
 echo "$@" >> '{asked}'
 case "$1" in
@@ -764,7 +772,7 @@ esac
     meetings.mkdir()
     pick = "return [...document.querySelectorAll('#model option')].map(o => o.value + '=' + o.text).join('|')"
     window = Window(meetings, "fr_FR.UTF-8")
-    window.env.update(WHOLEHEARD_SPEECH=str(program))
+    window.env.update(KITOKEY_SPEECH=str(program))
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
         offered = wait_for(browser, lambda b: "speechanalyzer=" in b.execute_script(pick), 10)
@@ -781,9 +789,9 @@ esac
         chosen = wait_for(browser, lambda b: 'engine = "speechanalyzer"' in window.file.read_text(), 10)
         check("on the click, macOS fetches it; then SpeechAnalyzer is who hears",
               chosen and "install fr-FR" in asked.read_text(), (asked.read_text(), window.file.read_text()))
-    # Where no wholeheard-speech answers — Linux, an older Mac — nothing is offered.
+    # Where no kitokey-speech answers — Linux, an older Mac — nothing is offered.
     window = Window(WORK / "speech", "fr_FR.UTF-8")
-    window.env.update(WHOLEHEARD_SPEECH=str(WORK / "nowhere"))
+    window.env.update(KITOKEY_SPEECH=str(WORK / "nowhere"))
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
         wait_for(browser, lambda b: b.find_elements(By.ID, "model"))
@@ -822,7 +830,7 @@ def service_named(now: dt.datetime) -> None:
     threading.Thread(target=server.serve_forever, daemon=True).start()
     stand = f"http://127.0.0.1:{server.server_address[1]}/api/v1"
     window = Window(meetings, "fr_FR.UTF-8")
-    window.env.update(WHOLEHEARD_HEARING=stand)
+    window.env.update(KITOKEY_HEARING=stand)
     said = "return document.getElementById('transcription-said')?.innerText || ''"
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
@@ -1014,7 +1022,7 @@ def service_named(now: dt.datetime) -> None:
             raw = wait_for(browser, lambda b: "raw words of the service" in b.execute_script(said), 10)
             told = browser.execute_script(said)
             check("Tester of a service in developer mode: the cause, then the raw line alone",
-                  raw and told.startswith(TEST_CAUSES[-1][1]) and "wholeheard-transcription:" not in told and "earlier line" not in told, told)
+                  raw and told.startswith(TEST_CAUSES[-1][1]) and "kitokey-transcription:" not in told and "earlier line" not in told, told)
         finally:
             code.unlink(missing_ok=True)
     server.shutdown()
@@ -1082,7 +1090,7 @@ def ollama_pulled(now: dt.datetime) -> None:
     meetings = WORK / "pulling"
     meetings.mkdir()
     window = Window(meetings, "fr_FR.UTF-8", ollama=f"http://127.0.0.1:{server.server_address[1]}")
-    window.env.update(XDG_DATA_HOME=str(WORK / "data-pulling"), WHOLEHEARD_MODEL_PUBLISHED=f"{at}/turbo.bin 1 {'0' * 64};{at}/small.bin 100000 {'0' * 64}")
+    window.env.update(XDG_DATA_HOME=str(WORK / "data-pulling"), KITOKEY_MODEL_PUBLISHED=f"{at}/turbo.bin 1 {'0' * 64};{at}/small.bin 100000 {'0' * 64}")
     row = "return document.querySelector('[data-offered=\"qwen3:8b\"]')?.innerText || ''"
     pull = "document.querySelector('[data-offered=\"qwen3:8b\"] button').click()"
     offers = "return [...document.querySelectorAll('#offered button, #model-fetch')].filter(b => !b.disabled).length"
@@ -1123,7 +1131,7 @@ def ollama_pulled(now: dt.datetime) -> None:
         monitor.terminate()
         monitor.wait(timeout=10)
         whisper.shutdown()
-    # No Ollama answering: where to get it is said, and nothing offered — Wholeheard never installs it.
+    # No Ollama answering: where to get it is said, and nothing offered — Kitokey never installs it.
     with Window(meetings, "fr_FR.UTF-8") as browser:
         browser.find_element(By.ID, "settings-link").click()
         absent = wait_for(browser, lambda b: "ollama.com" in b.execute_script(row))
@@ -1146,7 +1154,7 @@ def first_run(now: dt.datetime) -> None:
         meetings.mkdir()
         # No `window` line: the small one is the one left, as at a real first start (D35).
         window = Window(meetings, language, ollama=ollama, small=True, welcomed=False, args=())
-        window.env.update(XDG_DATA_HOME=str(WORK / f"data-welcome-{name}"), WHOLEHEARD_SPEECH=str(WORK / "nowhere"))
+        window.env.update(XDG_DATA_HOME=str(WORK / f"data-welcome-{name}"), KITOKEY_SPEECH=str(WORK / "nowhere"))
         # The dark theme asked of GTK, whatever the desktop shows; the light one cannot be asked
         # of a dark desktop without changing the user's setting — its colours are put on the page
         # for its screenshots instead, below.
@@ -1179,7 +1187,7 @@ def first_run(now: dt.datetime) -> None:
               shown and not browser.find_elements(By.ID, "small-record"), browser.execute_script(welcome))
         said = browser.execute_script(welcome)
         check("one question, its three answers in plain words, its sentence typeset as French has it",
-              "Réglons Wholeheard en une question." in said and "Vos réunions parlent-elles de sujets confidentiels ?" in said
+              "Réglons Kitokey en une question." in said and "Vos réunions parlent-elles de sujets confidentiels ?" in said
               and all(a in said for a in ("Oui, souvent", "Rarement ou jamais", "Je ne sais pas", "Passer — tout sur cet ordinateur", "Suivant")), said)
         check("nothing is chosen for the user", browser.execute_script(picked) == "", browser.execute_script(picked))
         check("each answer is a radio of one group, named by the question",
@@ -1214,7 +1222,7 @@ def first_run(now: dt.datetime) -> None:
         check("Passer: the minutes by Ollama on this computer, the meetings opened",
               listed and 'minutes_provider = "http://127.0.0.1:9/v1"' in text and 'minutes_model = "qwen3:8b"' in text, text)
         check("the window left is not changed: the small one stays the one reopened (D35)", "window =" not in text, text)
-        check("nothing is fetched on Passer", not (WORK / "data-welcome-skip" / "wholeheard" / "models").exists())
+        check("nothing is fetched on Passer", not (WORK / "data-welcome-skip" / "kitokey" / "models").exists())
     # Started again, welcomed: no assistant.
     window.args = ["--window"]
     with window as browser:
@@ -1244,7 +1252,7 @@ def first_run(now: dt.datetime) -> None:
         press(browser, "welcome-later")
         listed = wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 10)
         check("Plus tard: saved private, the meetings opened, the model left unfetched",
-              listed and 'minutes_model = "qwen3:8b"' in window.file.read_text() and not (WORK / "data-welcome-private" / "wholeheard" / "models").exists(),
+              listed and 'minutes_model = "qwen3:8b"' in window.file.read_text() and not (WORK / "data-welcome-private" / "kitokey" / "models").exists(),
               window.file.read_text())
 
     # 3. Rarely, then a service: connected, chosen in Settings.
@@ -1387,7 +1395,7 @@ def first_run(now: dt.datetime) -> None:
 
     # 6. The model here already: Terminer, nothing to fetch.
     window = started("here")
-    models = WORK / "data-welcome-here" / "wholeheard" / "models"
+    models = WORK / "data-welcome-here" / "kitokey" / "models"
     models.mkdir(parents=True)
     (models / "ggml-large-v3-turbo-q8_0.bin").write_bytes(b"\0" * 16)
     with window as browser:
@@ -1453,7 +1461,7 @@ def first_run(now: dt.datetime) -> None:
     for server in servers:
         threading.Thread(target=server.serve_forever, daemon=True).start()
     host, ollama = f"127.0.0.1:{servers[0].server_address[1]}", f"http://127.0.0.1:{servers[1].server_address[1]}"
-    fetched = WORK / "data-welcome-fetch" / "wholeheard" / "models" / "ggml-large-v3-turbo-q8_0.bin"
+    fetched = WORK / "data-welcome-fetch" / "kitokey" / "models" / "ggml-large-v3-turbo-q8_0.bin"
     state = "return document.getElementById('model-state')?.innerText || ''"
     notified = WORK / "notified-welcome"
     monitor = subprocess.Popen(
@@ -1474,7 +1482,7 @@ def first_run(now: dt.datetime) -> None:
 
     try:
         window = started("fetch", ollama=ollama)
-        window.env.update(WHOLEHEARD_MODEL_PUBLISHED=f"http://{host}/model.bin {len(right)} {hashlib.sha256(right).hexdigest()}")
+        window.env.update(KITOKEY_MODEL_PUBLISHED=f"http://{host}/model.bin {len(right)} {hashlib.sha256(right).hexdigest()}")
         with window as browser:
             until_question(browser)
             press(browser, "welcome-next")
@@ -1623,7 +1631,7 @@ def meeting_language(now: dt.datetime) -> None:
     program.write_text("#!/bin/sh\necho '{\"available\":true,\"installed\":true,\"supported\":true}'\n")
     program.chmod(0o755)
     window = Window(meetings, "fr_FR.UTF-8", f'reminder = false\nmodel = "{model}"\nengine = "speechanalyzer"\nmeeting_language = "de"\n')
-    window.env.update(WHOLEHEARD_SPEECH=str(program))
+    window.env.update(KITOKEY_SPEECH=str(program))
     with window as browser:
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
@@ -1647,7 +1655,7 @@ def meeting_language(now: dt.datetime) -> None:
 
 
 def app_language(now: dt.datetime) -> None:
-    """AF. The language Wholeheard speaks, chosen in Settings, the system's by default (D64)."""
+    """AF. The language Kitokey speaks, chosen in Settings, the system's by default (D64)."""
     print("AF. the app's language chosen in Settings: spoken at once and after a restart, never the meetings' (D64)")
     meetings = WORK / "speaking-app"
     heard = meetings / "2026-10-28_09-00"
@@ -1662,12 +1670,12 @@ echo '{{"available":true,"installed":true,"supported":true}}'
 """)
     program.chmod(0o755)
     window = Window(meetings, "fr_FR.UTF-8", f'reminder = false\nmodel = "{model}"\nengine = "speechanalyzer"\n')
-    window.env.update(WHOLEHEARD_SPEECH=str(program))
+    window.env.update(KITOKEY_SPEECH=str(program))
     args = WORK / "hearing-args"
     told = lambda: args.read_text() if args.exists() else ""
-    french = ["Ouvrir Wholeheard", "Démarrer un enregistrement", "Transcrire le dernier enregistrement",
-              "Rédiger le compte rendu de la dernière réunion", "Quitter Wholeheard"]
-    english = ["Open Wholeheard", "Start recording", "Transcribe the last recording", "Write the minutes of the last recording", "Quit Wholeheard"]
+    french = ["Ouvrir Kitokey", "Démarrer un enregistrement", "Transcrire le dernier enregistrement",
+              "Rédiger le compte rendu de la dernière réunion", "Quitter Kitokey"]
+    english = ["Open Kitokey", "Start recording", "Transcribe the last recording", "Write the minutes of the last recording", "Quit Kitokey"]
     sections = lambda b: b.execute_script("return [document.getElementById('settings-link').textContent, document.documentElement.lang]")
     redo = lambda b: b.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", heard.name, str(model))
 
@@ -1693,7 +1701,7 @@ echo '{{"available":true,"installed":true,"supported":true}}'
             label = browser.execute_script("return document.querySelector('label[for=app-language] .name')?.textContent")
             check("Settings offer the language, the system's by default, each other in its own",
                   [o.text for o in pick.options] == ["Langue du système", "Français", "English"]
-                  and pick.first_selected_option.get_attribute("value") == "" and label == "Langue de Wholeheard",
+                  and pick.first_selected_option.get_attribute("value") == "" and label == "Langue de Kitokey",
                   ([o.text for o in pick.options], label))
             redo(browser)
             wait_for(browser, lambda b: "Transcription prête" in notified.read_text(), 15)
@@ -1703,10 +1711,10 @@ echo '{{"available":true,"installed":true,"supported":true}}'
             saved = wait_for(browser, lambda b: 'language = "en"' in window.file.read_text(), 5)
             named = lambda b: b.execute_script("return document.querySelector('label[for=app-language] .name')?.textContent")
             # The page drawn again once SpeechAnalyzer has said what it offers: a moment after the sidebar.
-            spoken = wait_for(browser, lambda b: sections(b) == ["Settings", "en"] and named(b) == "Language of Wholeheard", 5)
+            spoken = wait_for(browser, lambda b: sections(b) == ["Settings", "en"] and named(b) == "Language of Kitokey", 5)
             label = named(browser)
             check("English chosen: written, and the window speaks it at once — the choice keeps the focus",
-                  saved and spoken and label == "Language of Wholeheard"
+                  saved and spoken and label == "Language of Kitokey"
                   and browser.execute_script("return document.activeElement.id") == "app-language",
                   (window.file.read_text(), sections(browser), label))
             check("the tray's menu speaks it at once, with no restart", wait_for(browser, lambda b: tray_labels() == english, 5), tray_labels())
@@ -5309,7 +5317,7 @@ def main() -> int:
         kept = browser.execute_script("return document.getElementById('search') && document.getElementById('search').value")
         check("another meeting opens without the last one's search", not kept, kept)
         notes = [p.text for p in browser.find_elements(By.CSS_SELECTOR, "#meeting .none") if p.is_displayed()]
-        check("minutes that cannot be read are said so", notes == ["Ce fichier ne peut pas être lu par cette version de Wholeheard."], notes)
+        check("minutes that cannot be read are said so", notes == ["Ce fichier ne peut pas être lu par cette version de Kitokey."], notes)
         chips = browser.find_element(By.CSS_SELECTOR, "#meeting .holds").text
         check("minutes that cannot be read claim no place", "Compte rendu" in chips and "Compte rendu ·" not in chips, chips)
         being = [p.text for p in browser.find_elements(By.CSS_SELECTOR, ".transcript .note")]
@@ -5322,7 +5330,7 @@ def main() -> int:
               browser.execute_script("return document.getElementById('meeting').dataset.name"))
 
     print("K. the settings: each choice saved at once, the user's file kept")
-    models = WORK / "data" / "wholeheard" / "models"
+    models = WORK / "data" / "kitokey" / "models"
     models.mkdir(parents=True, exist_ok=True)
     for name in ("ggml-large-v3-turbo-q8_0.bin", "ggml-small.bin"):
         (models / name).write_bytes(b"x" * 1000)
@@ -5375,7 +5383,7 @@ def main() -> int:
         changed(lambda: Select(browser.find_element(By.ID, "model")).select_by_visible_text(
             next(o.text for o in browser.find_elements(By.CSS_SELECTOR, "#model option") if o.text.startswith("Whisper small"))
         ))
-        # The user changes the file by hand while Wholeheard runs: the next save keeps it.
+        # The user changes the file by hand while Kitokey runs: the next save keeps it.
         window.file.write_text(window.file.read_text().replace("keep_audio = 30", "keep_audio = 90 # by hand"))
         changed(lambda: browser.find_element(By.ID, "reminder").click())
         changed(lambda: browser.find_element(By.ID, "developer").click())
@@ -5389,19 +5397,19 @@ def main() -> int:
         changed(lambda: Select(browser.find_element(By.ID, "offer")).select_by_value("nothing"))
         # Started with the user's session (D32): on from the first start, the desktop's own entry;
         # off, then turned off by the desktop's tools, then on again, each read from the entry.
-        entry = window.file.parent.parent / "autostart" / "dev.wholeheard.Wholeheard.desktop"
+        entry = window.file.parent.parent / "autostart" / "com.napkinstack.Kitokey.desktop"
         switch = lambda: browser.find_element(By.ID, "autostart")
-        start_on = read(browser, lambda b: switch().is_selected()) and entry.is_file() and "Exec=wholeheard\n" in entry.read_text()
+        start_on = read(browser, lambda b: switch().is_selected()) and entry.is_file() and "Exec=kitokey\n" in entry.read_text()
         changed(lambda: switch().click())
         start_off = not read(browser, lambda b: switch().is_selected()) and not entry.exists() and "autostart = false" in window.file.read_text()
-        entry.write_text("[Desktop Entry]\nType=Application\nExec=wholeheard\nX-GNOME-Autostart-enabled=false\n")
+        entry.write_text("[Desktop Entry]\nType=Application\nExec=kitokey\nX-GNOME-Autostart-enabled=false\n")
         browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 10)
         to_settings()
         tools_off = not read(browser, lambda b: switch().is_selected())
         changed(lambda: switch().click())
-        start_again = read(browser, lambda b: switch().is_selected()) and "TryExec=wholeheard\n" in entry.read_text() and "autostart = true" in window.file.read_text()
-        check("the session starts Wholeheard from its first start; turned off here or by the desktop's tools, on again",
+        start_again = read(browser, lambda b: switch().is_selected()) and "TryExec=kitokey\n" in entry.read_text() and "autostart = true" in window.file.read_text()
+        check("the session starts Kitokey from its first start; turned off here or by the desktop's tools, on again",
               start_on and start_off and tools_off and start_again, (start_on, start_off, tools_off, start_again))
         text = window.file.read_text()
         check(
@@ -5456,7 +5464,7 @@ def main() -> int:
             f"{keys!r}, settings offered: {offered}",
         )
         # The sessions' folder: typed, made when it is not there, and what the list reads.
-        elsewhere = WORK / "elsewhere" / "Wholeheard"
+        elsewhere = WORK / "elsewhere" / "Kitokey"
         spoken = browser.find_element(By.ID, "sessions-shown").get_attribute("textContent")
         # Outside the home folder, from the root: / tmp / … / chosen.
         check("the sessions' folder is shown as people say it", spoken == "/ " + " / ".join(chosen.parts[1:]), spoken)
@@ -5473,7 +5481,7 @@ def main() -> int:
         text = window.file.read_text()
         check("a folder typed is made, and in the settings file", elsewhere.is_dir() and f'sessions = "{elsewhere}"' in text, text)
         folder = folder_field()
-        changed(lambda: typed(folder, "Wholeheard"))
+        changed(lambda: typed(folder, "Kitokey"))
         said = not_saved()
         check("a folder that is not a whole path is said, and nothing changes", said.startswith("Le réglage n’a pas été enregistré") and window.file.read_text() == text, said)
         browser.execute_script("location.hash = '#/'")
@@ -5501,7 +5509,7 @@ def main() -> int:
         lines = [line for line in held.splitlines() if not line.startswith("keep_audio")] + ["keep_audio = 0"]
         broken = "\n".join(lines) + "\n"
         refused = "Le réglage n’a pas été enregistré\u00a0: le fichier des réglages ne peut pas être lu\u00a0: corrigez-le, puis réessayez.".replace("\xa0", " ")  # WebDriver's `.text` reads U+00A0 as a space
-        locked_said = "Le fichier des réglages ne peut pas être lu\u00a0: Wholeheard ne l’écrit pas tant qu’il n’est pas corrigé.".replace("\xa0", " ")  # WebDriver's `.text` reads U+00A0 as a space
+        locked_said = "Le fichier des réglages ne peut pas être lu\u00a0: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé.".replace("\xa0", " ")  # WebDriver's `.text` reads U+00A0 as a space
         unreadable = lambda: browser.find_element(By.ID, "settings-unreadable").text  # noqa: E731
         window.file.write_text(broken)
         changed(lambda: browser.find_element(By.ID, "reminder").click())
@@ -5588,11 +5596,11 @@ def main() -> int:
         browser.execute_script("location.hash = '#/'")
         to_settings()
         wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-test"), 5)
-        # Tester asks wholeheard-summary about the choice saved: no key for Ollama here.
+        # Tester asks kitokey-summary about the choice saved: no key for Ollama here.
         press(browser, "minutes-test")
         answered = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-tested").text == "Ça marche : le modèle répond.", 10)
         check(
-            "Tester says the model answers, asking wholeheard-summary with the choice saved",
+            "Tester says the model answers, asking kitokey-summary with the choice saved",
             answered
             and (WORK / "summary-args").read_text().split() == ["--test", "--provider", f"{ollama}/v1", "--model", "mistral:7b"]
             and (WORK / "summary-key").read_text() == "none",
@@ -5635,7 +5643,7 @@ def main() -> int:
             press(browser, "minutes-test")
             raw = wait_for(browser, lambda b: "raw words of the provider" in b.find_element(By.ID, "minutes-tested").get_attribute("textContent"), 10)
             told = browser.find_element(By.ID, "minutes-tested").get_attribute("textContent")
-            check("Tester in developer mode: the cause, then the raw line alone", raw and told.startswith(TEST_CAUSES[-1][1]) and "wholeheard-summary:" not in told and "earlier line" not in told, told)
+            check("Tester in developer mode: the cause, then the raw line alone", raw and told.startswith(TEST_CAUSES[-1][1]) and "kitokey-summary:" not in told and "earlier line" not in told, told)
             changed(lambda: browser.find_element(By.ID, "developer").click())
             text = window.file.read_text()
         finally:
@@ -5671,7 +5679,7 @@ def main() -> int:
         wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#settings .warn"))
         warned = browser.find_element(By.CSS_SELECTOR, "#settings .warn").text
         locked = browser.execute_script("return [...document.querySelectorAll('#settings input, #settings select')].every(e => e.disabled)")
-        check("a settings file that cannot be read is said so, and nothing can be changed", warned == "Le fichier des réglages ne peut pas être lu : Wholeheard ne l’écrit pas tant qu’il n’est pas corrigé." and locked, warned)
+        check("a settings file that cannot be read is said so, and nothing can be changed", warned == "Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé." and locked, warned)
         check("it is left as it was", window.file.read_text() == f'sessions = "{broken}"\nwelcomed = true\nkeep_audio = 0\n')
         # The shell itself refuses, not only the page.
         refused = browser.execute_async_script(
@@ -6313,7 +6321,7 @@ def main() -> int:
             "class ScenarioI extends Error { name = 'ScenarioI' }"
             " setTimeout(() => { throw new ScenarioI('Réunion avec Paul-Scenario') });"
             " setTimeout(() => Promise.reject(new ScenarioI('Réunion avec Paul-Scenario')))")
-        logs = WORK / "state" / "wholeheard" / "logs"
+        logs = WORK / "state" / "kitokey" / "logs"
         logged = lambda: "".join(p.read_text() for p in logs.glob("shell.*.jsonl")).count('"shell.page_failed"')
         wait_for(browser, lambda b: logged() >= 2, 10)
         text = "".join(p.read_text() for p in logs.glob("shell.*.jsonl"))
@@ -6553,7 +6561,7 @@ def main() -> int:
         there = wait_for(browser, lambda b: "ne peut pas lire cet audio" in b.execute_script(no_player), 10)
         check("a meeting whose audio is there but not playable is not said freed",
               there and "supprimé pour faire de la place" not in browser.execute_script(no_player), browser.execute_script(no_player))
-    check("the volume the system remembers for the user's Wholeheard is left as it was", same_volume(remembered(), kept), [remembered(), kept])
+    check("the volume the system remembers for the user's Kitokey is left as it was", same_volume(remembered(), kept), [remembered(), kept])
     model_offered(now)
     models_listed(now)
     list_refreshed(now)

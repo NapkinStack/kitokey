@@ -1,4 +1,4 @@
-//! `wholeheard` — Wholeheard as the user meets it: an icon in the tray, a global shortcut,
+//! `kitokey` — Kitokey as the user meets it: an icon in the tray, a global shortcut,
 //! notifications, and a window opened from the tray's menu — or at once with `--window`, the
 //! user's gesture too. It starts the program that records and stops it, then the one that
 //! hears; it records and hears nothing itself, and a recording goes on if this process does
@@ -25,8 +25,8 @@ use tauri::{
 use tauri_plugin_notification::NotificationExt;
 // A call starting is seen only on Linux, by PipeWire (D30).
 #[cfg(target_os = "linux")]
-use wholeheard_shell::microphone;
-use wholeheard_shell::{
+use kitokey_shell::microphone;
+use kitokey_shell::{
     autostart,
     confidential::{self, Left, Wait, What},
     context, correction, desktop, keys, log,
@@ -46,7 +46,7 @@ use wholeheard_shell::{
     words::{self, Failure, Language, Notice, Refusal, Told, Trouble},
 };
 
-const TRAY: &str = "wholeheard";
+const TRAY: &str = "kitokey";
 
 /// What the shell holds while it runs.
 struct Shell {
@@ -66,7 +66,7 @@ struct Shell {
     recorded: Mutex<Option<PathBuf>>,
     /// The menu's entry that starts and stops, relabelled as the recording goes.
     toggle: MenuItem<Wry>,
-    /// The user asked to quit while a recording ran: it is stopped first, then Wholeheard leaves.
+    /// The user asked to quit while a recording ran: it is stopped first, then Kitokey leaves.
     leaving: Mutex<bool>,
     /// When the recording was last started or told to stop: a second press in the same
     /// half-second is the same gesture, not a second one.
@@ -85,7 +85,7 @@ struct Shell {
     open: MenuItem<Wry>,
     quit: MenuItem<Wry>,
     /// A transcript made again: where it goes back, and where it was set aside — taken by the
-    /// run's end, or by Wholeheard quitting, whichever comes first.
+    /// run's end, or by Kitokey quitting, whichever comes first.
     redoing: Mutex<Option<(PathBuf, PathBuf)>>,
     /// The meeting whose transcript is being made, when one is: it cannot be freed meanwhile.
     hearing: Mutex<Option<PathBuf>>,
@@ -116,7 +116,7 @@ struct Shell {
     /// Minutes asked while others were written: made in turn, never dropped (D25).
     minutes_waiting: Mutex<VecDeque<Queued>>,
     /// Why the last minutes of a meeting were not written, until they are (D25).
-    /// With their cause, when wholeheard-summary named one this version knows: one entry, so
+    /// With their cause, when kitokey-summary named one this version knows: one entry, so
     /// that a later failure never shows an earlier one's cause (D29).
     minutes_failed: Mutex<HashMap<PathBuf, (String, Option<summarising::Cause>)>>,
     /// The loopback server the opened meeting is played from, started with the first (D26).
@@ -152,7 +152,7 @@ struct Shell {
     heard_here: Mutex<std::collections::HashSet<PathBuf>>,
     written_here: Mutex<std::collections::HashSet<PathBuf>>,
     /// What had left before a meeting was said confidential, and to which host: said on its page
-    /// while it stays so, until Wholeheard quits (D60).
+    /// while it stays so, until Kitokey quits (D60).
     left: Mutex<HashMap<PathBuf, Vec<Left>>>,
     /// Confidential meetings whose minutes wait for Ollama: silent, or holding no model (D60).
     ollama_waiting: Mutex<HashMap<PathBuf, Wait>>,
@@ -168,7 +168,7 @@ impl Shell {
         self.settings.lock().unwrap().clone()
     }
 
-    /// The language Wholeheard speaks now: the one the user chose, or the system's (D64).
+    /// The language Kitokey speaks now: the one the user chose, or the system's (D64).
     fn language(&self) -> Language {
         self.settings.lock().unwrap().language.unwrap_or(self.system)
     }
@@ -236,20 +236,20 @@ enum Shown {
 fn main() {
     // The logs' level the user chose in the developer mode, unless the environment names one:
     // set before anything runs beside it, so that the shell and every program it starts read it.
-    if std::env::var_os("WHOLEHEARD_LOG").is_none()
+    if std::env::var_os("KITOKEY_LOG").is_none()
         && let Some(level) = settings::file()
             .and_then(|file| settings::read(&file).ok())
             .map(|chosen| chosen.log)
             .filter(|level| *level != Log::Info)
     {
         // SAFETY: the program's first step, before any thread of it exists.
-        unsafe { std::env::set_var("WHOLEHEARD_LOG", level.as_str()) };
+        unsafe { std::env::set_var("KITOKEY_LOG", level.as_str()) };
     }
     // What the shell does is logged — never what was said — in the user's state folder (ADR-0007).
     let _run = log::start("shell");
     tracing::info!("shell.started");
     let app = tauri::Builder::default()
-        // One Wholeheard per session: a second start hands its arguments over and leaves — from
+        // One Kitokey per session: a second start hands its arguments over and leaves — from
         // the applications' menu (`--window`) its window opens; started again with the session,
         // nothing does (D35, #386). The plugin comes first, as its documentation asks.
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
@@ -311,22 +311,27 @@ fn main() {
         ])
         .setup(|app| {
             let system = Language::system();
-            // Summit became Wholeheard (D28): what the user held under the old name, carried over
+            // Wholeheard became Kitokey (D86), Summit Wholeheard (D28): what the user held under an earlier name, carried over
             // once, before anything is read; a failure leaves everything where it was, and says so.
             let carried = migrate::Places::here().map(|places| migrate::carry_over(&places));
             match &carried {
                 Some(Ok(carried)) if carried.settings || carried.data => tell(app.handle(), &words::carried_over(system)),
                 Some(Err(error)) => {
-                    eprintln!("wholeheard: Summit's folders could not all be carried over: {error}");
+                    eprintln!("kitokey: the earlier name's folders could not all be carried over: {error}");
                     tracing::error!(detail = %error, "shell.carry_failed");
                     tell(app.handle(), &words::carry_failed(system));
                 }
                 _ => {}
             }
-            // Started with the user's session from now on, written once by itself (D32); a
-            // settings file that cannot be read writes nothing, and is said below.
+            // Wholeheard's entry, when there is one, is Kitokey's from now on (D86), on or off as it
+            // was; then started with the user's session, written once by itself (D32). A settings
+            // file that cannot be read writes nothing, and is said below.
             if let (Some(entry), Some(file)) = (autostart::file(), settings::file()) {
-                match autostart::first(&entry, &file) {
+                let start = autostart::at_start(&entry, &file);
+                if let Err(error) = &start.carried {
+                    tracing::warn!(kind = ?error.kind(), "shell.autostart_not_carried");
+                }
+                match start.written {
                     Ok(true) => tracing::info!("shell.autostart_written"),
                     Ok(false) => {}
                     Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {}
@@ -348,7 +353,7 @@ fn main() {
             let download = MenuItem::with_id(app, "download", "", true, None::<&str>)?;
             TrayIconBuilder::with_id(TRAY)
                 .icon(Image::from_bytes(include_bytes!("../icons/tray.png"))?)
-                .tooltip("Wholeheard")
+                .tooltip("Kitokey")
                 .menu(&menu.clone())
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => open_window(app),
@@ -456,8 +461,8 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("Wholeheard could not start");
-    // No window is no reason to leave: Wholeheard lives in the tray until the user quits it.
+        .expect("Kitokey could not start");
+    // No window is no reason to leave: Kitokey lives in the tray until the user quits it.
     app.run(|_, event| {
         if let RunEvent::ExitRequested { api, code: None, .. } = event {
             api.prevent_exit();
@@ -492,7 +497,7 @@ fn offer_recording(app: &AppHandle, application: String) {
     tracing::info!("shell.offer_made");
     std::thread::spawn(move || {
         let shown = notify_rust::Notification::new()
-            .appname("Wholeheard")
+            .appname("Kitokey")
             .summary(&notice.title)
             .body(&notice.body)
             .action("record", record)
@@ -557,7 +562,7 @@ fn show_full(app: &AppHandle) {
 /// The full window made, on one of its pages.
 fn build_full(app: &AppHandle, page: &str) {
     let _ = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(format!("index.html{page}").into()))
-        .title("Wholeheard")
+        .title("Kitokey")
         .inner_size(1100.0, 800.0)
         .min_inner_size(420.0, 400.0)
         .build();
@@ -604,7 +609,7 @@ fn show_small(app: &AppHandle) {
     }
     let recording = app.state::<Shell>().recording.lock().unwrap().is_some();
     let _ = WebviewWindowBuilder::new(app, "small", WebviewUrl::App("index.html#/small".into()))
-        .title("Wholeheard")
+        .title("Kitokey")
         .inner_size(SMALL.0, SMALL.1)
         .resizable(false)
         .always_on_top(recording)
@@ -962,7 +967,7 @@ struct Microphones {
 async fn microphones_listed(app: AppHandle) -> Microphones {
     // The choice as it is when asked: the page knows a choice made since, and keeps its own (D74).
     let settings = app.state::<Shell>().settings();
-    let program = program("wholeheard-capture", "WHOLEHEARD_CAPTURE");
+    let program = program("kitokey-capture", "KITOKEY_CAPTURE");
     let list = tauri::async_runtime::spawn_blocking(move || recording::microphones(&program)).await;
     let list = list.unwrap_or_else(|error| Err(std::io::Error::other(error.to_string())));
     let chosen = settings.microphone.map(|name| recording::Listed {
@@ -1287,7 +1292,7 @@ async fn diagnostic(shell: State<'_, Shell>, name: String) -> Result<String, Tol
     // read away from the window's thread, an hour of tracks taking a second.
     tauri::async_runtime::spawn_blocking(move || {
         let lines = log::diagnostic(&folder, &name);
-        let levels = wholeheard_shell::levels::levels(&session);
+        let levels = kitokey_shell::levels::levels(&session);
         if lines.is_empty() { levels } else { format!("{lines}\n{levels}") }
     })
     .await
@@ -1454,7 +1459,7 @@ struct Offered {
 }
 
 /// The models Settings offer: the list shipped, or the one read again on the user's gesture
-/// until Wholeheard quits (D40, ADR-0010).
+/// until Kitokey quits (D40, ADR-0010).
 fn offered() -> Vec<registry::Listed> {
     offered_list().read().unwrap().clone()
 }
@@ -1464,13 +1469,13 @@ fn offered_list() -> &'static std::sync::RwLock<Vec<registry::Listed>> {
     LIST.get_or_init(|| std::sync::RwLock::new(registry::shipped()))
 }
 
-/// Where the list is read again from — or, for whoever tries Wholeheard, `WHOLEHEARD_REGISTRY`.
+/// Where the list is read again from — or, for whoever tries Kitokey, `KITOKEY_REGISTRY`.
 fn registry_address() -> String {
-    std::env::var("WHOLEHEARD_REGISTRY").unwrap_or_else(|_| registry::ADDRESS.to_owned())
+    std::env::var("KITOKEY_REGISTRY").unwrap_or_else(|_| registry::ADDRESS.to_owned())
 }
 
 /// Reads the list again, on the user's click in Settings — its host shown on the button. Taken,
-/// signed by the key built in, it is offered until Wholeheard quits; refused, the list offered
+/// signed by the key built in, it is offered until Kitokey quits; refused, the list offered
 /// stays, and the page says so. With no key built in the page offers no click (D56).
 #[tauri::command]
 async fn registry_refresh() -> Result<(), ()> {
@@ -1513,7 +1518,7 @@ struct SettingsShown {
     reminder: bool,
     /// A call another application starts is offered to be recorded (D30).
     offer: bool,
-    /// Wholeheard starts with the user's session (D32): its entry, as the desktop reads it.
+    /// Kitokey starts with the user's session (D32): its entry, as the desktop reads it.
     autostart: bool,
     keep_audio: KeepAudio,
     model: PathBuf,
@@ -1534,14 +1539,14 @@ struct SettingsShown {
     /// The language meetings are spoken in, none: detected; and those offered first (D65).
     meeting_language: Option<String>,
     languages: Vec<(&'static str, &'static str)>,
-    /// The language Wholeheard speaks, chosen by the user (D64): `fr`, `en`; none, the system's.
+    /// The language Kitokey speaks, chosen by the user (D64): `fr`, `en`; none, the system's.
     language: Option<&'static str>,
     developer: bool,
     log: Log,
     unreadable: Option<Told>,
 }
 
-/// The folder Wholeheard keeps its models in: the default model's.
+/// The folder Kitokey keeps its models in: the default model's.
 fn models_folder() -> PathBuf {
     Settings::default().model.parent().map(PathBuf::from).unwrap_or_default()
 }
@@ -1555,7 +1560,7 @@ fn settings_shown(shell: State<'_, Shell>) -> SettingsShown {
     let models = settings::whisper_models(&models_folder(), &settings)
         .into_iter()
         .map(|path| Model {
-            // One outside Wholeheard's folder says where it is: two files may share a name.
+            // One outside Kitokey's folder says where it is: two files may share a name.
             name: match path.parent() {
                 Some(parent) if parent != models_folder() => path.display().to_string(),
                 _ => path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default(),
@@ -1625,7 +1630,7 @@ struct Change {
     meeting_language: Option<String>,
     /// The sidebar folded or not (D61).
     folded: Option<bool>,
-    /// The language Wholeheard speaks (D64): `fr`, `en`, or empty for the system's.
+    /// The language Kitokey speaks (D64): `fr`, `en`, or empty for the system's.
     language: Option<String>,
 }
 
@@ -1658,7 +1663,7 @@ fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Re
     if let Some(offer) = change.offer {
         settings.offer = offer;
     }
-    // The entry first: the settings say what Wholeheard wrote of it, once it is written.
+    // The entry first: the settings say what Kitokey wrote of it, once it is written.
     if let Some(on) = change.autostart {
         let entry =
             autostart::file().ok_or_else(|| shell.told(Failure::Autostart, "this system names no folder for the session's start"))?;
@@ -1684,7 +1689,7 @@ fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Re
     if let Some(language) = change.language {
         settings.language = match language.trim() {
             "" => None,
-            code => Some(Language::named(code).ok_or_else(|| shell.told(Failure::Unexpected, "no language Wholeheard speaks"))?),
+            code => Some(Language::named(code).ok_or_else(|| shell.told(Failure::Unexpected, "no language Kitokey speaks"))?),
         };
     }
     // The same bounds as the file's: a value read refuses is never written.
@@ -1785,9 +1790,9 @@ async fn choose_folder(app: AppHandle) -> Option<PathBuf> {
     chosen.into_path().ok()
 }
 
-/// Ollama on this computer — or, for whoever tries Wholeheard, where `WHOLEHEARD_OLLAMA` says.
+/// Ollama on this computer — or, for whoever tries Kitokey, where `KITOKEY_OLLAMA` says.
 fn ollama() -> String {
-    std::env::var("WHOLEHEARD_OLLAMA").unwrap_or_else(|_| providers::OLLAMA.to_string())
+    std::env::var("KITOKEY_OLLAMA").unwrap_or_else(|_| providers::OLLAMA.to_string())
 }
 
 /// Who can write the minutes, and who does: the page never receives a key, only whether one is
@@ -1954,7 +1959,7 @@ async fn hearing_models(shell: State<'_, Shell>, index: usize) -> Result<Vec<Str
     Ok(listed.unwrap_or_else(published))
 }
 
-/// *Tester* for who hears: `wholeheard-transcription --test` sends a sound of its own to the service
+/// *Tester* for who hears: `kitokey-transcription --test` sends a sound of its own to the service
 /// saved, its key in the environment; refused, the program's own sentence.
 #[tauri::command]
 async fn transcription_tested(shell: State<'_, Shell>) -> Result<(), Told> {
@@ -1963,16 +1968,16 @@ async fn transcription_tested(shell: State<'_, Shell>) -> Result<(), Told> {
     let (Some(provider), Some(model)) = (settings.transcription_provider, settings.transcription_model) else {
         return Err(failed(shell.told(Failure::NoneChosen, "no service is chosen yet")));
     };
-    let hearing = program("wholeheard-transcription", "WHOLEHEARD_TRANSCRIPTION");
+    let hearing = program("kitokey-transcription", "KITOKEY_TRANSCRIPTION");
     let output = tauri::async_runtime::spawn_blocking(move || {
         let host = providers::host(&provider).unwrap_or_default();
         let key = keys::key(&transcription::key_account(&host)).ok().flatten();
         tracing::info!(host = %host, model = %model, key = key.is_some(), "shell.transcription_testing");
         let mut command = std::process::Command::new(&hearing);
         command.args(["--test", "--provider", &provider, "--model", &model]);
-        command.env_remove("WHOLEHEARD_PROVIDER_KEY");
+        command.env_remove("KITOKEY_PROVIDER_KEY");
         if let Some(key) = key {
-            command.env("WHOLEHEARD_PROVIDER_KEY", key);
+            command.env("KITOKEY_PROVIDER_KEY", key);
         }
         command.output()
     })
@@ -1983,7 +1988,7 @@ async fn transcription_tested(shell: State<'_, Shell>) -> Result<(), Told> {
         tracing::info!("shell.transcription_tested");
         return Ok(());
     }
-    let said = summarising::last_said(&String::from_utf8_lossy(&output.stderr), "wholeheard-transcription", output.status);
+    let said = summarising::last_said(&String::from_utf8_lossy(&output.stderr), "kitokey-transcription", output.status);
     tracing::warn!(detail = %said, "shell.transcription_test_failed");
     Err(test_told(&shell, &output, &said))
 }
@@ -1997,7 +2002,7 @@ fn test_told(shell: &Shell, output: &std::process::Output, said: &str) -> Told {
     }
 }
 
-/// *Tester*: asks `wholeheard-summary` whether the model saved answers — one sentence of its own,
+/// *Tester*: asks `kitokey-summary` whether the model saved answers — one sentence of its own,
 /// nothing of a meeting —, the key going from the keyring to its environment, never its
 /// arguments. Refused, what its code names, or the program's own sentence.
 #[tauri::command]
@@ -2007,7 +2012,7 @@ async fn minutes_tested(shell: State<'_, Shell>) -> Result<(), Told> {
     let (Some(provider), Some(model)) = (settings.minutes_provider, settings.minutes_model) else {
         return Err(failed(shell.told(Failure::NoneChosen, "no model is chosen yet")));
     };
-    let summary = program("wholeheard-summary", "WHOLEHEARD_SUMMARY");
+    let summary = program("kitokey-summary", "KITOKEY_SUMMARY");
     let ran = tauri::async_runtime::spawn_blocking(move || {
         let key = providers::host(&provider).and_then(|host| keys::key(&host).ok().flatten());
         let (trace, making) = log::making();
@@ -2021,10 +2026,10 @@ async fn minutes_tested(shell: State<'_, Shell>) -> Result<(), Told> {
         let mut command = std::process::Command::new(&summary);
         command
             .args(["--test", "--provider", &provider, "--model", &model])
-            .env("WHOLEHEARD_TRACE", &trace);
-        command.env_remove("WHOLEHEARD_PROVIDER_KEY");
+            .env("KITOKEY_TRACE", &trace);
+        command.env_remove("KITOKEY_PROVIDER_KEY");
         if let Some(key) = key {
-            command.env("WHOLEHEARD_PROVIDER_KEY", key);
+            command.env("KITOKEY_PROVIDER_KEY", key);
         }
         let output = command.output();
         match &output {
@@ -2043,11 +2048,11 @@ async fn minutes_tested(shell: State<'_, Shell>) -> Result<(), Told> {
         Ok(output) => Err(test_told(
             &shell,
             &output,
-            &summarising::last_said(&String::from_utf8_lossy(&output.stderr), "wholeheard-summary", output.status),
+            &summarising::last_said(&String::from_utf8_lossy(&output.stderr), "kitokey-summary", output.status),
         )),
         Err(error) => Err(failed(shell.said(
             Failure::ProgramNotStarted,
-            &format!("wholeheard-summary could not be started ({error})"),
+            &format!("kitokey-summary could not be started ({error})"),
         ))),
     }
 }
@@ -2093,7 +2098,7 @@ fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<
     shell.minutes_host.lock().unwrap().take();
     if let Some((why, cause)) = failed {
         let why = if why.trim().is_empty() {
-            "wholeheard-summary stopped without saying why".to_string()
+            "kitokey-summary stopped without saying why".to_string()
         } else {
             why
         };
@@ -2491,7 +2496,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
             Err(std::io::Error::other("the meeting was said confidential"))
         } else {
             Summarising::start(
-                &program("wholeheard-summary", "WHOLEHEARD_SUMMARY"),
+                &program("kitokey-summary", "KITOKEY_SUMMARY"),
                 &folder,
                 &provider,
                 &model,
@@ -2616,7 +2621,7 @@ fn show(app: &AppHandle, shown: Shown) {
         let shell = app.state::<Shell>();
         let labels = words::menu(shell.language());
         let (label, enabled, icon, tooltip) = match shown {
-            Shown::Idle => (labels.start, true, &include_bytes!("../icons/tray.png")[..], "Wholeheard"),
+            Shown::Idle => (labels.start, true, &include_bytes!("../icons/tray.png")[..], "Kitokey"),
             Shown::Recording => (
                 labels.stop,
                 true,
@@ -2643,7 +2648,7 @@ fn show(app: &AppHandle, shown: Shown) {
 }
 
 /// A step's program: beside this one, as an installation puts it — or, for whoever builds
-/// Wholeheard, where its variable says (`WHOLEHEARD_CAPTURE`, `WHOLEHEARD_TRANSCRIPTION`), or on the path.
+/// Kitokey, where its variable says (`KITOKEY_CAPTURE`, `KITOKEY_TRANSCRIPTION`), or on the path.
 fn program(name: &str, variable: &str) -> PathBuf {
     let name = if cfg!(windows) { format!("{name}.exe") } else { name.to_string() };
     let beside = std::env::current_exe().ok().and_then(|own| Some(own.parent()?.join(&name)));
@@ -2682,11 +2687,7 @@ fn toggle_recording(app: &AppHandle) {
             &words::trouble(&Trouble::NoFolder(sessions.display().to_string()), shell.language()),
         );
     }
-    let started = Recording::start(
-        &program("wholeheard-capture", "WHOLEHEARD_CAPTURE"),
-        &sessions,
-        microphone.as_deref(),
-    );
+    let started = Recording::start(&program("kitokey-capture", "KITOKEY_CAPTURE"), &sessions, microphone.as_deref());
     match started {
         Ok((running, said)) => {
             *recording = Some(running);
@@ -2725,7 +2726,7 @@ fn listen(app: &AppHandle, said: &Receiver<Said>) {
         let notice = match &event {
             // Ended before it had started: nothing was recorded, and that is the trouble.
             Said::Failed(why) if !started => Some(words::trouble(&Trouble::NoRecorder(why.clone()), shell.language())),
-            // A window of Wholeheard seen: the stop is there already, no notification says it (D44).
+            // A window of Kitokey seen: the stop is there already, no notification says it (D44).
             Said::Stopped(folder, _) if window_seen(app) => {
                 if shell.settings().after != settings::After::Nothing {
                     stopped = Some(folder.clone());
@@ -2804,7 +2805,7 @@ fn heard(shell: &Shell, folder: &Path, made: &Made) -> bool {
         Made::Failed(_) if here => {}
         Made::Failed(why) => {
             let why = if why.trim().is_empty() {
-                "wholeheard-transcription stopped without saying why"
+                "kitokey-transcription stopped without saying why"
             } else {
                 why
             };
@@ -2859,7 +2860,7 @@ fn retranscribe_or_say(app: &AppHandle, folder: PathBuf, again: Again) {
 /// changed, by whoever the settings name to hear, the minutes made again after it (D59). The
 /// transcript there stays in place until the new one is whole — set aside for the run, since the
 /// program goes on from a transcript it finds —, then goes to the system's trash; a run that
-/// fails, or that Wholeheard ends as it quits, puts it back.
+/// fails, or that Kitokey ends as it quits, puts it back.
 fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (Failure, String)> {
     let shell = app.state::<Shell>();
     let mut running = shell.transcription.lock().unwrap();
@@ -2910,7 +2911,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
     // The language the meeting says it is spoken in, else the settings' (D65).
     let spoken = spoken::read(&folder).or_else(|| settings.meeting_language.clone());
     let started = Transcription::start_with(
-        &program("wholeheard-transcription", "WHOLEHEARD_TRANSCRIPTION"),
+        &program("kitokey-transcription", "KITOKEY_TRANSCRIPTION"),
         &folder,
         &hearer,
         key.as_deref(),
@@ -2926,7 +2927,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
         }
     };
     *running = Some(transcription);
-    // Who puts the earlier transcript back, or trashes it: this run's end, or Wholeheard quitting —
+    // Who puts the earlier transcript back, or trashes it: this run's end, or Kitokey quitting —
     // whichever comes first takes it, the other finds nothing.
     *shell.redoing.lock().unwrap() = previous.clone().map(|previous| (current.clone(), previous));
     hearing(&shell, &folder, &hearer);
@@ -2991,7 +2992,7 @@ fn hearer_now(shell: &Shell, settings: &Settings, folder: &Path) -> (Hearer, Opt
     // longer offered here — an older macOS, the program gone —, Whisper hears, and it is logged.
     let language = shell.system.code();
     let apple_ready = || {
-        let program = program("wholeheard-speech", "WHOLEHEARD_SPEECH");
+        let program = program("kitokey-speech", "KITOKEY_SPEECH");
         speech::status(&program, language).is_some_and(|status| status.offered && status.installed)
     };
     // Said confidential: on this computer alone, whatever the settings name — no key, nothing sent (D60).
@@ -3056,7 +3057,7 @@ fn transcribe(app: &AppHandle, folder: PathBuf) {
     // The language the meeting says it is spoken in, else the settings' (D65).
     let spoken = spoken::read(&folder).or_else(|| settings.meeting_language.clone());
     let started = Transcription::start_with(
-        &program("wholeheard-transcription", "WHOLEHEARD_TRANSCRIPTION"),
+        &program("kitokey-transcription", "KITOKEY_TRANSCRIPTION"),
         &folder,
         &hearer,
         key.as_deref(),
@@ -3083,7 +3084,7 @@ fn transcribe(app: &AppHandle, folder: PathBuf) {
         let here = heard(&shell, &heard_folder, &made);
         drop(running);
         transcribing(&app, false);
-        // Ended by Wholeheard as it quits: nothing to tell, it goes on next time.
+        // Ended by Kitokey as it quits: nothing to tell, it goes on next time.
         if *shell.leaving.lock().unwrap() {
             return;
         }
@@ -3108,13 +3109,13 @@ fn transcribe(app: &AppHandle, folder: PathBuf) {
     });
 }
 
-/// The default model as published — or, for whoever tries Wholeheard, as `WHOLEHEARD_MODEL_PUBLISHED`
+/// The default model as published — or, for whoever tries Kitokey, as `KITOKEY_MODEL_PUBLISHED`
 /// says: its address, its size in bytes and its SHA-256, separated by spaces.
 fn published() -> Published {
     published_at(0)
 }
 
-/// One of the models offered, as published — or as `WHOLEHEARD_MODEL_PUBLISHED` says, its
+/// One of the models offered, as published — or as `KITOKEY_MODEL_PUBLISHED` says, its
 /// entries separated by `;` in the order of the list offered.
 fn published_at(index: usize) -> Published {
     // The list may have been read again since the index was taken: none there is the default.
@@ -3122,9 +3123,9 @@ fn published_at(index: usize) -> Published {
     published_named(index).unwrap_or(listed)
 }
 
-/// What `WHOLEHEARD_MODEL_PUBLISHED` says of one of the models offered, if it says it.
+/// What `KITOKEY_MODEL_PUBLISHED` says of one of the models offered, if it says it.
 fn published_named(index: usize) -> Option<Published> {
-    std::env::var("WHOLEHEARD_MODEL_PUBLISHED").ok().and_then(|named| {
+    std::env::var("KITOKEY_MODEL_PUBLISHED").ok().and_then(|named| {
         let named = named.split(';').nth(index)?.to_owned();
         let [address, bytes, sha256] = named.split(' ').collect::<Vec<_>>()[..] else {
             return None;
@@ -3164,11 +3165,11 @@ fn offer(app: &AppHandle) {
 }
 
 /// What Apple's SpeechAnalyzer offers on this Mac, in the system's language (D42, D64): asked of
-/// `wholeheard-speech` beside the shell, away from the window; none where it is not.
+/// `kitokey-speech` beside the shell, away from the window; none where it is not.
 #[tauri::command]
 async fn speech_shown(shell: State<'_, Shell>) -> Result<Option<speech::Status>, ()> {
     let language = shell.system.code();
-    let program = program("wholeheard-speech", "WHOLEHEARD_SPEECH");
+    let program = program("kitokey-speech", "KITOKEY_SPEECH");
     Ok(tauri::async_runtime::spawn_blocking(move || speech::status(&program, language))
         .await
         .ok()
@@ -3186,7 +3187,7 @@ async fn speech_installed(shell: State<'_, Shell>) -> Result<(), ()> {
         return Err(());
     }
     let language = shell.system.code();
-    let program = program("wholeheard-speech", "WHOLEHEARD_SPEECH");
+    let program = program("kitokey-speech", "KITOKEY_SPEECH");
     tracing::info!(language, "shell.speech_install");
     let installed = tauri::async_runtime::spawn_blocking(move || speech::install(&program, language)).await;
     INSTALLING.store(false, std::sync::atomic::Ordering::SeqCst);
@@ -3407,7 +3408,7 @@ fn tell_opening(app: &AppHandle, notice: &Notice, folder: PathBuf) {
     let app = app.clone();
     std::thread::spawn(move || {
         let shown = notify_rust::Notification::new()
-            .appname("Wholeheard")
+            .appname("Kitokey")
             .summary(&title)
             .body(&body)
             .action("default", &title)
@@ -3445,7 +3446,7 @@ fn address_part(name: &str) -> String {
         .collect()
 }
 
-/// Whether a window of Wholeheard is seen: shown and not minimized, as the toolkit says (D44).
+/// Whether a window of Kitokey is seen: shown and not minimized, as the toolkit says (D44).
 fn window_seen(app: &AppHandle) -> bool {
     ["main", "small"]
         .iter()
@@ -3453,8 +3454,8 @@ fn window_seen(app: &AppHandle) -> bool {
         .any(|window| window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false))
 }
 
-/// Quits Wholeheard. A recording in progress is stopped first, as the user would stop it: its
-/// files are whole before Wholeheard is gone. Asked a second time, Wholeheard leaves at once: a
+/// Quits Kitokey. A recording in progress is stopped first, as the user would stop it: its
+/// files are whole before Kitokey is gone. Asked a second time, Kitokey leaves at once: a
 /// recorder that does not end is not a reason to keep the user.
 fn leave(app: &AppHandle) {
     let shell = app.state::<Shell>();
@@ -3464,7 +3465,7 @@ fn leave(app: &AppHandle) {
     if let Some(transcription) = shell.transcription.lock().unwrap().as_ref() {
         transcription.end();
     }
-    // A transcript being made again is ended: the earlier one is put back now, before Wholeheard goes.
+    // A transcript being made again is ended: the earlier one is put back now, before Kitokey goes.
     if let Some((current, previous)) = shell.redoing.lock().unwrap().take() {
         let _ = std::fs::rename(&previous, &current);
     }
@@ -3509,8 +3510,8 @@ async fn bound(app: &AppHandle) -> Result<(), String> {
 
     let said = |error: ashpd::Error| error.to_string();
     // The desktop answers an application it knows: one whose desktop entry is installed
-    // under this very name (`linux/dev.wholeheard.Wholeheard.desktop`).
-    let id: ashpd::AppID = "dev.wholeheard.Wholeheard"
+    // under this very name (`linux/com.napkinstack.Kitokey.desktop`).
+    let id: ashpd::AppID = "com.napkinstack.Kitokey"
         .parse()
         .map_err(|_| "the application's name was refused".to_string())?;
     ashpd::register_host_app(id).await.map_err(said)?;

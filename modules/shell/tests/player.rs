@@ -4,7 +4,7 @@
 
 use std::{fs, io::Read, path::Path};
 
-use wholeheard_shell::{mix::Mix, player::Served};
+use kitokey_shell::{mix::Mix, player::Served};
 
 fn get(url: &str, method: &str, range: Option<&str>) -> (u16, Vec<(String, String)>, Vec<u8>) {
     let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();

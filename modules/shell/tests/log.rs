@@ -1,5 +1,5 @@
 //! What the shell logs of the makings it starts (ADR-0007): an id each, passed to the program
-//! in `WHOLEHEARD_TRACE` and logged with how it ended — never the session's path, nor a key.
+//! in `KITOKEY_TRACE` and logged with how it ended — never the session's path, nor a key.
 //! Played programs, no meeting of anyone.
 #![cfg(unix)]
 
@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-use wholeheard_shell::{
+use kitokey_shell::{
     log,
     recording::{Recording, Said},
     settings,
@@ -65,21 +65,21 @@ fn each_making_is_logged_under_the_id_its_program_was_given() {
     fs::create_dir(&session).unwrap();
 
     // A transcript that fails, saying why; its program writes down the id it was given.
-    let hears = folder.path().join("wholeheard-transcription");
+    let hears = folder.path().join("kitokey-transcription");
     script(
         &hears,
-        r#"printf %s "$WHOLEHEARD_TRACE" > "$1/../transcript.trace"
-echo "wholeheard-transcription: $1/derived/ cannot be written" >&2
+        r#"printf %s "$KITOKEY_TRACE" > "$1/../transcript.trace"
+echo "kitokey-transcription: $1/derived/ cannot be written" >&2
 exit 1"#,
     );
     let (_making, made) = Transcription::start(&hears, &session, &Hearer::Model("/models/ggml-a.bin".into())).unwrap();
     made.recv_timeout(Duration::from_secs(10)).unwrap();
 
     // Minutes written, with a key.
-    let writes = folder.path().join("wholeheard-summary");
+    let writes = folder.path().join("kitokey-summary");
     script(
         &writes,
-        r#"printf %s "$WHOLEHEARD_TRACE" > "$1/../minutes.trace"
+        r#"printf %s "$KITOKEY_TRACE" > "$1/../minutes.trace"
 echo '## A' > "$1/minutes.md"
 echo '{"event":"written","file":"x"}'"#,
     );
@@ -94,12 +94,12 @@ echo '{"event":"written","file":"x"}'"#,
     while !matches!(events.recv_timeout(Duration::from_secs(10)).unwrap(), Event::Ended(_)) {}
 
     // A recording whose program fails, naming the session's full path as an older version did.
-    let records = folder.path().join("wholeheard-capture");
+    let records = folder.path().join("kitokey-capture");
     script(
         &records,
-        r#"printf %s "$WHOLEHEARD_TRACE" > "$2/../recording.trace"
+        r#"printf %s "$KITOKEY_TRACE" > "$2/../recording.trace"
 echo "{\"event\":\"started\",\"folder\":\"$2/2026-10-20_10-00\"}"
-echo "wholeheard-capture: $2/2026-10-20_10-00/local.wav: No space left on device" >&2
+echo "kitokey-capture: $2/2026-10-20_10-00/local.wav: No space left on device" >&2
 exit 1"#,
     );
     let sessions = folder.path().join("sessions");
@@ -138,7 +138,7 @@ exit 1"#,
     // An older program named the session's path: the log holds the folder of sessions as a word.
     assert_eq!(
         failed["detail"],
-        "wholeheard-transcription: <sessions>/2026-10-20_10-00/derived/ cannot be written"
+        "kitokey-transcription: <sessions>/2026-10-20_10-00/derived/ cannot be written"
     );
     let asked = lines.iter().find(|line| line["message"] == "shell.minutes").unwrap();
     assert_eq!(
@@ -160,7 +160,7 @@ exit 1"#,
     let failed = lines.iter().find(|line| line["message"] == "shell.recording_failed").unwrap();
     assert_eq!(
         failed["detail"],
-        "wholeheard-capture: <sessions>/2026-10-20_10-00/local.wav: No space left on device"
+        "kitokey-capture: <sessions>/2026-10-20_10-00/local.wav: No space left on device"
     );
     let missing: Vec<_> = lines
         .iter()

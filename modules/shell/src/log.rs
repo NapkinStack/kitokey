@@ -1,7 +1,7 @@
 //! What the shell does, written for whoever reads after it (ADR-0007): one JSON line per step
 //! in the user's state folder, a file a day. Each making — a recording, a transcript, minutes,
 //! a test — has an id of its own ([`making`]): the shell logs under it and passes it to the
-//! program in `WHOLEHEARD_TRACE`, so that both logs read together.
+//! program in `KITOKEY_TRACE`, so that both logs read together.
 //! Never what was said: no text of the meeting, no context, no key, no path to a meeting
 //! beyond its folder's name.
 //!
@@ -21,27 +21,27 @@ const KEPT: Duration = Duration::from_secs(14 * 24 * 3600);
 /// What the folder may weigh, every program's files together.
 const WEIGHT: u64 = 50 * 1024 * 1024;
 
-/// Where the logs go: `WHOLEHEARD_LOG_DIR` when given, else the system's place for them. A
+/// Where the logs go: `KITOKEY_LOG_DIR` when given, else the system's place for them. A
 /// path that is not absolute is not taken: it would depend on where the program was started.
 pub fn folder() -> Option<PathBuf> {
     let given = |name| std::env::var_os(name).map(PathBuf::from).filter(|path| path.is_absolute());
-    if let Some(folder) = given("WHOLEHEARD_LOG_DIR") {
+    if let Some(folder) = given("KITOKEY_LOG_DIR") {
         return Some(folder);
     }
     if cfg!(target_os = "macos") {
-        given("HOME").map(|home| home.join("Library/Logs/Wholeheard"))
+        given("HOME").map(|home| home.join("Library/Logs/Kitokey"))
     } else if cfg!(windows) {
-        given("LOCALAPPDATA").map(|local| local.join("Wholeheard").join("logs"))
+        given("LOCALAPPDATA").map(|local| local.join("Kitokey").join("logs"))
     } else {
         given("XDG_STATE_HOME")
             .or_else(|| given("HOME").map(|home| home.join(".local/state")))
-            .map(|state| state.join("wholeheard").join("logs"))
+            .map(|state| state.join("kitokey").join("logs"))
     }
 }
 
-/// The making's id the shell passed in `WHOLEHEARD_TRACE`, or one of this run's own.
+/// The making's id the shell passed in `KITOKEY_TRACE`, or one of this run's own.
 fn trace() -> String {
-    match std::env::var("WHOLEHEARD_TRACE") {
+    match std::env::var("KITOKEY_TRACE") {
         Ok(id) if (1..=64).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') => id,
         _ => {
             let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default();
@@ -108,12 +108,12 @@ pub fn page_failed(kind: &str, file: &str, line: u32, column: u32) {
     tracing::error!(kind, file, line, column, "shell.page_failed");
 }
 
-/// `info` unless `WHOLEHEARD_LOG` names a level, `off` included — or, for whoever knows them, a filter.
+/// `info` unless `KITOKEY_LOG` names a level, `off` included — or, for whoever knows them, a filter.
 /// A level reaches the shell's own lines only — its library's and its program's, both named
-/// `wholeheard…` —: a library's are never asked for by it.
+/// `kitokey…` —: a library's are never asked for by it.
 fn filter() -> EnvFilter {
-    let own = "wholeheard";
-    let asked = std::env::var("WHOLEHEARD_LOG").unwrap_or_default();
+    let own = "kitokey";
+    let asked = std::env::var("KITOKEY_LOG").unwrap_or_default();
     let directives = match asked.trim() {
         level @ ("off" | "error" | "warn" | "info" | "debug" | "trace") => format!("off,{own}={level}"),
         filter if filter.contains('=') => filter.to_string(),
@@ -169,7 +169,7 @@ pub fn prune(folder: &Path, now: SystemTime) {
 /// to this run, its version and its making's id — at every level, a failure's line included.
 pub fn start(program: &'static str) -> EnteredSpan {
     // Turned off, the log leaves nothing: no file, nothing removed.
-    let off = std::env::var("WHOLEHEARD_LOG").is_ok_and(|level| level.trim() == "off");
+    let off = std::env::var("KITOKEY_LOG").is_ok_and(|level| level.trim() == "off");
     let appender = folder().filter(|_| !off).and_then(|folder| {
         std::fs::create_dir_all(&folder).ok()?;
         prune(&folder, SystemTime::now());

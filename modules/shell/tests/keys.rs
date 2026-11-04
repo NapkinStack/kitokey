@@ -1,7 +1,7 @@
 //! A provider's key in a keyring — the keyring library's own stand-in for the system's, so that
 //! no test reads or writes the user's.
 
-use wholeheard_shell::keys;
+use kitokey_shell::keys;
 
 #[test]
 fn a_key_is_kept_by_its_host_replaced_and_forgotten() {
@@ -19,22 +19,52 @@ fn a_key_is_kept_by_its_host_replaced_and_forgotten() {
     // Forgetting what is not kept is nothing.
     assert_eq!(keys::forget("openrouter.ai"), Ok(()));
 
-    // Filed under Wholeheard's name and the host: a key kept by a version before is found again.
+    // Filed under Kitokey's name and the host: a key kept by a version before is found again.
     keys::keep("api.openai.com", "sk-filed").unwrap();
-    let filed = keyring_core::Entry::new("dev.wholeheard.Wholeheard", "api.openai.com").unwrap();
+    let filed = keyring_core::Entry::new("com.napkinstack.Kitokey", "api.openai.com").unwrap();
     assert_eq!(filed.get_password().unwrap(), "sk-filed");
 
-    // Kept by Summit, before D28, under its name: found, moved under Wholeheard's, gone from Summit's.
+    // Kept by Summit, before D28, under its name: found, moved under Kitokey's, gone from Summit's.
     let before = keyring_core::Entry::new("dev.summit.Summit", "api.mistral.ai").unwrap();
     keys::forget("api.mistral.ai").unwrap();
     before.set_password("kept-by-summit").unwrap();
     assert_eq!(keys::key("api.mistral.ai").unwrap().as_deref(), Some("kept-by-summit"));
-    let now = keyring_core::Entry::new("dev.wholeheard.Wholeheard", "api.mistral.ai").unwrap();
+    let now = keyring_core::Entry::new("com.napkinstack.Kitokey", "api.mistral.ai").unwrap();
     assert_eq!(now.get_password().unwrap(), "kept-by-summit");
     assert!(
         matches!(before.get_password(), Err(keyring_core::Error::NoEntry)),
         "not left under Summit's name"
     );
+
+    // Kept by Wholeheard, before D86, under its name: found, moved under Kitokey's, gone from Wholeheard's.
+    let before = keyring_core::Entry::new("dev.wholeheard.Wholeheard", "api.groq.com").unwrap();
+    before.set_password("kept-by-wholeheard").unwrap();
+    assert_eq!(keys::key("api.groq.com").unwrap().as_deref(), Some("kept-by-wholeheard"));
+    let now = keyring_core::Entry::new("com.napkinstack.Kitokey", "api.groq.com").unwrap();
+    assert_eq!(now.get_password().unwrap(), "kept-by-wholeheard");
+    assert!(
+        matches!(before.get_password(), Err(keyring_core::Error::NoEntry)),
+        "not left under Wholeheard's name"
+    );
+    // Forgotten, it is forgotten under the earlier names too: it never comes back.
+    before.set_password("kept-by-wholeheard").unwrap();
+    keys::forget("api.groq.com").unwrap();
+    assert_eq!(keys::key("api.groq.com"), Ok(None));
+
+    // Under both earlier names: Wholeheard's, the latest, is the one read; Summit's is left.
+    let wholeheards = keyring_core::Entry::new("dev.wholeheard.Wholeheard", "api.both.example").unwrap();
+    let summits = keyring_core::Entry::new("dev.summit.Summit", "api.both.example").unwrap();
+    wholeheards.set_password("kept-by-wholeheard").unwrap();
+    summits.set_password("kept-by-summit").unwrap();
+    assert_eq!(keys::key("api.both.example").unwrap().as_deref(), Some("kept-by-wholeheard"));
+    keys::forget("api.both.example").unwrap();
+
+    // A keyring that fails under an earlier name is not "no key" either: the key would be asked again.
+    let failing = keyring_core::Entry::new("dev.wholeheard.Wholeheard", "api.locked.example").unwrap();
+    failing.set_password("kept").unwrap();
+    let mock = failing.as_any().downcast_ref::<keyring_core::mock::Cred>().unwrap();
+    mock.set_error(keyring_core::Error::PlatformFailure("locked".into()));
+    assert!(keys::key("api.locked.example").is_err());
 
     // A keyring that fails is not "no key": a locked one would otherwise ask for a key again.
     let mock = filed.as_any().downcast_ref::<keyring_core::mock::Cred>().unwrap();

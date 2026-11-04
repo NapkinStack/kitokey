@@ -8,8 +8,8 @@ use std::{
     thread,
 };
 
+use kitokey_shell::registry;
 use minisign::KeyPair;
-use wholeheard_shell::registry;
 
 /// A pair made for this run of the tests, never the decider's: its public key as the shell holds
 /// one, and what signs a list with it.
@@ -100,10 +100,7 @@ fn a_list_signed_by_the_key_is_taken_whole() {
     let listed = registry::fetch(&served.address, Some(&key.public)).unwrap();
     assert_eq!(listed.len(), registry::shipped().len() + 1);
     assert_eq!(listed[..listed.len() - 1], registry::shipped()[..]);
-    assert_eq!(
-        wholeheard_shell::model::file(&listed.last().unwrap().published),
-        "ggml-base-q8_0.bin"
-    );
+    assert_eq!(kitokey_shell::model::file(&listed.last().unwrap().published), "ggml-base-q8_0.bin");
     assert_eq!(*served.asked.lock().unwrap(), ["/models.json", "/models.json.minisig"]);
 }
 

@@ -1,4 +1,4 @@
-//! Minutes, made: `wholeheard-summary` is started on a session's folder with a provider, a model and,
+//! Minutes, made: `kitokey-summary` is started on a session's folder with a provider, a model and,
 //! when one is kept, its key — and what it says is read as `contracts/summarising/v1` describes
 //! it: where the request goes before it leaves, then whether the minutes are written. The
 //! shell reads none of the minutes here; the program writes `minutes.md` (`minutes/v1`).
@@ -88,8 +88,8 @@ pub struct Summarising {
 }
 
 impl Summarising {
-    /// Starts `wholeheard-summary` on a session's folder. The key goes to its environment only — a
-    /// key in Wholeheard's own environment never does.
+    /// Starts `kitokey-summary` on a session's folder. The key goes to its environment only — a
+    /// key in Kitokey's own environment never does.
     pub fn start(program: &Path, folder: &Path, provider: &str, model: &str, key: Option<&str>) -> io::Result<(Self, Receiver<Event>)> {
         let (trace, making) = crate::log::making();
         let _making = making.enter();
@@ -97,12 +97,12 @@ impl Summarising {
         command
             .arg(folder)
             .args(["--provider", provider, "--model", model])
-            .env("WHOLEHEARD_TRACE", &trace);
+            .env("KITOKEY_TRACE", &trace);
         let host = crate::providers::host(provider).unwrap_or_default();
         info!(session = %crate::transcription::named(folder), host, model, key = key.is_some(), "shell.minutes");
-        command.env_remove("WHOLEHEARD_PROVIDER_KEY");
+        command.env_remove("KITOKEY_PROVIDER_KEY");
         if let Some(key) = key {
-            command.env("WHOLEHEARD_PROVIDER_KEY", key);
+            command.env("KITOKEY_PROVIDER_KEY", key);
         }
         let mut child = command
             .stdin(Stdio::null())
@@ -160,11 +160,11 @@ impl Summarising {
                 Made::Written(folder)
             } else {
                 let said = last.lock().map(|said| said.clone()).unwrap_or_default();
-                let said = said.strip_prefix("wholeheard-summary: ").unwrap_or(&said).to_string();
+                let said = said.strip_prefix("kitokey-summary: ").unwrap_or(&said).to_string();
                 let why = match (said.is_empty(), status) {
                     (false, _) => said,
-                    (true, Some(status)) => format!("wholeheard-summary stopped without saying why ({status})"),
-                    (true, None) => "wholeheard-summary could not be waited for".into(),
+                    (true, Some(status)) => format!("kitokey-summary stopped without saying why ({status})"),
+                    (true, None) => "kitokey-summary could not be waited for".into(),
                 };
                 Made::Failed(why, *cause.lock().unwrap())
             };
@@ -179,7 +179,7 @@ impl Summarising {
         Ok((Self { program }, events))
     }
 
-    /// Stops the program now: Wholeheard is quitting. Nothing half-written is left by it.
+    /// Stops the program now: Kitokey is quitting. Nothing half-written is left by it.
     pub fn end(&self) {
         if let Ok(mut child) = self.program.lock() {
             let _ = child.kill();

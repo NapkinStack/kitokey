@@ -1,9 +1,9 @@
 //! The list of models Settings offer (D40, ADR-0010): the file in the repository is the list
 //! shipped, and a list that does not read as one is refused whole — in a pull request by these
-//! tests, and in Wholeheard by the same reading.
+//! tests, and in Kitokey by the same reading.
 
-use wholeheard_shell::model;
-use wholeheard_shell::registry::{self, Good};
+use kitokey_shell::model;
+use kitokey_shell::registry::{self, Good};
 
 /// A list of one model, with `entry` as its only line's fields.
 fn one(entry: &str) -> String {

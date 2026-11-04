@@ -1,5 +1,5 @@
 """What the e2e's runs logged, read against what its scenarios provoke (D29): every warning
-and error of Wholeheard's logs found in the run's folder must be one the manifest's
+and error of Kitokey's logs found in the run's folder must be one the manifest's
 `evidence.provoked` declares, at its level — any other fails the run, quoted; one declared and
 never seen fails it too, its scenario no longer provoking it. The logs are kept in the run's
 evidence, where NapkinStack reads them again ($NSTACK_EVIDENCE)."""
