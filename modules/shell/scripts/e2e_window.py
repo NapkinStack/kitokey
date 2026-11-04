@@ -304,14 +304,22 @@ def tray_entries() -> tuple[str, str, list[tuple[int, str]]]:
     watcher = ["org.kde.StatusNotifierWatcher", "/StatusNotifierWatcher", "org.kde.StatusNotifierWatcher"]
     listed = subprocess.run(["busctl", "--user", "get-property", *watcher, "RegisteredStatusNotifierItems"],
                             capture_output=True, text=True).stdout
-    ours = set(instances())
-    for item in (word.strip('"') for word in listed.split() if "@" in word and "kitokey" in word):
-        bus, path = item.split("@", 1)
-        status = subprocess.run(["busctl", "--user", "status", bus], capture_output=True, text=True).stdout
-        if not any(line == f"PID={pid}" for pid in ours for line in status.splitlines()):
+    ours = {str(pid) for pid in instances()}
+    # The program's own buses: the watcher lists an item as `bus@path`, or since GNOME's
+    # AppIndicator 66 as its path alone; the bus is the one of ours that answers for its menu.
+    names = subprocess.run(["busctl", "--user", "list", "--no-legend"], capture_output=True, text=True).stdout
+    buses = [words[0] for words in (line.split() for line in names.splitlines())
+             if len(words) > 1 and words[0].startswith(":") and words[1] in ours]
+    for item in (word.strip('"') for word in listed.split() if "kitokey" in word):
+        path = item.split("@", 1)[-1]
+        for bus in buses:
+            answered = subprocess.run(["busctl", "--user", "--json=short", "call", bus, f"{path}/Menu", "com.canonical.dbusmenu",
+                                       "GetLayout", "iias", "0", "--", "-1", "0"], capture_output=True, text=True)
+            if answered.returncode == 0:
+                break
+        else:
             continue
-        layout = subprocess.run(["busctl", "--user", "--json=short", "call", bus, f"{path}/Menu", "com.canonical.dbusmenu",
-                                 "GetLayout", "iias", "0", "--", "-1", "0"], capture_output=True, text=True).stdout
+        layout = answered.stdout
         entries: list[tuple[int, str]] = []
 
         def walk(node) -> None:

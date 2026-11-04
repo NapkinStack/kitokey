@@ -75,11 +75,16 @@ start() { # the language, the settings file's text, the recorder
   LANGUAGE= LC_ALL="$1" LANG="$1" XDG_CONFIG_HOME="$work/config" XDG_DATA_HOME="$work/data" XDG_STATE_HOME="$work/state" KITOKEY_CAPTURE="$3" \
     KITOKEY_TRANSCRIPTION="$work/kitokey-transcription" KITOKEY_MODEL_PUBLISHED="$published" KITOKEY_SUMMARY="$work/kitokey-summary" KITOKEY_KEYRING=memory "$bin" 2>> "$work/errors" &
   app=$!
-  # Its own tray item, found by its program's number: a Kitokey the user runs has one too.
+  # Its own tray item, found by its program's number: a Kitokey the user runs has one too. The
+  # watcher lists an item as `bus@path`, or since GNOME's AppIndicator 66 as its path alone: the
+  # bus is the one of the program's own that answers for that path's menu.
   item=""
   for _ in $(seq 100); do
-    for one in $(busctl --user get-property $watcher RegisteredStatusNotifierItems | grep -o ':[0-9.]*@[^" ]*kitokey[^" ]*'); do
-      [ "$(busctl --user status "${one%@*}" 2>/dev/null | awk -F= '/^PID=/ {print $2}')" = "$app" ] && item=$one
+    for one in $(busctl --user get-property $watcher RegisteredStatusNotifierItems | grep -o '[^" ]*kitokey[^" ]*'); do
+      for name in $(busctl --user list --no-legend 2>/dev/null | awk -v pid="$app" '$2 == pid && $1 ~ /^:/ {print $1}'); do
+        busctl --user call "$name" "${one#*@}/Menu" com.canonical.dbusmenu GetLayout iias 0 -- -1 0 >/dev/null 2>&1 &&
+          item="$name@${one#*@}"
+      done
     done
     [ -n "$item" ] && break
     sleep 0.1
