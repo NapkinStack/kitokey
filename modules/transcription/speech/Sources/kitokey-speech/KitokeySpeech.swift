@@ -1,10 +1,10 @@
-// wholeheard-speech — Apple's SpeechAnalyzer, run by wholeheard-transcription (D42, ADR-0012).
+// kitokey-speech — Apple's SpeechAnalyzer, run by kitokey-transcription (D42, ADR-0012).
 //
-//     wholeheard-speech status <locale>                what this Mac offers for the locale
-//     wholeheard-speech install <locale>               Apple's model of it, fetched by macOS
-//     wholeheard-speech transcribe <file> <locale>     one JSON line a segment: start, end, text
+//     kitokey-speech status <locale>                what this Mac offers for the locale
+//     kitokey-speech install <locale>               Apple's model of it, fetched by macOS
+//     kitokey-speech transcribe <file> <locale>     one JSON line a segment: start, end, text
 //
-// Nothing is fetched but by `install`, which Wholeheard runs only on the user's click. What it
+// Nothing is fetched but by `install`, which Kitokey runs only on the user's click. What it
 // prints is the meeting's text, for the program that runs it alone; its errors say no word of it.
 
 import AVFoundation
@@ -16,7 +16,7 @@ struct Refusal: Error {
 }
 
 @main
-struct WholeheardSpeech {
+struct KitokeySpeech {
     static func main() async {
         let arguments = Array(CommandLine.arguments.dropFirst())
         do {
@@ -25,7 +25,7 @@ struct WholeheardSpeech {
             case ("install", 2): try await install(Locale(identifier: arguments[1]))
             case ("transcribe", 3): try await transcribe(URL(fileURLWithPath: arguments[1]), Locale(identifier: arguments[2]))
             default:
-                throw Refusal(sentence: "usage: wholeheard-speech status <locale> | install <locale> | transcribe <file> <locale>")
+                throw Refusal(sentence: "usage: kitokey-speech status <locale> | install <locale> | transcribe <file> <locale>")
             }
         } catch let refusal as Refusal {
             fail(refusal.sentence)
@@ -105,7 +105,7 @@ struct WholeheardSpeech {
     }
 
     static func fail(_ sentence: String) -> Never {
-        FileHandle.standardError.write(Data("wholeheard-speech: \(sentence)\n".utf8))
+        FileHandle.standardError.write(Data("kitokey-speech: \(sentence)\n".utf8))
         exit(1)
     }
 }

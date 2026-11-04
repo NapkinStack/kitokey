@@ -8,7 +8,7 @@ Turns the audio of a session into a timestamped transcript.
 
 ```mermaid
 flowchart LR
-    A["The session's sound, in either form<br/>session.json · context.txt"]:::file --> P["wholeheard-transcription<br/>a program, no window"]:::mod
+    A["The session's sound, in either form<br/>session.json · context.txt"]:::file --> P["kitokey-transcription<br/>a program, no window"]:::mod
     P -->|"one span of sound at a time"| E["The engine:<br/>Whisper, on this machine"]:::ext
     E -->|"segments"| P
     P -->|"transcript/v1, a file that only grows"| T["transcript.jsonl"]:::file
@@ -22,33 +22,33 @@ flowchart LR
 
 **Legend** — blue: files of the session's folder · green: this module · grey: what hears,
 behind one interface (ADR-0003) · orange: who reads its events, one JSON object per line.
-Nothing leaves the machine unless a service is named: with `--provider`, each span is sent to that address (D43, below), the shell having asked the user to agree to the host first. On a Mac, `wholeheard-speech install` has macOS fetch Apple's model of a language — run on the user's word only.
+Nothing leaves the machine unless a service is named: with `--provider`, each span is sent to that address (D43, below), the shell having asked the user to agree to the host first. On a Mac, `kitokey-speech install` has macOS fetch Apple's model of a language — run on the user's word only.
 
 ```bash
 # The model is a Whisper model in whisper.cpp's format, already on the machine: nothing is fetched.
-wholeheard-transcription <session-folder> --model ggml-large-v3-turbo-q8_0.bin --language fr
+kitokey-transcription <session-folder> --model ggml-large-v3-turbo-q8_0.bin --language fr
 ```
 
 **On a Mac with macOS 26**, Apple's SpeechAnalyzer can hear instead of Whisper, when asked, on the Mac (D42,
 [ADR-0012](../../docs/adr/0012-on-macos-speechanalyzer-hears-through-a-program-of-its-own.md)):
-the step is the same; each span goes to `wholeheard-speech`, a Swift program of this module's
+the step is the same; each span goes to `kitokey-speech`, a Swift program of this module's
 (`speech/`), built beside the program by the release on a Mac. It hears the language asked, French
 or English, with Apple's model of it, which macOS fetches from Apple on the user's word:
 
 ```bash
-wholeheard-speech status fr-FR                       # available, supported, installed
-wholeheard-speech install fr-FR                      # Apple's model, fetched by macOS
-wholeheard-transcription <session-folder> --engine speechanalyzer --language fr
+kitokey-speech status fr-FR                       # available, supported, installed
+kitokey-speech install fr-FR                      # Apple's model, fetched by macOS
+kitokey-transcription <session-folder> --engine speechanalyzer --language fr
 ```
 
 **A service the user names** (D43, [ADR-0013](../../docs/adr/0013-a-transcription-service-the-user-names-heard-as-the-minutes-are-written.md)):
 each span goes to OpenAI's `/audio/transcriptions` at the address given, its times asked
 (`verbose_json`), the context the user attached as `prompt`; a service that gives no times is
-refused, never timed by guess. The key, when it wants one, is read from `WHOLEHEARD_PROVIDER_KEY`.
+refused, never timed by guess. The key, when it wants one, is read from `KITOKEY_PROVIDER_KEY`.
 
 ```bash
-wholeheard-transcription <session-folder> --provider https://api.groq.com/openai/v1 --model whisper-large-v3 --language fr
-wholeheard-transcription --test --provider http://localhost:8000/v1 --model whisper-1   # a sound of its own
+kitokey-transcription <session-folder> --provider https://api.groq.com/openai/v1 --model whisper-large-v3 --language fr
+kitokey-transcription --test --provider http://localhost:8000/v1 --model whisper-1   # a sound of its own
 ```
 
 | Tried on a public meeting of five minutes, four speakers, in French | Words that differ from a person's transcript | Time |
@@ -130,9 +130,9 @@ another language or model made, a folder that cannot be written to — is said a
 What it does is logged — the tracks' lengths, the echo found, each span heard with how long it
 took and how many segments it gave, each failure with its detail; never a word heard, the
 context, nor the session's path (ADR-0007): one JSON line per step in
-`$XDG_STATE_HOME/wholeheard/logs/transcription.<date>.jsonl` (UTC), fourteen days kept and the
-folder under 50 MB. `WHOLEHEARD_LOG_DIR`, an absolute path, puts them elsewhere, `WHOLEHEARD_LOG=debug` asks for more, and
-`WHOLEHEARD_TRACE` is the id of the making the shell passes.
+`$XDG_STATE_HOME/kitokey/logs/transcription.<date>.jsonl` (UTC), fourteen days kept and the
+folder under 50 MB. `KITOKEY_LOG_DIR`, an absolute path, puts them elsewhere, `KITOKEY_LOG=debug` asks for more, and
+`KITOKEY_TRACE` is the id of the making the shell passes.
 
 ## Getting started
 

@@ -3,7 +3,7 @@
 
 use std::{fs, path::Path};
 
-use wholeheard_transcription::{Making, Segment, Speaker, Transcript};
+use kitokey_transcription::{Making, Segment, Speaker, Transcript};
 
 fn making() -> Making {
     Making {

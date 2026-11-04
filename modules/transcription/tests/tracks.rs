@@ -3,7 +3,7 @@
 
 use std::{fs, path::Path};
 
-use wholeheard_transcription::{
+use kitokey_transcription::{
     step::RATE,
     tracks::{Clock, clock, heard},
 };

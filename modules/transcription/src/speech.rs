@@ -1,5 +1,5 @@
 //! Apple's SpeechAnalyzer, on a Mac with macOS 26 (D42, ADR-0012), behind the step's interface:
-//! each span is handed to `wholeheard-speech` — a Swift program of this module's — as a file of the
+//! each span is handed to `kitokey-speech` — a Swift program of this module's — as a file of the
 //! session's own form, and each line it prints is a segment. Nothing of the meeting is logged.
 
 use std::{
@@ -66,11 +66,11 @@ impl SpeechAnalyzer {
         self
     }
 
-    /// Where `wholeheard-speech` is: where `WHOLEHEARD_SPEECH` names it, or beside this program.
+    /// Where `kitokey-speech` is: where `KITOKEY_SPEECH` names it, or beside this program.
     pub fn program() -> PathBuf {
-        std::env::var_os("WHOLEHEARD_SPEECH").map(PathBuf::from).unwrap_or_else(|| {
+        std::env::var_os("KITOKEY_SPEECH").map(PathBuf::from).unwrap_or_else(|| {
             let beside = std::env::current_exe().ok().and_then(|exe| exe.parent().map(Path::to_path_buf));
-            beside.unwrap_or_default().join("wholeheard-speech")
+            beside.unwrap_or_default().join("kitokey-speech")
         })
     }
 

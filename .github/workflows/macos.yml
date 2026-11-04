@@ -48,7 +48,7 @@ jobs:
         working-directory: modules/${{ matrix.module }}
         run: cargo check --locked --all-targets
 
-  # D42's second criterion: Apple's SpeechAnalyzer through wholeheard-speech, heard on a French
+  # D42's second criterion: Apple's SpeechAnalyzer through kitokey-speech, heard on a French
   # sentence `say` speaks. A runner that offers no SpeechTranscriber or no French voice says it was
   # not run — as a warning, never as a pass of the criterion (ADR-0012).
   speech:
@@ -60,14 +60,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: wholeheard-speech, built
+      - name: kitokey-speech, built
         working-directory: modules/transcription/speech
         run: swift build -c release
 
       - name: A French sentence, heard back
         working-directory: modules/transcription/speech
         run: |
-          program=.build/release/wholeheard-speech
+          program=.build/release/kitokey-speech
           if ! "$program" status fr-FR > status.json 2> status.err; then
             echo "::warning::D42: not run — $(cat status.err)"; exit 0
           fi

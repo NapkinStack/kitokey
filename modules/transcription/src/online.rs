@@ -79,7 +79,7 @@ impl Service {
             code: None,
             why: format!("the span could not be made ({error})"),
         })?;
-        let boundary = format!("wholeheard-{}-{}", std::process::id(), sound.len());
+        let boundary = format!("kitokey-{}-{}", std::process::id(), sound.len());
         let mut body = Vec::new();
         let mut field = |name: &str, value: &str| {
             body.extend_from_slice(

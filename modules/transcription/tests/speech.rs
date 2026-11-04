@@ -1,5 +1,5 @@
 //! Apple's SpeechAnalyzer behind the step's interface (D42, ADR-0012), tried with a program played
-//! here in place of `wholeheard-speech`: what it is asked, and what is made of what it says. Apple's
+//! here in place of `kitokey-speech`: what it is asked, and what is made of what it says. Apple's
 //! engine itself is tried on a Mac — the macOS workflow, the colleague's.
 //!
 //! The program played here is a few lines of shell: these tests run where one runs, never on Windows.
@@ -7,15 +7,15 @@
 
 use std::{fs, os::unix::fs::PermissionsExt, path::Path, process::Command};
 
-use wholeheard_transcription::{
+use kitokey_transcription::{
     speech::SpeechAnalyzer,
     step::{Engine, RATE},
 };
 
-/// A program in place of `wholeheard-speech`: it writes what it was asked to `asked`, then runs
+/// A program in place of `kitokey-speech`: it writes what it was asked to `asked`, then runs
 /// `answer`, a few lines of shell.
 fn played(folder: &Path, answer: &str) -> std::path::PathBuf {
-    let program = folder.join("wholeheard-speech");
+    let program = folder.join("kitokey-speech");
     let asked = folder.join("asked");
     fs::write(
         &program,
@@ -89,11 +89,11 @@ fn only_a_language_it_has_a_locale_for_is_taken() {
 }
 
 fn run(folder: &Path, program: &Path, args: &[&str]) -> (bool, String) {
-    let output = Command::new(env!("CARGO_BIN_EXE_wholeheard-transcription"))
+    let output = Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .arg(folder)
         .args(args)
-        .env("WHOLEHEARD_SPEECH", program)
-        .env("WHOLEHEARD_LOG_DIR", Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
+        .env("KITOKEY_SPEECH", program)
+        .env("KITOKEY_LOG_DIR", Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
         .output()
         .unwrap();
     (output.status.success(), String::from_utf8_lossy(&output.stderr).into_owned())

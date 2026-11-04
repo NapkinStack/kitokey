@@ -1812,7 +1812,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wholeheard-transcription"
+name = "kitokey-transcription"
 version = "0.1.0"
 dependencies = [
  "jsonschema",

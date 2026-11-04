@@ -9,7 +9,7 @@ use std::{
     thread,
 };
 
-use wholeheard_transcription::{
+use kitokey_transcription::{
     online::Service,
     step::{Engine, RATE},
 };
@@ -206,10 +206,11 @@ fn the_program_writes_the_transcript_from_the_service_its_host_in_the_header() {
     std::fs::write(folder.path().join("me.wav"), &audio).unwrap();
     // Both sides sound: each is heard by the service, and each segment goes to its own track.
     std::fs::write(folder.path().join("others.wav"), &audio).unwrap();
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_wholeheard-transcription"))
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .arg(folder.path())
         .args(["--provider", &address, "--model", "whisper-large-v3", "--language", "fr"])
-        .env("WHOLEHEARD_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
+        .env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
+        .env_remove("KITOKEY_PROVIDER_KEY")
         .env_remove("WHOLEHEARD_PROVIDER_KEY")
         .output()
         .unwrap();
@@ -294,9 +295,9 @@ fn a_refusal_the_service_explains_is_said_in_its_words_on_one_line() {
 }
 
 fn tested(address: &str) -> (bool, String, String) {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_wholeheard-transcription"))
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .args(["--test", "--provider", address, "--model", "a-model"])
-        .env("WHOLEHEARD_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
+        .env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
         .output()
         .unwrap();
     (
@@ -346,7 +347,7 @@ fn a_test_that_fails_says_its_cause_on_the_output_s_last_line() {
             (Some("failed"), Some(code)),
             "{status} {answered}"
         );
-        assert!(err.starts_with("wholeheard-transcription: "), "{err}");
+        assert!(err.starts_with("kitokey-transcription: "), "{err}");
     }
 }
 
@@ -365,10 +366,10 @@ fn a_test_that_passes_says_nothing_and_one_in_the_service_s_own_words_names_no_c
 fn a_key_a_request_cannot_carry_is_said_before_anything_leaves() {
     for key in ["clé", "a b", "a\nb", "a\tb", "a\u{7f}b"] {
         let (address, asked) = served(200, SEGMENTS);
-        let output = std::process::Command::new(env!("CARGO_BIN_EXE_wholeheard-transcription"))
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
             .args(["--test", "--provider", &address, "--model", "a-model"])
-            .env("WHOLEHEARD_PROVIDER_KEY", key)
-            .env("WHOLEHEARD_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
+            .env("KITOKEY_PROVIDER_KEY", key)
+            .env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
             .output()
             .unwrap();
         let out = String::from_utf8_lossy(&output.stdout);
@@ -378,12 +379,31 @@ fn a_key_a_request_cannot_carry_is_said_before_anything_leaves() {
 }
 
 #[test]
+fn a_key_a_shell_still_named_wholeheard_passes_reaches_the_service() {
+    let (address, asked) = served(200, SEGMENTS);
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
+        .args(["--test", "--provider", &address, "--model", "a-model"])
+        .env_remove("KITOKEY_PROVIDER_KEY")
+        .env("WHOLEHEARD_PROVIDER_KEY", "a-key-of-the-test")
+        .env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let (head, _) = asked.recv().unwrap();
+    assert!(
+        head.to_ascii_lowercase().contains("authorization: bearer a-key-of-the-test"),
+        "{head}"
+    );
+}
+
+#[test]
 fn an_empty_key_sends_no_key() {
     let (address, asked) = served(200, SEGMENTS);
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_wholeheard-transcription"))
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .args(["--test", "--provider", &address, "--model", "a-model"])
-        .env("WHOLEHEARD_PROVIDER_KEY", "")
-        .env("WHOLEHEARD_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
+        .env("KITOKEY_PROVIDER_KEY", "")
+        .env("WHOLEHEARD_PROVIDER_KEY", "a-key-never-sent")
+        .env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -395,9 +415,9 @@ fn an_empty_key_sends_no_key() {
 fn an_output_closed_takes_no_line_and_the_sentence_is_still_said() {
     use std::process::Stdio;
     let (address, _asked) = served(500, "{}");
-    let mut program = std::process::Command::new(env!("CARGO_BIN_EXE_wholeheard-transcription"))
+    let mut program = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .args(["--test", "--provider", &address, "--model", "a-model"])
-        .env("WHOLEHEARD_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
+        .env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -406,10 +426,7 @@ fn an_output_closed_takes_no_line_and_the_sentence_is_still_said() {
     let output = program.wait_with_output().unwrap();
     let said = String::from_utf8_lossy(&output.stderr);
     assert_eq!(output.status.code(), Some(1), "{said}");
-    assert!(
-        said.starts_with("wholeheard-transcription: ") && said.contains("HTTP 500"),
-        "{said}"
-    );
+    assert!(said.starts_with("kitokey-transcription: ") && said.contains("HTTP 500"), "{said}");
 }
 
 #[test]

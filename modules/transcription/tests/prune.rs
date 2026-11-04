@@ -5,7 +5,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use wholeheard_transcription::log::prune;
+use kitokey_transcription::log::prune;
 
 const DAY: Duration = Duration::from_secs(24 * 3600);
 

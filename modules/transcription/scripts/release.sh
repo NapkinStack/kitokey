@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# What this module ships: wholeheard-transcription, into $NSTACK_DIST. Built for the system WHOLEHEARD_TARGET
+# What this module ships: kitokey-transcription, into $NSTACK_DIST. Built for the system KITOKEY_TARGET
 # names — in a container of that system (containers/<target>.Containerfile), so that it links the
 # libraries that system has, never this machine's (D27); unset, for this machine.
 set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 dist=${NSTACK_DIST:?run through nstack release, which names this module\'s artefacts folder}
-target=${WHOLEHEARD_TARGET:-}
+target=${KITOKEY_TARGET:-${WHOLEHEARD_TARGET:-}}   # WHOLEHEARD_TARGET: its name before D86, until every module reads the new one
 # Windows names a program with its .exe (D53).
 exe=; [ "${OS:-}" = Windows_NT ] && exe=.exe
 # The processors it is built for: .cargo/config.toml, read by every build of the module.
@@ -23,21 +23,21 @@ if [ -z "$target" ]; then
   if grep -qs '^GGML_NATIVE:BOOL=ON' "$out"/build/whisper-rs-sys-*/out/build/CMakeCache.txt; then
     (cd "$here" && cargo clean --release -p whisper-rs-sys && cargo build --locked --release ${features[@]+"${features[@]}"})
   fi
-  cp "${CARGO_TARGET_DIR:-$here/target}/release/wholeheard-transcription$exe" "$dist/"
+  cp "${CARGO_TARGET_DIR:-$here/target}/release/kitokey-transcription$exe" "$dist/"
   # On a Mac, Apple's SpeechAnalyzer through a Swift program of its own, beside it (D42, ADR-0012).
   if [ "$(uname -s)" = Darwin ]; then
     swift build -c release --package-path "$here/speech"
-    cp "$here/speech/.build/release/wholeheard-speech" "$dist/"
+    cp "$here/speech/.build/release/kitokey-speech" "$dist/"
   fi
   exit 0
 fi
 recipe=$here/containers/$target.Containerfile
-[ -f "$recipe" ] || { echo "release: wholeheard-transcription is not built for '$target' (containers/*.Containerfile)" >&2; exit 2; }
-image=wholeheard-build-transcription:$target
+[ -f "$recipe" ] || { echo "release: kitokey-transcription is not built for '$target' (containers/*.Containerfile)" >&2; exit 2; }
+image=kitokey-build-transcription:$target
 podman build -q -t "$image" -f "$recipe" "$here/containers" >/dev/null
 # Kept between releases, outside the repository: the build — one per image, so that another
 # recipe (headers, compilers) builds again from nothing — and the crates fetched.
-cache=${XDG_CACHE_HOME:-$HOME/.cache}/wholeheard-build/$target
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/kitokey-build/$target
 built=$cache/transcription-$(podman image inspect -f '{{.Id}}' "$image" | cut -c1-12)
 mkdir -p "$built" "$cache/registry"
 # No relabelling of what is mounted (`:Z` would relabel the files in place): labels left alone;
@@ -45,4 +45,4 @@ mkdir -p "$built" "$cache/registry"
 podman run --rm --security-opt label=disable -v "$here:/src:O" -v "$built:/target" \
   -v "$cache/registry:/opt/cargo/registry" -e CARGO_TARGET_DIR=/target -w /src "$image" \
   cargo build --locked --release -q "${features[@]}"
-cp "$built/release/wholeheard-transcription" "$dist/"
+cp "$built/release/kitokey-transcription" "$dist/"
