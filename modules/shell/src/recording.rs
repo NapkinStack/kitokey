@@ -283,7 +283,7 @@ impl Recording {
             .arg("record")
             .arg(sessions)
             .args(microphone.into_iter().flat_map(|name| ["--microphone", name]))
-            .env("WHOLEHEARD_TRACE", &trace)
+            .env("KITOKEY_TRACE", &trace)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

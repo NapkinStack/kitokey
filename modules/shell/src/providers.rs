@@ -1,5 +1,5 @@
 //! Who can write the minutes: the models Ollama holds on this computer, and the online services
-//! offered with their address. Each is an address `wholeheard-summary` speaks to — OpenAI's way of
+//! offered with their address. Each is an address `kitokey-summary` speaks to — OpenAI's way of
 //! asking, which Ollama speaks too.
 
 use std::time::Duration;
@@ -43,10 +43,10 @@ pub struct Hearing {
 
 /// The minutes' services that answer OpenAI's `audio/transcriptions` with segments and their
 /// times, as the step asks them (`verbose_json`). Mistral asks for a field of its own to give
-/// them: not offered. OpenRouter's address, for whoever tries Wholeheard, as
-/// `WHOLEHEARD_HEARING` says.
+/// them: not offered. OpenRouter's address, for whoever tries Kitokey, as
+/// `KITOKEY_HEARING` says.
 pub fn hearing() -> Vec<Hearing> {
-    let openrouter = std::env::var("WHOLEHEARD_HEARING").unwrap_or_else(|_| ONLINE[0].address.to_string());
+    let openrouter = std::env::var("KITOKEY_HEARING").unwrap_or_else(|_| ONLINE[0].address.to_string());
     vec![
         Hearing {
             name: ONLINE[0].name,
@@ -89,7 +89,7 @@ pub fn hearing_listed(address: &str) -> Option<Vec<String>> {
 /// form, where Mistral 7B and models for code do not (#261). Offered first when Ollama holds it.
 pub const RECOMMENDED: &str = "qwen3:8b";
 
-/// The address `wholeheard-summary` is given for a model of Ollama at `base`.
+/// The address `kitokey-summary` is given for a model of Ollama at `base`.
 pub fn ollama_address(base: &str) -> String {
     format!("{}/v1", base.trim_end_matches('/'))
 }
@@ -119,7 +119,7 @@ pub fn ollama_listed(base: &str) -> Option<Vec<String>> {
         .into_iter()
         .flatten()
         .filter_map(|model| model.get("name").and_then(serde_json::Value::as_str).map(str::to_string))
-        // A name `wholeheard-summary` would refuse is not offered.
+        // A name `kitokey-summary` would refuse is not offered.
         .filter(|name| !name.trim().is_empty() && !name.chars().any(char::is_control))
         .collect();
     // The recommended first, the others by name.
@@ -185,7 +185,7 @@ pub fn host(address: &str) -> Option<String> {
 }
 
 /// Whether a provider's address is this machine — what is sent there never leaves it. Read as
-/// `wholeheard-summary` reads it (its provider's reading of an address):
+/// `kitokey-summary` reads it (its provider's reading of an address):
 /// the same parser, the same rules, so that an address it refuses, or sends elsewhere, is never
 /// judged local here — the agreement is never skipped on a reading of the shell's own.
 pub fn local(address: &str) -> bool {

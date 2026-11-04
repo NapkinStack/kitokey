@@ -2,10 +2,10 @@
 
 use std::fs;
 
-use wholeheard_shell::spoken::{FILE, code, mark, read};
+use kitokey_shell::spoken::{FILE, code, mark, read};
 
 fn folder(name: &str) -> std::path::PathBuf {
-    let made = std::env::temp_dir().join(format!("wholeheard-spoken-{name}-{}", std::process::id()));
+    let made = std::env::temp_dir().join(format!("kitokey-spoken-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&made);
     fs::create_dir_all(&made).unwrap();
     made

@@ -2,7 +2,7 @@
 
 use std::{fs, path::Path};
 
-use wholeheard_shell::levels::levels;
+use kitokey_shell::levels::levels;
 
 /// A WAV of `channels` channels, `bits` deep — 16 or 24 as integers, 32 as floats — its data's
 /// length said or left unknown, from one function of the frame's index per channel.

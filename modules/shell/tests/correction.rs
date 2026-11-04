@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use wholeheard_shell::correction::{Refused, correct, tidy};
+use kitokey_shell::correction::{Refused, correct, tidy};
 
 const HEARD: &str = concat!(
     r#"{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}"#,
@@ -18,7 +18,7 @@ const HEARD: &str = concat!(
 );
 
 fn folder(name: &str) -> std::path::PathBuf {
-    let made = std::env::temp_dir().join(format!("wholeheard-correction-{name}-{}", std::process::id()));
+    let made = std::env::temp_dir().join(format!("kitokey-correction-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&made);
     fs::create_dir_all(&made).unwrap();
     made

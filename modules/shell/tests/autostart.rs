@@ -1,15 +1,15 @@
-//! Wholeheard started with the user's session (D32): an entry of the user's autostart folder, as
+//! Kitokey started with the user's session (D32): an entry of the user's autostart folder, as
 //! the XDG Autostart specification has it — the file is the setting, written once by itself.
 
 use std::fs;
 
-use wholeheard_shell::{autostart, settings};
+use kitokey_shell::{autostart, settings};
 
 #[test]
 fn the_entry_starts_the_tray_alone_and_nothing_once_the_package_is_gone() {
     let folder = tempfile::tempdir().unwrap();
     let entry = folder.path().join("autostart").join(autostart::NAME);
-    assert_eq!(autostart::NAME, "dev.wholeheard.Wholeheard.desktop");
+    assert_eq!(autostart::NAME, "com.kitokey.Kitokey.desktop");
     assert!(!autostart::on(&entry));
     autostart::set(&entry, true).unwrap();
     assert!(autostart::on(&entry));
@@ -17,7 +17,8 @@ fn the_entry_starts_the_tray_alone_and_nothing_once_the_package_is_gone() {
     let lines: Vec<&str> = text.lines().collect();
     assert_eq!(lines.first(), Some(&"[Desktop Entry]"), "{text}");
     // The tray, no window (D17); a removed package starts nothing.
-    for line in ["Type=Application", "Exec=wholeheard", "TryExec=wholeheard"] {
+    let wanted = ["Type=Application", "Exec=kitokey", "TryExec=kitokey"]; // gitleaks:allow: "kitokey" holds "key", no secret
+    for line in wanted {
         assert!(lines.contains(&line), "{line} in {text}");
     }
     assert!(!text.contains("--window") && !text.contains("Hidden=true"), "{text}");
@@ -32,17 +33,17 @@ fn what_the_desktops_tools_turn_off_is_off() {
     let folder = tempfile::tempdir().unwrap();
     let entry = folder.path().join(autostart::NAME);
     for off in ["Hidden=true", "X-GNOME-Autostart-enabled=false", "Hidden = true"] {
-        fs::write(&entry, format!("[Desktop Entry]\nType=Application\nExec=wholeheard\n{off}\n")).unwrap();
+        fs::write(&entry, format!("[Desktop Entry]\nType=Application\nExec=kitokey\n{off}\n")).unwrap();
         assert!(!autostart::on(&entry), "{off}");
     }
     fs::write(
         &entry,
-        "[Desktop Entry]\nType=Application\nExec=wholeheard\nHidden=false\nX-GNOME-Autostart-enabled=true\n",
+        "[Desktop Entry]\nType=Application\nExec=kitokey\nHidden=false\nX-GNOME-Autostart-enabled=true\n",
     )
     .unwrap();
     assert!(autostart::on(&entry));
     // A key of another group is not the entry's.
-    fs::write(&entry, "[Desktop Entry]\nExec=wholeheard\n[Desktop Action other]\nHidden=true\n").unwrap();
+    fs::write(&entry, "[Desktop Entry]\nExec=kitokey\n[Desktop Action other]\nHidden=true\n").unwrap();
     assert!(autostart::on(&entry));
 }
 
@@ -50,7 +51,7 @@ fn what_the_desktops_tools_turn_off_is_off() {
 fn the_first_start_writes_it_once_and_never_again_once_turned_off() {
     let folder = tempfile::tempdir().unwrap();
     let entry = folder.path().join("autostart").join(autostart::NAME);
-    let file = folder.path().join("wholeheard").join("settings.toml");
+    let file = folder.path().join("kitokey").join("settings.toml");
     fs::create_dir_all(file.parent().unwrap()).unwrap();
     fs::write(&file, "# mine\nreminder = false\n").unwrap();
     assert!(autostart::first(&entry, &file).unwrap());
@@ -88,4 +89,24 @@ fn the_settings_file_keeps_whether_it_was_written() {
     changed.autostart = Some(true);
     settings::write(&file, &changed).unwrap();
     assert_eq!(fs::read_to_string(&file).unwrap(), "autostart = true\n");
+}
+
+#[test]
+fn wholeheards_entry_becomes_kitokeys_and_an_entry_turned_off_stays_off() {
+    let folder = tempfile::tempdir().unwrap();
+    let before = folder.path().join(autostart::NAME_BEFORE);
+    let entry = folder.path().join(autostart::NAME);
+    assert_eq!(autostart::NAME_BEFORE, "dev.wholeheard.Wholeheard.desktop");
+    // On under Wholeheard: on under Kitokey, Wholeheard's gone — its program is, once the package is replaced.
+    fs::write(&before, "[Desktop Entry]\nType=Application\nExec=wholeheard\nTryExec=wholeheard\n").unwrap();
+    assert!(autostart::carry_over(&before, &entry).unwrap());
+    assert!(autostart::on(&entry) && !before.exists());
+    assert!(fs::read_to_string(&entry).unwrap().contains("Exec=kitokey"));
+    // Nothing left to carry: nothing done, Kitokey's own kept.
+    assert!(!autostart::carry_over(&before, &entry).unwrap() && autostart::on(&entry));
+    // Turned off under Wholeheard: off under Kitokey too.
+    fs::remove_file(&entry).unwrap();
+    fs::write(&before, "[Desktop Entry]\nType=Application\nExec=wholeheard\nHidden=true\n").unwrap();
+    assert!(autostart::carry_over(&before, &entry).unwrap());
+    assert!(!before.exists() && !autostart::on(&entry));
 }

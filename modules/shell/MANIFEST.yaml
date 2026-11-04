@@ -7,7 +7,7 @@ module:
 
   # ONE sentence. If it needs an "and", the module probably does two things.
   responsibility: >
-    Puts Wholeheard's four steps in the user's hands: a tray, a global shortcut, notifications, one window.
+    Puts Kitokey's four steps in the user's hands: a tray, a global shortcut, notifications, one window.
 
   owner: "NapkinStack/maintainers"          # a GitHub team, organisation/team; a user only without an organisation
   contact: "@NapkinStack/maintainers"
@@ -111,10 +111,10 @@ dependencies:
       One call, trash::delete_all, in src/main.rs; gio trash and the systems' own trash
       interfaces replace it.
   - name: http
-    purpose: Reads a provider's address as wholeheard-summary does, to tell one of this machine
+    purpose: Reads a provider's address as kitokey-summary does, to tell one of this machine
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
     exit_strategy: >
-      One parse, in providers::local; any reader of addresses wholeheard-summary also uses replaces it.
+      One parse, in providers::local; any reader of addresses kitokey-summary also uses replaces it.
   - name: tauri-plugin-dialog
     purpose: Opens the system's own dialog to choose the sessions' folder
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
@@ -132,7 +132,7 @@ dependencies:
       src/main.rs and the page in ui/ alone know it; the library beside it holds every
       decision and knows no toolkit.
   - name: tauri-plugin-single-instance
-    purpose: "One Wholeheard per session — a second start hands its arguments to the running one and leaves (D35, #386)"
+    purpose: "One Kitokey per session — a second start hands its arguments to the running one and leaves (D35, #386)"
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
     exit_strategy: >
       One plugin and its callback in src/main.rs; a lock file and a socket, or the session bus's
@@ -162,7 +162,7 @@ dependencies:
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
     exit_strategy: One function, fingerprint, in src/model.rs; any SHA-256.
   - name: pulldown-cmark
-    purpose: Renders a session's minutes from CommonMark, the reader wholeheard-summary judged them with
+    purpose: Renders a session's minutes from CommonMark, the reader kitokey-summary judged them with
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
     exit_strategy: >
       One function, parse_minutes, in src/minutes.rs; any CommonMark renderer whose events let
@@ -247,7 +247,7 @@ commands:
     bash -n scripts/release.sh && { ! command -v node >/dev/null || node --check ui/window.js; }
     && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
   test: cargo test --locked
-  run: cargo run --locked --release --bin wholeheard
+  run: cargo run --locked --release --bin kitokey
   release: bash scripts/release.sh
   e2e: bash scripts/e2e.sh
   clean: cargo clean
@@ -273,7 +273,7 @@ evidence:
     - pattern: '"message":"shell\.recording_unavailable"'
       level: warning
       scenario: AN
-    # No recorder where Wholeheard looks for one.
+    # No recorder where Kitokey looks for one.
     - pattern: '"message":"shell\.recording_failed"'
       level: error
       scenario: D

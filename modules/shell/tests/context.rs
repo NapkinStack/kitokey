@@ -3,7 +3,7 @@
 
 use std::{fs, io::ErrorKind, path::Path};
 
-use wholeheard_shell::{
+use kitokey_shell::{
     context::{self, Closed},
     meeting, minutes,
 };
@@ -188,7 +188,7 @@ fn the_readers_say_the_context_a_transcript_and_minutes_were_made_with() {
 
 #[test]
 fn a_transcript_left_unfinished_is_not_told_to_wait_it_will_not_finish_on_its_own() {
-    use wholeheard_shell::words::{self, Failure, Language};
+    use kitokey_shell::words::{self, Failure, Language};
     assert_eq!(Closed::Making.failure(), Failure::Busy);
     assert_eq!(Closed::Unfinished.failure(), Failure::NotComplete);
     assert_eq!(

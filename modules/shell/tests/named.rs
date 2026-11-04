@@ -2,13 +2,13 @@
 
 use std::{fs, io::ErrorKind};
 
-use wholeheard_shell::{
+use kitokey_shell::{
     named::{FILE, MOST, read, within, write},
     sessions,
 };
 
 fn folder(name: &str) -> std::path::PathBuf {
-    let made = std::env::temp_dir().join(format!("wholeheard-named-{name}-{}", std::process::id()));
+    let made = std::env::temp_dir().join(format!("kitokey-named-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&made);
     fs::create_dir_all(&made).unwrap();
     made

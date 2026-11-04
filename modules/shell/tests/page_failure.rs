@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use wholeheard_shell::log::page_failed;
+use kitokey_shell::log::page_failed;
 
 /// Where the log is written, for the test to read.
 #[derive(Clone, Default)]

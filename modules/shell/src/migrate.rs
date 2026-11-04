@@ -1,20 +1,22 @@
-//! Summit became Wholeheard (D28, PDR-0001): what a user held under the old name is carried over
-//! at the start, before anything is read — never asked for again, never lost.
+//! Summit became Wholeheard (D28, PDR-0001), then Wholeheard Kitokey (D86, PDR-0006): what a user
+//! held under an earlier name is carried over at the start, before anything is read — never asked
+//! for again, never lost.
 //!
 //! Each step looks at what is there and does what is left of it, so that one interrupted — a
 //! folder that could not be moved, a crash — is done at the next start, and a start with nothing
-//! left to do does nothing:
+//! left to do does nothing. For each earlier name, the latest first:
 //!
-//! 1. The meetings stay where Summit kept them: when the settings name no folder and Summit's
-//!    holds meetings, it is written in them — first, so that it is never lost to a step after.
+//! 1. The meetings stay where they were kept: when the settings name no folder and the earlier
+//!    name's own holds meetings, it is written in them — first, so that it is never lost to a step
+//!    after.
 //! 2. The settings' folder and the data's (the Whisper model, 874 MB) are moved, not copied: the
 //!    model is never fetched again. A folder already there under the new name and holding
-//!    something is Wholeheard's: nothing is overwritten, the old one is left as it is.
-//! 3. A model the settings name inside Summit's data folder is named where it was moved to.
+//!    something is Kitokey's: nothing is overwritten, the old one is left as it is.
+//! 3. A model the settings name inside the earlier data folder is named where it was moved to.
 //!
 //! The settings are edited where a key is, the rest of the file — comments, order — as it was,
 //! and written whole or not at all. The keys in the keyring are carried over as they are read
-//! (`keys`).
+//! (`keys`), the entry that starts it with the session at the start (`autostart`).
 
 use std::fs;
 use std::io;
@@ -22,12 +24,11 @@ use std::path::{Path, PathBuf};
 
 use toml_edit::{DocumentMut, value};
 
-/// The name of the folders before D28.
-pub const BEFORE: &str = "summit";
+/// The earlier names, the latest first: the folders' name, and the meetings' folder it made in
+/// the documents when the settings named none. Wholeheard's until D86, Summit's until D28.
+pub const BEFORE: [(&str, &str); 2] = [("wholeheard", "Wholeheard"), ("summit", "Summit")];
 /// The name of the folders now.
-pub const NOW: &str = "wholeheard";
-/// The meetings' folder Summit made in the documents when the settings named none.
-pub const MEETINGS_BEFORE: &str = "Summit";
+pub const NOW: &str = "kitokey";
 
 /// Where a user's things are on this system: its configuration, its data, its documents.
 pub struct Places {
@@ -56,22 +57,36 @@ pub struct Carried {
     pub model_named: bool,
 }
 
-/// Carries what is left of Summit's over to Wholeheard's; nothing left, nothing done.
+/// Carries what is left of each earlier name's over to Kitokey's, the latest first; nothing left,
+/// nothing done.
 pub fn carry_over(places: &Places) -> io::Result<Carried> {
     let mut carried = Carried::default();
-    let (settings_before, settings_now) = (places.config.join(BEFORE), places.config.join(NOW));
-    let (data_before, data_now) = (places.data.join(BEFORE), places.data.join(NOW));
-    // The file the settings are in now — Summit's while its folder is not moved yet.
+    for (before, meetings) in BEFORE {
+        let from = carry_from(places, before, meetings)?;
+        carried.settings |= from.settings;
+        carried.data |= from.data;
+        carried.meetings_kept = carried.meetings_kept.or(from.meetings_kept);
+        carried.model_named |= from.model_named;
+    }
+    Ok(carried)
+}
+
+/// Carries what is left under one earlier name.
+fn carry_from(places: &Places, before: &str, meetings_before: &str) -> io::Result<Carried> {
+    let mut carried = Carried::default();
+    let (settings_before, settings_now) = (places.config.join(before), places.config.join(NOW));
+    let (data_before, data_now) = (places.data.join(before), places.data.join(NOW));
+    // The file the settings are in now — the earlier name's while its folder is not moved yet.
     let file = if holds_something(&settings_now)? || !settings_before.is_dir() {
         settings_now.join("settings.toml")
     } else {
         settings_before.join("settings.toml")
     };
 
-    // 1. The meetings: Summit's folder named, when the settings name none and it holds meetings —
-    // while something of Summit's is still to carry over, or no settings are written yet: a user
-    // who takes the folder out of their settings afterwards is not overruled.
-    let meetings = places.documents.join(MEETINGS_BEFORE);
+    // 1. The meetings: the earlier name's folder named, when the settings name none and it holds
+    // meetings — while something of that name's is still to carry over, or no settings are written
+    // yet: a user who takes the folder out of their settings afterwards is not overruled.
+    let meetings = places.documents.join(meetings_before);
     let still = settings_before.is_dir() || data_before.is_dir() || !settings_now.join("settings.toml").exists();
     if still && holds_meetings(&meetings)? {
         let mut settings = read(&file)?;
@@ -86,7 +101,7 @@ pub fn carry_over(places: &Places) -> io::Result<Carried> {
     carried.settings = moved(&settings_before, &settings_now)?;
     carried.data = moved(&data_before, &data_now)?;
 
-    // 3. A model named inside Summit's data folder, named where it is now.
+    // 3. A model named inside the earlier data folder, named where it is now.
     let file = settings_now.join("settings.toml");
     if let Some(mut settings) = read(&file)?
         && let Some(written) = settings.get("model").and_then(|model| model.as_str())
@@ -105,7 +120,7 @@ fn moved(before: &Path, now: &Path) -> io::Result<bool> {
     if !before.is_dir() || holds_something(now)? {
         return Ok(false);
     }
-    // An empty folder under the new name holds nothing of Wholeheard's: it gives way.
+    // An empty folder under the new name holds nothing of Kitokey's: it gives way.
     if now.is_dir() {
         fs::remove_dir(now)?;
     }

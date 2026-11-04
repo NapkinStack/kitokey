@@ -26,7 +26,7 @@ pub enum Made {
 }
 
 /// Who hears it: a Whisper model file, or Apple's SpeechAnalyzer in a language (D42), as
-/// `wholeheard-transcription` takes them.
+/// `kitokey-transcription` takes them.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Hearer {
     Model(PathBuf),
@@ -144,7 +144,7 @@ impl Transcription {
         let (trace, making) = crate::log::making();
         let _making = making.enter();
         let mut command = Command::new(program);
-        command.arg(folder).env("WHOLEHEARD_TRACE", &trace);
+        command.arg(folder).env("KITOKEY_TRACE", &trace);
         let model = match hearer {
             Hearer::Model(model) => {
                 command.arg("--model").arg(model);
@@ -168,9 +168,9 @@ impl Transcription {
                 model.clone()
             }
         };
-        command.env_remove("WHOLEHEARD_PROVIDER_KEY");
+        command.env_remove("KITOKEY_PROVIDER_KEY");
         if let Some(key) = key {
-            command.env("WHOLEHEARD_PROVIDER_KEY", key);
+            command.env("KITOKEY_PROVIDER_KEY", key);
         }
         info!(session = %named(folder), model = %model, "shell.transcript");
         // A group of its own: ended, whatever it started ends with it.
@@ -222,7 +222,7 @@ impl Transcription {
         Ok((Self { program }, made))
     }
 
-    /// Stops the program now: Wholeheard is quitting. What it had heard stays written.
+    /// Stops the program now: Kitokey is quitting. What it had heard stays written.
     pub fn end(&self) {
         if let Ok(mut child) = self.program.lock() {
             // Only while it runs: once it is waited for, its group's number may be another's.

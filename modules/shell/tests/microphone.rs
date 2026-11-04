@@ -2,8 +2,8 @@
 //! batches `pw-dump --monitor` prints: the whole graph first, then each change, an object gone
 //! being its id with no info. The batches here are made for the tests, in that form.
 
+use kitokey_shell::microphone::{Change, Takers};
 use serde_json::{Value, json};
-use wholeheard_shell::microphone::{Change, Takers};
 
 fn client(id: u64, name: &str, pid: u64, binary: &str) -> Value {
     json!({ "id": id, "type": "PipeWire:Interface:Client", "info": { "props": {
@@ -86,7 +86,7 @@ fn an_application_that_takes_a_microphone_is_said_once_and_its_letting_go_too() 
 }
 
 #[test]
-fn what_reads_the_computer_s_sound_a_level_meter_and_wholeheard_itself_take_no_microphone() {
+fn what_reads_the_computer_s_sound_a_level_meter_and_kitokey_itself_take_no_microphone() {
     let mut takers = graph();
     let batch = json!([
         // Reading what the computer plays: a sink's monitor, or said so by the stream.
@@ -99,9 +99,9 @@ fn what_reads_the_computer_s_sound_a_level_meter_and_wholeheard_itself_take_no_m
         client(22, "pavucontrol", 200, "pavucontrol"),
         stream(35, 22, "Peak detect", json!({ "stream.monitor": "true" })),
         link(45, MIC, 35),
-        // Wholeheard's own capture.
-        client(23, "wholeheard-capture", 300, "wholeheard-capture"),
-        stream(36, 23, "wholeheard-capture", json!({})),
+        // Kitokey's own capture.
+        client(23, "kitokey-capture", 300, "kitokey-capture"),
+        stream(36, 23, "kitokey-capture", json!({})),
         link(46, MIC, 36),
     ]);
     assert!(takers.read(&batch).is_empty(), "{:?}", takers.read(&json!([])));
@@ -148,7 +148,7 @@ fn what_is_not_a_batch_of_the_graph_changes_nothing() {
 
 #[test]
 fn an_application_is_offered_once_while_it_holds_a_microphone_never_while_recording_nor_when_offers_are_off() {
-    use wholeheard_shell::microphone::Offers;
+    use kitokey_shell::microphone::Offers;
     let took = |key: u64| Change::Took {
         key,
         name: format!("app {key}"),
@@ -213,10 +213,10 @@ fn the_graph_as_pw_dump_writes_it_booleans_virtual_and_duplex_devices_links_and_
     // known and named as it was — never a new one.
     assert!(takers.read(&json!([gone(30)])).is_empty());
     assert_eq!(takers.read(&json!([gone(63), gone(53)])), [Change::Let { key: 703 }]);
-    // Wholeheard's own capture, its client gone first: still its own.
+    // Kitokey's own capture, its client gone first: still its own.
     takers.read(&json!([
-        client(31, "wholeheard-capture", 704, "wholeheard-capture"),
-        stream(54, 31, "wholeheard-capture", json!({})),
+        client(31, "kitokey-capture", 704, "kitokey-capture"),
+        stream(54, 31, "kitokey-capture", json!({})),
         link(64, MIC, 54)
     ]));
     assert!(takers.read(&json!([gone(31)])).is_empty());

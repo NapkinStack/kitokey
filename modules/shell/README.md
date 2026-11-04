@@ -1,6 +1,6 @@
 # shell
 
-Puts Wholeheard's four steps in the user's hands: a tray, a global shortcut, notifications, one window.
+Puts Kitokey's four steps in the user's hands: a tray, a global shortcut, notifications, one window.
 
 - **Owner**: NapkinStack/maintainers
 - **Criticality**: standard
@@ -9,7 +9,7 @@ Puts Wholeheard's four steps in the user's hands: a tray, a global shortcut, not
 ```mermaid
 flowchart TB
     U(["The user"]):::user -->|"start · stop · make the minutes"| S["shell<br/>tray · shortcut · notifications · one window"]:::mod
-    S -->|"starts, stops, reads what they print"| P["wholeheard-capture · wholeheard-transcription<br/>wholeheard-summary · export"]:::step
+    S -->|"starts, stops, reads what they print"| P["kitokey-capture · kitokey-transcription<br/>kitokey-summary · export"]:::step
     P --> F["The session's folder"]:::file
     F -->|"read"| S
     S -->|"what happened, what failed"| U
@@ -20,7 +20,7 @@ flowchart TB
     classDef file fill:#374151,color:#fff
 ```
 
-**Legend** — orange: whoever uses Wholeheard · green: this module · blue: the four steps, programs
+**Legend** — orange: whoever uses Kitokey · green: this module · blue: the four steps, programs
 it starts and never reads the code of · grey: files, the only thing it shares with them.
 
 **It holds no step** (ADR-0002): closed or crashed, a recording goes on, and every step still
@@ -40,20 +40,33 @@ with `pw-dump --monitor`; what it sees is shown in the notification and kept now
 `offer = false` in the settings file turns the offers off.
 
 **Started with the session** (D32, Linux), so that a call is offered after a restart: at its
-first start, Wholeheard writes `~/.config/autostart/dev.wholeheard.Wholeheard.desktop`
+first start, Kitokey writes `~/.config/autostart/com.kitokey.Kitokey.desktop`
 ([XDG Autostart](https://specifications.freedesktop.org/autostart-spec/latest/)) — the tray
 alone, no window; `TryExec`, so a removed package starts nothing. The entry is the setting:
-Settings' *Lancer Wholeheard à l'ouverture de session* writes or removes it, and reads it as the
+Settings' *Lancer Kitokey à l'ouverture de session* writes or removes it, and reads it as the
 desktop's tools leave it (`Hidden`, `X-GNOME-Autostart-enabled`). `autostart` in the settings
-file says Wholeheard wrote it once: turned off, it is never written again by itself.
+file says Kitokey wrote it once: turned off, it is never written again by itself.
 
-**One Wholeheard** per session (D35): a second start hands its arguments to the running one and
+**What the user held under an earlier name** — Wholeheard until D86, Summit until D28 — is carried
+over at the start, before anything is read (`src/migrate.rs`, `keys`, `autostart`), the latest name
+first, each step doing what is left of it so that an interrupted one is done at the next start:
+
+| Held | Becomes |
+|---|---|
+| The settings' and the data's folders (`wholeheard/`, the Whisper model in it) | Moved to `kitokey/`, never copied: the model is not fetched again; a `kitokey/` folder holding something is never overwritten |
+| The meetings in `Documents/Wholeheard`, the settings naming no folder | Named in the settings, where they are: never moved |
+| A key filed under `dev.wholeheard.Wholeheard` | Filed under `com.kitokey.Kitokey` as it is read, then forgotten there |
+| `~/.config/autostart/dev.wholeheard.Wholeheard.desktop` | Kitokey's entry, on if it was on, off if it was turned off; the old one taken away |
+
+Said once, in the user's language: *Wholeheard is now Kitokey*.
+
+**One Kitokey** per session (D35): a second start hands its arguments to the running one and
 leaves ([tauri-plugin-single-instance](https://v2.tauri.app/plugin/single-instance/)). The
-applications' menu runs `wholeheard --window`, so its window opens, running or not; started again
+applications' menu runs `kitokey --window`, so its window opens, running or not; started again
 with the session, nothing opens.
 
-**The window** (cycle 03, from D11's drawings) is opened by *Open Wholeheard* in the menu — or at
-once by `wholeheard --window` — and never without a gesture: the meetings in the sessions'
+**The window** (cycle 03, from D11's drawings) is opened by *Open Kitokey* in the menu — or at
+once by `kitokey --window` — and never without a gesture: the meetings in the sessions'
 folder by week, newest first, each with its day, its length, what it holds and what its
 audio weighs, and above them what all the audio weighs against the transcripts and minutes.
 A session being recorded, or one left without its end, says so. It reads `session.json` of
@@ -70,7 +83,7 @@ voice, searched over what was said — the two side by side once the pane is 100
 75 characters at most; who spoke over the meeting; its folder, opened in the
 system's file manager. *Réglages* sets what follows a recording, the transcription's model among
 those on this computer, the reminder and how long the audio is kept — each choice saved at once
-in the settings file; one Wholeheard could not read is said, and not written over. Audio kept
+in the settings file; one Kitokey could not read is said, and not written over. Audio kept
 longer than the settings say goes to the system's trash — at start, then every hour, said once —
 from sessions whose transcript is whole; their transcript and minutes stay.
 
@@ -142,7 +155,7 @@ making is ended and made again here first in line; while an agreement is asked, 
 after a service wrote the minutes, they are written again here. What had left — the sound to the
 host that heard it, the transcript to the one that wrote — is said on the page, from what the
 shell saw of the makings and what the transcript's header and the minutes' front matter name; it
-is kept in memory, until Wholeheard quits. A Whisper model missing is offered as for any meeting;
+is kept in memory, until Kitokey quits. A Whisper model missing is offered as for any meeting;
 Ollama silent or holding no model, the minutes wait, said, its recommended model offered, made
 once it is there. Turned off, the settings choose again for what is made next.
 
@@ -159,7 +172,7 @@ else of the disk; a meeting whose audio was freed has no player and says why.
 A transcript that failed is said in one sentence, the recording untouched: *Transcribe the
 last recording*, in the menu, makes it again from where it stopped; it is greyed while a
 recording runs, whose transcript follows its stop. One transcript at a time: a stop during
-another waits for it. Quitting Wholeheard ends a transcript being made; it goes on the same way. **The model, on the user's word.** The first transcript needs the Whisper model. Wholeheard says
+another waits for it. Quitting Kitokey ends a transcript being made; it goes on the same way. **The model, on the user's word.** The first transcript needs the Whisper model. Kitokey says
 so, and puts one entry in its menu: *Download the model (874 MB, huggingface.co)*. Nothing is
 fetched before it is chosen. The model comes into a part file beside its place. A cut is
 taken up where it stopped, and the model is used only whole and with the SHA-256 its authors
@@ -168,54 +181,54 @@ the model is missing: in *Réglages*, and on a meeting waiting for it (D36). *R�
 the Whisper models of [`registry/models.json`](registry/models.json), the list shipped (D40,
 ADR-0010), and for the minutes `qwen3:8b` fetched by Ollama's own pull (`POST /api/pull`) —,
 one fetch at a time. The Whisper models are read again from `main` only on *Mettre à jour la
-liste (raw.githubusercontent.com)*, and offered then until Wholeheard quits, only when the
+liste (raw.githubusercontent.com)*, and offered then until Kitokey quits, only when the
 decider's minisign key signed them (D56). Until that key is built in, no list is read again and
 *Réglages* say it waits on it; a list that cannot be read, unsigned, signed by another key or changed since leaves the one offered, and says so; a model fetched joins those to choose, the choice staying the
-user's. With no Ollama answering, the row says where to get it: Wholeheard never installs it (D37). A model the settings name, and which is not
+user's. With no Ollama answering, the row says where to get it: Kitokey never installs it (D37). A model the settings name, and which is not
 there, is said with where it was looked for: it is the user's own, never fetched.
 
 ```bash
 nstack bootstrap shell && nstack bootstrap capture
 (cd modules/capture && cargo build --locked --release)
 (cd modules/transcription && cargo build --locked --release)
-WHOLEHEARD_CAPTURE=$PWD/modules/capture/target/release/wholeheard-capture \
-  WHOLEHEARD_TRANSCRIPTION=$PWD/modules/transcription/target/release/wholeheard-transcription nstack run shell
+KITOKEY_CAPTURE=$PWD/modules/capture/target/release/kitokey-capture \
+  KITOKEY_TRANSCRIPTION=$PWD/modules/transcription/target/release/kitokey-transcription nstack run shell
 ```
 
 | On a Linux desktop | What it takes |
 |---|---|
-| The icon | Under GNOME, an extension that shows tray icons — *AppIndicator and KStatusNotifierItem Support*. Without it Wholeheard runs, unseen |
-| The shortcut | The desktop grants it to an application it can find: a desktop entry of Wholeheard's name in the user's `applications` folder, **whose `Exec` line is the program's whole path** — the desktop reads no entry whose program it cannot find, and says so as "App info not found". The line under the table installs it. Then start Wholeheard again and accept the desktop's question. Refused, Wholeheard says so once; the menu still does the same |
+| The icon | Under GNOME, an extension that shows tray icons — *AppIndicator and KStatusNotifierItem Support*. Without it Kitokey runs, unseen |
+| The shortcut | The desktop grants it to an application it can find: a desktop entry of Kitokey's name in the user's `applications` folder, **whose `Exec` line is the program's whole path** — the desktop reads no entry whose program it cannot find, and says so as "App info not found". The line under the table installs it. Then start Kitokey again and accept the desktop's question. Refused, Kitokey says so once; the menu still does the same |
 
 ```bash
-sed "s#^Exec=wholeheard#Exec=$PWD/modules/shell/target/release/wholeheard#" modules/shell/linux/dev.wholeheard.Wholeheard.desktop \
-  > "${XDG_DATA_HOME:-$HOME/.local/share}/applications/dev.wholeheard.Wholeheard.desktop"
+sed "s#^Exec=kitokey#Exec=$PWD/modules/shell/target/release/kitokey#" modules/shell/linux/com.kitokey.Kitokey.desktop \
+  > "${XDG_DATA_HOME:-$HOME/.local/share}/applications/com.kitokey.Kitokey.desktop"
 ```
 
-**Settings** — `wholeheard/settings.toml` in the user's configuration folder, a few lines a person
-reads and writes without Wholeheard: `reminder = false` to stop the reminder; `sessions = "…"` for
+**Settings** — `kitokey/settings.toml` in the user's configuration folder, a few lines a person
+reads and writes without Kitokey: `reminder = false` to stop the reminder; `sessions = "…"` for
 where sessions go; `after = "nothing"`, `"transcript"` or `"minutes"` for what follows a
 recording (`transcript = false`, from before, still means nothing); `model = "…"` for the
 Whisper model; `minutes_provider` — a provider's address, `"http://localhost:11434/v1"` for Ollama
 on this computer — and `minutes_model`
 for who writes the minutes (of this computer's models, Settings offer `qwen3:8b` first, as
 recommended: it holds the minutes' form where Mistral 7B and models for code do not, #261); `minutes_agreed = "…"`, the host the user agreed to send a meeting to
-the first time — another host asks again, one on this computer never asks; `keep_audio = "always"` or a number of days; `developer = true` for the developer mode (*Settings → Advanced*); `log = "debug"` for detailed logs from the next start, the shell's and its programs' (`WHOLEHEARD_LOG`, when set, wins). Out of the box,
-sessions go to a folder `Wholeheard` in the user's documents, the transcript follows alone, and the
-model is `wholeheard/models/ggml-large-v3-turbo-q8_0.bin` in the user's data folder — fetched there
-on the user's word, or placed by hand. When Wholeheard writes the file it touches only what changed:
+the first time — another host asks again, one on this computer never asks; `keep_audio = "always"` or a number of days; `developer = true` for the developer mode (*Settings → Advanced*); `log = "debug"` for detailed logs from the next start, the shell's and its programs' (`KITOKEY_LOG`, when set, wins). Out of the box,
+sessions go to a folder `Kitokey` in the user's documents, the transcript follows alone, and the
+model is `kitokey/models/ggml-large-v3-turbo-q8_0.bin` in the user's data folder — fetched there
+on the user's word, or placed by hand. When Kitokey writes the file it touches only what changed:
 a line it changes keeps its comment, and every other line, comment and key stays as written; a
 file it cannot read as settings it never writes over.
 
 What it does is logged — its start, each recording, transcript, minutes and test of a model with
 how it ended, a failure with its detail; never a word of a meeting, a key, nor a session's path
 beyond its folder's name (ADR-0007): one JSON line per step in
-`$XDG_STATE_HOME/wholeheard/logs/shell.<date>.jsonl` (UTC), beside the programs' own; day files
+`$XDG_STATE_HOME/kitokey/logs/shell.<date>.jsonl` (UTC), beside the programs' own; day files
 kept fourteen days and the folder under 50 MB. Each making has an id, logged here and passed to
-its program as `WHOLEHEARD_TRACE`: one id finds both sides. A failure of the window's page — an
+its program as `KITOKEY_TRACE`: one id finds both sides. A failure of the window's page — an
 error it throws or a rejection it leaves — is logged as `shell.page_failed`, its kind and where in
-the page's code, never its sentence. `WHOLEHEARD_LOG` and
-`WHOLEHEARD_LOG_DIR` (an absolute path) are passed on as they are set.
+the page's code, never its sentence. `KITOKEY_LOG` and
+`KITOKEY_LOG_DIR` (an absolute path) are passed on as they are set.
 
 A failure reaches the user in plain words — what failed, what still holds, what to do — in a
 notification and on the window's page; what its program or the system said of it is never there
@@ -230,7 +243,7 @@ The standard verbs — `bootstrap`, `check`, `test`, `run` — are declared in t
 section of the [manifest](./MANIFEST.yaml), for this module's stack. What each one must do:
 `.nstack/handbook/09-platform.md` §2.
 
-`e2e` drives Wholeheard on the desktop: the tray's menu over the session bus, then the window over
+`e2e` drives Kitokey on the desktop: the tray's menu over the session bus, then the window over
 WebDriver — WebKitGTK's own (`WebKitWebDriver`, in Fedora's `webkit2gtk4.1-devel`) behind
 `tauri-driver`, which the script installs when it is missing (`scripts/e2e_window.py`). Its run's logs
 are read after it, and kept in `$NSTACK_EVIDENCE` (`.evidence/e2e/`), in `logs/` with the pages'
@@ -241,13 +254,13 @@ run, quoted. `nstack e2e shell` audits the same logs after the run.
 ## Contracts
 
 - Provided: none
-- Consumed: [`recording/v1`](../../contracts/recording/v1/README.md) — what `wholeheard-capture` says while it records
+- Consumed: [`recording/v1`](../../contracts/recording/v1/README.md) — what `kitokey-capture` says while it records
   (`src/recording.rs`); [`transcript/v1`](../../contracts/transcript/v1/README.md) — only that a session's
-  `transcript.jsonl` is there once `wholeheard-transcription` ended well (`src/transcription.rs`);
+  `transcript.jsonl` is there once `kitokey-transcription` ended well (`src/transcription.rs`);
   [`session-audio`](../../contracts/session-audio/v2/README.md), v1 and v2 — a session's `session.json`, for the
   window's list (`src/sessions.rs`); the transcript's segments and [`minutes`](../../contracts/minutes/v3/README.md), v1 to v3
   — one meeting's, as the window will open it (`src/meeting.rs`, `src/minutes.rs`);
-  [`summarising/v1`](../../contracts/summarising/v1/README.md) — what `wholeheard-summary` says while it writes the
+  [`summarising/v1`](../../contracts/summarising/v1/README.md) — what `kitokey-summary` says while it writes the
   minutes (`src/summarising.rs`). The contracts of the files it will read are declared with the slice that reads
   them
 

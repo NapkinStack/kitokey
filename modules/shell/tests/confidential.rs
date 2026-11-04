@@ -4,7 +4,7 @@
 
 use std::{fs, io::ErrorKind, path::Path};
 
-use wholeheard_shell::{
+use kitokey_shell::{
     confidential::{self, Left, Wait, What},
     meeting, minutes, providers, sessions,
     settings::{Engine, Settings},

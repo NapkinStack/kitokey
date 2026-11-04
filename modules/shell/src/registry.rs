@@ -1,6 +1,6 @@
 //! The models Settings offer (D40, ADR-0010): one list, `registry/models.json`, built in as the
 //! list shipped. A list that does not read as one is refused whole: in a pull request by the
-//! shell's tests, and in Wholeheard by the same reading. Read again, it is taken only signed by
+//! shell's tests, and in Kitokey by the same reading. Read again, it is taken only signed by
 //! the decider's key (D56): the signature is minisign's, its private key outside any repository.
 
 use std::{collections::HashSet, io::Read, time::Duration};

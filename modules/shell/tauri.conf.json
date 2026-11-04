@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Wholeheard",
+  "productName": "Kitokey",
   "version": "0.2.0",
-  "identifier": "dev.wholeheard.Wholeheard",
+  "identifier": "com.kitokey.Kitokey",
   "build": {
     "frontendDist": "./ui"
   },

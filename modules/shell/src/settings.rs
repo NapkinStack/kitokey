@@ -1,4 +1,4 @@
-//! The settings, as one file the user can read and write without Wholeheard: a few lines of TOML
+//! The settings, as one file the user can read and write without Kitokey: a few lines of TOML
 //! in the system's place for an application's configuration. A file that is not there is
 //! every default; a key this version does not know is left alone, for the version that does —
 //! also when the window writes the file again, with the user's comments.
@@ -31,7 +31,7 @@ pub enum Log {
 }
 
 impl Log {
-    /// As `WHOLEHEARD_LOG` names it, for the shell and the programs it starts.
+    /// As `KITOKEY_LOG` names it, for the shell and the programs it starts.
     pub fn as_str(self) -> &'static str {
         match self {
             Log::Info => "info",
@@ -40,7 +40,7 @@ impl Log {
     }
 }
 
-/// The window Wholeheard opens: the one the user left, the small one first (D35).
+/// The window Kitokey opens: the one the user left, the small one first (D35).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Window {
@@ -98,12 +98,12 @@ pub struct Settings {
     pub model: PathBuf,
     /// Who hears: the model above, Apple's SpeechAnalyzer (D42), or a service the user named (D43).
     pub engine: Engine,
-    /// Who hears when a service does: its address, as `wholeheard-transcription --provider` takes it,
+    /// Who hears when a service does: its address, as `kitokey-transcription --provider` takes it,
     /// its model's name, and the host the user agreed to send a meeting's sound to (D43).
     pub transcription_provider: Option<String>,
     pub transcription_model: Option<String>,
     pub transcription_agreed: Option<String>,
-    /// Who writes the minutes: a provider's address, as `wholeheard-summary` takes it — Ollama on this
+    /// Who writes the minutes: a provider's address, as `kitokey-summary` takes it — Ollama on this
     /// computer is `http://localhost:11434/v1` —, and the model's name as it knows it. None: not
     /// chosen yet.
     pub minutes_provider: Option<String>,
@@ -117,11 +117,11 @@ pub struct Settings {
     pub keep_audio: KeepAudio,
     /// Shows, under a failure on the window's page, what the program said of it (D29).
     pub developer: bool,
-    /// The logs' level, from Wholeheard's next start.
+    /// The logs' level, from Kitokey's next start.
     pub log: Log,
     /// Offer to record when another application takes a microphone (D30).
     pub offer: bool,
-    /// Whether Wholeheard wrote its entry of the session's start, and as what (D32): none, never
+    /// Whether Kitokey wrote its entry of the session's start, and as what (D32): none, never
     /// — it is written at the next start. The entry itself is the setting.
     pub autostart: Option<bool>,
     /// The window opened from the menu or the tray: the one left (D35).
@@ -130,7 +130,7 @@ pub struct Settings {
     pub welcomed: bool,
     /// The full window's sidebar folded by the user (D61): opened again as it was left.
     pub folded: bool,
-    /// The language Wholeheard speaks, chosen by the user (D64); none, the system's.
+    /// The language Kitokey speaks, chosen by the user (D64); none, the system's.
     pub language: Option<Language>,
     /// The microphone recordings take, as capture names it, and as a person reads it (D74). None: Auto.
     pub microphone: Option<String>,
@@ -146,9 +146,9 @@ impl Default for Settings {
         let data = dirs::data_dir().unwrap_or_default();
         Self {
             reminder: true,
-            sessions: documents.join("Wholeheard"),
+            sessions: documents.join("Kitokey"),
             after: After::Transcript,
-            model: data.join("wholeheard").join("models").join(MODEL),
+            model: data.join("kitokey").join("models").join(MODEL),
             engine: Engine::Whisper,
             transcription_provider: None,
             transcription_model: None,
@@ -172,7 +172,7 @@ impl Default for Settings {
     }
 }
 
-/// The Whisper models on this computer: the `.bin` files in `folder` — Wholeheard's, where the
+/// The Whisper models on this computer: the `.bin` files in `folder` — Kitokey's, where the
 /// default model goes — and the one the settings name wherever it is. Each file once, however it
 /// is reached — by a link, by another path —, the folder's entry kept; by name, whatever its case.
 pub fn whisper_models(folder: &Path, settings: &Settings) -> Vec<PathBuf> {
@@ -197,7 +197,7 @@ pub fn welcome_due(settings: &Settings) -> bool {
     !settings.welcomed && crate::sessions::list(&settings.sessions, None).is_empty()
 }
 
-/// Where the settings are on this system: `wholeheard/settings.toml` in the user's configuration.
+/// Where the settings are on this system: `kitokey/settings.toml` in the user's configuration.
 /// A failure of the settings file as a log and developer mode may hold it: the file by its name,
 /// not its path — nor the one a link points to, which `write` reads it by.
 pub fn unnamed(said: &str, file: &Path) -> String {
@@ -210,7 +210,7 @@ pub fn unnamed(said: &str, file: &Path) -> String {
 }
 
 pub fn file() -> Option<PathBuf> {
-    dirs::config_dir().map(|folder| folder.join("wholeheard").join("settings.toml"))
+    dirs::config_dir().map(|folder| folder.join("kitokey").join("settings.toml"))
 }
 
 /// The file as it is written: what it names, and where it names each path.

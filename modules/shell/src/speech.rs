@@ -1,4 +1,4 @@
-//! Apple's SpeechAnalyzer on this Mac (D42, ADR-0012): what `wholeheard-speech` — transcription's
+//! Apple's SpeechAnalyzer on this Mac (D42, ADR-0012): what `kitokey-speech` — transcription's
 //! program, beside the shell's in the app — says it offers, and Apple's model of a language fetched
 //! by macOS on the user's word. Where the program is not, nothing is offered.
 
@@ -58,7 +58,7 @@ fn run(program: &Path, args: &[&str], within: Duration) -> Result<String, String
             _ => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err("wholeheard-speech did not answer in time".into());
+                return Err("kitokey-speech did not answer in time".into());
             }
         }
     };
@@ -75,5 +75,5 @@ fn run(program: &Path, args: &[&str], within: Duration) -> Result<String, String
     }
     let err = read(child.stderr.as_mut().map(|err| err as &mut dyn std::io::Read));
     let said = err.lines().next().unwrap_or("it ended without saying why");
-    Err(said.trim_start_matches("wholeheard-speech: ").to_string())
+    Err(said.trim_start_matches("kitokey-speech: ").to_string())
 }

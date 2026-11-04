@@ -257,7 +257,7 @@ function holdings(session, words, where) {
   return holds;
 }
 
-// What Wholeheard makes in the background (D25): read with the header, painted where it is shown.
+// What Kitokey makes in the background (D25): read with the header, painted where it is shown.
 let makings = null;
 const chipsMaking = new Set();
 
@@ -1865,7 +1865,7 @@ function minutesRow(minutes, words, locked) {
   });
   draw();
   box.append(row, where, fields, unsaved);
-  // Tester: the choice saved, asked whether it answers — one sentence of Wholeheard's, said first.
+  // Tester: the choice saved, asked whether it answers — one sentence of Kitokey's, said first.
   // One test at a time, the page drawn again meanwhile or not.
   if (minutes.provider && minutes.model) {
     const test = element("div", "row");
@@ -1909,7 +1909,7 @@ function minutesRow(minutes, words, locked) {
 }
 
 // A Whisper model's file named as people say it: `ggml-large-v3-turbo-q8_0.bin` is Whisper large
-// v3 turbo. A file of another kind, or outside Wholeheard's folder, keeps its own name.
+// v3 turbo. A file of another kind, or outside Kitokey's folder, keeps its own name.
 // A provider's model named as people say it: `anthropic/claude-sonnet` is Claude Sonnet; its
 // version and size stay as written (`mistral:7b` is Mistral 7b).
 function modelSaid(model) {
@@ -2428,7 +2428,7 @@ function showSettings(shown, minutes, words) {
   path.disabled = locked;
   path.spellcheck = false;
   path.hidden = true;
-  // Shown as the board says it — Dossier personnel / Wholeheard —; a click makes it a path to type.
+  // Shown as the board says it — Dossier personnel / Kitokey —; a click makes it a path to type.
   const said = shown.sessions_said.replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
   const folderShown = element("button", "path", shown.sessions_said.startsWith("/") ? `/ ${said}` : said);
   folderShown.type = "button";
@@ -2474,7 +2474,7 @@ function showSettings(shown, minutes, words) {
     );
     keys.append(open);
   }
-  // The language Wholeheard speaks (D64): the system's by default, each other named in its own.
+  // The language Kitokey speaks (D64): the system's by default, each other named in its own.
   const speaks = element("div", "row");
   const speaksSaid = element("label", "said");
   speaksSaid.htmlFor = "app-language";
@@ -2528,7 +2528,7 @@ function showSettings(shown, minutes, words) {
   developer.append(developerSaid, developerBox);
   advanced.append(developer);
   if (shown.developer) {
-    // The logs' level, read at Wholeheard's next start by the shell and its programs.
+    // The logs' level, read at Kitokey's next start by the shell and its programs.
     const level = element("div", "row");
     const levelSaid = element("label", "said");
     levelSaid.htmlFor = "log-level";
@@ -2673,7 +2673,7 @@ function showSmall(words) {
 
   const rest = element("div", "small-rest");
   const restTop = element("div", "small-top");
-  restTop.append(element("span", "small-brand", "Wholeheard"), toFull("small-full"));
+  restTop.append(element("span", "small-brand", "Kitokey"), toFull("small-full"));
   // Its new state at once, disabled until the recording's own says otherwise (D68). Answered, a press
   // the shell took for the same one, or a start that failed, gives the button back.
   let unanswered = false;
@@ -3409,7 +3409,7 @@ async function showWelcome(again, words) {
     else fact(minutesRow_, words.welcome_on_this_computer, fill(words.welcome_ollama_by, modelSaid(ollamaModel)));
     fact(reminder, shown.reminder ? words.welcome_reminder_on : words.welcome_reminder_off);
     made.append(mode, facts);
-    // The minutes wait for Ollama: said, with where it comes from — Wholeheard never installs it.
+    // The minutes wait for Ollama: said, with where it comes from — Kitokey never installs it.
     if (!online && !minutes.ollama_answers) made.append(element("p", "says welcome-wait", words.welcome_ollama_silent));
     else if (!online && !minutes.ollama.includes(ollamaModel)) made.append(element("p", "says welcome-wait", fill(words.welcome_ollama_lacks, ollamaModel)));
     const actions = element("div", "welcome-actions");

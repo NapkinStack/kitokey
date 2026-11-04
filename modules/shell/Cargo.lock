@@ -5690,7 +5690,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wholeheard-shell"
+name = "kitokey-shell"
 version = "0.2.0"
 dependencies = [
  "apple-native-keyring-store",

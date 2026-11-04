@@ -16,7 +16,7 @@ use serde::Serialize;
 pub enum State {
     /// Stopped: its files are whole.
     Done,
-    /// Being recorded now, by this Wholeheard.
+    /// Being recorded now, by this Kitokey.
     Recording,
     /// Started and never stopped, and nobody records it now: killed, or the machine went off.
     Interrupted,
@@ -297,7 +297,7 @@ pub fn settle(current: &Path, previous: &Path, written: bool, dispose: impl FnOn
 /// will do first —, leaving nothing: a folder that refuses is said before any recorder starts.
 pub fn writable(folder: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(folder)?;
-    let probe = folder.join(format!(".wholeheard-writable-{}", std::process::id()));
+    let probe = folder.join(format!(".kitokey-writable-{}", std::process::id()));
     std::fs::write(&probe, b"")?;
     std::fs::remove_file(&probe)
 }
