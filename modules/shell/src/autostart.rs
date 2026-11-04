@@ -13,7 +13,7 @@ use std::{
 use crate::settings;
 
 /// The entry's name: the package's own desktop entry's.
-pub const NAME: &str = "com.kitokey.Kitokey.desktop";
+pub const NAME: &str = "com.napkinstack.Kitokey.desktop";
 
 /// Wholeheard's entry, before D86: its program gone with its package, it starts nothing.
 pub const NAME_BEFORE: &str = "dev.wholeheard.Wholeheard.desktop";
@@ -26,7 +26,7 @@ const ENTRY: &str = "[Desktop Entry]\n\
     Comment[fr]=Propose d’enregistrer un appel dès qu’il commence\n\
     Exec=kitokey\n\
     TryExec=kitokey\n\
-    Icon=com.kitokey.Kitokey\n\
+    Icon=com.napkinstack.Kitokey\n\
     Terminal=false\n";
 
 /// Where the entry is on this system: the user's configuration's `autostart` folder.

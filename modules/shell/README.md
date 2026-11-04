@@ -40,7 +40,7 @@ with `pw-dump --monitor`; what it sees is shown in the notification and kept now
 `offer = false` in the settings file turns the offers off.
 
 **Started with the session** (D32, Linux), so that a call is offered after a restart: at its
-first start, Kitokey writes `~/.config/autostart/com.kitokey.Kitokey.desktop`
+first start, Kitokey writes `~/.config/autostart/com.napkinstack.Kitokey.desktop`
 ([XDG Autostart](https://specifications.freedesktop.org/autostart-spec/latest/)) — the tray
 alone, no window; `TryExec`, so a removed package starts nothing. The entry is the setting:
 Settings' *Lancer Kitokey à l'ouverture de session* writes or removes it, and reads it as the
@@ -55,7 +55,7 @@ first, each step doing what is left of it so that an interrupted one is done at 
 |---|---|
 | The settings' and the data's folders (`wholeheard/`, the Whisper model in it) | Moved to `kitokey/`, never copied: the model is not fetched again; a `kitokey/` folder holding something is never overwritten |
 | The meetings in `Documents/Wholeheard`, the settings naming no folder | Named in the settings, where they are: never moved |
-| A key filed under `dev.wholeheard.Wholeheard` | Filed under `com.kitokey.Kitokey` as it is read, then forgotten there |
+| A key filed under `dev.wholeheard.Wholeheard` | Filed under `com.napkinstack.Kitokey` as it is read, then forgotten there |
 | `~/.config/autostart/dev.wholeheard.Wholeheard.desktop` | Kitokey's entry, on if it was on, off if it was turned off; the old one taken away |
 
 Said once, in the user's language: *Wholeheard is now Kitokey*.
@@ -201,8 +201,8 @@ KITOKEY_CAPTURE=$PWD/modules/capture/target/release/kitokey-capture \
 | The shortcut | The desktop grants it to an application it can find: a desktop entry of Kitokey's name in the user's `applications` folder, **whose `Exec` line is the program's whole path** — the desktop reads no entry whose program it cannot find, and says so as "App info not found". The line under the table installs it. Then start Kitokey again and accept the desktop's question. Refused, Kitokey says so once; the menu still does the same |
 
 ```bash
-sed "s#^Exec=kitokey#Exec=$PWD/modules/shell/target/release/kitokey#" modules/shell/linux/com.kitokey.Kitokey.desktop \
-  > "${XDG_DATA_HOME:-$HOME/.local/share}/applications/com.kitokey.Kitokey.desktop"
+sed "s#^Exec=kitokey#Exec=$PWD/modules/shell/target/release/kitokey#" modules/shell/linux/com.napkinstack.Kitokey.desktop \
+  > "${XDG_DATA_HOME:-$HOME/.local/share}/applications/com.napkinstack.Kitokey.desktop"
 ```
 
 **Settings** — `kitokey/settings.toml` in the user's configuration folder, a few lines a person

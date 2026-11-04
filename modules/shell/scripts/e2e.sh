@@ -135,14 +135,14 @@ check is "$(labels)" "Ouvrir Kitokey|Démarrer un enregistrement|Transcrire le d
 # A window is a web view, a process of WebKit's under Kitokey: none before the user asks.
 check is "$(windows)" 0
 # Started with the user's session from its first start, in the tray alone (D32).
-check grep -qx 'Exec=kitokey' "$work/config/autostart/com.kitokey.Kitokey.desktop"
+check grep -qx 'Exec=kitokey' "$work/config/autostart/com.napkinstack.Kitokey.desktop"
 check grep -qx 'autostart = true' "$work/config/kitokey/settings.toml"
 # Started again that way while it runs: one Kitokey, and still no window (D35, #386).
 again
 sleep 2                                           # as long as a window takes to open, below
 check is "$(windows)" 0
 # From the applications' menu, while it runs: the running one shows its window, the second leaves.
-check grep -qx 'Exec=kitokey --window' linux/com.kitokey.Kitokey.desktop
+check grep -qx 'Exec=kitokey --window' linux/com.napkinstack.Kitokey.desktop
 again --window
 for _ in $(seq 50); do [ "$(windows)" -ge 1 ] && break; sleep 0.1; done
 check test "$(windows)" -ge 1

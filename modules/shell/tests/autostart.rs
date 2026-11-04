@@ -9,7 +9,7 @@ use kitokey_shell::{autostart, settings};
 fn the_entry_starts_the_tray_alone_and_nothing_once_the_package_is_gone() {
     let folder = tempfile::tempdir().unwrap();
     let entry = folder.path().join("autostart").join(autostart::NAME);
-    assert_eq!(autostart::NAME, "com.kitokey.Kitokey.desktop");
+    assert_eq!(autostart::NAME, "com.napkinstack.Kitokey.desktop");
     assert!(!autostart::on(&entry));
     autostart::set(&entry, true).unwrap();
     assert!(autostart::on(&entry));

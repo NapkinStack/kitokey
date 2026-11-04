@@ -5,7 +5,7 @@
 use keyring_core::{Entry, Error};
 
 /// What Kitokey's keys are filed under, in the keyring.
-const SERVICE: &str = "com.kitokey.Kitokey";
+const SERVICE: &str = "com.napkinstack.Kitokey";
 /// What they were filed under before, the latest first: before D86, when the product was named
 /// Wholeheard; before D28, Summit.
 const SERVICES_BEFORE: [&str; 2] = ["dev.wholeheard.Wholeheard", "dev.summit.Summit"];

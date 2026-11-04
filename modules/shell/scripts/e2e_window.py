@@ -5389,7 +5389,7 @@ def main() -> int:
         changed(lambda: Select(browser.find_element(By.ID, "offer")).select_by_value("nothing"))
         # Started with the user's session (D32): on from the first start, the desktop's own entry;
         # off, then turned off by the desktop's tools, then on again, each read from the entry.
-        entry = window.file.parent.parent / "autostart" / "com.kitokey.Kitokey.desktop"
+        entry = window.file.parent.parent / "autostart" / "com.napkinstack.Kitokey.desktop"
         switch = lambda: browser.find_element(By.ID, "autostart")
         start_on = read(browser, lambda b: switch().is_selected()) and entry.is_file() and "Exec=kitokey\n" in entry.read_text()
         changed(lambda: switch().click())

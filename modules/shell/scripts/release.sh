@@ -30,8 +30,8 @@ else
     cargo build --locked --release -q
   built=$kept/release
 fi
-cp "$built/kitokey$exe" "$here/linux/com.kitokey.Kitokey.desktop" "$dist/"
-cp "$here/icons/icon.png" "$dist/com.kitokey.Kitokey.png"
+cp "$built/kitokey$exe" "$here/linux/com.napkinstack.Kitokey.desktop" "$dist/"
+cp "$here/icons/icon.png" "$dist/com.napkinstack.Kitokey.png"
 # Windows names its Python python, never python3.
 python=python3; [ -n "$exe" ] && python=python
 "$python" -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$here/tauri.conf.json" > "$dist/VERSION"

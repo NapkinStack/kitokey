@@ -3511,8 +3511,8 @@ async fn bound(app: &AppHandle) -> Result<(), String> {
 
     let said = |error: ashpd::Error| error.to_string();
     // The desktop answers an application it knows: one whose desktop entry is installed
-    // under this very name (`linux/com.kitokey.Kitokey.desktop`).
-    let id: ashpd::AppID = "com.kitokey.Kitokey"
+    // under this very name (`linux/com.napkinstack.Kitokey.desktop`).
+    let id: ashpd::AppID = "com.napkinstack.Kitokey"
         .parse()
         .map_err(|_| "the application's name was refused".to_string())?;
     ashpd::register_host_app(id).await.map_err(said)?;

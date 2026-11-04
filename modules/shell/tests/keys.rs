@@ -21,7 +21,7 @@ fn a_key_is_kept_by_its_host_replaced_and_forgotten() {
 
     // Filed under Kitokey's name and the host: a key kept by a version before is found again.
     keys::keep("api.openai.com", "sk-filed").unwrap();
-    let filed = keyring_core::Entry::new("com.kitokey.Kitokey", "api.openai.com").unwrap();
+    let filed = keyring_core::Entry::new("com.napkinstack.Kitokey", "api.openai.com").unwrap();
     assert_eq!(filed.get_password().unwrap(), "sk-filed");
 
     // Kept by Summit, before D28, under its name: found, moved under Kitokey's, gone from Summit's.
@@ -29,7 +29,7 @@ fn a_key_is_kept_by_its_host_replaced_and_forgotten() {
     keys::forget("api.mistral.ai").unwrap();
     before.set_password("kept-by-summit").unwrap();
     assert_eq!(keys::key("api.mistral.ai").unwrap().as_deref(), Some("kept-by-summit"));
-    let now = keyring_core::Entry::new("com.kitokey.Kitokey", "api.mistral.ai").unwrap();
+    let now = keyring_core::Entry::new("com.napkinstack.Kitokey", "api.mistral.ai").unwrap();
     assert_eq!(now.get_password().unwrap(), "kept-by-summit");
     assert!(
         matches!(before.get_password(), Err(keyring_core::Error::NoEntry)),
@@ -40,7 +40,7 @@ fn a_key_is_kept_by_its_host_replaced_and_forgotten() {
     let before = keyring_core::Entry::new("dev.wholeheard.Wholeheard", "api.groq.com").unwrap();
     before.set_password("kept-by-wholeheard").unwrap();
     assert_eq!(keys::key("api.groq.com").unwrap().as_deref(), Some("kept-by-wholeheard"));
-    let now = keyring_core::Entry::new("com.kitokey.Kitokey", "api.groq.com").unwrap();
+    let now = keyring_core::Entry::new("com.napkinstack.Kitokey", "api.groq.com").unwrap();
     assert_eq!(now.get_password().unwrap(), "kept-by-wholeheard");
     assert!(
         matches!(before.get_password(), Err(keyring_core::Error::NoEntry)),
