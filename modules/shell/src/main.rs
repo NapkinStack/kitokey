@@ -233,7 +233,19 @@ enum Shown {
     Stopping,
 }
 
+/// The version this program says (`--version`): the package's, named when it is built
+/// (`KITOKEY_VERSION`, D78), Cargo's otherwise.
+const VERSION: &str = match option_env!("KITOKEY_VERSION") {
+    Some(version) => version,
+    None => env!("CARGO_PKG_VERSION"),
+};
+
 fn main() {
+    // Asked by a package or a person, answered before anything is logged or read.
+    if std::env::args_os().skip(1).eq(["--version"]) {
+        println!("kitokey {VERSION}");
+        return;
+    }
     // The logs' level the user chose in the developer mode, unless the environment names one:
     // set before anything runs beside it, so that the shell and every program it starts read it.
     if std::env::var_os("KITOKEY_LOG").is_none()
