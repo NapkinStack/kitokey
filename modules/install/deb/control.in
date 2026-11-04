@@ -1,14 +1,14 @@
-Package: wholeheard
+Package: kitokey
 Version: @VERSION@
 Architecture: @ARCH@
-Maintainer: Wholeheard <Hello@c12c.com>
+Maintainer: Kitokey <Hello@c12c.com>
 Installed-Size: @SIZE@
 Depends: @DEPENDS@
-Breaks: summit (<< 0.2.0)
-Replaces: summit (<< 0.2.0)
+Breaks: summit (<< 0.2.0), wholeheard (<< 0.3.0)
+Replaces: summit (<< 0.2.0), wholeheard (<< 0.3.0)
 Recommends: gnome-shell-extension-appindicator, mesa-vulkan-drivers
 Section: sound
 Priority: optional
 Description: Records a meeting, transcribes it and writes its minutes, on your machine
- Wholeheard records both sides of a call from the system tray, transcribes it on the machine with
+ Kitokey records both sides of a call from the system tray, transcribes it on the machine with
  Whisper, and writes its minutes with the model you choose. Your meetings stay in your folder.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# What a user installs, for the system WHOLEHEARD_TARGET names — as the programs were built for it
+# What a user installs, for the system KITOKEY_TARGET names — as the programs were built for it
 # (D27): `fedora-*`, an rpm made with rpmbuild; `ubuntu-*`, a .deb made with dpkg; `macos-arm64`,
-# Wholeheard.app zipped, made on a Mac (D38); unset, the package of the system it runs on. One
+# Kitokey.app zipped, made on a Mac (D38); unset, the package of the system it runs on. One
 # package of the four programs, made in a container of that system — a Mac's on the Mac — so that
 # the libraries each program links are read there and required by their packages.
 # Reads what the assembled modules' releases left beside this one's folder ($NSTACK_DIST/..).
@@ -14,20 +14,20 @@ version=$(tr -d '\r' < "$artefacts/shell/VERSION")
 # Unset, the system this runs on, as it names itself (fedora-44, ubuntu-24.04); a Mac, by its
 # processor (macos-arm64); Windows, windows-x64.
 if [ "$(uname -s)" = Darwin ]; then
-  target=${WHOLEHEARD_TARGET:-macos-$(uname -m)}
+  target=${KITOKEY_TARGET:-macos-$(uname -m)}
 elif [ "${OS:-}" = Windows_NT ]; then
-  target=${WHOLEHEARD_TARGET:-windows-x64}
+  target=${KITOKEY_TARGET:-windows-x64}
 else
-  target=${WHOLEHEARD_TARGET:-$(. /etc/os-release && echo "$ID-$VERSION_ID")}
+  target=${KITOKEY_TARGET:-$(. /etc/os-release && echo "$ID-$VERSION_ID")}
 fi
 # No relabelling of what is mounted (`:Z` would relabel the files in place): labels left alone.
 case $target in
   fedora-[0-9]*)
     podman run --rm --security-opt label=disable \
-      -v "$artefacts:/artefacts:ro" -v "$here/wholeheard.spec:/wholeheard.spec:ro" -v "$dist:/out" \
+      -v "$artefacts:/artefacts:ro" -v "$here/kitokey.spec:/kitokey.spec:ro" -v "$dist:/out" \
       "registry.fedoraproject.org/fedora:${target#fedora-}" bash -euo pipefail -c "
 dnf install -y -q rpm-build >/dev/null
-rpmbuild -bb /wholeheard.spec --define 'artefacts /artefacts' --define 'wholeheard_version $version' \
+rpmbuild -bb /kitokey.spec --define 'artefacts /artefacts' --define 'kitokey_version $version' \
   --define '_rpmdir /out' --define '_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm' --quiet
 "
     ls "$dist"/*.rpm
@@ -40,7 +40,7 @@ rpmbuild -bb /wholeheard.spec --define 'artefacts /artefacts' --define 'wholehea
     ;;
   macos-arm64)
     # No container: a Mac's app is made on a Mac, GitHub's runner (D38).
-    [ "$(uname -s)" = Darwin ] || { echo "release: Wholeheard.app is made on a Mac" >&2; exit 2; }
+    [ "$(uname -s)" = Darwin ] || { echo "release: Kitokey.app is made on a Mac" >&2; exit 2; }
     bash "$here/mac/build.sh" "$artefacts" "$version" "$dist"
     ls "$dist"/*.zip
     ;;

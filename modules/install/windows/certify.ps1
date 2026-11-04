@@ -10,13 +10,13 @@ if (-not (Test-Path $kit)) {
     Write-Output "certification kit: not run — appcert.exe is not on this machine ($kit)"
     exit 0
 }
-$package = (Get-ChildItem (Join-Path $Out 'Wholeheard-*-x64.msix') | Select-Object -First 1).FullName
+$package = (Get-ChildItem (Join-Path $Out 'Kitokey-*-x64.msix') | Select-Object -First 1).FullName
 $report = Join-Path (Resolve-Path $Out) 'appcert-report.xml'
 # The kit's return codes, as `appcert.exe /?` lists them.
 $meaning = @{ -1 = 'invalid command line'; -2 = 'infrastructure error'; -3 = 'user initiated error'
               -4 = 'app installation error'; -5 = 'app unpackaging error' }
 
-$certificate = Import-Certificate -FilePath (Join-Path $Out 'Wholeheard-this-run.cer') `
+$certificate = Import-Certificate -FilePath (Join-Path $Out 'Kitokey-this-run.cer') `
     -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople'
 try {
     & $kit reset | Out-Host
