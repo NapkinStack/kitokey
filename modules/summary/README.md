@@ -34,6 +34,9 @@ kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mi
 # Whether a model answers, before any meeting: one sentence of the program's own is sent,
 # `sending` then `answered` said, or why not in one sentence. What the settings' Tester runs.
 kitokey-summary --test --provider http://localhost:11434/v1 --model mistral
+
+# Its version, the package's (D78): nothing else is done.
+kitokey-summary --version
 ```
 
 | Tried on one meeting, with its context | Of seven actions agreed: missing | Time |
