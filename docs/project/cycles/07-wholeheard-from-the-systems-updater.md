@@ -87,7 +87,7 @@ deliverables:
     module: install
     state: ready
     acceptance:
-      - "Given Ubuntu 24.04, when a user installs Wholeheard from one package file (`sudo apt install ./wholeheard_<version>_amd64.deb`), then Wholeheard is in the applications menu and starts in the tray with nothing built and no variable set, and removing it leaves the user's meetings and settings"
+      - "Given Ubuntu 24.04, when a user installs Wholeheard from one package file (`sudo apt install ./kitokey_<version>_amd64.deb`), then Wholeheard is in the applications menu and starts in the tray with nothing built and no variable set, and removing it leaves the user's meetings and settings"
       - "Given a release for a system — Fedora or Ubuntu —, when the programs are built, then they are built in a container of that system, so that no package depends on the machine that made it"
 ---
 
@@ -190,13 +190,13 @@ day: « Déjà fait ». The end date does not move.
 
 | Deliverable | Who | The literal gesture |
 |---|---|---|
-| D86 | The decider | Once D86 is merged: on GitHub, the repository's *Settings* → *General* → *Repository name*: `kitokey`, then *Rename*. GitHub redirects the old address |
+| D86 | The decider | Done on 2026-11-04: the repository is `NapkinStack/kitokey`, GitHub redirecting the old address |
 | D78 | The decider | Sign in to [Copr](https://copr.fedorainfracloud.org/) with a Fedora account and create the project `kitokey` (D86; a project already made as `wholeheard` is deleted from its *Settings*). Copy the text [its API page](https://copr.fedorainfracloud.org/api/) gives into a file `copr`, then, at the root of a checkout: `gh secret set COPR_CONFIG < copr` and delete the file. Tell an agent the owner's name |
 | D66, trial | The decider | As cycle 06 says, on the build of this cycle's first tag: AirPods, a WhatsApp Web call, five starts and stops, the answers on [#494](https://github.com/NapkinStack/wholeheard/issues/494) |
 | ADR-0015 | The decider | After that trial, say « ADR-0015 acceptée », or what falls |
 | D41 | The decider | [#449](https://github.com/NapkinStack/wholeheard/issues/449): a call on the earbuds, the default on the speaker |
 | D63 | The decider | [#463](https://github.com/NapkinStack/wholeheard/issues/463): a real service heard, with their key |
-| D56 | The decider | In a terminal of your own, never through an agent: `sudo dnf install minisign`, then `minisign -G -p kitokey-models.pub -s ~/.minisign/kitokey-models.key` at the root of a checkout of `main` (named after D86), a passphrase kept in your password manager, the `.key` file copied offline; never `-W`, which keeps it without a passphrase. Give an agent `kitokey-models.pub` alone |
+| D56 | The decider | In a terminal of your own, never through an agent: `sudo dnf install minisign`, then, at the root of a checkout of `main`, `mkdir -m 700 -p ~/.minisign` and `minisign -G -p kitokey-models.pub -s ~/.minisign/kitokey-models.key` (named after D86): a passphrase kept in your password manager, the `.key` file copied offline, never `-W`, which keeps it without a passphrase. Give an agent `kitokey-models.pub` alone. Sign when asked: `minisign -Sm modules/shell/registry/models.json -s ~/.minisign/kitokey-models.key`, and give an agent `models.json.minisig`: it commits it |
 | D27 | Anyone on Ubuntu 24.04 | `nstack claim D27`, then [#255](https://github.com/NapkinStack/wholeheard/issues/255): `sudo apt install ./wholeheard_<version>_amd64.deb`, one real call of five minutes, the answer there |
 
 ## Dependency with a date

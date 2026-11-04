@@ -1,6 +1,6 @@
 # Kitokey — privacy policy / politique de confidentialité
 
-Last changed / dernière modification: 2026-10-30. Publisher / éditeur: NapkinStack.
+Last changed / dernière modification: 2026-11-04. Publisher / éditeur: NapkinStack.
 [English](#english) · [Français](#français)
 
 ```mermaid
@@ -23,7 +23,7 @@ server of ours, and it sends nothing anywhere unless you chose to.
 
 | What | Where |
 |---|---|
-| The sound of a meeting: your microphone and what your computer plays, as two tracks | Your meetings folder: `Documents/Kitokey` unless you choose another |
+| The sound of a meeting: your microphone and what your computer plays, as two tracks | Your meetings folder: `Documents/Kitokey` unless you choose another; if you used Kitokey under its earlier name, Wholeheard, they stay in `Documents/Wholeheard` |
 | Its transcript, its minutes, the context you wrote for it, its language, your corrections | The same folder, beside the sound |
 | Your settings, and the key of a service if you gave one | Your user's configuration folder |
 | Downloaded speech models | Your user's data folder |
@@ -81,7 +81,7 @@ Changes to this policy are in this file's history.
 
 | Quoi | Où |
 |---|---|
-| Le son d'une réunion : votre micro et ce que votre ordinateur joue, en deux pistes | Votre dossier de réunions : `Documents/Kitokey`, sauf si vous en choisissez un autre |
+| Le son d'une réunion : votre micro et ce que votre ordinateur joue, en deux pistes | Votre dossier de réunions : `Documents/Kitokey`, sauf si vous en choisissez un autre ; si vous utilisiez Kitokey sous son ancien nom, Wholeheard, elles restent dans `Documents/Wholeheard` |
 | Sa transcription, son compte rendu, le contexte que vous avez écrit, sa langue, vos corrections | Le même dossier, à côté du son |
 | Vos réglages, et la clé d'un service si vous en avez donné une | Le dossier de configuration de votre utilisateur |
 | Les modèles de parole téléchargés | Le dossier de données de votre utilisateur |
