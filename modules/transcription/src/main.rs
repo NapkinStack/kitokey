@@ -1,12 +1,12 @@
-//! `wholeheard-transcription` — writes the transcript of a session from its two audio files,
+//! `kitokey-transcription` — writes the transcript of a session from its two audio files,
 //! with an engine on this machine and no window.
 //!
-//!     wholeheard-transcription <session-folder> --model <model-file> [--language <code>]
-//!     wholeheard-transcription <session-folder> --engine speechanalyzer --language <fr|en>
+//!     kitokey-transcription <session-folder> --model <model-file> [--language <code>]
+//!     kitokey-transcription <session-folder> --engine speechanalyzer --language <fr|en>
 //!
 //! The model is a Whisper model in whisper.cpp's format, already on the machine: nothing is
 //! fetched. On a Mac with macOS 26, Apple's SpeechAnalyzer hears instead, through
-//! `wholeheard-speech` beside this program (D42, ADR-0012), its model already on the Mac. Stopped at any moment, the program is run again and goes on from where it was.
+//! `kitokey-speech` beside this program (D42, ADR-0012), its model already on the Mac. Stopped at any moment, the program is run again and goes on from where it was.
 //!
 //! It says what happens as one JSON object per line on its output — `hearing`, then
 //! `written` — and what failed in one sentence on the error stream. `hearing` says whether the
@@ -16,15 +16,15 @@
 
 use std::{io::Write, path::Path, process::ExitCode, time::Instant};
 
-use serde_json::json;
-use tracing::{error, info};
-use wholeheard_transcription::{
+use kitokey_transcription::{
     log,
     online::{Refused, Service},
     speech::SpeechAnalyzer,
     step::{Engine, hear, read},
     whisper::{Whisper, knows},
 };
+use serde_json::json;
+use tracing::{error, info};
 
 /// Who hears: a Whisper model, Apple's SpeechAnalyzer, or a service the user named (D43).
 enum Hearer<'a> {
@@ -35,7 +35,7 @@ enum Hearer<'a> {
 
 /// The key the service wants, when it wants one: handed by the shell, written nowhere (ADR-0013).
 fn key() -> Option<String> {
-    std::env::var("WHOLEHEARD_PROVIDER_KEY").ok().filter(|key| !key.is_empty())
+    kitokey_transcription::log::env("PROVIDER_KEY").filter(|key| !key.is_empty())
 }
 
 /// Seconds of sound an engine hears at a time. Long, on purpose: on the sample the engine was
@@ -63,7 +63,7 @@ fn main() -> ExitCode {
             run(Path::new(folder), Hearer::Service { provider, model }, Some(language))
         }
         _ => Err(
-            "usage: wholeheard-transcription <session-folder> --model <model-file> [--language <code>] \
+            "usage: kitokey-transcription <session-folder> --model <model-file> [--language <code>] \
              | --engine speechanalyzer --language <fr|en> \
              | --provider <address> --model <name> [--language <code>] | --test --provider <address> --model <name>"
                 .to_string(),
@@ -73,7 +73,7 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(why) => {
             error!(detail = %why, "transcription.failed");
-            eprintln!("wholeheard-transcription: {why}");
+            eprintln!("kitokey-transcription: {why}");
             ExitCode::FAILURE
         }
     }

@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use wholeheard_transcription::{
+use kitokey_transcription::{
     Segment,
     step::{Engine, RATE, transcribe},
 };

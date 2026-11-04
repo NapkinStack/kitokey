@@ -4,10 +4,10 @@
 use std::{fs, process::Command};
 
 fn run(args: &[&str]) -> (bool, String, String) {
-    let output = Command::new(env!("CARGO_BIN_EXE_wholeheard-transcription"))
+    let output = Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .args(args)
         // Its logs in the tests' own folder, never in the user's.
-        .env("WHOLEHEARD_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
+        .env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
         .output()
         .unwrap();
     (
@@ -27,8 +27,8 @@ fn what_cannot_be_heard_is_refused_in_one_sentence_before_anything_is_written() 
 
     for (args, expected) in [
         (vec![folder, "--model", model], "is not a session"),
-        (vec![folder], "usage: wholeheard-transcription"),
-        (vec![folder, "--model", model, "--language"], "usage: wholeheard-transcription"),
+        (vec![folder], "usage: kitokey-transcription"),
+        (vec![folder, "--model", model, "--language"], "usage: kitokey-transcription"),
     ] {
         let (ok, out, err) = run(&args);
         assert!(
@@ -93,12 +93,12 @@ fn a_refusal_is_logged_with_its_detail_and_never_the_sessions_path() {
     let session = tempfile::tempdir().unwrap();
     let logs = tempfile::tempdir().unwrap();
     fs::write(session.path().join("session.json"), r#"{"contract":"session-audio/v0"}"#).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_wholeheard-transcription"))
+    let output = Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .args([session.path().to_str().unwrap(), "--model", "/nowhere/a-model.bin"])
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
-        .env("WHOLEHEARD_TRACE", "making-7")
+        .env("KITOKEY_LOG_DIR", logs.path())
+        .env("KITOKEY_TRACE", "making-7")
         // The lowest level a user may ask: a failure is logged, with its id.
-        .env("WHOLEHEARD_LOG", "error")
+        .env("KITOKEY_LOG", "error")
         .output()
         .unwrap();
     assert!(!output.status.success());
@@ -123,6 +123,26 @@ fn a_refusal_is_logged_with_its_detail_and_never_the_sessions_path() {
 }
 
 #[test]
+fn a_shell_still_named_wholeheard_is_heard_until_it_passes_the_new_names() {
+    let session = tempfile::tempdir().unwrap();
+    let logs = tempfile::tempdir().unwrap();
+    fs::write(session.path().join("session.json"), r#"{"contract":"session-audio/v0"}"#).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
+        .args([session.path().to_str().unwrap(), "--model", "/nowhere/a-model.bin"])
+        .env("WHOLEHEARD_LOG_DIR", logs.path())
+        .env("WHOLEHEARD_TRACE", "making-7")
+        .env("WHOLEHEARD_LOG", "error")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let files: Vec<_> = fs::read_dir(logs.path()).unwrap().map(|entry| entry.unwrap().path()).collect();
+    assert_eq!(files.len(), 1, "the log is where WHOLEHEARD_LOG_DIR says: {files:?}");
+    let text = fs::read_to_string(&files[0]).unwrap();
+    let line: serde_json::Value = serde_json::from_str(text.lines().next().unwrap()).unwrap();
+    assert_eq!(line["span"]["trace"], "making-7", "the making's id read from WHOLEHEARD_TRACE");
+}
+
+#[test]
 fn a_session_read_then_refused_logs_nothing_of_its_context_and_an_odd_id_is_replaced() {
     let session = tempfile::tempdir().unwrap();
     let logs = tempfile::tempdir().unwrap();
@@ -132,10 +152,10 @@ fn a_session_read_then_refused_logs_nothing_of_its_context_and_an_odd_id_is_repl
     fs::write(session.path().join("others.wav"), empty).unwrap();
     fs::write(session.path().join("context.txt"), "Le projet Hirondelle, avec Bartholomew.\n").unwrap();
     // Read whole, context included, then refused on the model — given as the session's own folder.
-    let output = Command::new(env!("CARGO_BIN_EXE_wholeheard-transcription"))
+    let output = Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .args([session.path().to_str().unwrap(), "--model", session.path().to_str().unwrap()])
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
-        .env("WHOLEHEARD_TRACE", "not\nan id")
+        .env("KITOKEY_LOG_DIR", logs.path())
+        .env("KITOKEY_TRACE", "not\nan id")
         .output()
         .unwrap();
     assert!(!output.status.success());
@@ -165,13 +185,13 @@ fn full_logs(program: &str) -> tempfile::TempDir {
 fn a_log_that_cannot_be_written_says_nothing_on_the_error_stream() {
     let session = tempfile::tempdir().unwrap();
     let logs = full_logs("transcription");
-    let output = Command::new(env!("CARGO_BIN_EXE_wholeheard-transcription"))
+    let output = Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .args([session.path().to_str().unwrap(), "--model", "/nowhere/a-model.bin"])
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
+        .env("KITOKEY_LOG_DIR", logs.path())
         .output()
         .unwrap();
     let err = String::from_utf8_lossy(&output.stderr);
     assert!(!output.status.success());
     assert_eq!(err.lines().count(), 1, "{err}");
-    assert!(err.starts_with("wholeheard-transcription: this folder is not a session"), "{err}");
+    assert!(err.starts_with("kitokey-transcription: this folder is not a session"), "{err}");
 }

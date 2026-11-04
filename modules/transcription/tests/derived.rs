@@ -5,11 +5,11 @@ mod sound;
 
 use std::{fs, io, path::Path};
 
-use sound::{energy, room, speaking};
-use wholeheard_transcription::{
+use kitokey_transcription::{
     Segment,
     step::{DERIVED, Engine, MADE, RATE, transcribe},
 };
+use sound::{energy, room, speaking};
 
 /// An engine that writes how loud each span it hears is, and keeps what it was given.
 #[derive(Default)]

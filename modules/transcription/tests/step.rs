@@ -3,7 +3,7 @@
 
 use std::{fs, io, path::Path};
 
-use wholeheard_transcription::{
+use kitokey_transcription::{
     Segment,
     step::{Engine, RATE, read, sound, transcribe},
 };
