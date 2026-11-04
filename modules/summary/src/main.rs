@@ -28,10 +28,10 @@ use serde_json::json;
 use tracing::{error, info, warn};
 
 /// The version this program says (`--version`): the package's, named when it is built
-/// (`KITOKEY_VERSION`, D78), Cargo's otherwise.
+/// (`KITOKEY_VERSION`, D78), Cargo's when unset or empty.
 const VERSION: &str = match option_env!("KITOKEY_VERSION") {
-    Some(version) => version,
-    None => env!("CARGO_PKG_VERSION"),
+    Some(version) if !version.is_empty() => version,
+    _ => env!("CARGO_PKG_VERSION"),
 };
 
 fn main() -> ExitCode {
