@@ -61,9 +61,9 @@ may rewrite a segment's `text` (below). Every line has a `type`.
 
 ## A test of a service
 
-`wholeheard-transcription --test --provider <address> --model <name>` writes no transcript: it sends
+`kitokey-transcription --test --provider <address> --model <name>` writes no transcript: it sends
 a second of a sound of its own and reads the answer. Passed, it exits 0 and says nothing. Failed, it
-ends in failure with one sentence on its error stream, starting `wholeheard-transcription: `, for
+ends in failure with one sentence on its error stream, starting `kitokey-transcription: `, for
 the log, and its output's last line says the cause when a person acts on it differently, as
 `{"event": "failed", "code": "provider.no_times"}`; otherwise no line says it, and the sentence alone does: a refusal in the service's own words (HTTP 400), wrong arguments.
 

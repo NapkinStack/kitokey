@@ -5,11 +5,11 @@ text per event, for whoever started it.
 
 ```mermaid
 flowchart LR
-    S["shell — or a script,<br/>a terminal"]:::consumer -->|"starts: wholeheard-capture record <sessions-folder>, with --microphone <name>, or with --as v1"| C["capture"]:::producer
-    S -->|"asks: wholeheard-capture microphones"| C
+    S["shell — or a script,<br/>a terminal"]:::consumer -->|"starts: kitokey-capture record <sessions-folder>, with --microphone <name>, or with --as v1"| C["capture"]:::producer
+    S -->|"asks: kitokey-capture microphones"| C
     C -->|"its output: one JSON object per line"| S
     S -->|"its input: the line stop"| C
-    S -.->|"its environment: WHOLEHEARD_TRACE, its log's id"| C
+    S -.->|"its environment: KITOKEY_TRACE, its log's id"| C
     C -.->|"its error stream: one sentence, when it fails"| S
     C --> F["The session's folder<br/>(session-audio)"]:::file
 
@@ -56,18 +56,20 @@ nothing.
 
 **Its log**: the program logs what it does ([ADR-0007](../../../docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md)),
 at `info`, under an id of its own, in the user's folder for logs — on Linux
-`$XDG_STATE_HOME/wholeheard/logs`, or `~/.local/state/wholeheard/logs`; on macOS
-`~/Library/Logs/Wholeheard`; on Windows `%LOCALAPPDATA%\Wholeheard\logs`. There it also removes
+`$XDG_STATE_HOME/kitokey/logs`, or `~/.local/state/kitokey/logs`; on macOS
+`~/Library/Logs/Kitokey`; on Windows `%LOCALAPPDATA%\Kitokey\logs`. There it also removes
 the day files written more than fourteen days ago, then the oldest until the folder weighs
 under 50 MB — every program's day files, nothing else.
 Whoever starts it may set, in its environment:
 
-- `WHOLEHEARD_TRACE` — the making's id: ASCII letters, digits and dashes, 64 at most. Any other value
+- `KITOKEY_TRACE` — the making's id: ASCII letters, digits and dashes, 64 at most. Any other value
   is replaced by an id of the run's own, without a word;
-- `WHOLEHEARD_LOG` — `off`, `error`, `warn`, `info`, `debug` or `trace`, in lower case; a value
+- `KITOKEY_LOG` — `off`, `error`, `warn`, `info`, `debug` or `trace`, in lower case; a value
   holding `=` is read as a `tracing` filter, for whoever knows them; any other value is `info`. Turned `off`, the log leaves nothing: no file, no day file removed;
-- `WHOLEHEARD_LOG_DIR` — an absolute folder; a relative one is ignored. A folder that cannot be
+- `KITOKEY_LOG_DIR` — an absolute folder; a relative one is ignored. A folder that cannot be
   made or written leaves no log, and changes nothing else.
+
+Until D86's last pull request, the program also reads these under the names before D86 — `WHOLEHEARD_` in place of `KITOKEY_` — when the new one is not set: a shell not yet renamed passes them.
 
 None is required. None, and no state of the log, changes a line of the output, the error stream
 or what the program leaves — with one exception: a run that crosses midnight UTC while the
@@ -79,7 +81,7 @@ contract: it is read by people, never by a consumer.
 
 Cycle 06, D74; additive: a consumer that names none, and asks nothing, sees no change.
 
-**The list.** `wholeheard-capture microphones` prints one `microphone` line for each microphone the
+**The list.** `kitokey-capture microphones` prints one `microphone` line for each microphone the
 system offers by name, then ends well. It reads the system and opens nothing. It fails as *Failing*
 says, when the list could not be read. No line: nothing to choose from — the system has no such list
 (today, all but Linux with PipeWire), or no microphone: no list is offered. A choice the user already
@@ -90,7 +92,7 @@ as it is, its form meaning nothing to a consumer. No line of this page holds a B
 `name` holds a digest in its place, `description` none. `device` and `started`'s `sources` carry the
 `description`, never `name`, and neither they nor anything else says which id a recording is on.
 
-**The start.** `wholeheard-capture record <sessions-folder> --microphone <name>`, a `name` of that
+**The start.** `kitokey-capture record <sessions-folder> --microphone <name>`, a `name` of that
 list. With `--as v1`, the program refuses it as it refuses any other wrong use, and records nothing:
 the first form never follows a microphone, as *A microphone that waits* says of it.
 
