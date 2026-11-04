@@ -51,6 +51,21 @@ fn a_key_is_kept_by_its_host_replaced_and_forgotten() {
     keys::forget("api.groq.com").unwrap();
     assert_eq!(keys::key("api.groq.com"), Ok(None));
 
+    // Under both earlier names: Wholeheard's, the latest, is the one read; Summit's is left.
+    let wholeheards = keyring_core::Entry::new("dev.wholeheard.Wholeheard", "api.both.example").unwrap();
+    let summits = keyring_core::Entry::new("dev.summit.Summit", "api.both.example").unwrap();
+    wholeheards.set_password("kept-by-wholeheard").unwrap();
+    summits.set_password("kept-by-summit").unwrap();
+    assert_eq!(keys::key("api.both.example").unwrap().as_deref(), Some("kept-by-wholeheard"));
+    keys::forget("api.both.example").unwrap();
+
+    // A keyring that fails under an earlier name is not "no key" either: the key would be asked again.
+    let failing = keyring_core::Entry::new("dev.wholeheard.Wholeheard", "api.locked.example").unwrap();
+    failing.set_password("kept").unwrap();
+    let mock = failing.as_any().downcast_ref::<keyring_core::mock::Cred>().unwrap();
+    mock.set_error(keyring_core::Error::PlatformFailure("locked".into()));
+    assert!(keys::key("api.locked.example").is_err());
+
     // A keyring that fails is not "no key": a locked one would otherwise ask for a key again.
     let mock = filed.as_any().downcast_ref::<keyring_core::mock::Cred>().unwrap();
     mock.set_error(keyring_core::Error::PlatformFailure("locked".into()));

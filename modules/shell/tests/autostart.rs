@@ -110,3 +110,25 @@ fn wholeheards_entry_becomes_kitokeys_and_an_entry_turned_off_stays_off() {
     assert!(autostart::carry_over(&before, &entry).unwrap());
     assert!(!before.exists() && !autostart::on(&entry));
 }
+
+#[test]
+fn at_the_start_a_wholeheard_user_who_had_it_start_with_the_session_keeps_it_under_kitokey() {
+    let folder = tempfile::tempdir().unwrap();
+    let entry = folder.path().join("autostart").join(autostart::NAME);
+    let before = folder.path().join("autostart").join(autostart::NAME_BEFORE);
+    // As Wholeheard left it: its entry on, its settings — carried over — saying it was written once.
+    let file = folder.path().join("kitokey").join("settings.toml");
+    fs::create_dir_all(before.parent().unwrap()).unwrap();
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&before, "[Desktop Entry]\nType=Application\nExec=wholeheard\n").unwrap();
+    fs::write(&file, "autostart = true\n").unwrap();
+    let start = autostart::at_start(&entry, &file);
+    assert!(matches!(start.carried, Ok(true)) && matches!(start.written, Ok(false)), "{start:?}");
+    assert!(autostart::on(&entry) && !before.exists(), "on under Kitokey, Wholeheard's gone");
+    // Turned off under Wholeheard: still off, and never written by itself.
+    fs::remove_file(&entry).unwrap();
+    fs::write(&before, "[Desktop Entry]\nType=Application\nExec=wholeheard\nHidden=true\n").unwrap();
+    let start = autostart::at_start(&entry, &file);
+    assert!(matches!(start.carried, Ok(true)) && matches!(start.written, Ok(false)), "{start:?}");
+    assert!(!autostart::on(&entry) && !before.exists());
+}

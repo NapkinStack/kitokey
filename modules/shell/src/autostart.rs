@@ -102,3 +102,22 @@ pub fn first(entry: &Path, settings_file: &Path) -> io::Result<bool> {
     settings::write(settings_file, &settings)?;
     Ok(true)
 }
+
+/// What the start did of the entry: Wholeheard's carried over, then Kitokey's written once.
+#[derive(Debug)]
+pub struct AtStart {
+    /// `carry_over`'s answer: true when Wholeheard's entry was there.
+    pub carried: io::Result<bool>,
+    /// `first`'s answer: true when Kitokey's was written now.
+    pub written: io::Result<bool>,
+}
+
+/// At a start, in this order: Wholeheard's entry carried over (D86), then Kitokey's written when
+/// the settings say it never was (D32). The carrying over comes first: the settings carried from
+/// Wholeheard say its entry was written once, so `first` alone would leave the session starting
+/// nothing.
+pub fn at_start(entry: &Path, settings_file: &Path) -> AtStart {
+    let carried = carry_over(&entry.with_file_name(NAME_BEFORE), entry);
+    let written = first(entry, settings_file);
+    AtStart { carried, written }
+}

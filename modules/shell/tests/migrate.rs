@@ -383,3 +383,107 @@ fn a_folder_named_wholeheard_with_no_meeting_is_not_taken() {
     assert_eq!(carry_over(&here).unwrap(), Carried::default());
     assert!(!here.config.join("kitokey").exists());
 }
+
+// What #651's verifier found held by no test (its mutants M3, M8, M9, M13, M16).
+
+#[test]
+fn with_kitokeys_settings_there_the_meetings_are_named_in_them_not_in_wholeheards() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    write(&here.config.join("wholeheard/settings.toml"), "reminder = true\n");
+    write(&here.config.join("kitokey/settings.toml"), "reminder = false\n");
+    a_meeting_in(&here.documents.join("Wholeheard"));
+
+    carry_over(&here).unwrap();
+
+    assert_eq!(now(&here).sessions, here.documents.join("Wholeheard"), "named where Kitokey reads");
+    assert_eq!(
+        fs::read_to_string(here.config.join("wholeheard/settings.toml")).unwrap(),
+        "reminder = true\n",
+        "Wholeheard's, left as it is"
+    );
+}
+
+#[test]
+fn a_folder_holding_only_folders_without_a_session_is_not_taken_for_meetings() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    fs::create_dir_all(here.documents.join("Wholeheard/holidays")).unwrap();
+
+    assert_eq!(carry_over(&here).unwrap(), Carried::default());
+}
+
+#[test]
+fn the_meetings_are_named_while_wholeheards_data_is_still_to_move() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    // The settings moved already and name no folder; the data not yet.
+    write(&here.config.join("kitokey/settings.toml"), "reminder = false\n");
+    write(&here.data.join("wholeheard/models/a.bin"), "a model");
+    a_meeting_in(&here.documents.join("Wholeheard"));
+
+    carry_over(&here).unwrap();
+
+    assert_eq!(now(&here).sessions, here.documents.join("Wholeheard"));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_model_is_named_where_it_went_only_once_it_went_there() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    let model = here.data.join("wholeheard/models/a.bin");
+    write(&model, "a model");
+    write(
+        &here.config.join("wholeheard/settings.toml"),
+        &format!("model = '{}'\n", model.display()),
+    );
+    let data_mode = fs::metadata(&here.data).unwrap().permissions();
+    fs::set_permissions(&here.data, fs::Permissions::from_mode(0o500)).unwrap();
+
+    let first = carry_over(&here);
+
+    fs::set_permissions(&here.data, data_mode).unwrap();
+    assert!(first.is_err());
+    assert_eq!(now(&here).model, model, "still named where it is");
+    carry_over(&here).unwrap();
+    assert_eq!(now(&here).model, here.data.join("kitokey/models/a.bin"));
+}
+
+#[cfg(unix)]
+#[test]
+fn settings_that_cannot_be_moved_are_said_and_moved_at_the_next_start() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    write(&here.config.join("wholeheard/settings.toml"), "reminder = false\n");
+    let config_mode = fs::metadata(&here.config).unwrap().permissions();
+    fs::set_permissions(&here.config, fs::Permissions::from_mode(0o500)).unwrap();
+
+    let first = carry_over(&here);
+
+    fs::set_permissions(&here.config, config_mode).unwrap();
+    assert!(first.is_err(), "said, never taken for nothing to do");
+    assert!(carry_over(&here).unwrap().settings);
+    assert!(here.config.join("kitokey/settings.toml").is_file());
+}
+
+#[test]
+fn a_model_left_in_wholeheards_data_beside_kitokeys_is_not_named_where_it_is_not() {
+    let root = tempfile::tempdir().unwrap();
+    let here = places(root.path());
+    let model = here.data.join("wholeheard/models/a.bin");
+    write(&model, "a model");
+    write(&here.data.join("kitokey/models/other.bin"), "Kitokey's own");
+    write(
+        &here.config.join("wholeheard/settings.toml"),
+        &format!("model = '{}'\n", model.display()),
+    );
+
+    carry_over(&here).unwrap();
+
+    assert_eq!(
+        now(&here).model,
+        model,
+        "Wholeheard's data was not moved: the model is where it was"
+    );
+}

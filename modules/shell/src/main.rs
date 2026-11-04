@@ -323,16 +323,15 @@ fn main() {
                 }
                 _ => {}
             }
-            // Wholeheard's entry, when there is one, is Kitokey's from now on (D86), on or off as it was.
-            if let Some(entry) = autostart::file()
-                && let Err(error) = autostart::carry_over(&entry.with_file_name(autostart::NAME_BEFORE), &entry)
-            {
-                tracing::warn!(kind = ?error.kind(), "shell.autostart_not_carried");
-            }
-            // Started with the user's session from now on, written once by itself (D32); a
-            // settings file that cannot be read writes nothing, and is said below.
+            // Wholeheard's entry, when there is one, is Kitokey's from now on (D86), on or off as it
+            // was; then started with the user's session, written once by itself (D32). A settings
+            // file that cannot be read writes nothing, and is said below.
             if let (Some(entry), Some(file)) = (autostart::file(), settings::file()) {
-                match autostart::first(&entry, &file) {
+                let start = autostart::at_start(&entry, &file);
+                if let Err(error) = &start.carried {
+                    tracing::warn!(kind = ?error.kind(), "shell.autostart_not_carried");
+                }
+                match start.written {
                     Ok(true) => tracing::info!("shell.autostart_written"),
                     Ok(false) => {}
                     Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {}
