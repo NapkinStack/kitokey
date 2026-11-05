@@ -800,7 +800,7 @@ fn header(shell: State<'_, Shell>) -> Header {
     }
 }
 
-/// « Acheter »: the purchase asked — of the Store, once Kitokey reads it there (D83's last pull
+/// « Acheter Kitokey »: the purchase asked — of the Store, once Kitokey reads it there (D83's last pull
 /// request); until then said in the log alone —, then the licence read again: bought, the next
 /// recording records. Answers the header, which says whether a recording is still refused.
 #[tauri::command]

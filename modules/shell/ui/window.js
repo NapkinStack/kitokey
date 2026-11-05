@@ -593,7 +593,7 @@ function paintRecord(recording, stopping) {
   }
 }
 
-// A start refused, the trial over (D83): why, and « Acheter », under the gesture refused.
+// A start refused, the trial over (D83): no failure, said as information; buying, the one action left.
 function paintRefused(refused) {
   const said = document.getElementById("refused");
   said.textContent = words.trial_over;

@@ -240,7 +240,7 @@ from the days kept — nothing of the meeting, which no line holds (D29).
 
 **The trial** (PDR-0005, D83) is judged when a recording starts, whatever started it — the window,
 the small one, the tray, the shortcut, a call's offer —, never during one: on a trial licence whose
-trial is over (`src/trial.rs`), nothing is recorded and the full window says why, with « Acheter »;
+trial is over (`src/trial.rs`), nothing is recorded and the full window says so, as information, with « Acheter Kitokey »;
 every meeting is still read, played, corrected and exported. The licence is read anew at each start
 (`src/licence.rs`): bought while Kitokey is open, the next recording records. Today no build reads
 the Store's licence, so nothing is limited; one that cannot be read records, said once in the log.

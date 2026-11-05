@@ -5118,9 +5118,9 @@ def window_looks(now: dt.datetime) -> None:
 
 def trial_over(now: dt.datetime) -> None:
     """AV. The trial over on a stand-in licence (PDR-0005, D83): no recording from the window, the
-    small one or the tray; why and « Acheter » said in the full window; every meeting still read, played, corrected and
+    small one or the tray; why and « Acheter Kitokey » said in the full window; every meeting still read, played, corrected and
     copied; bought while open, the next one records; a licence not read records, said once."""
-    print("AV. the trial over: nothing recorded from the window, the small one or the tray, said in the full window with « Acheter »; every meeting"
+    print("AV. the trial over: nothing recorded from the window, the small one or the tray, said in the full window with « Acheter Kitokey »; every meeting"
           " still read, played, corrected, copied; bought while open, the next records; not read, it records (D83)")
     keys = lambda browser, *sent: ActionChains(browser).send_keys(*sent).perform()
     logs = WORK / "state" / "kitokey" / "logs"
@@ -5129,8 +5129,8 @@ def trial_over(now: dt.datetime) -> None:
     licence = WORK / "licence"
     # As the page holds it: the driver's text turns a space that does not break into a plain one.
     text = lambda browser, element_id: browser.execute_script("return document.getElementById(arguments[0]).textContent", element_id)
-    over_fr = "L’essai est terminé, et chaque réunion reste à vous, lisible et exportable\u00a0: achetez Kitokey pour en enregistrer de nouvelles."
-    over_en = "The trial is over, and every meeting stays yours to read and export: buy Kitokey to record new ones."
+    over_fr = "L’essai est terminé. Vos réunions restent à vous\u00a0: lisibles, jouables, exportables."
+    over_en = "Your trial is over. Your meetings stay yours: readable, playable, exportable."
     # Begun 30 days ago, ten meetings made here since: over.
     meetings = WORK / "trial-over"
     day = now - dt.timedelta(days=30)
@@ -5167,10 +5167,13 @@ def trial_over(now: dt.datetime) -> None:
         press(browser, "record")
         said = wait_for(browser, lambda b: b.find_element(By.ID, "refused").is_displayed(), 5)
         time.sleep(1)
-        check("from the window: nothing recorded, the button at rest, why said in one sentence under it, with « Acheter »",
+        check("from the window: nothing recorded, the button at rest, what stays said under it, as information, with « Acheter Kitokey » its primary action",
               said and not asked.exists() and "live" not in browser.find_element(By.ID, "record").get_attribute("class")
               and text(browser, "refused") == over_fr and browser.find_element(By.ID, "refused").get_attribute("role") == "status"
-              and browser.find_element(By.ID, "buy").text == "Acheter" and len([f for f in meetings.iterdir() if f.is_dir()]) == 10,
+              and browser.find_element(By.ID, "buy").text == "Acheter Kitokey" and len([f for f in meetings.iterdir() if f.is_dir()]) == 10
+              # Information, not a failure: the window's neutral note, never the red of an error; buying, its primary action.
+              and browser.find_element(By.ID, "refused").get_attribute("class") == "note"
+              and browser.find_element(By.ID, "buy").get_attribute("class") == "primary",
               (text(browser, "refused"), asked.exists()))
         shot(browser, "d83-trial-over-fr")
         time.sleep(0.6)
@@ -5197,7 +5200,7 @@ def trial_over(now: dt.datetime) -> None:
         check("and its minutes copied", wait_for(browser, lambda b: "Le budget est validé." in "".join(b.execute_script("return window.__copied")), 3))
         purchases = logged("shell.purchase_asked")
         press(browser, "buy")
-        check("« Acheter » asks the purchase — the stand-in's, said in the log —; not bought, the refusal stays",
+        check("« Acheter Kitokey » asks the purchase — the stand-in's, said in the log —; not bought, the refusal stays",
               wait_for(browser, lambda b: logged("shell.purchase_asked") == purchases + 1, 5) and browser.find_element(By.ID, "refused").is_displayed())
         # From the small window: it has no room to say why; the full window comes in its place and says it.
         main = browser.current_window_handle
@@ -5213,7 +5216,7 @@ def trial_over(now: dt.datetime) -> None:
         replaced = wait_for(browser, lambda b: len(b.window_handles) == 1, 5)
         browser.switch_to.window(browser.window_handles[0])
         said = wait_for(browser, lambda b: b.find_element(By.ID, "refused").is_displayed(), 5)
-        check("from the small window: nothing recorded, the full window in its place says why, with « Acheter »",
+        check("from the small window: nothing recorded, the full window in its place says why, with « Acheter Kitokey »",
               replaced and said and not asked.exists() and text(browser, "refused") == over_fr, (browser.window_handles, asked.exists()))
         # Bought while Kitokey is open: the next recording records, no restart.
         licence.write_text("bought")
@@ -5233,8 +5236,8 @@ def trial_over(now: dt.datetime) -> None:
         asked.unlink(missing_ok=True)
         press(browser, "record")
         said = wait_for(browser, lambda b: b.find_element(By.ID, "refused").is_displayed(), 5)
-        check("in English: why, and « Buy »", said and not asked.exists() and text(browser, "refused") == over_en
-              and browser.find_element(By.ID, "buy").text == "Buy", text(browser, "refused"))
+        check("in English: why, and « Buy Kitokey »", said and not asked.exists() and text(browser, "refused") == over_en
+              and browser.find_element(By.ID, "buy").text == "Buy Kitokey", text(browser, "refused"))
         shot(browser, "d83-trial-over-en")
         # A licence that cannot be read: it records, each time, said once in the log.
         licence.write_text("unread")
