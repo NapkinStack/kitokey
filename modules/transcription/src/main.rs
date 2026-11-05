@@ -44,7 +44,19 @@ fn key() -> Option<String> {
 /// killed loses at most the span it was hearing.
 const SPAN: usize = 300;
 
+/// The version this program says (`--version`): the package's, named when it is built
+/// (`KITOKEY_VERSION`, D78), Cargo's when unset or empty.
+const VERSION: &str = match option_env!("KITOKEY_VERSION") {
+    Some(version) if !version.is_empty() => version,
+    _ => env!("CARGO_PKG_VERSION"),
+};
+
 fn main() -> ExitCode {
+    // Asked by a package or a person, answered before anything is logged or read.
+    if std::env::args_os().skip(1).eq(["--version"]) {
+        println!("kitokey-transcription {VERSION}");
+        return ExitCode::SUCCESS;
+    }
     let _run = log::start("transcription");
     let args: Vec<String> = std::env::args_os().skip(1).filter_map(|arg| arg.into_string().ok()).collect();
     let all_text = args.len() + 1 == std::env::args_os().count();
