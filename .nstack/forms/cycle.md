@@ -8,7 +8,7 @@ end: 2026-01-19           # start + appetite: the first day the cycle is over �
 deliverables:
   - id: D1
     title: "<An outcome a user can observe; for a spike, the question it answers>"
-    module: "<module name>"   # null for a spike run outside the code
+    module: "<module name>"   # null for a spike run outside the code, or whose product is a record, not shipped code
     state: proposed       # proposed | ready (testable criteria) | in-progress (older, still read) | accepted (at the closure: nstack deliver --write-states) | deferred | dropped — held and delivered are read from records, never written
     acceptance:           # given · when · then, required from ready on: the test sheet starts here
       - "Given <context>, when <action>, then <observable result>"
