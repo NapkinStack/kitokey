@@ -433,6 +433,8 @@ def asking_less_motion(window: Window) -> Window:
     return window
 
 
+# The sidebar's primary actions shown, by their ids: one at a time (D69).
+PRIMARIES = "return [...document.querySelectorAll('#sidebar .primary')].filter(b => b.offsetParent).map(b => b.id)"
 LESS_MOTION = "return matchMedia('(prefers-reduced-motion: reduce)').matches"
 # From here on, whatever starts to move, in the running page.
 WATCH_MOTION = ("window.__moved = []; for (const kind of ['animationstart', 'transitionrun'])"
@@ -5034,8 +5036,10 @@ def window_looks(now: dt.datetime) -> None:
         # Drawn, and seen: stroked in the text's colour, the size of the text; a rule of another name once hid it.
         drawn = browser.execute_script("const v = document.querySelector('#small-link svg'), c = getComputedStyle(v), p = getComputedStyle(v.parentElement); return [c.stroke === p.color, c.fill, parseFloat(c.width) === parseFloat(p.fontSize), parseFloat(c.height) === parseFloat(p.fontSize)]")
         check("the icon is stroked, the size of its text", drawn == [True, "none", True, True], drawn)
-        primaries = browser.execute_script("return [...document.querySelectorAll('#sidebar .primary')].filter(b => b.offsetParent).length")
-        check("the header shows one primary action", primaries == 1, primaries)
+        check("the header shows one primary action", browser.execute_script(PRIMARIES) == ["record"], browser.execute_script(PRIMARIES))
+        # The trial over (D83): buying holds it in the recording's place, then gives it back.
+        swapped = [browser.execute_script(f"paintRefused({state}); return arguments[0]", None) or browser.execute_script(PRIMARIES) for state in ("true", "false")]
+        check("the trial over, one primary still: « Acheter Kitokey », then the recording's again", swapped == [["buy"], ["record"]], swapped)
         for theme in ("light", "dark"):
             shot_themed(browser, f"d69-full-{theme}", theme)
         # A chip turning: the making stood in, then the minutes there.
@@ -5129,8 +5133,8 @@ def trial_over(now: dt.datetime) -> None:
     licence = WORK / "licence"
     # As the page holds it: the driver's text turns a space that does not break into a plain one.
     text = lambda browser, element_id: browser.execute_script("return document.getElementById(arguments[0]).textContent", element_id)
-    over_fr = "L’essai est terminé. Vos réunions restent à vous\u00a0: lisibles, jouables, exportables."
-    over_en = "Your trial is over. Your meetings stay yours: readable, playable, exportable."
+    over_fr = "L’essai est terminé\u202f; vos réunions restent à vous, lisibles, jouables et exportables."
+    over_en = "Your trial is over; your meetings stay yours, readable, playable and exportable."
     # Begun 30 days ago, ten meetings made here since: over.
     meetings = WORK / "trial-over"
     day = now - dt.timedelta(days=30)
@@ -5173,7 +5177,7 @@ def trial_over(now: dt.datetime) -> None:
               and browser.find_element(By.ID, "buy").text == "Acheter Kitokey" and len([f for f in meetings.iterdir() if f.is_dir()]) == 10
               # Information, not a failure: the window's neutral note, never the red of an error; buying, its primary action.
               and browser.find_element(By.ID, "refused").get_attribute("class") == "note"
-              and browser.find_element(By.ID, "buy").get_attribute("class") == "primary",
+              and browser.execute_script(PRIMARIES) == ["buy"] and "open" in browser.find_element(By.ID, "record").get_attribute("class"),
               (text(browser, "refused"), asked.exists()))
         shot(browser, "d83-trial-over-fr")
         time.sleep(0.6)
@@ -5224,7 +5228,8 @@ def trial_over(now: dt.datetime) -> None:
         press(browser, "record")
         recorded = wait_for(browser, lambda b: "live" in b.find_element(By.ID, "record").get_attribute("class") and asked.exists(), 5)
         check("bought while open: the next recording records, nothing said of the trial any more",
-              recorded and not browser.find_element(By.ID, "refused").is_displayed() and not browser.find_element(By.ID, "buy").is_displayed())
+              recorded and not browser.find_element(By.ID, "refused").is_displayed() and not browser.find_element(By.ID, "buy").is_displayed()
+              and browser.execute_script(PRIMARIES) == ["record"], browser.execute_script(PRIMARIES))
         time.sleep(1)
         press(browser, "record")
         wait_for(browser, lambda b: "live" not in b.find_element(By.ID, "record").get_attribute("class"), 5)

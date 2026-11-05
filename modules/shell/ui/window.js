@@ -593,8 +593,12 @@ function paintRecord(recording, stopping) {
   }
 }
 
-// A start refused, the trial over (D83): no failure, said as information; buying, the one action left.
+// A start refused, the trial over (D83): no failure, said as information; buying, the one action
+// left, holds the primary style, the recording's gesture its secondary one until bought (D69).
 function paintRefused(refused) {
+  const record = document.getElementById("record");
+  record.classList.toggle("primary", !refused);
+  record.classList.toggle("open", refused);
   const said = document.getElementById("refused");
   said.textContent = words.trial_over;
   said.hidden = !refused;

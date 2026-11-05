@@ -343,7 +343,7 @@ pub struct Window {
     pub redo_cancel: &'static str,
     pub saved: &'static str,
     pub small_not_confidential: &'static str,
-    /// A recording refused, the trial over (PDR-0005, D83): why, what stays, and the one gesture.
+    /// A recording refused, the trial over (PDR-0005, D83): why and what stays, in one sentence; the one gesture.
     pub trial_over: &'static str,
     pub buy: &'static str,
     pub find_meetings: &'static str,
@@ -781,7 +781,7 @@ pub fn window(language: Language) -> Window {
             redo_cancel: "Cancel",
             saved: "Saved",
             small_not_confidential: "This meeting is not confidential: open it to mark it.",
-            trial_over: "Your trial is over. Your meetings stay yours: readable, playable, exportable.",
+            trial_over: "Your trial is over; your meetings stay yours, readable, playable and exportable.",
             buy: "Buy Kitokey",
             find_meetings: "Search the meetings",
             fold: "Fold the sidebar",
@@ -1175,7 +1175,7 @@ pub fn window(language: Language) -> Window {
             redo_cancel: "Annuler",
             saved: "Enregistré",
             small_not_confidential: "Cette réunion n’est pas confidentielle\u{a0}: ouvrez-la pour la marquer.",
-            trial_over: "L’essai est terminé. Vos réunions restent à vous\u{a0}: lisibles, jouables, exportables.",
+            trial_over: "L’essai est terminé\u{202f}; vos réunions restent à vous, lisibles, jouables et exportables.",
             buy: "Acheter Kitokey",
             find_meetings: "Chercher dans les réunions",
             fold: "Replier la barre latérale",
