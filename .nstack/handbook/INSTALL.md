@@ -275,8 +275,9 @@ nstack doctor
 and 2 when nothing read is missing but something could not be read.
 
 `nstack doctor` is also where a project learns that a newer version of NapkinStack is
-published: one line, with its notes and the way to take it — information, never a gap, and
-the one question any command asks the registry.
+published: one line, with its notes and the way to take it — information, never a gap. The
+registry is asked one other question: `nstack update` says when the version it lays is not
+on PyPI yet, since the project's CI installs it from there and stays red until it is.
 
 `nstack doctor` reads the token from `GH_TOKEN`, otherwise `GITHUB_TOKEN`: a fine-grained
 token, limited to the repository, with the **Administration: read** permission. Without a
