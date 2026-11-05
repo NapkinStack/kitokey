@@ -27,4 +27,5 @@ pub mod speech;
 pub mod spoken;
 pub mod summarising;
 pub mod transcription;
+pub mod trial;
 pub mod words;
