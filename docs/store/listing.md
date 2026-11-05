@@ -2,7 +2,10 @@
 
 The words Partner Center is given, kept here (D57, [PDR-0004](../pdr/0004-windows-through-the-microsoft-store.md)).
 They say [PDR-0001](../pdr/0001-wholeheard-open-on-linux-paid-on-macos-and-windows.md)'s promise,
-and claim only what the product does today. Privacy policy's URL:
+and claim only what the product does today. The trial's terms are
+[PDR-0005](../pdr/0005-on-windows-the-trial-ends-without-locking-the-meetings.md)'s, said as
+[Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) §10.8.4
+asks. Privacy policy's URL:
 <https://github.com/NapkinStack/kitokey/blob/main/docs/privacy.md>.
 
 ## Screenshots
@@ -34,6 +37,10 @@ before anything is sent. A meeting you say confidential never leaves.
 You tell the other participants that you are recording: Kitokey shows them nothing, and reminds
 you to.
 
+**Free trial.** Try Kitokey for free, for 14 days and 10 meetings, whichever comes last. Settings
+show what is left. Once the trial is over, you buy Kitokey to record new meetings. Every meeting
+you made stays yours: you can still read it, play it, correct it and copy its minutes.
+
 **Features.**
 - Records your microphone and your computer's sound, in any call application
 - No bot in the call, no account
@@ -61,6 +68,11 @@ et vous voyez où part une réunion avant tout envoi. Une réunion dite confiden
 
 C'est à vous de prévenir les autres participants que vous enregistrez : Kitokey ne leur montre
 rien, et vous le rappelle.
+
+**Essai gratuit.** Essayez Kitokey gratuitement pendant 14 jours et 10 réunions, jusqu'à ce que les
+deux soient atteints. Les Réglages indiquent ce qu'il en reste. Une fois l'essai terminé, vous
+achetez Kitokey pour enregistrer de nouvelles réunions. Toutes vos réunions restent à vous : vous
+pouvez toujours les lire, les écouter, les corriger et copier leur compte rendu.
 
 **Fonctionnalités.**
 - Enregistre votre micro et le son de votre ordinateur, dans toute application d'appel
