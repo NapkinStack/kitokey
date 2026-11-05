@@ -1270,12 +1270,12 @@ pub fn window(language: Language) -> Window {
             offer_choices: ["Proposer d’enregistrer", "Ne rien faire"],
             autostart: [
                 "Lancer Kitokey à l’ouverture de session",
-                "Dans la barre système, sans fenêtre\\u{a0}: un appel vous est proposé même après un redémarrage.",
+                "Dans la barre système, sans fenêtre : un appel vous est proposé même après un redémarrage.",
             ],
             // Windows-specific autostart sentences (Task Manager Startup tab).
             autostart_windows: [
                 "Lancer Kitokey à l'ouverture de session",
-                "Dans l'onglet Démarrage du Gestionnaire de tâches : activé lance dans la barre, désactivé reste désactivé.",
+                "Dans l'onglet Démarrage du Gestionnaire de tâches : activé lance dans la barre, désactivé reste désactivé.",
             ],
             advanced_title: "Avancé",
             developer: [

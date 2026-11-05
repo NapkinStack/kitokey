@@ -152,7 +152,7 @@ pub fn windows_startup_state() -> io::Result<Option<WindowsStartupState>> {
     use windows::ApplicationModel::StartupTask;
     let task = StartupTask::GetForCurrentPackageAsync()
         .map_err(|e| io::Error::other(e))?
-        .get()
+        .join()
         .map_err(|e| io::Error::other(e))?;
     let state = task.State().map_err(|e| io::Error::other(e))?;
     Ok(Some(match state {
@@ -178,12 +178,12 @@ pub fn windows_startup_enable() -> io::Result<Option<WindowsStartupState>> {
     use windows::ApplicationModel::StartupTask;
     let task = StartupTask::GetForCurrentPackageAsync()
         .map_err(|e| io::Error::other(e))?
-        .get()
+        .join()
         .map_err(|e| io::Error::other(e))?;
     let new_state = task
         .RequestEnableAsync()
         .map_err(|e| io::Error::other(e))?
-        .get()
+        .join()
         .map_err(|e| io::Error::other(e))?;
     Ok(Some(match new_state {
         windows::ApplicationModel::StartupTaskState::Enabled => WindowsStartupState::Enabled,
@@ -207,7 +207,7 @@ pub fn windows_startup_disable() -> io::Result<()> {
     use windows::ApplicationModel::StartupTask;
     let task = StartupTask::GetForCurrentPackageAsync()
         .map_err(|e| io::Error::other(e))?
-        .get()
+        .join()
         .map_err(|e| io::Error::other(e))?;
     task.Disable().map_err(|e| io::Error::other(e))
 }
