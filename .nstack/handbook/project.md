@@ -85,6 +85,7 @@ the agent records it, with no pull request and nothing under `docs/`, and the pl
 ```bash
 nstack deliver D30 --held '#412' --session alice-d30                   # every criterion held by that pull request
 nstack deliver D30 --held '1=#412' --held '2=#415' --session alice-d30   # criterion by criterion; an acceptance issue the cycle names counts
+nstack deliver D30 --held '1=#412' --held '1=#413' --held '2=#415' --session alice-d30   # a criterion held by two: each kept
 ```
 
 It is refused with no merge of the deliverable on the default branch since the cycle started, with a criterion

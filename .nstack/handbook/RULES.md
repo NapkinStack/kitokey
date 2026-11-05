@@ -133,7 +133,7 @@ it has no cycle, K1 to K3 and K5 say nothing there, and every other rule applies
 
 | Code | Records, never refuses | Why |
 |---|---|---|
-| `W1` | A commit that arrived outside a pull request — read from the last commit the record recorded, so that a run that never started is caught up | `07-governance.md` §7 |
+| `W1` | A commit that arrived outside a pull request — read from the last commit the record recorded, so that a run that never started is caught up; a merge whose link to its pull request the forge lost is read from the pull request its subject names, when that one merged it | `07-governance.md` §7 |
 
 ## L — the workstation
 
