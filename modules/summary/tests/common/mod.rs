@@ -14,10 +14,6 @@ use std::{
 pub fn program() -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_kitokey-summary"));
     command.env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"));
-    // The names before D86, still read: none of the machine's reaches a test unasked.
-    for name in ["PROVIDER_KEY", "TRACE", "LOG", "LOG_DIR"] {
-        command.env_remove(format!("WHOLEHEARD_{name}"));
-    }
     command
 }
 
