@@ -398,6 +398,7 @@ fn an_empty_key_sends_no_key() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .args(["--test", "--provider", &address, "--model", "a-model"])
         .env("KITOKEY_PROVIDER_KEY", "")
+        .env("WHOLEHEARD_PROVIDER_KEY", "a-key-never-sent")
         .env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
         .output()
         .unwrap();
