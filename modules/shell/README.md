@@ -63,7 +63,8 @@ Said once, in the user's language: *Wholeheard is now Kitokey*.
 **One Kitokey** per session (D35): a second start hands its arguments to the running one and
 leaves ([tauri-plugin-single-instance](https://v2.tauri.app/plugin/single-instance/)). The
 applications' menu runs `kitokey --window`, so its window opens, running or not; started again
-with the session, nothing opens.
+with the session, nothing opens. `kitokey --version` prints its version, the package's (D78), and
+starts nothing.
 
 **The window** (cycle 03, from D11's drawings) is opened by *Open Kitokey* in the menu — or at
 once by `kitokey --window` — and never without a gesture: the meetings in the sessions'

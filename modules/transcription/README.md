@@ -51,6 +51,8 @@ kitokey-transcription <session-folder> --provider https://api.groq.com/openai/v1
 kitokey-transcription --test --provider http://localhost:8000/v1 --model whisper-1   # a sound of its own
 ```
 
+`kitokey-transcription --version` prints its version, the package's (D78), and does nothing else.
+
 | Tried on a public meeting of five minutes, four speakers, in French | Words that differ from a person's transcript | Time |
 |---|---|---|
 | Built with `--features vulkan`, on a laptop's graphics card | 26.8 % | 34 to 38 s |
