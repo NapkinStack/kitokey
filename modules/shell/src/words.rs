@@ -455,6 +455,8 @@ pub struct Window {
     pub offer_choices: [&'static str; 2],
     /// Started with the user's session (D32): its name and line.
     pub autostart: [&'static str; 2],
+    // Windows-specific autostart sentences (Task Manager Startup tab).
+    pub autostart_windows: [&'static str; 2],
     pub keep_audio: [&'static str; 2],
     /// The settings' last card, and its one switch: what a program said of a failure, shown on
     /// the page under the sentence (D29).
@@ -870,6 +872,11 @@ pub fn window(language: Language) -> Window {
                 "Start Kitokey when you log in",
                 "In the tray, no window: a call is offered even after a restart.",
             ],
+            // Windows-specific autostart sentences (Task Manager Startup tab).
+            autostart_windows: [
+                "Start Kitokey when you sign in",
+                "In Task Manager's Startup tab: on runs in the tray, off stays off.",
+            ],
             advanced_title: "Advanced",
             developer: [
                 "Developer mode",
@@ -1263,7 +1270,12 @@ pub fn window(language: Language) -> Window {
             offer_choices: ["Proposer d’enregistrer", "Ne rien faire"],
             autostart: [
                 "Lancer Kitokey à l’ouverture de session",
-                "Dans la barre système, sans fenêtre\u{a0}: un appel vous est proposé même après un redémarrage.",
+                "Dans la barre système, sans fenêtre : un appel vous est proposé même après un redémarrage.",
+            ],
+            // Windows-specific autostart sentences (Task Manager Startup tab).
+            autostart_windows: [
+                "Lancer Kitokey à l'ouverture de session",
+                "Dans l'onglet Démarrage du Gestionnaire de tâches : activé lance dans la barre, désactivé reste désactivé.",
             ],
             advanced_title: "Avancé",
             developer: [

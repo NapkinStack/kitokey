@@ -4,6 +4,11 @@
 //! at its first start, and never again: once turned off, it stays off.
 //!
 //! [XDG Autostart]: https://specifications.freedesktop.org/autostart-spec/latest/
+//!
+//! On Windows, the session start uses the Windows StartupTask API (uap5:StartupTask in the
+//! package manifest) instead of XDG autostart. The Windows StartupTask is managed by Windows
+//! and shown in the Task Manager's Startup tab. Kitokey reads and writes its state through
+//! Windows.ApplicationModel.StartupTask.
 
 use std::{
     fs, io,
@@ -30,8 +35,13 @@ const ENTRY: &str = "[Desktop Entry]\n\
     Terminal=false\n";
 
 /// Where the entry is on this system: the user's configuration's `autostart` folder.
+/// On Windows, this returns None since Windows uses StartupTask API instead.
 pub fn file() -> Option<PathBuf> {
-    dirs::config_dir().map(|folder| folder.join("autostart").join(NAME))
+    if cfg!(target_os = "windows") {
+        None
+    } else {
+        dirs::config_dir().map(|folder| folder.join("autostart").join(NAME))
+    }
 }
 
 /// Whether the session starts Kitokey: the entry is there, and neither hidden nor turned off
@@ -120,4 +130,90 @@ pub fn at_start(entry: &Path, settings_file: &Path) -> AtStart {
     let carried = carry_over(&entry.with_file_name(NAME_BEFORE), entry);
     let written = first(entry, settings_file);
     AtStart { carried, written }
+}
+
+/// Windows StartupTask state, matching Windows.ApplicationModel.StartupTaskState.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowsStartupState {
+    /// The startup task is enabled.
+    Enabled,
+    /// The startup task is disabled (default state).
+    Disabled,
+    /// The startup task was disabled by the user in Task Manager.
+    DisabledByUser,
+    /// The startup task was disabled by system policy.
+    DisabledByPolicy,
+}
+
+/// Reads the Windows StartupTask state for the current package.
+/// Returns None if not on Windows or if the API is unavailable.
+#[cfg(target_os = "windows")]
+pub fn windows_startup_state() -> io::Result<Option<WindowsStartupState>> {
+    use windows::ApplicationModel::StartupTask;
+    let task = StartupTask::GetForCurrentPackageAsync()
+        .map_err(|e| io::Error::other(e))?
+        .join()
+        .map_err(|e| io::Error::other(e))?;
+    let state = task.State().map_err(|e| io::Error::other(e))?;
+    Ok(Some(match state {
+        windows::ApplicationModel::StartupTaskState::Enabled => WindowsStartupState::Enabled,
+        windows::ApplicationModel::StartupTaskState::Disabled => WindowsStartupState::Disabled,
+        windows::ApplicationModel::StartupTaskState::DisabledByUser => WindowsStartupState::DisabledByUser,
+        windows::ApplicationModel::StartupTaskState::DisabledByPolicy => WindowsStartupState::DisabledByPolicy,
+        _ => return Ok(None),
+    }))
+}
+
+/// On non-Windows, always returns Ok(None).
+#[cfg(not(target_os = "windows"))]
+pub fn windows_startup_state() -> io::Result<Option<WindowsStartupState>> {
+    Ok(None)
+}
+
+/// Enables the Windows StartupTask for the current package.
+/// Returns the new state after the enable request.
+/// On non-Windows, returns Ok(None).
+#[cfg(target_os = "windows")]
+pub fn windows_startup_enable() -> io::Result<Option<WindowsStartupState>> {
+    use windows::ApplicationModel::StartupTask;
+    let task = StartupTask::GetForCurrentPackageAsync()
+        .map_err(|e| io::Error::other(e))?
+        .join()
+        .map_err(|e| io::Error::other(e))?;
+    let new_state = task
+        .RequestEnableAsync()
+        .map_err(|e| io::Error::other(e))?
+        .join()
+        .map_err(|e| io::Error::other(e))?;
+    Ok(Some(match new_state {
+        windows::ApplicationModel::StartupTaskState::Enabled => WindowsStartupState::Enabled,
+        windows::ApplicationModel::StartupTaskState::Disabled => WindowsStartupState::Disabled,
+        windows::ApplicationModel::StartupTaskState::DisabledByUser => WindowsStartupState::DisabledByUser,
+        windows::ApplicationModel::StartupTaskState::DisabledByPolicy => WindowsStartupState::DisabledByPolicy,
+        _ => return Ok(None),
+    }))
+}
+
+/// On non-Windows, always returns Ok(None).
+#[cfg(not(target_os = "windows"))]
+pub fn windows_startup_enable() -> io::Result<Option<WindowsStartupState>> {
+    Ok(None)
+}
+
+/// Disables the Windows StartupTask for the current package.
+/// On non-Windows, returns Ok(()).
+#[cfg(target_os = "windows")]
+pub fn windows_startup_disable() -> io::Result<()> {
+    use windows::ApplicationModel::StartupTask;
+    let task = StartupTask::GetForCurrentPackageAsync()
+        .map_err(|e| io::Error::other(e))?
+        .join()
+        .map_err(|e| io::Error::other(e))?;
+    task.Disable().map_err(|e| io::Error::other(e))
+}
+
+/// On non-Windows, always returns Ok(()).
+#[cfg(not(target_os = "windows"))]
+pub fn windows_startup_disable() -> io::Result<()> {
+    Ok(())
 }

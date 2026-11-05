@@ -2301,6 +2301,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "kitokey-shell"
+version = "0.2.0"
+dependencies = [
+ "apple-native-keyring-store",
+ "ashpd",
+ "bytes",
+ "chrono",
+ "dirs 6.0.0",
+ "futures-util",
+ "getrandom 0.3.4",
+ "http",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "keyring-core",
+ "libc",
+ "minisign",
+ "minisign-verify",
+ "notify-rust",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_ast_visit",
+ "oxc_parser",
+ "oxc_span",
+ "pulldown-cmark",
+ "rubato",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sys-locale",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-notification",
+ "tauri-plugin-single-instance",
+ "tempfile",
+ "tokio",
+ "toml 0.9.12+spec-1.1.0",
+ "toml_edit 0.25.17+spec-1.1.0",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "trash",
+ "ureq",
+ "windows",
+ "windows-native-keyring-store",
+ "zbus-secret-service-keyring-store",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5687,56 +5738,6 @@ dependencies = [
  "thiserror 2.0.21",
  "windows",
  "windows-core",
-]
-
-[[package]]
-name = "kitokey-shell"
-version = "0.2.0"
-dependencies = [
- "apple-native-keyring-store",
- "ashpd",
- "bytes",
- "chrono",
- "dirs 6.0.0",
- "futures-util",
- "getrandom 0.3.4",
- "http",
- "http-body-util",
- "hyper",
- "hyper-util",
- "keyring-core",
- "libc",
- "minisign",
- "minisign-verify",
- "notify-rust",
- "oxc_allocator",
- "oxc_ast",
- "oxc_ast_visit",
- "oxc_parser",
- "oxc_span",
- "pulldown-cmark",
- "rubato",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "sys-locale",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-notification",
- "tauri-plugin-single-instance",
- "tempfile",
- "tokio",
- "toml 0.9.12+spec-1.1.0",
- "toml_edit 0.25.17+spec-1.1.0",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "trash",
- "ureq",
- "windows-native-keyring-store",
- "zbus-secret-service-keyring-store",
 ]
 
 [[package]]

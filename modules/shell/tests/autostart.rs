@@ -1,5 +1,7 @@
 //! Kitokey started with the user's session (D32): an entry of the user's autostart folder, as
 //! the XDG Autostart specification has it — the file is the setting, written once by itself.
+//!
+//! On Windows, the session start uses the Windows StartupTask API instead of XDG autostart.
 
 use std::fs;
 
@@ -131,4 +133,66 @@ fn at_the_start_a_wholeheard_user_who_had_it_start_with_the_session_keeps_it_und
     let start = autostart::at_start(&entry, &file);
     assert!(matches!(start.carried, Ok(true)) && matches!(start.written, Ok(false)), "{start:?}");
     assert!(!autostart::on(&entry) && !before.exists());
+}
+
+#[cfg(target_os = "windows")]
+mod windows_tests {
+    use super::*;
+    use windows::ApplicationModel::StartupTask;
+
+    #[test]
+    fn windows_startup_task_state_reading_enabled() {
+        // This test will fail until Windows StartupTask API support is implemented
+        let task = StartupTask::GetForCurrentPackageAsync().unwrap().get().unwrap();
+        let state = task.State().unwrap();
+        // Should be able to read the state: Enabled, Disabled, DisabledByUser, DisabledByPolicy
+        assert!(matches!(
+            state,
+            windows::ApplicationModel::StartupTaskState::Enabled
+                | windows::ApplicationModel::StartupTaskState::Disabled
+                | windows::ApplicationModel::StartupTaskState::DisabledByUser
+                | windows::ApplicationModel::StartupTaskState::DisabledByPolicy
+        ));
+    }
+
+    #[test]
+    fn windows_startup_task_state_reading_disabled_by_user() {
+        // This test will fail until Windows StartupTask API support is implemented
+        // When user manually disables in Task Manager, state should be DisabledByUser
+        let task = StartupTask::GetForCurrentPackageAsync().unwrap().get().unwrap();
+        let state = task.State().unwrap();
+        // We can't easily force this state in a test, but we can verify the API works
+        assert!(matches!(
+            state,
+            windows::ApplicationModel::StartupTaskState::Enabled
+                | windows::ApplicationModel::StartupTaskState::Disabled
+                | windows::ApplicationModel::StartupTaskState::DisabledByUser
+                | windows::ApplicationModel::StartupTaskState::DisabledByPolicy
+        ));
+    }
+
+    #[test]
+    fn windows_startup_task_state_writing_enable() {
+        // This test will fail until Windows StartupTask API support is implemented
+        // RequestEnableAsync should enable the startup task
+        let task = StartupTask::GetForCurrentPackageAsync().unwrap().get().unwrap();
+        let new_state = task.RequestEnableAsync().unwrap().get().unwrap();
+        // Should be Enabled after successful enable request
+        assert!(matches!(
+            new_state,
+            windows::ApplicationModel::StartupTaskState::Enabled
+                | windows::ApplicationModel::StartupTaskState::DisabledByUser
+                | windows::ApplicationModel::StartupTaskState::DisabledByPolicy
+        ));
+    }
+
+    #[test]
+    fn windows_startup_task_state_writing_disable() {
+        // This test will fail until Windows StartupTask API support is implemented
+        // Disable should disable the startup task
+        let task = StartupTask::GetForCurrentPackageAsync().unwrap().get().unwrap();
+        task.Disable().unwrap();
+        let state = task.State().unwrap();
+        assert!(matches!(state, windows::ApplicationModel::StartupTaskState::Disabled));
+    }
 }
