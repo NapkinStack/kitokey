@@ -1532,6 +1532,9 @@ struct SettingsShown {
     offer: bool,
     /// Kitokey starts with the user's session (D32): its entry, as the desktop reads it.
     autostart: bool,
+    /// On Windows: the startup task state as words for the Task Manager Startup tab.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    autostart_windows: Option<[&'static str; 2]>,
     keep_audio: KeepAudio,
     model: PathBuf,
     /// Who hears: the model above, Apple's SpeechAnalyzer (D42), or a service the user named (D43),
@@ -1593,7 +1596,20 @@ fn settings_shown(shell: State<'_, Shell>) -> SettingsShown {
         after: settings.after,
         reminder: settings.reminder,
         offer: settings.offer,
-        autostart: autostart::file().is_some_and(|entry| autostart::on(&entry)),
+        autostart: if cfg!(target_os = "windows") {
+            autostart::windows_startup_state()
+                .ok()
+                .flatten()
+                .map(|s| s == autostart::WindowsStartupState::Enabled)
+                .unwrap_or(false)
+        } else {
+            autostart::file().is_some_and(|entry| autostart::on(&entry))
+        },
+        autostart_windows: if cfg!(target_os = "windows") {
+            Some(words::window(shell.language()).autostart_windows)
+        } else {
+            None
+        },
         keep_audio: settings.keep_audio,
         model: settings.model,
         engine: settings.engine,
@@ -1677,9 +1693,17 @@ fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Re
     }
     // The entry first: the settings say what Kitokey wrote of it, once it is written.
     if let Some(on) = change.autostart {
-        let entry =
-            autostart::file().ok_or_else(|| shell.told(Failure::Autostart, "this system names no folder for the session's start"))?;
-        autostart::set(&entry, on).map_err(|error| shell.told(Failure::Autostart, error))?;
+        if cfg!(target_os = "windows") {
+            if on {
+                autostart::windows_startup_enable().map_err(|error| shell.told(Failure::Autostart, error))?;
+            } else {
+                autostart::windows_startup_disable().map_err(|error| shell.told(Failure::Autostart, error))?;
+            }
+        } else {
+            let entry =
+                autostart::file().ok_or_else(|| shell.told(Failure::Autostart, "this system names no folder for the session's start"))?;
+            autostart::set(&entry, on).map_err(|error| shell.told(Failure::Autostart, error))?;
+        }
         settings.autostart = Some(on);
     }
     if let Some(developer) = change.developer {
