@@ -1,6 +1,6 @@
 ---
 goal: "On Linux, Wholeheard comes from the system's updater: Fedora users install it with dnf from Copr and get each new version with their updates, removing it keeps their meetings, and the Linux trials that cycles 04 to 06 carried are run"
-status: accepted          # proposed | accepted | closed | stopped — the decider accepts
+status: closed            # proposed | accepted | closed | stopped — the decider accepts
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
 start: 2026-11-03         # YYYY-MM-DD
 end: 2026-11-17           # start + appetite: the first day the cycle is over — the circuit breaker
@@ -8,7 +8,7 @@ deliverables:
   - id: D80
     title: "Removing Wholeheard's package leaves the meetings and the settings, and nothing else of it"
     module: install
-    state: ready
+    state: accepted
     acceptance:
       - "Given the .rpm on Fedora 44 and the .deb on Ubuntu 24.04, each in a throwaway container, when Wholeheard is installed, its first start run as a user, a meeting written, then the package removed (`dnf remove`, `apt remove`), then no file the package installed is left, the user's meetings and settings are as they were, and what is left in the user's home is exactly what `docs/privacy.md` names"
       - "Given the same package installed again, when Wholeheard starts, then it reads the meetings and settings it left"
@@ -16,7 +16,7 @@ deliverables:
   - id: D86
     title: "Wholeheard becomes Kitokey, and nothing of the user's is lost on the way"
     module: shell
-    state: ready
+    state: deferred   # moved to cycle 08 at the closure, 2026-11-05
     acceptance:
       - "Given Wholeheard installed and used — settings, meetings, the Whisper model, keys in the keyring —, when the user installs Kitokey's package over it (`dnf install` of the .rpm, `apt install` of the .deb), then it replaces Wholeheard's, and Kitokey starts with the same settings, the same meetings where they were, the model not fetched again and the keys kept; a carrying over cut halfway resumes at the next start and never loses a meeting"
       - "Given the repository, when it is searched for Wholeheard, then the product, its programs, its packages, its application id, its folders and its variables are named Kitokey; Wholeheard and Summit are named only where history is told and in the code that carries over what the user held under them"
@@ -25,13 +25,13 @@ deliverables:
   - id: D82
     title: "A microphone chosen that cannot be kept says so, and the earlier choice stays"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given the small window and settings that cannot be written, when the user chooses a microphone, then the window says it was not kept, the name shows the earlier choice, and the next recording takes the earlier choice; held by the window's e2e on stand-in devices"
   - id: D78
     title: "On Fedora, Wholeheard installs from Copr with dnf, and each new version comes with the system's updates"
     module: install
-    state: ready
+    state: deferred   # moved to cycle 08 at the closure, 2026-11-05
     acceptance:
       - "Given a release tag on main, when the forge's workflow runs, then it makes a source package from that tag that builds the four programs from source, the crates inside it, and Copr builds it for each Fedora release Copr still supports, its internet access left off; a build that fails fails the workflow and names the release that failed"
       - "Given the package's header, when it is read, then its licence is the repository's, GPL-3.0, and its summary and description are those of today's package"
@@ -39,15 +39,15 @@ deliverables:
       - "Given the previous version installed from Copr, when the next tag is built and `dnf upgrade` runs, then the new version replaces it and the meetings and settings stay"
   - id: D79
     title: "Spike — can a PPA build Wholeheard for Ubuntu 24.04 with what the archive offers?"
-    module: install
-    state: ready
+    module: null      # re-framed at the closure (NapkinStack 0.26.0): its product is a record, not shipped code
+    state: accepted   # by hand at the closure, from #129's line: it builds offline
     acceptance:
       - "Given a source package of a release tag, its crates vendored in it, when it is built offline in an Ubuntu 24.04 container with only the archive's packages as build dependencies, then the module's log issue records whether it builds, the archive's rustc and cargo against what the four programs need, the time it took, the size of the source package, and what had to be added"
       - "Given that record, when it is read against the threshold — it builds offline with the archive's toolchain, or with one trusted PPA named as a build dependency *(framer's, no source)* —, then the framer proposes the PPA as a deliverable of the next framing; below it, what was missing is recorded. A refuted result is a delivered one"
   - id: D66
     title: "A recording holds the microphone the call holds, and never touches a Bluetooth headset's profile"
     module: capture
-    state: ready
+    state: deferred   # moved to cycle 08 at the closure, 2026-11-05
     acceptance:
       - "Given a call holding a microphone other than the default input, when a recording runs, then `me` records that one — its name in `session.json` and the `device` event — and, when the call changes it, follows it, the track going on; held on virtual devices by capture's e2e, a stand-in call on a source of its own"
       - "Given a source carrying `bluez5.loopback=true`, when capture records it, then its stream says its version's passive value (ADR-0015, as corrected by #574, merged after this amendment), the source never runs from it alone and no profile switch comes from it, within one known window: a default input turning into a headset during a recording stays on an active stream until a reading of the graph closes it, within a few seconds, and for as long as the graph does not read; in that window WirePlumber's decision to switch came 4 times in 10 measured, on a stand-in with no card; held by capture's e2e on a stand-in source, read in `pw-dump` — WirePlumber's decision testable on a stand-in carrying `device.id` —, and `others` is unchanged. Given no call holding a microphone, then capture records the meeting's sound and says in one sentence that the microphone waits when the default input is such a source; records the default input, as today, when it is not"
@@ -57,7 +57,7 @@ deliverables:
   - id: D56
     title: "The list of models read again is refused unless the decider's key signed it"
     module: shell
-    state: ready
+    state: deferred   # moved to cycle 08 at the closure, 2026-11-05
     acceptance:
       - "Given `registry/models.json` and its signature `models.json.minisig` on main, made with minisign by the decider's key — the public key built into the shell, the private one never in a repository —, when the list is read again on the user's gesture, then it is offered only when its signature verifies; a list unsigned, signed by another key, or changed after it was signed is refused, and the shipped list stays, said in one sentence (ADR-0010, *Rejected alternatives*)"
       - "Given a pull request that changes the list, when its checks run, then a list whose signature does not verify against the built-in key is refused; until the decider's key is given, no list is read again, and Settings and the check say it waits on that key — the colleagues' builds lose today's reading again, said in the cycle's closure"
@@ -66,7 +66,7 @@ deliverables:
   - id: D41
     title: "On Linux, a call heard on an output other than the system's default is recorded there"
     module: capture
-    state: ready
+    state: deferred   # moved to cycle 08 at the closure, 2026-11-05
     acceptance:
       - "Given a call — an application other than capture holding a microphone — whose sound plays on an output other than the system's default, when it is recorded, then the remote track holds what the call plays, and capture says `device` with that output's name"
       - "Given the call's sound moved to another output while recording, or back to the default, when it moves, then the remote track follows it within two seconds and the move is kept in `session.json` with when"
@@ -76,7 +76,7 @@ deliverables:
   - id: D63
     title: "A service that hears is chosen as the minutes' is: from a list, its transcription models offered"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given Settings, when the user chooses who hears online, then the services the minutes offer that publish OpenAI's `audio/transcriptions` — OpenRouter, OpenAI, and Mistral if it does — are offered by name, their address filled in as the minutes' are, and « Un service que je choisis » keeps an address of their own"
       - "Given a service chosen, when Settings show it, then its transcription models are offered to choose from — OpenRouter's read from its public list, `models?output_modalities=transcription`, asked with no key and nothing of a meeting; the others' that give segments and their times named in the repository —, a model typed by hand still possible, and *Tester* says whether the one chosen gives segment times, the list not saying it; its key kept in the system's keyring as the minutes' is"
@@ -85,10 +85,12 @@ deliverables:
   - id: D27
     title: "Wholeheard installs on Ubuntu from one package, its programs built on the system they ship to"
     module: install
-    state: ready
+    state: deferred   # moved to cycle 08 at the closure, 2026-11-05
     acceptance:
       - "Given Ubuntu 24.04, when a user installs Wholeheard from one package file (`sudo apt install ./kitokey_<version>_amd64.deb`), then Wholeheard is in the applications menu and starts in the tray with nothing built and no variable set, and removing it leaves the user's meetings and settings"
       - "Given a release for a system — Fedora or Ubuntu —, when the programs are built, then they are built in a container of that system, so that no package depends on the machine that made it"
+outcome: shipped
+ended_on: 2026-11-05
 ---
 
 # Cycle 07 — Wholeheard from the system's updater, on Linux
@@ -217,7 +219,7 @@ day: « Déjà fait ». The end date does not move.
 
 - **Cycle 08, Windows**: D53, D54, D57, D58 on Windows, D77's kit on a person's Windows, the Store's account.
 - **Cycle 09, macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation.
-- A PPA, if D79 says it can be built. Debian once a channel exists (PDR-0001).
+- A PPA: D79 says it can be built, offline, with the archive's toolchain; for the next Linux framing. Debian once a channel exists (PDR-0001).
 - Tests in `summary`, `transcription`, `platform` and `contracts` that still name a later version's number
   get `vnext`: one pull request each, out of cycle.
 - The window's AA scenario, failed twice in a whole e2e and never alone.
@@ -238,6 +240,53 @@ day: « Déjà fait ». The end date does not move.
 
 ## Closure
 
-<Written at the end.>
+**Closed on 2026-11-05, shipped, on the decider's word that day:** « continu tout ce que tu peux faire en
+autonomie pour avancer, deplace les tache dans les cycle suivant si besoin ». Every deliverable an agent could
+finish is built and verified. What is left waits on a person: the Fedora group that D78's first
+publication needs, and the trials. D63, D80 and D82 are accepted from their records by
+`nstack deliver --write-states`. D79 is re-framed `module: null` on the same word, as NapkinStack 0.26.0
+asks of a spike whose product is a record, and accepted from its line. The six others move to
+[cycle 08](08-wholeheard-ready-for-the-microsoft-store.md), their criteria as they stand. 4 of 10 accepted.
 
-**Documents brought current:** <at the closure>
+```mermaid
+flowchart LR
+    A["Built, sheets passed:<br/>D80 D82 D63"]:::done
+    S["Spike, it builds:<br/>D79"]:::done
+    P["Built, waits on<br/>the Fedora group:<br/>D78 · D86's criterion 4"]:::wait
+    T["A person's trial or key:<br/>D66 D41 D56 D27"]:::wait
+    A --> X["Accepted"]:::end7
+    S --> X
+    P --> N["Cycle 08"]:::next
+    T --> N
+    classDef done fill:#065f46,color:#fff
+    classDef wait fill:#92400e,color:#fff
+    classDef end7 fill:#0f766e,color:#fff
+    classDef next fill:#1e3a8a,color:#fff
+```
+
+**Legend** — green: built and verified · amber: a person's gesture left · teal: accepted · blue: the next cycle.
+
+**State, by what is true on `main` 4376bbe.** Only what was not proven is listed: each pull request's
+sheet holds the rest.
+
+| Deliverable | Pull requests | Not proven |
+|---|---|---|
+| D80 removal keeps the meetings | #656 | A real recording in the container; a key given, then the package removed: no keyring daemon there |
+| D82 a choice not kept, said | #633 | — |
+| D63 a service that hears | #463 | — |
+| D79 a PPA for Ubuntu | [#129](https://github.com/NapkinStack/kitokey/issues/129#issuecomment-6602852530) | It builds offline with noble's rustc 1.91, above the threshold: a PPA goes to the next Linux framing. Launchpad's builders themselves, untried |
+| D86 Kitokey | #648 to #654, #663 to #666 | Criterion 4, `dnf copr enable …/kitokey`: waits on D78's first publication |
+| D78 Copr | #657 to #659, #661, #662 | Its criteria 3 and 4: the Fedora group `napkinstack`, asked of Fedora's infrastructure, not yet made; then the tag |
+| D66, D41, D56, D27 | Cycles 04 to 06; #643, #644, #540 open | A person's trial or key, unchanged |
+
+**The goal.** Removing Kitokey keeps the meetings (D80), and the package Copr will build is ready from source
+at a tag (D78). **Not reached**: no Fedora user installs it from Copr yet, because the group that keeps the
+install command free of a person's name does not exist yet.
+
+**Success criteria**: none moved.
+
+**Dependency with a date**: the builds were remade and #255, #449, #463 and #494 updated on 2026-11-03. The
+decider's Copr token came on 2026-11-04, and the Fedora group is still asked.
+
+**Documents brought current:** the repository's pages and the product's name (#654, #666); `docs/privacy.md`,
+what Kitokey leaves on Linux (#656); the install module's README and AGENTS (#656, #662).
