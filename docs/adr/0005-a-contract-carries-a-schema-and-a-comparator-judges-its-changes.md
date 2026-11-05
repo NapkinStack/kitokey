@@ -104,6 +104,7 @@ for the purpose: if it judges one of them otherwise after an update, the tests s
 ## Success criterion
 
 Read at 02-the-audio-kept-as-recorded's closure, 2026-10-27: met
+Read at 07-wholeheard-from-the-systems-updater's closure, 2026-11-05: met
 
 > We will consider this was the right call if, **by the end of cycle 02 (2026-11-04)**, the
 > three pages known to be wrong are corrected in place with the comparator's approval, and a

@@ -1,10 +1,10 @@
 ---
 goal: "On Windows, Wholeheard is ready for the Store: its trial ends without locking a meeting, it starts with the session from its package, and the colleague on Windows records a real call from it"
-status: proposed          # proposed | accepted | closed | stopped — the decider accepts
-accepted_on: 2026-11-03   # « 08 accepté, défauts du cadreur »: stays proposed until 07's closure starts it
+status: accepted          # proposed | accepted | closed | stopped — the decider accepts
+accepted_on: 2026-11-03   # « 08 accepté, défauts du cadreur »; started at cycle 07's closure
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
-start: 2026-11-17         # YYYY-MM-DD
-end: 2026-12-01           # start + appetite: the first day the cycle is over — the circuit breaker
+start: 2026-11-05         # YYYY-MM-DD
+end: 2026-11-19           # start + appetite: the first day the cycle is over — the circuit breaker
 deliverables:
   - id: D83
     title: "On Windows, once the Store's trial is over, no new meeting is recorded, and every meeting is still read and exported"
@@ -57,6 +57,60 @@ deliverables:
       - "Given a run of the Windows workflow on main, or one started by hand, when it ends, then each program's tests pass on GitHub's Windows runner, and it leaves one artifact, Wholeheard-<version>-windows-x64.zip, holding wholeheard.exe and the three programs side by side, kept 7 days as the Mac's"
       - "Given that zip on the colleague's Windows 11, when they unpack it and open wholeheard.exe — past SmartScreen's warning on an unsigned program —, then Wholeheard's icon is in the notification area and its window opens from it, with nothing installed before it and no terminal"
       - "Given a call recorded there for at least five minutes, when it stops, then the cycle records, for each track — local, the microphone; remote, what Windows plays: whether it holds the call's speech, and what Windows asked before it recorded — read against D39's threshold: both tracks hold the call's speech as the colleague hears it at the start, the middle and the end of each, and capture's code holds no line added for Windows; below it, what was missing is recorded for the next framing. A refuted result is a delivered one"
+  - id: D86
+    title: "Wholeheard becomes Kitokey, and nothing of the user's is lost on the way"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given Wholeheard installed and used — settings, meetings, the Whisper model, keys in the keyring —, when the user installs Kitokey's package over it (`dnf install` of the .rpm, `apt install` of the .deb), then it replaces Wholeheard's, and Kitokey starts with the same settings, the same meetings where they were, the model not fetched again and the keys kept; a carrying over cut halfway resumes at the next start and never loses a meeting"
+      - "Given the repository, when it is searched for Wholeheard, then the product, its programs, its packages, its application id, its folders and its variables are named Kitokey; Wholeheard and Summit are named only where history is told and in the code that carries over what the user held under them"
+      - "Given the window, the tray, the applications menu and the notifications, in French and in English, when they are read, then they say Kitokey; the promise's sentence is PDR-0001's, unchanged"
+      - "Given D78, when its source package is made and built, then the package is `kitokey` and the Copr project `kitokey`: `dnf copr enable <owner>/kitokey` then `dnf install kitokey`"
+  - id: D78
+    title: "On Fedora, Wholeheard installs from Copr with dnf, and each new version comes with the system's updates"
+    module: install
+    state: ready
+    acceptance:
+      - "Given a release tag on main, when the forge's workflow runs, then it makes a source package from that tag that builds the four programs from source, the crates inside it, and Copr builds it for each Fedora release Copr still supports, its internet access left off; a build that fails fails the workflow and names the release that failed"
+      - "Given the package's header, when it is read, then its licence is the repository's, GPL-3.0, and its summary and description are those of today's package"
+      - "Given a clean Fedora 44 container, when `dnf copr enable <owner>/wholeheard` then `dnf install wholeheard` run, then Wholeheard is installed, each program answers `--version` with the tag's version, and D80's removal holds on it"
+      - "Given the previous version installed from Copr, when the next tag is built and `dnf upgrade` runs, then the new version replaces it and the meetings and settings stay"
+  - id: D66
+    title: "A recording holds the microphone the call holds, and never touches a Bluetooth headset's profile"
+    module: capture
+    state: ready
+    acceptance:
+      - "Given a call holding a microphone other than the default input, when a recording runs, then `me` records that one — its name in `session.json` and the `device` event — and, when the call changes it, follows it, the track going on; held on virtual devices by capture's e2e, a stand-in call on a source of its own"
+      - "Given a source carrying `bluez5.loopback=true`, when capture records it, then its stream says its version's passive value (ADR-0015, as corrected by #574, merged after this amendment), the source never runs from it alone and no profile switch comes from it, within one known window: a default input turning into a headset during a recording stays on an active stream until a reading of the graph closes it, within a few seconds, and for as long as the graph does not read; in that window WirePlumber's decision to switch came 4 times in 10 measured, on a stand-in with no card; held by capture's e2e on a stand-in source, read in `pw-dump` — WirePlumber's decision testable on a stand-in carrying `device.id` —, and `others` is unchanged. Given no call holding a microphone, then capture records the meeting's sound and says in one sentence that the microphone waits when the default input is such a source; records the default input, as today, when it is not"
+      - "Given a call that lets go of the microphone, when it leaves, then capture lets go of it too: within what WirePlumber's restore takes, it holds no HFP profile by a stream of its own and the source no longer runs — held by the same e2e, the source's state in `pw-dump`, and by the decider's trial, the card's profile"
+      - "Given a transport failure during a recording — a source taken away, on the e2e's stand-in —, when it fails, then the recording continues, the track's gap is marked as `session-audio/v2` allows (`clock.jsonl`'s `silence`, `changed` with `device: null`), and `recording/v1` says it as its page says now, by `device` with `null`; a reason in the event is D73's, in *Later*; the shell's words are in their own pull request"
+      - "Given the decider's AirPods and a real WhatsApp Web call, when they start and stop a recording during it, at least five times, then the call is never cut, no `Failure in Bluetooth audio transport` is logged within two seconds of capture opening or closing a stream, and `local.wav` holds their voice each time; an acceptance issue says what was seen"
+  - id: D56
+    title: "The list of models read again is refused unless the decider's key signed it"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given `registry/models.json` and its signature `models.json.minisig` on main, made with minisign by the decider's key — the public key built into the shell, the private one never in a repository —, when the list is read again on the user's gesture, then it is offered only when its signature verifies; a list unsigned, signed by another key, or changed after it was signed is refused, and the shipped list stays, said in one sentence (ADR-0010, *Rejected alternatives*)"
+      - "Given a pull request that changes the list, when its checks run, then a list whose signature does not verify against the built-in key is refused; until the decider's key is given, no list is read again, and Settings and the check say it waits on that key — the colleagues' builds lose today's reading again, said in the cycle's closure"
+      - "Given ADR-0010, when D56 is merged, then the record says its option 4 adopted, `minisign-verify` declared in the shell's manifest with its exit strategy, and what a signature does not stop: an older list, signed, offered again"
+      - "Given the shell's tests, when they run, then a list signed by a key made for the test is offered, and the three refusals above are held, without the decider's key"
+  - id: D41
+    title: "On Linux, a call heard on an output other than the system's default is recorded there"
+    module: capture
+    state: ready
+    acceptance:
+      - "Given a call — an application other than capture holding a microphone — whose sound plays on an output other than the system's default, when it is recorded, then the remote track holds what the call plays, and capture says `device` with that output's name"
+      - "Given the call's sound moved to another output while recording, or back to the default, when it moves, then the remote track follows it within two seconds and the move is kept in `session.json` with when"
+      - "Given no call, a call whose sound plays on the default, or on several outputs at once, when it is recorded, then the remote track records the system's default output, as D31 does"
+      - "Given a graph that cannot be read or a stream that cannot be moved, when it is recorded, then the recording goes on from the default, and one warning is logged"
+      - "Given capture's e2e, when a stand-in call plays a note on an output of its own that is not the default, then the remote track holds that note — on devices made for the run, nobody recorded"
+  - id: D27
+    title: "Wholeheard installs on Ubuntu from one package, its programs built on the system they ship to"
+    module: install
+    state: ready
+    acceptance:
+      - "Given Ubuntu 24.04, when a user installs Wholeheard from one package file (`sudo apt install ./kitokey_<version>_amd64.deb`), then Wholeheard is in the applications menu and starts in the tray with nothing built and no variable set, and removing it leaves the user's meetings and settings"
+      - "Given a release for a system — Fedora or Ubuntu —, when the programs are built, then they are built in a container of that system, so that no package depends on the machine that made it"
 ---
 
 # Cycle 08 — Wholeheard ready for the Microsoft Store
@@ -65,8 +119,8 @@ deliverables:
 
 > **Accepted by the decider on 2026-11-03**, on their word that day in the session that proposed it: « 08
 > accepté, défauts du cadreur ». Each open question below is settled by its default, and PDR-0005 is accepted
-> with it. Only one cycle is accepted at a time (C5), and cycle 07 is still running. Its closure therefore
-> writes `status: accepted` here, and moves `start` and `end` to that day if it comes before 2026-11-17.
+> with it. Started at [cycle 07's closure](07-wholeheard-from-the-systems-updater.md#closure), on
+> 2026-11-05, which moved six deliverables here.
 >
 > Proposed by the framer on 2026-11-03, on the decider's word « cadre le cycle 08 ». On 2026-10-31 the
 > decider asked for one cycle per system: Linux first (cycle 07), then Windows, then macOS. This is Windows'.
@@ -115,6 +169,14 @@ D53, D54 and D57. Their criteria are copied as they stand. Their state and pull 
 not moved: its criteria hold on the three systems, so it is accepted in the Mac cycle. Its Windows part — the
 first run's assistant opening once — is asked on #482 with D53's. D57's privacy page was brought current by
 #624; what is left of it is the decider's reading of the listing.
+
+### Moved from cycle 07
+
+D78, D86, D66, D56, D41 and D27, at cycle 07's closure, on the decider's word of 2026-11-05. Their criteria
+are copied as they stand, their sections are in [cycle 07](07-wholeheard-from-the-systems-updater.md), and
+*What needs a person* below gives each its gesture. D78's and D86's code is merged: what is left is the
+Fedora group `napkinstack`, then a tag, then the first publication, which holds D78's criteria 3 and 4 and
+D86's criterion 4. The end date does not move for them.
 
 ### D83
 
@@ -176,6 +238,11 @@ first run's assistant opening once — is asked on #482 with D53's. D57's privac
 | D57 | The decider | Read [`docs/store/listing.md`](../../store/listing.md) once D83's lines are in it; say « l'annonce ne promet rien de faux », or which line does |
 | D54, submission | The decider | In [Partner Center](https://partner.microsoft.com/dashboard), with a company's account: reserve the product's name and give an agent the identity Partner Center shows. Set *Free trial* to **Unlimited** (PDR-0005). Read the Store's licence terms beside GPL-3.0, answer the age questionnaire, and submit the package an agent built from that identity |
 | D53, D54 on Windows | The colleague on Windows 11 | [#482](https://github.com/NapkinStack/wholeheard/issues/482), updated first by an agent with the run's link, as cycle 06 says: the package signed for the run; the first run's assistant opens once (D58); a real call of five minutes; then sign out and in again: Wholeheard in the notification area, no window (D84). Answered there |
+| D78, D86 | The decider | Once Fedora's infrastructure has made the group `napkinstack`: activate it in [Copr](https://copr.fedorainfracloud.org) (*My Groups*), create its project `kitokey`, delete the project under your own account from its *Settings*. Then say it: an agent checks the project answers, tags `v<version>` on `main` on your word, and watches the publication |
+| D66, trial | The decider | As cycle 06 says, on a build of `main`: AirPods, a WhatsApp Web call, five starts and stops, the answers on [#494](https://github.com/NapkinStack/kitokey/issues/494); then « ADR-0015 acceptée », or what falls |
+| D41 | The decider | [#449](https://github.com/NapkinStack/kitokey/issues/449): a call on the earbuds, the default on the speaker |
+| D56 | The decider | As [cycle 07](07-wholeheard-from-the-systems-updater.md#what-needs-a-person) says, in a terminal of your own, never through an agent: a minisign key, its `.pub` alone given to an agent |
+| D27 | Anyone on Ubuntu 24.04 | `nstack claim D27`, then [#255](https://github.com/NapkinStack/kitokey/issues/255): the `.deb` of a build of `main`, one real call of five minutes, the answer there |
 
 ## Dependency with a date
 
