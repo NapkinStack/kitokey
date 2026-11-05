@@ -96,8 +96,6 @@ Whoever starts it may set, in its environment:
 - `KITOKEY_LOG_DIR` — an absolute folder; a relative one is ignored. A folder that cannot be
   made or written leaves no log, and changes nothing else.
 
-Until D86's last pull request, the program also reads these and `KITOKEY_PROVIDER_KEY` under the names before D86 — `WHOLEHEARD_` in place of `KITOKEY_` — when the new one is not set: a shell not yet renamed passes them.
-
 None is required. None, and no state of the log, changes a line of the output, the error stream
 or what the program leaves — with one exception: a run that crosses midnight UTC while the
 next day's file cannot be created has the logging library say so once on the error stream.
