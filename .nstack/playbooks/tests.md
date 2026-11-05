@@ -40,7 +40,8 @@ that could have been a unit test costs a hundred times more, breaks ten times mo
 often, and diagnoses ten times worse.
 
 A scenario replayable end to end belongs in the module's `e2e` command, and its evidence in
-`.evidence/`: CI keeps it for the test sheet (`.nstack/handbook/05-workflow.md` §7).
+`.evidence/`: CI keeps it for the test sheet (`.nstack/handbook/05-workflow.md` §7) — where checks are
+attested, the verifier's evidence branch (`verification.md`, *Evidence*).
 
 **What the run said.** `nstack e2e` gives the run a folder of its own, `$NSTACK_EVIDENCE`
 (`<module>/.evidence/e2e/`), keeps there the command's output — a traceback included — and then

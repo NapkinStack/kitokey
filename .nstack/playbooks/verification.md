@@ -53,7 +53,8 @@ You verify on someone's machine, beside work that goes on. Leave it as you found
    nothing to start: its scenarios run through its tests, and you say so in your report.
 3. **Run each scenario**, in order:
    - *automated* — the module's `e2e` verb, or its `test` verb when it declares no `e2e`;
-     the evidence is the CI run on the head commit, or its artefact — for a change to a
+     the evidence is the CI run on the head commit, or its artefact — where checks are attested,
+     the evidence branch below — for a change to a
      visible surface, read the run's screenshots and logs (`.evidence/e2e/`, its `audit.json`)
      and cite what they showed: never "rendering not seen" on a scenario passed. An audit
      `not run` (exit 77) ran no scenario: each one it stood for is *not verified*, or run where
@@ -108,7 +109,14 @@ mutant. A mutant can make the code loop forever, so it is never run unbounded:
 
 Test data only: never a real user's data, never a secret on a screenshot (`security.md`).
 Evidence lives where the whole team sees it — a CI artefact, or an image attached to the
-pull request.
+pull request. **Where checks are attested**, no CI run keeps an artefact, and an agent's identity
+cannot attach an image through the forge's API: the verifier commits the screenshots and videos
+that prove a criterion on a branch of its own, `evidence/<pull request>`, never on the change's
+branch — its head stays the one verified (T4), and the verifier writes no commit of the change
+(T2) — and links each file from the sheet at that branch's commit. Made-up data only, each file
+read before it is pushed: a public repository keeps it for good, and no secret scanner reads an
+image (`security.md`). The `check-added-large-files` hook bounds each file as it is committed;
+the branch is deleted once the cycle is closed.
 
 A user-facing change covers the eight states of an interface (`ux.md`), or says which are
 out of scope. A state missing from the sheet is a gap to report.
