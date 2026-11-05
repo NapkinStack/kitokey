@@ -64,7 +64,7 @@ missing.
 ## A cycle's progress
 
 `nstack plan` opens with what needs a person — `Needs you (n):`, one line each: a charter or a cycle waiting for
-the decider's word, a cycle at its end or with nothing left to deliver, and each open row of the cycle's *What needs a
+the decider's word — a next cycle accepted while one runs (`accepted_on`) waits for its closure, not for them —, a cycle at its end or with nothing left to deliver, and each open row of the cycle's *What needs a
 person*. A row closes when its deliverables are accepted, deferred or dropped. A delivery record closes it only when
 the row names nothing but ids and its gesture cites what the record cites; a row saying more (`D66, trial`) waits for
 the person: a delivery proves a merge, never a person's answer. *Nothing needs you* is said only when certain; a

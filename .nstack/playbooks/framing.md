@@ -124,7 +124,9 @@ while framing, and keep it true. It is what `nstack plan` opens with.
 Present the charter, the cycle, the open questions, what went to *later*, and what you are
 unsure of. The decider amends; the framer sets `status: accepted` — on the charter, then on the
 cycle — in a pull request the decider approves, and that approval is their gesture; accepted after `start`, the cycle's `start` and `end`
-move in the same pull request. The modules accepted there are created with the engine's
+move in the same pull request. **The next cycle, accepted while one runs**, stays `proposed` — one
+accepted cycle at a time (C5) — and gains `accepted_on: <the day of the word>`: `nstack plan` stops asking
+for it while that cycle runs, and the running cycle's closure starts it (§5). The modules accepted there are created with the engine's
 module scaffolding, declared user-facing when a user sees them.
 
 **Where the project's own rules waive approval** — an agent merging alone on an attested,
@@ -168,7 +170,8 @@ from then on the plan check refuses an accepted charter over a form left as it c
 **Every deliverable delivered or accepted** — `nstack deliver --write-states`, then write the closure: what was delivered, which success
 criteria moved, what was deferred, and **which documents the cycle brought current** — the
 front page and the module map first, each with its pull request; set `status: closed`,
-`outcome: completed`, `ended_on`.
+`outcome: completed`, `ended_on`. A next cycle carrying `accepted_on` is set `status: accepted` in the
+same pull request; its `start` becomes the closure's day when it is not, and its `end` follows the appetite.
 A success criterion the decider says moved is recorded under `success:` in the front matter, at
 any closure — by its number in the charter, `met`, or `observing` with the day observation
 started; the latest record is its state, and `nstack plan` counts the criteria met.
@@ -183,6 +186,9 @@ first, while the cycle is still accepted: it is what brings the records into the
 | Ship what is delivered or accepted | `closed` | `shipped` |
 | Frame a new cycle, with a new appetite | `stopped` | `reframed` |
 | Stop the project | `stopped` | `stopped` |
+
+A next cycle carrying `accepted_on` starts here only on `shipped`, as on a completed closure. On `reframed` or
+`stopped`, the word was given for another situation: it stays `proposed`, and `nstack plan` asks the decider again.
 
 The closure is where the next framing starts. When `nstack plan` says the charter's goal is
 reached — every success criterion met —, present it: the decider says whether the project is

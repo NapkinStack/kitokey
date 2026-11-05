@@ -67,7 +67,7 @@ a family, a number a rule; a retired rule's number is never reused.
 |---|---|---|
 | `C1` | A framing document whose front matter cannot be read | `.nstack/handbook/project.md` |
 | `C2` | A charter with an unknown status, no single decider or no success criterion | `.nstack/handbook/project.md` |
-| `C3` | A cycle with no goal, no appetite, or an end that is not its start plus its appetite | `.nstack/handbook/project.md` |
+| `C3` | A cycle with no goal, no appetite, an end that is not its start plus its appetite, or an `accepted_on` that is not a date | `.nstack/handbook/project.md` |
 | `C4` | A deliverable with no id, title or state — or ready without acceptance criteria | `05-workflow.md` §3 |
 | `C5` | Two accepted cycles, or an accepted cycle under a charter that is not | `.nstack/handbook/project.md` |
 | `C6` | A closed or stopped cycle with no outcome or no end date; a success criterion recorded outside a closure, twice in one, outside the charter's filled criteria, in an unknown state, or observed with no day | `.nstack/handbook/project.md` |

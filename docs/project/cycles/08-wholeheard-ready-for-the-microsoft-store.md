@@ -1,6 +1,7 @@
 ---
 goal: "On Windows, Wholeheard is ready for the Store: its trial ends without locking a meeting, it starts with the session from its package, and the colleague on Windows records a real call from it"
 status: proposed          # proposed | accepted | closed | stopped — the decider accepts
+accepted_on: 2026-11-03   # « 08 accepté, défauts du cadreur »: stays proposed until 07's closure starts it
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
 start: 2026-11-17         # YYYY-MM-DD
 end: 2026-12-01           # start + appetite: the first day the cycle is over — the circuit breaker

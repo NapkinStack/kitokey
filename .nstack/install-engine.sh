@@ -14,7 +14,14 @@ VERSION=$(answer _commit)
 if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   # --refresh-package: a runner that outlives its jobs keeps uv's cache, and a page of the
   # registry read before a release would say this version does not exist.
-  exec uv tool install "napkinstack==${VERSION#v}" --refresh-package napkinstack --with-executables-from pre-commit
+  uv tool install "napkinstack==${VERSION#v}" --refresh-package napkinstack --with-executables-from pre-commit || {
+    # D201: an update made by an engine run from its sources is ahead of the release
+    echo "FAIL [nstack] napkinstack ${VERSION#v} could not be installed from PyPI: not published yet — its release"
+    echo "      may await approval — or the registry did not answer."
+    echo "      Action: run this check again once https://pypi.org/project/napkinstack/${VERSION#v}/ answers."
+    exit 1
+  }
+  exit 0
 fi
 
 SOURCE=$(answer _src_path)
