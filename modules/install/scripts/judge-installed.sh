@@ -2,11 +2,12 @@
 # Run in the e2e's container once the package is installed: what it installed, as the system lists
 # it ($1, a command), is the spec's files ($expected, each a regular file) and the directories
 # above them — nothing else, no link, no directory of its own —; and the package carries no script
-# run as it is installed or removed ($2, a command that prints them).
+# run as it is installed or removed ($2, a command that prints them). A file in $optional may be
+# there too, a regular file.
 set -uo pipefail
 listed=$1 scripts=$2
 declare -A allowed=()
-for file in $expected; do
+for file in $expected ${optional:-}; do
   allowed[$file]=file
   parent=$file
   while parent=${parent%/*}; [ -n "$parent" ]; do allowed[$parent]=directory; done

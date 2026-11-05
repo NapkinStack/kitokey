@@ -77,6 +77,7 @@ dependencies: []
 commands:
   check: >-
     bash -n scripts/release.sh scripts/test.sh scripts/e2e.sh scripts/judge-installed.sh scripts/removal.sh
+    scripts/as-user.sh copr/srpm.sh copr/project.sh copr/build.sh copr/upgrade.sh copr/upgrade-inside.sh
     deb/build.sh mac/build.sh
     && python3 -m py_compile windows/build.py windows/msix.py windows/appcert.py scripts/start-as-user.py
   test: bash scripts/test.sh

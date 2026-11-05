@@ -13,7 +13,9 @@ def expand(path):
         path = path.replace(macro, value)
     return path
 installed = {expand(m) for m in re.findall(r"^install -D\S* \S+ (\S+)$", spec, re.M)}
-files = {expand(line.strip()) for line in spec.split("%files", 1)[1].splitlines() if line.strip()}
+# Its conditions and the licence, shipped when built from source (D78), are not files it installs.
+files = {expand(line.strip()) for line in spec.split("%files", 1)[1].splitlines()
+         if line.strip() and not line.startswith(("%if", "%endif", "%license"))}
 failed = 0
 def check(what, held, got=""):
     global failed
@@ -25,6 +27,9 @@ for program in ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-
 check("the desktop entry is named as the application's id", "/usr/share/applications/com.napkinstack.Kitokey.desktop" in files)
 check("its icon, under the same name", "/usr/share/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png" in files)
 check("nothing outside /usr: the user's meetings and settings are never the package's", all(f.startswith("/usr/") for f in files), files)
+check("its licence is the repository's, GPL-3.0, and a package built from source ships it (D78)",
+      re.search(r"^License:\s+GPL-3\.0-only$", spec, re.M) is not None
+      and re.search(r"^%if 0%\{\?from_source\}\n%license LICENSE\n%endif$", spec, re.M) is not None)
 check("pw-metadata required: capture runs it, no library names it", re.search(r"^Requires:\s+pipewire-utils$", spec, re.M) is not None)
 check("the tray's library required: the shell opens it at run time, no link names it",
       re.search(r"^Requires:.*\blib(ayatana-)?appindicator-gtk3\b", spec, re.M) is not None)

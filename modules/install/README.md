@@ -50,6 +50,40 @@ flowchart LR
 **Legend** — grey: what the e2e does · green: what it holds. The paths Kitokey may leave are read
 from [`docs/privacy.md`](../../docs/privacy.md)'s Linux line.
 
+## On Fedora, from Copr (D78)
+
+```bash
+sudo dnf copr enable @napkinstack/kitokey
+sudo dnf install kitokey          # each new version then comes with the system's updates
+```
+
+```mermaid
+flowchart LR
+    T["a tag v‹version›<br/>on main"]:::step --> S["copr/srpm.sh<br/>the sources at the tag,<br/>their crates vendored"]:::step
+    S --> B["copr/build.sh<br/>Copr builds it, no network,<br/>each Fedora it supports"]:::copr
+    B --> U{"the version Copr held,<br/>upgraded with dnf ·<br/>the meetings stay"}:::check
+    B --> E{"installed from Copr,<br/>each release: D80's e2e,<br/>each program's --version"}:::check
+    classDef step fill:#374151,color:#fff
+    classDef copr fill:#1e3a8a,color:#fff
+    classDef check fill:#065f46,color:#fff
+```
+
+**Legend** — grey: made by the forge's workflow · blue: Copr · green: what it holds.
+
+`.github/workflows/copr.yml` runs on a tag `v‹version›` on `main`, the shell's version. With no
+artefacts given, `kitokey.spec` builds from the source package (`from_source`): each module this
+one assembles released by its own `release` command, as `nstack release` does (`assemble.sh`,
+written by `srpm.sh`), each program saying the tag's version (`--version`, `KITOKEY_VERSION`); it
+ships `LICENSE`. The project
+`@napkinstack/kitokey` belongs to a Fedora group, so that installing names no person; the token is
+the forge's secret `COPR_CONFIG`. Copr builds on x86_64 only: transcription's whisper.cpp is built
+for x86-64-v3 (`modules/transcription/.cargo/config.toml`). By hand, from the repository's root:
+
+```bash
+bash modules/install/copr/srpm.sh v0.2.0 0.2.0 dist/copr             # the source package, in a Fedora container
+KITOKEY_TARGET=fedora-44 KITOKEY_VERSION=0.2.0 bash modules/install/scripts/e2e.sh copr:@napkinstack/kitokey
+```
+
 On a Mac, `nstack release` makes `dist/install/Kitokey-<version>-macos-arm64.zip`: the app,
 its four programs in `Contents/MacOS` and transcription's `kitokey-speech` (D42), signed ad hoc, not by Apple. GitHub's macOS runner makes
 it on every change to a program on `main` (`.github/workflows/macos-app.yml`, the job *the app*; on a pull request only when it changes install) and keeps it 7
