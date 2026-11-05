@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Copr builds the source package (D78) in the project named (`@<group>/kitokey`), with the token
-# COPR_CONFIG holds — the text of https://copr.fedorainfracloud.org/api/, a secret of the forge —: for each Fedora
-# release Copr still supports, on x86_64, the builds' internet access off. Fails when a release's
-# build fails, naming it. Writes the releases built, one a line, to <out-file>.
+# COPR_CONFIG holds — the text of https://copr.fedorainfracloud.org/api/, a secret of the forge —: for each
+# release copr/project.sh gave the project. Fails when a release's build fails, naming it. Writes the releases built, one a line, to <out-file>.
 # Usage: copr/build.sh <project> <the source package> <out-file>. Made in a Fedora container.
 set -euo pipefail
 usage='usage: copr/build.sh <project> <the source package> <out-file>'
@@ -15,11 +14,8 @@ podman run --rm --security-opt label=disable -e COPR_CONFIG -e project="$project
   registry.fedoraproject.org/fedora:44 bash -euo pipefail -c '
 dnf install -y -q copr-cli >/dev/null 2>&1
 mkdir -p ~/.config && printf "%s\n" "$COPR_CONFIG" > ~/.config/copr
-# The project says what it builds for, from here: each Fedora release Copr lists, and no network.
-chroots=$(copr-cli list-chroots | grep -E "^fedora-[0-9]+-x86_64$")
-copr-cli modify "$project" --enable-net off $(printf -- "--chroot %s " $chroots) >/dev/null
 build=$(copr-cli build "$project" /kitokey.src.rpm --nowait | sed -n "s/^Created builds: //p")
-echo "copr: build $build, for $(echo $chroots)" >&2
+echo "copr: build $build" >&2
 copr-cli watch-build "$build" >&2 || true
 python3 - "$build" <<"EOF_PY"
 import sys

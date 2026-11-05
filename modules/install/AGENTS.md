@@ -26,8 +26,9 @@
 - `copr/`: what Copr builds from (D78). `srpm.sh` makes the source package of a git ref — the
   sources of the modules `assembles` names, every crate their lock files name vendored (`cargo
   vendor`), since Copr's builds have no network, and `assemble.sh`, which runs each one's `release`
-  command from its manifest: install knows no module's insides —; `build.sh` has Copr build it for each `fedora-<n>-x86_64` it lists and
-  fails naming a release that failed; `upgrade.sh` and `upgrade-inside.sh` install the version Copr
+  command from its manifest: install knows no module's insides —; `project.sh` gives the project each `fedora-<n>-x86_64`
+  Copr lists, without network, before anything asks it; `build.sh` has Copr build it and fails
+  naming a release that failed; `upgrade.sh` and `upgrade-inside.sh` install the version Copr
   holds before the build and upgrade it after. `kitokey.spec` is one header for both ways: given
   `artefacts`, it packs them; not, it builds from source (`from_source`) and ships `LICENSE`.
 - `scripts/as-user.sh`: a user's first start, chosen folder and meeting, and how a later start is

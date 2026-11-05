@@ -17,12 +17,15 @@ inside() { podman exec -e tools="$tools" -e driver=/usr/bin/WebKitWebDriver -e v
 case $phase in
   before)
     podman rm -f "$name" >/dev/null 2>&1 || true
-    # No relabelling of what is mounted: labels left alone.
-    podman run -d --name "$name" --security-opt label=disable -v "$here/scripts/as-user.sh:/as-user.sh:ro" \
+    # No relabelling of what is mounted: labels left alone. An init as the first process, to reap
+    # what ends: under a bare `sleep`, a Kitokey that quit stays a zombie, and is seen as running.
+    podman run -d --init --name "$name" --security-opt label=disable -v "$here/scripts/as-user.sh:/as-user.sh:ro" \
       -v "$here/scripts/start-as-user.py:/start-as-user.py:ro" -v "$here/copr/upgrade-inside.sh:/upgrade-inside.sh:ro" \
       registry.fedoraproject.org/fedora:44 sleep infinity >/dev/null
     inside bash -c "dnf install -y -q dnf-plugins-core >/dev/null && dnf copr enable -y '$copr' >/dev/null"
-    if [ -z "$(inside dnf repoquery -q kitokey 2>/dev/null)" ]; then
+    # Copr unreachable is a failure, not an empty project.
+    held=$(inside dnf repoquery -q kitokey) || { echo "upgrade: FAIL — Copr could not be asked what it holds" >&2; podman rm -f "$name" >/dev/null; exit 1; }
+    if [ -z "$held" ]; then
       echo "upgrade: NOT RUN — Copr holds no kitokey yet: the first version has none to upgrade from"
       podman rm -f "$name" >/dev/null
       exit 0

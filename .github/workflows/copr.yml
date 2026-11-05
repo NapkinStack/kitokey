@@ -45,6 +45,11 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: bash modules/install/copr/srpm.sh "$TAG" "$KITOKEY_VERSION" dist/copr
 
+      - name: What the Copr project builds for
+        env:
+          COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
+        run: bash modules/install/copr/project.sh "$COPR_PROJECT"
+
       - name: The version Copr holds, installed and used
         run: bash modules/install/copr/upgrade.sh before "$COPR_PROJECT"
 
