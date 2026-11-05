@@ -194,10 +194,11 @@ impl Shell {
         read
     }
 
-    /// The licence, read anew, the Store given Kitokey's window: one that could not be read is said
+    /// The licence, read anew, the Store given Kitokey's window (`owner`, asked before any lock is
+    /// held: the toolkit answers it from the window's thread): one that could not be read is said
     /// in the log once, and records (D83).
-    fn licence(&self, app: &AppHandle) -> Result<Licence, String> {
-        let read = licence::read(owner(app));
+    fn licence(&self, owner: licence::Owner) -> Result<Licence, String> {
+        let read = licence::read(owner);
         if let Err(error) = &read
             && !std::mem::replace(&mut *self.licence_unread.lock().unwrap(), true)
         {
@@ -479,7 +480,7 @@ fn main() {
             });
             // The trial's first day, kept at the first start on a trial licence (PDR-0005).
             let shell = app.state::<Shell>();
-            if shell.licence(app.handle()) == Ok(Licence::Trial)
+            if shell.licence(owner(app.handle())) == Ok(Licence::Trial)
                 && let Err(error) = trial::begin(&shell.settings().sessions, seconds_now())
             {
                 tracing::warn!(kind = ?error.kind(), "shell.trial_not_begun");
@@ -830,7 +831,7 @@ async fn buy(app: AppHandle) -> Header {
         Err(error) => tracing::warn!(detail = %error, "shell.purchase_failed"),
     }
     let shell = app.state::<Shell>();
-    let licence = shell.licence(&app);
+    let licence = shell.licence(owner);
     shell.refuses(&licence, &shell.settings().sessions);
     header(shell)
 }
@@ -1686,7 +1687,7 @@ fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> SettingsShown {
         })
         .collect();
     let trial =
-        licence::left(&shell.licence(&app), &settings.sessions, seconds_now()).map(|left| words::trial_left(left, shell.language()));
+        licence::left(&shell.licence(owner(&app)), &settings.sessions, seconds_now()).map(|left| words::trial_left(left, shell.language()));
     SettingsShown {
         shortcut: shell.shortcut.lock().unwrap().clone(),
         shortcut_settings: keyboard_settings().is_some(),
@@ -2778,6 +2779,8 @@ fn program(name: &str, variable: &str) -> PathBuf {
 /// the global shortcut both come here.
 fn toggle_recording(app: &AppHandle) {
     let shell = app.state::<Shell>();
+    // The window the Store's dialogs belong to, asked before any lock is held (D83).
+    let owner = owner(app);
     let mut pressed = shell.pressed.lock().unwrap();
     if pressed.is_some_and(|last| last.elapsed() < Duration::from_millis(500)) {
         return;
@@ -2798,7 +2801,7 @@ fn toggle_recording(app: &AppHandle) {
     let Settings { sessions, microphone, .. } = shell.settings();
     // Every start comes here — the window's, the tray's, the shortcut's, a call's offer —: the
     // trial is judged once, on the licence read now (D83).
-    let licence = shell.licence(app);
+    let licence = shell.licence(owner);
     if shell.refuses(&licence, &sessions) {
         tracing::info!("shell.recording_refused");
         drop((recording, pressed));
