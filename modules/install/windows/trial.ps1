@@ -80,7 +80,11 @@ try {
     New-Item -ItemType Directory -Force (Split-Path $settings) | Out-Null
     Set-Content $settings 'welcomed = true'
 
-    Add-AppxPackage -Path $second
+    # What of the package still runs is listed, then closed by Windows as an update from the Store closes it:
+    # an app of the package still running refused the upgrade one run in two (0x80073D02, #660).
+    Get-Process | Where-Object { $_.Path -like "$($installed.InstallLocation)*" } |
+        ForEach-Object { Write-Output "still running before the upgrade: $($_.Name) $($_.Id)" }
+    Add-AppxPackage -Path $second -ForceApplicationShutdown
     $installed = Get-AppxPackage -Name $identity.name
     Check "upgraded over it, version $later.0" ($installed.Version -eq "$later.0")
     Check 'the meeting folder is still there' (Test-Path (Join-Path $meeting 'transcript.md'))
