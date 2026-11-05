@@ -83,6 +83,8 @@ answer, read from the same reading of the graph as below:
 | Nobody, and another default input | The default, as above | As above |
 | Nobody, and the default is a headset's | Nothing: no stream at all, until a call takes it | `unavailable` at the start; later, `device: null`, if a device was said |
 
+`kitokey-capture --version` prints its version, the package's (D78), and opens nothing.
+
 A microphone can be named at the start (D74, `recording/v1`): `kitokey-capture microphones` lists them,
 `record … --microphone <name>` takes one, and neither a call nor a new default moves it.
 
