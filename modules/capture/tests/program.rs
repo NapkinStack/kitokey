@@ -10,11 +10,6 @@ use std::{
 
 /// A run refused before any device is opened, and the lines of its log.
 fn refused(args: &[&str], logs: &Path) -> (String, Vec<serde_json::Value>, String) {
-    refused_under("KITOKEY", args, logs)
-}
-
-/// The same, the environment named with `prefix`: a shell still under the name before D86 passes `WHOLEHEARD_…`.
-fn refused_under(prefix: &str, args: &[&str], logs: &Path) -> (String, Vec<serde_json::Value>, String) {
     // No sound server within its reach, no ALSA device defined, and a short time: were a guard to fail,
     // it opens no real device and does not stay (seen under strace: no `/dev/snd` opened, no
     // source-output, "no source could be opened").
@@ -23,10 +18,10 @@ fn refused_under(prefix: &str, args: &[&str], logs: &Path) -> (String, Vec<serde
     fs::write(&alsa, "").unwrap();
     let mut run = Command::new(env!("CARGO_BIN_EXE_kitokey-capture"))
         .args(args)
-        .env(format!("{prefix}_LOG_DIR"), logs)
-        .env(format!("{prefix}_TRACE"), "making-9")
+        .env("KITOKEY_LOG_DIR", logs)
+        .env("KITOKEY_TRACE", "making-9")
         // The lowest level a user may ask: a failure is logged, with its id.
-        .env(format!("{prefix}_LOG"), "error")
+        .env("KITOKEY_LOG", "error")
         .env("PIPEWIRE_REMOTE", "kitokey-none")
         .env("PULSE_SERVER", format!("unix:{}/none", nowhere.path().display()))
         .env("XDG_RUNTIME_DIR", nowhere.path())
@@ -50,18 +45,6 @@ fn refused_under(prefix: &str, args: &[&str], logs: &Path) -> (String, Vec<serde
     let text = fs::read_to_string(&files[0]).unwrap();
     let lines = text.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
     (String::from_utf8_lossy(&output.stderr).into_owned(), lines, text)
-}
-
-#[test]
-fn a_shell_still_named_wholeheard_is_heard_until_it_passes_the_new_names() {
-    let logs = tempfile::tempdir().unwrap();
-    let (_, lines, _) = refused_under("WHOLEHEARD", &["listen"], logs.path());
-    assert_eq!(
-        lines.len(),
-        1,
-        "the log is where WHOLEHEARD_LOG_DIR says, at the level WHOLEHEARD_LOG asks"
-    );
-    assert_eq!(lines[0]["span"]["trace"], "making-9", "the making's id read from WHOLEHEARD_TRACE");
 }
 
 #[test]
@@ -162,20 +145,29 @@ fn walk(folder: &Path) -> Vec<std::path::PathBuf> {
 }
 
 #[test]
-fn the_new_names_win_over_the_names_before_d86() {
-    let (new, old) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+fn the_names_before_d86_are_read_no_more() {
+    // Every shell passes Kitokey's names since D86: Wholeheard's are no one's, and ignored.
+    let (old, state) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
     let files = logged_with(
-        &[("KITOKEY_LOG_DIR", new.path()), ("WHOLEHEARD_LOG_DIR", old.path())],
         &[
-            ("KITOKEY_TRACE", "new-1"),
-            ("WHOLEHEARD_TRACE", "old-1"),
-            ("KITOKEY_LOG", "error"),
-            ("WHOLEHEARD_LOG", "off"),
+            ("WHOLEHEARD_LOG_DIR", old.path()),
+            ("XDG_STATE_HOME", state.path()),
+            ("HOME", state.path()),
         ],
+        &[("WHOLEHEARD_TRACE", "old-1"), ("WHOLEHEARD_LOG", "off")],
     );
-    assert_eq!(files.len(), 1, "{files:?}");
-    assert!(files[0].starts_with(new.path()), "the log is where KITOKEY_LOG_DIR says: {files:?}");
-    assert!(fs::read_to_string(&files[0]).unwrap().contains(r#""trace":"new-1""#));
+    assert!(
+        files.iter().all(|file| !file.starts_with(old.path())),
+        "a log where WHOLEHEARD_LOG_DIR says: {files:?}"
+    );
+    for file in &files {
+        assert!(
+            !fs::read_to_string(file).unwrap().contains("old-1"),
+            "the id read from WHOLEHEARD_TRACE"
+        );
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    assert_eq!(files.len(), 1, "WHOLEHEARD_LOG=off taken: {files:?}");
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
