@@ -69,10 +69,10 @@ et vous voyez où part une réunion avant tout envoi. Une réunion dite confiden
 C'est à vous de prévenir les autres participants que vous enregistrez : Kitokey ne leur montre
 rien, et vous le rappelle.
 
-**Essai gratuit.** Essayez Kitokey gratuitement pendant 14 jours et 10 réunions, selon ce qui vient
-en dernier. Les Réglages disent ce qu'il en reste. Une fois l'essai terminé, vous achetez Kitokey
-pour enregistrer de nouvelles réunions. Chaque réunion faite reste à vous : vous pouvez toujours la
-lire, l'écouter, la corriger et copier son compte rendu.
+**Essai gratuit.** Essayez Kitokey gratuitement pendant 14 jours et 10 réunions, jusqu'à ce que les
+deux soient atteints. Les Réglages indiquent ce qu'il en reste. Une fois l'essai terminé, vous
+achetez Kitokey pour enregistrer de nouvelles réunions. Toutes vos réunions restent à vous : vous
+pouvez toujours les lire, les écouter, les corriger et copier leur compte rendu.
 
 **Fonctionnalités.**
 - Enregistre votre micro et le son de votre ordinateur, dans toute application d'appel
