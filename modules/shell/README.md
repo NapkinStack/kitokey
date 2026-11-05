@@ -242,8 +242,15 @@ from the days kept — nothing of the meeting, which no line holds (D29).
 the small one, the tray, the shortcut, a call's offer —, never during one: on a trial licence whose
 trial is over (`src/trial.rs`), nothing is recorded and the full window says so, as information, with « Acheter Kitokey »;
 every meeting is still read, played, corrected and exported. The licence is read anew at each start
-(`src/licence.rs`): bought while Kitokey is open, the next recording records. Today no build reads
-the Store's licence, so nothing is limited; one that cannot be read records, said once in the log.
+(`src/licence.rs`): bought while Kitokey is open, the next recording records. On Windows it is the
+Store's (`StoreContext.GetAppLicenseAsync`), the Store first given Kitokey's window — the full one,
+hidden or not, else the small one — as Microsoft requires of a desktop application; Kitokey not
+started from a package (the zip) is not from the Store, nothing asked. Elsewhere nothing is limited.
+A licence that cannot be read, or that the Store does not give within 5 s, records, said once in the
+log. « Acheter Kitokey » asks the Store for the purchase (`RequestPurchaseAsync`) by Kitokey's own
+Store ID, which the Store's licence names — never written in the code —, from the window's thread
+as the Store requires; failing, the Store's page for Kitokey opens in its place
+(`ms-windows-store://pdp/?ProductId=…`). Then the licence is read again.
 On a trial licence, Settings say first what is left of the trial, in days — a day begun is a day
 left — and in meetings; the days alone once 10 meetings are made, the meetings alone once the days
 have passed; nothing once it is over, nor when what is left cannot be told (the e2e's AW).

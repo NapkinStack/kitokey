@@ -5222,8 +5222,14 @@ def trial_over(now: dt.datetime) -> None:
         said = wait_for(browser, lambda b: b.find_element(By.ID, "refused").is_displayed(), 5)
         check("from the small window: nothing recorded, the full window in its place says why, with « Acheter Kitokey »",
               replaced and said and not asked.exists() and text(browser, "refused") == over_fr, (browser.window_handles, asked.exists()))
-        # Bought while Kitokey is open: the next recording records, no restart.
+        # Bought in the Store's dialog — the stand-in's turn —: « Acheter Kitokey » reads the licence
+        # again once the purchase is answered, and the refusal goes, nothing recorded.
         licence.write_text("bought")
+        press(browser, "buy")
+        check("« Acheter Kitokey », the purchase answered: the licence read again, the refusal gone, nothing recorded",
+              wait_for(browser, lambda b: not b.find_element(By.ID, "refused").is_displayed(), 5)
+              and not browser.find_element(By.ID, "buy").is_displayed() and not asked.exists())
+        # Bought while Kitokey is open: the next recording records, no restart.
         time.sleep(0.6)
         press(browser, "record")
         recorded = wait_for(browser, lambda b: "live" in b.find_element(By.ID, "record").get_attribute("class") and asked.exists(), 5)
