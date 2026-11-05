@@ -19,10 +19,9 @@ const KEPT: Duration = Duration::from_secs(14 * 24 * 3600);
 /// What the folder may weigh, every program's files together.
 const WEIGHT: u64 = 50 * 1024 * 1024;
 
-/// The environment's value under the name `KITOKEY_<name>`, or under `WHOLEHEARD_<name>`: the name
-/// before D86, which a shell not yet renamed passes, read until every module passes the new one.
+/// The environment's value under the name `KITOKEY_<name>`.
 fn env_os(name: &str) -> Option<std::ffi::OsString> {
-    std::env::var_os(format!("KITOKEY_{name}")).or_else(|| std::env::var_os(format!("WHOLEHEARD_{name}")))
+    std::env::var_os(format!("KITOKEY_{name}"))
 }
 
 /// The same, as text.
