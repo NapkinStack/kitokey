@@ -146,28 +146,33 @@ fn walk(folder: &Path) -> Vec<std::path::PathBuf> {
 
 #[test]
 fn the_names_before_d86_are_read_no_more() {
-    // Every shell passes Kitokey's names since D86: Wholeheard's are no one's, and ignored.
-    let (old, state) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
-    let files = logged_with(
-        &[
-            ("WHOLEHEARD_LOG_DIR", old.path()),
-            ("XDG_STATE_HOME", state.path()),
-            ("HOME", state.path()),
-        ],
-        &[("WHOLEHEARD_TRACE", "old-1"), ("WHOLEHEARD_LOG", "off")],
-    );
-    assert!(
-        files.iter().all(|file| !file.starts_with(old.path())),
-        "a log where WHOLEHEARD_LOG_DIR says: {files:?}"
-    );
-    for file in &files {
-        assert!(
-            !fs::read_to_string(file).unwrap().contains("old-1"),
-            "the id read from WHOLEHEARD_TRACE"
+    // Every shell passes Kitokey's names since D86: Wholeheard's are no one's, and ignored —
+    // Kitokey's unset, or set empty.
+    for empty in [&[][..], &[("KITOKEY_LOG_DIR", ""), ("KITOKEY_TRACE", ""), ("KITOKEY_LOG", "")][..]] {
+        let (old, state) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+        let mut texts = vec![("WHOLEHEARD_TRACE", "old-1"), ("WHOLEHEARD_LOG", "off")];
+        texts.extend_from_slice(empty);
+        let files = logged_with(
+            &[
+                ("WHOLEHEARD_LOG_DIR", old.path()),
+                ("XDG_STATE_HOME", state.path()),
+                ("HOME", state.path()),
+            ],
+            &texts,
         );
+        assert!(
+            files.iter().all(|file| !file.starts_with(old.path())),
+            "a log where WHOLEHEARD_LOG_DIR says: {files:?}"
+        );
+        for file in &files {
+            assert!(
+                !std::fs::read_to_string(file).unwrap().contains("old-1"),
+                "the id read from WHOLEHEARD_TRACE"
+            );
+        }
+        #[cfg(all(unix, not(target_os = "macos")))]
+        assert_eq!(files.len(), 1, "WHOLEHEARD_LOG=off taken: {files:?}");
     }
-    #[cfg(all(unix, not(target_os = "macos")))]
-    assert_eq!(files.len(), 1, "WHOLEHEARD_LOG=off taken: {files:?}");
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
