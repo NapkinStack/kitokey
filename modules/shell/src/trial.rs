@@ -76,19 +76,44 @@ pub fn made(meetings: &Path, name: &str) -> io::Result<()> {
     file.write_all(format!("{name}\n").as_bytes())
 }
 
-/// Whether the trial is over at `now`, in seconds since 1970.
-pub fn over(meetings: &Path, now: i64) -> bool {
-    let Some(first) = day(meetings) else { return false };
-    // A clock earlier than the day is less than 14 days past it.
-    if now.saturating_sub(first) < DAYS * 86_400 {
-        return false;
+/// What is left of the trial: its days — a day begun is a day left — and its meetings. It is over
+/// once neither is left.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Left {
+    pub days: u32,
+    pub meetings: u32,
+}
+
+impl Left {
+    /// Nothing left: neither a day nor a meeting.
+    pub fn over(self) -> bool {
+        self.days == 0 && self.meetings == 0
     }
-    // Not there, or not read: no meeting was made here.
-    let made: HashSet<String> = fs::read_to_string(meetings.join(MADE_FILE))
-        .unwrap_or_default()
-        .lines()
-        .map(str::to_owned)
-        .collect();
+}
+
+/// What is left of the trial at `now`, in seconds since 1970. Before its first day — none kept yet
+/// —, the 14 days whole and the 10 meetings. None on a doubt — a day, a list of the meetings made
+/// here or a folder of meetings that cannot be read —: a count that may be wrong is never said.
+pub fn left(meetings: &Path, now: i64) -> Option<Left> {
+    const DAY: i64 = 86_400;
+    if fs::symlink_metadata(meetings.join(DAY_FILE)).is_err_and(|error| error.kind() == io::ErrorKind::NotFound) {
+        return Some(Left {
+            days: DAYS as u32,
+            meetings: MEETINGS as u32,
+        });
+    }
+    let first = day(meetings)?;
+    // A clock earlier than the day is the day itself.
+    let past = now.saturating_sub(first).clamp(0, DAYS * DAY);
+    let days = (DAYS * DAY - past + DAY - 1) / DAY;
+    let made: HashSet<String> = match fs::read_to_string(meetings.join(MADE_FILE)) {
+        Ok(made) => made.lines().map(str::to_owned).collect(),
+        // Not there: no meeting was made here.
+        Err(error) if error.kind() == io::ErrorKind::NotFound => HashSet::new(),
+        Err(_) => return None,
+    };
+    // A folder that does not list lists no meeting: none would be counted, wrongly.
+    fs::read_dir(meetings).ok()?;
     let counted = crate::sessions::list(meetings, None)
         .iter()
         .filter(|meeting| meeting.instant.is_some_and(|started| started >= first))
@@ -100,7 +125,15 @@ pub fn over(meetings: &Path, now: i64) -> bool {
                 .is_some_and(|name| made.contains(name))
         })
         .count();
-    counted >= MEETINGS
+    Some(Left {
+        days: days as u32,
+        meetings: MEETINGS.saturating_sub(counted) as u32,
+    })
+}
+
+/// Whether the trial is over at `now`, in seconds since 1970: nothing is left of it.
+pub fn over(meetings: &Path, now: i64) -> bool {
+    left(meetings, now).is_some_and(Left::over)
 }
 
 /// The trial's first day, as kept; none when it is not there or does not read.

@@ -5286,6 +5286,93 @@ def trial_over(now: dt.datetime) -> None:
         check("and it stops as asked", stopped and not browser.find_element(By.ID, "refused").is_displayed())
 
 
+def trial_left(now: dt.datetime) -> None:
+    """AW. Settings on a trial licence say what is left of it, in days and in meetings (PDR-0005, D83):
+    the 14 days and the 10 meetings whole at its first start, each in its number, the days alone once 10
+    meetings are made, the meetings alone once the days have passed; nothing once it is over, nor on a
+    licence bought, not active, not read or not from the Store."""
+    print("AW. Settings on a trial licence say what is left of it, in days and in meetings; nothing when over, bought or outside the Store (D83)")
+    licence = WORK / "licence-left"
+    meetings = WORK / "trial-left"
+    meetings.mkdir()
+    # Ten meetings in the folder, an hour ago: those named in the list of meetings made here count.
+    names = [f"left-{index}" for index in range(10)]
+    for name in names:
+        session(meetings / name, now - dt.timedelta(hours=1), 10, {})
+
+    def kept(past: dt.timedelta, count: int) -> None:
+        """The trial begun `past` ago, the first `count` meetings made here."""
+        (meetings / ".kitokey-trial").write_text(f"{int((now - past).timestamp())}\n")
+        (meetings / ".kitokey-trial-meetings").write_text("".join(f"{name}\n" for name in names[:count]))
+
+    def line(browser) -> list[str] | None:
+        """Settings drawn anew, as the window does when it comes back: the trial's line, its name and what it says."""
+        browser.execute_script("document.getElementById('settings').replaceChildren(); window.dispatchEvent(new Event('focus'))")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "sessions"), 5)
+        # As the page holds it: the driver's text turns a space that does not break into a plain one.
+        return browser.execute_script("const t = document.getElementById('trial-left');"
+                                      " return t ? [t.querySelector('.name').textContent, t.querySelector('.says').textContent] : null")
+
+    both_fr = " ; l’essai prend fin une fois les deux épuisés."
+    both_en = "; the trial ends once both are used up."
+    licence.write_text("trial")
+    window = Window(meetings, "fr_FR.UTF-8", 'reminder = false\nafter = "nothing"\n')
+    window.env["KITOKEY_LICENCE"] = str(licence)
+    with window as browser:
+        browser.set_window_size(1100, 800)
+        wait_for(browser, lambda b: (meetings / ".kitokey-trial").is_file(), 5)
+        browser.execute_script("location.hash = '#/settings'")
+        said = line(browser)
+        first = browser.execute_script("return document.querySelector('#settings > section')?.id")
+        # One line in a card as the model's state is, never a card stretched below it.
+        tall = browser.execute_script("return document.getElementById('trial-left').getBoundingClientRect().height")
+        check("at its first start: the 14 days whole and the 10 meetings, the first thing Settings say, on one card no taller than its words",
+              said == ["Essai gratuit", f"Il reste 14 jours et 10 réunions{both_fr}"] and first == "trial-left" and tall < 140, (said, first, tall))
+        shot(browser, "d83-trial-left-fr")
+        kept(dt.timedelta(days=13, hours=1), 9)
+        said = line(browser)
+        check("a day begun and one meeting left: each in the singular", said == ["Essai gratuit", f"Il reste 1 jour et 1 réunion{both_fr}"], said)
+        kept(dt.timedelta(days=13, hours=1), 10)
+        said = line(browser)
+        check("ten meetings made, days left: the days alone", said == ["Essai gratuit", "Il reste 1 jour."], said)
+        kept(dt.timedelta(days=30), 3)
+        said = line(browser)
+        check("the days past, meetings left: the meetings alone", said == ["Essai gratuit", "Il reste 7 réunions."], said)
+        kept(dt.timedelta(days=30), 10)
+        said = line(browser)
+        check("over: nothing said of what is left", said is None, said)
+        kept(dt.timedelta(days=3, hours=1), 3)
+        said = line(browser)
+        check("days and meetings left, in the plural", said == ["Essai gratuit", f"Il reste 11 jours et 7 réunions{both_fr}"], said)
+        for word in ["bought", "inactive", "none", "unread"]:
+            licence.write_text(word)
+            said = line(browser)
+            check(f"a licence {word}: nothing said of a trial", said is None, said)
+        licence.write_text("trial")
+        said = line(browser)
+        check("a trial licence again: said again", said == ["Essai gratuit", f"Il reste 11 jours et 7 réunions{both_fr}"], said)
+    window = Window(meetings, "en_GB.UTF-8", 'reminder = false\nafter = "nothing"\n')
+    window.env["KITOKEY_LICENCE"] = str(licence)
+    with window as browser:
+        browser.set_window_size(1100, 800)
+        browser.execute_script("location.hash = '#/settings'")
+        said = line(browser)
+        check("in English: days and meetings left", said == ["Free trial", f"11 days and 7 meetings left{both_en}"], said)
+        shot(browser, "d83-trial-left-en")
+        kept(dt.timedelta(days=13, hours=1), 9)
+        said = line(browser)
+        check("in English, in the singular", said == ["Free trial", f"1 day and 1 meeting left{both_en}"], said)
+        kept(dt.timedelta(days=3, hours=1), 10)
+        said = line(browser)
+        check("in English, the days alone", said == ["Free trial", "11 days left."], said)
+        kept(dt.timedelta(days=30), 9)
+        said = line(browser)
+        check("in English, the meetings alone", said == ["Free trial", "1 meeting left."], said)
+        licence.write_text("none")
+        said = line(browser)
+        check("in English, outside the Store: nothing said of a trial", said is None, said)
+
+
 def main() -> int:
     now = dt.datetime.now().astimezone()
     sessions = WORK / "sessions"
@@ -6764,6 +6851,7 @@ def main() -> int:
     minutes_checked(now)
     meeting_renamed(now)
     trial_over(now)
+    trial_left(now)
     return 1 if FAILED else 0
 
 

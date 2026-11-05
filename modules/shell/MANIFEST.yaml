@@ -273,7 +273,7 @@ evidence:
     - pattern: '"message":"shell\.recording_unavailable"'
       level: warning
       scenario: AN
-    # The window's AV: the stand-in licence says what no licence says, once in the log (D83).
+    # The window's AV and AW: the stand-in licence says what no licence says, once in the log (D83).
     - pattern: '"message":"shell\.licence_unread"'
       level: warning
       scenario: AV

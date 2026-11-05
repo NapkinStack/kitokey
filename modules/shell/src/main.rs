@@ -1609,6 +1609,8 @@ struct SettingsShown {
     developer: bool,
     log: Log,
     unreadable: Option<Told>,
+    /// What is left of the trial, said on a trial licence alone, read anew (D83).
+    trial: Option<String>,
 }
 
 /// The folder Kitokey keeps its models in: the default model's.
@@ -1634,6 +1636,7 @@ fn settings_shown(shell: State<'_, Shell>) -> SettingsShown {
             path,
         })
         .collect();
+    let trial = licence::left(&shell.licence(), &settings.sessions, seconds_now()).map(|left| words::trial_left(left, shell.language()));
     SettingsShown {
         shortcut: shell.shortcut.lock().unwrap().clone(),
         shortcut_settings: keyboard_settings().is_some(),
@@ -1674,6 +1677,7 @@ fn settings_shown(shell: State<'_, Shell>) -> SettingsShown {
         developer: settings.developer,
         log: settings.log,
         unreadable,
+        trial,
     }
 }
 

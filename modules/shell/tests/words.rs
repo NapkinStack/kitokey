@@ -1621,3 +1621,43 @@ fn a_microphone_gone_is_told_once_and_what_stands_in_is_no_change_of_its_own() {
         assert_eq!(sides.told(&Said::MicrophoneBack, false, language), None);
     }
 }
+
+#[test]
+fn what_is_left_of_the_trial_is_said_in_days_and_in_meetings_each_in_its_number() {
+    use kitokey_shell::trial::Left;
+    let said = |days, meetings, language| words::trial_left(Left { days, meetings }, language);
+    for (days, meetings, english, french) in [
+        (
+            14,
+            10,
+            "14 days and 10 meetings left; the trial ends once both are used up.",
+            "Il reste 14 jours et 10 réunions\u{202f}; l’essai prend fin une fois les deux épuisés.",
+        ),
+        (
+            1,
+            1,
+            "1 day and 1 meeting left; the trial ends once both are used up.",
+            "Il reste 1 jour et 1 réunion\u{202f}; l’essai prend fin une fois les deux épuisés.",
+        ),
+        (
+            2,
+            2,
+            "2 days and 2 meetings left; the trial ends once both are used up.",
+            "Il reste 2 jours et 2 réunions\u{202f}; l’essai prend fin une fois les deux épuisés.",
+        ),
+        // Ten meetings made, days left: the days alone.
+        (4, 0, "4 days left.", "Il reste 4 jours."),
+        (1, 0, "1 day left.", "Il reste 1 jour."),
+        // The days past, meetings left: the meetings alone.
+        (0, 7, "7 meetings left.", "Il reste 7 réunions."),
+        (0, 1, "1 meeting left.", "Il reste 1 réunion."),
+    ] {
+        assert_eq!(said(days, meetings, Language::English), english);
+        assert_eq!(said(days, meetings, Language::French), french);
+    }
+    for language in BOTH {
+        assert!(!words::window(language).trial.is_empty());
+    }
+    assert_eq!(words::window(Language::French).trial, "Essai gratuit");
+    assert_eq!(words::window(Language::English).trial, "Free trial");
+}

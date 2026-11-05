@@ -6,6 +6,7 @@ use crate::{
     registry::Good,
     summarising::Cause,
     transcription::Made,
+    trial::Left,
 };
 
 /// A language the shell speaks. The interface follows the system's, unless the user chose one (D64);
@@ -346,6 +347,8 @@ pub struct Window {
     /// A recording refused, the trial over (PDR-0005, D83): why and what stays, in one sentence; the one gesture.
     pub trial_over: &'static str,
     pub buy: &'static str,
+    /// Settings on a trial licence (D83): the name of what they say is left of it (`trial_left`).
+    pub trial: &'static str,
     pub find_meetings: &'static str,
     /// The sidebar folded and brought back (D61): each button's name; the shortcut is added beside.
     pub fold: &'static str,
@@ -783,6 +786,7 @@ pub fn window(language: Language) -> Window {
             small_not_confidential: "This meeting is not confidential: open it to mark it.",
             trial_over: "Your trial is over; your meetings stay yours, readable, playable and exportable.",
             buy: "Buy Kitokey",
+            trial: "Free trial",
             find_meetings: "Search the meetings",
             fold: "Fold the sidebar",
             unfold: "Show the sidebar",
@@ -1177,6 +1181,7 @@ pub fn window(language: Language) -> Window {
             small_not_confidential: "Cette réunion n’est pas confidentielle\u{a0}: ouvrez-la pour la marquer.",
             trial_over: "L’essai est terminé\u{202f}; vos réunions restent à vous, lisibles, jouables et exportables.",
             buy: "Acheter Kitokey",
+            trial: "Essai gratuit",
             find_meetings: "Chercher dans les réunions",
             fold: "Replier la barre latérale",
             unfold: "Afficher la barre latérale",
@@ -2317,6 +2322,30 @@ pub fn audio_trashed(language: Language, outcome: &Result<(usize, u32), Refusal>
         ),
     };
     Notice { title, body }
+}
+
+/// What is left of the trial, said in Settings (D83): its days and its meetings; the days alone once
+/// the meetings are made, the meetings alone once the days have passed.
+pub fn trial_left(left: Left, language: Language) -> String {
+    let counted = |count: u32, one: &str, many: &str| {
+        if count == 1 {
+            format!("1 {one}")
+        } else {
+            format!("{count} {many}")
+        }
+    };
+    let (days, meetings) = match language {
+        Language::English => (counted(left.days, "day", "days"), counted(left.meetings, "meeting", "meetings")),
+        Language::French => (counted(left.days, "jour", "jours"), counted(left.meetings, "réunion", "réunions")),
+    };
+    match (language, left.days, left.meetings) {
+        (Language::English, 0, _) => format!("{meetings} left."),
+        (Language::English, _, 0) => format!("{days} left."),
+        (Language::English, ..) => format!("{days} and {meetings} left; the trial ends once both are used up."),
+        (Language::French, 0, _) => format!("Il reste {meetings}."),
+        (Language::French, _, 0) => format!("Il reste {days}."),
+        (Language::French, ..) => format!("Il reste {days} et {meetings}\u{202f}; l’essai prend fin une fois les deux épuisés."),
+    }
 }
 
 fn english_days(days: u32) -> String {

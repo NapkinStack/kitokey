@@ -49,3 +49,12 @@ fn stand_in(file: &Path) -> Result<Licence, String> {
 pub fn refused(licence: &Result<Licence, String>, meetings: &Path, now: i64) -> bool {
     matches!(licence, Ok(Licence::Trial)) && trial::over(meetings, now)
 }
+
+/// What Settings say is left of the trial: on a trial licence whose trial is not over, and on
+/// nothing else. Over, the refusal says the rest; none either when it cannot be told.
+pub fn left(licence: &Result<Licence, String>, meetings: &Path, now: i64) -> Option<trial::Left> {
+    if !matches!(licence, Ok(Licence::Trial)) {
+        return None;
+    }
+    trial::left(meetings, now).filter(|left| !left.over())
+}

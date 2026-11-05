@@ -6,7 +6,7 @@ use std::{fs, path::Path};
 use kitokey_shell::{
     licence::{self, Licence},
     sessions::instant,
-    trial,
+    trial::{self, Left},
 };
 
 const DAY: i64 = 86_400;
@@ -60,6 +60,30 @@ fn a_licence_bought_not_active_not_read_or_not_from_the_store_records_as_today()
         Err("the Store did not answer".to_string()),
     ] {
         assert!(!licence::refused(&licence, meetings.path(), first() + 400 * DAY), "{licence:?}");
+    }
+}
+
+#[test]
+fn settings_say_what_is_left_on_a_trial_licence_alone() {
+    let meetings = ten_made();
+    let trial = Ok(Licence::Trial);
+    assert_eq!(
+        licence::left(&trial, meetings.path(), first() + 3 * DAY),
+        Some(Left { days: 11, meetings: 0 })
+    );
+    // Over: nothing is left to say; the refusal says the rest.
+    assert_eq!(licence::left(&trial, meetings.path(), first() + 14 * DAY), None);
+    // Before its first day, the trial whole.
+    let none = tempfile::tempdir().unwrap();
+    assert_eq!(licence::left(&trial, none.path(), first()), Some(Left { days: 14, meetings: 10 }));
+    for licence in [
+        Ok(Licence::Bought),
+        Ok(Licence::Inactive),
+        Ok(Licence::NotFromStore),
+        Err("the Store did not answer".to_string()),
+    ] {
+        assert_eq!(licence::left(&licence, meetings.path(), first() + 3 * DAY), None, "{licence:?}");
+        assert_eq!(licence::left(&licence, none.path(), first()), None, "{licence:?}");
     }
 }
 

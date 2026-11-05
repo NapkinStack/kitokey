@@ -5,7 +5,7 @@ use std::{fs, path::Path};
 
 use kitokey_shell::{
     sessions::instant,
-    trial::{self, DAY_FILE, MADE_FILE},
+    trial::{self, DAY_FILE, Left, MADE_FILE},
 };
 
 const DAY: i64 = 86_400;
@@ -351,4 +351,127 @@ fn a_name_that_is_no_folder_of_the_meetings_is_refused() {
         assert!(trial::made(meetings.path(), wrong).is_err(), "{wrong:?}");
     }
     assert!(!meetings.path().join(MADE_FILE).exists());
+}
+
+/// What is left at `now`, the folder's own.
+fn left(meetings: &Path, now: i64) -> Option<(u32, u32)> {
+    trial::left(meetings, now).map(|Left { days, meetings }| (days, meetings))
+}
+
+#[test]
+fn before_its_first_day_the_trial_is_left_whole() {
+    // No day kept yet — a folder of meetings chosen since Kitokey started, or one not made yet.
+    let meetings = tempfile::tempdir().unwrap();
+    assert_eq!(left(meetings.path(), first()), Some((14, 10)));
+    assert_eq!(left(&meetings.path().join("gone"), first()), Some((14, 10)));
+    // Its first day, at its first instant.
+    let meetings = begun();
+    assert_eq!(left(meetings.path(), first()), Some((14, 10)));
+}
+
+#[test]
+fn a_day_begun_is_a_day_left() {
+    let meetings = begun();
+    for (past, days) in [
+        (1, 14),
+        (DAY - 1, 14),
+        (DAY, 13),
+        (13 * DAY - 1, 2),
+        (13 * DAY, 1),
+        (14 * DAY - 1, 1),
+        (14 * DAY, 0),
+        (400 * DAY, 0),
+    ] {
+        assert_eq!(left(meetings.path(), first() + past), Some((days, 10)), "{past} s past");
+    }
+}
+
+#[test]
+fn the_meetings_left_are_those_not_made_yet() {
+    let meetings = begun();
+    let now = first() + 20 * DAY;
+    assert_eq!(left(meetings.path(), now), Some((0, 10)));
+    made_here(meetings.path(), 1);
+    assert_eq!(left(meetings.path(), now), Some((0, 9)));
+    // Copied from elsewhere, or started before the first day: nothing is taken off.
+    meeting(meetings.path(), "2026-11-08_09-00", 3 * DAY);
+    made(meetings.path(), "2026-11-04_09-00", -DAY);
+    assert_eq!(left(meetings.path(), now), Some((0, 9)));
+    let meetings = begun();
+    made_here(meetings.path(), 9);
+    assert_eq!(left(meetings.path(), now), Some((0, 1)));
+    made(meetings.path(), "2026-11-20_10-00", 15 * DAY);
+    assert_eq!(left(meetings.path(), now), Some((0, 0)));
+    made(meetings.path(), "2026-11-21_10-00", 16 * DAY);
+    assert_eq!(left(meetings.path(), now), Some((0, 0)));
+}
+
+#[test]
+fn ten_meetings_made_and_days_left_leave_the_days_alone() {
+    let meetings = begun();
+    made_here(meetings.path(), 10);
+    assert_eq!(left(meetings.path(), first() + 10 * DAY), Some((4, 0)));
+}
+
+#[test]
+fn a_clock_earlier_than_the_day_leaves_the_fourteen_days_whole() {
+    let meetings = begun();
+    made_here(meetings.path(), 3);
+    assert_eq!(left(meetings.path(), first() - 1), Some((14, 7)));
+    assert_eq!(left(meetings.path(), first() - 30 * DAY), Some((14, 7)));
+    assert_eq!(left(meetings.path(), i64::MIN), Some((14, 7)));
+    assert_eq!(left(meetings.path(), i64::MAX), Some((0, 7)));
+}
+
+#[test]
+fn the_trial_is_over_when_nothing_is_left_and_only_then() {
+    for count in [0, 9, 10, 11] {
+        let meetings = begun();
+        made_here(meetings.path(), count);
+        for past in [-DAY, 0, 13 * DAY, 14 * DAY - 1, 14 * DAY, 30 * DAY] {
+            let now = first() + past;
+            let left = trial::left(meetings.path(), now).unwrap();
+            assert_eq!(
+                trial::over(meetings.path(), now),
+                left.days == 0 && left.meetings == 0,
+                "{count} {past}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_day_that_does_not_read_says_nothing_left() {
+    let meetings = tempfile::tempdir().unwrap();
+    for wrong in ["", "yesterday", "-", "1762333200x"] {
+        fs::write(meetings.path().join(DAY_FILE), wrong).unwrap();
+        assert_eq!(left(meetings.path(), first()), None, "{wrong:?}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_folder_of_meetings_that_cannot_be_read_says_nothing_left() {
+    use std::os::unix::fs::PermissionsExt;
+    let meetings = begun();
+    made_here(meetings.path(), 3);
+    let now = first() + 3 * DAY;
+    assert_eq!(left(meetings.path(), now), Some((11, 7)));
+    let mode = |path: &Path, mode| fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    // Its files open by name, and it does not list: its meetings are not known.
+    mode(meetings.path(), 0o311);
+    let listed = fs::read_dir(meetings.path()).is_ok();
+    assert_eq!(left(meetings.path(), now), None);
+    // Nothing opens in it, the day's file neither.
+    mode(meetings.path(), 0o000);
+    assert_eq!(left(meetings.path(), now), None);
+    mode(meetings.path(), 0o755);
+    assert!(!listed, "a test run by root reads any folder, and proves nothing here");
+    // The day's file, or the meetings made here, that cannot be read.
+    for file in [DAY_FILE, MADE_FILE] {
+        mode(&meetings.path().join(file), 0o000);
+        assert_eq!(left(meetings.path(), now), None, "{file}");
+        mode(&meetings.path().join(file), 0o644);
+    }
+    assert_eq!(left(meetings.path(), now), Some((11, 7)));
 }
