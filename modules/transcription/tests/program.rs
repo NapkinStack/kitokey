@@ -123,26 +123,6 @@ fn a_refusal_is_logged_with_its_detail_and_never_the_sessions_path() {
 }
 
 #[test]
-fn a_shell_still_named_wholeheard_is_heard_until_it_passes_the_new_names() {
-    let session = tempfile::tempdir().unwrap();
-    let logs = tempfile::tempdir().unwrap();
-    fs::write(session.path().join("session.json"), r#"{"contract":"session-audio/v0"}"#).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
-        .args([session.path().to_str().unwrap(), "--model", "/nowhere/a-model.bin"])
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
-        .env("WHOLEHEARD_TRACE", "making-7")
-        .env("WHOLEHEARD_LOG", "error")
-        .output()
-        .unwrap();
-    assert!(!output.status.success());
-    let files: Vec<_> = fs::read_dir(logs.path()).unwrap().map(|entry| entry.unwrap().path()).collect();
-    assert_eq!(files.len(), 1, "the log is where WHOLEHEARD_LOG_DIR says: {files:?}");
-    let text = fs::read_to_string(&files[0]).unwrap();
-    let line: serde_json::Value = serde_json::from_str(text.lines().next().unwrap()).unwrap();
-    assert_eq!(line["span"]["trace"], "making-7", "the making's id read from WHOLEHEARD_TRACE");
-}
-
-#[test]
 fn a_session_read_then_refused_logs_nothing_of_its_context_and_an_odd_id_is_replaced() {
     let session = tempfile::tempdir().unwrap();
     let logs = tempfile::tempdir().unwrap();
@@ -229,20 +209,29 @@ fn walk(folder: &std::path::Path) -> Vec<std::path::PathBuf> {
 }
 
 #[test]
-fn the_new_names_win_over_the_names_before_d86() {
-    let (new, old) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+fn the_names_before_d86_are_read_no_more() {
+    // Every shell passes Kitokey's names since D86: Wholeheard's are no one's, and ignored.
+    let (old, state) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
     let files = logged_with(
-        &[("KITOKEY_LOG_DIR", new.path()), ("WHOLEHEARD_LOG_DIR", old.path())],
         &[
-            ("KITOKEY_TRACE", "new-1"),
-            ("WHOLEHEARD_TRACE", "old-1"),
-            ("KITOKEY_LOG", "error"),
-            ("WHOLEHEARD_LOG", "off"),
+            ("WHOLEHEARD_LOG_DIR", old.path()),
+            ("XDG_STATE_HOME", state.path()),
+            ("HOME", state.path()),
         ],
+        &[("WHOLEHEARD_TRACE", "old-1"), ("WHOLEHEARD_LOG", "off")],
     );
-    assert_eq!(files.len(), 1, "{files:?}");
-    assert!(files[0].starts_with(new.path()), "the log is where KITOKEY_LOG_DIR says: {files:?}");
-    assert!(std::fs::read_to_string(&files[0]).unwrap().contains(r#""trace":"new-1""#));
+    assert!(
+        files.iter().all(|file| !file.starts_with(old.path())),
+        "a log where WHOLEHEARD_LOG_DIR says: {files:?}"
+    );
+    for file in &files {
+        assert!(
+            !std::fs::read_to_string(file).unwrap().contains("old-1"),
+            "the id read from WHOLEHEARD_TRACE"
+        );
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    assert_eq!(files.len(), 1, "WHOLEHEARD_LOG=off taken: {files:?}");
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]

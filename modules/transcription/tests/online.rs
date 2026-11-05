@@ -211,7 +211,6 @@ fn the_program_writes_the_transcript_from_the_service_its_host_in_the_header() {
         .args(["--provider", &address, "--model", "whisper-large-v3", "--language", "fr"])
         .env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
         .env_remove("KITOKEY_PROVIDER_KEY")
-        .env_remove("WHOLEHEARD_PROVIDER_KEY")
         .output()
         .unwrap();
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
@@ -379,7 +378,7 @@ fn a_key_a_request_cannot_carry_is_said_before_anything_leaves() {
 }
 
 #[test]
-fn a_key_a_shell_still_named_wholeheard_passes_reaches_the_service() {
+fn a_key_under_the_name_before_d86_is_sent_no_more() {
     let (address, asked) = served(200, SEGMENTS);
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .args(["--test", "--provider", &address, "--model", "a-model"])
@@ -390,10 +389,7 @@ fn a_key_a_shell_still_named_wholeheard_passes_reaches_the_service() {
         .unwrap();
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
     let (head, _) = asked.recv().unwrap();
-    assert!(
-        head.to_ascii_lowercase().contains("authorization: bearer a-key-of-the-test"),
-        "{head}"
-    );
+    assert!(!head.to_ascii_lowercase().contains("authorization"), "{head}");
 }
 
 #[test]
@@ -402,7 +398,6 @@ fn an_empty_key_sends_no_key() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .args(["--test", "--provider", &address, "--model", "a-model"])
         .env("KITOKEY_PROVIDER_KEY", "")
-        .env("WHOLEHEARD_PROVIDER_KEY", "a-key-never-sent")
         .env("KITOKEY_LOG_DIR", std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("logs"))
         .output()
         .unwrap();
