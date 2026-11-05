@@ -28,20 +28,40 @@ pub const MEETINGS: usize = 10;
 /// Keeps `now` as the trial's first day, unless a day is kept already: the day kept is given
 /// back. The folder of meetings is made when it is not there. A day's file that does not read is
 /// an error, and is left as it is.
+///
+/// The day appears whole or not at all: its line is written to a file of its own beside it, then
+/// linked under the day's name — which fails when a day is there —, then that file goes. A start
+/// cut short leaves no day, never an empty one, and the next start keeps its own.
 pub fn begin(meetings: &Path, now: i64) -> io::Result<i64> {
     fs::create_dir_all(meetings)?;
     let file = meetings.join(DAY_FILE);
-    match fs::OpenOptions::new().write(true).create_new(true).open(&file) {
-        Ok(mut made) => {
-            made.write_all(format!("{now}\n").as_bytes())?;
-            made.sync_all()?;
-            Ok(now)
+    if fs::symlink_metadata(&file).is_err() {
+        let (written, mut beside) = beside(meetings)?;
+        let whole = beside.write_all(format!("{now}\n").as_bytes()).and_then(|()| beside.sync_all());
+        // Closed before it is linked or removed: Windows removes no file still open.
+        drop(beside);
+        let linked = whole.and_then(|()| fs::hard_link(&written, &file));
+        let _ = fs::remove_file(&written);
+        match linked {
+            Ok(()) => return Ok(now),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(error),
         }
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-            day(meetings).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "the trial's day does not read"))
-        }
-        Err(error) => Err(error),
     }
+    day(meetings).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "the trial's day does not read"))
+}
+
+/// A file of this process's own beside the day, made new: one an earlier start left is never taken.
+fn beside(meetings: &Path) -> io::Result<(std::path::PathBuf, fs::File)> {
+    for count in 0..1000 {
+        let path = meetings.join(format!("{DAY_FILE}-{}-{count}.tmp", std::process::id()));
+        match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(file) => return Ok((path, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::other("no name free beside the trial's day"))
 }
 
 /// Keeps the name of a meeting's folder this Kitokey started. A name that is not one folder's,

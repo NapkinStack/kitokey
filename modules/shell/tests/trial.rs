@@ -163,6 +163,114 @@ fn the_day_is_written_once_and_kept() {
     assert!(trial::over(&folder, first() + 14 * DAY));
 }
 
+/// The files of the folder of meetings whose name is the day's own and that are not it.
+fn beside_the_day(meetings: &Path) -> Vec<String> {
+    let mut found: Vec<String> = fs::read_dir(meetings)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with(DAY_FILE) && name != DAY_FILE && name != MADE_FILE)
+        .collect();
+    found.sort();
+    found
+}
+
+#[test]
+fn a_file_left_beside_the_day_by_an_earlier_start_is_never_the_day() {
+    let meetings = tempfile::tempdir().unwrap();
+    // What a start cut short may have left, under any name this process could take too.
+    let stale = [
+        format!("{DAY_FILE}-{}-0.tmp", std::process::id()),
+        format!("{DAY_FILE}-{}-1.tmp", std::process::id()),
+        format!("{DAY_FILE}-1-0.tmp"),
+    ];
+    for name in &stale {
+        fs::write(meetings.path().join(name), "").unwrap();
+    }
+    assert_eq!(trial::begin(meetings.path(), first()).unwrap(), first());
+    assert_eq!(
+        fs::read_to_string(meetings.path().join(DAY_FILE)).unwrap(),
+        format!("{}\n", first())
+    );
+    // Its own is gone; the others are left as they were.
+    let mut left = stale.to_vec();
+    left.sort();
+    assert_eq!(beside_the_day(meetings.path()), left);
+    for name in &stale {
+        assert_eq!(fs::read_to_string(meetings.path().join(name)).unwrap(), "");
+    }
+}
+
+/// Run alone, in a process that may write no byte to a file (`a_day_cut_short_is_never_kept`): a
+/// day kept is given back, and none is an error.
+#[test]
+fn a_start_that_cannot_write() {
+    let Some(meetings) = std::env::var_os("KITOKEY_TRIAL_CANNOT_WRITE") else {
+        return;
+    };
+    let meetings = Path::new(&meetings);
+    let kept = fs::read_to_string(meetings.join(DAY_FILE)).ok();
+    match kept {
+        Some(day) => assert_eq!(trial::begin(meetings, first() + 5 * DAY).unwrap().to_string(), day.trim_end()),
+        None => assert!(trial::begin(meetings, first()).is_err()),
+    }
+}
+
+/// Runs `a_start_that_cannot_write` on a folder of meetings, in a process that may write no byte
+/// to a file (`ulimit -f 0`), the signal that would stop it ignored.
+#[cfg(unix)]
+fn start_that_cannot_write(meetings: &Path) {
+    let run = std::process::Command::new("bash")
+        .arg("-c")
+        .arg("trap '' XFSZ; ulimit -f 0; exec \"$0\" --exact a_start_that_cannot_write --test-threads 1")
+        .arg(std::env::current_exe().unwrap())
+        .env("KITOKEY_TRIAL_CANNOT_WRITE", meetings)
+        .output()
+        .unwrap();
+    let said = String::from_utf8_lossy(&run.stdout);
+    assert!(run.status.success() && said.contains("1 passed"), "{said}");
+}
+
+/// A start whose line is cut short — a disk full, a crash — leaves no day: never an empty or
+/// partial one, which would read as no day for ever.
+#[cfg(unix)]
+#[test]
+fn a_day_cut_short_is_never_kept() {
+    let meetings = tempfile::tempdir().unwrap();
+    start_that_cannot_write(meetings.path());
+    assert!(!meetings.path().join(DAY_FILE).exists());
+    assert!(beside_the_day(meetings.path()).is_empty());
+    // The next start keeps its day; a start that cannot write then still reads it.
+    assert_eq!(trial::begin(meetings.path(), first() + DAY).unwrap(), first() + DAY);
+    start_that_cannot_write(meetings.path());
+    assert_eq!(
+        fs::read_to_string(meetings.path().join(DAY_FILE)).unwrap(),
+        format!("{}\n", first() + DAY)
+    );
+    assert!(beside_the_day(meetings.path()).is_empty());
+}
+
+#[test]
+fn starts_at_once_keep_one_day() {
+    let meetings = tempfile::tempdir().unwrap();
+    let starts = 16;
+    let together = std::sync::Barrier::new(starts);
+    let kept: Vec<i64> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..starts)
+            .map(|index| {
+                let (meetings, together) = (meetings.path(), &together);
+                scope.spawn(move || {
+                    together.wait();
+                    trial::begin(meetings, first() + index as i64).unwrap()
+                })
+            })
+            .collect();
+        handles.into_iter().map(|handle| handle.join().unwrap()).collect()
+    });
+    let day = fs::read_to_string(meetings.path().join(DAY_FILE)).unwrap();
+    assert!(kept.iter().all(|kept| kept.to_string() == day.trim_end()), "{kept:?} {day:?}");
+    assert!(beside_the_day(meetings.path()).is_empty());
+}
+
 #[test]
 fn without_its_day_the_trial_is_never_over() {
     let meetings = tempfile::tempdir().unwrap();
