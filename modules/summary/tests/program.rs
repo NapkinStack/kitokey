@@ -265,11 +265,6 @@ fn what_is_not_text_or_cannot_be_read_is_refused_in_one_sentence_and_nothing_lea
         program().arg("a-model").env("KITOKEY_PROVIDER_KEY", not_text).output().unwrap(),
         "KITOKEY_PROVIDER_KEY is not text",
     );
-    // Under the name before D86 too: refused, never dropped.
-    refused(
-        program().arg("a-model").env("WHOLEHEARD_PROVIDER_KEY", not_text).output().unwrap(),
-        "is not text",
-    );
     // A context that is there and cannot be read is not the same as no context.
     fs::create_dir(folder.path().join("context.txt")).unwrap();
     refused(
@@ -305,7 +300,7 @@ fn tested(address: &str, key: Option<&str>) -> Output {
     command.output().unwrap()
 }
 
-/// The key a test sends, the environment naming it under either name.
+/// What a test sends, given these names in its environment.
 fn key_sent(keys: &[(&str, &str)]) -> String {
     let (address, received) = provider("200 OK", answering("OK", "stop"));
     let mut command = program();
@@ -321,9 +316,9 @@ fn key_sent(keys: &[(&str, &str)]) -> String {
 }
 
 #[test]
-fn the_new_keys_name_wins_and_set_empty_sends_none_whatever_the_old_one_holds() {
-    let head = key_sent(&[("KITOKEY_PROVIDER_KEY", "new-key"), ("WHOLEHEARD_PROVIDER_KEY", "old-key")]);
-    assert!(head.contains("bearer new-key") && !head.contains("old-key"), "{head}");
+fn a_key_under_the_name_before_d86_is_sent_no_more() {
+    let head = key_sent(&[("WHOLEHEARD_PROVIDER_KEY", "old-key")]);
+    assert!(!head.contains("authorization"), "{head}");
     let head = key_sent(&[("KITOKEY_PROVIDER_KEY", ""), ("WHOLEHEARD_PROVIDER_KEY", "old-key")]);
     assert!(!head.contains("authorization"), "{head}");
 }
@@ -443,34 +438,6 @@ fn the_log_says_each_step_under_the_makings_id_and_nothing_of_the_meeting() {
     ] {
         assert!(!text.contains(said), "the log holds {said:?}: {text}");
     }
-}
-
-#[test]
-fn a_shell_still_named_wholeheard_is_heard_until_it_passes_the_new_names() {
-    let folder = session(None);
-    let logs = tempfile::tempdir().unwrap();
-    let (address, received) = provider("200 OK", answering(MINUTES, "stop"));
-    let output = program()
-        .arg(folder.path())
-        .args(["--provider", &address, "--model", "a-model"])
-        .env_remove("KITOKEY_LOG_DIR")
-        .env("WHOLEHEARD_PROVIDER_KEY", "a-key-for-the-test")
-        .env("WHOLEHEARD_TRACE", "making-43")
-        .env("WHOLEHEARD_LOG_DIR", logs.path())
-        .output()
-        .unwrap();
-    assert!(output.status.success(), "{}", said(&output).1);
-    let (head, _) = received.recv().unwrap();
-    assert!(
-        head.to_ascii_lowercase().contains("bearer a-key-for-the-test"),
-        "the key read from WHOLEHEARD_PROVIDER_KEY: {head}"
-    );
-    let lines = logged(logs.path());
-    assert!(!lines.is_empty(), "the log is where WHOLEHEARD_LOG_DIR says");
-    assert!(
-        lines.iter().all(|line| line["span"]["trace"] == "making-43"),
-        "the making's id read from WHOLEHEARD_TRACE"
-    );
 }
 
 #[test]
@@ -970,20 +937,34 @@ fn walk(folder: &std::path::Path) -> Vec<std::path::PathBuf> {
 }
 
 #[test]
-fn the_new_names_win_over_the_names_before_d86() {
-    let (new, old) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
-    let files = logged_with(
-        &[("KITOKEY_LOG_DIR", new.path()), ("WHOLEHEARD_LOG_DIR", old.path())],
-        &[
-            ("KITOKEY_TRACE", "new-1"),
-            ("WHOLEHEARD_TRACE", "old-1"),
-            ("KITOKEY_LOG", "error"),
-            ("WHOLEHEARD_LOG", "off"),
-        ],
-    );
-    assert_eq!(files.len(), 1, "{files:?}");
-    assert!(files[0].starts_with(new.path()), "the log is where KITOKEY_LOG_DIR says: {files:?}");
-    assert!(std::fs::read_to_string(&files[0]).unwrap().contains(r#""trace":"new-1""#));
+fn the_names_before_d86_are_read_no_more() {
+    // Every shell passes Kitokey's names since D86: Wholeheard's are no one's, and ignored —
+    // Kitokey's unset, or set empty.
+    for empty in [&[][..], &[("KITOKEY_LOG_DIR", ""), ("KITOKEY_TRACE", ""), ("KITOKEY_LOG", "")][..]] {
+        let (old, state) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+        let mut texts = vec![("WHOLEHEARD_TRACE", "old-1"), ("WHOLEHEARD_LOG", "off")];
+        texts.extend_from_slice(empty);
+        let files = logged_with(
+            &[
+                ("WHOLEHEARD_LOG_DIR", old.path()),
+                ("XDG_STATE_HOME", state.path()),
+                ("HOME", state.path()),
+            ],
+            &texts,
+        );
+        assert!(
+            files.iter().all(|file| !file.starts_with(old.path())),
+            "a log where WHOLEHEARD_LOG_DIR says: {files:?}"
+        );
+        for file in &files {
+            assert!(
+                !std::fs::read_to_string(file).unwrap().contains("old-1"),
+                "the id read from WHOLEHEARD_TRACE"
+            );
+        }
+        #[cfg(all(unix, not(target_os = "macos")))]
+        assert_eq!(files.len(), 1, "WHOLEHEARD_LOG=off taken: {files:?}");
+    }
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
