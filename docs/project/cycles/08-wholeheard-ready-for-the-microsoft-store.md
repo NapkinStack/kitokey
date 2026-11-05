@@ -175,7 +175,7 @@ first run's assistant opening once — is asked on #482 with D53's. D57's privac
 D78, D86, D66, D56, D41 and D27, at cycle 07's closure, on the decider's word of 2026-11-05. Their criteria
 are copied as they stand, their sections are in [cycle 07](07-wholeheard-from-the-systems-updater.md), and
 *What needs a person* below gives each its gesture. D78's and D86's code is merged: what is left is the
-Fedora group `napkinstack`, then a tag, then the first publication, which holds D78's criteria 3 and 4 and
+Fedora group `napkinstack-labs`, then a tag, then the first publication, which holds D78's criteria 3 and 4 and
 D86's criterion 4. The end date does not move for them.
 
 ### D83
@@ -238,7 +238,7 @@ D86's criterion 4. The end date does not move for them.
 | D57 | The decider | Read [`docs/store/listing.md`](../../store/listing.md) once D83's lines are in it; say « l'annonce ne promet rien de faux », or which line does |
 | D54, submission | The decider | In [Partner Center](https://partner.microsoft.com/dashboard), with a company's account: reserve the product's name and give an agent the identity Partner Center shows. Set *Free trial* to **Unlimited** (PDR-0005). Read the Store's licence terms beside GPL-3.0, answer the age questionnaire, and submit the package an agent built from that identity |
 | D53, D54 on Windows | The colleague on Windows 11 | [#482](https://github.com/NapkinStack/wholeheard/issues/482), updated first by an agent with the run's link, as cycle 06 says: the package signed for the run; the first run's assistant opens once (D58); a real call of five minutes; then sign out and in again: Wholeheard in the notification area, no window (D84). Answered there |
-| D78, D86 | The decider | Once Fedora's infrastructure has made the group `napkinstack`: activate it in [Copr](https://copr.fedorainfracloud.org) (*My Groups*), create its project `kitokey`, delete the project under your own account from its *Settings*. Then say it: an agent checks the project answers, tags `v<version>` on `main` on your word, and watches the publication |
+| D78, D86 | The decider | Once Fedora's infrastructure has made the group `napkinstack-labs`: activate it in [Copr](https://copr.fedorainfracloud.org) (*My Groups*), create its project `kitokey`, delete the project under your own account from its *Settings*. Then say it: an agent checks the project answers, tags `v<version>` on `main` on your word, and watches the publication |
 | D66, trial | The decider | As cycle 06 says, on a build of `main`: AirPods, a WhatsApp Web call, five starts and stops, the answers on [#494](https://github.com/NapkinStack/kitokey/issues/494); then « ADR-0015 acceptée », or what falls |
 | D41 | The decider | [#449](https://github.com/NapkinStack/kitokey/issues/449): a call on the earbuds, the default on the speaker |
 | D56 | The decider | As [cycle 07](07-wholeheard-from-the-systems-updater.md#what-needs-a-person) says, in a terminal of your own, never through an agent: a minisign key, its `.pub` alone given to an agent |

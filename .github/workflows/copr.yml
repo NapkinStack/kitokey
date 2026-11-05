@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 env:
-  COPR_PROJECT: "@napkinstack/kitokey"
+  COPR_PROJECT: "@napkinstack-labs/kitokey"
 
 concurrency:
   group: copr
