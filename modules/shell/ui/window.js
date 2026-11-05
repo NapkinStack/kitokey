@@ -593,7 +593,21 @@ function paintRecord(recording, stopping) {
   }
 }
 
-function show({ words, folder, sessions, shapes, recording, stopping, shortcut, folded, unreadable }) {
+// A start refused, the trial over (D83): no failure, said as information; buying, the one action
+// left, holds the primary style, the recording's gesture its secondary one until bought (D69).
+function paintRefused(refused) {
+  const record = document.getElementById("record");
+  record.classList.toggle("primary", !refused);
+  record.classList.toggle("open", refused);
+  const said = document.getElementById("refused");
+  said.textContent = words.trial_over;
+  said.hidden = !refused;
+  const buy = document.getElementById("buy");
+  buy.textContent = words.buy;
+  buy.hidden = !refused;
+}
+
+function show({ words, folder, sessions, shapes, recording, stopping, shortcut, folded, unreadable, refused }) {
   document.documentElement.lang = words.locale;
   // The header's gesture, as the board has it: start or stop, with the shortcut beside.
   document.getElementById("free-link").textContent = words.free;
@@ -605,6 +619,7 @@ function show({ words, folder, sessions, shapes, recording, stopping, shortcut, 
   // At rest too: the small window is the user's to choose (D35).
   small.hidden = false;
   paintRecord(recording, stopping);
+  paintRefused(refused);
   const keys = document.getElementById("header-keys");
   keys.textContent = shortcut ?? "";
   keys.hidden = !shortcut;
@@ -3712,6 +3727,8 @@ document.getElementById("groups").addEventListener("keydown", (event) => {
 // The empty pane's own gesture (D61's board 5): the sidebar's, offered where the eye is.
 document.getElementById("empty-record").addEventListener("click", () => document.getElementById("record").click());
 document.getElementById("empty-again").addEventListener("click", () => refresh());
+// The purchase asked, then the licence read again by the shell: bought, nothing is said any more.
+document.getElementById("buy").addEventListener("click", async () => paintRefused((await window.__TAURI__.core.invoke("buy")).refused));
 document.getElementById("pane-again").addEventListener("click", () => refresh());
 // Its new state at once, the command answering after it; a second click meanwhile asks nothing.
 // Answered, the shell's word: a press it took for the same one, or a start that failed, shows (D68).
@@ -3724,8 +3741,9 @@ document.getElementById("record").addEventListener("click", async () => {
   } finally {
     recordAsked = null;
   }
-  const { recording, stopping } = await window.__TAURI__.core.invoke("header");
+  const { recording, stopping, refused } = await window.__TAURI__.core.invoke("header");
   paintRecord(recording, stopping);
+  paintRefused(refused);
   // The recording says it started, or stopped, a moment later: then the header follows.
   setTimeout(refresh, 1200);
 });
@@ -3736,8 +3754,9 @@ setInterval(async () => {
   const asked = await window.__TAURI__.core.invoke("header").catch(() => null);
   if (asked === null) return;
   readMakings();
-  const { recording, stopping, shortcut } = asked;
+  const { recording, stopping, shortcut, refused } = asked;
   paintRecord(recording, stopping);
+  paintRefused(refused);
   const keys = document.getElementById("header-keys");
   keys.textContent = shortcut ?? "";
   keys.hidden = !shortcut;

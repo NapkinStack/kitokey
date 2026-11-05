@@ -238,6 +238,15 @@ never does. It also offers the logs' level and folder in the settings, and on a 
 *Copy a diagnostic*: every program's lines of that meeting's makings, read together by their id
 from the days kept — nothing of the meeting, which no line holds (D29).
 
+**The trial** (PDR-0005, D83) is judged when a recording starts, whatever started it — the window,
+the small one, the tray, the shortcut, a call's offer —, never during one: on a trial licence whose
+trial is over (`src/trial.rs`), nothing is recorded and the full window says so, as information, with « Acheter Kitokey »;
+every meeting is still read, played, corrected and exported. The licence is read anew at each start
+(`src/licence.rs`): bought while Kitokey is open, the next recording records. Today no build reads
+the Store's licence, so nothing is limited; one that cannot be read records, said once in the log.
+In a build for trying Kitokey only, `KITOKEY_LICENCE` names a file whose word — `trial`, `bought`,
+`inactive`, `none` — stands in for the licence: the e2e's AV holds the gate with it.
+
 ## Getting started
 
 The standard verbs — `bootstrap`, `check`, `test`, `run` — are declared in the `commands`
