@@ -23,8 +23,8 @@ case $phase in
       -v "$here/scripts/start-as-user.py:/start-as-user.py:ro" -v "$here/copr/upgrade-inside.sh:/upgrade-inside.sh:ro" \
       registry.fedoraproject.org/fedora:44 sleep infinity >/dev/null
     inside bash -c "dnf install -y -q dnf-plugins-core >/dev/null && dnf copr enable -y '$copr' >/dev/null"
-    # Copr unreachable is a failure, not an empty project.
-    held=$(inside dnf repoquery -q kitokey) || { echo "upgrade: FAIL — Copr could not be asked what it holds" >&2; podman rm -f "$name" >/dev/null; exit 1; }
+    # Copr unreachable is a failure, not an empty project: its .repo says skip_if_unavailable=True.
+    held=$(inside dnf repoquery -q --setopt='copr:*.skip_if_unavailable=False' kitokey) || { echo "upgrade: FAIL — Copr could not be asked what it holds" >&2; podman rm -f "$name" >/dev/null; exit 1; }
     if [ -z "$held" ]; then
       echo "upgrade: NOT RUN — Copr holds no kitokey yet: the first version has none to upgrade from"
       podman rm -f "$name" >/dev/null
