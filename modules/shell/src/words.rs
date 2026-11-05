@@ -343,6 +343,9 @@ pub struct Window {
     pub redo_cancel: &'static str,
     pub saved: &'static str,
     pub small_not_confidential: &'static str,
+    /// A recording refused, the trial over (PDR-0005, D83): why, in one sentence, and the gesture.
+    pub trial_over: &'static str,
+    pub buy: &'static str,
     pub find_meetings: &'static str,
     /// The sidebar folded and brought back (D61): each button's name; the shortcut is added beside.
     pub fold: &'static str,
@@ -778,6 +781,8 @@ pub fn window(language: Language) -> Window {
             redo_cancel: "Cancel",
             saved: "Saved",
             small_not_confidential: "This meeting is not confidential: open it to mark it.",
+            trial_over: "The trial is over, and every meeting stays yours to read and export: buy Kitokey to record new ones.",
+            buy: "Buy",
             find_meetings: "Search the meetings",
             fold: "Fold the sidebar",
             unfold: "Show the sidebar",
@@ -1170,6 +1175,8 @@ pub fn window(language: Language) -> Window {
             redo_cancel: "Annuler",
             saved: "Enregistré",
             small_not_confidential: "Cette réunion n’est pas confidentielle\u{a0}: ouvrez-la pour la marquer.",
+            trial_over: "L’essai est terminé, et chaque réunion reste à vous, lisible et exportable\u{a0}: achetez Kitokey pour en enregistrer de nouvelles.",
+            buy: "Acheter",
             find_meetings: "Chercher dans les réunions",
             fold: "Replier la barre latérale",
             unfold: "Afficher la barre latérale",

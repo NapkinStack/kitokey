@@ -29,7 +29,9 @@ use kitokey_shell::microphone;
 use kitokey_shell::{
     autostart,
     confidential::{self, Left, Wait, What},
-    context, correction, desktop, keys, log,
+    context, correction, desktop, keys,
+    licence::{self, Licence},
+    log,
     meeting::{self, Read, Transcript},
     migrate,
     minutes::{self, Minutes},
@@ -43,6 +45,7 @@ use kitokey_shell::{
     speech, spoken,
     summarising::{self, Summarising},
     transcription::{self, Hearer, Made, Transcription},
+    trial,
     words::{self, Failure, Language, Notice, Refusal, Told, Trouble},
 };
 
@@ -160,6 +163,10 @@ struct Shell {
     fetching: Mutex<bool>,
     /// The model being fetched, by its file, and how far: the bytes held, of how many (D37).
     fetched: Mutex<Option<(String, u64, u64)>>,
+    /// A recording was refused, the trial over: the window says why until one starts (D83).
+    refused: Mutex<bool>,
+    /// A licence that could not be read was said in the log: once (D83).
+    licence_unread: Mutex<bool>,
 }
 
 impl Shell {
@@ -185,6 +192,25 @@ impl Shell {
             *self.settings.lock().unwrap() = settings.clone();
         }
         read
+    }
+
+    /// The licence, read anew: one that could not be read is said in the log once, and records (D83).
+    fn licence(&self) -> Result<Licence, String> {
+        let read = licence::read();
+        if let Err(error) = &read
+            && !std::mem::replace(&mut *self.licence_unread.lock().unwrap(), true)
+        {
+            tracing::warn!(detail = %error, "shell.licence_unread");
+        }
+        read
+    }
+
+    /// Whether a recording starting now is refused, the trial over — judged at each start, never
+    /// during a recording (D83) —, kept for the window to say.
+    fn refuses(&self, licence: &Result<Licence, String>, sessions: &Path) -> bool {
+        let refused = licence::refused(licence, sessions, seconds_now());
+        *self.refused.lock().unwrap() = refused;
+        refused
     }
 
     /// Whether a recording runs as the header says it: one told to stop is over for the user (D68).
@@ -287,6 +313,7 @@ fn main() {
             header,
             makings,
             record,
+            buy,
             recording_now,
             small_window,
             full_window,
@@ -446,7 +473,16 @@ fn main() {
                 ollama_waiting: Mutex::default(),
                 fetching: Mutex::new(false),
                 fetched: Mutex::new(None),
+                refused: Mutex::new(false),
+                licence_unread: Mutex::new(false),
             });
+            // The trial's first day, kept at the first start on a trial licence (PDR-0005).
+            let shell = app.state::<Shell>();
+            if shell.licence() == Ok(Licence::Trial)
+                && let Err(error) = trial::begin(&shell.settings().sessions, seconds_now())
+            {
+                tracing::warn!(kind = ?error.kind(), "shell.trial_not_begun");
+            }
             if let Err(why) = read {
                 tell(app.handle(), &words::trouble(&Trouble::Settings(why), language));
             }
@@ -679,6 +715,8 @@ struct Listing {
     folded: bool,
     /// The meetings' folder is there and cannot be read (D67): `sessions` is empty for that reason.
     unreadable: bool,
+    /// The last start refused, the trial over (D83).
+    refused: bool,
 }
 
 /// A meeting's small relief, kept until its transcript changes: the list is drawn each time the
@@ -733,6 +771,7 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
                 let folder = shell.settings().sessions.clone();
                 sessions::unreadable(&folder, folder == settings::Settings::default().sessions)
             },
+            refused: *shell.refused.lock().unwrap(),
         }
     })
     .await
@@ -747,6 +786,8 @@ struct Header {
     /// Told to stop and not ended yet: the gesture waits (D68).
     stopping: bool,
     shortcut: Option<String>,
+    /// The last start refused, the trial over (D83).
+    refused: bool,
 }
 
 #[tauri::command]
@@ -755,7 +796,19 @@ fn header(shell: State<'_, Shell>) -> Header {
         recording: shell.recording_on(),
         stopping: *shell.stopping.lock().unwrap(),
         shortcut: shell.shortcut.lock().unwrap().clone(),
+        refused: *shell.refused.lock().unwrap(),
     }
+}
+
+/// « Acheter »: the purchase asked — of the Store, once Kitokey reads it there (D83's last pull
+/// request); until then said in the log alone —, then the licence read again: bought, the next
+/// recording records. Answers the header, which says whether a recording is still refused.
+#[tauri::command]
+fn buy(shell: State<'_, Shell>) -> Header {
+    tracing::info!("shell.purchase_asked");
+    let licence = shell.licence();
+    shell.refuses(&licence, &shell.settings().sessions);
+    header(shell)
 }
 
 /// What a meeting lacks, made on the user's word from its page (D18): its minutes — through the
@@ -1745,10 +1798,7 @@ fn expire(app: &AppHandle, refused: &mut Option<Refusal>) {
     let shell = app.state::<Shell>();
     let Ok(settings) = shell.reread() else { return };
     let KeepAudio::Days(days) = settings.keep_audio else { return };
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_secs() as i64);
-    let gone = sessions::expired_audio(&settings.sessions, days, now);
+    let gone = sessions::expired_audio(&settings.sessions, days, seconds_now());
     if gone.is_empty() {
         return;
     }
@@ -2692,6 +2742,18 @@ fn toggle_recording(app: &AppHandle) {
     // The settings as the file says them now: the user may have changed it by hand.
     let _ = shell.reread();
     let Settings { sessions, microphone, .. } = shell.settings();
+    // Every start comes here — the window's, the tray's, the shortcut's, a call's offer —: the
+    // trial is judged once, on the licence read now (D83).
+    let licence = shell.licence();
+    if shell.refuses(&licence, &sessions) {
+        tracing::info!("shell.recording_refused");
+        drop((recording, pressed));
+        // Said in the full window, which the small one has no room for: brought forward, or opened,
+        // on this gesture of the user — once the command that asked has answered.
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || show_full(&handle));
+        return;
+    }
     if let Err(error) = sessions::writable(&sessions) {
         tracing::error!(detail = %error, "shell.sessions_refused");
         return tell(
@@ -2705,14 +2767,16 @@ fn toggle_recording(app: &AppHandle) {
             *recording = Some(running);
             show(app, Shown::Recording);
             let app = app.clone();
-            std::thread::spawn(move || listen(&app, &said));
+            // On a trial licence, the meeting is counted as made here (PDR-0005).
+            let trial = (licence == Ok(Licence::Trial)).then_some(sessions);
+            std::thread::spawn(move || listen(&app, &said, trial.as_deref()));
         }
         Err(error) => tell(app, &words::trouble(&Trouble::NoRecorder(error.to_string()), shell.language())),
     }
 }
 
 /// Tells the user what a recording says, until it has ended; then the tray is at rest again.
-fn listen(app: &AppHandle, said: &Receiver<Said>) {
+fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
     let shell = app.state::<Shell>();
     let mut started = false;
     let mut stopped = None;
@@ -2728,6 +2792,11 @@ fn listen(app: &AppHandle, said: &Receiver<Said>) {
             _ => {}
         }
         if let Said::Started(folder, ..) = &event {
+            if let (Some(meetings), Some(name)) = (trial, folder.file_name().and_then(|name| name.to_str()))
+                && let Err(error) = trial::made(meetings, name)
+            {
+                tracing::warn!(kind = ?error.kind(), "shell.trial_not_counted");
+            }
             *shell.recorded.lock().unwrap() = Some(folder.clone());
             *shell.meter.lock().unwrap() = (Some(Instant::now()), [0.0, 0.0]);
             small_recording(app, true);
@@ -3456,6 +3525,13 @@ fn address_part(name: &str) -> String {
             _ => format!("%{byte:02X}"),
         })
         .collect()
+}
+
+/// Seconds since 1970, by the system's clock.
+fn seconds_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs() as i64)
 }
 
 /// Whether a window of Kitokey is seen: shown and not minimized, as the toolkit says (D44).

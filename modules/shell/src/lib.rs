@@ -9,6 +9,7 @@ pub mod correction;
 pub mod desktop;
 pub mod keys;
 pub mod levels;
+pub mod licence;
 pub mod log;
 pub mod meeting;
 pub mod microphone;

@@ -5116,6 +5116,168 @@ def window_looks(now: dt.datetime) -> None:
         check("the full window: nothing moved, nothing can", browser.execute_script(MOVING) == [], browser.execute_script(MOVING))
 
 
+def trial_over(now: dt.datetime) -> None:
+    """AV. The trial over on a stand-in licence (PDR-0005, D83): no recording from the window, the
+    small one or the tray; why and « Acheter » said in the full window; every meeting still read, played, corrected and
+    copied; bought while open, the next one records; a licence not read records, said once."""
+    print("AV. the trial over: nothing recorded from the window, the small one or the tray, said in the full window with « Acheter »; every meeting"
+          " still read, played, corrected, copied; bought while open, the next records; not read, it records (D83)")
+    keys = lambda browser, *sent: ActionChains(browser).send_keys(*sent).perform()
+    logs = WORK / "state" / "kitokey" / "logs"
+    logged = lambda message: sum(f.read_text().count(f'"message":"{message}"') for f in logs.glob("shell.*.jsonl"))
+    asked = WORK / "recorder-args"
+    licence = WORK / "licence"
+    # As the page holds it: the driver's text turns a space that does not break into a plain one.
+    text = lambda browser, element_id: browser.execute_script("return document.getElementById(arguments[0]).textContent", element_id)
+    over_fr = "L’essai est terminé, et chaque réunion reste à vous, lisible et exportable\u00a0: achetez Kitokey pour en enregistrer de nouvelles."
+    over_en = "The trial is over, and every meeting stays yours to read and export: buy Kitokey to record new ones."
+    # Begun 30 days ago, ten meetings made here since: over.
+    meetings = WORK / "trial-over"
+    day = now - dt.timedelta(days=30)
+    names = [(day + dt.timedelta(days=index + 1)).strftime("%Y-%m-%d_10-00") for index in range(10)]
+    for index, name in enumerate(names):
+        session(meetings / name, day + dt.timedelta(days=index + 1, hours=1), 10, {})
+    (meetings / ".kitokey-trial").write_text(f"{int(day.timestamp())}\n")
+    made = "".join(f"{name}\n" for name in names)
+    (meetings / ".kitokey-trial-meetings").write_text(made)
+    # The last one heard, its minutes written: read, played, corrected, copied.
+    heard = meetings / names[-1]
+    record = json.loads((heard / "session.json").read_text())
+    record["tracks"] = {"local": {"device": "Mic"}}
+    (heard / "session.json").write_text(json.dumps(record))
+    with wave.open(str(heard / "local.wav"), "wb") as written:
+        written.setnchannels(1)
+        written.setsampwidth(2)
+        written.setframerate(48000)
+        written.writeframes(bytes(2 * 48000 * 3))
+    (heard / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n')
+    (heard / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.4,"end":1.2,"text":"Bonjour à tous."}\n'
+        '{"type":"complete","duration":3.0}\n')
+    (heard / "minutes.md").write_text(
+        "---\ncontract: minutes/v1\nmade: 2026-10-28T10:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+        "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
+    licence.write_text("trial")
+    refusals = logged("shell.recording_refused")
+    window = Window(meetings, "fr_FR.UTF-8", 'reminder = false\nafter = "nothing"\n')
+    window.env["KITOKEY_LICENCE"] = str(licence)
+    with window as browser:
+        asked.unlink(missing_ok=True)
+        press(browser, "record")
+        said = wait_for(browser, lambda b: b.find_element(By.ID, "refused").is_displayed(), 5)
+        time.sleep(1)
+        check("from the window: nothing recorded, the button at rest, why said in one sentence under it, with « Acheter »",
+              said and not asked.exists() and "live" not in browser.find_element(By.ID, "record").get_attribute("class")
+              and text(browser, "refused") == over_fr and browser.find_element(By.ID, "refused").get_attribute("role") == "status"
+              and browser.find_element(By.ID, "buy").text == "Acheter" and len([f for f in meetings.iterdir() if f.is_dir()]) == 10,
+              (text(browser, "refused"), asked.exists()))
+        shot(browser, "d83-trial-over-fr")
+        time.sleep(0.6)
+        check("from the tray: nothing recorded either, the refusal logged each time",
+              tray_click("Démarrer") and wait_for(browser, lambda b: logged("shell.recording_refused") == refusals + 2, 5) and not asked.exists(),
+              logged("shell.recording_refused") - refusals)
+        # Every meeting still read, played, corrected and copied (PDR-0001).
+        browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
+        wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .lines .edit") and b.find_elements(By.ID, "play")
+                 and b.find_elements(By.ID, "copy-minutes"), 10)
+        check("a meeting is still read: its transcript and its minutes",
+              "Bonjour à tous." in browser.find_element(By.CSS_SELECTOR, "#meeting .lines").text
+              and "Le budget est validé." in browser.find_element(By.CSS_SELECTOR, "#meeting .minutes").text)
+        browser.find_element(By.ID, "play").click()
+        check("and played", wait_for(browser, lambda b: b.execute_script("const a = document.querySelector('audio.track'); return !!a && !a.paused"), 10))
+        browser.find_element(By.ID, "play").click()
+        browser.find_element(By.CSS_SELECTOR, "#meeting .lines .edit").click()
+        wait_for(browser, lambda b: b.execute_script("return document.activeElement.id") == "correcting", 2)
+        keys(browser, Keys.END, " Et à toutes.", Keys.ENTER)
+        check("and corrected", wait_for(browser, lambda b: "Et à toutes." in (heard / "transcript.jsonl").read_text(), 3))
+        browser.execute_script("window.__copied = []; Object.defineProperty(navigator, 'clipboard', {configurable: true,"
+                               " value: {writeText: (text) => (window.__copied.push(text), Promise.resolve())}})")
+        press(browser, "copy-minutes")
+        check("and its minutes copied", wait_for(browser, lambda b: "Le budget est validé." in "".join(b.execute_script("return window.__copied")), 3))
+        purchases = logged("shell.purchase_asked")
+        press(browser, "buy")
+        check("« Acheter » asks the purchase — the stand-in's, said in the log —; not bought, the refusal stays",
+              wait_for(browser, lambda b: logged("shell.purchase_asked") == purchases + 1, 5) and browser.find_element(By.ID, "refused").is_displayed())
+        # From the small window: it has no room to say why; the full window comes in its place and says it.
+        main = browser.current_window_handle
+        press(browser, "small-link")
+        wait_for(browser, lambda b: len(b.window_handles) == 2, 5)
+        browser.switch_to.window([h for h in browser.window_handles if h != main][0])
+        wait_for(browser, lambda b: b.find_elements(By.ID, "small-record"))
+        time.sleep(0.6)
+        try:
+            browser.find_element(By.ID, "small-record").click()
+        except NoSuchWindowException:
+            pass  # the small window goes with the click
+        replaced = wait_for(browser, lambda b: len(b.window_handles) == 1, 5)
+        browser.switch_to.window(browser.window_handles[0])
+        said = wait_for(browser, lambda b: b.find_element(By.ID, "refused").is_displayed(), 5)
+        check("from the small window: nothing recorded, the full window in its place says why, with « Acheter »",
+              replaced and said and not asked.exists() and text(browser, "refused") == over_fr, (browser.window_handles, asked.exists()))
+        # Bought while Kitokey is open: the next recording records, no restart.
+        licence.write_text("bought")
+        time.sleep(0.6)
+        press(browser, "record")
+        recorded = wait_for(browser, lambda b: "live" in b.find_element(By.ID, "record").get_attribute("class") and asked.exists(), 5)
+        check("bought while open: the next recording records, nothing said of the trial any more",
+              recorded and not browser.find_element(By.ID, "refused").is_displayed() and not browser.find_element(By.ID, "buy").is_displayed())
+        time.sleep(1)
+        press(browser, "record")
+        wait_for(browser, lambda b: "live" not in b.find_element(By.ID, "record").get_attribute("class"), 5)
+        check("bought, a meeting is not counted for the trial", (meetings / ".kitokey-trial-meetings").read_text() == made)
+    licence.write_text("trial")
+    window = Window(meetings, "en_GB.UTF-8", 'reminder = false\nafter = "nothing"\n')
+    window.env["KITOKEY_LICENCE"] = str(licence)
+    with window as browser:
+        asked.unlink(missing_ok=True)
+        press(browser, "record")
+        said = wait_for(browser, lambda b: b.find_element(By.ID, "refused").is_displayed(), 5)
+        check("in English: why, and « Buy »", said and not asked.exists() and text(browser, "refused") == over_en
+              and browser.find_element(By.ID, "buy").text == "Buy", text(browser, "refused"))
+        shot(browser, "d83-trial-over-en")
+        # A licence that cannot be read: it records, each time, said once in the log.
+        licence.write_text("unread")
+        unread = logged("shell.licence_unread")
+        for _ in range(2):
+            asked.unlink(missing_ok=True)
+            time.sleep(0.6)
+            press(browser, "record")
+            recorded = wait_for(browser, lambda b: "live" in b.find_element(By.ID, "record").get_attribute("class") and asked.exists(), 5)
+            time.sleep(1)
+            press(browser, "record")
+            wait_for(browser, lambda b: "live" not in b.find_element(By.ID, "record").get_attribute("class"), 5)
+            check("a licence that cannot be read records", recorded)
+        time.sleep(1)
+        check("and is said once in the log", logged("shell.licence_unread") == unread + 1, logged("shell.licence_unread") - unread)
+    # A trial just begun: its day kept at the start, each recording counted as made here.
+    begun = WORK / "trial-begun"
+    begun.mkdir()
+    licence.write_text("trial")
+    window = Window(begun, "fr_FR.UTF-8", 'reminder = false\nafter = "nothing"\n')
+    window.env["KITOKEY_LICENCE"] = str(licence)
+    with window as browser:
+        check("the first start on a trial licence keeps its day", wait_for(browser, lambda b: (begun / ".kitokey-trial").is_file(), 5))
+        press(browser, "record")
+        wait_for(browser, lambda b: "live" in b.find_element(By.ID, "record").get_attribute("class"), 5)
+        counted = wait_for(browser, lambda b: (begun / ".kitokey-trial-meetings").is_file()
+                           and (begun / ".kitokey-trial-meetings").read_text() == "2026-10-18_12-00\n", 5)
+        check("a trial not over records, the meeting counted as made here", counted and not browser.find_element(By.ID, "refused").is_displayed())
+        # The limit reached while it records: never cut, and its stop is no start to judge.
+        shutil.copy(meetings / ".kitokey-trial", begun / ".kitokey-trial")
+        for name in names:
+            shutil.copytree(meetings / name, begun / name)
+        with open(begun / ".kitokey-trial-meetings", "a") as kept:
+            kept.write(made)
+        time.sleep(2)
+        check("a recording in progress when the limit is reached is not cut", "live" in browser.find_element(By.ID, "record").get_attribute("class")
+              and '"stopped"' not in (begun / "2026-10-18_12-00" / "session.json").read_text())
+        press(browser, "record")
+        stopped = wait_for(browser, lambda b: "live" not in b.find_element(By.ID, "record").get_attribute("class")
+                           and '"stopped"' in (begun / "2026-10-18_12-00" / "session.json").read_text(), 5)
+        check("and it stops as asked", stopped and not browser.find_element(By.ID, "refused").is_displayed())
+
+
 def main() -> int:
     now = dt.datetime.now().astimezone()
     sessions = WORK / "sessions"
@@ -6593,6 +6755,7 @@ def main() -> int:
     word_after_a_gap(now)
     minutes_checked(now)
     meeting_renamed(now)
+    trial_over(now)
     return 1 if FAILED else 0
 
 

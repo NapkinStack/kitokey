@@ -143,6 +143,28 @@ fn a_meeting_counts_once_and_only_while_the_window_lists_it() {
 }
 
 #[test]
+fn a_recording_stopped_after_seconds_or_cut_short_counts_as_the_window_lists_it() {
+    // Stopped after three seconds: the window lists it, so it counts.
+    let meetings = begun();
+    made_here(meetings.path(), 9);
+    made(meetings.path(), "2026-11-20_10-00", 15 * DAY);
+    let stopped_early = format!(
+        r#"{{"contract":"session-audio/v2","started":"{}","stopped":"{}","tracks":{{}}}}"#,
+        iso(first() + 15 * DAY),
+        iso(first() + 15 * DAY + 3)
+    );
+    fs::write(meetings.path().join("2026-11-20_10-00/session.json"), stopped_early).unwrap();
+    assert!(trial::over(meetings.path(), first() + 30 * DAY));
+    // Cut short — a crash, no stop written —: the window lists it, interrupted, so it counts.
+    let cut = format!(
+        r#"{{"contract":"session-audio/v2","started":"{}","tracks":{{}}}}"#,
+        iso(first() + 15 * DAY)
+    );
+    fs::write(meetings.path().join("2026-11-20_10-00/session.json"), cut).unwrap();
+    assert!(trial::over(meetings.path(), first() + 30 * DAY));
+}
+
+#[test]
 fn a_meeting_started_before_the_first_day_counts_for_nothing() {
     let meetings = begun();
     made_here(meetings.path(), 9);

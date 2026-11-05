@@ -456,6 +456,32 @@ else
   call 2
   check is "$(offers)" 4
   click 6
+  # The trial over on the stand-in licence (D83): Record refused, nothing recorded, the window
+  # opened to say why. Begun 30 days ago, ten meetings made here since.
+  day=$(( $(date +%s) - 30 * 86400 ))
+  printf '%s\n' "$day" > "$work/sessions/.kitokey-trial"
+  for i in $(seq 0 9); do
+    mkdir -p "$work/sessions/trial-$i"
+    at=$(date -u -d "@$(( day + (i + 1) * 86400 ))" +%FT%TZ)
+    printf '{"contract":"session-audio/v2","started":"%s","stopped":"%s","tracks":{}}' "$at" "$at" > "$work/sessions/trial-$i/session.json"
+    echo "trial-$i" >> "$work/sessions/.kitokey-trial-meetings"
+  done
+  echo trial > "$work/licence"
+  dbus-monitor --session "type='method_return',sender='org.freedesktop.Notifications'" > "$work/answered" 2>/dev/null &
+  answers=$!
+  KITOKEY_LICENCE="$work/licence" start fr_FR.UTF-8 "transcript = false" "$work/kitokey-capture"
+  sleep 1
+  check is "$(windows)" 0
+  call 4 & calling=$!
+  check offered 5
+  gesture record                                   # Record: refused, said in the window
+  wait "$calling"
+  check test ! -e "$work/sessions/given"
+  check test "$(windows)" -ge 1
+  check grep -q '"message":"shell.recording_refused"' <(cat "$work"/state/kitokey/logs/shell.*.jsonl)
+  click 6
+  kill "$answers" 2>/dev/null || true; answers=""
+  rm -rf "$work/licence" "$work/sessions/.kitokey-trial" "$work/sessions/.kitokey-trial-meetings" "$work/sessions"/trial-*
   pactl set-default-source "$old_source"; old_source=""
   pactl unload-module "$mic_module"; mic_module=""
 fi
