@@ -1980,6 +1980,15 @@ function showSettings(shown, minutes, words) {
   failed.hidden = notSaved === null;
   notSaved = null;
   parts.push(failed);
+  // What is left of the trial, on a trial licence alone (D83): said first, nothing to change.
+  if (shown.trial !== null) {
+    const trial = element("section", "card group state");
+    trial.id = "trial-left";
+    const trialSaid = element("div", "said");
+    trialSaid.append(element("span", "name", words.trial), element("span", "says", shown.trial));
+    trial.append(trialSaid);
+    parts.push(trial);
+  }
 
   const after = element("section", "card group");
   after.setAttribute("role", "radiogroup");

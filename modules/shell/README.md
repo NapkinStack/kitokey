@@ -244,6 +244,9 @@ trial is over (`src/trial.rs`), nothing is recorded and the full window says so,
 every meeting is still read, played, corrected and exported. The licence is read anew at each start
 (`src/licence.rs`): bought while Kitokey is open, the next recording records. Today no build reads
 the Store's licence, so nothing is limited; one that cannot be read records, said once in the log.
+On a trial licence, Settings say first what is left of the trial, in days — a day begun is a day
+left — and in meetings; the days alone once 10 meetings are made, the meetings alone once the days
+have passed; nothing once it is over, nor when what is left cannot be told (the e2e's AW).
 In a build for trying Kitokey only, `KITOKEY_LICENCE` names a file whose word — `trial`, `bought`,
 `inactive`, `none` — stands in for the licence: the e2e's AV holds the gate with it.
 
