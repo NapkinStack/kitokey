@@ -265,7 +265,8 @@ D86's criterion 4. The end date does not move for them.
 
 ## Later
 
-- **Cycle 09, macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation. Also the start with the
+- **Cycle 09, the finish before publishing**: proposed on 2026-11-06 ([its page](09-kitokey-finished-before-it-is-published.md)), from the decider's feedback that day.
+- **Cycle 10, macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation. Also the start with the
   session on macOS, today written where macOS never reads it (D84's note), and Foresight read again (the market
   review of 2026-11-03, row 6).
 - **The name**: Kitokey, chosen by the decider on 2026-11-04 ([PDR-0006](../../pdr/0006-the-product-is-named-kitokey.md)).
