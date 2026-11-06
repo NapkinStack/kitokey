@@ -117,6 +117,26 @@ fn outside_windows_there_is_nothing_to_buy_from() {
     assert_eq!(licence::page("9NBLGGH4R315"), "ms-windows-store://pdp/?ProductId=9NBLGGH4R315");
 }
 
+#[test]
+fn only_a_product_store_id_of_twelve_letters_and_digits_is_bought_or_opened() {
+    // A SKU's Store ID: the product's, then the SKU's own four characters (*Store IDs*).
+    assert_eq!(licence::product("9NBLGGH4R315/000N"), Some("9NBLGGH4R315"));
+    assert_eq!(licence::product("9NBLGGH4R315"), Some("9NBLGGH4R315"));
+    for sku in [
+        "",
+        "/000N",
+        "9NBLGGH4R31/000N",
+        "9NBLGGH4R3155/000N",
+        "9NBLGGH4R31,/000N",
+        "9NBLGGH4R31 /000N",
+        "9NBLGGH4R31&/000N",
+        "9NBLGGH4R3É/000N",
+        "9NBLGGH4R31\"/000N",
+    ] {
+        assert_eq!(licence::product(sku), None, "{sku:?}");
+    }
+}
+
 /// What the stand-in says, and what `read` answers then.
 fn says(file: &Path, word: &str) -> Result<Licence, String> {
     fs::write(file, word).unwrap();

@@ -3737,7 +3737,17 @@ document.getElementById("groups").addEventListener("keydown", (event) => {
 document.getElementById("empty-record").addEventListener("click", () => document.getElementById("record").click());
 document.getElementById("empty-again").addEventListener("click", () => refresh());
 // The purchase asked, then the licence read again by the shell: bought, nothing is said any more.
-document.getElementById("buy").addEventListener("click", async () => paintRefused((await window.__TAURI__.core.invoke("buy")).refused));
+// One purchase at a time: « Acheter » is disabled until the Store has answered (D83).
+document.getElementById("buy").addEventListener("click", async () => {
+  const buy = document.getElementById("buy");
+  if (buy.disabled) return;
+  buy.disabled = true;
+  try {
+    paintRefused((await window.__TAURI__.core.invoke("buy")).refused);
+  } finally {
+    buy.disabled = false;
+  }
+});
 document.getElementById("pane-again").addEventListener("click", () => refresh());
 // Its new state at once, the command answering after it; a second click meanwhile asks nothing.
 // Answered, the shell's word: a press it took for the same one, or a start that failed, shows (D68).

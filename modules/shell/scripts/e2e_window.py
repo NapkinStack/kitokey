@@ -5203,9 +5203,14 @@ def trial_over(now: dt.datetime) -> None:
         press(browser, "copy-minutes")
         check("and its minutes copied", wait_for(browser, lambda b: "Le budget est validé." in "".join(b.execute_script("return window.__copied")), 3))
         purchases = logged("shell.purchase_asked")
-        press(browser, "buy")
+        # Clicked from the page's own script: whether the button is disabled is read before the
+        # command can answer.
+        pending = browser.execute_script("const buy = document.getElementById('buy'); buy.click(); return buy.disabled")
+        check("« Acheter Kitokey » is disabled while the purchase is asked: one purchase at a time", pending is True, pending)
         check("« Acheter Kitokey » asks the purchase — the stand-in's, said in the log —; not bought, the refusal stays",
               wait_for(browser, lambda b: logged("shell.purchase_asked") == purchases + 1, 5) and browser.find_element(By.ID, "refused").is_displayed())
+        check("the purchase answered, « Acheter Kitokey » is enabled again",
+              wait_for(browser, lambda b: not b.find_element(By.ID, "buy").get_property("disabled"), 5))
         # From the small window: it has no room to say why; the full window comes in its place and says it.
         main = browser.current_window_handle
         press(browser, "small-link")

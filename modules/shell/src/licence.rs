@@ -60,7 +60,8 @@ pub enum Purchase {
     Nothing,
 }
 
-/// Kitokey's own Store ID, the product's (`9NBLGGH4R315`), as the Store's licence names it — none
+/// Kitokey's own Store ID, the product's — twelve letters and digits, `9NBLGGH4R315` in Microsoft's
+/// example —, as the Store's licence names it (`product`) — none
 /// outside the Store. Never written in the code: it is the identity the decider reserves in
 /// Partner Center, which only the Store knows. Read, like the licence, off the window's thread.
 pub fn store_id(owner: Owner) -> Result<Option<String>, String> {
@@ -88,6 +89,14 @@ pub fn purchase(owner: Owner, id: &str, done: impl FnOnce(Purchase) + Send + 'st
         let _ = (owner, id);
         done(Purchase::Nothing);
     }
+}
+
+/// The product's Store ID in a SKU's (`<product Store ID>/xxxx`, *Store IDs*): exactly 12 ASCII
+/// letters and digits, as Microsoft documents it; anything else is no ID, and nothing is bought
+/// or opened with it.
+pub fn product(sku: &str) -> Option<&str> {
+    let id = sku.split('/').next()?;
+    (id.len() == 12 && id.bytes().all(|byte| byte.is_ascii_alphanumeric())).then_some(id)
 }
 
 /// The Store's page for a product, by its Store ID: the address Microsoft recommends.
@@ -134,7 +143,7 @@ mod store {
         core::{HRESULT, HSTRING, Interface},
     };
 
-    use super::{Licence, Owner, Purchase, page};
+    use super::{Licence, Owner, Purchase, page, product};
 
     /// `APPMODEL_ERROR_NO_PACKAGE`: the process has no package's identity.
     const NO_PACKAGE: HRESULT = HRESULT::from_win32(15_700);
@@ -196,10 +205,14 @@ mod store {
         let Some(licence) = app_licence(owner)? else {
             return Ok(None);
         };
-        // A SKU's Store ID is the product's, then `/` and the SKU's own four characters.
         let sku = licence.SkuStoreId().map_err(|error| error.to_string())?.to_string();
-        let product = sku.split('/').next().unwrap_or_default();
-        Ok((!product.is_empty()).then(|| product.to_owned()))
+        // An empty SKU: no product to buy. Any other that is not the documented form is said.
+        if sku.is_empty() {
+            return Ok(None);
+        }
+        product(&sku)
+            .map(|id| Some(id.to_owned()))
+            .ok_or_else(|| format!("the Store's licence names no product Store ID ({} characters)", sku.len()))
     }
 
     pub fn purchase(owner: Owner, id: &str, done: impl FnOnce(Purchase) + Send + 'static) {
