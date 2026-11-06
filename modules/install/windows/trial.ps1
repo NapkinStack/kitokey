@@ -46,6 +46,12 @@ try {
     }
 
     function Start-Kitokey($Installed) {
+        $logs = Join-Path $env:LOCALAPPDATA "Packages\$($Installed.PackageFamilyName)\LocalCache\Local\Kitokey\logs"
+        $licenceRead = {
+            @(Get-ChildItem $logs -Filter 'shell.*.jsonl' -ErrorAction SilentlyContinue | Get-Content |
+                Where-Object { $_ -like '*"message":"shell.licence_read"*' })
+        }
+        $before = @(& $licenceRead).Count
         Start-Process "shell:AppsFolder\$($Installed.PackageFamilyName)!Kitokey"
         $process = Wait-For 'its process with a window, from the package' 90 {
             Get-Process kitokey -ErrorAction SilentlyContinue |
@@ -55,6 +61,15 @@ try {
         Check "the process runs from $($Installed.InstallLocation), its window open: $($process.MainWindowTitle)" $true
         $line = (Get-CimInstance Win32_Process -Filter "ProcessId = $($process.Id)").CommandLine
         Check "started with --window: $line" ($line -like '*--window*')
+        # What the Store answers a package it did not install, read at the start and said in the
+        # shell's log (D83): recorded here, and a recording not refused by it.
+        $read = Wait-For 'the licence read at this start, in the log' 30 {
+            $lines = @(& $licenceRead)
+            if ($lines.Count -gt $before) { $lines[-1] }
+        }
+        $answer = $read | ConvertFrom-Json
+        Write-Output "  the Store answered: licence $($answer.licence), refused $($answer.refused)"
+        Check 'a recording is not refused by the licence read' ($answer.refused -eq $false)
         Stop-Process -Id $process.Id -Force
         Wait-For 'its process gone' 30 { -not (Get-Process kitokey -ErrorAction SilentlyContinue) } | Out-Null
     }

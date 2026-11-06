@@ -93,7 +93,8 @@ Anyway (D38).
 On Windows, `nstack release` also makes `dist/install/Kitokey-<version>-x64.msix`, the package the
 Microsoft Store takes (D54, PDR-0004), unsigned; it needs the Windows SDK. `windows-app.yml` signs it
 for the run with a certificate it throws away, installs it, upgrades it and removes it
-(`windows/trial.ps1`), has the Windows App Certification Kit test it (`windows/certify.ps1`, each
+(`windows/trial.ps1`) — at each start, it prints what the Store answers for a package it did
+not install (`shell.licence_read`, D83), and fails if that read would refuse a recording —, has the Windows App Certification Kit test it (`windows/certify.ps1`, each
 failed test named in the run), and keeps it 7 days with the public certificate and the kit's report,
 `appcert-report.xml`: a colleague runs, as
 administrator, `Import-Certificate .\Kitokey-this-run.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople`,
