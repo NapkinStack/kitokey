@@ -410,9 +410,24 @@ else
   # pressed as a click presses them — the signal the desktop sends, typed as it types it (u, s).
   dbus-monitor --session "type='method_return',sender='org.freedesktop.Notifications'" > "$work/answered" 2>/dev/null &
   answers=$!
+  # The offer is counted when Kitokey asks for it; its number comes with the desktop's answer to
+  # that very call, a moment later: a gesture waits for it, never takes the last number seen.
   gesture() {
+    local call id=""
+    call=$(awk -v title="   string \"pw-cat utilise votre micro\"" '
+      /^method call/ { ours = / destination=org\.freedesktop\.Notifications /
+        match($0, / sender=[^ ]+/); from = substr($0, RSTART + 8, RLENGTH - 8)
+        match($0, / serial=[0-9]+/); serial = substr($0, RSTART + 8, RLENGTH - 8) }
+      ours && $0 == title { last = from " " serial } END { print last }' "$work/notified")
+    for _ in $(seq 50); do
+      id=$(awk -v to="${call% *}" -v serial="${call#* }" '
+        /^method return/ { ours = index($0, " destination=" to " ") && $0 ~ (" reply_serial=" serial "$") }
+        ours && /^ +uint32 / { print $2; exit }' "$work/answered")
+      [ -n "$id" ] && break
+      sleep 0.1
+    done
     gdbus emit --session --object-path /org/freedesktop/Notifications --signal \
-      org.freedesktop.Notifications.ActionInvoked "uint32 $(grep -oE '^ +uint32 [0-9]+' "$work/answered" | tail -1 | awk '{print $2}')" "'$1'" >/dev/null
+      org.freedesktop.Notifications.ActionInvoked "uint32 $id" "'$1'" >/dev/null
     sleep 1
   }
   settings_file="$work/config/kitokey/settings.toml"
