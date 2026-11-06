@@ -482,11 +482,20 @@ fn main() {
             });
             // The trial's first day, kept at the first start on a trial licence (PDR-0005).
             let shell = app.state::<Shell>();
-            if shell.licence(owner(app.handle())) == Ok(Licence::Trial)
-                && let Err(error) = trial::begin(&shell.settings().sessions, seconds_now())
+            let licence = shell.licence(owner(app.handle()));
+            let sessions = shell.settings().sessions;
+            if licence == Ok(Licence::Trial)
+                && let Err(error) = trial::begin(&sessions, seconds_now())
             {
                 tracing::warn!(kind = ?error.kind(), "shell.trial_not_begun");
             }
+            // What the licence read at the start is, and whether a recording would be refused: what
+            // the Store answered, said once, for whoever reads after it (D83).
+            let answer = licence
+                .as_ref()
+                .map_or_else(|_| "unread".to_string(), |licence| format!("{licence:?}"));
+            let refused = licence::refused(&licence, &sessions, seconds_now());
+            tracing::info!(licence = %answer, refused, "shell.licence_read");
             if let Err(why) = read {
                 tell(app.handle(), &words::trouble(&Trouble::Settings(why), language));
             }
