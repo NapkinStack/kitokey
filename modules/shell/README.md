@@ -247,7 +247,9 @@ Store's (`StoreContext.GetAppLicenseAsync`), the Store first given Kitokey's win
 hidden or not, else the small one — as Microsoft requires of a desktop application; Kitokey not
 started from a package (the zip) is not from the Store, nothing asked. Elsewhere nothing is limited.
 A licence that cannot be read, or that the Store does not give within 5 s, records, said once in the
-log. « Acheter Kitokey » asks the Store for the purchase (`RequestPurchaseAsync`) by Kitokey's own
+log. At each start, what the licence read is — `Bought`, `Trial`, `Inactive`, `NotFromStore`, `unread` —
+and whether a recording would be refused are said in the log, `shell.licence_read`: what the Store
+answered, for whoever reads after it. « Acheter Kitokey » asks the Store for the purchase (`RequestPurchaseAsync`) by Kitokey's own
 Store ID, which the Store's licence names — never written in the code —, from the window's thread
 as the Store requires; failing, the Store's page for Kitokey opens in its place
 (`ms-windows-store://pdp/?ProductId=…`). Then the licence is read again.
