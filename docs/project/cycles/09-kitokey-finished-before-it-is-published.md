@@ -11,7 +11,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given a recording stopped, when capture ends, then — under `session-audio/v3`, the third version `v2`'s page already names for it — each track is kept as FLAC in the meeting's folder in place of its WAV — the same rate, channels and bit depth —, its samples decoded equal, one by one, to the WAV's, which is removed only once that is checked; `recording/v1`'s page says which event tells that the tracks are final, and no step reads a track before it — a making started on `stopped` reads the WAV whole or the FLAC whole, never one being removed; held by capture's e2e, the second form's notes decoded and compared"
-      - "Given capture killed (`SIGKILL`) at chosen points while it compresses — before the FLAC is whole, after, before and after the WAV is removed —, when the meeting is read again, then its WAV is whole and read as today; no meeting is ever left with neither a whole WAV nor a whole FLAC"
+      - "Given capture killed (`SIGKILL`) at chosen points while it compresses — before the FLAC is whole, after, before and after the WAV is removed —, when the meeting is read again, then it is read whole — from its WAV until the FLAC is checked, from its FLAC after; no meeting is ever left with neither a whole WAV nor a whole FLAC"
       - "Given a meeting kept as FLAC, when it is transcribed, summarised, played, its waveform drawn, exported or made again, then each step reads it as it reads a WAV today; given a meeting recorded before, kept as WAV, then it is read as before — the readers of `session-audio/v3` merged before capture writes it, as `contracts/AGENTS.md` asks"
       - "Given the bench's meeting and an hour recorded by the e2e, when they are compressed, then the sheet records what each weighed as WAV and as FLAC and the time compressing took against the recording's length; the FLAC weighs at most 60 % of the WAV on the bench's meeting *(framer, to confirm: cycle 02 measured about 48 %)*"
   - id: D88
@@ -30,7 +30,7 @@ deliverables:
     acceptance:
       - "Given a new folder of drawings under `docs/project/drawings/` drawn before anything is built — with D90's boards, in one round —, when the decider reads it, then it shows in both themes Kitokey's mark, the tray's icon at rest and while recording, the full window's header and a meeting's page with the icons and sizes below; what the decider accepts there becomes this deliverable's bar, its date in the cycle"
       - "Given the window, the bar and Settings, when the shell's tests run, then every icon is one of Lucide's, inline, 16 or 20 CSS px; each screen has one labelled primary action, every secondary action is an icon button with a tooltip and an accessible name in French and in English; controls are 32 CSS px high, 28 in the bar, on a 4 px grid; red is used for recording alone; the contrast of each pair of colours the theme uses is checked by a test in both themes"
-      - "Given the accepted mark, when the packages are made, then the applications menu, the Store's logos, the deb's and the rpm's icons and the tray's two states are drawn from it, one SVG in the repository; given a recording, then the tray's icon shows it, on GNOME too, where the AppIndicator extension gives a tray; without it, GNOME's own microphone indicator and the bar are the signs, said in the README"
+      - "Given the accepted mark, when the packages are made, then the applications menu, the Store's logos, the deb's and the rpm's icons and the tray's two states are drawn from it, one SVG in the repository; given a recording, then the tray's icon shows it, on GNOME too, where the AppIndicator extension gives a tray; without it, GNOME's own microphone indicator and the bar are the signs, said in the README — that indicator says a microphone is in use, a call's too, not that Kitokey records, and whether a passive stream lights it is not verified *(framer, to confirm)*"
       - "Given the window's e2e, when it runs, then its screenshots in both themes, at 1920 and 420 CSS px, are in the sheet beside the accepted boards"
   - id: D90
     title: "Recording is a minimal bar: the essentials, and the rest one gesture away"
@@ -164,7 +164,7 @@ spike, alone, cut first.
   `stt-1b-en_fr`, the one open streaming model found that hears French ([review §4](../reviews/2026-11-06-market.md)),
   added as a second candidate. The market's design leader moved live AI aside (Granola); the decider's idea is
   measured before anything is built.
-- A measure whose product is a record, outside the shipped program: `module: null`, held by a line of the transcription's log issue (#129). Its program may live in the bench's folder; no merge carries it.
+- A measure whose product is a record, outside the shipped program: `module: null`, held by a line of the transcription's log issue (#129). Its program is kept outside the repository, or merged without carrying the deliverable.
 - On devices made for the run, while the decider is not on a call. **Cut first** when the breaker nears.
 
 ## What needs a person
