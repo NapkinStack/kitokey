@@ -472,6 +472,11 @@ else
   KITOKEY_LICENCE="$work/licence" start fr_FR.UTF-8 "transcript = false" "$work/kitokey-capture"
   sleep 1
   check is "$(windows)" 0
+  # What the licence read at each start is, in the log, before any recording is asked (D83): the
+  # stand-in's trial over, refused; the starts before it, not from the Store, never refused.
+  read_at_start() { grep '"message":"shell.licence_read"' "$work"/state/kitokey/logs/shell.*.jsonl | grep -c "\"licence\":\"$1\".*\"refused\":$2\|\"refused\":$2.*\"licence\":\"$1\"" || true; }
+  check is "$(read_at_start Trial true)" 1
+  check test "$(read_at_start NotFromStore false)" -ge 1
   call 4 & calling=$!
   check offered 5
   gesture record                                   # Record: refused, said in the window
@@ -479,6 +484,12 @@ else
   check test ! -e "$work/sessions/given"
   check test "$(windows)" -ge 1
   check grep -q '"message":"shell.recording_refused"' <(cat "$work"/state/kitokey/logs/shell.*.jsonl)
+  click 6
+  # A stand-in that does not read: the licence unread at the start, said so, never refused.
+  echo garbled > "$work/licence"
+  KITOKEY_LICENCE="$work/licence" start fr_FR.UTF-8 "transcript = false" "$work/kitokey-capture"
+  sleep 1
+  check is "$(read_at_start unread false)" 1
   click 6
   kill "$answers" 2>/dev/null || true; answers=""
   rm -rf "$work/licence" "$work/sessions/.kitokey-trial" "$work/sessions/.kitokey-trial-meetings" "$work/sessions"/trial-*
