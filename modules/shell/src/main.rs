@@ -194,9 +194,11 @@ impl Shell {
         read
     }
 
-    /// The licence, read anew: one that could not be read is said in the log once, and records (D83).
-    fn licence(&self) -> Result<Licence, String> {
-        let read = licence::read();
+    /// The licence, read anew, the Store given Kitokey's window (`owner`, asked before any lock is
+    /// held: the toolkit answers it from the window's thread): one that could not be read is said
+    /// in the log once, and records (D83).
+    fn licence(&self, owner: licence::Owner) -> Result<Licence, String> {
+        let read = licence::read(owner);
         if let Err(error) = &read
             && !std::mem::replace(&mut *self.licence_unread.lock().unwrap(), true)
         {
@@ -396,7 +398,9 @@ fn main() {
                 .menu(&menu.clone())
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => open_window(app),
-                    "toggle" => toggle_recording(app),
+                    "toggle" => {
+                        toggle_recording(app);
+                    }
                     "transcribe" => {
                         let shell = app.state::<Shell>();
                         // The latest session is the one being recorded: its transcript follows its stop.
@@ -478,7 +482,7 @@ fn main() {
             });
             // The trial's first day, kept at the first start on a trial licence (PDR-0005).
             let shell = app.state::<Shell>();
-            if shell.licence() == Ok(Licence::Trial)
+            if shell.licence(owner(app.handle())) == Ok(Licence::Trial)
                 && let Err(error) = trial::begin(&shell.settings().sessions, seconds_now())
             {
                 tracing::warn!(kind = ?error.kind(), "shell.trial_not_begun");
@@ -800,15 +804,63 @@ fn header(shell: State<'_, Shell>) -> Header {
     }
 }
 
-/// « Acheter Kitokey »: the purchase asked — of the Store, once Kitokey reads it there (D83's last pull
-/// request); until then said in the log alone —, then the licence read again: bought, the next
-/// recording records. Answers the header, which says whether a recording is still refused.
+/// « Acheter Kitokey »: the purchase asked of the Store, by Kitokey's own Store ID, its dialog owned
+/// by Kitokey's window and asked from that window's thread; failing, or never started, the Store's
+/// page for Kitokey opened in its place (D83). Outside the Store, and with the stand-in licence,
+/// said in the log alone. Then the licence read again: bought, the next recording records. Answers
+/// the header, which says whether a recording is still refused.
 #[tauri::command]
-fn buy(shell: State<'_, Shell>) -> Header {
+async fn buy(app: AppHandle) -> Header {
     tracing::info!("shell.purchase_asked");
-    let licence = shell.licence();
+    let owner = owner(&app);
+    let id = tauri::async_runtime::spawn_blocking(move || licence::store_id(owner)).await;
+    match id {
+        Ok(Ok(Some(id))) => {
+            let (said, answered) = tokio::sync::oneshot::channel();
+            let asked = app.run_on_main_thread(move || {
+                licence::purchase(owner, &id, move |purchase| {
+                    let _ = said.send(purchase);
+                });
+            });
+            if asked.is_ok()
+                && let Ok(licence::Purchase::Page(page)) = answered.await
+            {
+                opening_page(&page);
+            }
+        }
+        Ok(Ok(None)) => {}
+        Ok(Err(error)) => tracing::warn!(detail = %error, "shell.purchase_failed"),
+        Err(error) => tracing::warn!(detail = %error, "shell.purchase_failed"),
+    }
+    let shell = app.state::<Shell>();
+    let licence = shell.licence(owner);
     shell.refuses(&licence, &shell.settings().sessions);
     header(shell)
+}
+
+/// The window the Store's dialogs belong to (D83): the full window, hidden or not, else the small
+/// one; none when Kitokey shows in the tray alone.
+fn owner(app: &AppHandle) -> licence::Owner {
+    #[cfg(windows)]
+    return ["main", "small"]
+        .into_iter()
+        .find_map(|label| app.get_webview_window(label)?.hwnd().ok())
+        .map(|window| window.0 as isize);
+    #[cfg(not(windows))]
+    {
+        let _ = app;
+        None
+    }
+}
+
+/// Opens the Store's page for Kitokey, the way a folder is opened on Windows (`opening`).
+fn opening_page(page: &str) {
+    match std::process::Command::new("explorer").arg(page).spawn() {
+        Ok(mut started) => {
+            std::thread::spawn(move || started.wait());
+        }
+        Err(error) => tracing::warn!(detail = %error, "shell.store_page_failed"),
+    }
 }
 
 /// What a meeting lacks, made on the user's word from its page (D18): its minutes — through the
@@ -1081,10 +1133,13 @@ async fn full_window(app: AppHandle, page: Option<String>) {
 }
 
 /// The header's button: starts a recording, or stops the one running — as the tray and the
-/// shortcut do.
+/// shortcut do. Answers once a start is decided, started or refused, without the window's thread
+/// waiting on it (D83).
 #[tauri::command]
-fn record(app: AppHandle) {
-    toggle_recording(&app);
+async fn record(app: AppHandle) {
+    if let Some(start) = toggle_recording(&app) {
+        let _ = tauri::async_runtime::spawn_blocking(move || start.join()).await;
+    }
 }
 
 /// The folder of a session the window names (`sessions::folder`).
@@ -1619,7 +1674,7 @@ fn models_folder() -> PathBuf {
 }
 
 #[tauri::command]
-fn settings_shown(shell: State<'_, Shell>) -> SettingsShown {
+fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> SettingsShown {
     let (settings, unreadable) = match shell.reread() {
         Ok(settings) => (settings, None),
         Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked, why))),
@@ -1636,7 +1691,8 @@ fn settings_shown(shell: State<'_, Shell>) -> SettingsShown {
             path,
         })
         .collect();
-    let trial = licence::left(&shell.licence(), &settings.sessions, seconds_now()).map(|left| words::trial_left(left, shell.language()));
+    let trial =
+        licence::left(&shell.licence(owner(&app)), &settings.sessions, seconds_now()).map(|left| words::trial_left(left, shell.language()));
     SettingsShown {
         shortcut: shell.shortcut.lock().unwrap().clone(),
         shortcut_settings: keyboard_settings().is_some(),
@@ -2725,12 +2781,16 @@ fn program(name: &str, variable: &str) -> PathBuf {
 }
 
 /// Starts a recording when there is none, stops it when there is one: the menu's entry and
-/// the global shortcut both come here.
-fn toggle_recording(app: &AppHandle) {
+/// the global shortcut both come here. A stop is done here and never judged; a start is decided on
+/// a thread of its own, which is returned: the licence it reads may wait on the Store, and the
+/// window's thread, where the tray, the shortcut and the window call this, never waits on it (D83).
+fn toggle_recording(app: &AppHandle) -> Option<std::thread::JoinHandle<()>> {
     let shell = app.state::<Shell>();
+    // The window the Store's dialogs belong to, asked before any lock is held (D83).
+    let owner = owner(app);
     let mut pressed = shell.pressed.lock().unwrap();
     if pressed.is_some_and(|last| last.elapsed() < Duration::from_millis(500)) {
-        return;
+        return None;
     }
     *pressed = Some(Instant::now());
     let mut recording = shell.recording.lock().unwrap();
@@ -2741,17 +2801,29 @@ fn toggle_recording(app: &AppHandle) {
             let _ = running.stop();
             show(app, Shown::Stopping);
         }
-        return;
+        return None;
     }
+    let app = app.clone();
+    Some(std::thread::spawn(move || start_recording(&app, owner)))
+}
+
+/// A recording started, unless the trial refuses it — off the window's thread (`toggle_recording`).
+fn start_recording(app: &AppHandle, owner: licence::Owner) {
+    let shell = app.state::<Shell>();
     // The settings as the file says them now: the user may have changed it by hand.
     let _ = shell.reread();
     let Settings { sessions, microphone, .. } = shell.settings();
     // Every start comes here — the window's, the tray's, the shortcut's, a call's offer —: the
-    // trial is judged once, on the licence read now (D83).
-    let licence = shell.licence();
+    // trial is judged once, on the licence read now (D83), no lock held while the Store answers.
+    let licence = shell.licence(owner);
+    let mut recording = shell.recording.lock().unwrap();
+    // Started meanwhile, by another start decided first: left as it is.
+    if recording.is_some() {
+        return;
+    }
     if shell.refuses(&licence, &sessions) {
         tracing::info!("shell.recording_refused");
-        drop((recording, pressed));
+        drop(recording);
         // Said in the full window, which the small one has no room for: brought forward, or opened,
         // on this gesture of the user — once the command that asked has answered.
         let handle = app.clone();
@@ -3640,7 +3712,9 @@ async fn bound(app: &AppHandle) -> Result<(), String> {
         match event {
             Heard::Pressed => {
                 let handle = app.clone();
-                let _ = app.run_on_main_thread(move || toggle_recording(&handle));
+                let _ = app.run_on_main_thread(move || {
+                    toggle_recording(&handle);
+                });
             }
             Heard::Changed(keys) => *app.state::<Shell>().shortcut.lock().unwrap() = keys,
         }

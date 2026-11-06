@@ -61,6 +61,8 @@ apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-native-keyring-store = "1.1.0"
+# The Store's licence and purchase (D83): the package's identity, the Store, the window given to it.
+windows = { version = "0.62", features = ["ApplicationModel", "Services_Store", "Win32_UI_Shell"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 tauri-plugin-global-shortcut = "2.4.1"

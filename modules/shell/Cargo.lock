@@ -5735,6 +5735,7 @@ dependencies = [
  "tracing-subscriber",
  "trash",
  "ureq",
+ "windows",
  "windows-native-keyring-store",
  "zbus-secret-service-keyring-store",
 ]

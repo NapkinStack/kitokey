@@ -5203,9 +5203,14 @@ def trial_over(now: dt.datetime) -> None:
         press(browser, "copy-minutes")
         check("and its minutes copied", wait_for(browser, lambda b: "Le budget est validé." in "".join(b.execute_script("return window.__copied")), 3))
         purchases = logged("shell.purchase_asked")
-        press(browser, "buy")
+        # Clicked from the page's own script: whether the button is disabled is read before the
+        # command can answer.
+        pending = browser.execute_script("const buy = document.getElementById('buy'); buy.click(); return buy.disabled")
+        check("« Acheter Kitokey » is disabled while the purchase is asked: one purchase at a time", pending is True, pending)
         check("« Acheter Kitokey » asks the purchase — the stand-in's, said in the log —; not bought, the refusal stays",
               wait_for(browser, lambda b: logged("shell.purchase_asked") == purchases + 1, 5) and browser.find_element(By.ID, "refused").is_displayed())
+        check("the purchase answered, « Acheter Kitokey » is enabled again",
+              wait_for(browser, lambda b: not b.find_element(By.ID, "buy").get_property("disabled"), 5))
         # From the small window: it has no room to say why; the full window comes in its place and says it.
         main = browser.current_window_handle
         press(browser, "small-link")
@@ -5222,8 +5227,14 @@ def trial_over(now: dt.datetime) -> None:
         said = wait_for(browser, lambda b: b.find_element(By.ID, "refused").is_displayed(), 5)
         check("from the small window: nothing recorded, the full window in its place says why, with « Acheter Kitokey »",
               replaced and said and not asked.exists() and text(browser, "refused") == over_fr, (browser.window_handles, asked.exists()))
-        # Bought while Kitokey is open: the next recording records, no restart.
+        # Bought in the Store's dialog — the stand-in's turn —: « Acheter Kitokey » reads the licence
+        # again once the purchase is answered, and the refusal goes, nothing recorded.
         licence.write_text("bought")
+        press(browser, "buy")
+        check("« Acheter Kitokey », the purchase answered: the licence read again, the refusal gone, nothing recorded",
+              wait_for(browser, lambda b: not b.find_element(By.ID, "refused").is_displayed(), 5)
+              and not browser.find_element(By.ID, "buy").is_displayed() and not asked.exists())
+        # Bought while Kitokey is open: the next recording records, no restart.
         time.sleep(0.6)
         press(browser, "record")
         recorded = wait_for(browser, lambda b: "live" in b.find_element(By.ID, "record").get_attribute("class") and asked.exists(), 5)
