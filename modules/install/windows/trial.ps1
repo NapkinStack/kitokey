@@ -51,7 +51,7 @@ try {
             @(Get-ChildItem $logs -Filter 'shell.*.jsonl' -ErrorAction SilentlyContinue | Get-Content |
                 Where-Object { $_ -like '*"message":"shell.licence_read"*' })
         }
-        $before = (& $licenceRead).Count
+        $before = @(& $licenceRead).Count
         Start-Process "shell:AppsFolder\$($Installed.PackageFamilyName)!Kitokey"
         $process = Wait-For 'its process with a window, from the package' 90 {
             Get-Process kitokey -ErrorAction SilentlyContinue |
@@ -64,7 +64,7 @@ try {
         # What the Store answers a package it did not install, read at the start and said in the
         # shell's log (D83): recorded here, and a recording not refused by it.
         $read = Wait-For 'the licence read at this start, in the log' 30 {
-            $lines = & $licenceRead
+            $lines = @(& $licenceRead)
             if ($lines.Count -gt $before) { $lines[-1] }
         }
         $answer = $read | ConvertFrom-Json
