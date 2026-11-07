@@ -44,6 +44,12 @@ provides:
     version: v2
     path: contracts/session-audio/v2
     stability: experimental
+  # Declared before its readers (contracts/AGENTS.md): capture writes it once D87's last pull request
+  # lands; until then a session it records is v2's, which every reader of v3 also reads.
+  - contract: session-audio
+    version: v3
+    path: contracts/session-audio/v3
+    stability: experimental
   - contract: recording
     version: v1
     path: contracts/recording/v1
