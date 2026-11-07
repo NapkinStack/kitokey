@@ -122,8 +122,9 @@ for _ in $(seq 300); do
 done
 /usr/libexec/at-spi2-registryd 2> "$logs/registryd.log" &
 # A keyboard, as a person's session has one: a remote-desktop session's. Without one, no window is
-# ever told it has the focus — GTK learns it from the keyboard entering it.
-python3 - 2> "$logs/keyboard.log" <<'EOF' &
+# ever told it has the focus — GTK learns it from the keyboard entering it. The system's Python,
+# where PyGObject is: the first on the path may be a tool's own (nstack attest puts its own first).
+/usr/bin/python3 - > "$logs/keyboard" 2> "$logs/keyboard.log" <<'EOF' &
 from gi.repository import Gio, GLib
 bus = Gio.bus_get_sync(Gio.BusType.SESSION)
 def call(path, interface, method, args=None, reply=None):
@@ -132,10 +133,19 @@ session = call("/org/gnome/Mutter/RemoteDesktop", "org.gnome.Mutter.RemoteDeskto
 call(session, "org.gnome.Mutter.RemoteDesktop.Session", "Start")
 for pressed in (True, False):
     call(session, "org.gnome.Mutter.RemoteDesktop.Session", "NotifyKeyboardKeysym", GLib.Variant("(ub)", (0xffe1, pressed)))
+print("ready", flush=True)
 GLib.MainLoop().run()
 EOF
+for _ in $(seq 100); do [ -s "$logs/keyboard" ] && break; sleep 0.1; done
+if [ ! -s "$logs/keyboard" ]; then
+  mkdir -p "$here/../.evidence"
+  echo "e2e: FAILED — the session has no keyboard, so no window would have the focus:" | tee "$here/../.evidence/e2e.txt"
+  sed 's/^/    /' "$logs/keyboard.log" | tee -a "$here/../.evidence/e2e.txt"; exit 1
+fi
 
 status=0
 "$here/e2e.sh" "$@" || status=$?
-[ -z "${NSTACK_EVIDENCE:-}" ] || cp "$logs/shell.log" "$NSTACK_EVIDENCE/headless-shell.log" 2>/dev/null || true
+# The session's own log beside the run's evidence, never in it: what GNOME says of a session with
+# no logind nor accounts is no line of Kitokey's, and NapkinStack audits every log there.
+cp "$logs/shell.log" "$here/../.evidence/headless-shell.log" 2>/dev/null || true
 exit "$status"
