@@ -4,9 +4,9 @@
 
 - **Status**: Accepted — by the decider, 2026-11-04, in the session that studied the name:
   « mon preferé: kitokey », then « ok, écris le PDR pour kitokey ». Effective the same day: the trademark
-  search done, on the decider's word « Déjà fait », which covered the search alone (said 2026-11-07): on
-  2026-11-07 kitokey.com and kitokey.app were still free at their registries (RDAP: not found), so buying
-  them stays before Copr's first publication, as *Impacts* says. The rename is cycle 07's D86.
+  search done, on the decider's word « Déjà fait », which covered the search alone (said 2026-11-07).
+  kitokey.com bought on 2026-11-07 (RDAP: registered 07:39 UTC); kitokey.app not bought, the decider's
+  word the same day « .com seul », to limit what is paid. The rename is cycle 07's D86.
 - **Date**: 2026-11-04
 - **Decision makers**: the decider, `@napkinstack-admin`
 - **Modules affected**: all — the name. `install` (packages, the Store's listing), `shell` (what the user
@@ -21,7 +21,7 @@
 ```mermaid
 flowchart LR
     D["The name chosen<br/>Kitokey, 2026-11-04"]:::done --> T{"Trademark search<br/>INPI · EUIPO · USPTO<br/>classes 9 and 42"}:::decider
-    T -->|"nothing in the way"| B["Domains held<br/>kitokey.com · kitokey.app"]:::decider
+    T -->|"nothing in the way"| B["Domains held<br/>kitokey.com"]:::decider
     T -->|"a prior mark"| X["This record superseded<br/>another name chosen"]:::stop
     B --> S["The Store's name reserved<br/>Copr's first publication"]:::decider
     S --> R["The product renamed<br/>nothing of the user's lost"]:::agents
@@ -129,7 +129,7 @@ kept, as D28 did for Summit.
 ## Success criterion
 
 > We will consider this was the right call if, **by 2026-12-31**, the decider's trademark search found no
-> prior mark in the way, kitokey.com and kitokey.app are held for the project, and the Store's name is
+> prior mark in the way, kitokey.com is held for the project, and the Store's name is
 > reserved as Kitokey; and if, **by 2027-06-30**, no opposition to the name has been received and no
 > tester or user has asked how to say it.
 
@@ -158,7 +158,7 @@ the same way, before anything is published under Kitokey.
 - **The decider**, in this order, before the Store's reservation and Copr's first publication:
   1. the trademark search on « KITOKEY », classes 9 and 42: [INPI](https://data.inpi.fr/),
      [EUIPO](https://euipo.europa.eu/eSearch/), [USPTO](https://tmsearch.uspto.gov/);
-  2. kitokey.com and kitokey.app bought;
+  2. kitokey.com bought (kitokey.app left out, 2026-11-07);
   3. the organisation `kitokey` taken on GitHub, the repository renamed when the deliverable lands.
 - **The cycles**: the rename is a deliverable of a cycle, framed by the decider's word; it carries this
   record's acceptance criteria. Cycle 08's *Later* names this record in place of "onote or beebrief".
