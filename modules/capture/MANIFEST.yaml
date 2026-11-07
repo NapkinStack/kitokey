@@ -89,6 +89,18 @@ dependencies:
       The one file src/passive.rs, behind one function. Deleted, cpal opens the source again, and
       #494 is back; on the day cpal offers the property, it goes. Its -sys crate allows one version
       in a build, so its version moves with cpal's.
+  - name: libflac-sys
+    purpose: Writes a stopped track as FLAC with libFLAC, the reference, its verify on (session-audio/v3)
+    adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
+    exit_strategy: >
+      The one function written in src/keep.rs, held by tests/keep.rs; any encoder whose files Symphonia
+      reads back equal replaces it. Removed, the tracks stay WAV, which session-audio/v3 allows.
+  - name: symphonia
+    purpose: Reads a FLAC just written back from the disk, to compare every sample with its WAV before the WAV goes
+    adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
+    exit_strategy: >
+      The one function checked in src/keep.rs, held by tests/keep.rs; claxon, or libFLAC's own decoder,
+      replaces it (ADR-0016's way out).
   - name: chrono
     purpose: The local day, hour and offset a session is named and dated by
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
