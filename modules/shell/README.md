@@ -71,7 +71,7 @@ once by `kitokey --window` — and never without a gesture: the meetings in the 
 folder by week, newest first, each with its day, its length, what it holds and what its
 audio weighs, and above them what all the audio weighs against the transcripts and minutes.
 A session being recorded, or one left without its end, says so. It reads `session.json` of
-both forms (`contracts/session-audio`) and writes nothing; it speaks the language chosen in Settings, the system's by default (D64),
+each of its three forms (`contracts/session-audio`) and writes nothing; it speaks the language chosen in Settings, the system's by default (D64),
 follows its light or dark theme and font, in the colours of D11's boards, and reads the
 folder again whenever it comes forward. A folder that cannot be read is said, with a way to try again, never drawn as an empty list (D67). In two panes since D61 (its board,
 [`d61-the-window-in-two-panes`](../../docs/project/drawings/d61-the-window-in-two-panes/README.md)): the
@@ -164,7 +164,9 @@ once it is there. Turned off, the settings choose again for what is made next.
 without another gesture, on this machine, with the model the settings name; a notification
 says when it is there, and a click on it opens the session's folder under a Linux desktop.
 A meeting's page plays it (D26) as one sound: its tracks placed where the session's clock puts
-them, gaps included (D71), and mixed by the shell as they are read, never written (ADR-0009). The line being said is
+them, gaps included (D71), and mixed by the shell as they are read, never written (ADR-0009). A track kept as FLAC once
+stopped (`session-audio/v3`, D87) is read with Symphonia (ADR-0016) and plays byte for byte as its WAV did, even when
+the WAV goes while the meeting is open; a FLAC damaged on the disk is said, never played shorter. The line being said is
 marked, the page left where the user put it; the drawing of who spoke — a slider — and each line are the controls,
 by mouse or keyboard, and the space bar plays and pauses. The sound comes from a server on the
 loopback interface that answers the run's token and the opened meeting alone (ADR-0008), nothing
@@ -279,8 +281,9 @@ run, quoted. `nstack e2e shell` audits the same logs after the run.
 - Consumed: [`recording/v1`](../../contracts/recording/v1/README.md) — what `kitokey-capture` says while it records
   (`src/recording.rs`); [`transcript/v1`](../../contracts/transcript/v1/README.md) — only that a session's
   `transcript.jsonl` is there once `kitokey-transcription` ended well (`src/transcription.rs`);
-  [`session-audio`](../../contracts/session-audio/v2/README.md), v1 and v2 — a session's `session.json`, for the
-  window's list (`src/sessions.rs`) and the trial's count of the meetings made here (`src/trial.rs`, PDR-0005); the transcript's segments and [`minutes`](../../contracts/minutes/v3/README.md), v1 to v3
+  [`session-audio`](../../contracts/session-audio/v3/README.md), v1 to v3 — a session's `session.json`, for the
+  window's list (`src/sessions.rs`), its tracks, WAV or FLAC, for the player and the diagnostic (`src/meeting.rs`,
+  `src/mix.rs`, `src/levels.rs`, `src/flac.rs`) and the trial's count of the meetings made here (`src/trial.rs`, PDR-0005); the transcript's segments and [`minutes`](../../contracts/minutes/v3/README.md), v1 to v3
   — one meeting's, as the window will open it (`src/meeting.rs`, `src/minutes.rs`);
   [`summarising/v1`](../../contracts/summarising/v1/README.md) — what `kitokey-summary` says while it writes the
   minutes (`src/summarising.rs`). The contracts of the files it will read are declared with the slice that reads

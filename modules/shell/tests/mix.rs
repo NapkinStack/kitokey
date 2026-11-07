@@ -6,6 +6,9 @@ use std::{f64::consts::TAU, fs, path::Path};
 
 use kitokey_shell::{meeting, mix::Mix};
 
+mod kept;
+use kept::kept_as_flac;
+
 /// A WAV file: PCM of `bits` (16, 24 or 32), or 32-bit float when `bits` is 0; `frames`
 /// interleaved; its lengths said as given, or as a recording killed leaves them.
 fn wav(path: &Path, rate: u32, channels: u16, bits: u16, frames: &[Vec<f64>], killed: bool) {
@@ -460,4 +463,96 @@ fn the_same_track_placed_otherwise_is_another_mix_and_an_empty_track_still_is_on
     let empty = folder.path().join("empty.wav");
     wav(&empty, 48_000, 1, 16, &[], false);
     assert_eq!(Mix::placed(&[(empty, vec![(0, 0.0)])]).unwrap().frames(), 0);
+}
+
+/// A tone under noise, in two channels that differ: every bit of a sample counts.
+fn noisy(rate: u32, seconds: f64, hertz: f64, seed: u64) -> Vec<Vec<f64>> {
+    let mut seed = seed;
+    let mut noise = move || {
+        seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        ((seed >> 33) as f64 / f64::from(1u32 << 31) - 0.5) * 0.1
+    };
+    tone(hertz, rate, seconds, 0.3, 1)
+        .into_iter()
+        .map(|frame| vec![frame[0] + noise(), frame[0] - noise()])
+        .collect()
+}
+
+#[test]
+fn a_meeting_kept_as_flac_plays_byte_for_byte_as_its_wavs_did() {
+    let folder = tempfile::tempdir().unwrap();
+    let (local, remote, third) = (
+        folder.path().join("local.wav"),
+        folder.path().join("remote.wav"),
+        folder.path().join("third.wav"),
+    );
+    // 24 bits as a session holds; one of a lower rate, brought up by the resampler; one of 16 bits.
+    wav(&local, 48_000, 2, 24, &noisy(48_000, 3.0, 440.0, 3), false);
+    wav(&remote, 44_100, 2, 24, &noisy(44_100, 3.0, 1000.0, 5), false);
+    wav(&third, 48_000, 1, 16, &tone(660.0, 48_000, 1.0, 0.2, 1), false);
+    // Placed run by run, as the clock places them after a gap (D71).
+    let runs = [vec![(0, 0.25), (60_000, 2.0)], vec![(0, 0.5), (50_000, 1.9)], vec![(0, 1.0)]];
+    let placed = |paths: [&Path; 3]| -> Vec<(std::path::PathBuf, Vec<(u64, f64)>)> {
+        paths
+            .iter()
+            .zip(&runs)
+            .map(|(path, runs)| (path.to_path_buf(), runs.clone()))
+            .collect()
+    };
+    let before = Mix::placed(&placed([&local, &remote, &third])).unwrap();
+    let whole = before.read(0, before.size()).unwrap();
+    let ranges = [
+        (0, 10),
+        (1_001, 77_777),
+        (44 + 2 * 100_001, 9_000),
+        (44 + 2 * 120_003, 4_001),
+        (before.size() - 5, 5),
+    ];
+    let pieces: Vec<Vec<u8>> = ranges.iter().map(|&(from, length)| before.read(from, length).unwrap()).collect();
+
+    let kept = [kept_as_flac(&local), kept_as_flac(&remote), kept_as_flac(&third)];
+    assert!(!local.exists() && !remote.exists() && !third.exists());
+    let after = Mix::placed(&placed([&kept[0], &kept[1], &kept[2]])).unwrap();
+    assert_eq!(
+        (after.rate(), after.frames(), after.size()),
+        (before.rate(), before.frames(), before.size())
+    );
+    assert!(after.read(0, after.size()).unwrap() == whole, "the whole mix differs");
+    for (&(from, length), piece) in ranges.iter().zip(&pieces) {
+        assert!(after.read(from, length).unwrap() == *piece, "{from}+{length} differs");
+    }
+}
+
+#[test]
+fn a_wav_removed_under_the_mix_once_kept_as_flac_is_read_from_its_flac() {
+    // The window opened the meeting on its WAVs; capture then kept them as FLAC (`session-audio/v3`).
+    let folder = tempfile::tempdir().unwrap();
+    let (local, remote) = (folder.path().join("local.wav"), folder.path().join("remote.wav"));
+    wav(&local, 48_000, 2, 24, &noisy(48_000, 2.0, 440.0, 7), false);
+    wav(&remote, 44_100, 1, 24, &tone(1000.0, 44_100, 2.0, 0.3, 1), false);
+    let mix = Mix::of(&[(local.clone(), 0.0), (remote.clone(), 0.3)]).unwrap();
+    let whole = mix.read(0, mix.size()).unwrap();
+    kept_as_flac(&local);
+    kept_as_flac(&remote);
+    assert!(mix.read(0, mix.size()).unwrap() == whole);
+    assert!(mix.read(44 + 2 * 70_001, 3_000).unwrap() == whole[44 + 2 * 70_001..44 + 2 * 70_001 + 3_000]);
+}
+
+#[test]
+fn a_flac_damaged_in_its_middle_is_said_never_played_shorter() {
+    let folder = tempfile::tempdir().unwrap();
+    let local = folder.path().join("local.wav");
+    wav(&local, 48_000, 2, 24, &noisy(48_000, 2.0, 440.0, 9), false);
+    let mix = Mix::of(&[(local.clone(), 0.0)]).unwrap();
+    let whole = mix.read(0, mix.size()).unwrap();
+    let flac = kept_as_flac(&local);
+    let mut bytes = fs::read(&flac).unwrap();
+    let middle = bytes.len() / 2;
+    bytes[middle] ^= 0x10;
+    fs::write(&flac, bytes).unwrap();
+    // Its form is its STREAMINFO's: the same length. What lies before the damage reads; across it, an error.
+    let damaged = Mix::of(&[(flac, 0.0)]).unwrap();
+    assert_eq!(damaged.size(), mix.size());
+    assert!(damaged.read(0, 2_000).unwrap() == whole[..2_000]);
+    assert!(damaged.read(0, damaged.size()).is_err());
 }
