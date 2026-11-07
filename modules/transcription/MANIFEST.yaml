@@ -56,6 +56,9 @@ consumes:
   - contract: session-audio
     version: v2
     module: capture
+  - contract: session-audio
+    version: v3
+    module: capture
 #  - contract: identity-api
 #    version: v1
 #    module: identity
@@ -94,6 +97,12 @@ dependencies:
     exit_strategy: >
       One function, `cancelled` in src/echo.rs, held by tests/echo.rs and by the bench's
       counts; any canceller that passes them replaces it.
+  - name: symphonia
+    purpose: Reads a track kept as FLAC once its recording stopped (session-audio/v3), its FLAC decoder alone
+    adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
+    exit_strategy: >
+      One function, `opened` in src/flac.rs, held by tests/tracks.rs and tests/as_delivered.rs on FLACs
+      libFLAC wrote; claxon, or libFLAC's own decoder, passes them in its place (ADR-0016).
   - name: tracing
     purpose: The steps and failures the program logs, as events of a run (ADR-0007)
     adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md

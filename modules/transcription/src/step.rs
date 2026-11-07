@@ -1,5 +1,5 @@
 //! The step, written once for every engine (ADR-0003): it reads a session's sound as
-//! `contracts/session-audio/v1` or `v2` describes it, hands an engine one span at a time, and
+//! `contracts/session-audio/v1`, `v2` or `v3` describes it, hands an engine one span at a time, and
 //! writes what was heard. Stopped anywhere, it is run again and goes on from where it was.
 
 use std::{fs, io, path::Path, time::Instant};
@@ -95,9 +95,11 @@ pub fn read(folder: &Path) -> io::Result<(&'static str, Session)> {
     let form = match session["contract"].as_str() {
         Some("session-audio/v1") => "session-audio/v1",
         Some("session-audio/v2") => "session-audio/v2",
+        // As v2, a stopped track kept as FLAC in place of its WAV: `tracks::heard` reads either.
+        Some("session-audio/v3") => "session-audio/v3",
         _ => {
             return refused(
-                "this folder is not a session this version reads: session.json names neither session-audio/v1 nor session-audio/v2".into(),
+                "this folder is not a session this version reads: session.json names neither session-audio/v1, session-audio/v2 nor session-audio/v3".into(),
             );
         }
     };
@@ -107,7 +109,7 @@ pub fn read(folder: &Path) -> io::Result<(&'static str, Session)> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => None,
         Err(error) => return refused(format!("context.txt cannot be read ({error})")),
     };
-    let sounds = if form == "session-audio/v2" {
+    let sounds = if form != "session-audio/v1" {
         // Each source as it was delivered, on the session's clock. A track the session does
         // not name is a side that said nothing; one it names and does not hold is said.
         let named = |name: &str| session["tracks"][name].is_object();
@@ -125,7 +127,7 @@ pub fn read(folder: &Path) -> io::Result<(&'static str, Session)> {
             (Speaker::Others, sound(&folder.join("others.wav"))?),
         ]
     };
-    Ok((form, (session["stopped"].is_string(), context, sounds, form == "session-audio/v2")))
+    Ok((form, (session["stopped"].is_string(), context, sounds, form != "session-audio/v1")))
 }
 
 /// Where a session keeps what is made from its tracks, and the record of how it was made.

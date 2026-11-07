@@ -11,6 +11,7 @@ use std::{
 use serde_json::{Value, json};
 
 pub mod echo;
+mod flac;
 pub mod log;
 pub mod online;
 pub mod speech;

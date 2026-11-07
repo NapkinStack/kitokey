@@ -1,7 +1,12 @@
-//! The step on a session recorded as `session-audio/v2` describes it: tracks and a clock
-//! made here — notes around a rest, no voice of anyone — and an engine played here.
+//! The step on a session recorded as `session-audio/v2` describes it — or `v3`, its tracks kept as
+//! FLAC once stopped: tracks and a clock made here — notes around a rest, no voice of anyone — and an
+//! engine played here.
+
+mod kept;
 
 use std::{fs, io, path::Path};
+
+use kept::kept_as_flac;
 
 use kitokey_transcription::{
     Segment,
@@ -65,8 +70,12 @@ fn track(path: &Path, rate: u32, channels: u16, seconds: u32, rest: f32, note: (
 }
 
 fn record(folder: &Path, tracks: &str, clock: &str) {
+    recorded_as(folder, "session-audio/v2", tracks, clock);
+}
+
+fn recorded_as(folder: &Path, contract: &str, tracks: &str, clock: &str) {
     let record = format!(
-        r#"{{"contract":"session-audio/v2","started":"2026-10-13T14:05:12+02:00","stopped":"2026-10-13T14:05:32+02:00","tracks":{tracks}}}"#
+        r#"{{"contract":"{contract}","started":"2026-10-13T14:05:12+02:00","stopped":"2026-10-13T14:05:32+02:00","tracks":{tracks}}}"#
     );
     fs::write(folder.join("session.json"), record).unwrap();
     fs::write(folder.join("clock.jsonl"), clock).unwrap();
@@ -182,4 +191,44 @@ fn a_session_whose_tracks_are_not_what_its_record_says_is_refused_with_the_files
     refused("names no track this version reads");
     record(folder, r#"{"local":"a microphone"}"#, "");
     refused("names no track this version reads");
+}
+
+#[test]
+fn a_session_whose_tracks_are_kept_as_flac_is_heard_as_it_was_as_wav() {
+    let heard = |contract: &str, flac: bool| {
+        let session = tempfile::tempdir().unwrap();
+        let folder = session.path();
+        track(&folder.join("local.wav"), 48_000, 2, 20, 0.3, (3.0, 5.0), &[]);
+        track(
+            &folder.join("remote.wav"),
+            44_100,
+            1,
+            12,
+            -0.2,
+            (1.0, 2.0),
+            &[(0, 22_050), (264_600, 352_800)],
+        );
+        let clock = "{\"track\":\"local\",\"sample\":0,\"at\":0.0}\n{\"track\":\"remote\",\"silence\":[0,22050]}\n\
+                     {\"track\":\"remote\",\"sample\":22050,\"at\":1.0}\n{\"track\":\"remote\",\"silence\":[264600,352800]}\n";
+        recorded_as(folder, contract, BOTH, clock);
+        if flac {
+            kept_as_flac(&folder.join("local.wav"), 24);
+            kept_as_flac(&folder.join("remote.wav"), 24);
+        }
+        assert_eq!(read(folder).unwrap().0, contract);
+        let mut engine = Played::default();
+        transcribe(folder, &mut engine, None, 10).unwrap();
+        (
+            lines(folder)
+                .into_iter()
+                .filter(|line| line["type"] != "header")
+                .collect::<Vec<_>>(),
+            engine.0,
+        )
+    };
+    let as_wav = heard("session-audio/v2", false);
+    assert_eq!(as_wav.1, 2);
+    // Kept as FLAC, the same lines; not compressed yet — a v3 session still holding its WAVs —, the same.
+    assert_eq!(heard("session-audio/v3", true), as_wav);
+    assert_eq!(heard("session-audio/v3", false), as_wav);
 }

@@ -124,7 +124,7 @@ offset took the word out and moved the engine's inventions elsewhere on the tria
 the engine would otherwise write as it hears them.
 
 Whatever is wrong — a folder that is not a session, an audio file that is not what
-`session-audio/v1` or `v2` describes, a language the engine does not know, a model that cannot be
+`session-audio/v1`, `v2` or `v3` describes, a language the engine does not know, a model that cannot be
 loaded — is one sentence on the error stream, before anything is said to be heard, and no
 transcript is created or changed. What only shows once the model is there — a transcript
 another language or model made, a folder that cannot be written to — is said after `hearing`. Leave `--language` out to have the language detected.
@@ -145,9 +145,11 @@ section of the [manifest](./MANIFEST.yaml), for this module's stack. What each o
 ## Contracts
 
 - Provided: [`transcript/v1`](../../contracts/transcript/v1/README.md), `experimental`
-- Consumed: [`session-audio/v1`](../../contracts/session-audio/v1/README.md) and
-  [`session-audio/v2`](../../contracts/session-audio/v2/README.md) — `session.json` names
-  which, and `hearing` says which was read (`audio`)
+- Consumed: [`session-audio/v1`](../../contracts/session-audio/v1/README.md),
+  [`session-audio/v2`](../../contracts/session-audio/v2/README.md) and
+  [`session-audio/v3`](../../contracts/session-audio/v3/README.md) — `session.json` names
+  which, and `hearing` says which was read (`audio`). A track of v3 is its WAV while it is there,
+  its FLAC once it is not, read with Symphonia ([ADR-0016](../../docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md))
 
 ## Decisions
 
