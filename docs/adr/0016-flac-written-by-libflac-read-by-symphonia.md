@@ -2,9 +2,9 @@
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
-- **Status**: Proposed — the framer's, for cycle 09's D87. Rewritten on 2026-11-07, before any acceptance, on the
-  decider's word « étudie les solutions du marché (gratuit) pour trancher »: its first version chose flacenc and
-  claxon (#698)
+- **Status**: Accepted — by the decider, 2026-11-07, in the session that wrote it: « ADR-0016 acceptée ». Its
+  first version chose flacenc and claxon (#698); rewritten the same day, before the acceptance, on the
+  decider's word « étudie les solutions du marché (gratuit) pour trancher » (#699)
 - **Date**: 2026-11-07
 - **Decision makers**: the decider, `@napkinstack-admin`; proposed by an agent
 - **Scope**: project — module `capture` writes, modules `transcription` and `shell` read; contract `session-audio/v3`
