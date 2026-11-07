@@ -275,6 +275,33 @@ screenshots in `shots/`: every warning and error must be one a scenario provokes
 in the manifest's `evidence.provoked`, and each one declared must be logged — any other fails the
 run, quoted. `nstack e2e shell` audits the same logs after the run.
 
+The manifest's `e2e` runs it in a GNOME of its own, never shown (`scripts/headless.sh`): the
+user's desktop is never reached, so a run holds nobody's screen, microphone nor notifications.
+
+```mermaid
+flowchart LR
+    W["scripts/headless.sh"]:::run --> B["session bus<br/>system bus, empty"]:::own
+    B --> G["gnome-shell --headless<br/>AppIndicator · notifications · portal"]:::own
+    B --> P["PipeWire, no hardware"]:::own
+    G --> E["scripts/e2e.sh<br/>Kitokey, tray, window"]:::run
+    P --> E
+    U["the user's desktop<br/>screen · bus · sound · logind"]:::user -.-x|never reached| W
+    classDef run fill:#065f46,color:#fff
+    classDef own fill:#1e3a8a,color:#fff
+    classDef user fill:#92400e,color:#fff
+```
+
+**Legend** — green: the run's scripts · blue: the session made for the run, in its own runtime
+folder under `~/.cache/kitokey-headless/`, ended with it · orange: the user's, never reached.
+
+Its own dconf turns the AppIndicator extension on, grants the shortcut as the user's desktop
+once did, and keeps the lock off; a small extension of the session's shows the desktop rather
+than the overview and gives a window shown the focus; a remote-desktop session lends it a
+keyboard, without which GTK is never told it has the focus. Missing GNOME Shell, its AppIndicator
+extension or PipeWire, it says `NOT RUN`. `bash scripts/e2e.sh` alone still runs on the desktop
+itself — the tray, the notifications and the window shown, the run's microphone made the
+system's default meanwhile — for whoever wants to watch it: quit Kitokey first.
+
 ## Contracts
 
 - Provided: none

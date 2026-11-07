@@ -274,14 +274,16 @@ commands:
   # The page's script read for its syntax where Node is there (the hosted runners have it): a
   # name declared twice in one scope blanks the whole window, which only the e2e saw (D42).
   check: >-
-    bash -n scripts/release.sh && { ! command -v node >/dev/null || node --check ui/window.js; }
+    bash -n scripts/release.sh && bash -n scripts/headless.sh
+    && { ! command -v node >/dev/null || node --check ui/window.js; }
     && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
   # And the licence's tests built for release, where the stand-in licence must never be read
   # (D83): a build for release is what the Store sells.
   test: cargo test --locked && cargo test --locked --release --test licence
   run: cargo run --locked --release --bin kitokey
   release: bash scripts/release.sh
-  e2e: bash scripts/e2e.sh
+  # In a GNOME of the run's own, never on the user's desktop (scripts/headless.sh, README).
+  e2e: bash scripts/headless.sh
   clean: cargo clean
 
 # Each warning or error a scenario of the e2e provokes on purpose, as its log line says it (D29).
