@@ -50,6 +50,14 @@ order of the events, and what each means, are said here and nowhere else.
 All three end the same way: `stopped`, then the program ends well. Closing its input stops
 nothing.
 
+**The tracks final**: in a session of `session-audio/v3`, between `stopped` and its end, the program
+keeps each track as FLAC in place of its WAV, as that version says (cycle 09, D87). **Its end, well — a
+success —, tells that the session's tracks are final**: each is the file it stays. No event is added
+after `stopped`, which stays the last line. What it costs in time is measured on the bench and said on
+capture's page; a consumer that starts the steps that follow on `stopped` need not wait for it, since
+`session-audio/v3` says what it reads in between. Killed or failing after `stopped`, the program leaves
+the session as that version says of a track killed while compressed: whole, as WAV or as FLAC.
+
 **Failing**: the program ends in failure with one sentence on its error stream, and no
 `stopped`. Before `started`, nothing was recorded; after it, the folder holds what
 `session-audio` promises of a recording ended by a crash.
@@ -113,6 +121,7 @@ the first form never follows a microphone, as *A microphone that waits* says of 
   of this version already ignores an `event` it does not know.
 - It never says `stopped` for a recording that was killed: the consumer learns it from the
   program's end, and from a `session.json` without `stopped`.
+- It never says anything after `stopped`: the tracks made final are told by its end alone.
 - It never prints anything but these lines on its output: a consumer may refuse a line that
   is not one — and must ignore a field or an `event` it does not know, so that a second
   version can add one.
