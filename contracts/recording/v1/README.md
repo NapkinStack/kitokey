@@ -47,8 +47,8 @@ order of the events, and what each means, are said here and nowhere else.
 | `microphone` | `name`: what the start takes; `description`: as a person reads it | One microphone of what `microphones` lists (*A microphone named*, below). Never said by a recording |
 
 **Stopping**: the line `stop` on the program's input, an interrupt or a termination signal.
-All three end the same way: `stopped`, then the program ends well. Closing its input stops
-nothing.
+All three end the same way: `stopped`, then the program ends well. Closing a recording's input
+stops nothing; closing `listen`'s stops it (*Listening*).
 
 **The tracks final**: in a session of `session-audio/v3`, between `stopped` and its end, the program
 keeps each track as FLAC in place of its WAV, as that version says (cycle 09, D87). **Its end, well — a
@@ -68,7 +68,7 @@ What compressing costs in time is measured on the bench and said on capture's pa
 starts the steps that follow on `stopped` need not wait for it, since `session-audio/v3` says what it
 reads in between.
 
-**Failing**: before `stopped`, the program ends in failure with one sentence on its error stream, and
+**Failing**, a recording — `listen`'s is said under *Listening*: before `stopped`, the program ends in failure with one sentence on its error stream, and
 no `stopped`. After `stopped`, it fails only when it is killed (*The tracks final*, above). Before `started`, nothing was recorded; after it, the folder holds what
 `session-audio` promises of a recording ended by a crash.
 
@@ -142,11 +142,17 @@ session's folder, no file anywhere; only its log, as any run (*Its log*).
   source opened, `me` before `others`, naming it; then `level`, about ten times a second for each source
   opened, and `device` at each change. **Never `started` nor `stopped`**: there is no folder to name, nor a
   length; nor `silent`, `heard` or `microphone_back`: the meter says it.
-- **Stopping**: as a recording, the line `stop`, an interrupt or a termination signal; within one second
-  its streams are closed and the program ends well, saying nothing more. Its end, well, tells that nothing
-  of it is open any more. Closing its input stops nothing.
-- **Failing**: as a recording: both sources unavailable, or a wrong use, ends in failure with one
-  sentence on its error stream.
+- **A microphone named that goes while it listens**: nothing takes its place, and no line says it —
+  `me`'s `level` falls to 0 and stays there, still said ten times a second, until it is stopped; the error
+  stream may hold a line of the system's about that stream, which is no failure. Whoever wants another
+  microphone stops it and starts it again.
+- **Stopping**: the line `stop`, an interrupt, a termination signal — **or its input closed**, unlike a
+  recording: a consumer gone, crashed while it showed the meters, leaves no microphone open behind it.
+  Within one second of any of the four, its streams are closed and the program ends well, saying nothing
+  more.
+- **Its end is told by its exit status alone**, as it never says `stopped`: a success, it stopped as
+  asked, and nothing of it is open any more; a failure, it could not listen — both sources unavailable,
+  or a wrong use —, said in one sentence on its error stream, the last line there.
 - **Never during a recording.** Whoever starts it does not while one runs: it is no part of one, and the
   local side a recording opens passively would gain an active stream beside it.
 
@@ -162,7 +168,7 @@ session's folder, no file anywhere; only its log, as any run (*Its log*).
   is not one — and must ignore a field or an `event` it does not know, so that a second
   version can add one.
 - It never ends because its consumer did: a consumer that is gone — its end of the output
-  closed — stops nothing. **A consumer that keeps the output open reads it**: the system holds
+  closed — stops nothing. (`listen` ends when its *input* closes: *Listening*.) **A consumer that keeps the output open reads it**: the system holds
   some 1,700 unread events, and the program waits on the next one.
 
 **A source that becomes unavailable during the recording** — a headset unplugged — is said by
