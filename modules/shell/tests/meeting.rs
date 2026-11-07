@@ -297,3 +297,24 @@ fn a_version_3_track_is_its_wav_while_it_is_there_and_its_flac_once_it_is_gone()
     let names: Vec<String> = meeting::tracks(folder).into_iter().map(|track| track.name).collect();
     assert_eq!(names, ["remote"]);
 }
+
+#[test]
+fn a_version_3_wav_that_opens_and_is_no_track_is_no_track_its_flac_not_read_in_its_place() {
+    let folder = tempfile::tempdir().unwrap();
+    let root = folder.path();
+    fs::write(
+        root.join("session.json"),
+        r#"{"contract":"session-audio/v3","started":"2026-10-14T14:05:12+02:00","tracks":{"local":{"device":"a microphone"}}}"#,
+    )
+    .unwrap();
+    fs::write(root.join("clock.jsonl"), "{\"track\":\"local\",\"sample\":0,\"at\":0.0}\n").unwrap();
+    wav(&root.join("other.wav"), 48_000, 1, 24, 4_800);
+    fs::rename(kept_as_flac(&root.join("other.wav")), root.join("local.flac")).unwrap();
+    fs::write(root.join("local.wav"), b"not sound").unwrap();
+    assert!(
+        meeting::tracks(root).is_empty(),
+        "the FLAC was read in place of a WAV that is no track"
+    );
+    fs::remove_file(root.join("local.wav")).unwrap();
+    assert_eq!(meeting::tracks(root).len(), 1);
+}

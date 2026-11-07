@@ -158,7 +158,7 @@ pub struct Track {
 /// frame is: version 1's from the session's start; version 2's and 3's where `clock.jsonl`'s first
 /// point of the track puts its frame 0 — a track that opened on a silence starts later. A file that
 /// is not there, or is a link, is no track: freed audio leaves nothing to play. In version 3 a track
-/// is its WAV while the WAV is there and reads, its FLAC otherwise — never a `.flac.part`.
+/// is its WAV while the WAV is there and opens, its FLAC otherwise — never a `.flac.part`.
 pub fn tracks(folder: &Path) -> Vec<Track> {
     let Some(session) = fs::read_to_string(folder.join("session.json"))
         .ok()
@@ -186,12 +186,14 @@ pub fn tracks(folder: &Path) -> Vec<Track> {
     named
         .into_iter()
         .filter_map(|(name, files)| {
-            // The first of its files that is there, no link, and reads.
-            let (path, rate) = files.iter().find_map(|file| {
+            // The first of its files that is there, no link, and opens (`session-audio/v3`): a WAV
+            // that opens and is no track is no track — its FLAC is not read in its place.
+            let path = files.iter().find_map(|file| {
                 let path = std::path::absolute(folder.join(file)).ok()?;
                 fs::symlink_metadata(&path).ok().filter(fs::Metadata::is_file)?;
-                Some((path.clone(), rate(&path)?))
+                fs::File::open(&path).ok().map(|_| path)
             })?;
+            let rate = rate(&path)?;
             let mut placed: Vec<(u64, f64)> = points
                 .iter()
                 .filter(|point| point["track"] == name)
