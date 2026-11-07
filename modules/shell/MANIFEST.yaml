@@ -58,6 +58,9 @@ consumes:
   - contract: session-audio
     version: v2
     module: capture
+  - contract: session-audio
+    version: v3
+    module: capture
   - contract: minutes
     version: v1
     module: summary
@@ -186,6 +189,23 @@ dependencies:
       resampler the transcription already uses, same version
     adr: docs/adr/0009-the-window-plays-a-meeting-s-tracks-as-one-sound.md
     exit_strategy: One function, mix::Track::raised; any resampler of fixed ratio replaces it.
+  - name: symphonia
+    purpose: >
+      Reads a track kept as FLAC once its recording stopped (session-audio/v3) — for the diagnostic's
+      levels, then the list and the window's player —, its FLAC demuxer and decoder alone
+    adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
+    exit_strategy: >
+      src/flac.rs alone: open, seek and frame, held by tests/levels.rs on FLACs libFLAC wrote, and
+      by each reader's tests as it comes; claxon, or libFLAC's own decoder,
+      passes them in its place (ADR-0016).
+  - name: libflac-sys
+    purpose: >
+      For the tests only (a dev-dependency) — writes the FLACs the tests read as capture writes
+      them, with libFLAC, the reference, its verify on
+    adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
+    exit_strategy: >
+      One helper, tests/kept/mod.rs; the flac program, or any encoder Symphonia reads exactly,
+      replaces it. Removing it loses the tests, not the program.
   - name: getrandom
     purpose: The loopback server's token, 128 random bits from the system
     adr: docs/adr/0008-the-window-plays-a-meeting-from-a-loopback-server.md

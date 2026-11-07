@@ -7,6 +7,7 @@ pub mod confidential;
 pub mod context;
 pub mod correction;
 pub mod desktop;
+pub mod flac;
 pub mod keys;
 pub mod levels;
 pub mod licence;
