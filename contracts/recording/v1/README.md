@@ -52,14 +52,24 @@ nothing.
 
 **The tracks final**: in a session of `session-audio/v3`, between `stopped` and its end, the program
 keeps each track as FLAC in place of its WAV, as that version says (cycle 09, D87). **Its end, well — a
-success —, tells that the session's tracks are final**: each is the file it stays. No event is added
-after `stopped`, which stays the last line. What it costs in time is measured on the bench and said on
-capture's page; a consumer that starts the steps that follow on `stopped` need not wait for it, since
-`session-audio/v3` says what it reads in between. Killed or failing after `stopped`, the program leaves
-the session as that version says of a track killed while compressed: whole, as WAV or as FLAC.
+success —, tells that the session's tracks are final**: each is the file or files it stays — its FLAC,
+its WAV, or both, as that version allows. No event is added after `stopped`, which stays the last line.
 
-**Failing**: the program ends in failure with one sentence on its error stream, and no
-`stopped`. Before `started`, nothing was recorded; after it, the folder holds what
+- **A track not compressed is no failure**: a FLAC that cannot be written whole — a disk full — or whose
+  samples decode other than the WAV's leaves that track's WAV, its `.flac.part` removed, said in the
+  program's log; the program still ends well, and that WAV is the track.
+- **A second interrupt or termination signal** while it compresses stops the compressing: the
+  `.flac.part` being written is removed, the tracks are left as they are, and the program ends well —
+  its end still tells them final.
+- **Killed** after `stopped`, the program ends in failure, saying nothing: the session is whole, as
+  `session-audio/v3` says of a track killed while compressed — a WAV, a FLAC, or both.
+
+What compressing costs in time is measured on the bench and said on capture's page; a consumer that
+starts the steps that follow on `stopped` need not wait for it, since `session-audio/v3` says what it
+reads in between.
+
+**Failing**: before `stopped`, the program ends in failure with one sentence on its error stream, and
+no `stopped`. After `stopped`, it fails only when it is killed (*The tracks final*, above). Before `started`, nothing was recorded; after it, the folder holds what
 `session-audio` promises of a recording ended by a crash.
 
 **Its log**: the program logs what it does ([ADR-0007](../../../docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md)),
