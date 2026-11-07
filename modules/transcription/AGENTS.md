@@ -12,8 +12,9 @@ Turns the audio of a session into a timestamped transcript.
 
 ## What this module does not do
 
-- It records nothing: the audio files are `capture`'s, read as `session-audio/v1` or `v2` describes them.
-- `src/tracks.rs` brings a track of `session-audio/v2` to what an engine hears, in memory: the
+- It records nothing: the audio files are `capture`'s, read as `session-audio/v1`, `v2` or `v3` describes them.
+- `src/tracks.rs` brings a track of `session-audio/v2` or `v3` — its WAV, or its FLAC read by
+  `src/flac.rs` as 24-bit frames — to what an engine hears, in memory: the
   track is never written to (ADR-0004). The rate is changed by a library that does only that —
   a first conversion written here mirrored a voice's high notes into it at 44,100 and 8,000
   samples a second (the first verification of this reader, 2026-10-13). Nothing else is done

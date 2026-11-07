@@ -18,11 +18,11 @@ use std::{
 
 use rubato::{Fft, FixedSync, Resampler, WindowFunction, audioadapter_buffers::direct::InterleavedSlice};
 
-use crate::step::RATE;
+use crate::{flac, step::RATE};
 
 /// Frames a second no source of a meeting delivers fewer or more of: a header that says
 /// otherwise is not believed, and not given the memory it would take.
-const RATES: std::ops::RangeInclusive<u32> = 1_000..=1_000_000;
+pub(crate) const RATES: std::ops::RangeInclusive<u32> = 1_000..=1_000_000;
 /// Frames the resampler is given at a time.
 const BLOCK: usize = 4096;
 /// A frame heard this far, in seconds, from where the points before it put it starts again
@@ -71,17 +71,8 @@ pub fn clock(folder: &Path, track: &str) -> Clock {
 /// point it starts with the session. A file that is not a track is said and not converted;
 /// its header's lengths are not trusted.
 pub fn heard(path: &Path, clock: &Clock) -> io::Result<Vec<f32>> {
-    let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
-    // Whatever the system says of the file is said with the file's name; what this says of it stands.
-    let unread = |error: io::Error| match error.kind() {
-        io::ErrorKind::InvalidData => error,
-        _ => io::Error::new(io::ErrorKind::InvalidData, format!("{name} cannot be read ({error})")),
-    };
-    if !fs::metadata(path).map_err(unread)?.is_file() {
-        return refused(format!("{name} is not a file"));
-    }
-    let mut file = BufReader::with_capacity(1 << 16, File::open(path).map_err(unread)?);
-    let (rate, channels) = format(&mut file, &name).map_err(unread)?;
+    let (mut file, rate, channels, name) = opened(path)?;
+    let unread = unread(&name);
     // A clock made elsewhere than by `clock` is read in the order of its frames all the same.
     let (mut points, mut silences) = (clock.points.clone(), clock.silences.clone());
     points.sort_by_key(|(frame, _)| *frame);
@@ -104,7 +95,7 @@ pub fn heard(path: &Path, clock: &Clock) -> io::Result<Vec<f32>> {
     let (mut sounds, mut frames) = (Vec::new(), 0u64);
     for (index, (from, _)) in starts.iter().enumerate() {
         let until = starts.get(index + 1).map_or(u64::MAX, |(next, _)| *next);
-        let (sound, held, ended) = resampled(&mut track, rate, until - from).map_err(unread)?;
+        let (sound, held, ended) = resampled(&mut track, rate, until - from).map_err(&unread)?;
         sounds.push(sound);
         frames += held;
         if ended {
@@ -289,6 +280,47 @@ fn format(file: &mut impl Read, name: &str) -> io::Result<(u32, usize)> {
             if pcm { "" } else { ", and is not PCM" }
         )),
         None => not_a_track(),
+    }
+}
+
+/// Whatever the system says of a file is said with the file's name; what this says of it stands.
+fn unread(name: &str) -> impl Fn(io::Error) -> io::Error + '_ {
+    move |error| match error.kind() {
+        io::ErrorKind::InvalidData => error,
+        _ => io::Error::new(io::ErrorKind::InvalidData, format!("{name} cannot be read ({error})")),
+    }
+}
+
+/// A track's file, read from its first frame, its rate, its channels and the name it is said by: the
+/// WAV `path` names while it is there; once it is not — or cannot be opened, as Windows refuses a file
+/// being removed —, its FLAC (`session-audio/v3`), which is whole, the WAV being removed only once it
+/// is. A path naming a FLAC is that FLAC.
+fn opened(path: &Path) -> io::Result<(Box<dyn Read>, u32, usize, String)> {
+    let name = |path: &Path| path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let flac = path.with_extension("flac");
+    if path.extension().is_some_and(|extension| extension == "flac") {
+        let name = name(path);
+        let (file, rate, channels) = flac::opened(path, &name).map_err(unread(&name))?;
+        return Ok((file, rate, channels, name));
+    }
+    let wav = name(path);
+    let file = match fs::metadata(path) {
+        Ok(meta) if !meta.is_file() => refused(format!("{wav} is not a file")),
+        Ok(_) => File::open(path).map_err(unread(&wav)),
+        Err(error) => Err(unread(&wav)(error)),
+    };
+    match file {
+        Ok(file) => {
+            let mut file = BufReader::with_capacity(1 << 16, file);
+            let (rate, channels) = format(&mut file, &wav).map_err(unread(&wav))?;
+            Ok((Box::new(file), rate, channels, wav))
+        }
+        Err(error) if !flac.is_file() => Err(error),
+        Err(_) => {
+            let name = name(&flac);
+            let (file, rate, channels) = flac::opened(&flac, &name).map_err(unread(&name))?;
+            Ok((file, rate, channels, name))
+        }
     }
 }
 
