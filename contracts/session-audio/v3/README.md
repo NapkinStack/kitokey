@@ -100,11 +100,14 @@ the same number of frames, and each sample decoded equal to the WAV's.
   with the WAV sample by sample, renamed `<track>.flac` once equal, and only then is the WAV removed. A
   `.flac.part` is never part of the session: no reader reads it, and `capture` may remove it.
 - **A track is its WAV while the WAV is there**, its FLAC once the WAV is gone. A reader opens
-  `<track>.wav` when it is there and `<track>.flac` otherwise; a WAV gone between its check and its
-  open is read from its FLAC, which is whole, since the WAV is removed only after it. A WAV already
-  open is read to its end: on Linux and macOS a removed file stays readable to whoever holds it open,
-  and on Windows `capture` does not remove a WAV another program holds open — it leaves both, and
-  either is the track.
+  `<track>.wav` when it is there and `<track>.flac` otherwise; a WAV it cannot open — gone between its
+  check and its open, or refused, as Windows refuses a file being removed — is read from its FLAC,
+  which is whole, since the WAV is removed only once it is. A WAV already open is read to its end: on
+  Linux and macOS a removed file stays readable to whoever holds it open; on Windows, a WAV another
+  program holds open may not be removed, and both stay.
+- **Both there**: a WAV left beside its whole FLAC — not removed, or killed between the rename and the
+  removal — holds the same samples; either is the track, and `capture` may remove that WAV later. Until
+  then, the session weighs what it did.
 - **Killed at any point**, a session holds a whole WAV, a whole FLAC, or both: never neither.
 - **The same samples**: *Written once* holds — compressing changes the file a track is kept in, never a
   sample it holds. `clock.jsonl` places the FLAC's frames as it placed the WAV's.
