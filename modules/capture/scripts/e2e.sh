@@ -164,19 +164,55 @@ sleep 0.5
 KITOKEY_TRACE=e2e-e "$bin" record "$work/v2" > "$work/e.events" 2> "$work/e.errors" &
 recorder=$!
 sleep 1; pw-play "$work/others-a.wav"
+folder=$(ls -d "$work"/v2/*/ | head -1)
+cp "$folder/local.wav" "$work/e-local.wav"; cp "$folder/remote.wav" "$work/e-remote.wav"   # what the WAVs hold then
 sleep 14                                                 # nothing plays: "silent" is owed
 pw-play "$work/others-b.wav"; sleep 1
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 kill "$mic_player" 2>/dev/null || true
-folder=$(ls -d "$work"/v2/*/ | head -1)
 sed 's/^/    /' "$work/e.events" "$work/e.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0 -a ! -s "$work/e.errors"
 check measure events "$work/e.events"
+# Kept as FLAC once stopped (session-audio/v3, D87): the notes measured in them as in the WAVs.
 check measure2 stopped "$folder" 440 880
-check logged e2e-e capture.opened capture.opened capture.started capture.silent capture.heard capture.stopped
-for name in local remote; do
-  check test "$(ffprobe -v error -show_entries stream=codec_name -of csv=p=0 "$folder/$name.wav")" = pcm_s24le
+check measure2 kept "$folder" "$work/e-local.wav" "$work/e-remote.wav"
+check logged e2e-e capture.opened capture.opened capture.started capture.silent capture.heard capture.stopped capture.kept capture.kept
+
+say "E2. kept as FLAC: killed while it compresses, and a second signal (D87)"
+# Three recordings of a minute at once, each stopped, then: killed as its first FLAC is being written,
+# killed as it is renamed, and a second signal as it is being written. Where the moment is caught
+# depends on the machine: whatever is left is judged whole.
+tone 440 75 "$work/me-long.wav"; tone 880 75 "$work/others-75.wav"
+pw-play --target kitokey_e2e_mic "$work/me-long.wav" & mic_player=$!
+pw-play "$work/others-75.wav" & others_player=$!
+sleep 0.5
+for run in part flac again; do
+  KITOKEY_TRACE=e2e-e2-$run "$bin" record "$work/kept-$run" > /dev/null 2> "$work/e2-$run.errors" &
+  eval "recorder_$run=$!"
 done
+sleep 65
+for run in part flac again; do
+  folder=$(ls -d "$work/kept-$run"/*/ | head -1)
+  pid=$(eval echo "\$recorder_$run")
+  case $run in
+    part) python3 scripts/e2e_measure_v2.py signal-at "$folder" "$pid" SIGKILL local.flac.part & ;;
+    flac) python3 scripts/e2e_measure_v2.py signal-at "$folder" "$pid" SIGKILL local.flac & ;;
+    again) python3 scripts/e2e_measure_v2.py signal-at "$folder" "$pid" SIGTERM local.flac.part & ;;
+  esac
+done
+sleep 0.5
+kill -INT "$recorder_part" "$recorder_flac" "$recorder_again"
+wait "$recorder_part" "$recorder_flac" 2>/dev/null || true
+again_as=0; wait "$recorder_again" || again_as=$?
+wait
+kill "$mic_player" "$others_player" 2>/dev/null || true
+for run in part flac again; do
+  folder=$(ls -d "$work/kept-$run"/*/ | head -1)
+  say "    $run: $(ls "$folder" | tr '\n' ' ')"
+  check measure2 whole "$folder"
+done
+check test "$again_as" = 0 -a ! -s "$work/e2-again.errors"
+check test -z "$(ls "$(ls -d "$work"/kept-again/*/ | head -1)" | grep '\.part$')"
 
 say "F. each source as delivered: a recording killed"
 pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
@@ -452,7 +488,7 @@ sed 's/^/    /' "$work/o3.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0 -a ! -s "$work/o3.errors"
 check test "$(head -1 "$work/o3.events" | grep -c microphone_gone)" = 1
 check grep -q '"me":"kitokey_e2e_mic' "$work/o3.events"
-check test -s "$folder/local.wav"
+check test -s "$folder/local.flac"
 check logged e2e-o3 capture.microphone_gone capture.started capture.stopped
 
 # A name that goes during the recording: said, Auto takes over, the track going on; back, taken again.
@@ -476,7 +512,7 @@ check test "$(grep -c microphone_gone "$work/o4.events")" = 1
 check test "$(grep -c microphone_back "$work/o4.events")" = 1
 check measure2 said "$work/o4.events" me kitokey_e2e_mic kitokey_e2e_named
 check measure2 changes "$folder" kitokey_e2e_mic kitokey_e2e_named
-check test -s "$folder/local.wav"
+check test -s "$folder/local.flac"
 check logged e2e-o4 capture.started capture.microphone_gone capture.device capture.microphone_back capture.device capture.stopped
 
 # A headset's named, gone, back with no call on it: said back, what stood in closes, no stream, the

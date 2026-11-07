@@ -22,7 +22,8 @@ Records the audio sources of a conversation into a session.
   `src/main.rs` holds the devices, the clock and the signals. A promise of the contract is
   tested in `tests/session_audio.rs`, on sound made there.
 - `src/v2.rs` is the same for `session-audio/v2` — tracks as delivered and the clock
-  (ADR-0004) — tested in `tests/session_audio_v2.rs`. The program writes it on `--as v2`.
+  (ADR-0004) — tested in `tests/session_audio_v2.rs`. The program writes it on `--as v2`, and
+  `session-audio/v3` unasked: the same, each track then kept as FLAC by `src/keep.rs`.
 - `src/keep.rs` keeps a stopped track as FLAC (`session-audio/v3`, ADR-0016), in the contract's order; it is
   told each step and may be stopped at any, which is how `tests/keep.rs` takes the folder a kill leaves there.
 - A point of the clock is the instant the system handed a piece of sound over, not the one
@@ -78,8 +79,8 @@ Records the audio sources of a conversation into a session.
 
 ## Areas not to change without approval
 
-- The format of the files and of `session.json`: it is `contracts/session-audio/v1`, and `v2`
-  with `--as v2`; the events said while recording: `contracts/recording/v1`.
+- The format of the files and of `session.json`: it is `contracts/session-audio/v3`, `v2` with
+  `--as v2`, and `v1` with `--as v1`; the events said while recording: `contracts/recording/v1`.
 
 ## Non-standard commands
 

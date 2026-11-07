@@ -12,6 +12,9 @@ use std::{
 
 /// The contract's name, as `session.json` carries it.
 pub const CONTRACT: &str = "session-audio/v2";
+/// The same session, its tracks kept as FLAC once stopped (`contracts/session-audio/v3`): what `record`
+/// writes unasked.
+pub const V3: &str = "session-audio/v3";
 
 /// A header that says 24 bits needs the extensible form: 68 bytes before the first sample.
 const HEADER: usize = 68;
@@ -281,7 +284,7 @@ impl Held {
     }
 }
 
-pub fn write_session(folder: &Path, started: &str, stopped: Option<&str>, tracks: &[Held]) -> io::Result<()> {
+pub fn write_session(folder: &Path, contract: &str, started: &str, stopped: Option<&str>, tracks: &[Held]) -> io::Result<()> {
     let tracks: serde_json::Map<String, serde_json::Value> = tracks
         .iter()
         .map(|held| {
@@ -296,7 +299,7 @@ pub fn write_session(folder: &Path, started: &str, stopped: Option<&str>, tracks
             (held.track.clone(), track)
         })
         .collect();
-    let mut session = serde_json::json!({ "contract": CONTRACT, "started": started, "tracks": tracks });
+    let mut session = serde_json::json!({ "contract": contract, "started": started, "tracks": tracks });
     if let Some(stopped) = stopped {
         session["stopped"] = stopped.into();
     }
