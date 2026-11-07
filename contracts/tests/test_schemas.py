@@ -518,6 +518,15 @@ EXAMPLES = {
     ),
 }
 
+# session-audio/v3's documents are v2's, named v3: what changes is the file a stopped track is kept
+# in, which no schema reads; a document named v2 is refused by v3's schema.
+for _name in ("session.schema.json", "clock.schema.json"):
+    _allowed, _refused = json.loads(
+        json.dumps(EXAMPLES[f"session-audio/v2/{_name}"]).replace("session-audio/v2", "session-audio/v3")
+    )
+    EXAMPLES[f"session-audio/v3/{_name}"] = (_allowed, _refused)
+EXAMPLES["session-audio/v3/session.schema.json"][1].append(EXAMPLES["session-audio/v2/session.schema.json"][0][0])
+
 
 @pytest.mark.parametrize("path", SCHEMAS, ids=NAMES)
 def test_a_schema_allows_what_its_page_shows_and_refuses_what_its_page_refuses(path):
