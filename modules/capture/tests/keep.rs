@@ -196,3 +196,58 @@ fn a_track_not_in_24_bits_is_left_as_its_wav() {
     assert_eq!(names(folder.path()), ["local.wav"]);
     assert_eq!(fs::read(folder.path().join("local.wav")).unwrap(), before);
 }
+
+#[test]
+fn a_flac_whole_in_itself_but_not_its_wav_is_removed_and_the_wav_kept() {
+    let folder = tempfile::tempdir().unwrap();
+    session(folder.path());
+    // While the FLAC is read back, three bytes of the WAV are not what they were: the FLAC is whole
+    // — its frames and its MD5 its own —, and only the comparison, sample by sample, sees it is not the WAV.
+    let mut changed = false;
+    let kept = keep::keep(folder.path(), &["local", "remote"], |track, step| {
+        if track == "local" && step == Step::Checking && !changed {
+            let wav = folder.path().join("local.wav");
+            let mut bytes = fs::read(&wav).unwrap();
+            let at = 68 + 25_000 * 6;
+            bytes[at..at + 3].copy_from_slice(&[0x12, 0x34, 0x56]);
+            fs::write(&wav, bytes).unwrap();
+            changed = true;
+        }
+        true
+    });
+    assert!(matches!(&kept[0], (track, Kept::Wav(_)) if track == "local"), "{kept:?}");
+    assert_eq!(names(folder.path()), ["local.wav", "remote.flac"]);
+}
+
+#[test]
+fn stopped_once_renamed_its_wav_stays_beside_its_flac_and_no_other_track_starts() {
+    let folder = tempfile::tempdir().unwrap();
+    let samples = session(folder.path());
+    let kept = keep::keep(folder.path(), &["local", "remote"], |_, step| step != Step::Renamed);
+    assert!(
+        matches!(&kept[0], (track, Kept::Both(_) | Kept::Stopped) if track == "local"),
+        "{kept:?}"
+    );
+    assert_eq!(kept.len(), 1, "{kept:?}");
+    assert_eq!(names(folder.path()), ["local.flac", "local.wav", "remote.wav"]);
+    whole(folder.path(), &samples);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_wav_the_system_will_not_remove_is_said_kept_beside_its_flac() {
+    use std::os::unix::fs::PermissionsExt;
+    let folder = tempfile::tempdir().unwrap();
+    let samples = session(folder.path());
+    let kept = keep::keep(folder.path(), &["local"], |_, step| {
+        if step == Step::Renamed {
+            // The folder no longer lets a file go, as Windows refuses one another program holds open.
+            fs::set_permissions(folder.path(), fs::Permissions::from_mode(0o555)).unwrap();
+        }
+        true
+    });
+    fs::set_permissions(folder.path(), fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(matches!(&kept[0], (track, Kept::Both(_)) if track == "local"), "{kept:?}");
+    assert_eq!(names(folder.path()), ["local.flac", "local.wav", "remote.wav"]);
+    whole(folder.path(), &samples);
+}
