@@ -195,8 +195,8 @@ dependencies:
       levels, then the list and the window's player —, its FLAC demuxer and decoder alone
     adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
     exit_strategy: >
-      src/flac.rs alone: open, seek and frame, held by tests/levels.rs on FLACs libFLAC wrote, and
-      by each reader's tests as it comes; claxon, or libFLAC's own decoder,
+      src/flac.rs alone: open and frame held by tests/levels.rs on FLACs libFLAC wrote, seek by the
+      player's tests when it comes; claxon, or libFLAC's own decoder,
       passes them in its place (ADR-0016).
   - name: libflac-sys
     purpose: >

@@ -202,3 +202,56 @@ fn a_flac_damaged_in_its_middle_is_said_unread_never_measured_shorter() {
         "{local}"
     );
 }
+
+/// A FLAC's STREAMINFO, as libFLAC wrote it after `fLaC` and the block's header: its total of frames
+/// is the low 36 bits of its bytes 18 to 26 in the file, its MD5 the 16 bytes after.
+fn streaminfo(flac: &Path, change: impl Fn(&mut [u8])) {
+    let mut bytes = fs::read(flac).unwrap();
+    change(&mut bytes);
+    fs::write(flac, bytes).unwrap();
+}
+
+#[test]
+fn a_flac_whose_streaminfo_is_not_its_frames_is_said_unread() {
+    let unread = |change: &dyn Fn(&mut [u8])| {
+        let folder = tempfile::tempdir().unwrap();
+        let root = folder.path();
+        fs::write(root.join("session.json"), r#"{"contract":"session-audio/v3"}"#).unwrap();
+        wav(&root.join("local.wav"), 48_000, 2, 24, false, 48_000, sine(0.5));
+        let flac = kept_as_flac(&root.join("local.wav"));
+        streaminfo(&flac, change);
+        let local = line(&levels(root), "local");
+        (local["present"].as_bool(), local["read"].as_bool())
+    };
+    // Untouched, it reads.
+    assert_eq!(unread(&|_| {}), (Some(true), Some(true)));
+    // STREAMINFO counts more frames than the stream holds, every frame whole: said — by Symphonia
+    // itself on this stream, and by the length `frame` checks should it not.
+    let longer = |bytes: &mut [u8]| {
+        let field = u64::from_be_bytes(bytes[18..26].try_into().unwrap());
+        bytes[18..26].copy_from_slice(&(field + 1_000).to_be_bytes());
+    };
+    assert_eq!(unread(&longer), (Some(true), Some(false)), "a stream shorter than STREAMINFO");
+    // An MD5 that is not the frames', every frame whole and counted: the MD5 alone says it.
+    assert_eq!(
+        unread(&|bytes: &mut [u8]| bytes[30] ^= 0x01),
+        (Some(true), Some(false)),
+        "an MD5 not theirs"
+    );
+}
+
+#[test]
+fn a_flac_of_16_bits_says_its_wavs_levels_and_a_wav_beside_its_flac_is_measured() {
+    let folder = tempfile::tempdir().unwrap();
+    let root = folder.path();
+    fs::write(root.join("session.json"), r#"{"contract":"session-audio/v3"}"#).unwrap();
+    wav(&root.join("local.wav"), 16_000, 1, 16, false, 16_000, sine(0.5));
+    let mut before = line(&levels(root), "local");
+    kept_as_flac(&root.join("local.wav"));
+    let after = line(&levels(root), "local");
+    before["format"] = "flac".into();
+    assert_eq!(before, after);
+    // A WAV beside a FLAC is the track: measured, said as PCM.
+    wav(&root.join("local.wav"), 16_000, 1, 16, false, 16_000, sine(0.1));
+    assert_eq!(line(&levels(root), "local")["format"], "pcm");
+}
