@@ -6,6 +6,9 @@ use std::{fs, io::Read, path::Path};
 
 use kitokey_shell::{mix::Mix, player::Served};
 
+mod kept;
+use kept::kept_as_flac;
+
 fn get(url: &str, method: &str, range: Option<&str>) -> (u16, Vec<(String, String)>, Vec<u8>) {
     let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();
     let mut answer = match (method, range) {
@@ -166,4 +169,24 @@ fn the_meeting_offered_is_served_as_one_sound_whole_or_by_range_to_the_token_alo
     assert_eq!(served.offer(vec![(folder.path().join("secret.txt"), 0.0)]), None);
     let last = served.offer(vec![(local, 0.0)]).unwrap();
     assert_eq!(get(&last, "GET", Some("bytes=44-45")).2.len(), 2);
+}
+
+#[test]
+fn a_track_kept_as_flac_while_it_is_served_is_still_served_the_same() {
+    // Opened right after its stop, the meeting is played from its WAVs while capture keeps them as
+    // FLAC (`session-audio/v3`): the same sound, never a sound cut.
+    let folder = tempfile::tempdir().unwrap();
+    let (local, remote) = (folder.path().join("local.wav"), folder.path().join("remote.wav"));
+    track(&local, 150_000, 10);
+    track(&remote, 100_000, 7);
+    let offered = vec![(local.clone(), 0.0), (remote.clone(), 0.5)];
+    let served = Served::start().unwrap();
+    let url = served.offer(offered).unwrap();
+    let (_, _, whole) = get(&url, "GET", None);
+    let local_flac = kept_as_flac(&local);
+    let (status, _, body) = get(&url, "GET", None);
+    assert!(status == 200 && body == whole, "{status}");
+    // Freed — its FLAC to the trash too —: gone.
+    fs::remove_file(local_flac).unwrap();
+    assert_eq!(get(&url, "GET", None).0, 404);
 }
