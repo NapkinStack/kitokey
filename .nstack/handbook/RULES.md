@@ -94,7 +94,7 @@ a family, a number a rule; a retired rule's number is never reused.
 | Code | Refuses | Why |
 |---|---|---|
 | `T1` | A change that owes a test sheet and carries none | `05-workflow.md` §7 |
-| `T2` | A sheet with no verifier, a verifier who is an author, a row left empty, or a row with more cells than its header | `05-workflow.md` §7 |
+| `T2` | A sheet with no verifier, a verifier who is an author, a person named verifier with no hand on the pull request — no edit of its description, no review, no comment —, a row left empty, or a row with more cells than its header | `05-workflow.md` §7 |
 | `T3` | A scenario passed with no evidence, or no commit it was verified on | `05-workflow.md` §7 |
 | `T4` | Evidence older than the head commit | `05-workflow.md` §7 |
 | `T5` | A scenario failed, or left not verified | `05-workflow.md` §7 |

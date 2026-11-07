@@ -307,7 +307,9 @@ the change, and the stricter applies:
   the pull request's, the commits' GitHub accounts (read from their noreply addresses; off GitHub
   no other address names a person), and
   the sessions their `Agent-Session` trailers name — and refuses a match: a declaration
-  checked against the history, not a proof of identity.
+  checked against the history, not a proof of identity. Each person named must have a hand on
+  the pull request — an edit of its description, a review or a comment —: a name written over
+  the author's own results is refused.
 - **No result without evidence**, tied to the commit tested. A new commit does not send the
   whole sheet back:
   - a commit whose files are exactly the head's **is** the head: a hash changed by a merge
