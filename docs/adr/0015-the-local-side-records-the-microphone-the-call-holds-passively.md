@@ -189,6 +189,27 @@ active on its monitor: wrong by construction.
   the local track holds the voice the call hears.
 - **How we will observe it**: the success criterion below.
 
+### Amendment, 2026-11-07 — listening before a recording opens the microphone actively (D88)
+
+*Proposed by the author of D88, as cycle 09 asks; accepting it is the decider's, at its pull request.*
+
+- **Why.** A passive stream on a source no call runs hears nothing (*The measure*): before a call, a
+  headset's microphone cannot be tried passively, and D88's « Vérifier le son » must show it move.
+- **Prior art.** Zoom, Meet and Teams test the microphone inside a window the user opened, and only
+  there; an application that keeps a microphone open draws complaints
+  ([review 2026-11-06, §1](../project/reviews/2026-11-06-market.md)).
+- **What changes.** While capture listens (`recording/v1`'s `listen`) — the user's gesture, the panel
+  shown, nothing recorded — the local side is an **active** stream, on any source, a headset's too. A
+  Bluetooth headset may then switch to its call profile while the panel shows, which the panel says in one
+  sentence; WirePlumber restores it once the stream is closed (2 s, *Context*). capture closes it within a
+  second of being told to stop.
+- **What does not.** During a recording, everything above holds unchanged: a `bluez5.loopback=true`
+  source is never opened actively, and `me` is passive on it while a call holds it. Listening is never part
+  of a recording.
+- **Not claimed.** Listening while a call already runs a headset's microphone adds an active stream to a
+  source the call runs already: no switch the call has not asked — read in the script's conditions, not
+  tried. The panel is meant before a call; what it offers during one is the shell's (D88).
+
 ---
 
 ## Success criterion
