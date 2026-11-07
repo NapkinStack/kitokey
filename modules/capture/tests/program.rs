@@ -50,7 +50,7 @@ fn refused(args: &[&str], logs: &Path) -> (String, Vec<serde_json::Value>, Strin
 #[test]
 fn a_refusal_is_logged_with_its_detail_under_the_makings_id() {
     let logs = tempfile::tempdir().unwrap();
-    let (err, lines, _) = refused(&["listen"], logs.path());
+    let (err, lines, _) = refused(&["hear"], logs.path());
     assert!(err.contains("usage: kitokey-capture"), "{err}");
     assert_eq!(lines.len(), 1);
     assert_eq!(lines[0]["message"], "capture.failed");
@@ -58,6 +58,56 @@ fn a_refusal_is_logged_with_its_detail_under_the_makings_id() {
     assert_eq!(lines[0]["span"]["trace"], "making-9");
     assert_eq!(lines[0]["span"]["program"], "capture");
     assert!(lines[0]["detail"].as_str().unwrap().starts_with("usage: kitokey-capture"));
+}
+
+#[test]
+fn listening_takes_no_folder_and_nothing_but_a_microphone() {
+    for args in [&["listen", "sessions"][..], &["listen", "--microphone"], &["listen", "--as", "v2"]] {
+        let logs = tempfile::tempdir().unwrap();
+        let (err, _, _) = refused(args, logs.path());
+        assert!(err.contains("usage: kitokey-capture") && err.contains("listen"), "{err}");
+    }
+}
+
+#[test]
+fn listening_with_no_source_fails_as_a_recording_does_and_writes_nothing() {
+    // No sound server: each source is said unavailable, then the program fails; nothing is written
+    // anywhere it could write but its log.
+    let (home, logs, nowhere) = (
+        tempfile::tempdir().unwrap(),
+        tempfile::tempdir().unwrap(),
+        tempfile::tempdir().unwrap(),
+    );
+    let alsa = nowhere.path().join("alsa.conf");
+    fs::write(&alsa, "").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_kitokey-capture"))
+        .args(["listen", "--microphone", "any"])
+        .current_dir(home.path())
+        .env("HOME", home.path())
+        .env("XDG_STATE_HOME", home.path())
+        .env("TMPDIR", home.path())
+        .env("KITOKEY_LOG_DIR", logs.path())
+        .env("PIPEWIRE_REMOTE", "kitokey-none")
+        .env("PULSE_SERVER", format!("unix:{}/none", nowhere.path().display()))
+        .env("XDG_RUNTIME_DIR", nowhere.path())
+        .env("ALSA_CONFIG_PATH", &alsa)
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let err = String::from_utf8_lossy(&output.stderr);
+    // Its own sentence last: ALSA's library says what it found of no device before it.
+    let last = err.lines().last().unwrap_or_default();
+    assert!(last.starts_with("kitokey-capture: no source could be opened"), "{err}");
+    let said: Vec<serde_json::Value> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let events: Vec<_> = said.iter().map(|line| line["event"].as_str().unwrap()).collect();
+    assert!(!events.contains(&"started") && !events.contains(&"stopped"), "{events:?}");
+    assert_eq!(events.iter().filter(|event| **event == "unavailable").count(), 2, "{events:?}");
+    assert_eq!(walk(home.path()), Vec::<std::path::PathBuf>::new());
+    assert_eq!(walk(nowhere.path()), vec![alsa]);
 }
 
 #[test]
@@ -98,7 +148,7 @@ fn full_logs(program: &str) -> tempfile::TempDir {
 fn a_log_that_cannot_be_written_says_nothing_on_the_error_stream() {
     let logs = full_logs("capture");
     let output = Command::new(env!("CARGO_BIN_EXE_kitokey-capture"))
-        .arg("listen")
+        .arg("hear")
         .env("KITOKEY_LOG_DIR", logs.path())
         .output()
         .unwrap();
@@ -112,7 +162,7 @@ fn a_log_that_cannot_be_written_says_nothing_on_the_error_stream() {
 fn logged_with(env: &[(&str, &Path)], texts: &[(&str, &str)]) -> Vec<std::path::PathBuf> {
     let nowhere = tempfile::tempdir().unwrap();
     let mut run = Command::new(env!("CARGO_BIN_EXE_kitokey-capture"));
-    run.arg("listen")
+    run.arg("hear")
         .env_clear()
         .env("PIPEWIRE_REMOTE", "kitokey-none")
         .env("XDG_RUNTIME_DIR", nowhere.path());

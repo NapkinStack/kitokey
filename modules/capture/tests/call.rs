@@ -739,6 +739,33 @@ fn a_stream_that_never_had_a_track_owes_no_null() {
     assert!(!Local::started(false).gone());
 }
 
+fn listened(graph: Vec<Value>, name: Option<&str>) -> (Me, bool) {
+    call::listened(&Value::Array(graph).to_string(), OURS, name).unwrap()
+}
+
+#[test]
+fn listening_opens_what_a_recording_would_record_a_headset_s_too_and_never_passively() {
+    // D88, ADR-0015's amendment: the user asked to hear it, nothing is recorded.
+    let mut graph = sources();
+    graph.push(default_source(AIRPODS));
+    // No call, a headset's default: the default input, where a recording would wait.
+    assert_eq!(listened(graph.clone(), None), (Me::Default, true));
+    // Named, a headset's, no call on it: that one, actively.
+    let airpods = (held(AIRPODS, "AirPods", false), true);
+    assert_eq!(listened(graph.clone(), Some(&call::microphone_id(AIRPODS))), airpods);
+    // Not there: what none named gives, said.
+    assert_eq!(listened(graph.clone(), Some("nobody")), (Me::Default, false));
+    // A call on the headset: that one, actively.
+    let mut called = sources();
+    called.extend([stream(131, 143), link(3, 134, 131), default_source("alsa_input.laptop")]);
+    assert_eq!(listened(called.clone(), None), airpods);
+    // Named, it wins over the call's.
+    assert_eq!(
+        listened(called, Some("alsa_input.laptop")),
+        (held("alsa_input.laptop", "Digital Microphone", false), true)
+    );
+}
+
 fn named(graph: Vec<Value>, name: &str) -> (Me, bool) {
     call::named(&Value::Array(graph).to_string(), OURS, name).unwrap()
 }

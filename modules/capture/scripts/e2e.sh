@@ -557,5 +557,84 @@ kill "$named" "$other" "$headset" "$addressed" 2>/dev/null || true; wait "$named
 pactl unload-module "$mic_c"; mic_c=
 pactl unload-module "$mic_d"; mic_d=
 
+say "P. listening without recording (D88): each source heard, nothing written, stopped within a second"
+# What the run's folder holds, file by file and size: listening must leave it as it was. It starts in a
+# folder of its own, its temporary files there too: they must stay empty.
+files() { find "$work" -mindepth 1 \( -path "$work/p.*" -prune \) -o -type f -printf '%P %s\n' -o -printf '%P/\n' | sort; }
+# Whether it holds what it held before listening; what differs said, nothing else.
+unchanged() { diff <(echo "$before") <(files) | sed 's/^/    /' | tee -a .evidence/e2e.txt | grep -q . && return 1 || return 0; }
+mkdir -p "$work/p-cwd"
+# listen_for RUN [ARGS]: started on a pipe's input, its output in p.RUN.events; the pipe open on 3.
+listen_for() {
+  mkfifo "$work/p.$1.in"
+  (cd "$work/p-cwd" && KITOKEY_TRACE="e2e-p-$1" TMPDIR="$work/p-cwd" exec "$bin" listen "${@:2}") \
+    < "$work/p.$1.in" > "$work/p.$1.events" 2> "$work/p.$1.errors" &
+  listener=$!
+  exec 3> "$work/p.$1.in"
+}
+# stopped_within PID SECONDS: the program ends well within that long of what was just asked.
+stopped_within() {
+  local asked=$1 as=0; wait "$2" || as=$?
+  python3 -c 'import sys, time; sys.exit(0 if time.time() - float(sys.argv[1]) < float(sys.argv[2]) else "took " + str(time.time() - float(sys.argv[1])))' "$asked" "$3" && test "$as" = 0
+}
+# heard RUN ME OTHERS: each source named first, its level above the floor; no line a recording alone says.
+heard() {
+  python3 - "$work/p.$1.events" "$2" "$3" <<'PY'
+import json, sys
+lines = [json.loads(line) for line in open(sys.argv[1])]
+devices = [(line["source"], line["device"]) for line in lines if line["event"] == "device"]
+loudest = {source: max([line["level"] for line in lines if line["event"] == "level" and line["source"] == source] or [0]) for source in ("me", "others")}
+said = {line["event"] for line in lines}
+named = [source for source, _ in devices[:2]] == ["me", "others"] and all(device.startswith(want) for (_, device), want in zip(devices, sys.argv[2:]))
+ok = named and min(loudest.values()) > 0.5 and said <= {"device", "level"}
+print(f"    devices {devices}, loudest {loudest}, said {sorted(said)}")
+sys.exit(0 if ok else "not heard as it should be")
+PY
+}
+before=$(files)
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
+pw-play --target kitokey_e2e_out "$work/others-long.wav" & others_player=$!
+sleep 0.5
+listen_for stop
+sleep 3
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+check heard stop kitokey_e2e_mic kitokey_e2e_out
+check test ! -s "$work/p.stop.errors"
+# A termination signal, as the shell closing the panel.
+listen_for term
+sleep 2
+asked=$(date +%s.%N); kill -TERM "$listener"
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+check heard term kitokey_e2e_mic kitokey_e2e_out
+kill "$mic_player" "$others_player" 2>/dev/null || true; wait "$mic_player" "$others_player" 2>/dev/null || true
+check unchanged
+check test -z "$(ls -A "$work/p-cwd")"
+check test -z "$(pactl list short source-outputs)"
+check logged e2e-p-stop capture.opened capture.opened capture.listening capture.listened
+# A headset's default, no call: a recording waits (M); listening opens it actively — it runs from
+# capture's stream alone —, and lets it go when stopped (ADR-0015's amendment).
+mic_c=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic_c)
+stand_in kitokey_e2e_headset "bluez5.loopback=true"; headset=$!
+sleep 1
+pactl set-default-source kitokey_e2e_headset
+check measure2 not-running kitokey_e2e_headset 1
+listen_for headset
+sleep 2
+check grep -q '"device":"kitokey_e2e_headset","event":"device","source":"me"' "$work/p.headset.events"
+check measure2 running kitokey_e2e_headset
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+sleep 1
+check measure2 not-running kitokey_e2e_headset 2
+kill "$headset" 2>/dev/null || true; wait "$headset" 2>/dev/null || true
+pactl set-default-source kitokey_e2e_mic.monitor
+pactl unload-module "$mic_c"; mic_c=
+grep -v '"level"' "$work"/p.*.events | sed 's/^/    /' >> .evidence/e2e.txt
+check unchanged
+
 [ "$failed" = 0 ] && say "e2e: passed" || say "e2e: FAILED"
 exit "$failed"

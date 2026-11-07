@@ -6,6 +6,7 @@
 //!     kitokey-capture record <sessions-folder> --as v2     the same, its tracks kept as WAV
 //!     kitokey-capture record <sessions-folder> --as v1     the same, in the first form
 //!     kitokey-capture record <sessions-folder> --microphone <name>     `me` from that one
+//!     kitokey-capture listen [--microphone <name>]  each source's device and level, recording nothing
 //!     kitokey-capture microphones                  what can be named, one JSON object per line
 //!     kitokey-capture devices                      what the system offers
 //!
@@ -131,10 +132,12 @@ fn main() -> ExitCode {
             record_v2(Path::new(sessions), Some(name), v2::CONTRACT)
         }
         ["record", sessions, "--as", "v1"] => record(Path::new(sessions)),
+        ["listen"] => listen_only(None),
+        ["listen", "--microphone", name] => listen_only(Some(name)),
         ["microphones"] => microphones(),
         ["devices"] => devices(),
         _ => Err(
-            "usage: kitokey-capture record <sessions-folder> [--as v1|v2] [--microphone <name>, not with v1] | kitokey-capture microphones | kitokey-capture devices"
+            "usage: kitokey-capture record <sessions-folder> [--as v1|v2] [--microphone <name>, not with v1] | kitokey-capture listen [--microphone <name>] | kitokey-capture microphones | kitokey-capture devices"
                 .into(),
         ),
     };
@@ -1036,21 +1039,7 @@ fn record_v2(sessions: &Path, microphone: Option<&str>, contract: &str) -> Resul
                     }
                 })
         } else {
-            host.default_output_device()
-                .ok_or_else(|| "the system names no default device".to_string())
-                .and_then(|device| {
-                    let closing = Arc::new(AtomicBool::new(false));
-                    open(
-                        &device,
-                        true,
-                        index,
-                        zero,
-                        None,
-                        opening.sound.clone(),
-                        (opening.moved.clone(), closing.clone()),
-                    )
-                    .map(|(stream, rate, channels)| (named_as_used(&host, &device), Feed::Cpal { stream, closing }, rate, channels))
-                })
+            open_others(&host, &opening)
         };
         match opened {
             Ok((name, stream, rate, channels)) => {
@@ -1229,6 +1218,105 @@ fn record_v2(sessions: &Path, microphone: Option<&str>, contract: &str) -> Resul
             }
         }
     }
+    Ok(())
+}
+
+/// Opens what the default output plays, for the remote side: its name, what feeds it, and its form.
+fn open_others(host: &Host, opening: &Opening) -> Result<(String, Feed, u32, u16), String> {
+    let device = host.default_output_device().ok_or("the system names no default device")?;
+    let closing = Arc::new(AtomicBool::new(false));
+    let moved = (opening.moved.clone(), closing.clone());
+    let (stream, rate, channels) = open(&device, true, 1, opening.zero, None, opening.sound.clone(), moved)?;
+    Ok((named_as_used(host, &device), Feed::Cpal { stream, closing }, rate, channels))
+}
+
+/// Listens to the two sources and records nothing (`recording/v1`'s *Listening*, D88): each source's
+/// device, then its level ten times a second, until it is told to stop; no folder, no file. The local
+/// side is opened actively, a headset's too: the user asked to hear it (ADR-0015's amendment).
+fn listen_only(microphone: Option<&str>) -> Result<(), String> {
+    let host = host();
+    let (sound, heard) = mpsc::channel::<Sound>();
+    let (moved, moves) = mpsc::channel::<Move>();
+    // Nothing follows a call here: only the moves the system makes are named.
+    let (moves, follower) = naming(moves);
+    drop(follower);
+    let (stop, _) = stop_asked()?;
+    let pipewire = host.id().name() == "PipeWire";
+    let (me, there) = graph()
+        .filter(|_| pipewire)
+        .and_then(|dump| call::listened(&dump, u64::from(std::process::id()), microphone).ok())
+        .unwrap_or((Me::Default, microphone.is_none()));
+    if !there {
+        say(Event::MicrophoneGone);
+    }
+    let opening = Opening {
+        zero: Instant::now(),
+        sound,
+        moved,
+    };
+    let (mut feeds, mut meters, mut names) = (Vec::new(), [None, None], [None, None]);
+    for index in 0..2 {
+        let opened = if index == 0 {
+            open_me(&host, &me, None, &opening).and_then(|(feed, name, form)| {
+                let (rate, channels) = form.ok_or("the microphone gave no form")?;
+                Ok((name, feed, rate, channels))
+            })
+        } else {
+            open_others(&host, &opening)
+        };
+        match opened {
+            Ok((name, feed, rate, channels)) => {
+                info!(source = SOURCES[index], device = %name, rate, channels, "capture.opened");
+                feeds.push(feed);
+                meters[index] = Some(v2::Meter::new(rate, channels));
+                names[index] = Some(name);
+            }
+            Err(reason) => say(Event::Unavailable {
+                source: index,
+                reason: &call::without_address(&reason),
+            }),
+        }
+    }
+    drop(opening);
+    if meters.iter().all(Option::is_none) {
+        return Err("no source could be opened: nothing to listen to".into());
+    }
+    for (index, name) in names.iter().enumerate() {
+        if let Some(name) = name {
+            say(Event::Device {
+                source: index,
+                device: Some(name),
+            });
+        }
+    }
+    info!("capture.listening");
+    let mut metered = Instant::now();
+    while !stop.load(Ordering::SeqCst) {
+        said_moved(&moves, false, call::Local::started(true), &mut names, |_, _, _| Ok(()))?;
+        match heard.recv_timeout(Duration::from_millis(50)) {
+            Ok((index, _, samples)) => {
+                if let Some(meter) = &mut meters[index] {
+                    meter.push(&samples);
+                }
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => std::thread::sleep(Duration::from_millis(50)),
+        }
+        if metered.elapsed() >= Duration::from_millis(100) {
+            metered = Instant::now();
+            for (index, meter) in meters.iter_mut().enumerate() {
+                if let Some(meter) = meter {
+                    say(Event::Level {
+                        source: index,
+                        level: meter.level(),
+                    });
+                }
+            }
+        }
+    }
+    // Closed before the program ends: nothing of it is left open.
+    drop(feeds);
+    info!("capture.listened");
     Ok(())
 }
 
