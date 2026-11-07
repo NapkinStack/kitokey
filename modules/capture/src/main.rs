@@ -1,7 +1,9 @@
 //! `kitokey-capture` — records a conversation into a session's folder, with no window.
 //!
 //!     kitokey-capture record <sessions-folder>     each source as delivered, until Ctrl-C, a TERM
-//!                                                 signal, or "stop" on its input
+//!                                                 signal, or "stop" on its input; then each track
+//!                                                 kept as FLAC (session-audio/v3)
+//!     kitokey-capture record <sessions-folder> --as v2     the same, its tracks kept as WAV
 //!     kitokey-capture record <sessions-folder> --as v1     the same, in the first form
 //!     kitokey-capture record <sessions-folder> --microphone <name>     `me` from that one
 //!     kitokey-capture microphones                  what can be named, one JSON object per line
@@ -31,7 +33,12 @@ use cpal::{
     Device, FromSample, Host, Sample, SampleFormat, SizedSample, Stream,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
-use kitokey_capture::{Event, Heard, RATE, SOURCES, Track, Watch, call, call::Me, log, new_folder, v2, write_session};
+use kitokey_capture::{
+    Event, Heard, RATE, SOURCES, Track, Watch, call,
+    call::Me,
+    keep::{self, Kept},
+    log, new_folder, v2, write_session,
+};
 use serde_json::json;
 use tracing::{error, info, warn};
 
@@ -117,10 +124,12 @@ fn main() -> ExitCode {
     let _run = log::start("capture");
     let args: Vec<String> = std::env::args().skip(1).collect();
     let outcome = match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
-        ["record", sessions] | ["record", sessions, "--as", "v2"] => record_v2(Path::new(sessions), None),
-        ["record", sessions, "--microphone", name]
-        | ["record", sessions, "--as", "v2", "--microphone", name]
-        | ["record", sessions, "--microphone", name, "--as", "v2"] => record_v2(Path::new(sessions), Some(name)),
+        ["record", sessions] => record_v2(Path::new(sessions), None, v2::V3),
+        ["record", sessions, "--as", "v2"] => record_v2(Path::new(sessions), None, v2::CONTRACT),
+        ["record", sessions, "--microphone", name] => record_v2(Path::new(sessions), Some(name), v2::V3),
+        ["record", sessions, "--as", "v2", "--microphone", name] | ["record", sessions, "--microphone", name, "--as", "v2"] => {
+            record_v2(Path::new(sessions), Some(name), v2::CONTRACT)
+        }
         ["record", sessions, "--as", "v1"] => record(Path::new(sessions)),
         ["microphones"] => microphones(),
         ["devices"] => devices(),
@@ -828,7 +837,7 @@ fn record(sessions: &Path) -> Result<(), String> {
         sources: [&names[0], &names[1]],
     });
 
-    let stop = stop_asked()?;
+    let (stop, _) = stop_asked()?;
     // A call heard on another output than the default is followed there, where PipeWire is.
     if host.id().name() == "PipeWire" {
         follow(follower, None, zero, stop.clone());
@@ -911,12 +920,18 @@ fn record(sessions: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// True once the user asked to stop: an interrupt, a termination signal, or `stop` on the input.
-fn stop_asked() -> Result<Arc<AtomicBool>, String> {
-    let stop = Arc::new(AtomicBool::new(false));
+/// True once the user asked to stop: an interrupt, a termination signal, or `stop` on the input;
+/// and true once a signal came after that: what is being compressed is left (`recording/v1`).
+fn stop_asked() -> Result<(Arc<AtomicBool>, Arc<AtomicBool>), String> {
+    let (stop, abandon) = (Arc::new(AtomicBool::new(false)), Arc::new(AtomicBool::new(false)));
     {
-        let stop = stop.clone();
-        ctrlc::set_handler(move || stop.store(true, Ordering::SeqCst)).map_err(|e| e.to_string())?;
+        let (stop, abandon) = (stop.clone(), abandon.clone());
+        ctrlc::set_handler(move || {
+            if stop.swap(true, Ordering::SeqCst) {
+                abandon.store(true, Ordering::SeqCst);
+            }
+        })
+        .map_err(|e| e.to_string())?;
     }
     {
         let stop = stop.clone();
@@ -928,7 +943,7 @@ fn stop_asked() -> Result<Arc<AtomicBool>, String> {
             }
         });
     }
-    Ok(stop)
+    Ok((stop, abandon))
 }
 
 /// A track being recorded as `session-audio/v2` describes it, and where its clock stands.
@@ -987,7 +1002,8 @@ impl Delivered {
 }
 
 /// Records each source as the system delivers it, with the session's clock beside (ADR-0004).
-fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
+/// Written as `contract` says: under `session-audio/v3`, each track is kept as FLAC once stopped.
+fn record_v2(sessions: &Path, microphone: Option<&str>, contract: &str) -> Result<(), String> {
     let host = host();
     let (sound, heard) = mpsc::channel::<Sound>();
     let (moved, moves) = mpsc::channel::<Move>();
@@ -998,7 +1014,7 @@ fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
 
     // A source that cannot be opened is said and has no track; the other is still recorded. The
     // local side is what the graph says (ADR-0015): it may wait, and gets its track when it is taken.
-    let stop = stop_asked()?;
+    let (stop, abandon) = stop_asked()?;
     let opening = Opening { zero, sound, moved };
     let (me_first, named_there) = me_now(&host, microphone);
     if !named_there {
@@ -1070,7 +1086,7 @@ fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
         .map(|index| v2::Held::new(TRACKS[index], &names[index]))
         .collect();
     let stamp = |time: chrono::DateTime<chrono::Local>| time.to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
-    let session = |held: &[v2::Held]| v2::write_session(&folder, &stamp(started), None, held).map_err(|e| e.to_string());
+    let session = |held: &[v2::Held]| v2::write_session(&folder, contract, &stamp(started), None, held).map_err(|e| e.to_string());
     session(&held)?;
     say(Event::Started {
         folder: &folder,
@@ -1200,8 +1216,19 @@ fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
         let rate = f64::from(source.track.rate());
         seconds = seconds.max(source.track.finish().map_err(|e| e.to_string())? as f64 / rate);
     }
-    v2::write_session(&folder, &stamp(started), Some(&stamp(chrono::Local::now())), &held).map_err(|e| e.to_string())?;
+    v2::write_session(&folder, contract, &stamp(started), Some(&stamp(chrono::Local::now())), &held).map_err(|e| e.to_string())?;
     say(Event::Stopped { folder: &folder, seconds });
+    // Between `stopped` and its end, the tracks made final: a track not compressed is no failure.
+    if contract == v2::V3 {
+        for (track, kept) in keep::keep(&folder, &TRACKS, |_, _| !abandon.load(Ordering::SeqCst)) {
+            match kept {
+                Kept::Flac => info!(track, "capture.kept"),
+                Kept::Wav(reason) => warn!(track, kept = "wav", reason, "capture.not_kept"),
+                Kept::Both(reason) => warn!(track, kept = "both", reason, "capture.not_kept"),
+                Kept::Stopped => warn!(track, kept = "wav", reason = "a second signal", "capture.not_kept"),
+            }
+        }
+    }
     Ok(())
 }
 

@@ -10,7 +10,7 @@ Records the audio sources of a conversation into a session.
 flowchart LR
     M["The microphone"]:::src --> P["kitokey-capture<br/>a program, no window"]:::mod
     O["What the system plays"]:::src --> P
-    P -->|"session-audio/v2"| F["The session's folder<br/>session.json · local.wav · remote.wav · clock.jsonl"]:::file
+    P -->|"session-audio/v3"| F["The session's folder<br/>session.json · local.wav · remote.wav · clock.jsonl<br/>— each .wav a .flac once stopped"]:::file
     P -.->|"one line per event"| W["Whoever started it:<br/>the shell, a terminal"]:::user
 
     classDef src fill:#374151,color:#fff
@@ -36,6 +36,7 @@ Recording — **the people recorded know it**:
 
 ```bash
 cargo run --release -- record <sessions-folder>   # until Ctrl-C, a TERM signal, or "stop" on its input
+cargo run --release -- record <sessions-folder> --as v2   # the same, its tracks kept as WAV
 cargo run --release -- record <sessions-folder> --as v1   # the same, in the first form
 ```
 
@@ -61,7 +62,7 @@ One JSON object per line on its output; errors go to the error stream.
 | `unavailable` | A source could not be opened, the other is recorded: it has no file at all — with `--as v1`, it is written as silence | `source`, `reason` |
 | `silent` | A source has given no sound for ten seconds | `source` |
 | `heard` | A source told silent gives sound again | `source` |
-| `stopped` | The files are finished and `session.json` says so | `folder`, `seconds` |
+| `stopped` | The files are finished and `session.json` says so; then each track is kept as FLAC, and the program's end, well, says the tracks are final | `folder`, `seconds` |
 | `microphone_gone` | The microphone named at the start is not there: `me` goes on as with none named | |
 | `microphone_back` | It is there again, a stream following or not | |
 
@@ -129,11 +130,24 @@ asks for more; `KITOKEY_TRACE` is the id of the making the shell passes.
 
 These lines are a contract: [`recording/v1`](../../contracts/recording/v1/README.md), which the shell reads. They are the same lines in both forms, and still name the sources `me` and `others` where the second form's files are `local` and `remote`.
 
+**Once stopped, a track kept as FLAC** (D87, `session-audio/v3`, ADR-0016): after `stopped`, `record`
+writes each track as `<track>.flac.part` with libFLAC, reads it back from the disk with Symphonia and
+compares every sample with the WAV, renames it `<track>.flac`, and only then removes the WAV — killed at
+any point, each track is a whole WAV, a whole FLAC, or both. A track that cannot be kept so stays its
+WAV, logged as `capture.not_kept`; a second interrupt or TERM signal stops the compressing; the program
+ends well either way. Measured on 2026-11-07 on a machine of 16 processors, on the bench's meeting
+(`modules/platform`, `session-audio/v2`, 24 bits, two channels at 48 kHz): its 5 minutes, 172 MB of WAV,
+weigh 33 % (`headset`) to 36 % (the three others) as FLAC, compressed in 1.2 s; the same played twelve
+times, an hour — 2,063 MB of WAV — weighs 731 MB (35 %), compressed in 14 s: 0.4 % of its length, in
+5 MB of memory. `--as v2` and `--as v1` are never compressed.
+
 ## Contracts
 
+- Provided: [`session-audio/v3`](../../contracts/session-audio/v3/README.md), `experimental`
+  — each source as delivered, with the session's clock, each track kept as FLAC once stopped: what
+  `record` writes, and so what the tray records (ADR-0004, ADR-0016)
 - Provided: [`session-audio/v2`](../../contracts/session-audio/v2/README.md), `experimental`
-  — each source as delivered, with the session's clock: what `record` writes, and so what the
-  tray records (ADR-0004)
+  — the same, its tracks kept as WAV: what `record … --as v2` writes
 - Provided: [`session-audio/v1`](../../contracts/session-audio/v1/README.md), `experimental`
   — the first form, two files at 16 kHz: what `record … --as v1` writes, to compare with it
 - Provided: [`recording/v1`](../../contracts/recording/v1/README.md), `experimental`
