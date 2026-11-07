@@ -277,6 +277,10 @@ below gives each its gesture. D78's criterion 4 is held by the next tag, which c
 the decider's word on the rpm installed over Wholeheard. They do not count against the appetite: the cut order
 below is unchanged, and the end date does not move for them.
 
+| Deliverable | What holds it, made before this cycle or by its release |
+|---|---|
+| D78 | #657, #658, #659, #661, #662 (cycle 07: each program's `--version`, the source package and `copr.yml`), #686 (the group's project). Criterion 4, `dnf upgrade` from 0.2.0: the tag v0.2.1's run [42417841678](https://github.com/NapkinStack/kitokey/actions/runs/42417841678) — « upgraded with dnf, kitokey 0.2.0 to 0.2.1 », « the meetings and the settings stay as they were » —, its version set by #711 |
+
 ## What needs a person
 
 | Deliverable | Who | The literal gesture |
