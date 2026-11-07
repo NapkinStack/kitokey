@@ -549,3 +549,34 @@ fn a_flac_that_is_not_a_track_is_said_with_its_name_and_not_converted() {
     kept_as_flac(&wav, 16);
     says("PCM in 24 bits: it has 1 channel(s), 16000 Hz, 16 bits");
 }
+
+#[test]
+fn a_flac_damaged_inside_is_said_and_not_heard_shorter() {
+    let folder = tempfile::tempdir().unwrap();
+    let wav = folder.path().join("local.wav");
+    track(&wav, 16_000, 1, 16_000, note(16_000, 440.0, 0.2));
+    let flac = kept_as_flac(&wav, 24);
+    let mut bytes = fs::read(&flac).unwrap();
+    let middle = bytes.len() / 2;
+    bytes[middle] ^= 0xFF; // one byte flipped in a frame: the reader would resume after it
+    fs::write(&flac, bytes).unwrap();
+    let said = heard(&wav, &Clock::default()).unwrap_err().to_string();
+    assert!(said.contains("local.flac"), "{said}");
+}
+
+#[test]
+fn a_flac_of_a_rate_no_source_gives_is_refused_and_a_wav_that_is_no_track_is_not_passed_over() {
+    let folder = tempfile::tempdir().unwrap();
+    let wav = folder.path().join("local.wav");
+    track(&wav, 500, 1, 500, |_, _| 0.1);
+    kept_as_flac(&wav, 24);
+    let said = heard(&wav, &Clock::default()).unwrap_err().to_string();
+    assert!(said.contains("it has 1 channel(s), 500 Hz, 24 bits"), "{said}");
+    // A WAV that opens and is no track is said: a whole FLAC beside it is not read in its place.
+    let other = folder.path().join("other.wav");
+    track(&other, 48_000, 1, 4_800, note(48_000, 440.0, 0.2));
+    fs::rename(kept_as_flac(&other, 24), folder.path().join("local.flac")).unwrap();
+    fs::write(&wav, b"not sound").unwrap();
+    let said = heard(&wav, &Clock::default()).unwrap_err().to_string();
+    assert!(said.contains("local.wav is not a track of a session"), "{said}");
+}

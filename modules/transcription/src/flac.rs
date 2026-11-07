@@ -31,12 +31,10 @@ pub(crate) fn opened(path: &Path, name: &str) -> io::Result<(Box<dyn Read>, u32,
     let Ok(reader) = FlacReader::try_new(source, FormatOptions::default()) else {
         return not_a_track();
     };
-    let Some(said) = reader
-        .default_track(TrackType::Audio)
-        .and_then(|track| track.codec_params.as_ref())
-        .and_then(|params| params.audio())
-        .cloned()
-    else {
+    let Some((said, frames)) = reader.default_track(TrackType::Audio).and_then(|track| {
+        let said = track.codec_params.as_ref()?.audio()?.clone();
+        Some((said, track.num_frames))
+    }) else {
         return not_a_track();
     };
     let channels = said.channels.as_ref().map_or(0, |channels| channels.count());
@@ -46,13 +44,20 @@ pub(crate) fn opened(path: &Path, name: &str) -> io::Result<(Box<dyn Read>, u32,
             "{name} is not what a session holds — PCM in 24 bits: it has {channels} channel(s), {rate} Hz, {bits} bits"
         ));
     }
-    let Ok(decoder) = FlacDecoder::try_new(&said, &AudioDecoderOptions::default()) else {
+    // Each frame's checksum is read by the decoder, the whole's MD5 at the end: a frame lost to a
+    // damaged byte would otherwise be passed over, and what follows heard too early.
+    let mut options = AudioDecoderOptions::default();
+    options.verify = true;
+    let Ok(decoder) = FlacDecoder::try_new(&said, &options) else {
         return not_a_track();
     };
     let decoded = Decoded {
         reader,
         decoder,
         name: name.to_string(),
+        channels,
+        frames,
+        decoded: 0,
         samples: Vec::new(),
         bytes: Vec::new(),
         at: 0,
@@ -65,6 +70,10 @@ struct Decoded {
     reader: FlacReader<'static>,
     decoder: FlacDecoder,
     name: String,
+    channels: usize,
+    /// The frames its STREAMINFO says it holds, and those decoded so far.
+    frames: Option<u64>,
+    decoded: u64,
     samples: Vec<i32>,
     bytes: Vec<u8>,
     at: usize,
@@ -77,6 +86,14 @@ impl Read for Decoded {
                 io::Error::new(io::ErrorKind::InvalidData, format!("{} cannot be decoded ({error})", self.name))
             };
             let Some(packet) = self.reader.next_packet().map_err(unread)? else {
+                // Whole: every frame STREAMINFO counts, and the MD5 of them all as libFLAC wrote it.
+                let whole = self.frames.is_none_or(|frames| frames == self.decoded) && self.decoder.finalize().verify_ok != Some(false);
+                if !whole {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("{} is damaged: what it decodes is not what was kept in it", self.name),
+                    ));
+                }
                 return Ok(0);
             };
             // Symphonia gives 24 bits at the full scale of 32: the low byte is always zero.
@@ -84,6 +101,7 @@ impl Read for Decoded {
                 .decode(&packet)
                 .map_err(unread)?
                 .copy_to_vec_interleaved(&mut self.samples);
+            self.decoded += (self.samples.len() / self.channels) as u64;
             self.bytes.clear();
             for sample in &self.samples {
                 self.bytes.extend_from_slice(&(sample >> 8).to_le_bytes()[..3]);
