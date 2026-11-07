@@ -6695,9 +6695,17 @@ def main() -> int:
         ActionChains(browser).move_to_element_with_offset(browser.find_element(By.CSS_SELECTOR, ".drawing"), int(-width / 2 + width * 0.4), 0).click().perform()
         sought = wait_for(browser, lambda b: abs(at(b) - 2.4) < 0.6, 5)
         check("a click on who spoke moves the playback there", sought, at(browser))
+        # Space for a meeting playing, its seek over — not one still under way (#710's verifier):
+        # the seek settled and the sound flowing again, then the pause it gives waited for.
+        settled = wait_for(browser, lambda b: b.execute_script(
+            "const a = document.querySelector('audio.track'); return !a.seeking && !a.paused && a.readyState >= 3"), 5)
+        browser.execute_script("window.__paused = false; document.querySelector('audio.track')"
+                               ".addEventListener('pause', () => (window.__paused = true), {once: true})")
         browser.find_element(By.TAG_NAME, "body").send_keys(Keys.SPACE)
-        paused = wait_for(browser, lambda b: b.execute_script("return [...document.querySelectorAll('audio.track')].every(a => a.paused)"), 5)
-        check("the space bar pauses", paused and browser.find_element(By.ID, "play").text == "Écouter", browser.find_element(By.ID, "play").text)
+        paused = wait_for(browser, lambda b: b.execute_script(
+            "return window.__paused && [...document.querySelectorAll('audio.track')].every(a => a.paused)"
+            " && document.getElementById('play').textContent === 'Écouter'"), 5)
+        check("the space bar pauses", settled and paused, (settled, browser.find_element(By.ID, "play").text))
         # Pause clicked with the mouse, held as a hand holds it: playing, the button's words are
         # read ten times a second, and a press on words written again is no click in WebKitGTK.
         browser.find_element(By.TAG_NAME, "body").send_keys(Keys.SPACE)
