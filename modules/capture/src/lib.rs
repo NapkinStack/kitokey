@@ -6,6 +6,7 @@
 //! 16,000 samples a second, centred, and on disk as soon as it is heard.
 
 pub mod call;
+pub mod keep;
 pub mod log;
 pub mod v2;
 
