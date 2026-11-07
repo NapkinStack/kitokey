@@ -320,6 +320,11 @@ below is unchanged, and the end date does not move for them.
   32 and 48 kbit/s —, then, only if it holds and the decider amends ADR-0004, a compact copy after N days
   (about 43 MB an hour) ([review §3](../reviews/2026-11-06-market.md)).
 - Meetings recorded before D87 compressed from « Faire de la place ».
+- **FLAC written while recording**, in place of a WAV compressed at the stop: only if users' feedback says
+  the room a recording takes while it runs matters — about 1 GB an hour a track in 24-bit stereo. A new
+  version of `session-audio` and its ADR first: a WAV is readable while written and whole to its last frame
+  after a crash, which `session-audio/v2` promises. The decider, 2026-11-07: « on y reviendra si le besoin
+  de place remonte par les retours utilisateur ».
 - The live preview built, on D52's record and its ADR.
 - Meeting types, each with its context and its models (market review of 2026-10-26, 8).
 - Everything in cycle 08's *Later*, unchanged.
