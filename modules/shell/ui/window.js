@@ -65,30 +65,30 @@ function chip(text, kind) {
   return element;
 }
 
-// A lock, drawn: its meaning is always in the words beside it (D60).
+// A lock, Lucide's: its meaning is always in the words beside it (D60, D89).
 function lock() {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("class", "lock");
-  svg.setAttribute("aria-hidden", "true");
-  const body = document.createElementNS(ns, "rect");
-  for (const [key, value] of Object.entries({ x: 5, y: 11, width: 14, height: 10, rx: 2, fill: "currentColor" })) body.setAttribute(key, value);
-  const shackle = document.createElementNS(ns, "path");
-  for (const [key, value] of Object.entries({ d: "M8 11 V8 a4 4 0 0 1 8 0 V11", fill: "none", stroke: "currentColor", "stroke-width": 2.2 })) shackle.setAttribute(key, value);
-  svg.append(body, shackle);
+  const svg = icon("lock");
+  svg.classList.add("lock");
   return svg;
 }
 
 // Lucide's icons, inline (ISC, `ui/LUCIDE-LICENSE`): what the page draws for itself, a glyph being the
-// font's to draw (D69). The name goes on what holds it, for assistive technology.
+// font's to draw (D69). The name goes on what holds it, for assistive technology. A path's `d`, or
+// another shape as Lucide 1.14.0's icon node gives it (D89).
 const ICONS = {
   check: ["M20 6 9 17l-5-5"],
   "chevron-left": ["m15 18-6-6 6-6"],
   x: ["M18 6 6 18", "m6 6 12 12"],
   "arrow-right": ["M5 12h14", "m12 5 7 7-7 7"],
   "maximize-2": ["M15 3h6v6", "m21 3-7 7", "m3 21 7-7", "M9 21H3v-6"],
-  "picture-in-picture-2": ["M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4", "M14 13h6a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2"],
+  "picture-in-picture-2": ["M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4", ["rect", { width: 10, height: 7, x: 12, y: 13, rx: 2 }]],
+  "panel-left-close": [["rect", { width: 18, height: 18, x: 3, y: 3, rx: 2 }], "M9 3v18", "m16 15-3-3 3-3"],
+  "panel-left-open": [["rect", { width: 18, height: 18, x: 3, y: 3, rx: 2 }], "M9 3v18", "m14 9 3 3-3 3"],
+  search: ["m21 21-4.34-4.34", ["circle", { cx: 11, cy: 11, r: 8 }]],
+  "hard-drive": ["M10 16h.01", "M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z", "M21.946 12.013H2.054", "M6 16h.01"],
+  settings: ["M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915", ["circle", { cx: 12, cy: 12, r: 3 }]],
+  lock: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2, ry: 2 }], "M7 11V7a5 5 0 0 1 10 0v4"],
+  pencil: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
 };
 function icon(name) {
   const ns = "http://www.w3.org/2000/svg";
@@ -96,10 +96,11 @@ function icon(name) {
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("class", "glyph");
   svg.setAttribute("aria-hidden", "true");
-  for (const d of ICONS[name]) {
-    const path = document.createElementNS(ns, "path");
-    path.setAttribute("d", d);
-    svg.append(path);
+  for (const part of ICONS[name]) {
+    const [tag, attributes] = typeof part === "string" ? ["path", { d: part }] : part;
+    const shape = document.createElementNS(ns, tag);
+    for (const [key, value] of Object.entries(attributes)) shape.setAttribute(key, value);
+    svg.append(shape);
   }
   return svg;
 }
@@ -577,11 +578,15 @@ function row(session, shape, words) {
 // until the command has answered (D68).
 let recordAsked = null;
 let recordRefocus = false;
+// The shortcut, said in the recording's tooltip rather than on a line under it (D89).
+let recordKeys = null;
 function paintRecord(recording, stopping) {
   const live = recordAsked ?? recording;
   // Ending, it waits: *Arrêt…*, a click then would ask nothing.
   const ending = recordAsked === false || (recordAsked === null && stopping);
-  document.getElementById("record-said").textContent = ending ? words.record_stopping : live ? words.record_stop : words.record_start;
+  const said = ending ? words.record_stopping : live ? words.record_stop : words.record_start;
+  document.getElementById("record-said").textContent = said;
+  document.getElementById("record").title = recordKeys ? `${said} (${recordKeys})` : said;
   document.getElementById("record").classList.toggle("live", live);
   // The mark says it too (D89): its dot red and larger while recording, the cut around it following.
   const [r, cy, gap] = live ? ["2.2", "6.2", "3.5"] : ["1.6", "5.6", "2.9"];
@@ -617,35 +622,41 @@ function paintRefused(refused) {
 function show({ words, folder, sessions, shapes, recording, stopping, shortcut, folded, unreadable, refused }) {
   document.documentElement.lang = words.locale;
   // The header's gesture, as the board has it: start or stop, with the shortcut beside.
-  document.getElementById("free-link").textContent = words.free;
-  const small = document.getElementById("small-link");
-  // An icon with its name: the header's one action stays the recording's (D69, UX review 3.2).
-  small.replaceChildren(icon("picture-in-picture-2"));
-  small.title = words.small;
-  small.setAttribute("aria-label", words.small);
+  // The sidebar's secondary actions: icons, each with its tooltip and its name; the header's one
+  // action stays the recording's (D69, D89).
+  for (const [id, glyph, name] of [["free-link", "hard-drive", words.free], ["small-link", "picture-in-picture-2", words.small], ["settings-link", "settings", words.settings]]) {
+    const button = document.getElementById(id);
+    if (!button.firstChild) button.append(icon(glyph));
+    button.title = name;
+    button.setAttribute("aria-label", name);
+  }
+  document.getElementById("free-link").hidden = sessions.length === 0;
   // At rest too: the small window is the user's to choose (D35).
-  small.hidden = false;
+  document.getElementById("small-link").hidden = false;
+  recordKeys = shortcut ?? null;
   paintRecord(recording, stopping);
   paintRefused(refused);
-  const keys = document.getElementById("header-keys");
+  const keys = document.getElementById("empty-keys");
   keys.textContent = shortcut ?? "";
   keys.hidden = !shortcut;
   document.getElementById("sidebar").setAttribute("aria-label", words.meetings);
   document.getElementById("sections").setAttribute("aria-label", words.sections);
-  document.getElementById("settings-link").textContent = words.settings;
   document.getElementById("pane-back").replaceChildren(icon("chevron-left"), words.back);
   // Folded as the user left it (D61), each button named with its shortcut.
   document.body.classList.toggle("folded", folded);
   const folding = /Mac/.test(navigator.platform) ? "⌘B" : "Ctrl+B";
-  for (const [id, name] of [["fold", words.fold], ["unfold", words.unfold]]) {
+  for (const [id, name, glyph] of [["fold", words.fold, "panel-left-close"], ["unfold", words.unfold, "panel-left-open"]]) {
     const button = document.getElementById(id);
+    if (!button.firstChild) button.append(icon(glyph));
     button.setAttribute("aria-label", name);
     button.title = `${name} (${folding})`;
   }
   const find = document.getElementById("find");
   find.placeholder = words.find_meetings;
   find.setAttribute("aria-label", words.find_meetings);
-  find.hidden = sessions.length === 0;
+  // The search field's icon in it, as the board draws it (D89); the field and it hidden with no meeting.
+  if (!find.previousElementSibling) find.before(icon("search"));
+  find.hidden = find.parentElement.hidden = sessions.length === 0;
   document.getElementById("none-found").textContent = words.none_found;
   const weight = document.getElementById("weight");
   weight.hidden = sessions.length === 0;
@@ -1307,7 +1318,8 @@ function transcriptCard(read, words, session) {
     // Corrected by whoever listens, once complete (D62): the line becomes a field; Enter or leaving
     // it keeps what is typed, Escape leaves it as it was.
     if (read.complete) {
-      const pencil = element("button", "edit", "✎");
+      const pencil = element("button", "edit");
+      pencil.append(icon("pencil"));
       pencil.type = "button";
       pencil.dataset.name = nameOf(session);
       pencil.setAttribute("aria-label", fill(words.correct_line, clock(segment.start)));

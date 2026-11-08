@@ -11,8 +11,9 @@ use oxc_span::SourceType;
 const PAGE: &str = include_str!("../ui/window.js");
 const STYLE: &str = include_str!("../ui/window.css");
 const HTML: &str = include_str!("../ui/index.html");
-/// The glyphs a font would draw as an icon (UX review §8), and the back arrow beside them.
-const GLYPHS: [char; 7] = ['›', '‹', '⤢', '✓', '✔', '→', '×'];
+/// The glyphs a font would draw as an icon (UX review §8), and the back arrow beside them; the
+/// sidebar's fold arrows and a line's pencil, Lucide's since D89.
+const GLYPHS: [char; 10] = ['›', '‹', '⤢', '✓', '✔', '→', '×', '⇤', '⇥', '✎'];
 /// The same, written otherwise.
 const ESCAPES: [&str; 12] = [
     "\\203A", "\\2039", "\\2922", "\\2713", "\\2714", "\\2192", "\\D7", "&times;", "&rarr;", "&rsaquo;", "&lsaquo;", "&#",

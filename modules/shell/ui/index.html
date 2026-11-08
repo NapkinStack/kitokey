@@ -17,32 +17,32 @@
       <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24"><mask id="mark-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle id="mark-gap" cx="6.5" cy="5.6" r="2.9" fill="#000"></circle></mask><path d="M6.5 7v13M6.5 14.2 17 4M9.8 11 17.3 20" mask="url(#mark-cut)" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path><circle id="mark-dot" cx="6.5" cy="5.6" r="1.6"></circle></svg>
       <span>Kitokey</span>
     </div>
-    <button type="button" id="fold" class="icon-button" aria-keyshortcuts="Control+B Meta+B">⇤</button>
+    <button type="button" id="fold" class="icon-button" aria-keyshortcuts="Control+B Meta+B"></button>
   </div>
-  <div class="act"><button type="button" id="record" class="primary"><span class="dot" aria-hidden="true"></span><span id="record-said"></span></button><kbd id="header-keys" class="keys" hidden></kbd><p id="refused" class="note" role="status" hidden></p><button type="button" id="buy" class="primary" hidden></button></div>
-  <input type="search" id="find" class="search" autocomplete="off" spellcheck="false">
+  <div class="act"><button type="button" id="record" class="primary"><span class="dot" aria-hidden="true"></span><span id="record-said"></span></button><p id="refused" class="note" role="status" hidden></p><button type="button" id="buy" class="primary" hidden></button></div>
+  <div class="finding"><input type="search" id="find" class="search" autocomplete="off" spellcheck="false"></div>
   <main id="list">
     <p id="none-found" class="none" role="status" hidden></p>
     <div id="groups"></div>
   </main>
   <div class="foot">
     <section id="weight" class="weight" aria-live="polite" hidden>
-      <div class="total"><strong id="total"></strong> <span id="taken"></span><a href="#/free" id="free-link" class="open"></a></div>
+      <div class="total"><strong id="total"></strong> <span id="taken"></span></div>
       <div id="bar" class="split" role="img"><span id="bar-audio" class="audio"></span><span id="bar-text" class="text"></span></div>
       <ul class="legend">
         <li><span class="swatch audio" aria-hidden="true"></span><span id="audio-kept"></span></li>
         <li><span class="swatch text" aria-hidden="true"></span><span id="text-kept"></span></li>
       </ul>
     </section>
-    <nav id="sections"><a href="#/settings" id="settings-link"></a><button type="button" id="small-link" class="open" hidden></button></nav>
+    <nav id="sections"><a href="#/free" id="free-link" class="icon-button" hidden></a><button type="button" id="small-link" class="icon-button" hidden></button><a href="#/settings" id="settings-link" class="icon-button"></a></nav>
   </div>
 </aside>
 <div id="pane" class="pane">
-  <button type="button" id="unfold" class="icon-button" aria-keyshortcuts="Control+B Meta+B">⇥</button>
+  <button type="button" id="unfold" class="icon-button" aria-keyshortcuts="Control+B Meta+B"></button>
   <a href="#/" id="pane-back" class="back"></a>
   <p id="pane-said" class="note warn" role="status" hidden></p>
   <button type="button" id="pane-again" class="open" hidden></button>
-  <section id="empty" class="empty" hidden><div class="card"><p id="none" class="none"></p><p id="none-do" class="says"></p><button type="button" id="empty-record" class="primary"></button><button type="button" id="empty-again" class="primary" hidden></button></div></section>
+  <section id="empty" class="empty" hidden><div class="card"><p id="none" class="none"></p><p id="none-do" class="says"></p><kbd id="empty-keys" class="keys" hidden></kbd><button type="button" id="empty-record" class="primary"></button><button type="button" id="empty-again" class="primary" hidden></button></div></section>
   <main id="meeting" hidden></main>
   <main id="settings" hidden></main>
   <main id="agree" hidden></main>

@@ -404,7 +404,7 @@ class Window:
             self.driver_process.wait(timeout=10)
             raise SystemExit("tauri-driver did not answer")
         # Whichever window opened: the small one at rest, or the full one's sections named.
-        wait_for(self.browser, lambda b: b.find_elements(By.ID, "small-record") or b.execute_script("return document.getElementById('settings-link').textContent !== ''"))
+        wait_for(self.browser, lambda b: b.find_elements(By.ID, "small-record") or b.execute_script("return (document.getElementById('settings-link').getAttribute('aria-label') || '') !== ''"))
         return self.browser
 
     def __exit__(self, *_) -> None:
@@ -1678,7 +1678,7 @@ echo '{{"available":true,"installed":true,"supported":true}}'
     french = ["Ouvrir Kitokey", "Démarrer un enregistrement", "Transcrire le dernier enregistrement",
               "Rédiger le compte rendu de la dernière réunion", "Quitter Kitokey"]
     english = ["Open Kitokey", "Start recording", "Transcribe the last recording", "Write the minutes of the last recording", "Quit Kitokey"]
-    sections = lambda b: b.execute_script("return [document.getElementById('settings-link').textContent, document.documentElement.lang]")
+    sections = lambda b: b.execute_script("return [document.getElementById('settings-link').getAttribute('aria-label'), document.documentElement.lang]")
     redo = lambda b: b.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", heard.name, str(model))
 
     def by_settings(b, ready: str) -> str:
@@ -3240,7 +3240,7 @@ def two_panes(now: dt.datetime) -> None:
         check("the sidebar holds, top to bottom: the recording, the search, the meetings, the space they take, Réglages",
               None not in order and all(order[i][1] < order[i + 1][1] for i in range(4))
               and all(side[0] <= o[0] and o[2] <= side[2] + 1 for o in order), order)
-        check("« Faire de la place » beside the space they take", browser.find_element(By.ID, "free-link").is_displayed()
+        check("« Faire de la place » an icon under the space they take (D89)", browser.find_element(By.ID, "free-link").is_displayed()
               and box(browser, "#free-link")[1] >= box(browser, "#weight")[1] - 1)
         check("the header's two tabs are gone", not browser.find_elements(By.ID, "meetings") and not browser.find_elements(By.CSS_SELECTOR, "header.bar"))
         check("the pane shows the last meeting, marked in the list", shown(browser) == names[-1]
@@ -3340,7 +3340,7 @@ def two_panes(now: dt.datetime) -> None:
     with Window(meetings, "en_GB.UTF-8") as browser:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1] and b.find_elements(By.CSS_SELECTOR, ".transcript .lines li"), 10)
-        english = [browser.find_element(By.ID, i).text for i in ("record-said", "settings-link", "free-link")]
+        english = [browser.find_element(By.ID, "record-said").text] + [browser.find_element(By.ID, i).get_attribute("aria-label") for i in ("settings-link", "free-link")]
         browser.execute_script("document.activeElement.blur()")
         stops = []
         for _ in range(45):
@@ -3371,6 +3371,9 @@ def two_panes(now: dt.datetime) -> None:
             "return document.getElementById('pane').contains(document.getElementById('none'))")
               and browser.find_element(By.ID, "none-do").text == "Start a recording: its button, its shortcut, or the tray’s icon."
               and browser.find_element(By.ID, "empty-record").text == "Start a recording", browser.find_element(By.ID, "none").text)
+        # D89: the shortcut, gone from under the sidebar's button, is said here, where nothing was recorded yet.
+        keys = browser.execute_script("const k = document.getElementById('empty-keys'); return [!!k && k.offsetParent !== null, k && k.textContent, document.getElementById('record').title]")
+        check("no meeting: the shortcut said beside what to do, and in the button's tooltip (D89)", keys[0] and keys[1] and keys[2] == f"Start a recording ({keys[1]})", keys)
         browser.set_window_size(420, 400)
         narrow = wait_for(browser, lambda b: b.find_element(By.ID, "sidebar").is_displayed() and b.find_element(By.ID, "none").is_displayed(), 5)
         check("under 840 px too: the sidebar, then what to do", narrow and not browser.execute_script(
@@ -5029,7 +5032,7 @@ def gestures_answer(now: dt.datetime) -> None:
 
 def window_looks(now: dt.datetime) -> None:
     """AR. The window looks finished: Petite fenêtre an icon with its name, one primary action, little motion (D69)."""
-    print("AR. one primary action, Petite fenêtre an icon named for assistive technology; 200 ms at most between states (D69)")
+    print("AR. one primary action, La barre d’enregistrement an icon named for assistive technology; 200 ms at most between states (D69)")
     meetings = WORK / "looking"
     made = meetings / "2026-10-28_09-00"
     session(made, now - dt.timedelta(days=1), 10, {"local.wav": 1000})
@@ -5037,8 +5040,19 @@ def window_looks(now: dt.datetime) -> None:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
         small = browser.find_element(By.ID, "small-link")
-        check("Petite fenêtre: an icon, named for assistive technology and to the pointer", small.text == "" and small.get_attribute("aria-label") == "Petite fenêtre"
-              and small.get_attribute("title") == "Petite fenêtre" and small.find_elements(By.CSS_SELECTOR, "svg"), small.text)
+        check("La barre d’enregistrement: an icon, named for assistive technology and to the pointer (D89)", small.text == "" and small.get_attribute("aria-label") == "La barre d’enregistrement"
+              and small.get_attribute("title") == "La barre d’enregistrement" and small.find_elements(By.CSS_SELECTOR, "svg"), small.text)
+        # D89: each secondary action of the sidebar an icon button, its tooltip and its name; every icon Lucide's, 16 or 20 px.
+        secondary = browser.execute_script(
+            "return ['fold', 'free-link', 'small-link', 'settings-link'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim() === '' && e.classList.contains('icon-button'),"
+            " (e.getAttribute('aria-label') || '') !== '' && (e.title || '').startsWith(e.getAttribute('aria-label')), e.querySelectorAll('svg.glyph').length === 1]).filter(([, a, b, c]) => !(a && b && c))")
+        check("each secondary action of the sidebar: an icon button, its tooltip and its name (D89)", secondary == [], secondary)
+        icons = browser.execute_script(
+            "return [...document.querySelectorAll('#frame svg')].filter(v => v.getBoundingClientRect().width > 0 && !v.closest('.brand') && !v.matches('.relief'))"
+            ".map(v => [v.getAttribute('class'), v.getBoundingClientRect().width, v.getBoundingClientRect().height]).filter(([c, w, h]) => !(c || '').split(' ').includes('glyph') || ![16, 20].includes(w) || w !== h)")
+        check("every icon shown is a Lucide glyph of 16 or 20 px (D89)", icons == [], icons)
+        keys = browser.execute_script("return [document.getElementById('header-keys'), document.getElementById('record').title]")
+        check("no shortcut line under the recording's button: the shortcut is in its tooltip (D89)", keys[0] is None and keys[1].startswith("Démarrer un enregistrement"), keys)
         # Drawn, and seen: stroked in the text's colour, the size of the text; a rule of another name once hid it.
         drawn = browser.execute_script("const v = document.querySelector('#small-link svg'), c = getComputedStyle(v), p = getComputedStyle(v.parentElement); return [c.stroke === p.color, c.fill, parseFloat(c.width) === parseFloat(p.fontSize), parseFloat(c.height) === parseFloat(p.fontSize)]")
         check("the icon is stroked, the size of its text", drawn == [True, "none", True, True], drawn)
@@ -5450,9 +5464,9 @@ def main() -> int:
         check("its sections are named in French for a screen reader", sections == "Rubriques", sections)
         listed = rows(browser)
         shot(browser, "1-sessions")
-        granted = browser.find_element(By.ID, "header-keys").text
-        check("the shortcut is said as a person reads it, never in GTK's notation (#312)",
-              "<" not in granted and "Press" not in granted, granted)
+        granted = browser.find_element(By.ID, "record").get_attribute("title")
+        check("the shortcut is said as a person reads it, in the recording's tooltip, never in GTK's notation (#312, D89)",
+              granted.startswith("Démarrer un enregistrement (") and "<" not in granted and "Press" not in granted, granted)
         # The header's gesture, as the board has it — never pressed here: no recorder is played.
         said = browser.find_element(By.ID, "record").text
         check("the header offers to start a recording", said == "Démarrer un enregistrement", said)
@@ -5629,7 +5643,7 @@ def main() -> int:
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
         wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed() and b.find_elements(By.ID, "model"))
-        check("the settings open from the header", browser.find_element(By.ID, "settings-link").text == "Réglages")
+        check("the settings open from the sidebar's foot, an icon named Réglages", browser.find_element(By.ID, "settings-link").get_attribute("aria-label") == "Réglages")
         shot(browser, "4-settings")
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight)")
         shot(browser, "4-settings-end")
@@ -6426,7 +6440,7 @@ def main() -> int:
     session(roomy / "heavy", now - dt.timedelta(days=2), 60, {"local.wav": 5_000_000, "derived/local.wav": 1_000_000, "transcript.jsonl": 100})
     session(roomy / "old", now - dt.timedelta(days=60), 30, {"local.wav": 3_000_000, "minutes.md": 50})
     with Window(roomy, "fr_FR.UTF-8") as browser:
-        offered = browser.find_element(By.ID, "free-link").text
+        offered = browser.find_element(By.ID, "free-link").get_attribute("aria-label")
         check("the weights offer to free space", offered == "Faire de la place", offered)
         browser.find_element(By.ID, "free-link").click()
         wait_for(browser, lambda b: b.find_elements(By.ID, "free-do"))
@@ -6525,10 +6539,10 @@ def main() -> int:
         full = wait_for(browser, lambda b: len(b.window_handles) == 1 and b.window_handles != [small], 5)
         check("Toute la fenêtre replaces the small one: one window", full, browser.window_handles)
         browser.switch_to.window(browser.window_handles[0])
-        wait_for(browser, lambda b: b.execute_script("return document.getElementById('settings-link').textContent !== ''"))
+        wait_for(browser, lambda b: b.execute_script("return (document.getElementById('settings-link').getAttribute('aria-label') || '') !== ''"))
         check("the full window left is the one kept in the settings", 'window = "full"' in window.file.read_text(), window.file.read_text())
         back = browser.find_element(By.ID, "small-link")
-        check("at rest too, the full window offers the small one", back.is_displayed() and back.get_attribute("aria-label") == "Petite fenêtre", back.get_attribute("aria-label"))
+        check("at rest too, the full window offers the small one", back.is_displayed() and back.get_attribute("aria-label") == "La barre d’enregistrement", back.get_attribute("aria-label"))
         main = browser.current_window_handle
         back.click()
         smaller = wait_for(browser, lambda b: len(b.window_handles) == 2, 5)

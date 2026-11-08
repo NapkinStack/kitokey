@@ -503,7 +503,7 @@ pub struct Window {
     /// The folder the sessions go to, and the button that opens the system's dialog for it.
     pub sessions_folder: [&'static str; 2],
     pub choose: &'static str,
-    /// The small window while recording (D11's sixth board).
+    /// The recording bar, its icon in the sidebar's foot (D89): the small window until D90 makes it a bar.
     pub small: &'static str,
     pub small_mic: &'static str,
     pub small_meeting: &'static str,
@@ -915,7 +915,7 @@ pub fn window(language: Language) -> Window {
                 "New meetings are written here. Those already recorded stay where they were: the window and the audio's keeping follow this folder.",
             ],
             choose: "Choose…",
-            small: "Small window",
+            small: "The recording bar",
             small_mic: "Your microphone",
             small_meeting: "The meeting’s sound",
             small_stop: "Stop",
@@ -1313,7 +1313,7 @@ pub fn window(language: Language) -> Window {
                 "Les nouvelles réunions y sont écrites. Celles déjà enregistrées restent où elles étaient\u{a0}: la fenêtre et la garde de l’audio suivent ce dossier.",
             ],
             choose: "Choisir…",
-            small: "Petite fenêtre",
+            small: "La barre d’enregistrement",
             small_mic: "Votre micro",
             small_meeting: "Le son de la réunion",
             small_stop: "Arrêter",
