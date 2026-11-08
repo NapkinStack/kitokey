@@ -8,7 +8,8 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-render() { magick -background none -density 384 "$here/icons/$1" -resize "$2x$2" "PNG32:$3"; }
+# No date chunk: the same source writes the same bytes, and a run leaves nothing to commit.
+render() { magick -background none -density 384 "$here/icons/$1" -resize "$2x$2" -define png:exclude-chunks=date,time "PNG32:$3"; }
 
 render kitokey.svg 512 "$work/icon.png"
 for size in 256 64 48 32 16; do render kitokey.svg "$size" "$work/icon-$size.png"; done
