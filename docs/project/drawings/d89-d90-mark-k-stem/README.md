@@ -1,6 +1,6 @@
 # D89 — D90, sixth round: the dot on the stem, as wide as the letter
 
-**Drawn** 2026-11-08, sixth round · **Status**: for the decider to read, after the [fifth round's answers](../d89-d90-mark-k-cut/README.md#what-the-decider-answers) of 2026-11-08: P1, the dot as wide as the letter, as if it continued the stem; the name's « t » not cut · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
+**Drawn** 2026-11-08, sixth round · **Status**: read by the decider on 2026-11-08 (answers below): the mark accepted; the name's i drawn as the mark's stem in a seventh round; drawn after the [fifth round's answers](../d89-d90-mark-k-cut/README.md#what-the-decider-answers) of 2026-11-08: P1, the dot as wide as the letter, as if it continued the stem; the name's « t » not cut · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
 
 ```mermaid
 flowchart LR
@@ -21,12 +21,14 @@ flowchart LR
 
 ## What the decider answers
 
+The decider, 2026-11-08, in the working session: « ok, valide le logo, quand on a le nom "kitokey" on fait le "i" de la meme maniere avec le "record" qui coupe le i comme dans le logo ».
+
 | Question | The author's proposal on the boards | The decider's answer |
 |---|---|---|
-| The mark | P1, the dot as wide as the stroke (radius 1.6), its top on the arm's top, a 1.3 gap above the stem | owed |
-| The name | « kitokey », the i's own dot as wide as its stem, the same gap; the « t » untouched | owed |
-| The dot while recording | Red and larger (radius 1.6 → 2.2, the gap following): at 16 px a dot as wide as the stroke is 2 px, too little for a red alone; shape and colour together. In the tray, the bar's handle and the window's header; the app's icon always at rest | owed |
-| Where the mark has no tile | The bar's handle and the window's header draw the mark alone, in the accent | owed |
+| The mark | P1, the dot as wide as the stroke (radius 1.6), its top on the arm's top, a 1.3 gap above the stem | Accepted |
+| The name | « kitokey », the i's own dot as wide as its stem, the same gap; the « t » untouched | Changed: the i drawn as the mark's stem, the record dot cutting it as in the mark — a seventh round |
+| The dot while recording | Red and larger (radius 1.6 → 2.2, the gap following): at 16 px a dot as wide as the stroke is 2 px, too little for a red alone; shape and colour together. In the tray, the bar's handle and the window's header; the app's icon always at rest | Accepted |
+| Where the mark has no tile | The bar's handle and the window's header draw the mark alone, in the accent | Accepted |
 
 ## Contrast, both themes
 
