@@ -271,10 +271,12 @@ dependencies:
 # description (fitness M7): declare them before its first file of code.
 commands:
   bootstrap: bash scripts/bootstrap.sh
+  # Every icon drawn from icons/kitokey.svg (D89), where ImageMagick and librsvg are (Linux).
   # The page's script read for its syntax where Node is there (the hosted runners have it): a
   # name declared twice in one scope blanks the whole window, which only the e2e saw (D42).
   check: >-
-    bash -n scripts/release.sh && bash -n scripts/headless.sh
+    bash -n scripts/release.sh && bash -n scripts/headless.sh && bash -n scripts/icons.sh
+    && { [ "$(uname)" != Linux ] || ! command -v magick >/dev/null || bash scripts/icons.sh --check; }
     && { ! command -v node >/dev/null || node --check ui/window.js; }
     && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
   # And the licence's tests built for release, where the stand-in licence must never be read
