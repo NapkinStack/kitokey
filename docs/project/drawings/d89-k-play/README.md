@@ -1,6 +1,6 @@
 # D89, eighth round: the K that turns into « play »
 
-**Drawn** 2026-11-08, eighth round · **Status**: for the decider to read — their idea, the same day: « le "K" en symetrie vertical represente le logo "play", est ce qu'on ne peut pas le decliner en logo ? jouer avec ? fait des proposition ». The [accepted mark](../d89-d90-mark-k-stem/README.md) and [name](../d89-d90-name-kitokey/README.md) do not change · **Frozen**: what the decider accepts becomes criteria of D89; once built, the window and its screenshots are the truth. A new round is a new folder.
+**Drawn** 2026-11-08, eighth round · **Status**: read by the decider on 2026-11-08: « on garde la version precedente » — nothing of this round is kept; drawn from their idea, the same day: « le "K" en symetrie vertical represente le logo "play", est ce qu'on ne peut pas le decliner en logo ? jouer avec ? fait des proposition ». The [accepted mark](../d89-d90-mark-k-stem/README.md) and [name](../d89-d90-name-kitokey/README.md) do not change · **Frozen**: what the decider accepts becomes criteria of D89; once built, the window and its screenshots are the truth. A new round is a new folder.
 
 ```mermaid
 stateDiagram-v2
@@ -22,12 +22,14 @@ stateDiagram-v2
 
 ## What the decider answers
 
+The decider, 2026-11-08, in the working session: « on garde la version precedente ».
+
 | Question | The author's proposal on the board | The decider's answer |
 |---|---|---|
-| The strict mirror (B) | Left out: mirrored, the K reads ▷| « next track », the players' convention, and no longer K | owed |
-| The family (A) | K to record (the mark), ▷ to listen, ‖ paused — the stem and its dot kept in all three | owed |
-| The motion | Playback starting turns the arms in 200 ms, K → ▷; they turn back when it stops; once per change, never looping; none when the system asks for less motion | owed |
-| Where it shows | The meeting player's play and pause buttons (still a triangle: nothing to learn), kitokey.com; the tray while listening, never red | owed |
+| The strict mirror (B) | Left out: mirrored, the K reads ▷| « next track », the players' convention, and no longer K | Not kept: the accepted mark stays |
+| The family (A) | K to record (the mark), ▷ to listen, ‖ paused — the stem and its dot kept in all three | Not kept: the accepted mark stays |
+| The motion | Playback starting turns the arms in 200 ms, K → ▷; they turn back when it stops; once per change, never looping; none when the system asks for less motion | Not kept: the accepted mark stays |
+| Where it shows | The meeting player's play and pause buttons (still a triangle: nothing to learn), kitokey.com; the tray while listening, never red | Not kept: the accepted mark stays |
 
 ## Sources
 
