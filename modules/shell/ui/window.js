@@ -1255,7 +1255,10 @@ function transcriptCard(read, words, session) {
   search.id = "search";
   search.placeholder = words.search;
   search.setAttribute("aria-label", words.search);
-  top.append(search);
+  // Its icon in the field, as the sidebar's search (D89).
+  const finding = element("div", "finding");
+  finding.append(icon("search"), search);
+  top.append(finding);
   // Refaire…: another Whisper model of this computer, this time only.
   const redo = iconButton("rotate-ccw", words.redo, "redo-transcript");
   redo.addEventListener("click", async () => {

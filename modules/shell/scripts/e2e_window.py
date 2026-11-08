@@ -5623,6 +5623,8 @@ def main() -> int:
         actions = browser.execute_script(
             "return ['open-folder', 'copy-minutes', 'redo-minutes', 'redo-transcript'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim(), e.getAttribute('aria-label'), e.title,"
             " e.classList.contains('icon-button') && e.querySelectorAll('svg.glyph').length === 1])")
+        searched = browser.execute_script("return !!document.getElementById('search').previousElementSibling?.matches('svg.glyph')")
+        check("the transcript's search holds its icon, as the sidebar's (D89)", searched)
         check("each secondary action of the meeting: an icon button, its tooltip and its name (D89)", actions == [
             ["open-folder", "", "Ouvrir le dossier", "Ouvrir le dossier", True], ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu", True],
             ["redo-minutes", "", "Refaire…", "Refaire…", True], ["redo-transcript", "", "Refaire…", "Refaire…", True]], actions)
