@@ -20,8 +20,9 @@ if ! command -v busctl >/dev/null || ! busctl --user get-property $watcher Regis
   say "e2e: NOT RUN — no desktop session that shows tray items here"; exit 77
 fi
 # The user's own Kitokey shares the desktop's bus and microphones: it would be offered the
-# run's calls, and take its clicks into its own settings (D23's trial, 2026-10-24).
-if pgrep -x kitokey >/dev/null; then
+# run's calls, and take its clicks into its own settings (D23's trial, 2026-10-24). In a session
+# of the run's own (scripts/headless.sh) it shares neither.
+if [ -z "${KITOKEY_HEADLESS:-}" ] && pgrep -x kitokey >/dev/null; then
   say "e2e: NOT RUN — a Kitokey is running outside the run: quit it first (its menu, Quitter Kitokey)"; exit 1
 fi
 cargo build --locked 2>&1 | tail -1 >> .evidence/e2e.txt

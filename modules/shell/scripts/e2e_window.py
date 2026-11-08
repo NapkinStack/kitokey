@@ -6461,8 +6461,8 @@ def main() -> int:
         check("Tab reaches each of its controls, then comes back round", "small-full" in reached and "small-record" in reached, reached)
         check("no meeting yet: said, the recording offered alone", browser.find_element(By.CSS_SELECTOR, "#small .none").text == "Aucune réunion pour l’instant." and not browser.find_elements(By.CSS_SELECTOR, "#small .last"))
         hint = browser.find_element(By.ID, "small-keys").text
-        # The desktop's grant is the desktop's: the hint says the keys, or that none were granted and where to choose.
-        check("the shortcut is said under the gesture, as the desktop granted it — or where to choose one", hint.endswith("de n’importe où") or "Réglages" in hint, hint)
+        # The desktop's grant is the desktop's: the hint says the keys, or that none were granted and to choose one.
+        check("the shortcut is said under the gesture, as the desktop granted it — or where to choose one", hint.endswith("de n’importe où") or hint == "Pas de raccourci clavier — en définir un", hint)
         fits = browser.execute_script("const e = document.scrollingElement; return [e.scrollHeight, e.clientHeight];")
         check("at rest it holds in its window, nothing to scroll", fits[0] <= fits[1], fits)
         shot(browser, "6-small-rest")
@@ -6695,9 +6695,17 @@ def main() -> int:
         ActionChains(browser).move_to_element_with_offset(browser.find_element(By.CSS_SELECTOR, ".drawing"), int(-width / 2 + width * 0.4), 0).click().perform()
         sought = wait_for(browser, lambda b: abs(at(b) - 2.4) < 0.6, 5)
         check("a click on who spoke moves the playback there", sought, at(browser))
+        # Space for a meeting playing, its seek over — not one still under way (#710's verifier):
+        # the seek settled and the sound flowing again, then the pause it gives waited for.
+        settled = wait_for(browser, lambda b: b.execute_script(
+            "const a = document.querySelector('audio.track'); return !a.seeking && !a.paused && a.readyState >= 3"), 5)
+        browser.execute_script("window.__paused = false; document.querySelector('audio.track')"
+                               ".addEventListener('pause', () => (window.__paused = true), {once: true})")
         browser.find_element(By.TAG_NAME, "body").send_keys(Keys.SPACE)
-        paused = wait_for(browser, lambda b: b.execute_script("return [...document.querySelectorAll('audio.track')].every(a => a.paused)"), 5)
-        check("the space bar pauses", paused and browser.find_element(By.ID, "play").text == "Écouter", browser.find_element(By.ID, "play").text)
+        paused = wait_for(browser, lambda b: b.execute_script(
+            "return window.__paused && [...document.querySelectorAll('audio.track')].every(a => a.paused)"
+            " && document.getElementById('play').textContent === 'Écouter'"), 5)
+        check("the space bar pauses", settled and paused, (settled, browser.find_element(By.ID, "play").text))
         # Pause clicked with the mouse, held as a hand holds it: playing, the button's words are
         # read ten times a second, and a press on words written again is no click in WebKitGTK.
         browser.find_element(By.TAG_NAME, "body").send_keys(Keys.SPACE)
@@ -6829,7 +6837,8 @@ def main() -> int:
         there = wait_for(browser, lambda b: "ne peut pas lire cet audio" in b.execute_script(no_player), 10)
         check("a meeting whose audio is there but not playable is not said freed",
               there and "supprimé pour faire de la place" not in browser.execute_script(no_player), browser.execute_script(no_player))
-    check("the volume the system remembers for the user's Kitokey is left as it was", same_volume(remembered(), kept), [remembered(), kept])
+    # None remembered before the run, as on a desktop where Kitokey never played: none of the user's to keep.
+    check("the volume the system remembers for the user's Kitokey is left as it was", kept is None or same_volume(remembered(), kept), [remembered(), kept])
     model_offered(now)
     models_listed(now)
     list_refreshed(now)
