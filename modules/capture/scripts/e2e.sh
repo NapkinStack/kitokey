@@ -557,7 +557,7 @@ kill "$named" "$other" "$headset" "$addressed" 2>/dev/null || true; wait "$named
 pactl unload-module "$mic_c"; mic_c=
 pactl unload-module "$mic_d"; mic_d=
 
-say "P. listening without recording (D88): each source heard, nothing written, stopped within a second"
+say "P. listening without recording (D88): each source heard, nothing written, stopped within a second — asked, or its input closed"
 # What the run's folder holds, file by file and size: listening must leave it as it was. It starts in a
 # folder of its own, its temporary files there too: they must stay empty.
 files() { find "$work" -mindepth 1 \( -path "$work/p.*" -prune \) -o -type f -printf '%P %s\n' -o -printf '%P/\n' | sort; }
@@ -609,6 +609,12 @@ asked=$(date +%s.%N); kill -TERM "$listener"
 check stopped_within "$asked" "$listener" 1
 exec 3>&-
 check heard term kitokey_e2e_mic kitokey_e2e_out
+# Its input closed, as by a shell that crashed while the panel showed: no microphone outlives it.
+listen_for eof
+sleep 2
+asked=$(date +%s.%N); exec 3>&-
+check stopped_within "$asked" "$listener" 1
+check heard eof kitokey_e2e_mic kitokey_e2e_out
 kill "$mic_player" "$others_player" 2>/dev/null || true; wait "$mic_player" "$others_player" 2>/dev/null || true
 check unchanged
 check test -z "$(ls -A "$work/p-cwd")"
@@ -632,6 +638,33 @@ sleep 1
 check measure2 not-running kitokey_e2e_headset 2
 kill "$headset" 2>/dev/null || true; wait "$headset" 2>/dev/null || true
 pactl set-default-source kitokey_e2e_mic.monitor
+# A microphone named, taken away while it listens: what it says then, and it still stops as asked.
+stand_in kitokey_e2e_named; named=$!
+pw-play --target kitokey_e2e_mic_c "$work/660-long.wav" & named_player=$!
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
+sleep 1
+listen_for named --microphone kitokey_e2e_named
+sleep 2
+kill "$named" 2>/dev/null || true; wait "$named" 2>/dev/null || true
+sleep 3
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+kill "$named_player" "$mic_player" 2>/dev/null || true; wait "$named_player" "$mic_player" 2>/dev/null || true
+# As recording/v1 says: no line says it, `me`'s level falls to 0 and stays there, still said.
+gone_unsaid() {
+  python3 - "$work/p.named.events" <<'PY' 2>&1 | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"
+import json, sys
+lines = [json.loads(line) for line in open(sys.argv[1])]
+said = [line for line in lines if line["event"] != "level"]
+me = [line["level"] for line in lines if line["event"] == "level" and line["source"] == "me"]
+print(f"    named, gone while listening: {said}; me's levels by half-seconds {[max(me[n:n + 5]) for n in range(0, len(me), 5)]}")
+ok = [line["event"] for line in said] == ["device", "device"] and max(me[:15]) > 0.5 and len(me) > 40 and max(me[-15:]) == 0
+sys.exit(0 if ok else "not as recording/v1 says")
+PY
+}
+check gone_unsaid
+sed 's/^/    errors: /' "$work/p.named.errors" >> .evidence/e2e.txt
 pactl unload-module "$mic_c"; mic_c=
 grep -v '"level"' "$work"/p.*.events | sed 's/^/    /' >> .evidence/e2e.txt
 check unchanged

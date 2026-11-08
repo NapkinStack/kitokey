@@ -38,12 +38,13 @@ Recording — **the people recorded know it**:
 cargo run --release -- record <sessions-folder>   # until Ctrl-C, a TERM signal, or "stop" on its input
 cargo run --release -- record <sessions-folder> --as v2   # the same, its tracks kept as WAV
 cargo run --release -- record <sessions-folder> --as v1   # the same, in the first form
-cargo run --release -- listen     # each source's device and level, nothing written, until the same
+cargo run --release -- listen     # each source's device and level, nothing written, until the same or its input closes
 ```
 
 **Listening** (D88, `recording/v1`'s *Listening*) is what « Vérifier le son » runs before a recording:
 `device` for each source, then its `level` ten times a second, no folder and no file, stopped within a
-second as a recording is. `me` is what a recording would take — the microphone named with
+second as a recording is — and when its input closes, unlike a recording, so that no microphone outlives
+a shell that crashed. `me` is what a recording would take — the microphone named with
 `--microphone`, else the call's, else the default input — opened **actively**, a headset's too: a
 Bluetooth headset may switch to its call profile while it listens, and the system restores it after
 (ADR-0015's amendment of 2026-11-07). It is never part of a recording.
@@ -58,7 +59,8 @@ comes back. It runs nothing where there is no sound server, or while an applicat
 microphone; what it saw is in `.evidence/e2e.txt`, its logs in `$NSTACK_EVIDENCE/logs`
 (`.evidence/e2e/logs` when run alone), where nstack reads them after the run: a warning or an
 error the manifest's `evidence.provoked` does not declare is said. A real call, a real microphone and a
-headset stay a person's to try. Scenario P listens, stopped by `stop` and by a TERM signal: each note's
+headset stay a person's to try. Scenario P listens, stopped by `stop`, by a TERM signal and by its input closed, and with a named
+microphone taken away (nothing said, its level at 0): each note's
 level is seen, the run's folder is left as it was, and a stand-in headset runs while it listens alone.
 
 ## What it says while it runs

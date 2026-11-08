@@ -840,7 +840,7 @@ fn record(sessions: &Path) -> Result<(), String> {
         sources: [&names[0], &names[1]],
     });
 
-    let (stop, _) = stop_asked()?;
+    let (stop, _) = stop_asked(false)?;
     // A call heard on another output than the default is followed there, where PipeWire is.
     if host.id().name() == "PipeWire" {
         follow(follower, None, zero, stop.clone());
@@ -923,9 +923,10 @@ fn record(sessions: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// True once the user asked to stop: an interrupt, a termination signal, or `stop` on the input;
-/// and true once a signal came after that: what is being compressed is left (`recording/v1`).
-fn stop_asked() -> Result<(Arc<AtomicBool>, Arc<AtomicBool>), String> {
+/// True once the user asked to stop: an interrupt, a termination signal, or `stop` on the input — or,
+/// `closed_stops`, the input closed: listening never outlives whoever asked it (`recording/v1`); and
+/// true once a signal came after that: what is being compressed is left.
+fn stop_asked(closed_stops: bool) -> Result<(Arc<AtomicBool>, Arc<AtomicBool>), String> {
     let (stop, abandon) = (Arc::new(AtomicBool::new(false)), Arc::new(AtomicBool::new(false)));
     {
         let (stop, abandon) = (stop.clone(), abandon.clone());
@@ -943,6 +944,9 @@ fn stop_asked() -> Result<(Arc<AtomicBool>, Arc<AtomicBool>), String> {
                 if line.trim() == "stop" {
                     stop.store(true, Ordering::SeqCst);
                 }
+            }
+            if closed_stops {
+                stop.store(true, Ordering::SeqCst);
             }
         });
     }
@@ -1017,7 +1021,7 @@ fn record_v2(sessions: &Path, microphone: Option<&str>, contract: &str) -> Resul
 
     // A source that cannot be opened is said and has no track; the other is still recorded. The
     // local side is what the graph says (ADR-0015): it may wait, and gets its track when it is taken.
-    let (stop, abandon) = stop_asked()?;
+    let (stop, abandon) = stop_asked(false)?;
     let opening = Opening { zero, sound, moved };
     let (me_first, named_there) = me_now(&host, microphone);
     if !named_there {
@@ -1240,7 +1244,7 @@ fn listen_only(microphone: Option<&str>) -> Result<(), String> {
     // Nothing follows a call here: only the moves the system makes are named.
     let (moves, follower) = naming(moves);
     drop(follower);
-    let (stop, _) = stop_asked()?;
+    let (stop, _) = stop_asked(true)?;
     let pipewire = host.id().name() == "PipeWire";
     let (me, there) = graph()
         .filter(|_| pipewire)

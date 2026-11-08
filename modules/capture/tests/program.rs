@@ -69,6 +69,84 @@ fn listening_takes_no_folder_and_nothing_but_a_microphone() {
     }
 }
 
+/// `listen` on ALSA's null device, which hears nothing and plays nowhere — no sound server within its
+/// reach, so nothing real is opened —, its input `input`; how long it took to end, and its output.
+#[cfg(target_os = "linux")]
+fn listened_on_nothing(
+    input: Stdio,
+    ending: impl FnOnce(&mut std::process::Child),
+) -> (Duration, std::process::Output, Vec<std::path::PathBuf>) {
+    let (home, logs, nowhere) = (
+        tempfile::tempdir().unwrap(),
+        tempfile::tempdir().unwrap(),
+        tempfile::tempdir().unwrap(),
+    );
+    let alsa = nowhere.path().join("alsa.conf");
+    fs::write(&alsa, "pcm.!default { type null }\n").unwrap();
+    let mut run = Command::new(env!("CARGO_BIN_EXE_kitokey-capture"))
+        .arg("listen")
+        .current_dir(home.path())
+        .env("HOME", home.path())
+        .env("XDG_STATE_HOME", home.path())
+        .env("TMPDIR", home.path())
+        .env("KITOKEY_LOG_DIR", logs.path())
+        .env("PIPEWIRE_REMOTE", "kitokey-none")
+        .env("PULSE_SERVER", format!("unix:{}/none", nowhere.path().display()))
+        .env("XDG_RUNTIME_DIR", nowhere.path())
+        .env("ALSA_CONFIG_PATH", &alsa)
+        .stdin(input)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    // Listening: its first `level`, then what ends it.
+    let mut out = std::io::BufReader::new(run.stdout.take().unwrap());
+    let mut said = String::new();
+    while !said.contains("\"level\"") {
+        let mut line = String::new();
+        assert!(
+            std::io::BufRead::read_line(&mut out, &mut line).unwrap() > 0,
+            "ended before a level: {said}"
+        );
+        said.push_str(&line);
+    }
+    let asked = Instant::now();
+    ending(&mut run);
+    while run.try_wait().unwrap().is_none() && asked.elapsed() < Duration::from_secs(5) {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let took = asked.elapsed();
+    let _ = run.kill();
+    let output = run.wait_with_output().unwrap();
+    let mut left = walk(home.path());
+    left.extend(walk(nowhere.path()).into_iter().filter(|file| *file != alsa));
+    (took, output, left)
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn listening_ends_well_within_a_second_when_its_input_closes_and_leaves_nothing() {
+    // The shell gone — crashed while the panel showed — closes its input: no microphone outlives it.
+    let (took, output, left) = listened_on_nothing(Stdio::piped(), |run| drop(run.stdin.take()));
+    assert!(
+        took < Duration::from_secs(1),
+        "{took:?}, {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(left, Vec::<std::path::PathBuf>::new());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn listening_ends_well_within_a_second_on_stop() {
+    let (took, output, left) = listened_on_nothing(Stdio::piped(), |run| {
+        std::io::Write::write_all(run.stdin.as_mut().unwrap(), b"stop\n").unwrap();
+    });
+    assert!(took < Duration::from_secs(1) && output.status.success(), "{took:?}");
+    assert_eq!(left, Vec::<std::path::PathBuf>::new());
+}
+
 #[test]
 fn listening_with_no_source_fails_as_a_recording_does_and_writes_nothing() {
     // No sound server: each source is said unavailable, then the program fails; nothing is written
