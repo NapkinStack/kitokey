@@ -65,6 +65,11 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .session:hover { border-color: var(--accent); }
 .meeting-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
 .meeting-top .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+/* « Plus d’actions » (D89): its menu under the button, at its right edge. */
+.more { position: relative; }
+.menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 5; min-width: 220px; padding: 4px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 0.16); }
+.menu-item { display: flex; align-items: center; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; white-space: nowrap; cursor: pointer; }
+.menu-item:hover, .menu-item:focus { background: var(--raised); }
 .back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }
 /* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
 .open, .search { min-height: 32px; border-radius: 8px; border: 1px solid var(--edge); background: var(--raised); color: var(--ink); font: inherit; font-size: 14px; }
@@ -394,8 +399,18 @@ body.small-window .frame { display: none; }
   .welcome-from { text-align: left; }
 }
 
-/* A meeting's context (D59's board): a field, its count, closed while a making runs. */
-.context { padding: 18px 24px; display: flex; flex-direction: column; gap: 6px; }
+/* A meeting's settings (D89, board 4): one row of 32 px controls, their sentences under it. */
+.settings { display: flex; flex-direction: column; gap: 8px; }
+.settings-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.setting { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; min-width: 0; max-width: 100%; overflow: hidden; padding: 0 10px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--soft); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: pointer; }
+.setting:hover { background: var(--raised); }
+.setting .value { min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-weight: 500; }
+.setting select { min-width: 0; min-height: 0; max-width: 28ch; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.setting select:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.setting input[type="checkbox"] { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+.settings .left { margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+/* A meeting's context (D59's board): a field, its count, closed while a making runs; opened from its row (D89). */
+.context-panel { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .context-label { font-weight: 600; font-size: 14.5px; }
 .context-text { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.4; resize: vertical; }
 .context-text:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
@@ -416,11 +431,8 @@ body.small-window .frame { display: none; }
 .confidential { flex-wrap: nowrap; gap: 10px; cursor: pointer; }
 .confidential .said { flex: 1 1 auto; }
 .confidential .says { font-size: 13px; }
-.confidential.on .lock, .confidential-card.on .lock { color: var(--ok); }
+.confidential.on .lock { color: var(--ok); }
 .confidential input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-.confidential-card { padding: 14px 24px; display: flex; flex-direction: column; gap: 8px; }
-.confidential-card .left { margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
-.confidential-card .says:empty { display: none; }
 .chip.locked { display: inline-flex; align-items: center; gap: 5px; color: var(--ok); font-weight: 600; }
 .chip.locked .lock { color: inherit; }
 #small .confidential .name { font-size: 14px; }

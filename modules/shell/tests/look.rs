@@ -356,8 +356,9 @@ fn red_says_a_recording_and_nothing_else() {
     );
 }
 
-/// The controls of the window and Settings (D89): 32 px high; the small window's are D90's.
-const CONTROLS: [&str; 10] = [
+/// The controls of the window and Settings (D89): 32 px high; the small window's are D90's. A
+/// meeting's settings row and its « Plus d’actions » menu, board 4's.
+const CONTROLS: [&str; 12] = [
     ".open, .search",
     "select",
     ".picks input",
@@ -368,6 +369,8 @@ const CONTROLS: [&str; 10] = [
     ".sidebar .act .primary",
     ".icon-button",
     ".folder input",
+    ".setting",
+    ".menu-item",
 ];
 
 #[test]
@@ -397,7 +400,16 @@ fn controls_are_32_px_high_on_a_4_px_grid() {
 
 /// What a field, a list's choice or a switch is drawn with: never `--line`, which a ground hides
 /// (1.36:1); `--edge` instead.
-const FIELDS: [&str; 7] = ["input", "select", "textarea", ".open", ".search", ".choice", ".context-text"];
+const FIELDS: [&str; 8] = [
+    "input",
+    "select",
+    "textarea",
+    ".open",
+    ".search",
+    ".choice",
+    ".context-text",
+    ".setting",
+];
 
 #[test]
 fn a_control_is_edged_and_a_line_only_divides() {
@@ -411,7 +423,7 @@ fn a_control_is_edged_and_a_line_only_divides() {
             .any(|one| FIELDS.iter().any(|field| one.trim().split(' ').any(|part| part.starts_with(field))));
         assert!(!(bordered_by_line && a_control), "{selector} borders a control with --line");
     }
-    for control in [".open, .search", "select", ".field input", ".context-text"] {
+    for control in [".open, .search", "select", ".field input", ".context-text", ".setting"] {
         let found = rules(STYLE).into_iter().find(|(selector, _)| selector == control).unwrap();
         assert!(found.1.contains("var(--edge)"), "{control}");
     }

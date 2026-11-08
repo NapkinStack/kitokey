@@ -114,7 +114,9 @@ screen. The window left (`window`) is not changed by it.
 
 **A meeting's context** (D59, [its board](../../docs/project/drawings/d59-the-context/)) — what it
 is about, who takes part — is written in the window: while recording, the small window's *Ajouter
-le contexte*, closed by default, and the meeting's page, the one being recorded too. It is kept as
+le contexte*, closed by default, and the meeting's page, the one being recorded too — there, the
+first of the meeting's settings row (D89), opened from it beside the spoken language and
+*Confidentielle*. It is kept as
 it is typed as the meeting's `context.txt` (`contracts/session-audio/v2`), written whole through a
 file beside it and only once the folder holds `session.json`; 400 characters at most, counted as
 characters; another script than Latin or Cyrillic is said, Whisper keeping only the last 224
@@ -236,8 +238,8 @@ the page's code, never its sentence. `KITOKEY_LOG` and
 A failure reaches the user in plain words — what failed, what still holds, what to do — in a
 notification and on the window's page; what its program or the system said of it is never there
 but in the log. With the developer mode on, the page shows it under the sentence; a notification
-never does. It also offers the logs' level and folder in the settings, and on a meeting's page
-*Copy a diagnostic*: every program's lines of that meeting's makings, read together by their id
+never does. It also offers the logs' level and folder in the settings, and on a meeting's page,
+under *More actions* beside *Rename this meeting*, *Copy a diagnostic*: every program's lines of that meeting's makings, read together by their id
 from the days kept — nothing of the meeting, which no line holds (D29).
 
 **The trial** (PDR-0005, D83) is judged when a recording starts, whatever started it — the window,
