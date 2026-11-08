@@ -610,3 +610,12 @@ def test_session_audio_v2_shows_a_track_gained_late_opening_on_zeros_its_clock_n
     # A gap under 1.5 s: no silence at all, the point alone says it.
     assert "sample" in local[-2] and "sample" in local[-1]
     assert changed[2]["at"] < local[-1]["at"] and local[-1]["at"] - local[-2]["at"] > 1
+
+
+def test_recording_v1_shows_listening_in_lines_a_recording_says_and_neither_start_nor_stop():
+    reads = jsonschema.Draft202012Validator(json.loads((CONTRACTS / "recording/v1/event.schema.json").read_text()))
+    lines = [json.loads(line) for line in shown("recording/v1/README.md", "Valid — listening")[0].splitlines()]
+    assert [line for line in lines if not reads.is_valid(line)] == []
+    # Only what a recording says too, of its sources: no folder, so no `started`, no `stopped`.
+    assert {line["event"] for line in lines} == {"device", "level"}
+    assert [line["source"] for line in lines if line["event"] == "device"][:2] == ["me", "others"]

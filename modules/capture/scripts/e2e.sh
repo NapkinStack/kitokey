@@ -557,5 +557,117 @@ kill "$named" "$other" "$headset" "$addressed" 2>/dev/null || true; wait "$named
 pactl unload-module "$mic_c"; mic_c=
 pactl unload-module "$mic_d"; mic_d=
 
+say "P. listening without recording (D88): each source heard, nothing written, stopped within a second — asked, or its input closed"
+# What the run's folder holds, file by file and size: listening must leave it as it was. It starts in a
+# folder of its own, its temporary files there too: they must stay empty.
+files() { find "$work" -mindepth 1 \( -path "$work/p.*" -prune \) -o -type f -printf '%P %s\n' -o -printf '%P/\n' | sort; }
+# Whether it holds what it held before listening; what differs said, nothing else.
+unchanged() { diff <(echo "$before") <(files) | sed 's/^/    /' | tee -a .evidence/e2e.txt | grep -q . && return 1 || return 0; }
+mkdir -p "$work/p-cwd"
+# listen_for RUN [ARGS]: started on a pipe's input, its output in p.RUN.events; the pipe open on 3.
+listen_for() {
+  mkfifo "$work/p.$1.in"
+  (cd "$work/p-cwd" && KITOKEY_TRACE="e2e-p-$1" TMPDIR="$work/p-cwd" exec "$bin" listen "${@:2}") \
+    < "$work/p.$1.in" > "$work/p.$1.events" 2> "$work/p.$1.errors" &
+  listener=$!
+  exec 3> "$work/p.$1.in"
+}
+# stopped_within PID SECONDS: the program ends well within that long of what was just asked.
+stopped_within() {
+  local asked=$1 as=0; wait "$2" || as=$?
+  python3 -c 'import sys, time; sys.exit(0 if time.time() - float(sys.argv[1]) < float(sys.argv[2]) else "took " + str(time.time() - float(sys.argv[1])))' "$asked" "$3" && test "$as" = 0
+}
+# heard RUN ME OTHERS: each source named first, its level above the floor; no line a recording alone says.
+heard() {
+  python3 - "$work/p.$1.events" "$2" "$3" <<'PY'
+import json, sys
+lines = [json.loads(line) for line in open(sys.argv[1])]
+devices = [(line["source"], line["device"]) for line in lines if line["event"] == "device"]
+loudest = {source: max([line["level"] for line in lines if line["event"] == "level" and line["source"] == source] or [0]) for source in ("me", "others")}
+said = {line["event"] for line in lines}
+named = [source for source, _ in devices[:2]] == ["me", "others"] and all(device.startswith(want) for (_, device), want in zip(devices, sys.argv[2:]))
+ok = named and min(loudest.values()) > 0.5 and said <= {"device", "level"}
+print(f"    devices {devices}, loudest {loudest}, said {sorted(said)}")
+sys.exit(0 if ok else "not heard as it should be")
+PY
+}
+before=$(files)
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
+pw-play --target kitokey_e2e_out "$work/others-long.wav" & others_player=$!
+sleep 0.5
+listen_for stop
+sleep 3
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+check heard stop kitokey_e2e_mic kitokey_e2e_out
+check test ! -s "$work/p.stop.errors"
+# A termination signal, as the shell closing the panel.
+listen_for term
+sleep 2
+asked=$(date +%s.%N); kill -TERM "$listener"
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+check heard term kitokey_e2e_mic kitokey_e2e_out
+# Its input closed, as by a shell that crashed while the panel showed: no microphone outlives it.
+listen_for eof
+sleep 2
+asked=$(date +%s.%N); exec 3>&-
+check stopped_within "$asked" "$listener" 1
+check heard eof kitokey_e2e_mic kitokey_e2e_out
+kill "$mic_player" "$others_player" 2>/dev/null || true; wait "$mic_player" "$others_player" 2>/dev/null || true
+check unchanged
+check test -z "$(ls -A "$work/p-cwd")"
+check test -z "$(pactl list short source-outputs)"
+check logged e2e-p-stop capture.opened capture.opened capture.listening capture.listened
+# A headset's default, no call: a recording waits (M); listening opens it actively — it runs from
+# capture's stream alone —, and lets it go when stopped (ADR-0015's amendment).
+mic_c=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic_c)
+stand_in kitokey_e2e_headset "bluez5.loopback=true"; headset=$!
+sleep 1
+pactl set-default-source kitokey_e2e_headset
+check measure2 not-running kitokey_e2e_headset 1
+listen_for headset
+sleep 2
+check grep -q '"device":"kitokey_e2e_headset","event":"device","source":"me"' "$work/p.headset.events"
+check measure2 running kitokey_e2e_headset
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+sleep 1
+check measure2 not-running kitokey_e2e_headset 2
+kill "$headset" 2>/dev/null || true; wait "$headset" 2>/dev/null || true
+pactl set-default-source kitokey_e2e_mic.monitor
+# A microphone named, taken away while it listens: what it says then, and it still stops as asked.
+stand_in kitokey_e2e_named; named=$!
+pw-play --target kitokey_e2e_mic_c "$work/660-long.wav" & named_player=$!
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
+sleep 1
+listen_for named --microphone kitokey_e2e_named
+sleep 2
+kill "$named" 2>/dev/null || true; wait "$named" 2>/dev/null || true
+sleep 3
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+kill "$named_player" "$mic_player" 2>/dev/null || true; wait "$named_player" "$mic_player" 2>/dev/null || true
+# As recording/v1 says: no line says it, `me`'s level falls to 0 and stays there, still said.
+gone_unsaid() {
+  python3 - "$work/p.named.events" <<'PY' 2>&1 | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"
+import json, sys
+lines = [json.loads(line) for line in open(sys.argv[1])]
+said = [line for line in lines if line["event"] != "level"]
+me = [line["level"] for line in lines if line["event"] == "level" and line["source"] == "me"]
+print(f"    named, gone while listening: {said}; me's levels by half-seconds {[max(me[n:n + 5]) for n in range(0, len(me), 5)]}")
+ok = [line["event"] for line in said] == ["device", "device"] and max(me[:15]) > 0.5 and len(me) > 40 and max(me[-15:]) == 0
+sys.exit(0 if ok else "not as recording/v1 says")
+PY
+}
+check gone_unsaid
+sed 's/^/    errors: /' "$work/p.named.errors" >> .evidence/e2e.txt
+pactl unload-module "$mic_c"; mic_c=
+grep -v '"level"' "$work"/p.*.events | sed 's/^/    /' >> .evidence/e2e.txt
+check unchanged
+
 [ "$failed" = 0 ] && say "e2e: passed" || say "e2e: FAILED"
 exit "$failed"
