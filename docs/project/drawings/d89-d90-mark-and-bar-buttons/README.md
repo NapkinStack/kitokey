@@ -1,6 +1,6 @@
 # D89 — D90, second round: Kitokey's mark and the bar's record and stop buttons
 
-**Drawn** 2026-11-08, second round · **Status**: for the decider to read, after the [first round's answers](../d89-d90-kitokey-look-and-bar/README.md#what-the-decider-answers) of 2026-11-08: « les visuels sont ok. le logo est a revoir », then « go » on the bar's buttons drawn as icons alone · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
+**Drawn** 2026-11-08, second round · **Status**: read by the decider on 2026-11-08 (answers below): the mark goes to a third round; drawn after the [first round's answers](../d89-d90-kitokey-look-and-bar/README.md#what-the-decider-answers) of 2026-11-08: « les visuels sont ok. le logo est a revoir », then « go » on the bar's buttons drawn as icons alone · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
 
 Everything else of the [first round](../d89-d90-kitokey-look-and-bar/README.md) stands as answered there; this round redraws only the two things the decider sent back.
 
@@ -25,12 +25,14 @@ The letters follow the first round's A and B; F was left out while drawing (a le
 
 ## What the decider answers
 
+The decider, 2026-11-08, in the working session: « pour le logo j'aime bien l'idée avec la lettre K mais juste modifier le logo en gardant le meme idée, peut être un "K" et un "i" avec le point du "i" comme un boutton "record", a voir comment harmonisé et associé les lettre k et i ou juste le K. vois les tendances des logo et l'identité graphique de kitokey pour refaire des propositions ».
+
 | Question | The author's proposal on the boards | The decider's answer |
 |---|---|---|
-| The mark | C « La bulle » — the most legible, it says « conversation »; G « Kito » if Kitokey should first be friendly. D and H read less well at 16 px, H looks like many podcasts' « broadcast » icon | owed |
-| The tray while recording | The mark's marked part turns red, its shape unchanged; no blinking | owed |
-| The bar's buttons | ● a red-ringed round button holding the red dot, larger on hover; ■ a filled red rounded square holding a white square; the words in the tooltip and the accessible name | owed |
-| The live dot | Beats gently while recording, unless the system asks for less motion; nothing else moves | owed |
+| The mark | C « La bulle » — the most legible, it says « conversation »; G « Kito » if Kitokey should first be friendly. D and H read less well at 16 px, H looks like many podcasts' « broadcast » icon | None of the five: back to the first round's « K », with a « K » and an « i » whose dot is a record button, or the « K » alone — a third round |
+| The tray while recording | The mark's marked part turns red, its shape unchanged; no blinking | Follows the mark of the third round |
+| The bar's buttons | ● a red-ringed round button holding the red dot, larger on hover; ■ a filled red rounded square holding a white square; the words in the tooltip and the accessible name | Not answered in this round; drawn again in the third, with the mark kept |
+| The live dot | Beats gently while recording, unless the system asks for less motion; nothing else moves | Not answered in this round; drawn again in the third |
 
 ## Contrast, both themes
 
