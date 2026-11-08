@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>D89 — D90, troisième tour : le « K », le « i » et le bouton d’enregistrement</title>
+<!-- The source of the images beside it, rendered at 1280 px by chromium-browser --headless.
+     The colours are ui/window.css's, both themes. The wordmark is set in Montserrat 700 (OFL) as
+     installed on the author's workstation; a kept wordmark is outlined before it is published.
+     ?dark draws the dark theme; ?only=N draws board N alone. Icons: Lucide 1.14.0, inline,
+     ISC (modules/shell/ui/LUCIDE-LICENSE). Yellow = the author's notes, never the interface. -->
+<style>
+  :root {
+    --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
+    --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
+    --on-accent: #FFFFFF; --edge: #808898;
+    --note: #7A5A00; --note-ground: #FFF6DB; --note-line: #C9A227;
+    --brand-red: #E5483D;
+  }
+  :root.dark {
+    --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
+    --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+    --on-accent: #1E2129; --edge: #737B8C;
+    --note: #F2CC6B; --note-ground: #2E2A1E; --note-line: #8C7330;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1280px; padding: 32px 34px 8px; background: var(--ground); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
+  section { margin-bottom: 40px; }
+  h2 { margin: 0 0 14px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: var(--note-ground); color: var(--note); font-size: 13px; line-height: 1.45; }
+  .note b { display: block; margin-bottom: 2px; }
+  .note ul { margin: 4px 0 0; padding-left: 18px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .cap { font-size: 12px; color: var(--soft); }
+  .tab { font-variant-numeric: tabular-nums; }
+  svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .hidden-board { display: none !important; }
+
+  /* ——— Board 1 · the marks ——— */
+  .cands { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .cand { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .cand.pick { box-shadow: 0 0 0 2px var(--note-line); }
+  .cand .name { font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
+  .cand .name .l { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 4px; border-radius: 6px; background: var(--raised); font-size: 12px; }
+  .cand .idea { font-size: 12.5px; color: var(--soft); min-height: 54px; }
+  .tiles { display: flex; align-items: flex-end; gap: 10px; }
+  .tray { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 10px; }
+  .tray.darkbar { background: #000; color: #FFF; --rec: #FF7A72; }
+  .tray.lightbar { background: #F3F3F3; color: #15171C; border: 1px solid #D9DDE5; --rec: #C2352D; }
+  .tray .sep { width: 1px; align-self: stretch; background: currentColor; opacity: .25; }
+  .head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .grid24 { background-color: var(--surface); background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 8px 8px; border: 1px solid var(--line); border-radius: 8px; }
+
+  /* ——— Board 2 · the identity ——— */
+  .wm { font-family: Montserrat, system-ui, sans-serif; font-weight: 700; letter-spacing: -.02em; display: inline-flex; align-items: baseline; line-height: 1; }
+  .wm .ii { position: relative; display: inline-block; }
+  .wm .ii .btn { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 50%; background: var(--brand-red); box-shadow: 0 0 0 var(--ring) var(--surface); }
+  .panelc { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; gap: 36px; }
+  .panelc.inv { background: #2253CF; border-color: #2253CF; color: #FFFFFF; }
+  .panelc.inv .wm .ii .btn { box-shadow: 0 0 0 var(--ring) #2253CF; }
+  .bar { width: 440px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 8px 28px rgba(0,0,0,.16); flex: none; }
+  .strip { height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; }
+  .strip > .gap { width: 4px; }
+  .handle { width: 28px; height: 28px; display: grid; place-items: center; flex: none; }
+  .ib { width: 28px; height: 28px; border-radius: 6px; display: inline-grid; place-items: center; color: var(--soft); flex: none; }
+  .fld { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--edge); background: var(--surface); display: flex; align-items: center; font-size: 13px; min-width: 0; flex: 1; }
+  .fld .ph { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rb { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--red); display: grid; place-items: center; flex: none; background: var(--surface); }
+  .rb i { width: 14px; height: 14px; border-radius: 50%; background: var(--red); }
+  .sq { width: 28px; height: 28px; border-radius: 8px; background: var(--red); display: grid; place-items: center; flex: none; }
+  .sq i { width: 10px; height: 10px; border-radius: 2px; background: var(--on-accent); }
+  :root.dark .sq i { background: #1E2129; }
+  .live { width: 10px; height: 10px; border-radius: 50%; background: var(--red); flex: none; margin: 0 4px 0 6px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--red) 22%, transparent); }
+  .time { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; width: 64px; }
+  .meters { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; padding: 0 8px; }
+  .mt { display: flex; align-items: center; gap: 6px; height: 16px; color: var(--soft); }
+  .mt .track { flex: 1; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+  .mt .fill { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+  .mt.far .fill { background: var(--ok); }
+  .rhyme { display: flex; align-items: center; gap: 18px; font-size: 12px; color: var(--soft); }
+  .rhyme .eq { font-size: 18px; color: var(--soft); }
+</style>
+<script>
+  if (location.search.includes("dark")) document.documentElement.classList.add("dark");
+</script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<!-- Lucide 1.14.0, ISC -->
+<symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></symbol>
+<symbol id="i-volume-2" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-maximize-2" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+
+<!-- The marks, on a 24 grid, stroke 3, round ends. The record button is a disc of the glyph's colour
+     holding a smaller disc of --btn: the brand's red on the tile; the glyph's own colour in the tray
+     at rest (one solid dot), the recording red in the tray while recording (a ringed red dot). -->
+<!-- K1 · Le K bouton : the first round's A, its upper arm kept short and ending in a record button. -->
+<symbol id="m-k1" viewBox="0 0 24 24"><path d="M6.5 4v16M8 12.5 17.5 20M8 11.5l3.2-2.4" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15.6" cy="6.6" r="3.9" fill="currentColor"/><circle cx="15.6" cy="6.6" r="2.3" style="fill:var(--btn,currentColor)"/></symbol>
+<!-- K2 · Ki : a K and an i side by side, the i's dot a record button. -->
+<symbol id="m-k2" viewBox="0 0 24 24"><path d="M4.5 4v16M6 12.2 12 5M6 12.2 12.5 20M18.5 11v9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18.5" cy="5.5" r="3.4" fill="currentColor"/><circle cx="18.5" cy="5.5" r="2" style="fill:var(--btn,currentColor)"/></symbol>
+<!-- K3 · iK : the K's stem is an i — a short stem under a record button — and the K's two arms leave it. -->
+<symbol id="m-k3" viewBox="0 0 24 24"><path d="M6.5 11v9M8.2 15.2 17.5 5.5M8.2 15.2 17.5 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="5.2" r="3.4" fill="currentColor"/><circle cx="6.5" cy="5.2" r="2" style="fill:var(--btn,currentColor)"/></symbol>
+<!-- K4 · Le K dans le bouton : the record button itself, a K inside it. -->
+<symbol id="m-k4" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><circle cx="12" cy="12" r="8.3" style="fill:var(--btn,currentColor)"/><path d="M9.3 7v10M10.6 12.3 15 17M10.6 11.7 15 7" fill="none" style="stroke:var(--k4ink,#FFFFFF)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</defs>
+</svg>
+
+<!-- ═══════════════ 1 · QUATRE MARQUES ═══════════════ -->
+<section data-board="1">
+  <h2>1 · La marque de Kitokey, troisième tour — le « K », le « i » et le bouton d’enregistrement (D89)</h2>
+  <div class="cands" data-cands></div>
+  <h3 style="margin-top:24px">Construction — grille de 24, trait 3, bouts ronds, comme Lucide à 1,5 ×</h3>
+  <div class="row" style="gap:20px" data-grids></div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Tendance 2026 : une marque est un <b style="display:inline">système</b> — une icône, un mot, un monogramme — plutôt qu’un dessin seul ; et l’icône d’application tient dans le carreau arrondi que macOS impose désormais à toutes. Ces quatre pistes gardent le « K » du premier tour et y ajoutent le seul signe propre à Kitokey : <b style="display:inline">le bouton d’enregistrement</b>, qui devient le point du « i » dans le nom (planche 2) et le bouton ● de la barre.</li>
+      <li><b style="display:inline">K1</b> est le premier tour corrigé : le bras haut, court, mène à un vrai bouton (un point rouge cerclé de blanc) — il se lit comme un « K » à 16 px, ce qui manquait à A. <b style="display:inline">K2 · Ki</b> dit les deux premières lettres ; plus large, il s’empâte à 16 px. <b style="display:inline">K3 · iK</b> fait d’un même trait le « i » et le fût du « K » : le plus original, le plus ludique. <b style="display:inline">K4</b> est le bouton lui-même : le plus simple, moins une lettre qu’un signe.</li>
+      <li>La recommandation de l’auteur : <b style="display:inline">K3</b>, ou <b style="display:inline">K1</b> pour un « K » qui se lit d’abord.</li>
+      <li>Sur le carreau, le point est rouge (#E5483D) dans un anneau blanc : le rouge de la marque. Dans la barre système au repos, la marque est d’une seule couleur, sans rouge ; pendant un enregistrement, seul le point devient rouge. Dans l’interface, le rouge reste réservé à l’enregistrement.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════ 2 · L'IDENTITÉ ═══════════════ -->
+<section data-board="2">
+  <h2>2 · L’identité — le nom, l’icône et la barre partagent le même bouton (D89, D90) · tracée ici avec K3</h2>
+  <div class="col" style="gap:16px">
+    <div class="panelc">
+      <span data-wm="64"></span>
+      <span style="width:1px;align-self:stretch;background:var(--line)"></span>
+      <span style="display:flex;align-items:center;gap:12px"><svg width="48" height="48" data-tile="m-k3"></svg><span data-wm="32"></span></span>
+      <span style="display:flex;align-items:center;gap:8px"><svg width="24" height="24" data-tile="m-k3"></svg><span data-wm="18"></span></span>
+    </div>
+    <div class="panelc inv">
+      <span data-wm="64"></span>
+      <span style="width:1px;align-self:stretch;background:rgba(255,255,255,.3)"></span>
+      <span class="cap" style="color:#E6ECFB;max-width:420px">Le nom en blanc sur l’accent — la page de kitokey.com, le Store, la bannière du dépôt. Le point du « i » garde son rouge, cerclé de l’accent.</span>
+    </div>
+    <div class="row" style="gap:28px;align-items:center">
+      <div class="col" style="gap:6px"><h3>La barre, au repos — la poignée est la marque</h3><div data-bar="rest"></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement</h3><div data-bar="rec"></div></div>
+    </div>
+    <div class="rhyme" data-rhyme></div>
+  </div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Le nom s’écrit en minuscules, « kitokey », le point du « i » remplacé par le bouton d’enregistrement : un seul signe relie le nom, l’icône (K3, K1 ou K2 le portent aussi), le bouton ● de la barre et l’icône de la barre système pendant un enregistrement.</li>
+      <li>Le nom est composé ici en Montserrat 700 (licence OFL), installée sur le poste de l’auteur ; celui qui est gardé est vectorisé avant d’être publié, sans police à installer.</li>
+      <li>L’accent bleu reste la couleur de marque, le rouge n’habille que le bouton. Rien d’autre ne change dans la fenêtre (premier tour accepté).</li>
+    </ul>
+  </div>
+</section>
+
+<script>
+  const marks = [
+    ["K1", "m-k1", "Le K bouton", "Le « K » du premier tour : son bras haut, court, mène à un bouton d’enregistrement."],
+    ["K2", "m-k2", "Ki", "Un « K » et un « i » côte à côte, le point du « i » en bouton d’enregistrement : les deux premières lettres."],
+    ["K3", "m-k3", "iK", "Le fût du « K » est un « i » : un trait court sous le bouton, d’où partent les deux bras du « K »."],
+    ["K4", "m-k4", "Le K dans le bouton", "Le bouton d’enregistrement lui-même, un « K » blanc dedans."],
+  ];
+  const use = (id, size, style = "") => `<svg width="${size}" height="${size}" style="${style}"><use href="#${id}"/></svg>`;
+  const tileSvg = (id, size) => `<svg width="${size}" height="${size}" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2253CF"/><use href="#${id}" x="10" y="10" width="44" height="44" style="color:#FFFFFF;--btn:#E5483D"/></svg>`;
+  // In the tray, K4's K is cut in the bar's colour: dark bar black, light bar its grey.
+  const tray = (id, cls, cut) => `<div class="tray ${cls}" style="--k4ink:${cut}">${use(id, 16)}${use(id, 22)}<span class="sep"></span>${use(id, 16, "--btn:var(--rec)")}${use(id, 22, "--btn:var(--rec)")}<span style="opacity:.7">repos · enregistre</span></div>`;
+  document.querySelector("[data-cands]").innerHTML = marks.map(([l, id, name, idea]) => `
+    <div class="cand${l === "K3" ? " pick" : ""}">
+      <div class="name"><span class="l">${l}</span>${name}</div>
+      <div class="idea">${idea}</div>
+      <div class="tiles">${tileSvg(id, 96)}${tileSvg(id, 48)}${tileSvg(id, 32)}${tileSvg(id, 24)}${tileSvg(id, 16)}</div>
+      <div class="cap tab">96 · 48 · 32 · 24 · 16 px</div>
+      ${tray(id, "darkbar", "#000")}${tray(id, "lightbar", "#F3F3F3")}
+      <div class="head">${tileSvg(id, 20)}Kitokey</div>
+    </div>`).join("");
+  document.querySelector("[data-grids]").innerHTML = marks.map(([l, id]) =>
+    `<div class="col" style="gap:6px;align-items:center"><div class="grid24" style="width:192px;height:192px;display:grid;place-items:center;color:var(--ink);--btn:var(--brand-red);--k4ink:var(--surface)">${use(id, 192)}</div><span class="cap">${l}</span></div>`).join("");
+
+  // The wordmark: "k", a dotless i under the record button, "tokey".
+  for (const el of document.querySelectorAll("[data-wm]")) {
+    const s = +el.dataset.wm, d = s * 0.2, ring = Math.max(1, s * 0.045);
+    el.innerHTML = `<span class="wm" style="font-size:${s}px;--ring:${ring}px">k<span class="ii">ı<span class="btn" style="width:${d}px;height:${d}px;top:${s * 0.13}px"></span></span>tokey</span>`;
+  }
+  for (const el of document.querySelectorAll("[data-tile]")) el.outerHTML = tileSvg(el.dataset.tile, el.getAttribute("width"));
+
+  const I = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
+  const handle = `<span class="handle">${tileSvg("m-k3", 20)}</span>`;
+  const tools = `<span class="ib">${I("chevron-down")}</span><span class="ib">${I("maximize-2")}</span><span class="ib">${I("minus")}</span>`;
+  const draw = {
+    rest: () => `<div class="strip">${handle}<span class="gap"></span><span class="fld"><span class="ph">Contexte de la réunion</span></span><span class="gap"></span><span class="rb"><i></i></span><span class="gap"></span>${tools}</div>`,
+    rec: () => `<div class="strip"><span class="live"></span><span class="time">00:16:42</span><span class="meters"><span class="mt">${I("mic")}<span class="track"><i class="fill" style="width:62%"></i></span></span><span class="mt far">${I("volume-2")}<span class="track"><i class="fill" style="width:38%"></i></span></span></span><span class="sq"><i></i></span><span class="gap"></span>${tools}</div>`,
+  };
+  for (const host of document.querySelectorAll("[data-bar]")) {
+    const bar = document.createElement("div"); bar.className = "bar"; bar.innerHTML = draw[host.dataset.bar](); host.append(bar);
+  }
+  document.querySelector("[data-rhyme]").innerHTML =
+    `<span class="wm" style="font-size:28px;--ring:1.3px">k<span class="ii">ı<span class="btn" style="width:5.6px;height:5.6px;top:3.6px"></span></span></span></span><span class="eq">≈</span>` +
+    `${tileSvg("m-k3", 32)}<span class="eq">≈</span><span class="rb"><i></i></span><span class="eq">≈</span>` +
+    `<span class="tray darkbar" style="padding:6px 8px">${use("m-k3", 22, "--btn:var(--rec)")}</span>` +
+    `<span>Le même bouton : le point du « i », l’icône, ● dans la barre, la barre système pendant un enregistrement.</span>`;
+
+  const only = new URLSearchParams(location.search).get("only");
+  if (only) for (const s of document.querySelectorAll("section")) if (s.dataset.board !== only) s.classList.add("hidden-board");
+  document.body.dataset.h = Math.ceil(document.body.getBoundingClientRect().height);
+</script>
+</body>
+</html>
