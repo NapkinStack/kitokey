@@ -88,6 +88,9 @@ const ICONS = {
   "hard-drive": ["M10 16h.01", "M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z", "M21.946 12.013H2.054", "M6 16h.01"],
   settings: ["M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915", ["circle", { cx: 12, cy: 12, r: 3 }]],
   lock: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2, ry: 2 }], "M7 11V7a5 5 0 0 1 10 0v4"],
+  copy: [["rect", { width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2 }], "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"],
+  "rotate-ccw": ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5"],
+  "folder-open": ["m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"],
   pencil: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
 };
 function icon(name) {
@@ -103,6 +106,17 @@ function icon(name) {
     svg.append(shape);
   }
   return svg;
+}
+
+// A secondary action (D89): an icon, its tooltip and its name the same words.
+function iconButton(glyph, name, id) {
+  const button = element("button", "icon-button");
+  button.type = "button";
+  button.id = id;
+  button.title = name;
+  button.setAttribute("aria-label", name);
+  button.append(icon(glyph));
+  return button;
 }
 
 function readySaid(text) {
@@ -1048,9 +1062,7 @@ function minutesCard(read, words, session, transcript) {
   }
   // Refaire… (D11's sixth board): another model, this time only; the minutes stay until the new
   // ones are whole.
-  const redo = element("button", "open", words.redo);
-  redo.type = "button";
-  redo.id = "redo-minutes";
+  const redo = iconButton("rotate-ccw", words.redo, "redo-minutes");
   redo.addEventListener("click", async () => {
     const choices = await window.__TAURI__.core.invoke("minutes_shown");
     const panel = redoPanel(choices, session, words, redo);
@@ -1058,9 +1070,7 @@ function minutesCard(read, words, session, transcript) {
     panel.querySelector("input, button:enabled").focus();
   });
   // Copied in one click, as written, to paste where the user writes (D45): said in place, a moment.
-  const copy = element("button", "open", words.copy_minutes);
-  copy.type = "button";
-  copy.id = "copy-minutes";
+  const copy = iconButton("copy", words.copy_minutes, "copy-minutes");
   const copied = element("span", "says copied");
   copied.id = "minutes-copied";
   copied.setAttribute("role", "status");
@@ -1247,9 +1257,7 @@ function transcriptCard(read, words, session) {
   search.setAttribute("aria-label", words.search);
   top.append(search);
   // Refaire…: another Whisper model of this computer, this time only.
-  const redo = element("button", "open", words.redo);
-  redo.type = "button";
-  redo.id = "redo-transcript";
+  const redo = iconButton("rotate-ccw", words.redo, "redo-transcript");
   redo.addEventListener("click", async () => {
     const shown = await window.__TAURI__.core.invoke("settings_shown");
     const panel = redoTranscriptPanel(shown, session, words, redo, read.segments.some((segment) => segment.edited));
@@ -1562,8 +1570,7 @@ document.addEventListener("keydown", (event) => {
 function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
-  const open = element("button", "open", words.open_folder);
-  open.type = "button";
+  const open = iconButton("folder-open", words.open_folder, "open-folder");
   open.addEventListener("click", () => window.__TAURI__.core.invoke("open_folder", { name: nameOf(session) }).catch((why) => {
     open.replaceWith(element("p", "note warn", why));
   }));
@@ -1591,6 +1598,8 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   actions.append(open);
   // The way back is the pane's, under 840 px alone (D61).
   top.append(actions);
+  // The meeting's header (D89): its name and what it holds, its actions at their right.
+  const head = element("div", "meeting-head");
   const title = element("section", "meeting-title");
   const named = element("div", "named");
   // Named by its minutes (D48): the date above the name.
@@ -1600,6 +1609,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   // Where the minutes were written, from their own front matter: unread, or naming none, not said.
   const minutesHere = minutes.state === "present" && minutes.provider ? minutes.provider === "local" : undefined;
   title.append(named, holdings(session, words, { minutes_here: minutesHere }));
+  head.append(title, top);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
   const drawn = element("section", "card drawn");
@@ -1624,7 +1634,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   page.dataset.name = nameOf(session);
   const kept = confidentialCard(session, confidential, words);
   kept.append(languageRow(session, language, languages, words, meeting_language, apple, system_language));
-  page.replaceChildren(top, title, kept, contextCard(session, { context, transcript, minutes }, words), drawn, columns);
+  page.replaceChildren(head, kept, contextCard(session, { context, transcript, minutes }, words), drawn, columns);
   // The line being said, marked while it plays; the page stays where the user left it (D26, the
   // decider, 2026-10-24: following the line was intrusive).
   if (player?.name === nameOf(session)) {

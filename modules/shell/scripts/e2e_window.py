@@ -1909,7 +1909,7 @@ def minutes_copied(now: dt.datetime) -> None:
             "const c = document.getElementById('copy-minutes'), r = document.getElementById('redo-minutes');"
             "return c && r && c.parentElement === r.parentElement && c.nextElementSibling === r")
         check("a meeting with minutes offers « Copier le compte rendu », beside Refaire…",
-              offered and beside and browser.find_element(By.ID, "copy-minutes").text == "Copier le compte rendu", beside)
+              offered and beside and browser.find_element(By.ID, "copy-minutes").get_attribute("aria-label") == "Copier le compte rendu", beside)
         browser.execute_script(stand_in, False)
         press(browser, "copy-minutes")
         said = wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
@@ -5614,7 +5614,18 @@ def main() -> int:
         search.send_keys("voix")
         none = [p.text for p in browser.find_elements(By.CSS_SELECTOR, ".transcript .none") if p.is_displayed()]
         check("a search looks at what was said, not at who or when", none == ["Aucun passage ne correspond."], none)
-        check("the folder can be opened from the meeting", browser.find_element(By.CSS_SELECTOR, "#meeting .meeting-top .open").text == "Ouvrir le dossier")
+        check("the folder can be opened from the meeting", browser.find_element(By.ID, "open-folder").get_attribute("aria-label") == "Ouvrir le dossier")
+        # D89: the meeting's header — its title at 18 px, its actions on its right; each card's actions icons, each with its tooltip and its name.
+        head = browser.execute_script(
+            "const h = document.querySelector('#meeting h1'), o = document.getElementById('open-folder');"
+            " return [parseFloat(getComputedStyle(h).fontSize), Math.abs(h.getBoundingClientRect().top - o.getBoundingClientRect().top) < 24 && o.getBoundingClientRect().left > h.getBoundingClientRect().right]")
+        check("the meeting's title is 18 px, « Ouvrir le dossier » on the same line, at its right (D89)", head == [18, True], head)
+        actions = browser.execute_script(
+            "return ['open-folder', 'copy-minutes', 'redo-minutes', 'redo-transcript'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim(), e.getAttribute('aria-label'), e.title,"
+            " e.classList.contains('icon-button') && e.querySelectorAll('svg.glyph').length === 1])")
+        check("each secondary action of the meeting: an icon button, its tooltip and its name (D89)", actions == [
+            ["open-folder", "", "Ouvrir le dossier", "Ouvrir le dossier", True], ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu", True],
+            ["redo-minutes", "", "Refaire…", "Refaire…", True], ["redo-transcript", "", "Refaire…", "Refaire…", True]], actions)
         browser.find_elements(By.CSS_SELECTOR, ".session")[1].click()
         wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed() and b.find_elements(By.CSS_SELECTOR, ".minutes .none"))
         kept = browser.execute_script("return document.getElementById('search') && document.getElementById('search').value")

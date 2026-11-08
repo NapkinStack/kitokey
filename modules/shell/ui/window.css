@@ -64,7 +64,7 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .chip.cut { color: var(--soft); font-style: italic; }
 .session:hover { border-color: var(--accent); }
 .meeting-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
-.meeting-top .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.meeting-top .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }
 /* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
 .open, .search { min-height: 32px; border-radius: 8px; border: 1px solid var(--edge); background: var(--raised); color: var(--ink); font: inherit; font-size: 14px; }
@@ -76,7 +76,11 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .made { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .made > .redo { flex-basis: 100%; }
 .meeting-title { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
-.meeting-title h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+/* The meeting's header (D89): its title at 18 px, its actions at its right. */
+.meeting-head { display: flex; align-items: flex-start; gap: 12px 16px; }
+.meeting-head .meeting-title { flex: 1 1 auto; min-width: 0; }
+.meeting-head .meeting-top { flex: none; }
+.meeting-title h1 { margin: 0; font-size: 18px; font-weight: 650; overflow-wrap: anywhere; }
 .meeting-title h1 .rename { display: block; max-width: 100%; margin: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; overflow-wrap: anywhere; cursor: text; }
 .meeting-title h1 .rename:hover { background: var(--raised); box-shadow: 0 0 0 4px var(--raised); }
 .meeting-title:has(.naming) .named { flex: 1 1 100%; }
