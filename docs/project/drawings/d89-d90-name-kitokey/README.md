@@ -1,6 +1,6 @@
 # D89 — D90, seventh round: the name, its i cut by the record dot
 
-**Drawn** 2026-11-08, seventh round · **Status**: for the decider to read, after the [sixth round's answers](../d89-d90-mark-k-stem/README.md#what-the-decider-answers) of 2026-11-08: the mark accepted; « quand on a le nom "kitokey" on fait le "i" de la meme maniere avec le "record" qui coupe le i comme dans le logo » · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
+**Drawn** 2026-11-08, seventh round · **Status**: accepted by the decider on 2026-11-08 (answers below); drawn after the [sixth round's answers](../d89-d90-mark-k-stem/README.md#what-the-decider-answers) of 2026-11-08: the mark accepted; « quand on a le nom "kitokey" on fait le "i" de la meme maniere avec le "record" qui coupe le i comme dans le logo » · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
 
 ```mermaid
 flowchart LR
@@ -19,10 +19,12 @@ flowchart LR
 
 ## What the decider answers
 
+The decider, 2026-11-08, in the working session: « ok, valide le nom ».
+
 | Question | The author's proposal on the board | The decider's answer |
 |---|---|---|
-| The name | « kitokey » in lower case, its i drawn as the mark's stem: the stem rises to the dot, as wide as the stroke, its top at the k's height, cut by an empty gap of 0.41 times the stroke, as in the mark; the « t » untouched | owed |
-| The name while recording | Where the name shows a state (kitokey.com's animation, the installer's last screen), the dot turns red and grows by the mark's ratio (× 1.375) | owed |
+| The name | « kitokey » in lower case, its i drawn as the mark's stem: the stem rises to the dot, as wide as the stroke, its top at the k's height, cut by an empty gap of 0.41 times the stroke, as in the mark; the « t » untouched | Accepted |
+| The name while recording | Where the name shows a state (kitokey.com's animation, the installer's last screen), the dot turns red and grows by the mark's ratio (× 1.375) | Accepted |
 
 ## Sources
 
