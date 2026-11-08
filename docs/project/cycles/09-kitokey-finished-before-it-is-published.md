@@ -274,18 +274,18 @@ D84, D85, D54, D57, D53, D86, D78, D66, D56, D41 and D27, at cycle 08's closure,
 2026-11-07. Their criteria are copied as they stand, their sections are in
 [cycle 08](08-wholeheard-ready-for-the-microsoft-store.md) and the cycles before it, and *What needs a person*
 below gives each its gesture. D78's criterion 4 is held by the next tag, which carries D87; D86's criterion 1 by
-the decider's word on the rpm installed over Wholeheard. They do not count against the appetite: the cut order
+the decider's word on the rpm installed over Wholeheard, given on 2026-11-08. They do not count against the appetite: the cut order
 below is unchanged, and the end date does not move for them.
 
 | Deliverable | What holds it, made before this cycle or by its release |
 |---|---|
 | D78 | #657, #658, #659, #661, #662 (cycle 07: each program's `--version`, the source package and `copr.yml`), #686 (the group's project). Criterion 4, `dnf upgrade` from 0.2.0: the tag v0.2.1's run [42417841678](https://github.com/NapkinStack/kitokey/actions/runs/42417841678) — « upgraded with dnf, kitokey 0.2.0 to 0.2.1 », « the meetings and the settings stay as they were » —, its version set by #711 |
+| D86 | Criterion 1: the decider's word, 2026-11-08, in the working session, on the rpm installed over Wholeheard on 2026-11-06 — « oui, mes réunions s'affichent » —, after an agent read on their disk the settings, the meetings, the model and the key file under Kitokey's names. Criterion 2: #648, #649, #650, #651, #652, #653, #654, #663, #664, #665, #666. Criterion 3: #651, #654. Criterion 4: #652, #686 |
 
 ## What needs a person
 
 | Deliverable | Who | The literal gesture |
 |---|---|---|
-| D86, criterion 1 | The decider | Say whether Kitokey, the rpm installed over Wholeheard on 2026-11-06, kept your settings, meetings, model and keys |
 | PDR-0005 | The decider | Read [PDR-0005](../../pdr/0005-on-windows-the-trial-ends-without-locking-the-meetings.md) and say « PDR-0005 acceptée », or what changes |
 | D57 | The decider | Read [`docs/store/listing.md`](../../store/listing.md); say « l'annonce ne promet rien de faux », or which line does |
 | D54, submission | The decider | In [Partner Center](https://partner.microsoft.com/dashboard), with a company's account: reserve the product's name and give an agent the identity Partner Center shows. Set *Free trial* to **Unlimited** (PDR-0005). Read the Store's licence terms beside GPL-3.0, answer the age questionnaire, and submit the package an agent built from that identity |
@@ -294,7 +294,7 @@ below is unchanged, and the end date does not move for them.
 | D41 | The decider | [#449](https://github.com/NapkinStack/kitokey/issues/449): a call on the earbuds, the default on the speaker |
 | D56 | The decider | As [cycle 07](07-wholeheard-from-the-systems-updater.md#what-needs-a-person) says, in a terminal of your own, never through an agent: a minisign key, its `.pub` alone given to an agent |
 | D27 | Anyone on Ubuntu 24.04 | `nstack claim D27`, then [#255](https://github.com/NapkinStack/kitokey/issues/255): the `.deb` of a build of `main`, one real call of five minutes, the answer there |
-| D89, D90 | The decider | First round [read on 2026-11-08](../drawings/d89-d90-kitokey-look-and-bar/README.md#what-the-decider-answers): second round [read the same day](../drawings/d89-d90-mark-and-bar-buttons/README.md#what-the-decider-answers): third round [read the same day](../drawings/d89-d90-mark-k-and-i/README.md#what-the-decider-answers): the mark [accepted in the sixth](../drawings/d89-d90-mark-k-stem/README.md#what-the-decider-answers), the name [in the seventh](../drawings/d89-d90-name-kitokey/README.md#what-the-decider-answers): done: accepted, or what to change |
+| D89, D90 | The decider | First round [read on 2026-11-08](../drawings/d89-d90-kitokey-look-and-bar/README.md#what-the-decider-answers): second round [read the same day](../drawings/d89-d90-mark-and-bar-buttons/README.md#what-the-decider-answers): third round [read the same day](../drawings/d89-d90-mark-k-and-i/README.md#what-the-decider-answers): the mark [accepted in the sixth](../drawings/d89-d90-mark-k-stem/README.md#what-the-decider-answers), the name [in the seventh](../drawings/d89-d90-name-kitokey/README.md#what-the-decider-answers), the tray's icon on its tile, red while recording (« ok C », 2026-11-08, in the working session): done |
 | D88 | The decider | Before a real call, on the AirPods: Kitokey → the bar → « Vérifier le son »; say in the acceptance issue whether both sides moved |
 
 ## Dependency with a date
