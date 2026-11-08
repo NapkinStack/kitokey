@@ -3793,9 +3793,11 @@ setInterval(async () => {
   if (asked === null) return;
   readMakings();
   const { recording, stopping, shortcut, refused } = asked;
+  // The shortcut, granted or changed meanwhile: in the recording's tooltip and the empty state (D89).
+  recordKeys = shortcut ?? null;
   paintRecord(recording, stopping);
   paintRefused(refused);
-  const keys = document.getElementById("header-keys");
+  const keys = document.getElementById("empty-keys");
   keys.textContent = shortcut ?? "";
   keys.hidden = !shortcut;
 }, 1500);
