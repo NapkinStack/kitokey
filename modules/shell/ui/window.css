@@ -3,11 +3,14 @@
   color-scheme: light dark;
   --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
   --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
+  /* A field's, a list's, a switch's border, 3:1 on each ground (D89); --line divides, and only that. */
+  --edge: #808898;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
     --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+    --edge: #737B8C;
   }
 }
 * { box-sizing: border-box; }
@@ -20,8 +23,10 @@ body {
 /* An icon drawn (D69), the size of the text it stands beside. */
 .glyph { width: 1em; height: 1em; vertical-align: -0.125em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
-.mark { fill: var(--ink); }
-.peaks { stroke: var(--surface); }
+/* The mark (D89), alone in the accent; while recording, its dot red and larger. */
+.brand svg { flex: none; color: var(--accent); }
+#mark-dot { fill: currentColor; }
+.brand.live #mark-dot { fill: var(--red); }
 nav { display: flex; gap: 4px; }
 nav a {
   display: inline-block; padding: 8px 14px; border-radius: 9px; color: var(--ink);
@@ -61,8 +66,9 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .meeting-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
 .meeting-top .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }
-.open, .search { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--raised); color: var(--ink); font: inherit; }
-.open { padding: 0 16px; font-weight: 600; cursor: pointer; }
+/* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
+.open, .search { min-height: 32px; border-radius: 8px; border: 1px solid var(--edge); background: var(--raised); color: var(--ink); font: inherit; font-size: 14px; }
+.open { padding: 0 12px; font-weight: 600; cursor: pointer; }
 .search { padding: 0 12px; min-width: 200px; }
 /* In the transcript's head, the search takes the room the title leaves; Refaire… sits beside who
    heard it, as board 2 has it (#312). */
@@ -134,29 +140,29 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .status.online::before { background: var(--accent); }
 #settings .group > .row + .row { border-top: 1px solid var(--line); padding-top: 14px; }
 .picks { display: flex; gap: 8px; align-items: center; }
-.picks input { width: 96px; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); font: inherit; }
+.picks input { width: 96px; min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
 #settings .state { flex-direction: row; align-items: center; justify-content: space-between; }
 .ready { color: var(--ok); font-weight: 700; white-space: nowrap; }
 /* The models to download (D37): a row each, its state at its end. */
 .step h3 { margin: 6px 0 0; font-size: 14px; font-weight: 700; }
 .offered { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.choice { display: flex; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); cursor: pointer; }
+.choice { display: flex; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--edge); cursor: pointer; }
 .choice:has(input:checked) { border-color: var(--accent); background: var(--raised); }
 .choice input, .row input[type="checkbox"] { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); }
 .said { display: flex; flex-direction: column; gap: 2px; flex: 1 1 320px; min-width: 0; }
 .said .name, .row > .name { font-weight: 600; }
 .says { color: var(--soft); font-size: 14px; margin: 0; }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
-select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); color: var(--ink); font: inherit; }
-.warn { padding: 12px 16px; color: var(--red); }
+select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--raised); color: var(--ink); font: inherit; }
+.warn { padding: 12px 16px; color: var(--ink); }
 /* In developer mode, a command's raw failure on the line under its sentence (D47). */
 .warn, #language-said, #context-said, #correction-said, #minutes-tested, #transcription-said, #free-said, #welcome-said { white-space: pre-line; }
 .fields { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
 .field { display: flex; flex-direction: column; gap: 5px; flex: 1 1 200px; }
 .keys { padding: 6px 10px; border-radius: 8px; background: var(--raised); font: 13.5px ui-monospace, monospace; }
-.folder input { flex: 1 1 240px; min-width: 0; min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; }
-.folder input:hover, .folder input:focus { border-color: var(--line); background: var(--ground); color: var(--ink); }
-.field input { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); font: inherit; }
+.folder input { flex: 1 1 240px; min-width: 0; min-height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; }
+.folder input:hover, .folder input:focus { border-color: var(--edge); background: var(--ground); color: var(--ink); }
+.field input { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
 
 /* The agreement before a meeting first leaves (D11's fifth board). */
 #agree { align-items: center; }
@@ -176,7 +182,7 @@ select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px sol
 .choices { display: flex; flex-wrap: wrap; gap: 10px; }
 .choices .primary { flex: 1 1 240px; }
 .choices .open { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
-.primary { min-height: 48px; padding: 0 20px; border: 0; border-radius: 12px; background: var(--accent); color: var(--surface); font: inherit; font-weight: 700; cursor: pointer; transition: transform 120ms ease, filter 120ms ease; }
+.primary { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--accent); color: var(--surface); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform 120ms ease, filter 120ms ease; }
 .primary:hover { filter: brightness(1.08); }
 .primary:active { transform: translateY(1px); }
 .link { align-self: flex-start; padding: 6px 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
@@ -187,11 +193,11 @@ select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px sol
 .fields:empty { display: none; }
 .tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); }
 .path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.path:hover { border-color: var(--line); color: var(--ink); }
+.path:hover { border-color: var(--edge); color: var(--ink); }
 
 /* The sidebar's gesture and the list's rows (D11's first board). */
 .act { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-.act .primary { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 16px; }
+.act .primary { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px; }
 .act .dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
 .act .primary.live { background: var(--red); }
 .act .primary.live .dot { animation: beat 1.2s ease-in-out infinite; }
@@ -222,7 +228,7 @@ select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px sol
 .lines li:hover .edit, .lines li:focus-within .edit, .lines .edit:focus-visible { opacity: 1; }
 .lines .edit:hover { background: var(--raised); color: var(--ink); }
 .lines .edited { margin-left: 8px; font-size: 12px; color: var(--soft); }
-.lines .correcting { width: 100%; min-height: 36px; padding: 4px 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+.lines .correcting { width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
 .corrected-since { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 8px; }
 .corrected-since .note { margin: 0; }
 .maker { font: 12.5px ui-monospace, monospace; color: var(--soft); overflow-wrap: anywhere; }
@@ -248,7 +254,8 @@ select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px sol
 .freeable .weighs { margin-left: auto; font: 600 15px ui-monospace, monospace; }
 .freeable.busy { cursor: default; opacity: 0.6; }
 .free-total { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 20px 24px; background: var(--raised); }
-.danger { min-height: 48px; padding: 0 22px; border: 0; border-radius: 12px; background: var(--red); color: var(--surface); font: inherit; font-weight: 700; cursor: pointer; }
+/* Arrêter in the small window: red, as the recording it stops. */
+.danger { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--red); color: var(--surface); font: inherit; font-weight: 700; cursor: pointer; }
 .danger:disabled, .primary:disabled, .open:disabled { opacity: 0.45; cursor: default; }
 .page-top { display: flex; align-items: baseline; gap: 18px; }
 .page-top h1 { margin: 0; font-size: 20px; }
@@ -275,7 +282,7 @@ body.small-window .frame { display: none; }
 .check { position: relative; flex: none; width: 14px; height: 14px; margin-right: 5px; border-radius: 50%; border: 1.5px solid var(--soft); }
 .check-said { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .slot[data-check="listening"] .check { animation: beat 1.6s ease-in-out infinite; }
-.slot[data-check="nothing"] .check { border-color: var(--red); }
+.slot[data-check="nothing"] .check { border-color: var(--ink); }
 .slot[data-check="waiting"] .check { display: none; }
 .slot[data-check="heard"] .check { border-color: var(--ok); background: var(--ok); animation: check-pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1); transition: opacity 500ms ease, width 300ms ease 400ms, margin-right 300ms ease 400ms, border-width 0s linear 700ms; }
 .check .glyph { display: none; position: absolute; inset: 0; width: 100%; height: 100%; stroke: var(--surface); stroke-width: 3; }
@@ -333,14 +340,14 @@ body.small-window .frame { display: none; }
 
 /* What is made in the background (D25): said on the meeting's page, and on a list's row. */
 .chip.making { color: var(--accent); font-weight: 600; }
-.chip.making.failed { color: var(--red); }
+.chip.making.failed { color: var(--ink); }
 .making-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--raised); }
 .making-state .what { font-weight: 600; }
 .making-state .by { color: var(--soft); font-size: 14px; }
 .making-state .making-bar { flex-basis: 100%; height: 4px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent) 0 0 / 40% 100% no-repeat, var(--line); animation: travel 1.4s ease-in-out infinite; }
-.making-state.failed { background: transparent; border: 1px solid var(--red); }
+.making-state.failed { background: transparent; border: 1px solid var(--edge); }
 .making-state .detail { flex-basis: 100%; color: var(--soft); font-size: 13px; overflow-wrap: anywhere; }
-.making-state.failed .what { color: var(--red); font-weight: 500; }
+.making-state.failed .what { color: var(--ink); font-weight: 600; }
 @keyframes travel { from { background-position: -40% 0, 0 0; } to { background-position: 140% 0, 0 0; } }
 @media (prefers-reduced-motion: reduce) { .making-state .making-bar { animation: none; background: var(--accent); opacity: 0.5; } }
 
@@ -358,7 +365,7 @@ body.small-window .frame { display: none; }
 .welcome > .says { margin-top: -6px; }
 .welcome-choices { display: flex; flex-direction: column; gap: 10px; }
 .welcome .choice { padding: 10px 14px; gap: 10px; border-width: 1.5px; transition: border-color 120ms ease, box-shadow 120ms ease; }
-.welcome .choice:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.welcome .choice:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--edge)); }
 .welcome .choice:has(input:checked) { background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 .choice:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
 .welcome-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 4px; }
@@ -386,7 +393,7 @@ body.small-window .frame { display: none; }
 /* A meeting's context (D59's board): a field, its count, closed while a making runs. */
 .context { padding: 18px 24px; display: flex; flex-direction: column; gap: 6px; }
 .context-label { font-weight: 600; font-size: 14.5px; }
-.context-text { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.4; resize: vertical; }
+.context-text { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.4; resize: vertical; }
 .context-text:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .context-text[readonly] { background: var(--raised); color: var(--soft); }
 .context-count { font-size: 12.5px; color: var(--soft); font-variant-numeric: tabular-nums; line-height: 1.35; }
@@ -408,7 +415,7 @@ body.small-window .frame { display: none; }
 .confidential.on .lock, .confidential-card.on .lock { color: var(--ok); }
 .confidential input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .confidential-card { padding: 14px 24px; display: flex; flex-direction: column; gap: 8px; }
-.confidential-card .left { margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; background: color-mix(in srgb, var(--red) 10%, var(--surface)); }
+.confidential-card .left { margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .confidential-card .says:empty { display: none; }
 .chip.locked { display: inline-flex; align-items: center; gap: 5px; color: var(--ok); font-weight: 600; }
 .chip.locked .lock { width: 13px; height: 13px; color: inherit; }
@@ -431,9 +438,9 @@ body.small-window .frame { display: none; }
 .side-top .brand { font-size: 16px; gap: 8px; }
 .side-top #fold { flex: none; }
 .sidebar .act { margin: 0; flex-direction: column; align-items: stretch; gap: 4px; }
-.sidebar .act .primary { justify-content: center; min-height: 42px; padding: 0 12px; white-space: nowrap; font-size: 14.5px; }
+.sidebar .act .primary { justify-content: center; min-height: 32px; padding: 0 12px; white-space: nowrap; }
 .sidebar .keys { text-align: center; font: 12px ui-monospace, monospace; color: var(--soft); background: transparent; padding: 0; }
-.sidebar .search { min-width: 0; width: 100%; min-height: 38px; }
+.sidebar .search { min-width: 0; width: 100%; }
 #list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 4px 4px; margin: 0 -4px; gap: 10px; }
 .sidebar .group { gap: 2px; }
 .sidebar .group h2 { margin: 6px 0 2px 10px; font-size: 11.5px; }
@@ -454,7 +461,7 @@ body.small-window .frame { display: none; }
 .foot { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .foot .weight { padding: 0 4px; gap: 6px; font-size: 12.5px; }
 .foot .total strong { font-size: 16px; }
-.foot .total #free-link { min-height: 30px; padding: 0 10px; font-size: 12.5px; }
+.foot .total #free-link { min-height: 32px; padding: 0 10px; font-size: 12.5px; }
 .foot .legend { font-size: 11.5px; gap: 2px 12px; }
 .foot nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .foot nav a { display: block; padding: 8px 10px; border-radius: 10px; }
@@ -469,7 +476,9 @@ body.small-window .frame { display: none; }
 .arriving > * { animation: page-arrives 120ms ease-out; }
 @keyframes page-arrives { from { opacity: 0.4; } }
 /* Folding the sidebar (D61): its button at its top, the one that brings it back at the pane's. */
-.icon-button { width: 34px; min-height: 34px; padding: 0; border-radius: 9px; border: 1px solid var(--line); background: var(--raised); color: var(--ink); font-size: 17px; cursor: pointer; }
+/* An icon button has no border (GNOME HIG, header bars): its tooltip and its name say it (D89). */
+.icon-button { width: 32px; min-height: 32px; padding: 0; border-radius: 8px; border: 0; background: transparent; color: var(--soft); font-size: 16px; cursor: pointer; }
+.icon-button:hover { background: var(--raised); color: var(--ink); }
 .pane > #unfold { display: none; margin: 14px 0 0 16px; }
 @media (min-width: 840px) {
   body.folded .sidebar { display: none; }
@@ -480,7 +489,6 @@ body.small-window .frame { display: none; }
 .empty .card { max-width: 480px; padding: 22px 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .empty .none { margin: 0; color: var(--ink); font-weight: 600; }
 .empty .says { margin: 0; }
-.empty .primary { min-height: 40px; padding: 0 16px; }
 /* Too low for the list to hold between the gesture and the foot: the sidebar scrolls with the page. */
 @media (max-width: 839px), (max-height: 559px) {
   .sidebar { position: static; height: auto; min-height: 100vh; }

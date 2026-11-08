@@ -3053,6 +3053,10 @@ def meeting_renamed(now: dt.datetime) -> None:
         recording = meetings / "2026-10-18_12-00"
         browser.find_element(By.ID, "record").click()
         wait_for(browser, lambda b: (recording / "session.json").exists() and live(b), 10)
+        # D89: while it records, the header's mark says it — its dot red and larger, the cut following.
+        dot = ("const d = document.getElementById('mark-dot');"
+               " return [getComputedStyle(d).fill === getComputedStyle(document.getElementById('record')).backgroundColor, d.getAttribute('r'), document.getElementById('mark-gap').getAttribute('r')]")
+        check("recording: the mark's dot red and larger, the cut following (D89)", browser.execute_script(dot) == [True, "2.2", "3.5"], browser.execute_script(dot))
         browser.execute_script(f"location.hash = '#/meeting/{recording.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "rename") and b.execute_script("return document.getElementById('meeting').dataset.name") == recording.name, 10)
         name(browser, "En direct", Keys.ENTER)
@@ -3070,6 +3074,8 @@ def meeting_renamed(now: dt.datetime) -> None:
         browser.find_element(By.ID, "record").click()
         stopped = wait_for(browser, lambda b: "stopped" in (recording / "session.json").read_text() and not live(b), 10)
         check("stopped: the name stays", stopped and (recording / "title.txt").read_text() == "En direct\n" and head(browser) == "En direct", head(browser))
+        rest = "const d = document.getElementById('mark-dot'); return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r')]"
+        check("stopped: the mark at rest again, in the accent (D89)", browser.execute_script(rest) == [True, "1.6"], browser.execute_script(rest))
 
 
 def actions_rows(now: dt.datetime) -> None:
@@ -5037,6 +5043,21 @@ def window_looks(now: dt.datetime) -> None:
         drawn = browser.execute_script("const v = document.querySelector('#small-link svg'), c = getComputedStyle(v), p = getComputedStyle(v.parentElement); return [c.stroke === p.color, c.fill, parseFloat(c.width) === parseFloat(p.fontSize), parseFloat(c.height) === parseFloat(p.fontSize)]")
         check("the icon is stroked, the size of its text", drawn == [True, "none", True, True], drawn)
         check("the header shows one primary action", browser.execute_script(PRIMARIES) == ["record"], browser.execute_script(PRIMARIES))
+        # D89: the accepted mark, alone in the accent; controls of 32 px; fields bordered with --edge.
+        brand = browser.execute_script(
+            "const s = document.querySelector('.brand svg'), r = document.getElementById('record');"
+            " return [s.querySelector('path').getAttribute('d'), getComputedStyle(s).color === getComputedStyle(r).backgroundColor,"
+            " s.getBoundingClientRect().width, getComputedStyle(document.getElementById('mark-dot')).fill === getComputedStyle(s).color]")
+        check("the header's mark is the K and its record dot, alone in the accent, 24 px (D89)", brand == ["M6.5 7v13M6.5 14.2 17 4M9.8 11 17.3 20", True, 24, True], brand)
+        tall = browser.execute_script(
+            "return [...document.querySelectorAll('.primary, .open, .icon-button, select, .search, .field input')]"
+            ".filter(e => e.offsetParent && !e.closest('#small')).map(e => [e.id || e.className, e.getBoundingClientRect().height]).filter(([, h]) => h !== 32)")
+        check("every control shown is 32 px high (D89)", tall == [], tall)
+        edged = browser.execute_script(
+            "const t = document.createElement('i'); t.style.color = 'var(--edge)'; document.body.append(t); const edge = getComputedStyle(t).color; t.remove();"
+            " const all = [...document.querySelectorAll('.open, select, .search, .field input')].filter(e => e.offsetParent && !e.closest('#small'));"
+            " return [all.length > 0, all.filter(e => getComputedStyle(e).borderTopColor !== edge).map(e => e.id || e.className)]")
+        check("fields and secondary buttons are bordered with --edge (D89)", edged == [True, []], edged)
         # The trial over (D83): buying holds it in the recording's place, then gives it back.
         swapped = [browser.execute_script(f"paintRefused({state}); return arguments[0]", None) or browser.execute_script(PRIMARIES) for state in ("true", "false")]
         check("the trial over, one primary still: « Acheter Kitokey », then the recording's again", swapped == [["buy"], ["record"]], swapped)

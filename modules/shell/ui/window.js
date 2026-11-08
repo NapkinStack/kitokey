@@ -583,6 +583,13 @@ function paintRecord(recording, stopping) {
   const ending = recordAsked === false || (recordAsked === null && stopping);
   document.getElementById("record-said").textContent = ending ? words.record_stopping : live ? words.record_stop : words.record_start;
   document.getElementById("record").classList.toggle("live", live);
+  // The mark says it too (D89): its dot red and larger while recording, the cut around it following.
+  const [r, cy, gap] = live ? ["2.2", "6.2", "3.5"] : ["1.6", "5.6", "2.9"];
+  document.querySelector(".brand").classList.toggle("live", live);
+  for (const [id, radius] of [["mark-dot", r], ["mark-gap", gap]]) {
+    document.getElementById(id).setAttribute("r", radius);
+    document.getElementById(id).setAttribute("cy", cy);
+  }
   // Disabled, it loses the focus: given back with the button, for whoever stopped by the keyboard.
   const button = document.getElementById("record");
   if (ending && document.activeElement === button) recordRefocus = true;
@@ -3254,7 +3261,7 @@ function showFree(listing, busy, words) {
     named.append(element("strong", "", size(freed, words)), element("span", "", chosen.length === 1 ? words.free_one : fill(words.free_total, chosen.length)));
     sum.append(named, element("p", "says", words.free_note));
     if (!whole) sum.append(element("p", "says", words.free_audio_note));
-    const go = element("button", "danger", whole ? words.free_do_whole : words.free_do_audio);
+    const go = element("button", "open", whole ? words.free_do_whole : words.free_do_audio);
     go.type = "button";
     go.id = "free-do";
     go.disabled = chosen.length === 0;

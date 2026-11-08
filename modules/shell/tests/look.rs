@@ -260,3 +260,158 @@ fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
     }
     assert!(style.contains("prefers-reduced-motion: reduce) { .small-rest, .small-live, .chip.turned { animation: none; } }"));
 }
+
+/// Each pair of colours the theme uses (D89's first round of drawings, *Contrast, both themes*), read
+/// from the file in both themes: text 4.5:1 (WCAG 2.2, 1.4.3), a control's edge or a meter 3:1 (1.4.11).
+/// `--line` is no pair: it divides, and borders no control (the test below).
+const PAIRS: [(&str, &str, f64); 22] = [
+    ("var(--ink)", "var(--ground)", 4.5),
+    ("var(--ink)", "var(--surface)", 4.5),
+    ("var(--ink)", "var(--raised)", 4.5),
+    ("var(--soft)", "var(--ground)", 4.5),
+    ("var(--soft)", "var(--surface)", 4.5),
+    ("var(--soft)", "var(--raised)", 4.5),
+    ("var(--ink)", SELECTED, 4.5),
+    ("var(--soft)", SELECTED, 4.5),
+    ("var(--accent)", "var(--surface)", 4.5),
+    ("var(--accent)", "var(--ground)", 4.5),
+    ("var(--accent)", SELECTED, 4.5),
+    // The primary's words, on the accent; Arrêter's, on the red.
+    ("var(--surface)", "var(--accent)", 4.5),
+    ("var(--surface)", "var(--red)", 4.5),
+    ("var(--red)", "var(--surface)", 4.5),
+    ("var(--ok)", "var(--surface)", 4.5),
+    ("var(--accent)", "var(--raised)", 3.0),
+    ("var(--ok)", "var(--raised)", 3.0),
+    ("var(--edge)", "var(--surface)", 3.0),
+    ("var(--edge)", "var(--ground)", 3.0),
+    ("var(--edge)", "var(--raised)", 3.0),
+    // The mark, in the accent, while recording its dot red.
+    ("var(--accent)", "var(--surface)", 3.0),
+    ("var(--red)", "var(--raised)", 3.0),
+];
+/// The selected row's ground, as the sidebar mixes it.
+const SELECTED: &str = "color-mix(in srgb, var(--accent) 13%, var(--surface))";
+
+fn below_their_threshold(style: &str) -> Vec<String> {
+    let style = without_css_comments(style);
+    let mut below = Vec::new();
+    for (index, theme) in themes(&style).iter().enumerate() {
+        for (front, ground, need) in PAIRS {
+            let (Some(a), Some(b)) = (value(front, theme), value(ground, theme)) else {
+                below.push(format!("theme {index}: {front} on {ground} cannot be read"));
+                continue;
+            };
+            let ratio = contrast(a, b);
+            if ratio < need {
+                below.push(format!("theme {index}: {front} on {ground} {ratio:.2} < {need}"));
+            }
+        }
+    }
+    below
+}
+
+#[test]
+fn each_pair_of_the_theme_reaches_its_threshold_in_both_themes() {
+    assert!(STYLE.contains(SELECTED), "the selected row is mixed otherwise: say so here");
+    assert_eq!(below_their_threshold(STYLE), Vec::<String>::new());
+    // An edge as faint as a divider is refused, in the dark theme as in the light one.
+    let faint = STYLE.replacen("--edge: #737B8C", "--edge: #343946", 1);
+    assert!(
+        below_their_threshold(&faint)
+            .iter()
+            .any(|line| line.starts_with("theme 1: var(--edge)")),
+        "a faint edge passed"
+    );
+}
+
+/// Each rule of the style, its selector and its body, comments aside.
+fn rules(style: &str) -> Vec<(String, String)> {
+    without_css_comments(style)
+        .split('}')
+        .filter_map(|rule| rule.rsplit_once('{'))
+        .map(|(selector, body)| (selector.trim().to_string(), body.to_string()))
+        .collect()
+}
+
+/// What draws a recording, the one use of the red (D89): the header's button and the mark while it
+/// records, a row's live chip, the small window's dot and Arrêter.
+const RECORDING: [&str; 5] = [".brand.live #mark-dot", ".chip.live", ".act .primary.live", ".live-dot", ".danger"];
+
+#[test]
+fn red_says_a_recording_and_nothing_else() {
+    let red: Vec<String> = rules(STYLE)
+        .into_iter()
+        .filter(|(_, body)| body.contains("var(--red)"))
+        .map(|(selector, _)| selector)
+        .filter(|selector| !RECORDING.contains(&selector.as_str()))
+        .collect();
+    assert_eq!(red, Vec::<String>::new());
+    assert!(!PAGE.contains("--red"), "red drawn by the page");
+    assert_eq!(
+        PAGE.matches("\"danger\"").count(),
+        1,
+        "the red button is the small window's Arrêter alone"
+    );
+}
+
+/// The controls of the window and Settings (D89): 32 px high; the small window's are D90's.
+const CONTROLS: [&str; 10] = [
+    ".open, .search",
+    "select",
+    ".picks input",
+    ".field input",
+    ".primary",
+    ".danger",
+    ".act .primary",
+    ".sidebar .act .primary",
+    ".icon-button",
+    ".folder input",
+];
+
+#[test]
+fn controls_are_32_px_high_on_a_4_px_grid() {
+    let all = rules(STYLE);
+    let height = |body: &str| {
+        body.split(';')
+            .filter_map(|one| one.split_once(':'))
+            .rfind(|(key, _)| key.trim() == "min-height")
+            .and_then(|(_, value)| value.trim().strip_suffix("px")?.parse::<f64>().ok())
+    };
+    for control in CONTROLS {
+        let found = all
+            .iter()
+            .find(|(selector, _)| selector == control)
+            .unwrap_or_else(|| panic!("{control}"));
+        assert_eq!(height(&found.1), Some(32.0), "{control}");
+    }
+    // Every height the window sets is on the grid; the small window's are D90's.
+    let off: Vec<String> = all
+        .iter()
+        .filter(|(selector, _)| !selector.contains("small"))
+        .filter_map(|(selector, body)| height(body).filter(|px| px % 4.0 != 0.0).map(|px| format!("{selector}: {px}")))
+        .collect();
+    assert_eq!(off, Vec::<String>::new());
+}
+
+/// What a field, a list's choice or a switch is drawn with: never `--line`, which a ground hides
+/// (1.36:1); `--edge` instead.
+const FIELDS: [&str; 7] = ["input", "select", "textarea", ".open", ".search", ".choice", ".context-text"];
+
+#[test]
+fn a_control_is_edged_and_a_line_only_divides() {
+    for (selector, body) in rules(STYLE) {
+        let bordered_by_line = body
+            .split(';')
+            .filter_map(|one| one.split_once(':'))
+            .any(|(key, value)| key.trim().starts_with("border") && value.contains("var(--line)"));
+        let a_control = selector
+            .split(',')
+            .any(|one| FIELDS.iter().any(|field| one.trim().split(' ').any(|part| part.starts_with(field))));
+        assert!(!(bordered_by_line && a_control), "{selector} borders a control with --line");
+    }
+    for control in [".open, .search", "select", ".field input", ".context-text"] {
+        let found = rules(STYLE).into_iter().find(|(selector, _)| selector == control).unwrap();
+        assert!(found.1.contains("var(--edge)"), "{control}");
+    }
+}
