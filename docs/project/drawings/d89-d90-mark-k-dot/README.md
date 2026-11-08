@@ -1,6 +1,6 @@
 # D89 — D90, fourth round: K3 made cleaner, and the dot that moves
 
-**Drawn** 2026-11-08, fourth round · **Status**: for the decider to read, after the [third round's answers](../d89-d90-mark-k-and-i/README.md#what-the-decider-answers) of 2026-11-08: K3 and the name kept; K3 cleaner, without the button's ring, its dot cut from the stem as the name's i, red only while recording · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
+**Drawn** 2026-11-08, fourth round · **Status**: read by the decider on 2026-11-08 (answers below): the mark goes to a fifth round; drawn after the [third round's answers](../d89-d90-mark-k-and-i/README.md#what-the-decider-answers) of 2026-11-08: K3 and the name kept; K3 cleaner, without the button's ring, its dot cut from the stem as the name's i, red only while recording · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
 
 ```mermaid
 stateDiagram-v2
@@ -21,12 +21,14 @@ stateDiagram-v2
 
 ## What the decider answers
 
+The decider, 2026-11-08, in the working session: « pour le logo je me suis peut être mal exrimé, je vais reessayé, pour moi le "record" rond vient comme se positionné sur la lettre, comme sil la completé mais la lettre est "coupé" par le rond du record. comme le I de la version precedente, le i de kitokey etait bien, je voulais pareil le le logo K. reessaye ».
+
 | Question | The author's proposal on the boards | The decider's answer |
 |---|---|---|
-| The mark | A short stem with the dot cut above it, as the name's i; the arm meets the stem, the leg leaves the arm; stroke 3.4, round ends; no ring | owed |
-| The dot while recording | Red and a little larger (radius 2.9 → 3.3): shape and colour, never colour alone; in the tray, the bar's handle and the window's header; the app's icon always at rest | owed |
-| Where the mark has no tile | The bar's handle and the window's header draw the mark alone, in the accent, so the red dot reads against the surface | owed |
-| The bar's live dot | Removed: the handle's red dot says a recording runs | owed |
+| The mark | A short stem with the dot cut above it, as the name's i; the arm meets the stem, the leg leaves the arm; stroke 3.4, round ends; no ring | Not this one: the round dot set on the whole K, the letter cut around it as the third round's name cut its i — a fifth round |
+| The dot while recording | Red and a little larger (radius 2.9 → 3.3): shape and colour, never colour alone; in the tray, the bar's handle and the window's header; the app's icon always at rest | Not answered; drawn again in the fifth round |
+| Where the mark has no tile | The bar's handle and the window's header draw the mark alone, in the accent, so the red dot reads against the surface | Not answered; drawn again in the fifth round |
+| The bar's live dot | Removed: the handle's red dot says a recording runs | Not answered; drawn again in the fifth round |
 
 ## Contrast, both themes
 
