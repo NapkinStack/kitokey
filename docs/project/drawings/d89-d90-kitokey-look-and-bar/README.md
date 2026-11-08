@@ -1,6 +1,6 @@
 # D89 — D90: Kitokey's look and its minimal bar, drawn before they are built
 
-**Drawn** 2026-11-07, first round · **Status**: drawn by D89's and D90's author, for the decider to read within two working days of its pull request ([cycle 09, *Dependency with a date*](../../cycles/09-kitokey-finished-before-it-is-published.md#dependency-with-a-date)); D88's panel and D91's context and models are drawn with them · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of the deliverables that build it; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
+**Drawn** 2026-11-07, first round · **Status**: read by the decider on 2026-11-08 (answers below): the mark and the bar's record and stop buttons go to a second round; drawn by D89's and D90's author ([cycle 09, *Dependency with a date*](../../cycles/09-kitokey-finished-before-it-is-published.md#dependency-with-a-date)); D88's panel and D91's context and models are drawn with them · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of the deliverables that build it; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
 
 It replaces the small window of [D34](../d34-the-small-window-at-rest/README.md) and D11's sixth board, at rest and while recording; the window's layout stays [D61's](../d61-the-window-in-two-panes/README.md), only its sizes, icons and mark change.
 The words are the product's, in French, where `modules/shell/src/words.rs` has them; the others are proposals, marked *nouveau* on the boards. The yellow notes, numbers and measures are the author's, for the decider — never part of the interface.
@@ -47,18 +47,20 @@ stateDiagram-v2
 
 ## What the decider answers
 
+The decider, 2026-11-08, in the working session: « les visuels sont ok. le logo est a revoir », then « go » on the bar's record and stop buttons drawn as icons alone, the window and the check panel keeping their words.
+
 | Question | The author's proposal on the boards | The decider's answer |
 |---|---|---|
-| The mark | A — a « K » whose upper arm is the recording dot, on an accent tile; B as the one variant | owed |
-| The tray while recording | The same mark, its dot larger and red; no blinking | owed |
-| One labelled action per screen | The window: « Démarrer un enregistrement » (« Arrêter » while recording); the bar: « Enregistrer » / « Arrêter »; the check panel: « Démarrer un enregistrement » | owed |
-| « Jouer un son de test » | Labelled, an exception to icon-only secondary actions (no icon says it alone) | owed |
-| The bar's size | 440 × 44 CSS px at rest and recording, the same place; opened, 440 wide, as tall as it holds, nothing scrolling | owed |
-| The bar's short word | « Enregistrer », the tooltip saying « Démarrer un enregistrement » and the shortcut | owed |
-| The border token | `--edge` for fields, lists and switches (3:1); `--line` kept for dividers | owed |
-| The meeting's own settings | One 32 px row: context, spoken language, « Confidentielle », instead of two cards | owed |
-| « Petite fenêtre » | Becomes « La barre d’enregistrement », its icon in the sidebar's foot | owed |
-| The shortcut's line under the button | Removed; in the tooltip and the empty state | owed |
+| The mark | A — a « K » whose upper arm is the recording dot, on an accent tile; B as the one variant | To redraw: « le logo est à revoir » — a second round |
+| The tray while recording | The same mark, its dot larger and red; no blinking | Follows the mark of the second round |
+| One labelled action per screen | The window: « Démarrer un enregistrement » (« Arrêter » while recording); the bar: « Enregistrer » / « Arrêter »; the check panel: « Démarrer un enregistrement » | Accepted for the window and the check panel; the bar goes icon-only, ● to record and ■ to stop, a tooltip with the words and the shortcut — drawn in the second round |
+| « Jouer un son de test » | Labelled, an exception to icon-only secondary actions (no icon says it alone) | Accepted |
+| The bar's size | 440 × 44 CSS px at rest and recording, the same place; opened, 440 wide, as tall as it holds, nothing scrolling | Accepted |
+| The bar's short word | « Enregistrer », the tooltip saying « Démarrer un enregistrement » and the shortcut | Superseded: the bar's record button is icon-only (row above); its tooltip keeps « Démarrer un enregistrement » and the shortcut |
+| The border token | `--edge` for fields, lists and switches (3:1); `--line` kept for dividers | Accepted |
+| The meeting's own settings | One 32 px row: context, spoken language, « Confidentielle », instead of two cards | Accepted |
+| « Petite fenêtre » | Becomes « La barre d’enregistrement », its icon in the sidebar's foot | Accepted |
+| The shortcut's line under the button | Removed; in the tooltip and the empty state | Accepted |
 
 ## Contrast, both themes
 
