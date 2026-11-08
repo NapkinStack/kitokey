@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>Kitokey — recording</title>
+  <!-- The tray's icon while recording (D89, the decider's « ok C », 2026-11-08): the mark on its tile, which reads on a
+       light bar and a dark one alike; a recording turns the whole tile red and the dot larger, as
+       a red dot on the blue tile is under 3:1. Drawn by scripts/icons.sh. -->
+  <rect width="64" height="64" rx="14" fill="#C2352D"/>
+  <g transform="translate(8 8) scale(2)" fill="#FFFFFF">
+    <path d="M4.9 9.313A3.5 3.5 0 0 0 8.1 9.313V20A1.6 1.6 0 0 1 4.9 20Z"/>
+    <circle cx="6.5" cy="6.2" r="2.2"/>
+    <path d="M6.5 14.2 17 4M9.8 11 17.3 20" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
