@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>D89 — D90, huitième tour : le K qui devient « lecture »</title>
+<!-- The source of the images beside it, rendered at 1280 px by chromium-browser --headless.
+     The colours are ui/window.css's, both themes. The name is set in Montserrat 700 (OFL) as
+     installed on the author's workstation; the name kept is outlined before it is published.
+     ?dark draws the dark theme; ?only=N draws board N alone. Icons: Lucide 1.14.0, inline,
+     ISC (modules/shell/ui/LUCIDE-LICENSE). Yellow = the author's notes, never the interface. -->
+<style>
+  :root {
+    --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
+    --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
+    --on-accent: #FFFFFF; --edge: #808898;
+    --note: #7A5A00; --note-ground: #FFF6DB; --note-line: #C9A227;
+  }
+  :root.dark {
+    --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
+    --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+    --on-accent: #1E2129; --edge: #737B8C;
+    --note: #F2CC6B; --note-ground: #2E2A1E; --note-line: #8C7330;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1280px; padding: 32px 34px 8px; background: var(--ground); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
+  section { margin-bottom: 40px; }
+  h2 { margin: 0 0 14px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: var(--note-ground); color: var(--note); font-size: 13px; line-height: 1.45; }
+  .note b { display: block; margin-bottom: 2px; }
+  .note ul { margin: 4px 0 0; padding-left: 18px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .cap { font-size: 12px; color: var(--soft); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+  svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .hidden-board { display: none !important; }
+  .tiles { display: flex; align-items: flex-end; gap: 14px; }
+  .grid24 { background-color: var(--surface); background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 10px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .tray { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px; font-size: 11px; }
+  .tray.darkbar { background: #000; color: #FFF; --rec: #FF7A72; }
+  .tray.lightbar { background: #F3F3F3; color: #15171C; border: 1px solid #D9DDE5; --rec: #C2352D; }
+  .tray .sep { width: 1px; align-self: stretch; background: currentColor; opacity: .25; }
+  .wm { font-family: Montserrat, system-ui, sans-serif; font-weight: 700; letter-spacing: -.02em; display: inline-flex; align-items: baseline; line-height: 1; }
+  .wm .ii { position: relative; display: inline-block; }
+  .wm .ii .dot { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 50%; background: var(--wdot, currentColor); box-shadow: 0 0 0 var(--cut) var(--cutc, var(--surface)); }
+  .cands { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .cand { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .cand.pick { box-shadow: 0 0 0 2px var(--note-line); }
+  .cand .name { font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
+  .cand .name .l { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 4px; border-radius: 6px; background: var(--raised); font-size: 12px; }
+  .cand .idea { font-size: 12.5px; color: var(--soft); min-height: 38px; }
+  .cand .tray { padding: 8px 10px; gap: 10px; font-size: 10px; }
+  .head { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font-weight: 700; font-size: 15px; width: 280px; }
+  .bar { width: 440px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 8px 28px rgba(0,0,0,.16); flex: none; }
+  .strip { height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; }
+  .strip > .gap { width: 4px; }
+  .handle { width: 28px; height: 28px; display: grid; place-items: center; flex: none; }
+  .ib { width: 28px; height: 28px; border-radius: 6px; display: inline-grid; place-items: center; color: var(--soft); flex: none; }
+  .fld { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--edge); background: var(--surface); display: flex; align-items: center; font-size: 13px; min-width: 0; flex: 1; }
+  .fld .ph { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rb { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--red); display: grid; place-items: center; flex: none; background: var(--surface); }
+  .rb i { width: 14px; height: 14px; border-radius: 50%; background: var(--red); }
+  .sq { width: 28px; height: 28px; border-radius: 8px; background: var(--red); display: grid; place-items: center; flex: none; }
+  .sq i { width: 10px; height: 10px; border-radius: 2px; background: var(--on-accent); }
+  :root.dark .sq i { background: #1E2129; }
+  .time { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; width: 64px; padding-left: 4px; }
+  .meters { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; padding: 0 8px; }
+  .mt { display: flex; align-items: center; gap: 6px; height: 16px; color: var(--soft); }
+  .mt .track { flex: 1; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+  .mt .fill { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+  .mt.far .fill { background: var(--ok); }
+  .arrow { font-size: 22px; color: var(--soft); }
+</style>
+<script>
+  if (location.search.includes("dark")) document.documentElement.classList.add("dark");
+</script>
+</head>
+<body>
+<section data-board="1">
+  <h2>1 · Le K et « lecture » — ses bras se retournent : le K devient ▷ (D89, une idée du décideur)</h2>
+  <div class="col" style="gap:18px">
+    <div class="col" style="gap:6px"><h3>La transformation — les deux bras pivotent sur le fût, le rond reste</h3><div class="card" style="display:flex;align-items:center;gap:22px" data-frames></div></div>
+    <div class="row" style="gap:20px">
+      <div class="col" style="gap:6px"><h3>A · La famille — enregistrer, écouter, en pause</h3><div class="card" style="display:flex;gap:28px;align-items:flex-end" data-family></div></div>
+      <div class="col" style="gap:6px"><h3>B · Le miroir strict du K : ▷| « suivant »</h3><div class="card" style="display:flex;gap:18px;align-items:flex-end" data-mirror></div></div>
+    </div>
+    <div class="row" style="gap:20px">
+      <div class="col" style="gap:6px"><h3>C · Dans le lecteur d’une réunion — le bouton lecture</h3><div class="card" style="display:flex;align-items:center;gap:14px;width:560px" data-player></div></div>
+      <div class="col" style="gap:6px"><h3>D · L’icône pendant une lecture (barre système)</h3><div class="row" style="gap:12px" data-trays></div></div>
+    </div>
+  </div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Le miroir strict du K (B) donne ▷| : le symbole « piste suivante » des lecteurs, pas « lecture » ; et le K ne se lit plus. Ce qui donne ▷, c’est de <b style="display:inline">retourner les bras seuls</b> : le fût reste, les bras pivotent et se rejoignent à droite. Le K et ▷ partagent alors leur fût et leur rond.</li>
+      <li><b style="display:inline">A · Une famille</b> tirée du K : le K (enregistrer, la marque), ▷ (écouter une réunion), ‖ (en pause). Le rond reste sur le fût dans les trois : on reconnaît Kitokey dans chaque état.</li>
+      <li><b style="display:inline">Le mouvement</b> : quand on lance l’écoute d’une réunion, les bras pivotent en 200 ms, le K devient ▷ ; ils reviennent à l’arrêt. Ludique au changement d’état, jamais en boucle ; aucun mouvement si le système demande moins d’animations.</li>
+      <li><b style="display:inline">C</b> : le bouton lecture du lecteur prend ce ▷ ; il reste un triangle, la convention de tous les lecteurs, donc rien à apprendre. <b style="display:inline">D</b> : pendant une écoute, l’icône de la barre système peut montrer ▷ ; elle ne rougit jamais (le rouge reste à l’enregistrement).</li>
+      <li>La recommandation de l’auteur : A + le mouvement dans le lecteur (C) et sur kitokey.com ; la marque reste le K accepté. B est écarté (« suivant »).</li>
+    </ul>
+  </div>
+</section>
+<script>
+  let uid = 0;
+  // One glyph on the 24 grid, stroke 3.2, the stem with the record dot as accepted (sixth round).
+  // t: 0 = the K's arms, 1 = the arms turned into ▷ (both meet at the right). pause: two stems.
+  const glyph = (size, { t = 0, pause = false, mirror = false, color = "currentColor", dot = "currentColor", rec = false } = {}) => {
+    const id = `g${++uid}`, r = rec ? 2.2 : 1.6, cy = 4 + r;
+    const lerp = (a, b) => a + (b - a) * t;
+    let arms;
+    if (pause) arms = `M15.5 4v16`;
+    else {
+      // K: arm (6.5,14.2)->(17,4), leg (9.8,11)->(17.3,20). Play: (6.5,9)->(18,13.2)? both meet at (18.5,14.5)...
+      const a1 = [lerp(6.5, 6.5), lerp(14.2, 9.2), lerp(17, 18.5), lerp(4, 14.6)];
+      const a2 = [lerp(9.8, 6.5), lerp(11, 20), lerp(17.3, 18.5), lerp(20, 14.6)];
+      arms = `M${a1[0]} ${a1[1]} ${a1[2]} ${a1[3]}M${a2[0]} ${a2[1]} ${a2[2]} ${a2[3]}`;
+    }
+    const stem = `M6.5 7v13`;
+    const g = `<path d="${stem}${arms}" fill="none" stroke="${color}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="${mirror ? "transform:scaleX(-1)" : ""}"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><circle cx="6.5" cy="${cy}" r="${r + 1.3}" fill="#000"/></mask></defs><g mask="url(#${id})">${g}</g><circle cx="6.5" cy="${cy}" r="${r}" fill="${dot}"/></svg>`;
+  };
+  const tile = (n, o = {}) => `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2253CF"/><foreignObject x="10" y="10" width="44" height="44">${glyph(44, { color: "#fff", dot: "#fff", ...o })}</foreignObject></svg>`;
+  const cap = t => `<span class="cap">${t}</span>`;
+  const col = (inner, t) => `<span class="col" style="gap:6px;align-items:center">${inner}${cap(t)}</span>`;
+  document.querySelector("[data-frames]").innerHTML =
+    [0, .25, .5, .75, 1].map((t, n) => col(tile(80, { t }), ["K", "", "", "", "▷"][n] || `${Math.round(t * 200)} ms`)).join(`<span style="color:var(--soft)">→</span>`);
+  document.querySelector("[data-family]").innerHTML =
+    [["Enregistrer — la marque", {}], ["Écouter", { t: 1 }], ["En pause", { pause: true }]].map(([t, o]) =>
+      col(`<span style="display:flex;gap:10px;align-items:flex-end">${tile(64, o)}${tile(32, o)}${tile(16, o)}</span>`, t)).join("");
+  document.querySelector("[data-mirror]").innerHTML = col(tile(64, { mirror: true }), "Miroir du K : ▷| « suivant »") + col(`<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l10 8-10 8z"/><path d="M19 5v14"/></svg>`, "Lucide skip-forward");
+  const ink = "var(--accent)";
+  document.querySelector("[data-player]").innerHTML =
+    `<span style="width:40px;height:40px;border-radius:50%;background:var(--accent);display:grid;place-items:center;flex:none">${glyph(24, { t: 1, color: "var(--on-accent)", dot: "var(--on-accent)" })}</span>` +
+    `<span class="tab cap">08:41 / 42:05</span><span style="flex:1;height:4px;border-radius:2px;background:var(--raised);position:relative"><i style="position:absolute;left:0;top:0;bottom:0;width:21%;background:var(--accent);border-radius:2px"></i></span><span class="cap">1×</span>` +
+    `<span style="width:40px;height:40px;border-radius:50%;background:var(--raised);display:grid;place-items:center;flex:none">${glyph(24, { pause: true, color: ink, dot: ink })}</span>`;
+  document.querySelector("[data-trays]").innerHTML =
+    `<div style="background:#000;color:#fff;padding:10px 14px;border-radius:8px;display:flex;gap:12px;align-items:center">${glyph(16)}${glyph(22)}<span style="opacity:.3">|</span>${glyph(16, { t: 1 })}${glyph(22, { t: 1 })}<span style="font-size:11px;opacity:.7">repos | écoute</span></div>` +
+    `<div style="background:#F3F3F3;color:#15171C;border:1px solid #D9DDE5;padding:10px 14px;border-radius:8px;display:flex;gap:12px;align-items:center">${glyph(16)}${glyph(22)}<span style="opacity:.3">|</span>${glyph(16, { t: 1 })}${glyph(22, { t: 1 })}<span style="font-size:11px;opacity:.7">repos | écoute</span></div>`;
+  const only = new URLSearchParams(location.search).get("only");
+  if (only) for (const s of document.querySelectorAll("section")) if (s.dataset.board !== only) s.classList.add("hidden-board");
+  document.body.dataset.h = Math.ceil(document.body.getBoundingClientRect().height);
+</script>
+</body>
+</html>
