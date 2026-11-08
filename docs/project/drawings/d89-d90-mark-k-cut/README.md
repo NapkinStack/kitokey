@@ -1,6 +1,6 @@
 # D89 — D90, fifth round: the record dot set on the K, the letter cut around it
 
-**Drawn** 2026-11-08, fifth round · **Status**: for the decider to read, after the [fourth round's answers](../d89-d90-mark-k-dot/README.md#what-the-decider-answers) of 2026-11-08: the round dot set on the whole K, the letter cut around it as the third round's name cut its i · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
+**Drawn** 2026-11-08, fifth round · **Status**: read by the decider on 2026-11-08 (answers below): P1 kept, the dot the letter's width, in a sixth round; drawn after the [fourth round's answers](../d89-d90-mark-k-dot/README.md#what-the-decider-answers) of 2026-11-08: the round dot set on the whole K, the letter cut around it as the third round's name cut its i · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
 
 ```mermaid
 flowchart LR
@@ -21,12 +21,14 @@ flowchart LR
 
 ## What the decider answers
 
+The decider, 2026-11-08, in the working session: « c'est beaucoup mieux, sur le fut oui, mais de la taille de la lettre, comme si c'etait sa continuité, pas besoinde coupé le "t" dans le nom complet ».
+
 | Question | The author's proposal on the boards | The decider's answer |
 |---|---|---|
-| The mark | P1 — the dot caps the stem where the name's i has its dot, the K cut around it; P3 if the dot must be seen first | owed |
-| The name | « kitokey », the same dot on the i, cutting it the same way | owed |
-| The dot while recording | Red and a little larger (radius 3.3 → 3.7, the cut following): shape and colour, never colour alone; in the tray, the bar's handle and the window's header; the app's icon always at rest | owed |
-| Where the mark has no tile | The bar's handle and the window's header draw the mark alone, in the accent, so the red dot reads against the surface | owed |
+| The mark | P1 — the dot caps the stem where the name's i has its dot, the K cut around it; P3 if the dot must be seen first | P1, the dot as wide as the stroke, as if it continued the stem — a sixth round |
+| The name | « kitokey », the same dot on the i, cutting it the same way | The same, the dot as wide as the i's stem; it must not cut the « t » — a sixth round |
+| The dot while recording | Red and a little larger (radius 3.3 → 3.7, the cut following): shape and colour, never colour alone; in the tray, the bar's handle and the window's header; the app's icon always at rest | Not answered; drawn again in the sixth round |
+| Where the mark has no tile | The bar's handle and the window's header draw the mark alone, in the accent, so the red dot reads against the surface | Not answered; drawn again in the sixth round |
 
 ## Contrast, both themes
 
