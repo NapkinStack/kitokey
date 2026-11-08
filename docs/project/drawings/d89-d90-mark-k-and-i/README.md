@@ -1,6 +1,6 @@
 # D89 — D90, third round: the « K », the « i » and the record button
 
-**Drawn** 2026-11-08, third round · **Status**: for the decider to read, after the [second round's answers](../d89-d90-mark-and-bar-buttons/README.md#what-the-decider-answers) of 2026-11-08: back to the first round's « K », with a « K » and an « i » whose dot is a record button, or the « K » alone, after a look at the year's logo trends and Kitokey's identity · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
+**Drawn** 2026-11-08, third round · **Status**: read by the decider on 2026-11-08 (answers below): K3 and the name kept, K3 to be made cleaner in a fourth round; drawn after the [second round's answers](../d89-d90-mark-and-bar-buttons/README.md#what-the-decider-answers) of 2026-11-08: back to the first round's « K », with a « K » and an « i » whose dot is a record button, or the « K » alone, after a look at the year's logo trends and Kitokey's identity · **Frozen**: these drawings are not kept up to date. What the decider accepts becomes the criteria of D89 and D90; once built, the window, the bar and their screenshots are the truth. A new round is a new folder.
 
 The [first round](../d89-d90-kitokey-look-and-bar/README.md) stands as answered there; this round redraws the mark and shows the name beside it.
 
@@ -33,12 +33,14 @@ Read 2026-11-08 through a web search's summaries; the pages themselves **not ope
 
 ## What the decider answers
 
+The decider, 2026-11-08, in the working session: « K3 et le nom ok mais il faut a mon avis revoir un peut le k3 pour qqchose d'un peut epuré, propre visurellement, le contour du bouton record est peut être en trop, le K semble un peut malformé, peut être que le bouton record doit être comme decoupé sur la barre du K a l'image du "i" dans le nom complet […] un peut comme si le record se deplacé. si le nom est complet sur le I et si le logo K sur le K. le record devient rouge quand l'enregitrement est en cours ».
+
 | Question | The author's proposal on the boards | The decider's answer |
 |---|---|---|
-| The mark | K3 « iK » — the K's stem is an i under the record button: the most its own, the most playful; K1 if the K must read first | owed |
-| The name | « kitokey » in lower case, the i's dot the record button, set in Montserrat 700 then outlined | owed |
-| The brand's red | Only the button: on the tile and in the name, #E5483D in a ring; the tray at rest in one colour, its dot red while recording; in the interface, red stays for recording alone | owed |
-| The bar's buttons | ● and ■ as the second round drew them, the bar's handle the mark kept | owed |
+| The mark | K3 « iK » — the K's stem is an i under the record button: the most its own, the most playful; K1 if the K must read first | K3, made cleaner: no ring around the button, a better-formed K, the button cut from the K's stem as the i's dot is — a fourth round |
+| The name | « kitokey » in lower case, the i's dot the record button, set in Montserrat 700 then outlined | Accepted: « kitokey », the i's dot the record button |
+| The brand's red | Only the button: on the tile and in the name, #E5483D in a ring; the tray at rest in one colour, its dot red while recording; in the interface, red stays for recording alone | Changed: the button turns red only while a recording runs; at rest it has the mark's colour — drawn in the fourth round |
+| The bar's buttons | ● and ■ as the second round drew them, the bar's handle the mark kept | Not answered; drawn again in the fourth round |
 
 ## Contrast, both themes
 
