@@ -3,7 +3,7 @@
 
 use std::{f32::consts::TAU, fs, path::Path};
 
-use kitokey_capture::v2::{CONTRACT, Clock, Held, Track, V3, write_session};
+use kitokey_capture::v2::{CONTRACT, Clock, Held, Meter, Track, V3, write_session};
 
 const SESSION: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/session-audio/v2/session.schema.json");
 
@@ -194,6 +194,29 @@ fn how_loud_a_source_is_is_measured_from_where_it_rests_and_the_track_is_untouch
     track.push(&voice).unwrap();
     assert!((track.loudest() - 0.2).abs() < 0.02);
     assert_eq!(track.loudest(), 0.0, "since the last call");
+}
+
+#[test]
+fn listening_measures_as_a_track_does_and_writes_nothing() {
+    // `listen` (D88): a meter with no file, measured as a track measures, from where a source rests.
+    let folder = tempfile::tempdir().unwrap();
+    let mut track = Track::create(&folder.path().join("local.wav"), 48_000, 2).unwrap();
+    let mut meter = Meter::new(48_000, 2);
+    for (sound, heard) in [(vec![0.33; 9600], false), (tone(48_000, 2, 0.5, 0.2, 0.33), true)] {
+        for piece in sound.chunks(960) {
+            track.push(piece).unwrap();
+            meter.push(piece);
+        }
+        let level = meter.level();
+        assert_eq!(level, track.level());
+        assert_eq!(level > 0.5, heard, "{level}");
+        assert_eq!(meter.level(), 0.0, "since the last call");
+    }
+    // What is no number is not a sound; a piece that is not whole frames is not guessed at.
+    let mut resting = Meter::new(48_000, 2);
+    resting.push(&[0.33, 0.33, f32::NAN, 0.33]);
+    resting.push(&[0.9, 0.9, 0.9]);
+    assert_eq!(resting.level(), 0.0);
 }
 
 #[test]

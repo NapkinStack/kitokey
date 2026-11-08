@@ -30,14 +30,64 @@ pub struct Track {
     frames: u64,
     rate: u32,
     channels: u16,
-    /// Where each channel rests, to measure sound from there: (last sample, last measure).
-    rest: Vec<Option<(f32, f32)>>,
-    keep: f32,
+    /// How loud it is, from where each channel rests; read ten times a second, apart from the
+    /// silence's watch.
+    meter: Meter,
     loudest: f32,
     /// A sample other than an exact zero came since the last call (#361).
     stirred: bool,
-    /// The same, for the meter: read ten times a second, apart from the silence's watch.
-    meter: f32,
+}
+
+/// How loud a source is, measured from where each of its channels rests — what a [`Track`]
+/// measures, with no file: `listen` writes nothing (D88).
+pub struct Meter {
+    /// Where each channel rests: (last sample, last measure).
+    rest: Vec<Option<(f32, f32)>>,
+    keep: f32,
+    peak: f32,
+}
+
+impl Meter {
+    pub fn new(rate: u32, channels: u16) -> Self {
+        Self {
+            rest: vec![None; usize::from(channels.max(1))],
+            // One pole at 20 Hz: what a source rests at is not sound, a voice is.
+            keep: (1.0 - std::f64::consts::TAU * 20.0 / f64::from(rate.max(1))).max(0.0) as f32,
+            peak: 0.0,
+        }
+    }
+
+    /// Measures what a source delivered, whole frames, interleaved, as a track does: a piece that is
+    /// not whole frames is not measured, a sample that is no number is not sound.
+    pub fn push(&mut self, interleaved: &[f32]) {
+        let channels = self.rest.len();
+        if !interleaved.len().is_multiple_of(channels) {
+            return;
+        }
+        for (at, &sample) in interleaved.iter().enumerate() {
+            if !sample.is_nan() {
+                self.measure(at % channels, sample.clamp(-1.0, 1.0));
+            }
+        }
+    }
+
+    /// How far `sample` is from where its channel rests; none when no number came of it.
+    fn measure(&mut self, channel: usize, sample: f32) -> Option<f32> {
+        let (last_in, last_out) = self.rest[channel].unwrap_or((sample, 0.0));
+        let out = sample - last_in + self.keep * last_out;
+        if !out.is_finite() {
+            return None;
+        }
+        self.rest[channel] = Some((sample, out));
+        self.peak = self.peak.max(out.abs());
+        Some(out.abs())
+    }
+
+    /// How loud it was since the last call: the loudest sound on a scale of decibels, from 0 at
+    /// -60 dB of full scale or below to 1 at full scale.
+    pub fn level(&mut self) -> f32 {
+        crate::level(std::mem::take(&mut self.peak))
+    }
 }
 
 impl Track {
@@ -54,12 +104,9 @@ impl Track {
             frames: 0,
             rate,
             channels,
-            rest: vec![None; usize::from(channels)],
-            // One pole at 20 Hz: what a source rests at is not sound, a voice is.
-            keep: (1.0 - std::f64::consts::TAU * 20.0 / f64::from(rate)).max(0.0) as f32,
+            meter: Meter::new(rate, channels),
             loudest: 0.0,
             stirred: false,
-            meter: 0.0,
         })
     }
 
@@ -80,7 +127,9 @@ impl Track {
                 continue;
             }
             self.stirred |= sample != 0.0;
-            self.measure(at % channels, sample.clamp(-1.0, 1.0));
+            if let Some(out) = self.meter.measure(at % channels, sample.clamp(-1.0, 1.0)) {
+                self.loudest = self.loudest.max(out);
+            }
             let value = (sample * FULL_SCALE).round().clamp(-FULL_SCALE, FULL_SCALE - 1.0) as i32;
             bytes.extend_from_slice(&value.to_le_bytes()[..BYTES]);
         }
@@ -100,18 +149,6 @@ impl Track {
         let whole = HEADER as u64 + self.frames * u64::from(self.channels) * BYTES as u64;
         self.file.set_len(whole)?;
         self.file.seek(SeekFrom::Start(whole)).map(drop)
-    }
-
-    /// The track holds the sound as delivered; how loud it is, is measured from where the
-    /// source rests — a microphone resting at a third of full scale is not a sound.
-    fn measure(&mut self, channel: usize, sample: f32) {
-        let (last_in, last_out) = self.rest[channel].unwrap_or((sample, 0.0));
-        let out = sample - last_in + self.keep * last_out;
-        if out.is_finite() {
-            self.rest[channel] = Some((sample, out));
-            self.loudest = self.loudest.max(out.abs());
-            self.meter = self.meter.max(out.abs());
-        }
     }
 
     /// Writes zeros until the track holds `frames`, for a source that delivered nothing, and
@@ -165,7 +202,7 @@ impl Track {
     /// How loud it was since the last call, for a meter: the loudest sound on a scale of
     /// decibels, from 0 at -60 dB of full scale or below to 1 at full scale.
     pub fn level(&mut self) -> f32 {
-        crate::level(std::mem::take(&mut self.meter))
+        self.meter.level()
     }
 
     /// Writes the true lengths in the header — the only bytes of a track ever written twice.

@@ -262,6 +262,31 @@ pub fn named(dump: &str, ours: u64, name: &str) -> Result<(Me, bool), String> {
     Ok((Me::Hold(microphone), true))
 }
 
+/// What `listen` opens for the local side (D88), and whether a name given is there: what a recording
+/// would record — the microphone named, else the one a call holds, else the default input —, a
+/// headset's too, and always actively: the user asked to hear it, and nothing is recorded (ADR-0015's
+/// amendment of 2026-11-07). Never `Wait`.
+pub fn listened(dump: &str, ours: u64, name: Option<&str>) -> Result<(Me, bool), String> {
+    let graph = Graph::read(dump)?;
+    let found = name.map(|name| graph.nodes.values().find(|node| node.opens() && microphone_id(&node.name) == name));
+    if let Some(Some(node)) = found {
+        let microphone = Microphone {
+            name: node.name.clone(),
+            description: node.named(),
+            passive: None,
+        };
+        return Ok((Me::Hold(microphone), true));
+    }
+    let me = match me(dump, ours)? {
+        Me::Hold(microphone) => Me::Hold(Microphone {
+            passive: None,
+            ..microphone
+        }),
+        Me::Default | Me::Wait => Me::Default,
+    };
+    Ok((me, found.is_none()))
+}
+
 /// The microphones that can be named at the start, each its id and what a person reads, by what a
 /// person reads, then by id.
 pub fn microphones(dump: &str) -> Result<Vec<(String, String)>, String> {
