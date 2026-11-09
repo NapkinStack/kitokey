@@ -718,7 +718,7 @@ struct Listing {
     folder: PathBuf,
     sessions: Vec<Listed>,
     /// For each session, in the same order, who spoke over it — here, then remote — when its
-    /// transcript reads: the small relief each row draws.
+    /// transcript reads. No row draws it since D89's compact rows: taken out on its own.
     shapes: Vec<Option<[Vec<f32>; 2]>>,
     /// Whether a recording runs, and the shortcut's keys as the desktop granted them: the header's.
     recording: bool,

@@ -304,12 +304,10 @@ pub struct Window {
     /// What a screen reader calls the window's sections.
     pub sections: &'static str,
     pub meetings: &'static str,
-    /// The weight of everything: its size, how many meetings, how long their audio lasts.
+    /// How many meetings weigh the size beside it (board 4's foot).
     pub weight: &'static str,
     /// The same, for one meeting.
     pub weight_one: &'static str,
-    pub audio_kept: &'static str,
-    pub text_kept: &'static str,
     /// A picture of the two weights, for whoever does not see it.
     pub weight_described: &'static str,
     pub this_week: &'static str,
@@ -503,7 +501,7 @@ pub struct Window {
     /// The folder the sessions go to, and the button that opens the system's dialog for it.
     pub sessions_folder: [&'static str; 2],
     pub choose: &'static str,
-    /// The small window while recording (D11's sixth board).
+    /// The recording bar, its icon in the sidebar's foot (D89): the small window until D90 makes it a bar.
     pub small: &'static str,
     pub small_mic: &'static str,
     pub small_meeting: &'static str,
@@ -752,10 +750,8 @@ pub fn window(language: Language) -> Window {
             units: ["B", "kB", "MB", "GB"],
             sections: "Sections",
             meetings: "Meetings",
-            weight: "taken by {} meetings · {} of audio",
-            weight_one: "taken by {} meeting · {} of audio",
-            audio_kept: "Audio, as recorded — {}",
-            text_kept: "Transcripts and minutes — {}",
+            weight: "{} meetings",
+            weight_one: "{} meeting",
             weight_described: "The audio takes {}; the transcripts and minutes, {}.",
             this_week: "This week",
             last_week: "Last week",
@@ -915,7 +911,7 @@ pub fn window(language: Language) -> Window {
                 "New meetings are written here. Those already recorded stay where they were: the window and the audio's keeping follow this folder.",
             ],
             choose: "Choose…",
-            small: "Small window",
+            small: "The recording bar",
             small_mic: "Your microphone",
             small_meeting: "The meeting’s sound",
             small_stop: "Stop",
@@ -1147,10 +1143,8 @@ pub fn window(language: Language) -> Window {
             units: ["o", "ko", "Mo", "Go"],
             sections: "Rubriques",
             meetings: "Réunions",
-            weight: "occupés par {} réunions · {} d’audio",
-            weight_one: "occupés par {} réunion · {} d’audio",
-            audio_kept: "Audio, tel qu’enregistré — {}",
-            text_kept: "Transcriptions et comptes rendus — {}",
+            weight: "{} réunions",
+            weight_one: "{} réunion",
             weight_described: "L’audio occupe {}\u{202f}; les transcriptions et les comptes rendus, {}.",
             this_week: "Cette semaine",
             last_week: "La semaine dernière",
@@ -1313,7 +1307,7 @@ pub fn window(language: Language) -> Window {
                 "Les nouvelles réunions y sont écrites. Celles déjà enregistrées restent où elles étaient\u{a0}: la fenêtre et la garde de l’audio suivent ce dossier.",
             ],
             choose: "Choisir…",
-            small: "Petite fenêtre",
+            small: "La barre d’enregistrement",
             small_mic: "Votre micro",
             small_meeting: "Le son de la réunion",
             small_stop: "Arrêter",
