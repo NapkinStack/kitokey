@@ -320,6 +320,8 @@ pub struct Window {
     pub transcript: &'static str,
     pub audio: &'static str,
     pub audio_freed: &'static str,
+    /// What a meeting's audio weighs, beside its length in its header (D89).
+    pub audio_weighs: &'static str,
     pub recording: &'static str,
     pub interrupted: &'static str,
     /// No session in the folder: the folder.
@@ -590,7 +592,6 @@ pub struct Window {
     pub transcript_model_needed: &'static str,
     pub transcript_model_coming: &'static str,
     pub ran_online: &'static str,
-    pub ran_here: &'static str,
     /// The header's button, at rest and while a recording runs.
     pub record_start: &'static str,
     pub record_stop: &'static str,
@@ -761,6 +762,7 @@ pub fn window(language: Language) -> Window {
             transcript: "Transcript",
             audio: "Audio · {}",
             audio_freed: "Audio deleted",
+            audio_weighs: "audio {}",
             recording: "Recording now",
             interrupted: "Interrupted",
             none: "No meeting in {} yet.",
@@ -992,7 +994,6 @@ pub fn window(language: Language) -> Window {
             transcript_model_needed: "Waiting for the Whisper model.",
             transcript_model_coming: "Waiting for the Whisper model, being downloaded.",
             ran_online: "online",
-            ran_here: "on this machine",
             record_start: "Start a recording",
             record_stop: "Stop the recording",
             agree_eyebrow: "Before the first minutes online",
@@ -1154,6 +1155,7 @@ pub fn window(language: Language) -> Window {
             transcript: "Transcription",
             audio: "Audio · {}",
             audio_freed: "Audio supprimé",
+            audio_weighs: "audio {}",
             recording: "Enregistrement en cours",
             interrupted: "Interrompu",
             none: "Aucune réunion dans {} pour l’instant.",
@@ -1388,7 +1390,6 @@ pub fn window(language: Language) -> Window {
             transcript_model_needed: "En attente du modèle Whisper.",
             transcript_model_coming: "En attente du modèle Whisper, en cours de téléchargement.",
             ran_online: "en ligne",
-            ran_here: "sur cet ordinateur",
             record_start: "Démarrer un enregistrement",
             record_stop: "Arrêter l’enregistrement",
             agree_eyebrow: "Avant le premier compte rendu en ligne",
