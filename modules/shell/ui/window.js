@@ -2825,7 +2825,7 @@ function showAgreement(name, agreement, words, session) {
 
 // The mark, alone in the accent, the bar's handle (D90; the decider, 2026-11-08): its dot red and
 // larger while recording, its stem cut further, as the tray's icon draws it.
-function mark() {
+function barMark() {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
@@ -2856,7 +2856,7 @@ function showSmall(words) {
   const toFull = iconButton("maximize-2", words.small_full, "small-full");
   toFull.addEventListener("click", () => full());
   const handle = element("span", "handle");
-  handle.append(mark());
+  handle.append(barMark());
   // ● and ■ (D90's second round): icons alone, their words the tooltip — with the shortcut — and the name.
   let keys = null;
   const named = (button, said) => {

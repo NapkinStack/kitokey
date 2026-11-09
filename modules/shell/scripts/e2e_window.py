@@ -4787,9 +4787,9 @@ def nothing_silent(now: dt.datetime) -> None:
             time.sleep(0.6)
             press(browser, "small-stop")
             at_rest = wait_for(browser, lambda b: shown(b, "small-record") and "n’est pas confidentielle" in text(b, "small-said"), 10)
-            first = browser.execute_script("return document.getElementById('small').firstElementChild.id")
-            check("stopped with the mark refused: said at rest as it is, first of all, and nothing marked",
-                  at_rest and first == "small-said" and not (folder / "confidential").exists(), (text(browser, "small-said"), first))
+            first = browser.execute_script("const s = document.getElementById('small-said'); return (s.parentElement.id === 'small' ? s : s.parentElement).previousElementSibling.className")
+            check("stopped with the mark refused: said at rest as it is, right under the bar's row, and nothing marked",
+                  at_rest and first == "bar-row" and not (folder / "confidential").exists(), (text(browser, "small-said"), first))
         finally:
             folder.chmod(0o755)
         time.sleep(2)

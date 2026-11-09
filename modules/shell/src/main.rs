@@ -676,7 +676,8 @@ fn show_small(app: &AppHandle) {
     let _ = WebviewWindowBuilder::new(app, "small", WebviewUrl::App("index.html#/small".into()))
         .title("Kitokey")
         .inner_size(BAR.0, BAR.1)
-        .resizable(false)
+        .min_inner_size(BAR.0, BAR.1)
+        .max_inner_size(BAR.0, BAR.1)
         .always_on_top(recording)
         .build();
 }
@@ -1140,7 +1141,14 @@ async fn small_window(app: AppHandle) {
 #[tauri::command]
 fn bar_fit(window: tauri::WebviewWindow, height: f64) {
     if window.label() == "small" && height.is_finite() {
-        let _ = window.set_size(tauri::LogicalSize::new(BAR.0, height.clamp(BAR.1, BAR_TALLEST)));
+        // Its size bounded to the one asked, the user's to keep: GTK holds a window the user cannot
+        // resize no lower than the web view's own minimum, 200 px, but an explicit bound it keeps.
+        let size = tauri::LogicalSize::new(BAR.0, height.clamp(BAR.1, BAR_TALLEST));
+        let _ = window.set_min_size(Some(tauri::LogicalSize::new(BAR.0, BAR.1)));
+        let _ = window.set_max_size(Some(tauri::LogicalSize::new(BAR.0, BAR_TALLEST)));
+        let _ = window.set_size(size);
+        let _ = window.set_min_size(Some(size));
+        let _ = window.set_max_size(Some(size));
     }
 }
 
