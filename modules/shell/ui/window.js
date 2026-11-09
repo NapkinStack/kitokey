@@ -78,6 +78,7 @@ function lock() {
 const ICONS = {
   check: ["M20 6 9 17l-5-5"],
   "chevron-left": ["m15 18-6-6 6-6"],
+  "chevron-down": ["m6 9 6 6 6-6"],
   x: ["M18 6 6 18", "m6 6 12 12"],
   "arrow-right": ["M5 12h14", "m12 5 7 7-7 7"],
   "maximize-2": ["M15 3h6v6", "m21 3-7 7", "m3 21 7-7", "M9 21H3v-6"],
@@ -260,7 +261,10 @@ function languageRow(session, language, languages, words, settled, apple, system
       said.textContent = fill(words.language_not_saved, why);
     }
   });
-  row.append(icon("languages"), element("span", "name", fill(words.labelled, words.language_label)), pick);
+  // Its value and a chevron, as board 4 draws the list: the system's own box not drawn.
+  const chevron = icon("chevron-down");
+  chevron.classList.add("chevron");
+  row.append(icon("languages"), element("span", "name", fill(words.labelled, words.language_label)), pick, chevron);
   return [row, said];
 }
 
@@ -275,6 +279,11 @@ function confidentialCard(session, confidential, words) {
   box.id = "confidential-switch";
   box.setAttribute("role", "switch");
   box.checked = confidential.on;
+  // What it means, read with it by a screen reader as the tooltip shows it to the pointer; outside
+  // the label, which would make it part of the switch's name.
+  const described = element("span", "unseen", words.confidential_says);
+  described.id = "confidential-described";
+  box.setAttribute("aria-describedby", described.id);
   const left = element("p", "left");
   left.id = "confidential-left";
   const said = element("p", "says");
@@ -306,7 +315,7 @@ function confidentialCard(session, confidential, words) {
   });
   card.append(element("span", "name", words.confidential_chip), box);
   paint(confidential);
-  return [card, left, said];
+  return [card, left, said, described];
 }
 
 // A session's folder name: what the window calls it, and the only date it says when its start
@@ -1741,9 +1750,9 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const same = page.dataset.name === nameOf(session);
   const typing = same && naming ? { value: naming.value, caret: naming.selectionStart, end: naming.selectionEnd, focused: document.activeElement === naming } : null;
   page.dataset.name = nameOf(session);
-  const [secret, left, secretSaid] = confidentialCard(session, confidential, words);
+  const [secret, left, secretSaid, secretDescribed] = confidentialCard(session, confidential, words);
   const [spoken, spokenSaid] = languageRow(session, language, languages, words, meeting_language, apple, system_language);
-  const settings = contextCard(session, { context, transcript, minutes }, words, [spoken, secret], [left, secretSaid, spokenSaid]);
+  const settings = contextCard(session, { context, transcript, minutes }, words, [spoken, secret], [left, secretSaid, spokenSaid, secretDescribed]);
   page.replaceChildren(head, settings, drawn, columns);
   // The line being said, marked while it plays; the page stays where the user left it (D26, the
   // decider, 2026-10-24: following the line was intrusive).

@@ -403,9 +403,16 @@ body.small-window .frame { display: none; }
 .setting { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; min-width: 0; max-width: 100%; overflow: hidden; padding: 0 10px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--soft); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: pointer; }
 .setting:hover { background: var(--raised); }
 .setting .value { min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-weight: 500; }
-.setting select { min-width: 0; min-height: 0; max-width: 28ch; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.setting select { appearance: none; -webkit-appearance: none; min-width: 0; min-height: 0; max-width: 28ch; padding: 0 4px 0 0; border: 0; background: transparent; color: var(--ink); font-size: 13.5px; font-weight: 500; cursor: pointer; }
 .setting select:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
-.setting input[type="checkbox"] { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+/* The language's list drawn as board 4's: its value and a chevron, the system's box not drawn. */
+.setting .chevron { margin-left: -4px; color: var(--soft); pointer-events: none; }
+/* « Confidentielle »'s switch (board 4): the same checkbox, its role switch, drawn as a track and
+   its knob — off at the start, the knob soft; on, the track in the accent, the knob at the end. */
+.setting input[type="checkbox"] { appearance: none; -webkit-appearance: none; flex: none; width: 32px; height: 20px; margin: 0; border: 1px solid var(--edge); border-radius: 10px; background: radial-gradient(circle closest-side, var(--soft) 82%, transparent 90%) no-repeat 2px 50% / 14px 14px, var(--raised); cursor: pointer; transition: background-position 120ms ease; }
+.setting input[type="checkbox"]:checked { border-color: var(--accent); background: radial-gradient(circle closest-side, var(--surface) 82%, transparent 90%) no-repeat calc(100% - 2px) 50% / 14px 14px, var(--accent); }
+/* Read by a screen reader, not drawn. */
+.unseen { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .settings .left { margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 /* A meeting's context (D59's board): a field, its count, closed while a making runs; opened from its row (D89). */
 .context-panel { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }

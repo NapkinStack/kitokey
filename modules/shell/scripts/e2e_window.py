@@ -4756,6 +4756,28 @@ def nothing_silent(now: dt.datetime) -> None:
             told = browser.execute_async_script(
                 "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('minutes_again', { name: 'gone' }).then(() => done(''), (why) => done(String(why)));")
             check(f"the raw text only in developer mode ({'on' if raw else 'off'})", ("gone is no session" in told) == raw, told)
+            if raw:
+                # « More actions » with both items (D89): Enter opens it on the first, ↑ on the last, expanded while open.
+                wait_for(browser, lambda b: b.find_elements(By.ID, "more-actions"), 10)
+                opened_on = []
+                for key in (Keys.ENTER, Keys.ARROW_UP):
+                    browser.execute_script("document.getElementById('more-actions').focus()")
+                    ActionChains(browser).send_keys(key).perform()
+                    wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
+                    opened_on.append(browser.execute_script("return [document.activeElement.id, document.getElementById('more-actions').getAttribute('aria-expanded')]"))
+                    ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+                    wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
+                check("in developer mode, « More actions » opens on its first by Enter, on its last by ↑, expanded while open (D89)",
+                      opened_on == [["rename-item", "true"], ["copy-diagnostic", "true"]], opened_on)
+                browser.execute_script("document.getElementById('more-actions').focus()")
+                ActionChains(browser).send_keys(Keys.ENTER).perform()
+                wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
+                ActionChains(browser).send_keys(Keys.TAB).perform()
+                left_ = wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
+                check("Tab leaves « More actions » closed, not expanded (D89)",
+                      left_ and browser.execute_script("return document.getElementById('more-actions').getAttribute('aria-expanded')") == "false")
+                described = browser.execute_script("const b = document.getElementById('confidential-switch'); return document.getElementById(b.getAttribute('aria-describedby'))?.textContent")
+                check("in English, the switch's description: « Nothing leaves this computer » (D89)", described == "Nothing leaves this computer", described)
     # What the page reads and cannot: said where the eye is, in the user's language; asked by no gesture
     # or not, never only a line in the log (D67).
     for language, not_opened, not_read, unread, gone in (
@@ -5088,7 +5110,7 @@ def window_looks(now: dt.datetime) -> None:
         check("fields and secondary buttons are bordered with --edge (D89)", edged == [True, []], edged)
         filled = browser.execute_script(
             "const t = document.createElement('i'); t.style.background = 'var(--surface)'; document.body.append(t); const surface = getComputedStyle(t).backgroundColor; t.remove();"
-            " const all = [...document.querySelectorAll('select, .search')].filter(e => e.offsetParent && !e.closest('#small'));"
+            " const all = [...document.querySelectorAll('select, .search, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
             " return [all.length > 0, all.filter(e => getComputedStyle(e).backgroundColor !== surface).map(e => e.id || e.className)]")
         check("fields are drawn on the surface, only edged, as board 2 (D89)", filled == [True, []], filled)
         # The trial over (D83): buying holds it in the recording's place, then gives it back.
@@ -5683,6 +5705,17 @@ def main() -> int:
         check("the meeting's settings: context, spoken language, Confidentielle, on one row of 32 px (D89)",
               row is not None and [id_ for id_, _, _ in row] == ["context-toggle", "meeting-language", "confidential-switch"]
               and len(tops) == 1 and {height for _, _, height in row} == {32}, row)
+        # « Confidentielle »: a sliding switch, the checkbox drawn otherwise, what it means read with it (D89, board 4).
+        drawn = browser.execute_script(
+            "const b = document.getElementById('confidential-switch'), s = getComputedStyle(b), d = document.getElementById(b.getAttribute('aria-describedby'));"
+            " return [b.type, b.getAttribute('role'), s.webkitAppearance || s.appearance, Math.round(b.getBoundingClientRect().width), Math.round(b.getBoundingClientRect().height),"
+            " b.labels[0].textContent, d?.textContent, !!d && !b.labels[0].contains(d)]")
+        check("« Confidentielle »: a switch drawn sliding, 32 × 20, named by its word, « Rien ne quitte cet ordinateur » its description (D89)",
+              drawn == ["checkbox", "switch", "none", 32, 20, "Confidentielle", "Rien ne quitte cet ordinateur", True], drawn)
+        listed = browser.execute_script(
+            "const p = document.getElementById('meeting-language'), s = getComputedStyle(p);"
+            " return [s.webkitAppearance || s.appearance, !!p.nextElementSibling?.matches('svg.glyph.chevron')]")
+        check("the spoken language: its value and a chevron, the system's box not drawn (D89, board 4)", listed == ["none", True], listed)
         toggle = browser.find_element(By.ID, "context-toggle")
         closed = toggle.get_attribute("aria-expanded") == "false" and not browser.find_element(By.ID, "context-text").is_displayed()
         toggle.click()
@@ -5696,6 +5729,7 @@ def main() -> int:
         browser.execute_script("arguments[0].focus()", more)
         ActionChains(browser).send_keys(Keys.ENTER).perform()
         menu = wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
+        expanded = more.get_attribute("aria-expanded")
         items = browser.execute_script("return [...document.querySelectorAll('#more-menu [role=menuitem]')].map(e => e.textContent)")
         first = browser.execute_script("return [document.activeElement.getAttribute('role'), document.activeElement.textContent, document.getElementById('more-menu').getAttribute('role')]")
         ActionChains(browser).send_keys(Keys.ESCAPE).perform()
@@ -5703,7 +5737,7 @@ def main() -> int:
         check("« Plus d’actions »: a menu of the rarer actions, opened by Enter on its first, Escape closes it, the focus back on its button (D89)",
               labelled == ["Plus d’actions", "Plus d’actions", "menu", "false"] and menu and items == ["Renommer cette réunion"]
               and first == ["menuitem", "Renommer cette réunion", "menu"] and back and browser.execute_script("return document.activeElement.id") == "more-actions"
-              and more.get_attribute("aria-expanded") == "false", (labelled, items, first))
+              and more.get_attribute("aria-expanded") == "false" and expanded == "true", (labelled, items, first, expanded))
         more.click()
         wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
         browser.find_element(By.CSS_SELECTOR, "#more-menu [role=menuitem]").click()
