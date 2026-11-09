@@ -146,6 +146,10 @@ struct Shell {
     /// model is needed and not there.
     menu: Menu<Wry>,
     download: MenuItem<Wry>,
+    /// The menu's « Afficher la barre », in it only while the bar is hidden (D90).
+    show_bar: MenuItem<Wry>,
+    /// When the bar was last moved: its place is kept once it stays still (D90).
+    bar_moved: Mutex<Option<Instant>>,
     /// The host the transcript being made is sent to, when a service hears it (D60).
     hearing_host: Mutex<Option<String>>,
     /// The host the minutes being written are sent to, when it is not this computer (D60).
@@ -319,6 +323,8 @@ fn main() {
             recording_now,
             small_window,
             bar_fit,
+            bar_drag,
+            bar_hide,
             full_window,
             minutes_asked,
             minutes_again,
@@ -393,12 +399,14 @@ fn main() {
             let open = MenuItem::with_id(app, "open", labels.open, true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &toggle, &again, &minutes, &quit])?;
             let download = MenuItem::with_id(app, "download", "", true, None::<&str>)?;
+            let show_bar = MenuItem::with_id(app, "show_bar", labels.show_bar, true, None::<&str>)?;
             TrayIconBuilder::with_id(TRAY)
                 .icon(Image::from_bytes(include_bytes!("../icons/tray.png"))?)
                 .tooltip("Kitokey")
                 .menu(&menu.clone())
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => open_window(app),
+                    "show_bar" => show_small(app),
                     "toggle" => {
                         toggle_recording(app);
                     }
@@ -470,6 +478,8 @@ fn main() {
                 transcripts_tried: Mutex::new(HashMap::new()),
                 menu,
                 download,
+                show_bar,
+                bar_moved: Mutex::new(None),
                 hearing_host: Mutex::new(None),
                 minutes_host: Mutex::new(None),
                 heard_here: Mutex::default(),
@@ -611,6 +621,7 @@ fn show_full(app: &AppHandle) {
     left(app, settings::Window::Full);
     if let Some(small) = app.get_webview_window("small") {
         let _ = small.close();
+        bar_shown(app, true);
     }
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -670,15 +681,73 @@ fn show_small(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("small") {
         let _ = window.show();
         let _ = window.set_focus();
+        bar_shown(app, true);
         return;
     }
-    let recording = app.state::<Shell>().recording.lock().unwrap().is_some();
-    let _ = WebviewWindowBuilder::new(app, "small", WebviewUrl::App("index.html#/small".into()))
+    let shell = app.state::<Shell>();
+    let recording = shell.recording.lock().unwrap().is_some();
+    // Without the system's title bar (D90, board 8): moved by its handle, hidden by its own button.
+    let mut bar = WebviewWindowBuilder::new(app, "small", WebviewUrl::App("index.html#/small".into()))
         .title("Kitokey")
         .inner_size(BAR.0, BAR.1)
         .resizable(false)
-        .always_on_top(recording)
-        .build();
+        .decorations(false)
+        .always_on_top(recording);
+    // Where it was left, where the system lets an application place itself: GNOME chooses.
+    if let Some([x, y]) = shell.settings().bar_at {
+        bar = bar.position(f64::from(x), f64::from(y));
+    }
+    if let Ok(window) = bar.build() {
+        let app = app.clone();
+        window.on_window_event(move |event| {
+            if let tauri::WindowEvent::Moved(_) = event {
+                bar_moved(&app);
+            }
+        });
+    }
+}
+
+/// The tray's « Afficher la barre »: in its menu while the bar is hidden, before « Ouvrir Kitokey ».
+fn bar_shown(app: &AppHandle, shown: bool) {
+    let shell = app.state::<Shell>();
+    let _ = shell.menu.remove(&shell.show_bar);
+    if !shown {
+        let _ = shell.menu.insert(&shell.show_bar, 0);
+    }
+}
+
+/// The bar moved: its place kept once it has stayed still half a second, not at each step of a drag.
+fn bar_moved(app: &AppHandle) {
+    let at = Instant::now();
+    *app.state::<Shell>().bar_moved.lock().unwrap() = Some(at);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(500));
+        let shell = app.state::<Shell>();
+        if *shell.bar_moved.lock().unwrap() != Some(at) {
+            return;
+        }
+        let Some(window) = app.get_webview_window("small") else {
+            return;
+        };
+        let (Ok(place), Ok(scale)) = (window.outer_position(), window.scale_factor()) else {
+            return;
+        };
+        let place = place.to_logical::<i32>(scale);
+        let _saving = shell.saving.lock().unwrap();
+        let Ok(mut settings) = shell.reread() else {
+            return;
+        };
+        if settings.bar_at == Some([place.x, place.y]) {
+            return;
+        }
+        settings.bar_at = Some([place.x, place.y]);
+        if let Some(file) = settings::file()
+            && settings::write(&file, &settings).is_ok()
+        {
+            *shell.settings.lock().unwrap() = settings;
+        }
+    });
 }
 
 /// A recording begins or ends: the small window, when open, is above the others while it runs
@@ -1144,6 +1213,25 @@ async fn small_window(app: AppHandle) {
 fn bar_fit(window: tauri::WebviewWindow, height: f64) {
     if window.label() == "small" && height.is_finite() {
         let _ = window.set_size(tauri::LogicalSize::new(BAR.0, height.clamp(BAR.1, BAR_TALLEST)));
+    }
+}
+
+/// The bar's handle, or its row, pressed (D90): the system moves the bar as the pointer goes.
+#[tauri::command]
+fn bar_drag(window: tauri::WebviewWindow) {
+    if window.label() == "small" {
+        let _ = window.start_dragging();
+    }
+}
+
+/// « Masquer la barre » (D90): hidden, a recording going on; it comes back on the user's gesture
+/// alone — the tray's « Afficher la barre » or « Ouvrir Kitokey » —, never by itself.
+#[tauri::command]
+fn bar_hide(app: AppHandle, window: tauri::WebviewWindow) {
+    if window.label() == "small" {
+        let _ = window.hide();
+        bar_shown(&app, false);
+        tracing::info!("shell.bar_hidden");
     }
 }
 
@@ -3558,6 +3646,7 @@ fn relabel(app: &AppHandle) {
         let shell = app.state::<Shell>();
         let labels = words::menu(shell.language());
         let _ = shell.open.set_text(labels.open);
+        let _ = shell.show_bar.set_text(labels.show_bar);
         let _ = shell.quit.set_text(labels.quit);
         // The model's entry, while it is offered: how far it is, or what it fetches.
         let wanted = published();

@@ -2441,6 +2441,47 @@ def microphone_chosen(now: dt.datetime) -> None:
         stop_from_small(browser)
 
 
+def bar_window(now: dt.datetime) -> None:
+    """AX. The bar as a window (D90, board 8): no title bar, « Masquer la barre »; hidden during a
+    recording, it never comes back by itself — the tray's « Afficher la barre » brings it back."""
+    print("AX. the bar without a title bar; hidden while recording, it stays hidden whatever happens, the tray stops and brings it back (D90)")
+    taping = WORK / "bar-hidden"
+    taping.mkdir()
+    hidden = "return document.visibilityState"
+    with Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True) as browser:
+        wait_for(browser, lambda b: b.find_element(By.ID, "small-hide").is_displayed(), 8)
+        got = browser.execute_script("const h = document.getElementById('small-hide'); return [h.getAttribute('aria-label'), h.title, h.getBoundingClientRect().height, h.textContent.trim(), outerHeight - innerHeight]")
+        check("« Masquer la barre »: an icon of 28 px, named by its words; no title bar over the row", got[:4] == ["Masquer la barre", "Masquer la barre", 28, ""] and got[4] == 0, got)
+        check("shown, the tray offers no « Afficher la barre »", "Afficher la barre" not in tray_labels(), tray_labels())
+        press(browser, "small-record")
+        wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed() and tray_colour() == "red", 10)
+        press(browser, "small-hide")
+        gone = wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
+        check("hidden during a recording: the bar goes, the recording goes on, the tray's icon red", gone and tray_colour() == "red", browser.execute_script(hidden))
+        check("the tray offers « Afficher la barre », first", wait_for(None, lambda b: tray_labels()[:1] == ["Afficher la barre"], 5), tray_labels())
+        # Whatever happens but a gesture: a device changes, the microphone goes and comes back.
+        (taping / "move").touch()
+        (taping / "mic-gone").touch()
+        time.sleep(1)
+        (taping / "mic-back").write_text("Mic")
+        time.sleep(2)
+        check("a device changed, the microphone gone and back: the bar stays hidden", browser.execute_script(hidden) == "hidden", browser.execute_script(hidden))
+        # The tray's stop, the gesture the shortcut shares (toggle_recording): stopped, the bar still hidden.
+        tray_click("Arrêter l’enregistrement")
+        stopped = wait_for(None, lambda b: tray_colour() == "blue", 15)
+        time.sleep(1)
+        check("stopped from the tray, as the shortcut stops: the bar does not come back by itself", stopped and browser.execute_script(hidden) == "hidden", browser.execute_script(hidden))
+        tray_click("Afficher la barre")
+        back = wait_for(browser, lambda b: b.execute_script(hidden) == "visible", 5)
+        check("« Afficher la barre » brings it back, at rest, and leaves the menu", back and browser.find_element(By.ID, "small-record").is_displayed()
+              and wait_for(None, lambda b: "Afficher la barre" not in tray_labels(), 5), tray_labels())
+        # At rest too: hidden, « Ouvrir Kitokey » opens the window left, the bar.
+        press(browser, "small-hide")
+        wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
+        tray_click("Ouvrir Kitokey")
+        check("hidden at rest, « Ouvrir Kitokey » shows it again", wait_for(browser, lambda b: b.execute_script(hidden) == "visible", 5), browser.execute_script(hidden))
+
+
 def meeting_named(now: dt.datetime) -> None:
     """AL. A meeting named by its minutes (D48): the title in the row and the page, as text."""
     print("AL. a meeting takes the title its minutes give it — the date beneath it in the list, above it on the page; as text; made again, the new one (D48)")
@@ -7065,6 +7106,7 @@ def main() -> int:
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
+    bar_window(now)
     meeting_named(now)
     word_after_a_gap(now)
     minutes_checked(now)

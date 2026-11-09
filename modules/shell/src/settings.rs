@@ -130,6 +130,9 @@ pub struct Settings {
     pub welcomed: bool,
     /// The full window's sidebar folded by the user (D61): opened again as it was left.
     pub folded: bool,
+    /// Where the user left the recording bar, in the screen's logical pixels (D90): it opens there
+    /// again where the system lets an application place itself — Windows, macOS —, never on GNOME.
+    pub bar_at: Option<[i32; 2]>,
     /// The language Kitokey speaks, chosen by the user (D64); none, the system's.
     pub language: Option<Language>,
     /// The microphone recordings take, as capture names it, and as a person reads it (D74). None: Auto.
@@ -165,6 +168,7 @@ impl Default for Settings {
             log: Log::Info,
             welcomed: false,
             folded: false,
+            bar_at: None,
             language: None,
             microphone: None,
             microphone_description: None,
@@ -238,6 +242,7 @@ struct Written {
     log: Option<Log>,
     welcomed: Option<bool>,
     folded: Option<bool>,
+    bar_at: Option<[i32; 2]>,
     language: Option<String>,
     microphone: Option<String>,
     microphone_description: Option<String>,
@@ -279,6 +284,7 @@ pub fn read(path: &Path) -> Result<Settings, String> {
     settings.window = written.window.unwrap_or(settings.window);
     settings.welcomed = written.welcomed.unwrap_or(settings.welcomed);
     settings.folded = written.folded.unwrap_or(settings.folded);
+    settings.bar_at = written.bar_at;
     // One it does not speak, written by hand: the system's.
     settings.language = written.language.as_deref().and_then(Language::named);
     settings.log = written.log.unwrap_or(settings.log);
@@ -374,6 +380,11 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     }
     if settings.folded != before.folded {
         set(&mut document, "folded", Value::from(settings.folded));
+    }
+    if let Some([x, y]) = settings.bar_at
+        && settings.bar_at != before.bar_at
+    {
+        set(&mut document, "bar_at", Value::from_iter([i64::from(x), i64::from(y)]));
     }
     if settings.language != before.language {
         match settings.language {
