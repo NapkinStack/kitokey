@@ -1315,7 +1315,7 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
         ),
         (french.time_listen, "Écouter depuis {}"),
         (french.time_passage, "Voir le passage de {}"),
-        (french.small_no_keys, "Pas de raccourci clavier — en définir un"),
+        (french.bar_more, "Plus d’options"),
         (french.shortcut_none, "Aucun raccourci défini"),
         (french.shortcut_where, "Il se modifie dans les réglages clavier du système."),
         (

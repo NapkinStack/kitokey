@@ -318,6 +318,7 @@ fn main() {
             buy,
             recording_now,
             small_window,
+            bar_fit,
             full_window,
             minutes_asked,
             minutes_again,
@@ -652,12 +653,15 @@ fn show_welcome(app: &AppHandle) {
     build_full(app, "#/welcome");
 }
 
-/// The small window's size, the same at rest and recording: GTK does not shrink a window the
-/// user cannot resize, and a window that changes size under the pointer is one more surprise (D35).
-const SMALL: (f64, f64) = (380.0, 400.0);
+/// The recording bar's width and its row's height (D90, the decider's boards of 2026-11-08): made
+/// at its row's height, the smallest it is — GTK grows a window the user cannot resize, and
+/// shrinks it back no lower than the size it was made at —, as tall as it holds after that.
+const BAR: (f64, f64) = (440.0, 44.0);
+/// As tall as the bar may grow: what it holds beyond that scrolls.
+const BAR_TALLEST: f64 = 720.0;
 
-/// The small window, in place of the full one, which is hidden: at rest, or showing the
-/// recording above the other windows (D35, board 6).
+/// The recording bar, in place of the full window, which is hidden: at rest, or showing the
+/// recording above the other windows (D35, D90).
 fn show_small(app: &AppHandle) {
     left(app, settings::Window::Small);
     if let Some(main) = app.get_webview_window("main") {
@@ -671,7 +675,7 @@ fn show_small(app: &AppHandle) {
     let recording = app.state::<Shell>().recording.lock().unwrap().is_some();
     let _ = WebviewWindowBuilder::new(app, "small", WebviewUrl::App("index.html#/small".into()))
         .title("Kitokey")
-        .inner_size(SMALL.0, SMALL.1)
+        .inner_size(BAR.0, BAR.1)
         .resizable(false)
         .always_on_top(recording)
         .build();
@@ -1129,6 +1133,15 @@ fn microphone_chosen(shell: State<'_, Shell>, name: Option<String>, description:
 #[tauri::command]
 async fn small_window(app: AppHandle) {
     show_small(&app);
+}
+
+/// The bar asks to be as tall as what it shows (D90): its row alone, its options opened, a line
+/// added; its width the same.
+#[tauri::command]
+fn bar_fit(window: tauri::WebviewWindow, height: f64) {
+    if window.label() == "small" && height.is_finite() {
+        let _ = window.set_size(tauri::LogicalSize::new(BAR.0, height.clamp(BAR.1, BAR_TALLEST)));
+    }
 }
 
 /// From the small window to the full one, on one of its pages when named: a meeting, the

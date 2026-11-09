@@ -79,6 +79,7 @@ const ICONS = {
   check: ["M20 6 9 17l-5-5"],
   "chevron-left": ["m15 18-6-6 6-6"],
   "chevron-down": ["m6 9 6 6 6-6"],
+  "chevron-up": ["m18 15-6-6-6 6"],
   x: ["M18 6 6 18", "m6 6 12 12"],
   "arrow-right": ["M5 12h14", "m12 5 7 7-7 7"],
   "maximize-2": ["M15 3h6v6", "m21 3-7 7", "m3 21 7-7", "M9 21H3v-6"],
@@ -2822,53 +2823,97 @@ function showAgreement(name, agreement, words, session) {
   send.focus();
 }
 
-// The small window (D35): at rest — the recording's gesture and the shortcut, the last meeting and
-// where it stands, what the meetings weigh, the way to the full window —, or while recording
-// (D11's sixth board): the time, the two levels, the way to stop. The recording asked ten times a
-// second; at rest, the meetings as often as the full window asks.
+// The mark, alone in the accent, the bar's handle (D90; the decider, 2026-11-08): its dot red and
+// larger while recording, its stem cut further, as the tray's icon draws it.
+function mark() {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("class", "mark");
+  svg.setAttribute("aria-hidden", "true");
+  for (const [tag, attributes] of [
+    ["path", { class: "rest", d: "M4.9 8.019A2.9 2.9 0 0 0 8.1 8.019V20A1.6 1.6 0 0 1 4.9 20Z" }],
+    ["path", { class: "live", d: "M4.9 9.313A3.5 3.5 0 0 0 8.1 9.313V20A1.6 1.6 0 0 1 4.9 20Z" }],
+    ["circle", { class: "dot", cx: 6.5, cy: 5.6, r: 1.6 }],
+    ["path", { class: "arms", d: "M6.5 14.2 17 4M9.8 11 17.3 20" }],
+  ]) {
+    const shape = document.createElementNS(ns, tag);
+    for (const [key, value] of Object.entries(attributes)) shape.setAttribute(key, value);
+    svg.append(shape);
+  }
+  return svg;
+}
+
+// The recording bar (D90, replacing D35's small window): one row of 44 px — the mark as its handle,
+// ● at rest or, recording, the time and ■ —, its options under it once opened; the window as tall
+// as it shows. The recording asked ten times a second.
 function showSmall(words) {
   const page = document.getElementById("small");
   document.body.classList.add("small-window");
   const invoke = (...asked) => window.__TAURI__.core.invoke(...asked);
   const full = (where) => invoke("full_window", { page: where ?? null });
-  const toFull = (id) => {
-    const button = element("button", "open icon");
-    button.append(icon("maximize-2"));
-    button.type = "button";
-    button.id = id;
-    button.title = words.small_full;
-    button.setAttribute("aria-label", words.small_full);
-    button.addEventListener("click", () => full());
-    return button;
+  new ResizeObserver(() => invoke("bar_fit", { height: Math.ceil(page.getBoundingClientRect().height) }).catch(() => {})).observe(page);
+  const toFull = iconButton("maximize-2", words.small_full, "small-full");
+  toFull.addEventListener("click", () => full());
+  const handle = element("span", "handle");
+  handle.append(mark());
+  // ● and ■ (D90's second round): icons alone, their words the tooltip — with the shortcut — and the name.
+  let keys = null;
+  const named = (button, said) => {
+    button.setAttribute("aria-label", said);
+    button.title = keys ? `${said} (${keys})` : said;
   };
-
-  const rest = element("div", "small-rest");
-  const restTop = element("div", "small-top");
-  restTop.append(element("span", "small-brand", "Kitokey"), toFull("small-full"));
   // Its new state at once, disabled until the recording's own says otherwise (D68). Answered, a press
   // the shell took for the same one, or a start that failed, gives the button back.
   let unanswered = false;
   const asking = async (button, said, wanted, back) => {
     button.disabled = true;
-    button.textContent = said;
+    named(button, said);
     unanswered = true;
     await window.__TAURI__.core.invoke("record");
     unanswered = false;
     const header = await window.__TAURI__.core.invoke("header");
     if (header.recording !== wanted) {
       button.disabled = false;
-      button.textContent = back;
+      named(button, back);
     }
   };
-  const start = element("button", "primary", words.record_start);
+  const start = element("button", "record");
   start.type = "button";
   start.id = "small-record";
+  start.append(element("span", "record-dot"));
+  named(start, words.record_start);
   start.addEventListener("click", () => asking(start, words.record_starting, true, words.record_start));
-  const keys = element("button", "hint");
-  keys.type = "button";
-  keys.id = "small-keys";
-  const last = element("div", "small-last");
-  const foot = element("div", "small-foot");
+  const stop = element("button", "danger");
+  stop.type = "button";
+  stop.id = "small-stop";
+  stop.append(element("span", "stop-square"));
+  named(stop, words.record_stop);
+  stop.addEventListener("click", () => asking(stop, words.record_stopping, false, words.record_stop));
+  const time = element("span", "time", "00:00:00");
+  // « Plus d’options » (D90): what is rarer, under the row; Escape closes it.
+  const more = iconButton("chevron-down", words.bar_more, "small-more");
+  more.setAttribute("aria-controls", "small-options");
+  const row = element("div", "bar-row");
+  row.append(handle, time, element("span", "bar-space"), start, stop, more, toFull);
+  const rest = element("div", "small-rest");
+  rest.id = "small-options";
+  let open = false;
+  const unfoldOptions = (now, back) => {
+    open = now;
+    rest.hidden = !open || recording;
+    more.setAttribute("aria-expanded", String(open));
+    more.title = open ? words.bar_less : words.bar_more;
+    more.setAttribute("aria-label", more.title);
+    more.firstChild.replaceWith(icon(open ? "chevron-up" : "chevron-down"));
+    if (back) more.focus();
+  };
+  more.addEventListener("click", () => unfoldOptions(!open, false));
+  rest.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    event.preventDefault();
+    unfoldOptions(false, true);
+  });
   // Which microphone the next recording takes (D74): the name, opened on Auto and what capture lists,
   // over what is under it, as a menu is. Nothing is offered where capture lists none. Read when it
   // opens, never watched: a device arriving opens nothing.
@@ -2944,6 +2989,8 @@ function showSmall(words) {
     // The list and whether it read are taken; the choice, only if none was made since it was asked.
     known = { ...read, chosen: asked === choicesMade ? read.chosen : known.chosen };
     microphone.hidden = known.list.length === 0 && !known.unread && known.chosen === null;
+    // Nothing to choose, no options yet at rest (D90's next row adds them).
+    if (recording === false) more.hidden = microphone.hidden;
     paintPick();
     if (!picks.hidden && !same) {
       drawPicks();
@@ -2955,8 +3002,6 @@ function showSmall(words) {
     picks.hidden = false;
     pick.setAttribute("aria-expanded", "true");
     pick.lastChild.textContent = "▴";
-    // Down to the window's edge: what does not fit scrolls inside, nothing is cut.
-    picks.style.maxHeight = `${innerHeight - pick.getBoundingClientRect().bottom - 12}px`;
     drawPicks();
     focusPick();
     readPicks();
@@ -2996,12 +3041,9 @@ function showSmall(words) {
   document.addEventListener("click", (event) => {
     if (!microphone.contains(event.target)) closePicks(false);
   });
-  rest.append(restTop, start, keys, microphone, last, foot);
+  rest.append(microphone);
 
   const live = element("div", "small-live");
-  const time = element("span", "time", "00:00:00");
-  const top = element("div", "small-top");
-  top.append(element("span", "live-dot"), time, toFull("small-full-live"));
   // Each level under what it is recorded from, as the system names it (D33); before that name, a
   // check that turns ✓ when the side is heard, then fades; under it, what a silence asks (D49).
   const checks = [];
@@ -3055,10 +3097,6 @@ function showSmall(words) {
     }
     setTimeout(() => (said_copied.textContent = ""), 2000);
   });
-  const stop = element("button", "danger", words.small_stop);
-  stop.type = "button";
-  stop.id = "small-stop";
-  stop.addEventListener("click", () => asking(stop, words.record_stopping, false, words.small_stop));
   const meters = element("div", "meters");
   meters.append(
     meter(words.small_mic, "level-me", "device-me", { silent: words.small_silent_me, nothing: words.small_nothing, waiting: words.small_waiting_me }),
@@ -3157,51 +3195,17 @@ function showSmall(words) {
     secret.row.classList.toggle("on", secret.box.checked);
     marked();
   });
-  live.append(top, announce, meters, stop, secret.row, disclose, opened, note);
+  live.append(announce, meters, secret.row, disclose, opened, note);
   live.hidden = true;
-  page.replaceChildren(rest, live, unkeptSaid);
+  page.replaceChildren(row, unkeptSaid, rest, live);
 
-  // At rest: drawn again only when what it says changes, so that a link under the focus stays.
-  const drawRest = async () => {
-    // Not read: said as a folder unread is, nothing stale offered; drawn anew once it reads.
-    const listing = await invoke("listed").catch(() => {
-      rest.dataset.key = "";
-      last.replaceChildren(element("p", "none", words.small_unread));
-      foot.replaceChildren();
-      return null;
-    });
-    if (listing === null) return;
-    await readMakings();
-    const sessions = listing.sessions.filter((session) => session.state !== "recording");
-    const shown = sessions[0] ?? null;
-    const weight = sessions.reduce((sum, session) => sum + session.audio + session.text, 0);
-    const key = JSON.stringify([listing.unreadable, listing.shortcut, shown && [nameOf(shown), shown.minutes, shown.transcript, shown.audio, shown.seconds], sessions.length, weight]);
-    if (rest.dataset.key !== key) {
-      rest.dataset.key = key;
-      keys.textContent = listing.shortcut ? fill(words.small_keys, listing.shortcut) : words.small_no_keys;
-      keys.disabled = Boolean(listing.shortcut);
-      keys.onclick = listing.shortcut ? null : () => full("#/settings");
-      if (shown === null) {
-        last.replaceChildren(element("p", "none", listing.unreadable ? words.small_unread : words.small_none));
-        foot.replaceChildren();
-      } else {
-        const card = element("div", "last");
-        const when = shown.seconds === null ? heading(shown, words) : `${heading(shown, words)} · ${length(shown.seconds)}`;
-        const open = element("button", "open link", shown.minutes ? words.small_read : words.small_open);
-        open.type = "button";
-        open.id = "small-read";
-        open.addEventListener("click", () => full(`#/meeting/${encodeURIComponent(nameOf(shown))}`));
-        card.append(element("span", "label", words.small_last), element("span", "what", when), holdings(shown, words), open);
-        last.replaceChildren(card);
-        const count = fill(sessions.length === 1 ? words.small_count_one : words.small_count, sessions.length, size(weight, words));
-        const all = element("button", "open link", words.small_all);
-        all.type = "button";
-        all.id = "small-all";
-        all.addEventListener("click", () => full("#/"));
-        foot.replaceChildren(element("span", "count", count), all);
-      }
-    }
-    paintMakings();
+  // The shortcut, in ●'s and ■'s tooltips, as the desktop grants it.
+  const paintKeys = async () => {
+    const header = await invoke("header").catch(() => null);
+    if (header === null || header.shortcut === keys) return;
+    keys = header.shortcut;
+    named(start, start.getAttribute("aria-label"));
+    named(stop, stop.getAttribute("aria-label"));
   };
 
   let recording = null;
@@ -3225,14 +3229,20 @@ function showSmall(words) {
       closePicks(false);
       // Back at rest, and the first time: what capture lists now.
       if (!now.recording) readPicks();
-      // Under the switch while recording, *Arrêter* staying where it is; first of all at rest.
+      // Under the switch while recording; under the row at rest.
       if (now.recording) secret.row.after(unkeptSaid);
-      else page.prepend(unkeptSaid);
+      else row.after(unkeptSaid);
       recording = now.recording;
       start.disabled = false;
-      start.textContent = words.record_start;
+      named(start, words.record_start);
       stop.disabled = false;
-      stop.textContent = words.small_stop;
+      named(stop, words.record_stop);
+      start.hidden = recording;
+      stop.hidden = time.hidden = !recording;
+      handle.classList.toggle("live", recording);
+      const dot = handle.querySelector(".dot");
+      dot.setAttribute("r", recording ? "2.2" : "1.6");
+      dot.setAttribute("cy", recording ? "6.2" : "5.6");
       // Each recording its own context: nothing of the one before.
       Object.assign(meeting, { name: null, saved: null, typed: null, refused: null });
       mark.wanted = null;
@@ -3241,9 +3251,11 @@ function showSmall(words) {
       field.area.value = "";
       field.painted();
       unfold(false);
-      rest.hidden = recording;
       live.hidden = !recording;
-      if (!recording) await drawRest();
+      // Recording, the options wait for D90's next row: the live view holds what they would.
+      more.hidden = recording || microphone.hidden;
+      unfoldOptions(open && !recording, false);
+      if (!recording) paintKeys();
       // Opened at rest, the recording's gesture has the focus.
       if (first && !recording) start.focus();
     }
@@ -3251,7 +3263,7 @@ function showSmall(words) {
       // A start that failed late: the shell has let it go, and no recording will come to give it back.
       if (start.disabled && !unanswered && !(await window.__TAURI__.core.invoke("header")).recording) {
         start.disabled = false;
-        start.textContent = words.record_start;
+        named(start, words.record_start);
       }
       return;
     }
@@ -3317,7 +3329,7 @@ function showSmall(words) {
     if (Date.now() - mark.refused >= 5000) marked();
   };
   setInterval(tick, 100);
-  setInterval(() => recording === false && drawRest(), 1500);
+  setInterval(() => recording === false && paintKeys(), 1500);
   tick();
 }
 
