@@ -236,7 +236,7 @@ fn a_pair_below_aa_is_refused() {
 #[test]
 fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
     let style = without_css_comments(STYLE);
-    for selector in [".small-rest, .small-live {", ".chip.turned {"] {
+    for selector in [".small-rest, .small-live {", ".turned {"] {
         let rule = style
             .split(selector)
             .skip(1)
@@ -259,7 +259,7 @@ fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
             .unwrap();
         assert!(ms <= 200, "{selector} {ms} ms");
     }
-    assert!(style.contains("prefers-reduced-motion: reduce) { .small-rest, .small-live, .chip.turned { animation: none; } }"));
+    assert!(style.contains("prefers-reduced-motion: reduce) { .small-rest, .small-live, .turned { animation: none; } }"));
 }
 
 /// Each pair of colours the theme uses (D89's first round of drawings, *Contrast, both themes*), read
@@ -339,24 +339,87 @@ fn rules(style: &str) -> Vec<(String, String)> {
 /// records, a row's live chip, the small window's dot and Arrêter.
 const RECORDING: [&str; 5] = [".brand.live #mark-dot", ".chip.live", ".act .primary.live", ".live-dot", ".danger"];
 
+/// The rules that are no recording's and still draw red: by the token, by its value written out, by
+/// a colour's name or function. Outside the theme's tokens, a colour is a token: a value written in a
+/// rule — `#C2352D` on a border — is refused whatever it is, but a shadow's black.
+fn red_outside_a_recording(style: &str) -> Vec<String> {
+    rules(style)
+        .into_iter()
+        .filter(|(selector, _)| !selector.ends_with(":root") && !RECORDING.contains(&selector.as_str()))
+        .filter(|(_, body)| {
+            let body = body.to_lowercase();
+            let literal = body.split(|c: char| !(c.is_ascii_alphanumeric() || c == '#')).any(|word| {
+                word == "red"
+                    || (word.starts_with('#') && [4, 5, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit()))
+            });
+            let function = ["rgb(", "rgba(", "hsl(", "hsla("].iter().any(|f| {
+                body.replace(f, "\u{0}")
+                    .split('\u{0}')
+                    .skip(1)
+                    .any(|args| !args.trim_start().starts_with("0 0 0"))
+            });
+            body.contains("var(--red)") || literal || function
+        })
+        .map(|(selector, _)| selector)
+        .collect()
+}
+
+/// A colour the page would set by value, or the red token it would name: the page draws a state by a
+/// class, never by a colour (D89).
+fn colours_in_page(page: &str) -> Vec<String> {
+    let allocator = Allocator::default();
+    let parsed = Parser::new(&allocator, page, SourceType::mjs()).parse();
+    assert!(parsed.diagnostics.is_empty(), "the page does not parse");
+    let mut texts = Texts::default();
+    texts.visit_program(&parsed.program);
+    texts
+        .0
+        .into_iter()
+        .filter(|text| {
+            let lower = text.to_lowercase();
+            let hex = lower
+                .split(|c: char| !(c.is_ascii_alphanumeric() || c == '#'))
+                .any(|word| word.starts_with('#') && [4, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit()));
+            hex || lower.trim() == "red" || lower.contains("--red") || ["rgb(", "rgba(", "hsl(", "hsla("].iter().any(|f| lower.contains(f))
+        })
+        .collect()
+}
+
 #[test]
 fn red_says_a_recording_and_nothing_else() {
-    let red: Vec<String> = rules(STYLE)
-        .into_iter()
-        .filter(|(_, body)| body.contains("var(--red)"))
-        .map(|(selector, _)| selector)
-        .filter(|selector| !RECORDING.contains(&selector.as_str()))
-        .collect();
-    assert_eq!(red, Vec::<String>::new());
-    assert!(!PAGE.contains("--red"), "red drawn by the page");
+    assert_eq!(red_outside_a_recording(STYLE), Vec::<String>::new());
+    assert_eq!(colours_in_page(PAGE), Vec::<String>::new());
     assert_eq!(
         PAGE.matches("\"danger\"").count(),
         1,
         "the red button is the small window's Arrêter alone"
     );
+    // The red written out on a failure's border, named, or by its function, is refused as the token is.
+    for red in ["#C2352D", "#c2352d", "red", "rgb(194, 53, 45)", "var(--red)"] {
+        let mutated = STYLE.replacen(
+            ".making-state.failed { background: transparent; border: 1px solid var(--edge); }",
+            &format!(".making-state.failed {{ background: transparent; border: 1px solid {red}; }}"),
+            1,
+        );
+        assert_ne!(mutated, STYLE);
+        assert_eq!(red_outside_a_recording(&mutated), vec![".making-state.failed".to_string()], "{red}");
+    }
+    // A shadow's black stays a shadow.
+    assert!(red_outside_a_recording(".menu { box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); }").is_empty());
+    // Set by the page by value, or by the token.
+    for set in [
+        "mark.style.fill = \"#C2352D\";",
+        "row.style.borderColor = \"#f00\";",
+        "row.style.color = `rgb(194 53 45)`;",
+        "row.style.color = \"red\";",
+        "row.style.setProperty(\"color\", \"var(--red)\");",
+    ] {
+        assert_eq!(colours_in_page(&format!("{PAGE}\n{set}")).len(), 1, "{set}");
+    }
 }
 
-/// The controls of the window and Settings (D89): 32 px high; the small window's are D90's.
+/// The controls of the window and Settings (D89): 32 px high; the small window's are D90's. Each
+/// must be found, so that none leaves the scan below by a renamed rule.
 const CONTROLS: [&str; 10] = [
     ".open, .search",
     "select",
@@ -370,27 +433,117 @@ const CONTROLS: [&str; 10] = [
     ".folder input",
 ];
 
+/// What makes a rule a control's: an element a user presses or types in, or a class or id the page
+/// gives one. A rule whose selector ends on one of them and sets a height sets 32 px.
+const CONTROL_PARTS: [&str; 19] = [
+    "input",
+    "select",
+    "textarea",
+    "button",
+    ".open",
+    ".search",
+    ".primary",
+    ".danger",
+    ".icon-button",
+    ".edit",
+    ".correcting",
+    ".rename",
+    ".naming",
+    ".link",
+    ".path",
+    ".line-time",
+    ".disclose",
+    "#free-link",
+    ".choice",
+];
+
+/// The heights a control keeps under 32 px, each with its reason: a box to tick, a time in a line of
+/// text that is a link and no button.
+const SMALLER: [(&str, f64); 4] = [
+    (".choice input, .row input[type=\"checkbox\"]", 20.0),
+    (".remember input", 20.0),
+    (".freeable input", 20.0),
+    (".line-time", 24.0),
+];
+
+fn px(body: &str, name: &str) -> Option<f64> {
+    body.split(';')
+        .filter_map(|one| one.split_once(':'))
+        .rfind(|(key, _)| key.trim() == name)
+        .and_then(|(_, value)| value.trim().strip_suffix("px")?.parse::<f64>().ok())
+}
+
+/// Whether one compound of a selector (`.lines .correcting:hover`'s last) names a control's part.
+fn names_a_control(selector: &str) -> bool {
+    selector.split(',').any(|one| {
+        let last = one.trim().rsplit([' ', '>']).next().unwrap_or_default();
+        CONTROL_PARTS.iter().any(|part| {
+            let at = if part.starts_with(['.', '#']) {
+                last.match_indices(part).map(|(at, _)| at).collect::<Vec<_>>()
+            } else if last.starts_with(part) {
+                vec![0]
+            } else {
+                vec![]
+            };
+            at.into_iter()
+                .any(|at| !last[at + part.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+        })
+    })
+}
+
+/// Each rule of the window that names a control and sets its height, at another than 32 px.
+fn controls_not_32(style: &str) -> Vec<String> {
+    rules(style)
+        .into_iter()
+        .filter(|(selector, _)| !selector.contains("small") && names_a_control(selector))
+        .filter_map(|(selector, body)| {
+            let set = px(&body, "min-height").or_else(|| px(&body, "height"))?;
+            let allowed = SMALLER.iter().find(|(name, _)| *name == selector).map_or(32.0, |(_, px)| *px);
+            (set != allowed).then(|| format!("{selector}: {set}"))
+        })
+        .collect()
+}
+
 #[test]
 fn controls_are_32_px_high_on_a_4_px_grid() {
     let all = rules(STYLE);
-    let height = |body: &str| {
-        body.split(';')
-            .filter_map(|one| one.split_once(':'))
-            .rfind(|(key, _)| key.trim() == "min-height")
-            .and_then(|(_, value)| value.trim().strip_suffix("px")?.parse::<f64>().ok())
-    };
     for control in CONTROLS {
         let found = all
             .iter()
             .find(|(selector, _)| selector == control)
             .unwrap_or_else(|| panic!("{control}"));
-        assert_eq!(height(&found.1), Some(32.0), "{control}");
+        assert_eq!(px(&found.1, "min-height"), Some(32.0), "{control}");
     }
+    for (selector, _) in SMALLER {
+        assert!(
+            all.iter().any(|(found, _)| found == selector),
+            "{selector} is no longer in the style: take it out"
+        );
+    }
+    assert_eq!(controls_not_32(STYLE), Vec::<String>::new());
+    // A control the list above does not name is measured all the same.
+    for wrong in [
+        ".lines .correcting { min-height: 36px; }",
+        ".foot nav #free-link { min-height: 28px; }",
+        ".lines .edit { min-height: 40px; }",
+    ] {
+        assert_eq!(controls_not_32(&format!("{STYLE}\n{wrong}")).len(), 1, "{wrong}");
+    }
+    assert!(
+        names_a_control(".step select")
+            && names_a_control("#small .link:hover")
+            && !names_a_control(".linked")
+            && !names_a_control(".open-row span")
+    );
     // Every height the window sets is on the grid; the small window's are D90's.
     let off: Vec<String> = all
         .iter()
         .filter(|(selector, _)| !selector.contains("small"))
-        .filter_map(|(selector, body)| height(body).filter(|px| px % 4.0 != 0.0).map(|px| format!("{selector}: {px}")))
+        .filter_map(|(selector, body)| {
+            px(body, "min-height")
+                .filter(|px| px % 4.0 != 0.0)
+                .map(|px| format!("{selector}: {px}"))
+        })
         .collect();
     assert_eq!(off, Vec::<String>::new());
 }

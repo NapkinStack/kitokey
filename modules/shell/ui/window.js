@@ -91,6 +91,8 @@ const ICONS = {
   copy: [["rect", { width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2 }], "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"],
   "rotate-ccw": ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5"],
   "folder-open": ["m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"],
+  "file-text": ["M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z", "M14 2v5a1 1 0 0 0 1 1h5", "M10 9H8", "M16 13H8", "M16 17H8"],
+  captions: [["rect", { width: 18, height: 14, x: 3, y: 5, rx: 2, ry: 2 }], "M7 15h4M15 15h2M7 11h2M13 11h4"],
   pencil: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
 };
 function icon(name) {
@@ -244,24 +246,27 @@ function heading(session, words) {
   return `${date} · ${time}`;
 }
 
-// What a meeting holds; on its page, where each step ran (`where`: the minutes' provider known).
-function holdings(session, words, where) {
+// What a meeting holds; on its page, where each step ran (`where`: the minutes' provider known). A
+// list's row says only what is not at rest — recording, cut, its audio freed, a step being made —,
+// what it holds being its marks (D89).
+function holdings(session, words, where, compact = false) {
   const holds = document.createElement("div");
   holds.className = "holds";
   // A place is said only where it is known: `here` true or false; unknown, the chip says none.
   const ran = (text, here) => (where && here !== undefined ? `${text} · ${here ? words.ran_here : words.ran_online}` : text);
   // Said confidential (D60): the lock and its word, first — never the lock alone.
-  if (session.confidential) holds.append(lockedChip(words));
+  if (session.confidential && !compact) holds.append(lockedChip(words));
   if (session.state === "recording") holds.append(chip(words.recording, "live"));
   if (session.state === "interrupted") holds.append(chip(words.interrupted, "cut"));
-  if (session.minutes) {
+  if (session.minutes && !compact) {
     const made = chip(ran(words.minutes, where?.minutes_here));
     // Turned from what was being made: said by one small pop, once (D69).
     if (chipsMaking.delete(nameOf(session))) made.classList.add("turned");
     holds.append(made);
   }
-  if (session.transcript) holds.append(chip(ran(words.transcript, true)));
-  holds.append(session.audio > 0 ? chip(fill(words.audio, size(session.audio, words))) : chip(words.audio_freed, "gone"));
+  if (session.transcript && !compact) holds.append(chip(ran(words.transcript, true)));
+  if (session.audio > 0 && !compact) holds.append(chip(fill(words.audio, size(session.audio, words))));
+  if (session.audio === 0) holds.append(chip(words.audio_freed, "gone"));
   // What is being made for it, in the background (D25): painted from `makings`.
   const making = chip("", "making");
   making.dataset.name = nameOf(session);
@@ -533,27 +538,28 @@ async function readMakings() {
   paintMakings();
 }
 
-// How much was said over a meeting, small, as the board draws it beside each one: one line of
-// speech, both sides together, over its baseline. Its page draws who spoke, side by side.
-function shapeOf([here, remote], quiet) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 132 36");
-  // The row says the meeting; the line only draws it: nothing for a screen reader to repeat.
-  svg.setAttribute("aria-hidden", "true");
-  svg.classList.add("relief", "small");
-  if (quiet) svg.classList.add("quiet");
-  const step = 132 / Math.max(1, here.length - 1);
-  const base = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  for (const [name, value] of [["x1", 0], ["y1", 32], ["x2", 132], ["y2", 32]]) base.setAttribute(name, value);
-  base.classList.add("base");
-  const said = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  said.setAttribute("points", here.map((v, i) => `${(i * step).toFixed(1)},${(32 - Math.min(1, v + remote[i]) * 26).toFixed(1)}`).join(" "));
-  said.classList.add("said");
-  svg.append(base, said);
-  return svg;
+// What a meeting holds, at a row's end (boards 2 and 4): an icon each, its word its name and tooltip.
+function marks(session, words) {
+  const held = element("span", "marks");
+  for (const [on, glyph, name, kind] of [
+    [session.confidential, "lock", words.confidential_chip, "locked"],
+    [session.minutes, "file-text", words.minutes, "made"],
+    [session.transcript, "captions", words.transcript, "heard"],
+  ]) {
+    if (!on) continue;
+    const mark = element("span", `mark ${kind}`);
+    mark.setAttribute("role", "img");
+    mark.setAttribute("aria-label", name);
+    mark.title = name;
+    mark.append(icon(glyph));
+    // Turned from what was being made: said by one small pop, once (D69).
+    if (kind === "made" && chipsMaking.delete(nameOf(session))) mark.classList.add("turned");
+    held.append(mark);
+  }
+  return held;
 }
 
-function row(session, shape, words) {
+function row(session, words) {
   const item = document.createElement("li");
   const link = document.createElement("a");
   link.className = "card session";
@@ -574,16 +580,12 @@ function row(session, shape, words) {
     lasted.textContent = length(session.seconds);
     when.append(lasted);
   }
-  // No transcript read: a quiet line where its relief would be, so the rows keep their rhythm.
-  const drawn = element("span", "shape");
-  const none = new Array(24).fill(0);
-  drawn.append(shapeOf(shape ?? [none, none], !shape));
-  // In the sidebar (D61): the title and its relief on a line, what it holds below.
+  // In the sidebar (D61, D89): the date and length, what it holds at their end; a state not at rest below.
   const line = element("div", "line");
-  line.append(when, drawn);
-  // A name has the row's whole width, its date and relief under it.
+  line.append(when, marks(session, words));
+  // A name has the row's whole width, its date under it.
   if (session.title) link.append(title);
-  link.append(line, holdings(session, words));
+  link.append(line, holdings(session, words, undefined, true));
   item.append(link);
   return item;
 }
@@ -633,7 +635,7 @@ function paintRefused(refused) {
   buy.hidden = !refused;
 }
 
-function show({ words, folder, sessions, shapes, recording, stopping, shortcut, folded, unreadable, refused }) {
+function show({ words, folder, sessions, recording, stopping, shortcut, folded, unreadable, refused }) {
   document.documentElement.lang = words.locale;
   // The header's gesture, as the board has it: start or stop, with the shortcut beside.
   // The sidebar's secondary actions: icons, each with its tooltip and its name; the header's one
@@ -684,16 +686,16 @@ function show({ words, folder, sessions, shapes, recording, stopping, shortcut, 
 
   const audio = sessions.reduce((sum, s) => sum + s.audio, 0);
   const text = sessions.reduce((sum, s) => sum + s.text, 0);
-  const heard = sessions.filter((s) => s.audio > 0 && s.seconds !== null).reduce((sum, s) => sum + s.seconds, 0);
   document.getElementById("total").textContent = size(audio + text, words);
   const taken = sessions.length === 1 ? words.weight_one : words.weight;
-  document.getElementById("taken").textContent = fill(taken, sessions.length, length(heard));
-  document.getElementById("audio-kept").textContent = fill(words.audio_kept, size(audio, words));
-  document.getElementById("text-kept").textContent = fill(words.text_kept, size(text, words));
+  document.getElementById("taken").textContent = fill(taken, sessions.length);
   const share = audio + text > 0 ? (100 * audio) / (audio + text) : 0;
   document.getElementById("bar-audio").style.width = `${share}%`;
   document.getElementById("bar-text").style.width = `${100 - share}%`;
-  document.getElementById("bar").setAttribute("aria-label", fill(words.weight_described, size(audio, words), size(text, words)));
+  // Its two parts said in words, to the pointer as to a screen reader: no legend under it (board 4).
+  const described = fill(words.weight_described, size(audio, words), size(text, words));
+  document.getElementById("bar").setAttribute("aria-label", described);
+  document.getElementById("bar").title = described;
 
   const now = new Date();
   const groups = document.getElementById("groups");
@@ -701,7 +703,7 @@ function show({ words, folder, sessions, shapes, recording, stopping, shortcut, 
   const focused = document.activeElement?.closest?.("#groups .session")?.getAttribute("href");
   groups.replaceChildren();
   let current = null;
-  for (const [index, session] of sessions.entries()) {
+  for (const session of sessions) {
     const name = group(dayOf(session), now, words);
     if (!current || current.name !== name) {
       const section = document.createElement("section");
@@ -713,7 +715,7 @@ function show({ words, folder, sessions, shapes, recording, stopping, shortcut, 
       groups.append(section);
       current = { name, list };
     }
-    current.list.append(row(session, shapes[index], words));
+    current.list.append(row(session, words));
   }
   if (focused) groups.querySelector(`.session[href="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
   sought();
