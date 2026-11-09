@@ -335,9 +335,9 @@ fn rules(style: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// What draws a recording, the one use of the red (D89): the header's button and the mark while it
+/// What draws a recording, the one use of the red (D89): the header's button and the name's dot while it
 /// records, a row's live chip, the small window's dot and Arrêter.
-const RECORDING: [&str; 5] = [".brand.live #mark-dot", ".chip.live", ".act .primary.live", ".live-dot", ".danger"];
+const RECORDING: [&str; 5] = [".brand.live #name-dot", ".chip.live", ".act .primary.live", ".live-dot", ".danger"];
 
 /// The rules that are no recording's and still draw red: by the token, by its value written out, by
 /// a colour's name or function. Outside the theme's tokens, a colour is a token: a value written in a
