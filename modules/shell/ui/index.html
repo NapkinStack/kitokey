@@ -13,7 +13,8 @@
 <aside id="sidebar" class="sidebar">
   <div class="side-top">
     <div class="brand">
-      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" class="mark"></rect><path d="M12 46 L26 20 L37 40 M33 32 L40 24 L52 46" fill="none" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" class="peaks"></path></svg>
+      <!-- The mark (D89, its sixth round): the K, its record dot on the stem, the stroke cut around it. -->
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24"><mask id="mark-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"></rect><circle id="mark-gap" cx="6.5" cy="5.6" r="2.9" fill="#000"></circle></mask><path d="M6.5 7v13M6.5 14.2 17 4M9.8 11 17.3 20" mask="url(#mark-cut)" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"></path><circle id="mark-dot" cx="6.5" cy="5.6" r="1.6"></circle></svg>
       <span>Kitokey</span>
     </div>
     <button type="button" id="fold" class="icon-button" aria-keyshortcuts="Control+B Meta+B">⇤</button>
