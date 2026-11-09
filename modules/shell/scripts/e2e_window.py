@@ -5058,6 +5058,11 @@ def window_looks(now: dt.datetime) -> None:
             " const all = [...document.querySelectorAll('.open, select, .search, .field input')].filter(e => e.offsetParent && !e.closest('#small'));"
             " return [all.length > 0, all.filter(e => getComputedStyle(e).borderTopColor !== edge).map(e => e.id || e.className)]")
         check("fields and secondary buttons are bordered with --edge (D89)", edged == [True, []], edged)
+        filled = browser.execute_script(
+            "const t = document.createElement('i'); t.style.background = 'var(--surface)'; document.body.append(t); const surface = getComputedStyle(t).backgroundColor; t.remove();"
+            " const all = [...document.querySelectorAll('select, .search')].filter(e => e.offsetParent && !e.closest('#small'));"
+            " return [all.length > 0, all.filter(e => getComputedStyle(e).backgroundColor !== surface).map(e => e.id || e.className)]")
+        check("fields are drawn on the surface, only edged, as board 2 (D89)", filled == [True, []], filled)
         # The trial over (D83): buying holds it in the recording's place, then gives it back.
         swapped = [browser.execute_script(f"paintRefused({state}); return arguments[0]", None) or browser.execute_script(PRIMARIES) for state in ("true", "false")]
         check("the trial over, one primary still: « Acheter Kitokey », then the recording's again", swapped == [["buy"], ["record"]], swapped)
