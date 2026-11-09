@@ -357,6 +357,30 @@ def tray_click(words: str) -> bool:
     return subprocess.run(["busctl", "--user", "call", bus, f"{path}/Menu", "com.canonical.dbusmenu", "Event", "isvu",
                            str(number), "clicked", "s", "", "0"], capture_output=True).returncode == 0
 
+def tray_colour() -> str:
+    """The tray's icon of the Kitokey under test as the desktop draws it: "blue" at rest, "red" while
+    recording (D89), from the image the item names — the toolkit writes it to a file and gives its
+    folder and name (IconThemePath, IconName); "" when none is read."""
+    bus, path, _ = tray_entries()
+    if not bus:
+        return ""
+    def prop(name: str) -> str:
+        said = subprocess.run(["busctl", "--user", "get-property", bus, path, "org.kde.StatusNotifierItem", name],
+                              capture_output=True, text=True).stdout.split(" ", 1)
+        return said[1].strip().strip('"') if len(said) == 2 else ""
+    folder, name = prop("IconThemePath"), prop("IconName")
+    found = [f for f in (Path(name), Path(folder) / f"{name}.png", Path(folder) / name) if name and f.is_file()]
+    if not found:
+        return ""
+    mean = subprocess.run(["magick", str(found[0]), "-background", "white", "-alpha", "remove", "-resize", "1x1!",
+                           "-format", "%[fx:int(255*r)] %[fx:int(255*g)] %[fx:int(255*b)]", "info:"],
+                          capture_output=True, text=True).stdout.split()
+    if len(mean) != 3:
+        return ""
+    r, g, b = (int(v) for v in mean)
+    return "red" if r > b + 40 else "blue" if b > r + 40 else f"{r},{g},{b}"
+
+
 class Window:
     """Kitokey with its window, for as long as the `with` lasts."""
 
@@ -1951,8 +1975,12 @@ def announced(now: dt.datetime) -> None:
         if theme == "dark":
             window.env.update(GTK_THEME="Adwaita:dark")
         with window as browser:
+            # The tray's icon at rest, then while recording (D89): the tile blue, then red.
+            rest = wait_for(browser, lambda b: tray_colour() == "blue", 10)
+            check("the tray's icon at rest: the mark on its blue tile", rest, tray_colour())
             browser.find_element(By.ID, "small-record").click()
             wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.execute_script(line)[0], 10)
+            check("recording, the tray's icon turns red", wait_for(browser, lambda b: tray_colour() == "red", 5), tray_colour())
             shown = browser.execute_script(line)
             check("recording, the reminder says it under the timer", shown[0] and shown[1] == "visible" and "Prévenez les participants que cette réunion est enregistrée." in shown[2], shown)
             order = browser.execute_script("const l = [...document.querySelector('.small-live').children]; return [l.indexOf(document.querySelector('.small-live .small-top')), l.indexOf(document.getElementById('small-announce')), l.indexOf(document.querySelector('.meters'))]")
@@ -1971,6 +1999,7 @@ def announced(now: dt.datetime) -> None:
             check("after fifteen seconds it is gone", gone, browser.execute_script(line))
             check("Arrêter has not moved", browser.execute_script(place) == before, [before, browser.execute_script(place)])
             stop_from_small(browser)
+            check("stopped, the tray's icon is blue again", wait_for(None, lambda b: tray_colour() == "blue", 20), tray_colour())
     speaking = WORK / "announcing-en"
     speaking.mkdir()
     with Window(speaking, "fr_FR.UTF-8", 'after = "nothing"\nmeeting_language = "en"\n', small=True) as browser:
