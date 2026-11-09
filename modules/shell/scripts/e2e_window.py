@@ -3114,7 +3114,7 @@ def meeting_renamed(now: dt.datetime) -> None:
         check("stopped: the name stays", stopped and (recording / "title.txt").read_text() == "En direct\n" and head(browser) == "En direct", head(browser))
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
-        check("stopped: the name at rest again, its dot in the accent (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
+        check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
 
 
 def actions_rows(now: dt.datetime) -> None:
@@ -5123,14 +5123,14 @@ def window_looks(now: dt.datetime) -> None:
         drawn = browser.execute_script("const v = document.querySelector('#small-link svg'), c = getComputedStyle(v), p = getComputedStyle(v.parentElement); return [c.stroke === p.color, c.fill, parseFloat(c.width) === parseFloat(p.fontSize), parseFloat(c.height) === parseFloat(p.fontSize)]")
         check("the icon is stroked, the size of its text", drawn == [True, "none", True, True], drawn)
         check("the header shows one primary action", browser.execute_script(PRIMARIES) == ["record"], browser.execute_script(PRIMARIES))
-        # D89: the accepted name, alone in the accent — no mark, no word written beside it (the decider,
+        # D89: the accepted name, alone in the text's ink as its board draws it — no mark, no word written beside it (the decider,
         # 2026-11-09); controls of 32 px; fields bordered with --edge.
         brand = browser.execute_script(
             "const b = document.querySelector('.brand'), s = b.querySelector('svg'), r = document.getElementById('record'), d = document.getElementById('name-dot');"
             " return [b.querySelectorAll('svg').length, b.textContent.trim(), s.id, s.getAttribute('role'), s.getAttribute('aria-label'),"
-            " getComputedStyle(s).color === getComputedStyle(r).backgroundColor, Math.round(s.getBoundingClientRect().height),"
+            " getComputedStyle(s).color === getComputedStyle(document.body).color, Math.round(s.getBoundingClientRect().height),"
             " getComputedStyle(d).fill === getComputedStyle(s).color, d.getAttribute('r') === d.dataset.rest, getComputedStyle(s.querySelector('g')).fill === getComputedStyle(s).color]")
-        check("the header shows the name alone, named Kitokey, in the accent, its dot at rest (D89)", brand == [1, "", "name", "img", "Kitokey", True, 18, True, True, True], brand)
+        check("the header shows the name alone, named Kitokey, in the ink, its dot at rest (D89)", brand == [1, "", "name", "img", "Kitokey", True, 18, True, True, True], brand)
         # A meeting's setting is one control, its list inside it: the setting is measured (board 4).
         tall = browser.execute_script(
             "return [...document.querySelectorAll('.primary, .open, .icon-button, select, .search, .field input, .setting')]"
