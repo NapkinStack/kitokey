@@ -304,12 +304,10 @@ pub struct Window {
     /// What a screen reader calls the window's sections.
     pub sections: &'static str,
     pub meetings: &'static str,
-    /// The weight of everything: its size, how many meetings, how long their audio lasts.
+    /// How many meetings weigh the size beside it (board 4's foot).
     pub weight: &'static str,
     /// The same, for one meeting.
     pub weight_one: &'static str,
-    pub audio_kept: &'static str,
-    pub text_kept: &'static str,
     /// A picture of the two weights, for whoever does not see it.
     pub weight_described: &'static str,
     pub this_week: &'static str,
@@ -322,6 +320,8 @@ pub struct Window {
     pub transcript: &'static str,
     pub audio: &'static str,
     pub audio_freed: &'static str,
+    /// What a meeting's audio weighs, beside its length in its header (D89).
+    pub audio_weighs: &'static str,
     pub recording: &'static str,
     pub interrupted: &'static str,
     /// No session in the folder: the folder.
@@ -595,7 +595,6 @@ pub struct Window {
     pub transcript_model_needed: &'static str,
     pub transcript_model_coming: &'static str,
     pub ran_online: &'static str,
-    pub ran_here: &'static str,
     /// The header's button, at rest and while a recording runs.
     pub record_start: &'static str,
     pub record_stop: &'static str,
@@ -755,10 +754,8 @@ pub fn window(language: Language) -> Window {
             units: ["B", "kB", "MB", "GB"],
             sections: "Sections",
             meetings: "Meetings",
-            weight: "taken by {} meetings · {} of audio",
-            weight_one: "taken by {} meeting · {} of audio",
-            audio_kept: "Audio, as recorded — {}",
-            text_kept: "Transcripts and minutes — {}",
+            weight: "{} meetings",
+            weight_one: "{} meeting",
             weight_described: "The audio takes {}; the transcripts and minutes, {}.",
             this_week: "This week",
             last_week: "Last week",
@@ -768,6 +765,7 @@ pub fn window(language: Language) -> Window {
             transcript: "Transcript",
             audio: "Audio · {}",
             audio_freed: "Audio deleted",
+            audio_weighs: "audio {}",
             recording: "Recording now",
             interrupted: "Interrupted",
             none: "No meeting in {} yet.",
@@ -1001,7 +999,6 @@ pub fn window(language: Language) -> Window {
             transcript_model_needed: "Waiting for the Whisper model.",
             transcript_model_coming: "Waiting for the Whisper model, being downloaded.",
             ran_online: "online",
-            ran_here: "on this machine",
             record_start: "Start a recording",
             record_stop: "Stop the recording",
             agree_eyebrow: "Before the first minutes online",
@@ -1152,10 +1149,8 @@ pub fn window(language: Language) -> Window {
             units: ["o", "ko", "Mo", "Go"],
             sections: "Rubriques",
             meetings: "Réunions",
-            weight: "occupés par {} réunions · {} d’audio",
-            weight_one: "occupés par {} réunion · {} d’audio",
-            audio_kept: "Audio, tel qu’enregistré — {}",
-            text_kept: "Transcriptions et comptes rendus — {}",
+            weight: "{} réunions",
+            weight_one: "{} réunion",
             weight_described: "L’audio occupe {}\u{202f}; les transcriptions et les comptes rendus, {}.",
             this_week: "Cette semaine",
             last_week: "La semaine dernière",
@@ -1165,6 +1160,7 @@ pub fn window(language: Language) -> Window {
             transcript: "Transcription",
             audio: "Audio · {}",
             audio_freed: "Audio supprimé",
+            audio_weighs: "audio {}",
             recording: "Enregistrement en cours",
             interrupted: "Interrompu",
             none: "Aucune réunion dans {} pour l’instant.",
@@ -1401,7 +1397,6 @@ pub fn window(language: Language) -> Window {
             transcript_model_needed: "En attente du modèle Whisper.",
             transcript_model_coming: "En attente du modèle Whisper, en cours de téléchargement.",
             ran_online: "en ligne",
-            ran_here: "sur cet ordinateur",
             record_start: "Démarrer un enregistrement",
             record_stop: "Arrêter l’enregistrement",
             agree_eyebrow: "Avant le premier compte rendu en ligne",

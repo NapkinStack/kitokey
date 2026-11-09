@@ -95,6 +95,8 @@ const ICONS = {
   "message-square-text": ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z", "M7 11h10", "M7 15h6", "M7 7h8"],
   languages: ["m5 8 6 6", "m4 14 6-6 2-3", "M2 5h12", "M7 2h1", "m22 22-5-10-5 10", "M14 18h6"],
   "lock-open": [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2, ry: 2 }], "M7 11V7a5 5 0 0 1 9.9-1"],
+  "file-text": ["M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z", "M14 2v5a1 1 0 0 0 1 1h5", "M10 9H8", "M16 13H8", "M16 17H8"],
+  captions: [["rect", { width: 18, height: 14, x: 3, y: 5, rx: 2, ry: 2 }], "M7 15h4M15 15h2M7 11h2M13 11h4"],
   pencil: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
 };
 function icon(name) {
@@ -294,10 +296,6 @@ function confidentialCard(session, confidential, words) {
       const shown = await window.__TAURI__.core.invoke("confidential_set", { name, on: box.checked });
       said.textContent = "";
       paint(shown);
-      // The title's chips say it at once.
-      const holds = document.querySelector("#meeting .meeting-title .holds");
-      holds?.querySelector(".chip.locked")?.remove();
-      if (shown.on) holds?.prepend(lockedChip(words));
     } catch {
       box.checked = !box.checked;
       said.textContent = words.confidential_not_saved;
@@ -323,24 +321,25 @@ function heading(session, words) {
   return `${date} · ${time}`;
 }
 
-// What a meeting holds; on its page, where each step ran (`where`: the minutes' provider known).
-function holdings(session, words, where) {
+// What a meeting holds. A list's row and a meeting's header say only what is not at rest —
+// recording, cut, its audio freed, a step being made —: the row's marks and the page's cards say
+// the rest, where each step ran with them (D89).
+function holdings(session, words, compact = false) {
   const holds = document.createElement("div");
   holds.className = "holds";
-  // A place is said only where it is known: `here` true or false; unknown, the chip says none.
-  const ran = (text, here) => (where && here !== undefined ? `${text} · ${here ? words.ran_here : words.ran_online}` : text);
   // Said confidential (D60): the lock and its word, first — never the lock alone.
-  if (session.confidential) holds.append(lockedChip(words));
+  if (session.confidential && !compact) holds.append(lockedChip(words));
   if (session.state === "recording") holds.append(chip(words.recording, "live"));
   if (session.state === "interrupted") holds.append(chip(words.interrupted, "cut"));
-  if (session.minutes) {
-    const made = chip(ran(words.minutes, where?.minutes_here));
+  if (session.minutes && !compact) {
+    const made = chip(words.minutes);
     // Turned from what was being made: said by one small pop, once (D69).
     if (chipsMaking.delete(nameOf(session))) made.classList.add("turned");
     holds.append(made);
   }
-  if (session.transcript) holds.append(chip(ran(words.transcript, true)));
-  holds.append(session.audio > 0 ? chip(fill(words.audio, size(session.audio, words))) : chip(words.audio_freed, "gone"));
+  if (session.transcript && !compact) holds.append(chip(words.transcript));
+  if (session.audio > 0 && !compact) holds.append(chip(fill(words.audio, size(session.audio, words))));
+  if (session.audio === 0) holds.append(chip(words.audio_freed, "gone"));
   // What is being made for it, in the background (D25): painted from `makings`.
   const making = chip("", "making");
   making.dataset.name = nameOf(session);
@@ -612,27 +611,28 @@ async function readMakings() {
   paintMakings();
 }
 
-// How much was said over a meeting, small, as the board draws it beside each one: one line of
-// speech, both sides together, over its baseline. Its page draws who spoke, side by side.
-function shapeOf([here, remote], quiet) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 132 36");
-  // The row says the meeting; the line only draws it: nothing for a screen reader to repeat.
-  svg.setAttribute("aria-hidden", "true");
-  svg.classList.add("relief", "small");
-  if (quiet) svg.classList.add("quiet");
-  const step = 132 / Math.max(1, here.length - 1);
-  const base = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  for (const [name, value] of [["x1", 0], ["y1", 32], ["x2", 132], ["y2", 32]]) base.setAttribute(name, value);
-  base.classList.add("base");
-  const said = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  said.setAttribute("points", here.map((v, i) => `${(i * step).toFixed(1)},${(32 - Math.min(1, v + remote[i]) * 26).toFixed(1)}`).join(" "));
-  said.classList.add("said");
-  svg.append(base, said);
-  return svg;
+// What a meeting holds, at a row's end (boards 2 and 4): an icon each, its word its name and tooltip.
+function marks(session, words) {
+  const held = element("span", "marks");
+  for (const [on, glyph, name, kind] of [
+    [session.confidential, "lock", words.confidential_chip, "locked"],
+    [session.minutes, "file-text", words.minutes, "made"],
+    [session.transcript, "captions", words.transcript, "heard"],
+  ]) {
+    if (!on) continue;
+    const mark = element("span", `mark ${kind}`);
+    mark.setAttribute("role", "img");
+    mark.setAttribute("aria-label", name);
+    mark.title = name;
+    mark.append(icon(glyph));
+    // Turned from what was being made: said by one small pop, once (D69).
+    if (kind === "made" && chipsMaking.delete(nameOf(session))) mark.classList.add("turned");
+    held.append(mark);
+  }
+  return held;
 }
 
-function row(session, shape, words) {
+function row(session, words) {
   const item = document.createElement("li");
   const link = document.createElement("a");
   link.className = "card session";
@@ -653,16 +653,12 @@ function row(session, shape, words) {
     lasted.textContent = length(session.seconds);
     when.append(lasted);
   }
-  // No transcript read: a quiet line where its relief would be, so the rows keep their rhythm.
-  const drawn = element("span", "shape");
-  const none = new Array(24).fill(0);
-  drawn.append(shapeOf(shape ?? [none, none], !shape));
-  // In the sidebar (D61): the title and its relief on a line, what it holds below.
+  // In the sidebar (D61, D89): the date and length, what it holds at their end; a state not at rest below.
   const line = element("div", "line");
-  line.append(when, drawn);
-  // A name has the row's whole width, its date and relief under it.
+  line.append(when, marks(session, words));
+  // A name has the row's whole width, its date under it.
   if (session.title) link.append(title);
-  link.append(line, holdings(session, words));
+  link.append(line, holdings(session, words, true));
   item.append(link);
   return item;
 }
@@ -712,7 +708,7 @@ function paintRefused(refused) {
   buy.hidden = !refused;
 }
 
-function show({ words, folder, sessions, shapes, recording, stopping, shortcut, folded, unreadable, refused }) {
+function show({ words, folder, sessions, recording, stopping, shortcut, folded, unreadable, refused }) {
   document.documentElement.lang = words.locale;
   // The header's gesture, as the board has it: start or stop, with the shortcut beside.
   // The sidebar's secondary actions: icons, each with its tooltip and its name; the header's one
@@ -763,16 +759,16 @@ function show({ words, folder, sessions, shapes, recording, stopping, shortcut, 
 
   const audio = sessions.reduce((sum, s) => sum + s.audio, 0);
   const text = sessions.reduce((sum, s) => sum + s.text, 0);
-  const heard = sessions.filter((s) => s.audio > 0 && s.seconds !== null).reduce((sum, s) => sum + s.seconds, 0);
   document.getElementById("total").textContent = size(audio + text, words);
   const taken = sessions.length === 1 ? words.weight_one : words.weight;
-  document.getElementById("taken").textContent = fill(taken, sessions.length, length(heard));
-  document.getElementById("audio-kept").textContent = fill(words.audio_kept, size(audio, words));
-  document.getElementById("text-kept").textContent = fill(words.text_kept, size(text, words));
+  document.getElementById("taken").textContent = fill(taken, sessions.length);
   const share = audio + text > 0 ? (100 * audio) / (audio + text) : 0;
   document.getElementById("bar-audio").style.width = `${share}%`;
   document.getElementById("bar-text").style.width = `${100 - share}%`;
-  document.getElementById("bar").setAttribute("aria-label", fill(words.weight_described, size(audio, words), size(text, words)));
+  // Its two parts said in words, to the pointer as to a screen reader: no legend under it (board 4).
+  const described = fill(words.weight_described, size(audio, words), size(text, words));
+  document.getElementById("bar").setAttribute("aria-label", described);
+  document.getElementById("bar").title = described;
 
   const now = new Date();
   const groups = document.getElementById("groups");
@@ -780,7 +776,7 @@ function show({ words, folder, sessions, shapes, recording, stopping, shortcut, 
   const focused = document.activeElement?.closest?.("#groups .session")?.getAttribute("href");
   groups.replaceChildren();
   let current = null;
-  for (const [index, session] of sessions.entries()) {
+  for (const session of sessions) {
     const name = group(dayOf(session), now, words);
     if (!current || current.name !== name) {
       const section = document.createElement("section");
@@ -792,7 +788,7 @@ function show({ words, folder, sessions, shapes, recording, stopping, shortcut, 
       groups.append(section);
       current = { name, list };
     }
-    current.list.append(row(session, shapes[index], words));
+    current.list.append(row(session, words));
   }
   if (focused) groups.querySelector(`.session[href="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
   sought();
@@ -1369,8 +1365,7 @@ function transcriptCard(read, words, session) {
   // Its icon in the field, as the sidebar's search (D89).
   const finding = element("div", "finding");
   finding.append(icon("search"), search);
-  top.append(finding);
-  // Refaire…: another Whisper model of this computer, this time only.
+  // Refaire…: another Whisper model of this computer, this time only; beside the search (board 4).
   const redo = iconButton("rotate-ccw", words.redo, "redo-transcript");
   redo.addEventListener("click", async () => {
     const shown = await window.__TAURI__.core.invoke("settings_shown");
@@ -1378,7 +1373,7 @@ function transcriptCard(read, words, session) {
     redo.replaceWith(panel);
     panel.querySelector("input, button:enabled").focus();
   });
-  // Beside who heard it, as board 2 has it: the head keeps its search whole.
+  top.append(finding, redo);
   const heard = element("div", "made");
   // A service names its host as who heard (D43): said as the minutes' maker is, never « on this
   // computer » — a host of one word (`http://transcriber/v1`) is a service too. This computer's
@@ -1387,7 +1382,7 @@ function transcriptCard(read, words, session) {
   const heardSaid = service
     ? fill(words.written_by, read.model || "—") + fill(words.written_via, read.engine)
     : fill(words.heard_by, read.model ? spoken(read.model) : read.engine || "—");
-  heard.append(element("p", "maker", heardSaid), redo);
+  heard.append(element("p", "maker", heardSaid));
   card.append(heard);
   if (!read.complete) card.append(element("p", "note", words.being_made));
   if (read.unread > 0) card.append(element("p", "note", fill(words.unread, read.unread)));
@@ -1711,17 +1706,18 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   actions.append(open, moreActions(rarer, words));
   // The way back is the pane's, under 840 px alone (D61).
   top.append(actions);
-  // The meeting's header (D89): its name and what it holds, its actions at their right.
+  // The meeting's header (D89, board 4): a bar of 56 px, its name, how long and how heavy beside
+  // it, its actions at their right.
   const head = element("div", "meeting-head");
   const title = element("section", "meeting-title");
   const named = element("div", "named");
   // Named by its minutes (D48): the date above the name.
   if (session.title) named.append(element("span", "on", heading(session, words)));
   named.append(meetingName(session, words));
-  if (session.seconds !== null) named.append(element("span", "length", length(session.seconds)));
-  // Where the minutes were written, from their own front matter: unread, or naming none, not said.
-  const minutesHere = minutes.state === "present" && minutes.provider ? minutes.provider === "local" : undefined;
-  title.append(named, holdings(session, words, { minutes_here: minutesHere }));
+  const lasts = element("span", "lasts");
+  if (session.seconds !== null) lasts.append(element("span", "length", length(session.seconds)));
+  if (session.audio > 0) lasts.append(element("span", "weighs", fill(words.audio_weighs, size(session.audio, words))));
+  title.append(named, lasts, holdings(session, words, true));
   head.append(title, top);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;

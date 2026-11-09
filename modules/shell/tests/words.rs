@@ -1287,7 +1287,6 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
         (french.transcript, "Transcription"),
         (french.transcript_title, "Transcription"),
         (french.chip_transcribing, "Transcription…"),
-        (french.ran_here, "sur cet ordinateur"),
         (french.heard_by, "Transcrit par {}, sur cet ordinateur"),
         (french.remote_described, "À distance — le son de l’ordinateur"),
         (french.no_match, "Aucun passage ne correspond."),
