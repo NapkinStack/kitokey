@@ -69,7 +69,8 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 /* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
 .open, .search { min-height: 32px; border-radius: 8px; border: 1px solid var(--edge); background: var(--raised); color: var(--ink); font: inherit; font-size: 14px; }
 .open { padding: 0 12px; font-weight: 600; cursor: pointer; }
-.search { padding: 0 12px; min-width: 200px; }
+/* A field is drawn on the surface, only edged (board 2's after); a button is raised. */
+.search { padding: 0 12px; min-width: 200px; background: var(--surface); }
 /* In the transcript's head, the search takes the room the title leaves; Refaire… sits beside who
    heard it, as board 2 has it (#312). */
 .top > .search { flex: 1 1 200px; max-width: 320px; }
@@ -153,7 +154,7 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .said .name, .row > .name { font-weight: 600; }
 .says { color: var(--soft); font-size: 14px; margin: 0; }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
-select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--raised); color: var(--ink); font: inherit; }
+select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--ink); font: inherit; }
 .warn { padding: 12px 16px; color: var(--ink); }
 /* In developer mode, a command's raw failure on the line under its sentence (D47). */
 .warn, #language-said, #context-said, #correction-said, #minutes-tested, #transcription-said, #free-said, #welcome-said { white-space: pre-line; }
