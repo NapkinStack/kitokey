@@ -100,6 +100,8 @@ struct Shell {
     microphone_gone: Mutex<bool>,
     /// What the recording running is recorded from, for the small window (D33).
     devices: Mutex<recording::Devices>,
+    /// The list's small reliefs, by transcript, kept until it changes.
+    shapes: Mutex<Shapes>,
     /// The minutes being written, when they are: one at a time, taken from the gesture on.
     minuting: Mutex<Option<Summarising>>,
     /// Minutes made again (*Refaire…*) with a model, waiting for the user's agreement to send,
@@ -444,6 +446,7 @@ fn main() {
                 open: open.clone(),
                 quit: quit.clone(),
                 minuting: Mutex::new(None),
+                shapes: Mutex::new(HashMap::new()),
                 meter: Mutex::new((None, [0.0, 0.0])),
                 checks: Mutex::default(),
                 microphone_gone: Mutex::default(),
@@ -714,6 +717,9 @@ struct Listing {
     words: words::Window,
     folder: PathBuf,
     sessions: Vec<Listed>,
+    /// For each session, in the same order, who spoke over it — here, then remote — when its
+    /// transcript reads. No row draws it since D89's compact rows: taken out on its own.
+    shapes: Vec<Option<[Vec<f32>; 2]>>,
     /// Whether a recording runs, and the shortcut's keys as the desktop granted them: the header's.
     recording: bool,
     stopping: bool,
@@ -726,7 +732,12 @@ struct Listing {
     refused: bool,
 }
 
-/// The list, read away from the window's and the tray's thread.
+/// A meeting's small relief, kept until its transcript changes: the list is drawn each time the
+/// window comes forward, and a transcript is read again only when it was written meanwhile.
+type Shapes = HashMap<PathBuf, (Option<std::time::SystemTime>, u64, Option<[Vec<f32>; 2]>)>;
+
+/// The list, read away from the window's and the tray's thread: it reads every transcript it
+/// has not read yet.
 #[tauri::command]
 async fn listed(app: AppHandle) -> Result<Listing, Told> {
     let asked = app.clone();
@@ -734,10 +745,37 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
         let shell = app.state::<Shell>();
         let recorded = shell.recorded.lock().unwrap().clone();
         let sessions = sessions::list(&shell.settings().sessions, recorded.as_deref());
+        let mut kept = shell.shapes.lock().unwrap();
+        let shapes = sessions
+            .iter()
+            .map(|session| {
+                let file = session.folder.join("transcript.jsonl");
+                let stamp = std::fs::metadata(&file)
+                    .map(|data| (data.modified().ok(), data.len()))
+                    .unwrap_or((None, 0));
+                if let Some((modified, length, shape)) = kept.get(&file)
+                    && (*modified, *length) == stamp
+                    && session.seconds.is_some()
+                {
+                    return shape.clone();
+                }
+                let shape = match meeting::transcript(&session.folder) {
+                    Read::Present(transcript) if !transcript.segments.is_empty() => {
+                        let said = transcript.segments.iter().map(|segment| segment.end).fold(0.0, f64::max);
+                        Some(meeting::shape(&transcript, session.seconds.unwrap_or(said).max(said), 24))
+                    }
+                    _ => None,
+                };
+                kept.insert(file, (stamp.0, stamp.1, shape.clone()));
+                shape
+            })
+            .collect();
+        drop(kept);
         Listing {
             words: words::window(shell.language()),
             folder: shell.settings().sessions.clone(),
             sessions,
+            shapes,
             recording: shell.recording_on(),
             stopping: *shell.stopping.lock().unwrap(),
             shortcut: shell.shortcut.lock().unwrap().clone(),
