@@ -236,7 +236,7 @@ fn a_pair_below_aa_is_refused() {
 #[test]
 fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
     let style = without_css_comments(STYLE);
-    for selector in [".small-rest, .small-live {", ".chip.turned {"] {
+    for selector in [".small-rest, .small-live {", ".turned {"] {
         let rule = style
             .split(selector)
             .skip(1)
@@ -259,7 +259,7 @@ fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
             .unwrap();
         assert!(ms <= 200, "{selector} {ms} ms");
     }
-    assert!(style.contains("prefers-reduced-motion: reduce) { .small-rest, .small-live, .chip.turned { animation: none; } }"));
+    assert!(style.contains("prefers-reduced-motion: reduce) { .small-rest, .small-live, .turned { animation: none; } }"));
 }
 
 /// Each pair of colours the theme uses (D89's first round of drawings, *Contrast, both themes*), read
@@ -522,23 +522,12 @@ fn controls_are_32_px_high_on_a_4_px_grid() {
     }
     assert_eq!(controls_not_32(STYLE), Vec::<String>::new());
     // A control the list above does not name is measured all the same.
-    for (rule, wrong) in [
-        (
-            ".lines .correcting { width: 100%; min-height: 32px;",
-            ".lines .correcting { width: 100%; min-height: 36px;",
-        ),
-        (
-            ".foot .total #free-link { min-height: 32px;",
-            ".foot .total #free-link { min-height: 28px;",
-        ),
-        (
-            ".lines .edit { margin-left: auto; flex: 0 0 auto; min-width: 32px; min-height: 32px;",
-            ".lines .edit { margin-left: auto; flex: 0 0 auto; min-width: 32px; min-height: 40px;",
-        ),
+    for wrong in [
+        ".lines .correcting { min-height: 36px; }",
+        ".foot nav #free-link { min-height: 28px; }",
+        ".lines .edit { min-height: 40px; }",
     ] {
-        let mutated = STYLE.replacen(rule, wrong, 1);
-        assert_ne!(mutated, STYLE, "{rule}");
-        assert_eq!(controls_not_32(&mutated).len(), 1, "{wrong}");
+        assert_eq!(controls_not_32(&format!("{STYLE}\n{wrong}")).len(), 1, "{wrong}");
     }
     assert!(
         names_a_control(".step select")

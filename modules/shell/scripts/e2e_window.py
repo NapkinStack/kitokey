@@ -489,11 +489,11 @@ def played_to(window: "Window") -> set[str]:
 
 
 def rows(browser) -> list[tuple[str, str, str]]:
-    """Each listed session: its group's heading, its first line, and what it holds."""
+    """Each listed session: its group's heading, its first line, and what it holds — a mark by its name."""
     return browser.execute_script(
         """return [...document.querySelectorAll('.group')].flatMap(g => [...g.querySelectorAll('.session')].map(s =>
              [g.querySelector('h2').textContent, s.querySelector('.day').textContent,
-              [...s.querySelectorAll('.length, .chip')].filter(c => !c.hidden).map(c => c.textContent).join('|')]))"""
+              [...s.querySelectorAll('.length, .mark, .chip')].filter(c => !c.hidden).map(c => c.getAttribute('aria-label') ?? c.textContent).join('|')]))"""
     )
 
 
@@ -3246,10 +3246,12 @@ def two_panes(now: dt.datetime) -> None:
         check("the pane shows the last meeting, marked in the list", shown(browser) == names[-1]
               and current(browser) == [f"#/meeting/{names[-1]}"], (shown(browser), current(browser)))
         said = browser.execute_script("return [...document.querySelectorAll('#groups .session')].map(r => ["
-                                      "r.querySelector('.day')?.textContent, r.querySelector('.length')?.textContent, r.querySelectorAll('.holds .chip').length])")
-        check("each meeting in the list says its title and date, its length and what it holds",
+                                      "r.querySelector('.day')?.textContent, r.querySelector('.length')?.textContent,"
+                                      " [...r.querySelectorAll('.holds .chip')].filter(c => !c.hidden).length, [...r.querySelectorAll('.mark')].map(m => m.getAttribute('aria-label'))])")
+        check("each meeting in the list says its title and date, its length and, by its marks, what it holds; no chip at rest (D89)",
               len(said) == len(names) and all(day and day not in names and " · " in day and any(c.isdigit() for c in day.split(" · ")[0])
-                                               and length == "30 min" and chips >= 1 for day, length, chips in said), said[:3])
+                                               and length == "30 min" and chips == 0 for day, length, chips, _ in said)
+              and [marks for *_, marks in said].count(["Compte rendu", "Transcription"]) == 1, said[:3])
         browser.execute_script("document.getElementById('list').scrollTop = 100000")
         scrolled = browser.execute_script("return document.getElementById('list').scrollTop")
         browser.find_elements(By.CSS_SELECTOR, "#groups .session")[-1].click()
@@ -3340,7 +3342,8 @@ def two_panes(now: dt.datetime) -> None:
     with Window(meetings, "en_GB.UTF-8") as browser:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1] and b.find_elements(By.CSS_SELECTOR, ".transcript .lines li"), 10)
-        english = [browser.find_element(By.ID, "record-said").text] + [browser.find_element(By.ID, i).get_attribute("aria-label") for i in ("settings-link", "free-link")]
+        english = [browser.find_element(By.ID, "record-said").text] + [
+            [browser.find_element(By.ID, i).get_attribute(a) for a in ("aria-label", "title")] for i in ("fold", "unfold", "free-link", "small-link", "settings-link")]
         browser.execute_script("document.activeElement.blur()")
         stops = []
         for _ in range(45):
@@ -3358,7 +3361,8 @@ def two_panes(now: dt.datetime) -> None:
         unseen = [name for _, seen_, name in stops if not seen_]
         # The pane's stops in one run: none of the sidebar's between them — past the last, the page starts again.
         last = len(places) - 1 - places[::-1].index("pane") if "pane" in places else 0
-        check("in English, the keyboard reaches the sidebar first, then the pane's stops in one run", english == ["Start a recording", "Settings", "Free space"]
+        check("in English, the keyboard reaches the sidebar first, then the pane's stops in one run", english == ["Start a recording", ["Fold the sidebar", "Fold the sidebar (Ctrl+B)"], ["Show the sidebar", "Show the sidebar (Ctrl+B)"],
+                                                                                                         ["Free space", "Free space"], ["The recording bar", "The recording bar"], ["Settings", "Settings"]]
               and places[0] == "side" and "pane" in places and set(places[places.index("pane"):last + 1]) == {"pane"} and "other" not in places,
               (english, places))
         check("the focus is always seen", unseen == [], unseen)
@@ -4436,8 +4440,8 @@ def confidential_kept(now: dt.datetime) -> None:
 
     # In the full window: the list's lock; turned off, the settings choose again; on, made again here.
     with window(meetings, "fr_FR.UTF-8", agreed) as browser:
-        chips = browser.execute_script("return [...document.querySelectorAll('.session .chip.locked')].map(c => [c.textContent, !!c.querySelector('svg.lock')])")
-        check("the list shows the meeting with a lock and its word", chips == [["Confidentielle", True]], chips)
+        chips = browser.execute_script("return [...document.querySelectorAll('.session .mark.locked')].map(c => [c.getAttribute('aria-label'), c.title, !!c.querySelector('svg')])")
+        check("the list shows the meeting with a lock, its word its name and tooltip (D89)", chips == [["Confidentielle", "Confidentielle", True]], chips)
         seen(browser, "d60-4-list-light")
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         # The last meeting, drawn beside the list already: its page may be drawn again under the driver.
@@ -4552,7 +4556,7 @@ def confidential_kept(now: dt.datetime) -> None:
         stop_from_small(browser)
         wait_for(browser, lambda b: front(english / "2026-10-18_12-00", "provider") == "local", 20)
     with window(english, "en_GB.UTF-8", agreed, dark=True) as browser:
-        chips = browser.execute_script("return [...document.querySelectorAll('.session .chip.locked')].map(c => c.textContent)")
+        chips = browser.execute_script("return [...document.querySelectorAll('.session .mark.locked')].map(c => c.getAttribute('aria-label'))")
         seen(browser, "d60-4-list-dark")
         browser.execute_script("location.hash = '#/meeting/2026-10-18_12-00'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "confidential-switch"), 10)
@@ -5089,14 +5093,14 @@ def window_looks(now: dt.datetime) -> None:
             "---\ncontract: minutes/v1\nmade: 2026-10-28T10:00:00+01:00\nprovider: local\nmodel: m\ncontext: null\n---\n\n"
             "## 1.\n\nLe budget.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
         browser.execute_script("window.restore(); window.dispatchEvent(new Event('focus'))")
-        turned = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, ".chip.turned"), 5)
-        duration = browser.execute_script("const c = document.querySelector('.chip.turned'); return c ? parseFloat(getComputedStyle(c).animationDuration) : null")
+        turned = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, ".turned"), 5)
+        duration = browser.execute_script("const c = document.querySelector('.turned'); return c ? parseFloat(getComputedStyle(c).animationDuration) : null")
         check("a chip turned: one small move, 200 ms at most", turned and duration is not None and 0 < duration <= 0.2, duration)
-        once = browser.execute_script("const c = getComputedStyle(document.querySelector('.chip.turned')); return [c.animationIterationCount, c.animationDelay]")
+        once = browser.execute_script("const c = getComputedStyle(document.querySelector('.turned')); return [c.animationIterationCount, c.animationDelay]")
         check("once, with no wait", once == ["1", "0s"], once)
         browser.execute_script("window.dispatchEvent(new Event('focus'))")
         time.sleep(0.8)
-        check("once: drawn again, it stands still", not browser.find_elements(By.CSS_SELECTOR, ".chip.turned"))
+        check("once: drawn again, it stands still", not browser.find_elements(By.CSS_SELECTOR, ".turned"))
         # Made again, the minutes there: nothing has turned, however often it is drawn.
         browser.execute_script("const real = window.__TAURI__.core, name = arguments[0]; window.__TAURI__.core = { ...real, invoke: async (asked, ...rest) => { const answer = await real.invoke(asked, ...rest); return asked === 'makings' ? { ...answer, minutes: { name, model: 'm', provider: 'p' } } : answer; } }; window.restore = () => { window.__TAURI__.core = real; };", made.name)
         wait_for(browser, lambda b: b.execute_script("return [...document.querySelectorAll('.chip.making')].some(c => !c.hidden)"), 8)
@@ -5104,7 +5108,7 @@ def window_looks(now: dt.datetime) -> None:
         for _ in range(3):
             browser.execute_script("window.dispatchEvent(new Event('focus'))")
             time.sleep(0.5)
-            seen = seen or bool(browser.find_elements(By.CSS_SELECTOR, ".chip.turned"))
+            seen = seen or bool(browser.find_elements(By.CSS_SELECTOR, ".turned"))
         browser.execute_script("window.restore()")
         check("minutes made again: no chip turned", not seen)
     with Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True) as browser:
@@ -5154,8 +5158,8 @@ def window_looks(now: dt.datetime) -> None:
             "---\ncontract: minutes/v1\nmade: 2026-10-28T10:00:00+01:00\nprovider: local\nmodel: m\ncontext: null\n---\n\n"
             "## 1.\n\nLe budget.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
         browser.execute_script("window.restore(); window.dispatchEvent(new Event('focus'))")
-        turned = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, ".chip.turned"), 5)
-        said = browser.execute_script("const c = document.querySelector('.chip.turned'); return c ? getComputedStyle(c).animationName : null")
+        turned = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, ".turned"), 5)
+        said = browser.execute_script("const c = document.querySelector('.turned'); return c ? getComputedStyle(c).animationName : null")
         check("a chip turned: it does not move", turned and said == "none", said)
         check("the full window: nothing moved, nothing can", browser.execute_script(MOVING) == [], browser.execute_script(MOVING))
 
@@ -5448,11 +5452,11 @@ def main() -> int:
     (sessions / "not-a-session").mkdir()
     expected = sorted(
         [
-            (this, "Interrompu|Audio · 2 ko"),
-            (last, "42 min|Compte rendu|Transcription|Audio · 200 Mo"),
+            (this, "Interrompu"),
+            (last, "42 min|Compte rendu|Transcription"),
             (months, "35 min|Transcription|Audio supprimé"),
             (earlier, "20 min|Transcription|Audio supprimé"),
-            (hours_only, "10 min|Audio · 1 Mo"),
+            (hours_only, "10 min"),
         ],
         key=lambda pair: pair[0],
         reverse=True,
@@ -5475,10 +5479,12 @@ def main() -> int:
         # The header's gesture, as the board has it — never pressed here: no recorder is played.
         said = browser.find_element(By.ID, "record").text
         check("the header offers to start a recording", said == "Démarrer un enregistrement", said)
+        # Compact rows (D89, boards 2 and 4): no relief; what each holds an icon, its word its name and tooltip.
         drawn = browser.execute_script(
-            "return [...document.querySelectorAll('#groups .session')].map(s => s.querySelector('.relief.small:not(.quiet) .said') !== null)"
-        )
-        check("a transcript that cannot be read draws no one", drawn and True not in drawn, drawn)
+            "return [document.querySelectorAll('#groups .relief').length, [...document.querySelectorAll('#groups .mark')].map(m =>"
+            " [m.getAttribute('role'), m.title === m.getAttribute('aria-label'), m.textContent, m.querySelectorAll('svg.glyph').length])]")
+        check("the list's rows: no relief, each mark an icon named, its tooltip its name (D89)", drawn[0] == 0 and drawn[1]
+              and all(mark == ["img", True, "", 1] for mark in drawn[1]), drawn)
         # A meeting with its audio and no transcript offers one — never asked here: no engine is played.
         browser.execute_script("location.hash = '#/meeting/f'")
         offered = wait_for(browser, lambda b: b.find_elements(By.ID, "make-transcript"), 5)
@@ -5492,8 +5498,10 @@ def main() -> int:
         )
         check("a session with no readable day is named by its folder", listed[-1][1] == "g", listed[-1])
         total = browser.find_element(By.ID, "weight").text
-        check("what they weigh, audio against the rest", total.startswith("201 Mo occupés par 6 réunions · 52 min d’audio"), total)
-        check("the picture of the weights is described", "L’audio occupe 201 Mo" in (browser.find_element(By.ID, "bar").get_attribute("aria-label") or ""))
+        check("what they weigh, on one line, then the bar, no legend (D89, board 4)", total == "201 Mo · 6 réunions", total)
+        bar = browser.find_element(By.ID, "bar")
+        check("the picture of the weights is described, to the pointer too", "L’audio occupe 201 Mo" in (bar.get_attribute("aria-label") or "")
+              and bar.get_attribute("title") == bar.get_attribute("aria-label"), bar.get_attribute("title"))
         # The theme is the system's: the page's ground is that of the theme the system shows.
         dark = browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
         ground = browser.execute_script("return getComputedStyle(document.body).backgroundColor")
@@ -5545,8 +5553,20 @@ def main() -> int:
         browser.switch_to.active_element.send_keys(Keys.TAB)
         focused = browser.execute_script("return document.activeElement.id")
         check("after the meetings, freeing space, beside the weights", focused == "free-link", focused)
-        drawn = browser.execute_script("return [...document.querySelectorAll('#groups .session')].map(s => s.querySelector('.relief.small:not(.quiet) .said') !== null)")
-        check("a meeting whose transcript reads shows who spoke, small, beside it", True in drawn, drawn)
+        # The whole of the sidebar's order, exactly (D89): no stop added, moved or skipped.
+        browser.execute_script("document.getElementById('fold').focus()")
+        order = ["fold"]
+        for _ in range(16):
+            ActionChains(browser).send_keys(Keys.TAB).perform()
+            stop = browser.execute_script("const e = document.activeElement; return document.getElementById('sidebar').contains(e) ? (e.classList.contains('session') ? 'meeting' : e.id) : null")
+            if stop is None:
+                break
+            order.append(stop)
+        meetings_listed = len(browser.find_elements(By.CSS_SELECTOR, "#groups .session"))
+        check("Tab through the sidebar: fold, record, find, the meetings, freeing space, the recording bar, Réglages — exactly",
+              order == ["fold", "record", "find", *["meeting"] * meetings_listed, "free-link", "small-link", "settings-link"], order)
+        drawn = browser.execute_script("return [...document.querySelectorAll('#groups .session')].map(s => [...s.querySelectorAll('.mark')].map(m => m.getAttribute('aria-label')))")
+        check("a meeting with its minutes and transcript marks both, at its row's end (D89)", ["Compte rendu", "Transcription"] in drawn, drawn)
         shot(browser, "1-sessions-drawn")
         browser.find_elements(By.CSS_SELECTOR, ".session")[0].click()
         shown = wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed() and b.find_elements(By.CSS_SELECTOR, ".lines li"))
@@ -6622,7 +6642,7 @@ def main() -> int:
         browser.execute_script("window.dispatchEvent(new Event('focus'))")
         wait_for(browser, lambda b: b.find_element(By.ID, "weight").is_displayed())
         one = browser.find_element(By.ID, "taken").text
-        check("one meeting is said in the singular", one == "taken by 1 meeting · 10 min of audio", one)
+        check("one meeting is said in the singular", one == "1 meeting", one)
         # A failure of the page's own, thrown and rejected: logged by the shell (declared in the
         # manifest), its kind and where — never its sentence.
         browser.execute_script(

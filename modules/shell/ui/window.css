@@ -40,11 +40,10 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .total strong { font-size: 26px; letter-spacing: -0.02em; }
 .total span, .legend { color: var(--soft); }
 .split { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--raised); }
-.split .audio, .swatch.audio { background: var(--accent); }
-.split .text, .swatch.text { background: var(--ok); }
+.split .audio { background: var(--accent); }
+.split .text { background: var(--ok); }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; }
 .legend li { display: flex; align-items: center; gap: 7px; }
-.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .none { color: var(--soft); }
 .group { display: flex; flex-direction: column; gap: 10px; }
 .group h2 {
@@ -205,15 +204,10 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 @keyframes beat { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .act .primary.live .dot { animation: none; } }
 .session { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px 22px; }
-.session .shape { width: 132px; display: flex; }
-.relief.small { width: 132px; height: 36px; }
-.relief.small polyline { fill: none; stroke-width: 2; stroke-linejoin: round; stroke: var(--accent); }
-.relief.small .base { stroke: var(--line); stroke-width: 1; }
 .session .length { font: 13px ui-monospace, monospace; }
 .chevron { color: var(--soft); font-size: 22px; line-height: 1; transition: transform 120ms ease; }
 .session:hover .chevron { transform: translateX(3px); color: var(--accent); }
-@media (max-width: 640px) { .session { grid-template-columns: 1fr auto; } .session .shape, .session .chevron { display: none; } }
-.relief.small.quiet polyline { stroke: none; }
+@media (max-width: 640px) { .session { grid-template-columns: 1fr auto; } .session .chevron { display: none; } }
 
 /* One meeting (D11's second board): where each step ran, the relief's span, makers in monospace. */
 .drawn .legend .range { margin-left: auto; font: 12.5px ui-monospace, monospace; color: var(--soft); }
@@ -452,19 +446,21 @@ body.small-window .frame { display: none; }
   display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; padding: 8px 10px;
   border: 0; border-radius: 10px; background: transparent;
 }
-.sidebar .session .line { display: flex; align-items: center; gap: 8px; }
+.sidebar .session .line { display: flex; align-items: flex-end; gap: 8px; }
+/* What a meeting holds, at its row's end: an icon each, 16 px (boards 2 and 4). */
+.marks { display: inline-flex; gap: 6px; color: var(--soft); font-size: 16px; line-height: 1; }
+.sidebar .holds:not(:has(> :not([hidden]))) { display: none; }
 .sidebar .session .when { flex: 1 1 auto; }
 .sidebar .session .day { font-size: 14px; }
 .sidebar .session .on { font-size: 12px; }
-.sidebar .session .shape, .sidebar .relief.small { width: 64px; height: 20px; }
 .sidebar .holds { gap: 4px; font-size: 11.5px; }
 .sidebar .chip { padding: 2px 6px; border-radius: 6px; }
 .sidebar .session:hover { background: var(--raised); }
 .sidebar .session[aria-current="page"] { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); box-shadow: inset 3px 0 0 var(--accent); }
 .foot { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .foot .weight { padding: 0 4px; gap: 6px; font-size: 12.5px; }
-.foot .total strong { font-size: 16px; }
-.foot .legend { font-size: 11.5px; gap: 2px 12px; }
+.foot .total { gap: 4px; color: var(--soft); }
+.foot .total strong { font-size: inherit; color: var(--ink); }
 /* The foot's tools (D89): freeing space and the recording bar, Réglages at the end. */
 .foot nav { display: flex; align-items: center; gap: 4px; margin: 0 -4px; }
 .foot nav #settings-link { margin-left: auto; }
@@ -516,9 +512,9 @@ body.small-window .frame { display: none; }
 /* A little motion (D69): one fade between the small window's two states, one pop when a chip turns. */
 .small-rest, .small-live { animation: settle 160ms ease-out; }
 @keyframes settle { from { opacity: 0; } }
-.chip.turned { animation: chip-turn 180ms ease-out; }
+.turned { animation: chip-turn 180ms ease-out; }
 @keyframes chip-turn { from { opacity: 0.4; transform: scale(0.94); } }
-@media (prefers-reduced-motion: reduce) { .small-rest, .small-live, .chip.turned { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .small-rest, .small-live, .turned { animation: none; } }
 
 /* Last, for all of it: who asked for less motion is given none — hover, levels and chevrons too (D69). */
 @media (prefers-reduced-motion: reduce) {
