@@ -204,7 +204,7 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 @keyframes beat { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .act .primary.live .dot { animation: none; } }
 .session { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px 22px; }
-.session .length { font: 13px ui-monospace, monospace; }
+.session .length { font-size: 13px; font-variant-numeric: tabular-nums; }
 .chevron { color: var(--soft); font-size: 22px; line-height: 1; transition: transform 120ms ease; }
 .session:hover .chevron { transform: translateX(3px); color: var(--accent); }
 @media (max-width: 640px) { .session { grid-template-columns: 1fr auto; } .session .chevron { display: none; } }
