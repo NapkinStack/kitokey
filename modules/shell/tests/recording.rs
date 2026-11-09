@@ -7,7 +7,7 @@ use std::{
     os::unix::fs::PermissionsExt,
     path::Path,
     sync::{Mutex, mpsc::Receiver},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use kitokey_shell::recording::{self, Check, Checks, Devices, Recording, Said, Source, read};
@@ -413,4 +413,29 @@ fn a_program_that_does_not_answer_the_list_is_given_up_on() {
     let started = std::time::Instant::now();
     assert!(listed("sleep 30").is_err());
     assert!(started.elapsed() < Duration::from_secs(10), "{:?}", started.elapsed());
+}
+
+#[test]
+fn a_side_is_said_silent_for_as_long_as_capture_has_not_heard_it() {
+    let start = Instant::now();
+    let mut checks = Checks::default();
+    let later = |seconds| start + Duration::from_secs(seconds);
+    checks.heard_at(&Said::Level(Source::Others, 0.9), start);
+    assert_eq!(checks.silent_for(later(5)), [None, None]);
+    // Capture says it after ten seconds of silence (`recording/v1`): the shell counts from there.
+    checks.heard_at(&Said::Silent(Source::Others), later(10));
+    assert_eq!(checks.silent_for(later(10)), [None, Some(10.0)]);
+    assert_eq!(checks.silent_for(later(120)), [None, Some(120.0)]);
+    // A device changed is no sound: the silence goes on.
+    checks.heard_at(&Said::Moved(Source::Others, Some("Casque".into())), later(60));
+    assert_eq!(checks.silent_for(later(120)), [None, Some(120.0)]);
+    checks.heard_at(&Said::Heard(Source::Others), later(130));
+    assert_eq!(checks.silent_for(later(200)), [None, None]);
+    // Exact zeros are a device's state, said at once, not a silence counted.
+    checks.heard_at(&Said::Nothing, later(140));
+    assert_eq!(checks.silent_for(later(400)), [None, None]);
+    // No device: nothing recorded, no silence to count.
+    checks.heard_at(&Said::Lost(Source::Others), later(150));
+    checks.heard_at(&Said::Silent(Source::Others), later(160));
+    assert_eq!(checks.silent_for(later(400)), [None, None]);
 }

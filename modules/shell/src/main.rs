@@ -1040,6 +1040,8 @@ struct Now {
     devices: [Option<String>; 2],
     /// Whether each side was heard, or why not (D49).
     checks: [recording::Check; 2],
+    /// How long each side said silent has been, in seconds: the bar says it at two minutes (D90).
+    silent_for: [Option<f64>; 2],
     /// The microphone chosen is not there: Auto stands in (D74).
     microphone_gone: bool,
     /// Whether the transcript is made at the stop, by itself: the small window says so then only.
@@ -1074,6 +1076,7 @@ fn recording_now(shell: State<'_, Shell>) -> Now {
         levels,
         devices: shell.devices.lock().unwrap().names(),
         checks: shell.checks.lock().unwrap().now(),
+        silent_for: shell.checks.lock().unwrap().silent_for(Instant::now()),
         microphone_gone: *shell.microphone_gone.lock().unwrap(),
         transcript_follows: shell.settings.lock().unwrap().after != settings::After::Nothing,
         meeting,
