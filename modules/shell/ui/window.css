@@ -23,10 +23,10 @@ body {
 /* An icon drawn (D69): Lucide's, 16 px (D89). */
 .glyph { flex: none; width: 16px; height: 16px; vertical-align: -0.125em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
-/* The mark (D89), alone in the accent; while recording, its dot red and larger. */
-.brand svg { flex: none; color: var(--accent); }
-#mark-dot { fill: currentColor; }
-.brand.live #mark-dot { fill: var(--red); }
+/* The name (D89), alone, in the ink as its board draws it; while recording, its dot red and larger. */
+.brand svg { flex: none; display: block; color: var(--ink); }
+#name-dot { fill: currentColor; }
+.brand.live #name-dot { fill: var(--red); }
 nav { display: flex; gap: 4px; }
 nav a {
   display: inline-block; padding: 8px 14px; border-radius: 9px; color: var(--ink);

@@ -3090,10 +3090,11 @@ def meeting_renamed(now: dt.datetime) -> None:
         recording = meetings / "2026-10-18_12-00"
         browser.find_element(By.ID, "record").click()
         wait_for(browser, lambda b: (recording / "session.json").exists() and live(b), 10)
-        # D89: while it records, the header's mark says it — its dot red and larger, the cut following.
-        dot = ("const d = document.getElementById('mark-dot');"
-               " return [getComputedStyle(d).fill === getComputedStyle(document.getElementById('record')).backgroundColor, d.getAttribute('r'), document.getElementById('mark-gap').getAttribute('r')]")
-        check("recording: the mark's dot red and larger, the cut following (D89)", browser.execute_script(dot) == [True, "2.2", "3.5"], browser.execute_script(dot))
+        # D89: while it records, the header's name says it — the dot of its i red and 1.375 times larger, the cut following.
+        dot = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
+               " return [getComputedStyle(d).fill === getComputedStyle(document.getElementById('record')).backgroundColor,"
+               " Math.abs(d.getAttribute('r') - d.dataset.rest * 1.375) <= 0.1, g.getAttribute('r') === g.dataset.live, d.getBoundingClientRect().width > 0]")
+        check("recording: the name's dot red and 1.375 times larger, the cut following (D89)", browser.execute_script(dot) == [True, True, True, True], browser.execute_script(dot))
         browser.execute_script(f"location.hash = '#/meeting/{recording.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "rename") and b.execute_script("return document.getElementById('meeting').dataset.name") == recording.name, 10)
         name(browser, "En direct", Keys.ENTER)
@@ -3111,8 +3112,9 @@ def meeting_renamed(now: dt.datetime) -> None:
         browser.find_element(By.ID, "record").click()
         stopped = wait_for(browser, lambda b: "stopped" in (recording / "session.json").read_text() and not live(b), 10)
         check("stopped: the name stays", stopped and (recording / "title.txt").read_text() == "En direct\n" and head(browser) == "En direct", head(browser))
-        rest = "const d = document.getElementById('mark-dot'); return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r')]"
-        check("stopped: the mark at rest again, in the accent (D89)", browser.execute_script(rest) == [True, "1.6"], browser.execute_script(rest))
+        rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
+                " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
+        check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
 
 
 def actions_rows(now: dt.datetime) -> None:
@@ -5121,12 +5123,14 @@ def window_looks(now: dt.datetime) -> None:
         drawn = browser.execute_script("const v = document.querySelector('#small-link svg'), c = getComputedStyle(v), p = getComputedStyle(v.parentElement); return [c.stroke === p.color, c.fill, parseFloat(c.width) === parseFloat(p.fontSize), parseFloat(c.height) === parseFloat(p.fontSize)]")
         check("the icon is stroked, the size of its text", drawn == [True, "none", True, True], drawn)
         check("the header shows one primary action", browser.execute_script(PRIMARIES) == ["record"], browser.execute_script(PRIMARIES))
-        # D89: the accepted mark, alone in the accent; controls of 32 px; fields bordered with --edge.
+        # D89: the accepted name, alone in the text's ink as its board draws it — no mark, no word written beside it (the decider,
+        # 2026-11-09); controls of 32 px; fields bordered with --edge.
         brand = browser.execute_script(
-            "const s = document.querySelector('.brand svg'), r = document.getElementById('record');"
-            " return [s.querySelector('path').getAttribute('d'), getComputedStyle(s).color === getComputedStyle(r).backgroundColor,"
-            " s.getBoundingClientRect().width, getComputedStyle(document.getElementById('mark-dot')).fill === getComputedStyle(s).color]")
-        check("the header's mark is the K and its record dot, alone in the accent, 24 px (D89)", brand == ["M6.5 7v13M6.5 14.2 17 4M9.8 11 17.3 20", True, 24, True], brand)
+            "const b = document.querySelector('.brand'), s = b.querySelector('svg'), r = document.getElementById('record'), d = document.getElementById('name-dot');"
+            " return [b.querySelectorAll('svg').length, b.textContent.trim(), s.id, s.getAttribute('role'), s.getAttribute('aria-label'),"
+            " getComputedStyle(s).color === getComputedStyle(document.body).color, Math.round(s.getBoundingClientRect().height),"
+            " getComputedStyle(d).fill === getComputedStyle(s).color, d.getAttribute('r') === d.dataset.rest, getComputedStyle(s.querySelector('g')).fill === getComputedStyle(s).color]")
+        check("the header shows the name alone, named Kitokey, in the ink, its dot at rest (D89)", brand == [1, "", "name", "img", "Kitokey", True, 18, True, True, True], brand)
         # A meeting's setting is one control, its list inside it: the setting is measured (board 4).
         tall = browser.execute_script(
             "return [...document.querySelectorAll('.primary, .open, .icon-button, select, .search, .field input, .setting')]"

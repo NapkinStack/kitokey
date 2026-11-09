@@ -271,12 +271,15 @@ dependencies:
 # description (fitness M7): declare them before its first file of code.
 commands:
   bootstrap: bash scripts/bootstrap.sh
-  # Every icon drawn from icons/kitokey.svg (D89), where ImageMagick and librsvg are (Linux).
+  # Every icon drawn from icons/kitokey.svg (D89), where ImageMagick and librsvg are (Linux); the
+  # header's name drawn from Montserrat by scripts/name.py, where fontTools and the font are.
   # The page's script read for its syntax where Node is there (the hosted runners have it): a
   # name declared twice in one scope blanks the whole window, which only the e2e saw (D42).
   check: >-
     bash -n scripts/release.sh && bash -n scripts/headless.sh && bash -n scripts/icons.sh
     && { [ "$(uname)" != Linux ] || ! command -v magick >/dev/null || bash scripts/icons.sh --check; }
+    && { [ ! -f /usr/share/fonts/julietaula-montserrat-fonts/Montserrat-Bold.otf ]
+    || ! python3 -c 'import fontTools' 2>/dev/null || python3 scripts/name.py --check; }
     && { ! command -v node >/dev/null || node --check ui/window.js; }
     && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
   # And the licence's tests built for release, where the stand-in licence must never be read

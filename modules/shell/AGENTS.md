@@ -36,6 +36,7 @@ Puts Kitokey's four steps in the user's hands: a tray, a global shortcut, notifi
 - A notification is shown from the main thread or a plain thread, never from a task of the async runtime.
 - The tray's icon is the mark on its tile — blue at rest, red while recording (the decider, 2026-11-08) —, never a glyph alone: a light glyph was invisible on the decider's desktop, whose bar is light, and a red dot on the blue tile is under 3:1. A tray icon is judged on a light bar, a grey one and a dark one. It is drawn by `scripts/icons.sh` from `icons/tray*.svg`, never edited as a PNG.
 - A desktop entry whose `Exec` program is not found is no entry at all for the desktop: the portal answers "App info not found" and the shortcut is refused.
+- The header's name is Montserrat 700 outlined into `ui/index.html` by `scripts/name.py`, never edited by hand (D89): the font's SIL Open Font License lets its outlines be drawn into the page, no font shipped; Lucide's icons keep their ISC notice in `ui/LUCIDE-LICENSE`.
 - The toolkit writes `gen/` at each build: it is ignored. Files are added to a commit by name.
 - A name declared twice in one function of `ui/window.js` is a syntax error that leaves the whole window blank, with nothing in the shell's own logs: `check` runs `node --check` on it where Node is there.
 

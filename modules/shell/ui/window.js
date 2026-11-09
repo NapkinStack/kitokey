@@ -686,12 +686,11 @@ function paintRecord(recording, stopping) {
   document.getElementById("record-said").textContent = said;
   document.getElementById("record").title = recordKeys ? `${said} (${recordKeys})` : said;
   document.getElementById("record").classList.toggle("live", live);
-  // The mark says it too (D89): its dot red and larger while recording, the cut around it following.
-  const [r, cy, gap] = live ? ["2.2", "6.2", "3.5"] : ["1.6", "5.6", "2.9"];
+  // The name says it too (D89): its dot red and larger while recording, the cut around it following.
   document.querySelector(".brand").classList.toggle("live", live);
-  for (const [id, radius] of [["mark-dot", r], ["mark-gap", gap]]) {
-    document.getElementById(id).setAttribute("r", radius);
-    document.getElementById(id).setAttribute("cy", cy);
+  for (const id of ["name-dot", "name-gap"]) {
+    const circle = document.getElementById(id);
+    circle.setAttribute("r", live ? circle.dataset.live : circle.dataset.rest);
   }
   // Disabled, it loses the focus: given back with the button, for whoever stopped by the keyboard.
   const button = document.getElementById("record");
