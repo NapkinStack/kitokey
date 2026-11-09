@@ -4446,9 +4446,8 @@ def confidential_kept(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         # The last meeting, drawn beside the list already: its page may be drawn again under the driver.
         shown = wait_for(browser, lambda b: b.find_elements(By.ID, "confidential-switch"), 10)
-        check("its page says it, the switch on, the lock among what it holds, nothing said to have left",
-              shown and read(browser, lambda b: switch(b, "confidential-switch").is_selected()
-                             and b.find_element(By.CSS_SELECTOR, "#meeting .meeting-title .chip.locked").text == "Confidentielle")
+        check("its page says it, the switch on, nothing said to have left",
+              shown and read(browser, lambda b: switch(b, "confidential-switch").is_selected())
               and browser.execute_script(left) == "")
         press(browser, "confidential-switch")
         off = wait_for(browser, lambda b: not (meeting / "confidential").exists(), 3)
@@ -5645,6 +5644,18 @@ def main() -> int:
             "const h = document.querySelector('#meeting h1'), o = document.getElementById('open-folder');"
             " return [parseFloat(getComputedStyle(h).fontSize), Math.abs(h.getBoundingClientRect().top - o.getBoundingClientRect().top) < 24 && o.getBoundingClientRect().left > h.getBoundingClientRect().right]")
         check("the meeting's title is 18 px, « Ouvrir le dossier » on the same line, at its right (D89)", head == [18, True], head)
+        bar = browser.execute_script(
+            "const b = document.querySelector('#meeting .meeting-head'), h = document.querySelector('#meeting h1'), l = document.querySelector('#meeting .lasts'), s = getComputedStyle(b);"
+            " const t = document.createElement('i'); t.style.color = 'var(--line)'; document.body.append(t); const line = getComputedStyle(t).color; t.remove();"
+            " return [b.getBoundingClientRect().height, s.borderBottomColor === line && s.borderBottomWidth === '1px', [...l.children].map(c => c.textContent),"
+            " l.getBoundingClientRect().left > h.getBoundingClientRect().right && Math.abs(l.getBoundingClientRect().bottom - h.getBoundingClientRect().bottom) < 6,"
+            " [...b.querySelectorAll('.chip')].filter(c => !c.hidden).map(c => c.textContent)]")
+        check("the header: a bar of 56 px over its divider, its length and weight beside the title, no chip at rest (D89, board 4)",
+              bar == [56, True, ["16 min", "audio 8 ko"], True, []], bar)
+        beside = browser.execute_script(
+            "const f = document.querySelector('.transcript .top .finding'), r = document.getElementById('redo-transcript'), a = f.getBoundingClientRect(), b = r.getBoundingClientRect();"
+            " return [r.parentElement === f.parentElement, Math.abs((a.top + a.bottom) - (b.top + b.bottom)) < 4 && b.left >= a.right]")
+        check("the transcript's Refaire… beside its search, at its right (D89, board 4)", beside == [True, True], beside)
         actions = browser.execute_script(
             "return ['open-folder', 'copy-minutes', 'redo-minutes', 'redo-transcript'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim(), e.getAttribute('aria-label'), e.title,"
             " e.classList.contains('icon-button') && e.querySelectorAll('svg.glyph').length === 1])")
@@ -5659,8 +5670,8 @@ def main() -> int:
         check("another meeting opens without the last one's search", not kept, kept)
         notes = [p.text for p in browser.find_elements(By.CSS_SELECTOR, "#meeting .none") if p.is_displayed()]
         check("minutes that cannot be read are said so", notes == ["Ce fichier ne peut pas être lu par cette version de Kitokey."], notes)
-        chips = browser.find_element(By.CSS_SELECTOR, "#meeting .holds").text
-        check("minutes that cannot be read claim no place", "Compte rendu" in chips and "Compte rendu ·" not in chips, chips)
+        chips = browser.find_element(By.CSS_SELECTOR, "#meeting .meeting-head").text
+        check("minutes that cannot be read claim nothing in the header: their card says them (D89)", "Compte rendu" not in chips, chips)
         being = [p.text for p in browser.find_elements(By.CSS_SELECTOR, ".transcript .note")]
         check("a transcript without its end says it is being written", being == ["En cours d’écriture — ce qui est là est vrai quand même."], being)
 
@@ -6140,8 +6151,8 @@ def main() -> int:
         browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
         # Offered once what was being made for it is read as ended.
         wait_for(browser, lambda b: b.find_elements(By.ID, "make-minutes") and b.find_element(By.ID, "make-minutes").is_displayed())
-        chips = browser.find_element(By.CSS_SELECTOR, "#meeting .holds").text
-        check("the meeting's page says where its transcript was made", "Transcription · sur cet ordinateur" in chips, chips)
+        heard = browser.find_element(By.CSS_SELECTOR, "#meeting .made .maker").text
+        check("the meeting's page says where its transcript was made, on its card (D89)", heard.endswith("sur cet ordinateur"), heard)
         (WORK / "slow-minutes").touch()
         browser.find_element(By.ID, "make-minutes").click()
         state = lambda b: b.find_element(By.ID, "minutes-state").text if b.find_elements(By.ID, "minutes-state") else ""

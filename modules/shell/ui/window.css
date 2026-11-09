@@ -70,15 +70,18 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .open { padding: 0 12px; font-weight: 600; cursor: pointer; }
 /* A field is drawn on the surface, only edged (board 2's after); a button is raised. */
 .search { padding: 0 12px; min-width: 200px; background: var(--surface); }
-/* In the transcript's head, the search takes the room the title leaves; Refaire… sits beside who
-   heard it, as board 2 has it (#312). */
-.top > .finding { flex: 1 1 200px; max-width: 320px; }
+/* In the transcript's head, the search takes the room the title leaves, Refaire… at its right
+   (D89, board 4). */
+.top > .finding { flex: 1 1 200px; max-width: 320px; margin-left: auto; }
 .top > .finding .search { width: 100%; }
 .made { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .made > .redo { flex-basis: 100%; }
-.meeting-title { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.meeting-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 /* The meeting's header (D89): its title at 18 px, its actions at its right. */
-.meeting-head { display: flex; align-items: flex-start; gap: 12px 16px; }
+#meeting { padding-top: 0; }
+.meeting-head { display: flex; align-items: center; gap: 12px 16px; min-height: 56px; margin: 0 -24px; padding: 8px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.lasts { color: var(--soft); font-size: 13px; white-space: nowrap; }
+.lasts .length + .weighs::before { content: " · "; }
 .meeting-head .meeting-title { flex: 1 1 auto; min-width: 0; }
 .meeting-head .meeting-top { flex: none; }
 .meeting-title h1 { margin: 0; font-size: 18px; font-weight: 650; overflow-wrap: anywhere; }
@@ -512,6 +515,7 @@ body.small-window .frame { display: none; }
   body[data-at="list"]:has(#pane-said:not([hidden])) .pane > .back { display: none; }
   .pane > .back { display: inline-block; margin: 8px 0 0 16px; }
   .pane > main { padding: 12px 16px 40px; }
+  .meeting-head { margin: 0 -16px; padding: 8px 16px; }
 }
 
 /* A little motion (D69): one fade between the small window's two states, one pop when a chip turns. */

@@ -217,10 +217,6 @@ function confidentialCard(session, confidential, words) {
       const shown = await window.__TAURI__.core.invoke("confidential_set", { name, on: box.checked });
       said.textContent = "";
       paint(shown);
-      // The title's chips say it at once.
-      const holds = document.querySelector("#meeting .meeting-title .holds");
-      holds?.querySelector(".chip.locked")?.remove();
-      if (shown.on) holds?.prepend(lockedChip(words));
     } catch {
       box.checked = !box.checked;
       said.textContent = words.confidential_not_saved;
@@ -246,25 +242,23 @@ function heading(session, words) {
   return `${date} · ${time}`;
 }
 
-// What a meeting holds; on its page, where each step ran (`where`: the minutes' provider known). A
-// list's row says only what is not at rest — recording, cut, its audio freed, a step being made —,
-// what it holds being its marks (D89).
-function holdings(session, words, where, compact = false) {
+// What a meeting holds. A list's row and a meeting's header say only what is not at rest —
+// recording, cut, its audio freed, a step being made —: the row's marks and the page's cards say
+// the rest, where each step ran with them (D89).
+function holdings(session, words, compact = false) {
   const holds = document.createElement("div");
   holds.className = "holds";
-  // A place is said only where it is known: `here` true or false; unknown, the chip says none.
-  const ran = (text, here) => (where && here !== undefined ? `${text} · ${here ? words.ran_here : words.ran_online}` : text);
   // Said confidential (D60): the lock and its word, first — never the lock alone.
   if (session.confidential && !compact) holds.append(lockedChip(words));
   if (session.state === "recording") holds.append(chip(words.recording, "live"));
   if (session.state === "interrupted") holds.append(chip(words.interrupted, "cut"));
   if (session.minutes && !compact) {
-    const made = chip(ran(words.minutes, where?.minutes_here));
+    const made = chip(words.minutes);
     // Turned from what was being made: said by one small pop, once (D69).
     if (chipsMaking.delete(nameOf(session))) made.classList.add("turned");
     holds.append(made);
   }
-  if (session.transcript && !compact) holds.append(chip(ran(words.transcript, true)));
+  if (session.transcript && !compact) holds.append(chip(words.transcript));
   if (session.audio > 0 && !compact) holds.append(chip(fill(words.audio, size(session.audio, words))));
   if (session.audio === 0) holds.append(chip(words.audio_freed, "gone"));
   // What is being made for it, in the background (D25): painted from `makings`.
@@ -585,7 +579,7 @@ function row(session, words) {
   line.append(when, marks(session, words));
   // A name has the row's whole width, its date under it.
   if (session.title) link.append(title);
-  link.append(line, holdings(session, words, undefined, true));
+  link.append(line, holdings(session, words, true));
   item.append(link);
   return item;
 }
@@ -1260,8 +1254,7 @@ function transcriptCard(read, words, session) {
   // Its icon in the field, as the sidebar's search (D89).
   const finding = element("div", "finding");
   finding.append(icon("search"), search);
-  top.append(finding);
-  // Refaire…: another Whisper model of this computer, this time only.
+  // Refaire…: another Whisper model of this computer, this time only; beside the search (board 4).
   const redo = iconButton("rotate-ccw", words.redo, "redo-transcript");
   redo.addEventListener("click", async () => {
     const shown = await window.__TAURI__.core.invoke("settings_shown");
@@ -1269,7 +1262,7 @@ function transcriptCard(read, words, session) {
     redo.replaceWith(panel);
     panel.querySelector("input, button:enabled").focus();
   });
-  // Beside who heard it, as board 2 has it: the head keeps its search whole.
+  top.append(finding, redo);
   const heard = element("div", "made");
   // A service names its host as who heard (D43): said as the minutes' maker is, never « on this
   // computer » — a host of one word (`http://transcriber/v1`) is a service too. This computer's
@@ -1278,7 +1271,7 @@ function transcriptCard(read, words, session) {
   const heardSaid = service
     ? fill(words.written_by, read.model || "—") + fill(words.written_via, read.engine)
     : fill(words.heard_by, read.model ? spoken(read.model) : read.engine || "—");
-  heard.append(element("p", "maker", heardSaid), redo);
+  heard.append(element("p", "maker", heardSaid));
   card.append(heard);
   if (!read.complete) card.append(element("p", "note", words.being_made));
   if (read.unread > 0) card.append(element("p", "note", fill(words.unread, read.unread)));
@@ -1603,17 +1596,18 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   actions.append(open);
   // The way back is the pane's, under 840 px alone (D61).
   top.append(actions);
-  // The meeting's header (D89): its name and what it holds, its actions at their right.
+  // The meeting's header (D89, board 4): a bar of 56 px, its name, how long and how heavy beside
+  // it, its actions at their right.
   const head = element("div", "meeting-head");
   const title = element("section", "meeting-title");
   const named = element("div", "named");
   // Named by its minutes (D48): the date above the name.
   if (session.title) named.append(element("span", "on", heading(session, words)));
   named.append(meetingName(session, words));
-  if (session.seconds !== null) named.append(element("span", "length", length(session.seconds)));
-  // Where the minutes were written, from their own front matter: unread, or naming none, not said.
-  const minutesHere = minutes.state === "present" && minutes.provider ? minutes.provider === "local" : undefined;
-  title.append(named, holdings(session, words, { minutes_here: minutesHere }));
+  const lasts = element("span", "lasts");
+  if (session.seconds !== null) lasts.append(element("span", "length", length(session.seconds)));
+  if (session.audio > 0) lasts.append(element("span", "weighs", fill(words.audio_weighs, size(session.audio, words))));
+  title.append(named, lasts, holdings(session, words, true));
   head.append(title, top);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
