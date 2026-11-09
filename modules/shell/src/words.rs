@@ -357,6 +357,9 @@ pub struct Window {
     /// One meeting's page.
     pub back: &'static str,
     pub open_folder: &'static str,
+    /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
+    pub more_actions: &'static str,
+    pub labelled: &'static str,
     pub minutes_title: &'static str,
     pub transcript_title: &'static str,
     pub search: &'static str,
@@ -791,6 +794,8 @@ pub fn window(language: Language) -> Window {
             none_found: "No meeting holds these words.",
             back: "Meetings",
             open_folder: "Open the folder",
+            more_actions: "More actions",
+            labelled: "{}:",
             minutes_title: "Minutes",
             transcript_title: "Transcript",
             search: "Search the meeting",
@@ -1184,6 +1189,8 @@ pub fn window(language: Language) -> Window {
             none_found: "Aucune réunion ne contient ces mots.",
             back: "Réunions",
             open_folder: "Ouvrir le dossier",
+            more_actions: "Plus d’actions",
+            labelled: "{}\u{a0}:",
             minutes_title: "Compte rendu",
             transcript_title: "Transcription",
             search: "Rechercher dans la transcription",

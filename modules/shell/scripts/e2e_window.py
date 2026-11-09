@@ -216,6 +216,14 @@ def press(browser, element_id: str) -> None:
     browser.find_element(By.ID, element_id).click()
 
 
+def context_opened(browser):
+    """A meeting's context, opened from its settings row when it is closed (D89)."""
+    toggle = browser.find_element(By.ID, "context-toggle")
+    if toggle.get_attribute("aria-expanded") != "true":
+        toggle.click()
+    return browser.find_element(By.ID, "context-text")
+
+
 def panel_choice(browser, choices: str, index: int):
     """A redo panel's choice: its models come after the panel, so they are waited for."""
     wait_for(browser, lambda b: len(b.find_elements(By.CSS_SELECTOR, choices)) > index)
@@ -3789,6 +3797,7 @@ def press_on_the_page_left(now: dt.datetime) -> None:
         browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: b.execute_script("return ['', '#/'].includes(location.hash)") and b.execute_script(page_of) is not None, 5)
         beside = browser.execute_script(page_of)
+        context_opened(browser)
         browser.execute_script("window.__kept = document.getElementById('context-text'); window.__kept.focus()")
         browser.execute_script(f"location.hash = '#/meeting/{beside}'")
         same = wait_for(browser, lambda b: b.execute_script("return location.hash") == f"#/meeting/{beside}" and b.execute_script("return document.getElementById('meeting').dataset.at === location.hash"), 5)
@@ -3981,6 +3990,7 @@ def press_on_the_page_left(now: dt.datetime) -> None:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == named_so and b.find_elements(By.ID, "context-text"), 10)
         written_so = browser.execute_script("return document.querySelector('#groups .session').getAttribute('href')")
+        context_opened(browser)
         browser.execute_script("window.__kept = document.getElementById('context-text'); window.__kept.focus(); location.hash = arguments[0]", written_so)
         same = wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.at === location.hash"), 5)
         check("a name that needs encoding, at its own address: the page kept, its field and the focus with it",
@@ -4120,7 +4130,7 @@ def context_written(now: dt.datetime) -> None:
     with window as browser:
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         shown = wait_for(browser, lambda b: b.find_elements(By.ID, "context-text"), 10)
-        area = browser.find_element(By.ID, "context-text")
+        area = context_opened(browser)
         label = browser.execute_script("return document.querySelector('label[for=context-text]')?.textContent")
         check("a meeting's page shows its context, labelled", shown and area.get_attribute("value") == said
               and label == "De quoi parle la réunion ? Qui y participe ?", (area.get_attribute("value"), label))
@@ -4249,7 +4259,7 @@ def context_written(now: dt.datetime) -> None:
     with window as browser:
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "context-text"), 10)
-        browser.find_element(By.ID, "context-text").send_keys(Keys.END, " And Lena.")
+        context_opened(browser).send_keys(Keys.END, " And Lena.")
         changed = wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
         check("in English, a meeting's page offers Redo with this context", changed
               and browser.find_element(By.ID, "context-redo").text == "Redo with this context", browser.find_element(By.ID, "context-redo").text)
@@ -4280,7 +4290,7 @@ def context_gaps(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         open_ = wait_for(browser, lambda b: b.find_elements(By.ID, "context-text")
                          and b.find_element(By.ID, "context-text").get_attribute("readonly") is None, 10)
-        browser.find_element(By.ID, "context-text").click()
+        context_opened(browser).click()
         keys(browser, typed)
         kept = wait_for(browser, lambda b: (meeting / "context.txt").exists() and (meeting / "context.txt").read_text() == typed, 3)
         check("the full window's page of the meeting being recorded offers its context: a Cyrillic name and an emoji kept whole",
@@ -4304,7 +4314,7 @@ def context_gaps(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "context-text"), 10)
         minutes = (meeting / "minutes.md").read_text()
-        browser.find_element(By.ID, "context-text").send_keys(Keys.END, " Et Lena.")
+        context_opened(browser).send_keys(Keys.END, " Et Lena.")
         wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
         hearing.unlink(missing_ok=True)
         writing.unlink(missing_ok=True)
@@ -4775,6 +4785,28 @@ def nothing_silent(now: dt.datetime) -> None:
             told = browser.execute_async_script(
                 "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('minutes_again', { name: 'gone' }).then(() => done(''), (why) => done(String(why)));")
             check(f"the raw text only in developer mode ({'on' if raw else 'off'})", ("gone is no session" in told) == raw, told)
+            if raw:
+                # « More actions » with both items (D89): Enter opens it on the first, ↑ on the last, expanded while open.
+                wait_for(browser, lambda b: b.find_elements(By.ID, "more-actions"), 10)
+                opened_on = []
+                for key in (Keys.ENTER, Keys.ARROW_UP):
+                    browser.execute_script("document.getElementById('more-actions').focus()")
+                    ActionChains(browser).send_keys(key).perform()
+                    wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
+                    opened_on.append(browser.execute_script("return [document.activeElement.id, document.getElementById('more-actions').getAttribute('aria-expanded')]"))
+                    ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+                    wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
+                check("in developer mode, « More actions » opens on its first by Enter, on its last by ↑, expanded while open (D89)",
+                      opened_on == [["rename-item", "true"], ["copy-diagnostic", "true"]], opened_on)
+                browser.execute_script("document.getElementById('more-actions').focus()")
+                ActionChains(browser).send_keys(Keys.ENTER).perform()
+                wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
+                ActionChains(browser).send_keys(Keys.TAB).perform()
+                left_ = wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
+                check("Tab leaves « More actions » closed, not expanded (D89)",
+                      left_ and browser.execute_script("return document.getElementById('more-actions').getAttribute('aria-expanded')") == "false")
+                described = browser.execute_script("const b = document.getElementById('confidential-switch'); return document.getElementById(b.getAttribute('aria-describedby'))?.textContent")
+                check("in English, the switch's description: « Nothing leaves this computer » (D89)", described == "Nothing leaves this computer", described)
     # What the page reads and cannot: said where the eye is, in the user's language; asked by no gesture
     # or not, never only a line in the log (D67).
     for language, not_opened, not_read, unread, gone in (
@@ -4811,7 +4843,7 @@ def nothing_silent(now: dt.datetime) -> None:
             wait_for(browser, lambda b: shown(b, "context-said"), 5)
             # Written since: it is no longer the last word, with no redraw to wipe it.
             browser.execute_script("window.__card = document.getElementById('context')")
-            browser.find_element(By.ID, "context-text").send_keys(" X")
+            context_opened(browser).send_keys(" X")
             gone_said = wait_for(browser, lambda b: not shown(b, "context-said") and context_file.read_text() == "Budget 2026 X", 5)
             check("written after it could not be read: the sentence goes, on the same page", gone_said and browser.execute_script("return window.__card === document.getElementById('context')"), text(browser, "context-said"))
             browser.execute_script("window.restore()")
@@ -5095,18 +5127,19 @@ def window_looks(now: dt.datetime) -> None:
             " return [s.querySelector('path').getAttribute('d'), getComputedStyle(s).color === getComputedStyle(r).backgroundColor,"
             " s.getBoundingClientRect().width, getComputedStyle(document.getElementById('mark-dot')).fill === getComputedStyle(s).color]")
         check("the header's mark is the K and its record dot, alone in the accent, 24 px (D89)", brand == ["M6.5 7v13M6.5 14.2 17 4M9.8 11 17.3 20", True, 24, True], brand)
+        # A meeting's setting is one control, its list inside it: the setting is measured (board 4).
         tall = browser.execute_script(
-            "return [...document.querySelectorAll('.primary, .open, .icon-button, select, .search, .field input')]"
-            ".filter(e => e.offsetParent && !e.closest('#small')).map(e => [e.id || e.className, e.getBoundingClientRect().height]).filter(([, h]) => h !== 32)")
+            "return [...document.querySelectorAll('.primary, .open, .icon-button, select, .search, .field input, .setting')]"
+            ".filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select')).map(e => [e.id || e.className, e.getBoundingClientRect().height]).filter(([, h]) => h !== 32)")
         check("every control shown is 32 px high (D89)", tall == [], tall)
         edged = browser.execute_script(
             "const t = document.createElement('i'); t.style.color = 'var(--edge)'; document.body.append(t); const edge = getComputedStyle(t).color; t.remove();"
-            " const all = [...document.querySelectorAll('.open, select, .search, .field input')].filter(e => e.offsetParent && !e.closest('#small'));"
+            " const all = [...document.querySelectorAll('.open, select, .search, .field input, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
             " return [all.length > 0, all.filter(e => getComputedStyle(e).borderTopColor !== edge).map(e => e.id || e.className)]")
         check("fields and secondary buttons are bordered with --edge (D89)", edged == [True, []], edged)
         filled = browser.execute_script(
             "const t = document.createElement('i'); t.style.background = 'var(--surface)'; document.body.append(t); const surface = getComputedStyle(t).backgroundColor; t.remove();"
-            " const all = [...document.querySelectorAll('select, .search')].filter(e => e.offsetParent && !e.closest('#small'));"
+            " const all = [...document.querySelectorAll('select, .search, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
             " return [all.length > 0, all.filter(e => getComputedStyle(e).backgroundColor !== surface).map(e => e.id || e.className)]")
         check("fields are drawn on the surface, only edged, as board 2 (D89)", filled == [True, []], filled)
         # The trial over (D83): buying holds it in the recording's place, then gives it back.
@@ -5693,6 +5726,54 @@ def main() -> int:
         check("each secondary action of the meeting: an icon button, its tooltip and its name (D89)", actions == [
             ["open-folder", "", "Ouvrir le dossier", "Ouvrir le dossier", True], ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu", True],
             ["redo-minutes", "", "Refaire…", "Refaire…", True], ["redo-transcript", "", "Refaire…", "Refaire…", True]], actions)
+        # D89, board 4: the meeting's settings in one row of 32 px controls; the context opened from it.
+        row = browser.execute_script(
+            "const r = document.querySelector('#meeting .settings-row'); if (!r) return null;"
+            " return [...r.children].map(e => [e.id || e.querySelector('select, input')?.id, Math.round(e.getBoundingClientRect().top), Math.round(e.getBoundingClientRect().height)])")
+        tops = {top for _, top, _ in row or []}
+        check("the meeting's settings: context, spoken language, Confidentielle, on one row of 32 px (D89)",
+              row is not None and [id_ for id_, _, _ in row] == ["context-toggle", "meeting-language", "confidential-switch"]
+              and len(tops) == 1 and {height for _, _, height in row} == {32}, row)
+        # « Confidentielle »: a sliding switch, the checkbox drawn otherwise, what it means read with it (D89, board 4).
+        drawn = browser.execute_script(
+            "const b = document.getElementById('confidential-switch'), s = getComputedStyle(b), d = document.getElementById(b.getAttribute('aria-describedby'));"
+            " return [b.type, b.getAttribute('role'), s.webkitAppearance || s.appearance, Math.round(b.getBoundingClientRect().width), Math.round(b.getBoundingClientRect().height),"
+            " b.labels[0].textContent, d?.textContent, !!d && !b.labels[0].contains(d)]")
+        check("« Confidentielle »: a switch drawn sliding, 32 × 20, named by its word, « Rien ne quitte cet ordinateur » its description (D89)",
+              drawn == ["checkbox", "switch", "none", 32, 20, "Confidentielle", "Rien ne quitte cet ordinateur", True], drawn)
+        listed = browser.execute_script(
+            "const p = document.getElementById('meeting-language'), s = getComputedStyle(p);"
+            " return [s.webkitAppearance || s.appearance, !!p.nextElementSibling?.matches('svg.glyph.chevron')]")
+        check("the spoken language: its value and a chevron, the system's box not drawn (D89, board 4)", listed == ["none", True], listed)
+        toggle = browser.find_element(By.ID, "context-toggle")
+        closed = toggle.get_attribute("aria-expanded") == "false" and not browser.find_element(By.ID, "context-text").is_displayed()
+        toggle.click()
+        opened = wait_for(browser, lambda b: b.find_element(By.ID, "context-text").is_displayed(), 2)
+        check("the context closed in its row, opened by it, the focus in its field (D89)",
+              closed and opened and toggle.get_attribute("aria-expanded") == "true" and browser.execute_script("return document.activeElement.id") == "context-text",
+              (closed, toggle.get_attribute("aria-expanded")))
+        # « Plus d’actions »: a menu button — Enter opens it on its first item, Escape closes it, the focus back on it.
+        more = browser.find_element(By.ID, "more-actions")
+        labelled = [more.get_attribute(a) for a in ("aria-label", "title", "aria-haspopup", "aria-expanded")]
+        browser.execute_script("arguments[0].focus()", more)
+        ActionChains(browser).send_keys(Keys.ENTER).perform()
+        menu = wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
+        expanded = more.get_attribute("aria-expanded")
+        items = browser.execute_script("return [...document.querySelectorAll('#more-menu [role=menuitem]')].map(e => e.textContent)")
+        first = browser.execute_script("return [document.activeElement.getAttribute('role'), document.activeElement.textContent, document.getElementById('more-menu').getAttribute('role')]")
+        ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+        back = wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
+        check("« Plus d’actions »: a menu of the rarer actions, opened by Enter on its first, Escape closes it, the focus back on its button (D89)",
+              labelled == ["Plus d’actions", "Plus d’actions", "menu", "false"] and menu and items == ["Renommer cette réunion"]
+              and first == ["menuitem", "Renommer cette réunion", "menu"] and back and browser.execute_script("return document.activeElement.id") == "more-actions"
+              and more.get_attribute("aria-expanded") == "false" and expanded == "true", (labelled, items, first, expanded))
+        more.click()
+        wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
+        browser.find_element(By.CSS_SELECTOR, "#more-menu [role=menuitem]").click()
+        naming = wait_for(browser, lambda b: b.execute_script("return document.activeElement.id") == "naming", 2)
+        ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+        check("its « Renommer cette réunion » opens the name's field, Escape leaves it as it was (D89)",
+              naming and wait_for(browser, lambda b: b.find_elements(By.ID, "rename"), 2) and not browser.find_element(By.ID, "more-menu").is_displayed())
         browser.find_elements(By.CSS_SELECTOR, ".session")[1].click()
         wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed() and b.find_elements(By.CSS_SELECTOR, ".minutes .none"))
         kept = browser.execute_script("return document.getElementById('search') && document.getElementById('search').value")

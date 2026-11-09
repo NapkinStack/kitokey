@@ -78,6 +78,7 @@ function lock() {
 const ICONS = {
   check: ["M20 6 9 17l-5-5"],
   "chevron-left": ["m15 18-6-6 6-6"],
+  "chevron-down": ["m6 9 6 6 6-6"],
   x: ["M18 6 6 18", "m6 6 12 12"],
   "arrow-right": ["M5 12h14", "m12 5 7 7-7 7"],
   "maximize-2": ["M15 3h6v6", "m21 3-7 7", "m3 21 7-7", "M9 21H3v-6"],
@@ -91,6 +92,10 @@ const ICONS = {
   copy: [["rect", { width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2 }], "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"],
   "rotate-ccw": ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5"],
   "folder-open": ["m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"],
+  ellipsis: [["circle", { cx: 12, cy: 12, r: 1 }], ["circle", { cx: 19, cy: 12, r: 1 }], ["circle", { cx: 5, cy: 12, r: 1 }]],
+  "message-square-text": ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z", "M7 11h10", "M7 15h6", "M7 7h8"],
+  languages: ["m5 8 6 6", "m4 14 6-6 2-3", "M2 5h12", "M7 2h1", "m22 22-5-10-5 10", "M14 18h6"],
+  "lock-open": [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2, ry: 2 }], "M7 11V7a5 5 0 0 1 9.9-1"],
   "file-text": ["M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z", "M14 2v5a1 1 0 0 0 1 1h5", "M10 9H8", "M16 13H8", "M16 17H8"],
   captions: [["rect", { width: 18, height: 14, x: 3, y: 5, rx: 2, ry: 2 }], "M7 15h4M15 15h2M7 11h2M13 11h4"],
   pencil: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
@@ -108,6 +113,73 @@ function icon(name) {
     svg.append(shape);
   }
   return svg;
+}
+
+// « Plus d’actions » (D89): the rarer actions behind one button, as WAI-ARIA's menu button has it —
+// Enter, Space or ↓ open it on its first item, ↑ on its last; ↑ ↓ Home End move in it; Escape
+// closes it, the focus back on its button; Tab or a click elsewhere closes it; an item chosen
+// closes it, the focus back on the button before the item acts.
+function moreActions(items, words) {
+  const more = element("div", "more");
+  const button = iconButton("ellipsis", words.more_actions, "more-actions");
+  button.setAttribute("aria-haspopup", "menu");
+  button.setAttribute("aria-controls", "more-menu");
+  button.setAttribute("aria-expanded", "false");
+  const menu = element("div", "menu");
+  menu.id = "more-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", words.more_actions);
+  menu.hidden = true;
+  const close = (back) => {
+    menu.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+    if (back) button.focus();
+  };
+  const entries = items.map(([id, said, act]) => {
+    const item = element("button", "menu-item", said);
+    item.type = "button";
+    item.id = id;
+    item.tabIndex = -1;
+    item.setAttribute("role", "menuitem");
+    item.addEventListener("click", () => {
+      close(true);
+      act();
+    });
+    return item;
+  });
+  const open = (at) => {
+    menu.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+    entries.at(at).focus();
+  };
+  button.addEventListener("click", () => (menu.hidden ? open(0) : close(true)));
+  button.addEventListener("keydown", (event) => {
+    const at = { ArrowDown: 0, ArrowUp: -1 }[event.key];
+    if (at === undefined) return;
+    event.preventDefault();
+    open(at);
+  });
+  menu.addEventListener("keydown", (event) => {
+    const now = entries.indexOf(document.activeElement);
+    const last = entries.length - 1;
+    const to = { ArrowDown: now === last ? 0 : now + 1, ArrowUp: now <= 0 ? last : now - 1, Home: 0, End: last }[event.key];
+    if (to !== undefined) entries[to].focus();
+    else if (event.key === "Escape") close(true);
+    else if (event.key === "Tab") return close(false);
+    else return;
+    // Its own: neither a panel's Escape nor the page's keys hear it.
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  // A press elsewhere: WebKit does not focus a button pressed, so the press is heard, not the focus.
+  const elsewhere = (event) => {
+    if (!more.isConnected) return document.removeEventListener("pointerdown", elsewhere, true);
+    if (!menu.hidden && !more.contains(event.target)) close(false);
+  };
+  document.addEventListener("pointerdown", elsewhere, true);
+  menu.append(...entries);
+  more.append(button, menu);
+  return more;
 }
 
 // A secondary action (D89): an icon, its tooltip and its name the same words.
@@ -155,9 +227,9 @@ function leftSaid(words, left) {
 // The language a meeting is spoken in (D65): the settings' own, or one of its own — its next
 // transcript heard in it. Written at once; refused, said, the choice put back.
 function languageRow(session, language, languages, words, settled, apple, system) {
-  const row = element("div", "row language");
-  const label = element("label", "name", words.language_label);
-  label.htmlFor = "meeting-language";
+  // A setting of the meeting's row (D89): its icon, its name, its list.
+  const row = element("label", "setting language");
+  row.htmlFor = "meeting-language";
   const pick = element("select");
   pick.id = "meeting-language";
   const add = (value, text) => {
@@ -189,17 +261,29 @@ function languageRow(session, language, languages, words, settled, apple, system
       said.textContent = fill(words.language_not_saved, why);
     }
   });
-  row.append(label, pick, said);
-  return row;
+  // Its value and a chevron, as board 4 draws the list: the system's own box not drawn.
+  const chevron = icon("chevron-down");
+  chevron.classList.add("chevron");
+  row.append(icon("languages"), element("span", "name", fill(words.labelled, words.language_label)), pick, chevron);
+  return [row, said];
 }
 
-// The switch on a meeting's page: the file written or removed at once; what had left said.
+// The switch on a meeting's page, a setting of its row (D89): the file written or removed at once;
+// what had left said under the row. Its lock open while it is off, as board 4 draws it.
 function confidentialCard(session, confidential, words) {
   const name = nameOf(session);
-  const card = element("section", "card confidential-card");
-  card.id = "confidential";
-  const { row, box } = confidentialSwitch(words, "confidential-switch");
+  const card = element("label", "setting confidential");
+  card.title = words.confidential_says;
+  const box = element("input");
+  box.type = "checkbox";
+  box.id = "confidential-switch";
+  box.setAttribute("role", "switch");
   box.checked = confidential.on;
+  // What it means, read with it by a screen reader as the tooltip shows it to the pointer; outside
+  // the label, which would make it part of the switch's name.
+  const described = element("span", "unseen", words.confidential_says);
+  described.id = "confidential-described";
+  box.setAttribute("aria-describedby", described.id);
   const left = element("p", "left");
   left.id = "confidential-left";
   const said = element("p", "says");
@@ -207,6 +291,10 @@ function confidentialCard(session, confidential, words) {
   said.setAttribute("role", "status");
   const paint = (shown) => {
     card.classList.toggle("on", shown.on);
+    card.querySelector("svg")?.remove();
+    const drawn = shown.on ? lock() : icon("lock-open");
+    drawn.classList.add("lock");
+    card.prepend(drawn);
     left.textContent = leftSaid(words, shown.left);
     left.hidden = left.textContent === "";
     said.hidden = said.textContent === "";
@@ -225,9 +313,9 @@ function confidentialCard(session, confidential, words) {
     box.disabled = false;
     readMakings();
   });
-  card.append(row, left, said);
+  card.append(element("span", "name", words.confidential_chip), box);
   paint(confidential);
-  return card;
+  return [card, left, said, described];
 }
 
 // A session's folder name: what the window calls it, and the only date it says when its start
@@ -786,11 +874,15 @@ function contextField(words, text, save, id) {
   return { area, count, painted };
 }
 
+// The meeting whose context was opened from its row: open still when its page is drawn again.
+let contextOpen = null;
+
 // The context on a meeting's page: shown and written, closed while a making of it runs or its
-// transcript is left unfinished, and made again with it when what was made had another.
-function contextCard(session, { context, transcript, minutes }, words) {
+// transcript is left unfinished, and made again with it when what was made had another. Its row
+// (D89, board 4): the context, opened by it, then the meeting's other settings; their sentences under it.
+function contextCard(session, { context, transcript, minutes }, words, settings, sentences) {
   const name = nameOf(session);
-  const card = element("section", "card context");
+  const card = element("section", "settings context");
   card.id = "context";
   card.dataset.name = name;
   card.dataset.changed = String(context.changed);
@@ -813,7 +905,26 @@ function contextCard(session, { context, transcript, minutes }, words) {
     redo.disabled = false;
   });
   changed.append(element("p", "says", words.context_changed[minutes.state === "present" ? 1 : 0]), redo);
+  const toggle = element("button", "setting context-toggle");
+  toggle.type = "button";
+  toggle.id = "context-toggle";
+  toggle.setAttribute("aria-controls", "context-panel");
+  const named = element("span", "name", fill(words.labelled, words.context_title));
+  const value = element("b", "value");
+  toggle.append(icon("message-square-text"), named, value);
+  const valued = (text) => {
+    named.hidden = text.trim() === "";
+    value.textContent = text.trim() || words.context_add;
+  };
+  const panel = element("div", "context-panel");
+  panel.id = "context-panel";
+  const opened = (open) => {
+    panel.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+    contextOpen = open ? name : null;
+  };
   const save = async (text) => {
+    valued(text);
     // Written now: what it could not read back is no longer the last word.
     delete card.dataset.unread;
     try {
@@ -832,7 +943,16 @@ function contextCard(session, { context, transcript, minutes }, words) {
   label.htmlFor = area.id;
   // Made again from its audio: a meeting whose audio was freed is not offered it.
   card.dataset.redo = String(session.audio > 0);
-  card.append(element("h2", "label", words.context_title), label, area, count, element("p", "says", words.context_why), said, changed);
+  toggle.addEventListener("click", () => {
+    opened(panel.hidden);
+    if (!panel.hidden) area.focus();
+  });
+  valued(context.text);
+  opened(contextOpen === name);
+  const row = element("div", "settings-row");
+  row.append(toggle, ...settings);
+  panel.append(label, area, count, element("p", "says", words.context_why));
+  card.append(row, ...sentences, said, changed, panel);
   return card;
 }
 
@@ -1573,16 +1693,15 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     open.replaceWith(element("p", "note warn", why));
   }));
   const actions = element("div", "actions");
+  // The rarer actions, behind « Plus d’actions » (D89, board 4): the name, as its heading clicked.
+  const rarer = [["rename-item", words.rename_meeting, () => document.getElementById("rename")?.click()]];
   // In developer mode: this meeting's logs, to send to whoever looks into it — nothing of the
   // meeting is in them (D29).
   if (developer) {
-    const copy = element("button", "open", words.copy_diagnostic);
-    copy.type = "button";
-    copy.id = "copy-diagnostic";
     // What became of it, said where a screen reader hears it.
     const copied = element("span", "says", "");
     copied.setAttribute("role", "status");
-    copy.addEventListener("click", async () => {
+    rarer.push(["copy-diagnostic", words.copy_diagnostic, async () => {
       try {
         const lines = await window.__TAURI__.core.invoke("diagnostic", { name: nameOf(session) });
         await navigator.clipboard.writeText(lines);
@@ -1590,10 +1709,10 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
       } catch {
         copied.textContent = words.diagnostic_not_copied;
       }
-    });
-    actions.append(copied, copy);
+    }]);
+    actions.append(copied);
   }
-  actions.append(open);
+  actions.append(open, moreActions(rarer, words));
   // The way back is the pane's, under 840 px alone (D61).
   top.append(actions);
   // The meeting's header (D89, board 4): a bar of 56 px, its name, how long and how heavy beside
@@ -1631,9 +1750,10 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const same = page.dataset.name === nameOf(session);
   const typing = same && naming ? { value: naming.value, caret: naming.selectionStart, end: naming.selectionEnd, focused: document.activeElement === naming } : null;
   page.dataset.name = nameOf(session);
-  const kept = confidentialCard(session, confidential, words);
-  kept.append(languageRow(session, language, languages, words, meeting_language, apple, system_language));
-  page.replaceChildren(head, kept, contextCard(session, { context, transcript, minutes }, words), drawn, columns);
+  const [secret, left, secretSaid, secretDescribed] = confidentialCard(session, confidential, words);
+  const [spoken, spokenSaid] = languageRow(session, language, languages, words, meeting_language, apple, system_language);
+  const settings = contextCard(session, { context, transcript, minutes }, words, [spoken, secret], [left, secretSaid, spokenSaid, secretDescribed]);
+  page.replaceChildren(head, settings, drawn, columns);
   // The line being said, marked while it plays; the page stays where the user left it (D26, the
   // decider, 2026-10-24: following the line was intrusive).
   if (player?.name === nameOf(session)) {
