@@ -2614,10 +2614,20 @@ def sound_checked(now: dt.datetime) -> None:
                   started and float(ended.read_text()) - asked <= 1.0 and float(ended.read_text()) <= (WORK / "recorder-args").stat().st_mtime,
                   [started, ended.is_file() and float(ended.read_text()) - asked])
             check("the panel goes with its listening", wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3))
+            # Stopped past the half-second in which a second press is the same gesture (toggle_recording).
+            time.sleep(0.7)
             browser.execute_script("window.__TAURI__.core.invoke('record')")
-            wait_for(browser, lambda b: not b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 8)
+            stopped = wait_for(browser, lambda b: not b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 8)
+            check("the recording from the tray stopped", stopped)
             # A panel that stops asking — its page gone, as a crash leaves it —: the shell gives its listening up.
-            opened(browser)
+            # Opened once the stopped recording has let go: until then the panel is refused, as it must be.
+            for _ in range(8):
+                (WORK / "listen-args").unlink(missing_ok=True)
+                opened(browser)
+                if wait_for(None, lambda b: (WORK / "listen-args").is_file(), 2):
+                    break
+                press(browser, "check-sound-close")
+                time.sleep(1)
             ended.unlink(missing_ok=True)
             browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
                                    " asked === 'sound_check_now' ? new Promise(() => {}) : real.invoke(asked, ...rest) }; window.restoreInvoke = () => { window.__TAURI__.core = real; };")
