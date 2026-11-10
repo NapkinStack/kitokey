@@ -186,3 +186,84 @@ read line"#,
     assert!(!heard.headset, "{heard:?}");
     check.stop();
 }
+
+// ---- One listening at a time, never beside a recording (ADR-0015's amendment), and never left behind.
+
+use kitokey_shell::sound_check::{Refused, Slot, open};
+
+/// A program that listens until told, as `listen` does.
+const LISTENS: &str = r#"echo '{"event":"device","source":"others","device":"Speaker"}'
+read line"#;
+
+fn script(folder: &Path) -> std::path::PathBuf {
+    let _held = ONE_AT_A_TIME.lock().unwrap();
+    let path = folder.join("kitokey-capture");
+    fs::write(&path, format!("#!/bin/bash\n{LISTENS}\n")).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    path
+}
+
+#[test]
+fn no_listening_opens_while_a_recording_runs() {
+    let recording = Mutex::new(Some(()));
+    let slot = Mutex::new(Slot::default());
+    let refused = open(&recording, &slot, "main", || panic!("nothing is started"));
+    assert!(matches!(refused, Err(Refused::Recording)));
+    assert!(!slot.lock().unwrap().is_open());
+}
+
+#[test]
+fn a_recording_that_starts_while_a_listening_opens_finds_it_to_stop() {
+    let folder = tempfile::tempdir().unwrap();
+    let program = script(folder.path());
+    let recording: Mutex<Option<()>> = Mutex::new(None);
+    let slot = Mutex::new(Slot::default());
+    std::thread::scope(|scope| {
+        let opening = scope.spawn(|| {
+            open(&recording, &slot, "main", || {
+                // Slow to start, as a program is: a recording asked meanwhile waits for it.
+                std::thread::sleep(Duration::from_millis(300));
+                SoundCheck::start(&program, None)
+            })
+        });
+        std::thread::sleep(Duration::from_millis(50));
+        // A recording's start, as `start_recording` does it: the recording's lock, then the listening's.
+        let started = recording.lock().unwrap();
+        let found = slot.lock().unwrap().take();
+        drop(started);
+        assert!(found.is_some(), "the listening was stored before the recording could start");
+        found.unwrap().stop();
+        assert!(matches!(opening.join().unwrap(), Ok(None)));
+    });
+}
+
+#[test]
+fn a_listening_unasked_too_long_is_given_up_and_one_asked_is_kept() {
+    let folder = tempfile::tempdir().unwrap();
+    let program = script(folder.path());
+    let (recording, slot) = (Mutex::new(None::<()>), Mutex::new(Slot::default()));
+    open(&recording, &slot, "main", || SoundCheck::start(&program, None)).unwrap();
+    let unasked = Duration::from_millis(200);
+    std::thread::sleep(Duration::from_millis(120));
+    assert!(slot.lock().unwrap().asked().is_some());
+    std::thread::sleep(Duration::from_millis(120));
+    assert!(slot.lock().unwrap().abandoned(unasked).is_none(), "asked 120 ms ago");
+    std::thread::sleep(Duration::from_millis(150));
+    let gone = slot.lock().unwrap().abandoned(unasked).expect("unasked 270 ms: given up");
+    gone.stop();
+    assert!(!slot.lock().unwrap().is_open());
+}
+
+#[test]
+fn a_listening_ends_with_the_window_that_opened_it_alone() {
+    let folder = tempfile::tempdir().unwrap();
+    let program = script(folder.path());
+    let (recording, slot) = (Mutex::new(None::<()>), Mutex::new(Slot::default()));
+    open(&recording, &slot, "main", || SoundCheck::start(&program, None)).unwrap();
+    assert!(
+        slot.lock().unwrap().of_window("small").is_none(),
+        "another window's end is not its own"
+    );
+    slot.lock().unwrap().of_window("main").expect("its window gone: it goes").stop();
+    assert!(!slot.lock().unwrap().is_open());
+}

@@ -171,9 +171,8 @@ struct Shell {
     refused: Mutex<bool>,
     /// A licence that could not be read was said in the log: once (D83).
     licence_unread: Mutex<bool>,
-    /// « Vérifier le son » (D88): capture listening while the panel shows, and when the panel last
-    /// asked what it hears — a panel that stops asking is gone, and so is the listening.
-    sound_check: Mutex<Option<(sound_check::SoundCheck, Instant)>>,
+    /// « Vérifier le son » (D88): capture listening while the panel shows (`sound_check::Slot`).
+    sound_check: Mutex<sound_check::Slot>,
     /// The applications that hold a microphone now, as the graph says (D30): a call — no test sound then.
     holders: Mutex<std::collections::BTreeSet<u64>>,
 }
@@ -308,6 +307,20 @@ fn main() {
         }))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        // « Vérifier le son »'s window destroyed with the panel open: its listening goes with it, within
+        // the second capture promises (D88) — stopped off the window's thread. A window hidden closes
+        // the panel itself (`visibilitychange`, `ui/window.js`).
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event
+                && let Some(shell) = window.app_handle().try_state::<Shell>()
+                && let Some(gone) = shell.sound_check.lock().unwrap().of_window(window.label())
+            {
+                std::thread::spawn(move || {
+                    gone.stop();
+                    tracing::info!("shell.sound_check_closed");
+                });
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             listed,
             microphones_listed,
@@ -499,7 +512,7 @@ fn main() {
                 fetched: Mutex::new(None),
                 refused: Mutex::new(false),
                 licence_unread: Mutex::new(false),
-                sound_check: Mutex::new(None),
+                sound_check: Mutex::default(),
                 holders: Mutex::default(),
             });
             // The trial's first day, kept at the first start on a trial licence (PDR-0005).
@@ -1246,46 +1259,43 @@ fn microphone_chosen(shell: State<'_, Shell>, name: Option<String>, description:
     Ok(())
 }
 
-/// « Vérifier le son » opened (D88): capture listens, the microphone the user chose or Auto. Never while
-/// a recording runs — its meters are the bar's —: false then, nothing opened.
+/// « Vérifier le son » opened (D88): capture listens, the microphone the user chose or Auto, for the
+/// window that asked. Never beside a recording — its meters are the bar's —: refused then, nothing opened.
 #[tauri::command]
-async fn sound_check_open(app: AppHandle) -> SoundCheckOpened {
+async fn sound_check_open(app: AppHandle, window: tauri::WebviewWindow) -> SoundCheckOpened {
     let shell = app.state::<Shell>();
-    if shell.recording.lock().unwrap().is_some() {
-        return SoundCheckOpened { opened: false };
-    }
     let microphone = shell.settings().microphone;
     let program = program("kitokey-capture", "KITOKEY_CAPTURE");
-    let started = sound_check::SoundCheck::start(&program, microphone.as_deref());
-    let started = match started {
-        Ok(started) => started,
-        Err(error) => {
+    let opened = sound_check::open(&shell.recording, &shell.sound_check, window.label(), || {
+        sound_check::SoundCheck::start(&program, microphone.as_deref())
+    });
+    let before = match opened {
+        Ok(before) => before,
+        Err(sound_check::Refused::Recording) => return SoundCheckOpened { opened: false },
+        Err(sound_check::Refused::NotStarted(error)) => {
             tracing::error!(detail = %error, "shell.sound_check_failed");
             return SoundCheckOpened { opened: false };
         }
     };
     tracing::info!(auto = microphone.is_none(), "shell.sound_check_opened");
-    let before = shell.sound_check.lock().unwrap().replace((started, Instant::now()));
-    if let Some((before, _)) = before {
+    if let Some(before) = before {
         before.stop();
     }
-    // A panel that no longer asks — its window closed, its page gone — leaves nothing open.
+    // A panel that no longer asks — its page gone — leaves nothing open.
     let watched = app.clone();
     std::thread::spawn(move || {
         loop {
             std::thread::sleep(Duration::from_millis(250));
             let shell = watched.state::<Shell>();
-            let mut check = shell.sound_check.lock().unwrap();
-            match check.as_ref() {
-                Some((_, asked)) if asked.elapsed() > SOUND_CHECK_UNASKED => {
-                    let (gone, _) = check.take().unwrap();
-                    drop(check);
-                    tracing::info!("shell.sound_check_abandoned");
-                    gone.stop();
-                    return;
-                }
-                Some(_) => {}
-                None => return,
+            let mut slot = shell.sound_check.lock().unwrap();
+            if !slot.is_open() {
+                return;
+            }
+            if let Some(gone) = slot.abandoned(SOUND_CHECK_UNASKED) {
+                drop(slot);
+                tracing::info!("shell.sound_check_abandoned");
+                gone.stop();
+                return;
             }
         }
     });
@@ -1312,11 +1322,7 @@ struct SoundChecked {
 
 #[tauri::command]
 fn sound_check_now(shell: State<'_, Shell>) -> SoundChecked {
-    let mut check = shell.sound_check.lock().unwrap();
-    let heard = check.as_mut().map(|(check, asked)| {
-        *asked = Instant::now();
-        check.now()
-    });
+    let heard = shell.sound_check.lock().unwrap().asked();
     SoundChecked {
         open: heard.is_some(),
         heard: heard.unwrap_or_default(),
@@ -1327,9 +1333,10 @@ fn sound_check_now(shell: State<'_, Shell>) -> SoundChecked {
 /// A test sound is about to play (D88): the meeting's side is listened to for it from now on.
 #[tauri::command]
 fn sound_check_mark(shell: State<'_, Shell>) {
-    if let Some((check, _)) = shell.sound_check.lock().unwrap().as_ref() {
+    let slot = shell.sound_check.lock().unwrap();
+    if slot.is_open() {
         tracing::info!("shell.sound_check_test");
-        check.mark();
+        slot.mark();
     }
 }
 
@@ -1342,7 +1349,7 @@ async fn sound_check_close(app: AppHandle) {
 /// Ends the listening, if any, and waits for it: before a recording starts, and when the panel closes.
 fn sound_check_stopped(app: &AppHandle) {
     let check = app.state::<Shell>().sound_check.lock().unwrap().take();
-    if let Some((check, _)) = check {
+    if let Some(check) = check {
         check.stop();
         tracing::info!("shell.sound_check_closed");
     }

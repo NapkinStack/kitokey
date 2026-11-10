@@ -169,3 +169,77 @@ fn heard(state: &mut State, line: &str) {
         _ => {}
     }
 }
+
+/// The one listening the panel holds: whose window asked for it, and when the panel last asked what it
+/// hears — a panel that stops asking is gone, and so is its window's listening.
+#[derive(Default)]
+pub struct Slot {
+    held: Option<(SoundCheck, Instant, String)>,
+}
+
+/// Why no listening opened: a recording runs — never both (ADR-0015's amendment) —, or the program
+/// could not be started.
+#[derive(Debug)]
+pub enum Refused {
+    Recording,
+    NotStarted(String),
+}
+
+impl Slot {
+    pub fn is_open(&self) -> bool {
+        self.held.is_some()
+    }
+
+    /// What the panel shows now; the panel is there to ask.
+    pub fn asked(&mut self) -> Option<Heard> {
+        let (check, asked, _) = self.held.as_mut()?;
+        *asked = Instant::now();
+        Some(check.now())
+    }
+
+    /// A test sound is about to play.
+    pub fn mark(&self) {
+        if let Some((check, ..)) = &self.held {
+            check.mark();
+        }
+    }
+
+    /// The listening taken out, to be stopped: the panel closed, or a recording starting.
+    pub fn take(&mut self) -> Option<SoundCheck> {
+        self.held.take().map(|(check, ..)| check)
+    }
+
+    /// The listening of a panel that has not asked for `unasked`, taken out to be stopped.
+    pub fn abandoned(&mut self, unasked: Duration) -> Option<SoundCheck> {
+        if self.held.as_ref()?.1.elapsed() > unasked {
+            self.take()
+        } else {
+            None
+        }
+    }
+
+    /// The listening the window `label` opened, taken out to be stopped: that window is gone.
+    pub fn of_window(&mut self, label: &str) -> Option<SoundCheck> {
+        if self.held.as_ref()?.2 == label { self.take() } else { None }
+    }
+}
+
+/// Opens a listening for the window `label`, unless a recording runs. The recording's lock is held
+/// from the look to the listening stored — the order `start_recording` takes them in, so neither waits
+/// on the other for ever —: a recording asked meanwhile waits, then finds it to stop. The one it
+/// replaces is returned, to be stopped.
+pub fn open<R>(
+    recording: &Mutex<Option<R>>,
+    slot: &Mutex<Slot>,
+    label: &str,
+    start: impl FnOnce() -> std::io::Result<SoundCheck>,
+) -> Result<Option<SoundCheck>, Refused> {
+    let recording = recording.lock().unwrap();
+    if recording.is_some() {
+        return Err(Refused::Recording);
+    }
+    let started = start().map_err(|error| Refused::NotStarted(error.to_string()))?;
+    let before = slot.lock().unwrap().held.replace((started, Instant::now(), label.to_string()));
+    drop(recording);
+    Ok(before.map(|(check, ..)| check))
+}
