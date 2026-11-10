@@ -102,7 +102,7 @@ fn say(event: Event) {
         Event::Silent { source, nothing } => info!(source = SOURCES[source], nothing, "capture.silent"),
         Event::Heard { source } => info!(source = SOURCES[source], "capture.heard"),
         Event::Stopped { folder, seconds } => info!(session = %session(folder), seconds, "capture.stopped"),
-        Event::Device { source, device } => info!(source = SOURCES[source], device, "capture.device"),
+        Event::Device { source, device, headset } => info!(source = SOURCES[source], device, headset, "capture.device"),
         Event::MicrophoneGone => warn!("capture.microphone_gone"),
         Event::MicrophoneBack => info!("capture.microphone_back"),
         Event::Level { .. } | Event::Microphone { .. } => {}
@@ -406,6 +406,7 @@ fn said_moved(
         say(Event::Device {
             source: index,
             device: name.as_deref(),
+            headset: None,
         });
         kept(index, at, name.as_deref())?;
         last[index] = name;
@@ -1246,10 +1247,14 @@ fn listen_only(microphone: Option<&str>) -> Result<(), String> {
     drop(follower);
     let (stop, _) = stop_asked(true)?;
     let pipewire = host.id().name() == "PipeWire";
-    let (me, there) = graph()
-        .filter(|_| pipewire)
-        .and_then(|dump| call::listened(&dump, u64::from(std::process::id()), microphone).ok())
+    let ours = u64::from(std::process::id());
+    let dump = graph().filter(|_| pipewire);
+    let (me, there) = dump
+        .as_deref()
+        .and_then(|dump| call::listened(dump, ours, microphone).ok())
         .unwrap_or((Me::Default, microphone.is_none()));
+    // What the panel says of a headset (D88): not known where the graph does not read.
+    let headset = dump.as_deref().and_then(|dump| call::headset(dump, &me).ok());
     if !there {
         say(Event::MicrophoneGone);
     }
@@ -1290,6 +1295,7 @@ fn listen_only(microphone: Option<&str>) -> Result<(), String> {
             say(Event::Device {
                 source: index,
                 device: Some(name),
+                headset: headset.filter(|_| index == 0),
             });
         }
     }

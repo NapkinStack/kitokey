@@ -39,8 +39,23 @@ fn every_event_the_program_says_is_one_the_contracts_schema_allows_and_there_are
         Event::Device {
             source: 0,
             device: Some("Headset Microphone"),
+            headset: None,
         },
-        Event::Device { source: 1, device: None },
+        Event::Device {
+            source: 0,
+            device: Some("AirPods Pro"),
+            headset: Some(true),
+        },
+        Event::Device {
+            source: 0,
+            device: Some("Digital Microphone"),
+            headset: Some(false),
+        },
+        Event::Device {
+            source: 1,
+            device: None,
+            headset: None,
+        },
         Event::Stopped { folder, seconds: 0.0 },
         Event::Stopped { folder, seconds: 1912.4 },
         Event::MicrophoneGone,
@@ -77,6 +92,21 @@ fn every_event_the_program_says_is_one_the_contracts_schema_allows_and_there_are
         .map(String::from)
         .into()
     );
+}
+
+#[test]
+fn a_device_says_headset_only_when_it_is_known() {
+    let device = |headset| {
+        Event::Device {
+            source: 0,
+            device: Some("AirPods Pro"),
+            headset,
+        }
+        .line()
+    };
+    assert_eq!(device(Some(true))["headset"], true);
+    assert_eq!(device(Some(false))["headset"], false);
+    assert!(device(None).get("headset").is_none(), "absent: not known");
 }
 
 #[test]

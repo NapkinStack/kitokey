@@ -557,7 +557,7 @@ kill "$named" "$other" "$headset" "$addressed" 2>/dev/null || true; wait "$named
 pactl unload-module "$mic_c"; mic_c=
 pactl unload-module "$mic_d"; mic_d=
 
-say "P. listening without recording (D88): each source heard, nothing written, stopped within a second — asked, or its input closed"
+say "P. listening without recording (D88): each source heard, nothing written, stopped within a second — asked, or its input closed; a headset said"
 # What the run's folder holds, file by file and size: listening must leave it as it was. It starts in a
 # folder of its own, its temporary files there too: they must stay empty.
 files() { find "$work" -mindepth 1 \( -path "$work/p.*" -prune \) -o -type f -printf '%P %s\n' -o -printf '%P/\n' | sort; }
@@ -577,7 +577,8 @@ stopped_within() {
   local asked=$1 as=0; wait "$2" || as=$?
   python3 -c 'import sys, time; sys.exit(0 if time.time() - float(sys.argv[1]) < float(sys.argv[2]) else "took " + str(time.time() - float(sys.argv[1])))' "$asked" "$3" && test "$as" = 0
 }
-# heard RUN ME OTHERS: each source named first, its level above the floor; no line a recording alone says.
+# heard RUN ME OTHERS: each source named first, `me` no headset's; each level above the floor; no line a
+# recording alone says.
 heard() {
   python3 - "$work/p.$1.events" "$2" "$3" <<'PY'
 import json, sys
@@ -586,7 +587,7 @@ devices = [(line["source"], line["device"]) for line in lines if line["event"] =
 loudest = {source: max([line["level"] for line in lines if line["event"] == "level" and line["source"] == source] or [0]) for source in ("me", "others")}
 said = {line["event"] for line in lines}
 named = [source for source, _ in devices[:2]] == ["me", "others"] and all(device.startswith(want) for (_, device), want in zip(devices, sys.argv[2:]))
-ok = named and min(loudest.values()) > 0.5 and said <= {"device", "level"}
+ok = named and lines[0].get("headset") is False and min(loudest.values()) > 0.5 and said <= {"device", "level"}
 print(f"    devices {devices}, loudest {loudest}, said {sorted(said)}")
 sys.exit(0 if ok else "not heard as it should be")
 PY
@@ -629,7 +630,7 @@ pactl set-default-source kitokey_e2e_headset
 check measure2 not-running kitokey_e2e_headset 1
 listen_for headset
 sleep 2
-check grep -q '"device":"kitokey_e2e_headset","event":"device","source":"me"' "$work/p.headset.events"
+check grep -q '"device":"kitokey_e2e_headset","event":"device","headset":true,"source":"me"' "$work/p.headset.events"
 check measure2 running kitokey_e2e_headset
 asked=$(date +%s.%N); echo stop >&3
 check stopped_within "$asked" "$listener" 1

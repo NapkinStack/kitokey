@@ -980,3 +980,22 @@ fn a_graph_read_at_the_start_decides_by_the_name_given() {
         (Me::Default, false)
     );
 }
+
+#[test]
+fn listening_says_whether_me_is_a_headset_s() {
+    // D88: the panel's Bluetooth sentence.
+    let dump = |graph: &[Value]| Value::Array(graph.to_vec()).to_string();
+    let mut headset = sources();
+    headset.push(default_source(AIRPODS));
+    let mut laptop = sources();
+    laptop.push(default_source("alsa_input.laptop"));
+    // The default input listened to: a headset's, or not.
+    assert_eq!(call::headset(&dump(&headset), &Me::Default), Ok(true));
+    assert_eq!(call::headset(&dump(&laptop), &Me::Default), Ok(false));
+    // A microphone held by its name: the headset's, or the laptop's, whatever the default.
+    assert_eq!(call::headset(&dump(&laptop), &held(AIRPODS, "AirPods", false)), Ok(true));
+    let digital = held("alsa_input.laptop", "Digital Microphone", false);
+    assert_eq!(call::headset(&dump(&headset), &digital), Ok(false));
+    // A graph that does not read is said so: not known.
+    assert!(call::headset("not a graph", &Me::Default).is_err());
+}

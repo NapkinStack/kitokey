@@ -287,6 +287,21 @@ pub fn listened(dump: &str, ours: u64, name: Option<&str>) -> Result<(Me, bool),
     Ok((me, found.is_none()))
 }
 
+/// Whether what `listen` opens for the local side (`listened`) is a headset's microphone, read as
+/// [`Me`] reads it: the microphone held by its name, or the default input (D88). An active stream on
+/// it switches the headset to its call profile: the panel says so.
+pub fn headset(dump: &str, me: &Me) -> Result<bool, String> {
+    let graph = Graph::read(dump)?;
+    Ok(match me {
+        Me::Hold(microphone) => graph
+            .nodes
+            .iter()
+            .find(|(_, node)| node.name == microphone.name)
+            .is_some_and(|(id, _)| graph.loopback_behind(*id, &mut BTreeSet::new())),
+        Me::Default | Me::Wait => graph.default_waits(),
+    })
+}
+
 /// The microphones that can be named at the start, each its id and what a person reads, by what a
 /// person reads, then by id.
 pub fn microphones(dump: &str) -> Result<Vec<(String, String)>, String> {
