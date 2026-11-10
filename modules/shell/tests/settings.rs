@@ -504,6 +504,27 @@ fn the_sidebar_is_open_until_folded_and_kept_folded_by_every_other_write() {
 }
 
 #[test]
+fn the_bar_is_opened_where_it_was_left() {
+    // D90: none until the user leaves it somewhere; written, and read again as it was left.
+    assert_eq!(Settings::default().bar_at, None);
+    assert_eq!(written("bar_at = [1500, -20]\n").unwrap().bar_at, Some([1500, -20]));
+    assert!(written("bar_at = [1500]\n").is_err());
+    assert!(written("bar_at = \"top\"\n").is_err());
+    let folder = tempfile::tempdir().unwrap();
+    let path = folder.path().join("settings.toml");
+    fs::write(&path, "# mine\nreminder = false\n").unwrap();
+    let mut settings = read(&path).unwrap();
+    settings.bar_at = Some([1460, 980]);
+    write(&path, &settings).unwrap();
+    assert!(fs::read_to_string(&path).unwrap().contains("bar_at = [1460, 980]"));
+    settings.offer = false;
+    write(&path, &settings).unwrap();
+    let again = read(&path).unwrap();
+    assert_eq!((again.bar_at, again.offer), (Some([1460, 980]), false));
+    assert!(fs::read_to_string(&path).unwrap().contains("# mine"));
+}
+
+#[test]
 fn the_assistant_is_due_only_with_no_meeting_and_not_welcomed() {
     let folder = tempfile::tempdir().unwrap();
     let mut settings = Settings {

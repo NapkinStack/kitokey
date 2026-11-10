@@ -263,6 +263,8 @@ pub struct Menu {
     pub minutes: &'static str,
     /// The same entry while they are being written.
     pub minuting: &'static str,
+    /// Brings back the recording bar the user hid (D90).
+    pub show_bar: &'static str,
 }
 
 pub fn menu(language: Language) -> Menu {
@@ -278,6 +280,7 @@ pub fn menu(language: Language) -> Menu {
             transcribing: "Transcribing…",
             minutes: "Write the minutes of the last recording",
             minuting: "Writing the minutes…",
+            show_bar: "Show the bar",
         },
         Language::French => Menu {
             start: "Démarrer un enregistrement",
@@ -290,6 +293,7 @@ pub fn menu(language: Language) -> Menu {
             transcribing: "Transcription en cours…",
             minutes: "Rédiger le compte rendu de la dernière réunion",
             minuting: "Compte rendu en cours…",
+            show_bar: "Afficher la barre",
         },
     }
 }
@@ -525,6 +529,7 @@ pub struct Window {
     /// The bar's options (D90): opened under its row, closed again.
     pub bar_more: &'static str,
     pub bar_less: &'static str,
+    pub bar_hide: &'static str,
     pub small_microphone: &'static str,
     pub small_microphones: &'static str,
     pub microphone_auto: &'static str,
@@ -940,6 +945,7 @@ pub fn window(language: Language) -> Window {
             small_full: "The whole window",
             bar_more: "More options",
             bar_less: "Fewer options",
+            bar_hide: "Hide the bar",
             small_microphone: "Microphone: {}",
             small_microphones: "The microphone of the next recording",
             microphone_auto: "Auto",
@@ -1340,6 +1346,7 @@ pub fn window(language: Language) -> Window {
             small_full: "Toute la fenêtre",
             bar_more: "Plus d’options",
             bar_less: "Moins d’options",
+            bar_hide: "Masquer la barre",
             small_microphone: "Micro\u{a0}: {}",
             small_microphones: "Le micro du prochain enregistrement",
             microphone_auto: "Auto",
