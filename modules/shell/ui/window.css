@@ -274,14 +274,31 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 .free-total .total { display: flex; align-items: baseline; gap: 8px; }
 .free-total .total strong { font-size: 24px; }
 
-/* The small window while recording (D11's sixth board). */
+/* The recording bar (D90's boards): one row of 44 px on the surface, its controls 28 px; under it,
+   its options once opened, and the recording's view. */
+body.small-window { background: var(--surface); }
 body.small-window .frame { display: none; }
-#small { max-width: none; padding: 14px 20px; gap: 10px; }
-.small-top { display: flex; align-items: center; gap: 12px; }
-.live-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--red); animation: beat 1.2s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
-.small-top .time { font: 500 30px ui-monospace, monospace; letter-spacing: 0.02em; }
-.small-top .icon { margin-left: auto; width: 40px; min-height: 40px; padding: 0; font-size: 18px; }
+#small { max-width: none; padding: 0; gap: 0; }
+#small .bar-row { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 8px 0 12px; }
+#small .bar-space { flex: 1 1 auto; }
+#small .bar-row .icon-button { width: 28px; min-height: 28px; }
+/* The mark alone, in the accent: the handle; recording, its dot red and larger (the decider, 2026-11-08). */
+#small .handle { display: grid; place-items: center; margin-right: 8px; color: var(--accent); cursor: grab; }
+.mark { display: block; width: 20px; height: 20px; fill: currentColor; }
+.mark .arms { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.mark .live, .handle.live .mark .rest { display: none; }
+.handle.live .mark .live { display: inline; }
+#small .handle.live .dot { fill: var(--red); }
+#small .time { font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+/* ● to record, a red ring holding a red dot that grows under the pointer; ■ to stop, red. */
+#small .record { display: inline-grid; place-items: center; width: 28px; min-height: 28px; padding: 0; border: 2px solid var(--red); border-radius: 50%; background: transparent; cursor: pointer; }
+#small .record .record-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--red); transition: transform 90ms ease-out; }
+#small .record:hover .record-dot { transform: scale(1.15); }
+#small .record:disabled { opacity: 0.45; cursor: default; }
+#small .danger { display: inline-grid; place-items: center; width: 28px; min-height: 28px; padding: 0; }
+#small .stop-square { width: 10px; height: 10px; border-radius: 2px; background: var(--surface); }
+#small .small-rest, #small .small-live { padding: 8px 16px 14px; border-top: 1px solid var(--line); }
+#small > .small-said { margin: 0; padding: 0 16px 8px; }
 /* The room of the two sentences a silence may say is kept under the meters: Arrêter never moves as
    the recording goes (D49). */
 .meters { display: grid; grid-template-columns: max-content 1fr; align-items: center; align-content: start; gap: 4px 16px; height: 122px; }
@@ -311,36 +328,22 @@ body.small-window .frame { display: none; }
 .meter .track { height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
 .meter .fill { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--accent); transition: width 90ms linear; }
 #level-others { background: var(--ok); }
-#small .danger { width: 100%; }
 .small-announce { display: flex; flex-wrap: wrap; align-items: baseline; align-content: flex-start; gap: 0 10px; height: 32px; font-size: 12px; line-height: 1.3; color: var(--soft); }
 .small-announce[hidden] { display: none; }
 .small-announce.gone { visibility: hidden; }
 #small .small-announce .link, #small .small-announce .says { font-size: 12px; line-height: 1.3; }
 #small .small-live { gap: 5px; }
-#small .small-live .disclose { min-height: 34px; }
-#small .small-live .danger { min-height: 40px; }
-.small-live .small-top .time { font-size: 26px; }
-.small-live .small-top .icon { min-height: 34px; width: 34px; }
+#small .small-live .disclose { min-height: 28px; }
 .small-live.context-open .small-announce { display: none; }
 #small #small-note { font-size: 12px; line-height: 1.25; }
-/* At rest (D35, D34's board): the recording's gesture, the last meeting, the way to the full window. */
 .small-rest, .small-live { display: flex; flex-direction: column; gap: 12px; }
-.small-brand { font-weight: 700; font-size: 16px; }
-#small .primary { width: 100%; justify-content: center; }
-#small .hint { margin: -6px 0 0; padding: 0; border: 0; background: none; color: var(--soft); font: inherit; font-size: 13px; text-align: center; }
-#small .hint:enabled { cursor: pointer; text-decoration: underline; }
-#small .hint:disabled { opacity: 1; }
-#small .last { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
-#small .last .label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--soft); }
-#small .last .what { font-weight: 600; }
-#small .none { margin: 0; color: var(--soft); }
 #small .link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
-/* The microphone's name, and its list over what is under it (D74). */
+/* The microphone's name, and its list under it, the bar growing to hold it (D74, D90). */
 .small-microphone { position: relative; }
 .small-microphone[hidden] { display: none; }
-#small .small-microphone .disclose { min-height: 34px; gap: 8px; }
+#small .small-microphone .disclose { min-height: 28px; gap: 8px; }
 .small-microphone .named { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.small-microphones { position: absolute; z-index: 2; top: calc(100% + 4px); left: 0; right: 0; display: flex; flex-direction: column; gap: 4px; padding: 6px; overflow: hidden auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); }
+.small-microphones { margin-top: 4px; max-height: 240px; display: flex; flex-direction: column; gap: 4px; padding: 6px; overflow: hidden auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .small-microphones[hidden] { display: none; }
 .small-microphones .choice { flex: none; padding: 6px 10px; gap: 10px; }
 .small-microphones .said { min-width: 0; }
@@ -348,7 +351,6 @@ body.small-window .frame { display: none; }
 .small-microphones .says { font-size: 12px; line-height: 1.25; }
 .small-microphones .says:empty { display: none; }
 .small-microphones > .says { margin: 4px 10px; }
-.small-foot { display: flex; justify-content: space-between; align-items: center; color: var(--soft); font-size: 13px; }
 
 /* What is made in the background (D25): said on the meeting's page, and on a list's row. */
 .chip.making { color: var(--accent); font-weight: 600; }

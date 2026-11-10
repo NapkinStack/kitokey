@@ -14,7 +14,12 @@ use oxc_span::{GetSpan, SourceType};
 const SILENT: &[(&str, usize, &str)] = &[
     ("page_failed", 1, "the log itself: nowhere left to say it"),
     ("makings", 2, "returns no `Result`: it cannot fail"),
-    ("header", 1, "returns no `Result`: it cannot fail"),
+    ("header", 2, "returns no `Result`: it cannot fail"),
+    (
+        "bar_fit",
+        1,
+        "returns no `Result`: it cannot fail; a size refused leaves the bar as it was",
+    ),
     (
         "microphones_listed",
         1,

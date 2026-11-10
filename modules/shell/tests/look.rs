@@ -337,8 +337,16 @@ fn rules(style: &str) -> Vec<(String, String)> {
 }
 
 /// What draws a recording, the one use of the red (D89): the header's button and the name's dot while it
-/// records, a row's live chip, the small window's dot and Arrêter.
-const RECORDING: [&str; 5] = [".brand.live #name-dot", ".chip.live", ".act .primary.live", ".live-dot", ".danger"];
+/// records, a row's live chip, the bar's ● and ■, its handle's dot while it records (D90).
+const RECORDING: [&str; 7] = [
+    ".brand.live #name-dot",
+    ".chip.live",
+    ".act .primary.live",
+    "#small .handle.live .dot",
+    "#small .record",
+    "#small .record .record-dot",
+    ".danger",
+];
 
 /// CSS Color 4's named colours, its table of 148 (https://www.w3.org/TR/css-color-4/#named-colors):
 /// a colour written by its name is a value as `#RRGGBB` is, `crimson` a red as `red` is.

@@ -88,10 +88,11 @@ in the settings file; one Kitokey could not read is said, and not written over. 
 longer than the settings say goes to the system's trash — at start, then every hour, said once —
 from sessions whose transcript is whole; their transcript and minutes stay.
 
-**The small window** (D35, D34's board) opens first: *Démarrer un enregistrement* and the shortcut
-as the desktop granted it — or where to choose one —, the last meeting and where it stands, what
-the meetings weigh, and the way to the full window. A recording shows in it (board 6, D33), above
-the other windows until the stop; then it comes back to rest. While recording, each side has its
+**The recording bar** (D90, in place of D35's small window) opens first: one row, 440 × 44 — the
+mark, ● to record, its options, the way to the full window, each an icon named by its words, the
+shortcut in ●'s tooltip; its options open under the row, the window as tall as it shows. A recording
+shows in it (D33) — the time and ■ in the row, the mark's dot red —, above the other windows until
+the stop; then it comes back to rest. While recording, each side has its
 check (D49): a ring that turns ✓ when it is heard, then fades; a silence capture says is said under
 it, a side with no device too, and *Arrêter* stays where it is as they come. One window at a time: going from one
 to the other replaces it, and the one left — `window` in the settings, `small` or `full` — is the
