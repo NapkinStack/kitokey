@@ -86,6 +86,8 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 #meeting { padding-top: 0; }
 .meeting-head { display: flex; align-items: center; gap: 12px 16px; min-height: 56px; margin: 0 -24px; padding: 8px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
 .lasts { color: var(--soft); font-size: 13px; white-space: nowrap; }
+/* On the title's line, never on the date's above it (board 4): the bottoms of the name and of these words together. */
+.meeting-head .lasts { align-self: flex-end; }
 .lasts .length + .weighs::before { content: " · "; }
 .meeting-head .meeting-title { flex: 1 1 auto; min-width: 0; }
 .meeting-head .meeting-top { flex: none; }

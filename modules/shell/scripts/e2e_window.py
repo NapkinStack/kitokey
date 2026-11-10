@@ -2472,6 +2472,16 @@ def meeting_named(now: dt.datetime) -> None:
         page = wait_for(browser, lambda b: at_head(b, 1, 0) == "H1" and at_head(b, 1, 2) == long, 10)
         got = browser.execute_script(head)
         check("on its page: the date above, the title its heading", page and got[0][0] != "H1" and "·" in got[0][2], got)
+        # D89, board 4: how long and how heavy beside the title, on its line — never on the date's above
+        # it; read where the title holds on one line beside them, 1920 wide.
+        was = browser.get_window_size()
+        browser.set_window_size(1920, 1080)
+        wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 5)
+        beside = browser.execute_script(
+            "const h = document.querySelector('#meeting h1').getBoundingClientRect(), l = document.querySelector('#meeting .lasts').getBoundingClientRect();"
+            " return [Math.round(l.left - h.right), Math.round(l.bottom - h.bottom)]")
+        check("on its page: its length and weight beside the title, on the title's line (D89)", 0 < beside[0] <= 24 and abs(beside[1]) < 6, beside)
+        browser.set_window_size(was["width"], was["height"])
         shot(browser, "d48-named")
         browser.execute_script(f"location.hash = '#/meeting/{marked.name}'")
         as_text = wait_for(browser, lambda b: at_head(b, 1, 2).startswith("<img"), 10)
