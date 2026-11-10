@@ -668,6 +668,25 @@ check gone_unsaid
 sed 's/^/    errors: /' "$work/p.named.errors" >> .evidence/e2e.txt
 pactl unload-module "$mic_c"; mic_c=
 grep -v '"level"' "$work"/p.*.events | sed 's/^/    /' >> .evidence/e2e.txt
+# `headset` is said on listening's first `device` of `me` alone (recording/v1): never on a later one,
+# never on `others`', never by a recording — every scenario's lines read.
+headset_said_once() {
+  python3 - "$work" <<'PY' 2>&1 | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"
+import json, pathlib, sys
+wrong, listened = [], 0
+for path in sorted(pathlib.Path(sys.argv[1]).glob("*.events")):
+    lines = [json.loads(line) for line in path.read_text().splitlines() if line.startswith("{")]
+    listening = path.name.startswith("p.")
+    first = next((n for n, line in enumerate(lines) if line.get("event") == "device" and line.get("source") == "me"), None) if listening else None
+    for n, line in enumerate(lines):
+        if "headset" in line and not (listening and n == first):
+            wrong.append(f"{path.name}:{n + 1} {line}")
+    listened += listening
+print(f"    headset: {len(wrong)} line(s) where recording/v1 does not say it, in {listened} listening runs and every recording's" + "".join(f"\n      {w}" for w in wrong[:5]))
+sys.exit(1 if wrong or not listened else 0)
+PY
+}
+check headset_said_once
 check unchanged
 
 [ "$failed" = 0 ] && say "e2e: passed" || say "e2e: FAILED"

@@ -1254,7 +1254,7 @@ fn listen_only(microphone: Option<&str>) -> Result<(), String> {
         .and_then(|dump| call::listened(dump, ours, microphone).ok())
         .unwrap_or((Me::Default, microphone.is_none()));
     // What the panel says of a headset (D88): not known where the graph does not read.
-    let headset = dump.as_deref().and_then(|dump| call::headset(dump, &me).ok());
+    let headset = call::listened_headset(dump.as_deref(), &me);
     if !there {
         say(Event::MicrophoneGone);
     }
