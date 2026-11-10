@@ -678,8 +678,6 @@ fn show_small(app: &AppHandle) {
     let _ = WebviewWindowBuilder::new(app, "small", WebviewUrl::App("index.html#/small".into()))
         .title("Kitokey")
         .inner_size(BAR.0, BAR.1)
-        .min_inner_size(BAR.0, BAR.1)
-        .max_inner_size(BAR.0, BAR.1)
         .decorations(false)
         .always_on_top(recording)
         .build();

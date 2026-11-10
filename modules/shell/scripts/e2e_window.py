@@ -2315,7 +2315,7 @@ def microphone_chosen(now: dt.datetime) -> None:
                 (taping / "mic-gone").touch()
                 check(f"{short} {theme}: gone a third time, said", wait_for(browser, lambda b: b.execute_script(said) == gone, 5), browser.execute_script(said))
                 stop_from_small(browser)
-                check(f"{short} {theme}: stopped, at rest", wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8))
+                check(f"{short} {theme}: stopped, at rest", wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and not b.find_element(By.ID, "small-stop").is_displayed(), 8))
                 # A press within half a second of the last is the same one, for the shell.
                 time.sleep(0.8)
                 press(browser, "small-record")
@@ -2323,7 +2323,7 @@ def microphone_chosen(now: dt.datetime) -> None:
                 time.sleep(1)
                 check(f"{short} {theme}: the next recording does not say the last one's gone", browser.execute_script(said) != gone, browser.execute_script(said))
                 stop_from_small(browser)
-                wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8)
+                wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and not b.find_element(By.ID, "small-stop").is_displayed(), 8)
             # Kept for another start; Auto again takes the name away, from the file and the next start.
             with window as browser:
                 options(browser)
@@ -2351,7 +2351,7 @@ def microphone_chosen(now: dt.datetime) -> None:
                 check(f"{short} {theme}: on Auto the recording names none", "--microphone" not in args.read_text(), args.read_text())
                 wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8)
                 stop_from_small(browser)
-                wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8)
+                wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and not b.find_element(By.ID, "small-stop").is_displayed(), 8)
 
     # What the fr light window above does not need twice: the other states, once.
     taping = WORK / "microphones-states"
@@ -2417,7 +2417,7 @@ def microphone_chosen(now: dt.datetime) -> None:
             check("the next recording takes the earlier choice", "--microphone alsa_laptop" in args.read_text(), args.read_text())
             wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8)
             stop_from_small(browser)
-            wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8)
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and not b.find_element(By.ID, "small-stop").is_displayed(), 8)
         finally:
             window.file.parent.chmod(0o755)
             window.file.chmod(0o644)
@@ -4120,8 +4120,8 @@ def context_written(now: dt.datetime) -> None:
         check("what is typed is the meeting's context.txt, whole, as typed", kept, (meeting / "context.txt").read_text() if (meeting / "context.txt").exists() else None)
         check("nothing is left beside it", sorted(p.name for p in meeting.iterdir()) == ["context.txt", "session.json"], sorted(p.name for p in meeting.iterdir()))
         time.sleep(0.3)
-        check("open and written, it holds in its window — 380 × 400", fits(browser)[0] <= fits(browser)[1]
-              and browser.execute_script("return [innerWidth, innerHeight]") == [380, 400], (fits(browser), browser.execute_script("return [innerWidth, innerHeight]")))
+        check("open and written, it holds in the bar — 440 wide, as tall as it shows", fits(browser)[0] <= fits(browser)[1]
+              and browser.execute_script("return innerWidth") == 440, (fits(browser), browser.execute_script("return [innerWidth, innerHeight]")))
         seen(browser, "d59-2-small-open-light")
         # Another script: said in the count, the window still whole.
         keys(browser, " Γιώργος Παπαδόπουλος.")
@@ -4487,8 +4487,8 @@ def confidential_kept(now: dt.datetime) -> None:
         check("turned on by the keyboard, the meeting's file confidential is written, empty, nothing beside it",
               marked and (meeting / "confidential").read_bytes() == b"" and names(meeting) == ["confidential", "session.json"], names(meeting))
         time.sleep(0.3)
-        check("on, the window holds whole — 380 × 400", fits(browser)[0] <= fits(browser)[1]
-              and browser.execute_script("return [innerWidth, innerHeight]") == [380, 400], fits(browser))
+        check("on, the bar holds whole — 440 wide, as tall as it shows", fits(browser)[0] <= fits(browser)[1]
+              and browser.execute_script("return innerWidth") == 440, (fits(browser), browser.execute_script("return [innerWidth, innerHeight]")))
         seen(browser, "d60-2-small-on-light")
         press(browser, "small-context-toggle")
         time.sleep(0.4)
