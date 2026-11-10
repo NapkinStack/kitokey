@@ -185,11 +185,19 @@ def check(what: str, held: bool, got: object = "") -> None:
 
 
 def shot(browser, name: str) -> None:
-    """The page as it is, saved where KITOKEY_SCREENSHOTS says: for an eye against D11's boards."""
+    """The page as it is, saved where KITOKEY_SCREENSHOTS says: for an eye against D11's boards. One
+    whose name says its theme is measured: a light one light, a dark one dark (D89), its mean
+    lightness read by ImageMagick, 0 black to 1 white."""
     folder = os.environ.get("KITOKEY_SCREENSHOTS")
     if folder:
         Path(folder).mkdir(parents=True, exist_ok=True)
         browser.save_screenshot(str(Path(folder) / f"{name}.png"))
+        theme = next((theme for theme in ("light", "dark") if theme in name.split("-")), None)
+        if theme:
+            said = subprocess.run(["magick", str(Path(folder) / f"{name}.png"), "-colorspace", "Gray", "-format", "%[fx:mean]", "info:"],
+                                  capture_output=True, text=True).stdout.strip()
+            mean = float(said) if said.replace(".", "", 1).isdigit() else None
+            check(f"{name}: the screenshot is {theme}", mean is not None and (mean >= 0.6 if theme == "light" else mean <= 0.4), said)
 
 
 def choose(browser, element_id: str, value: str) -> None:
@@ -230,13 +238,20 @@ def panel_choice(browser, choices: str, index: int):
     return browser.find_elements(By.CSS_SELECTOR, choices)[index]
 
 
-def shot_themed(browser, name: str, theme: str) -> None:
-    """A screenshot in its theme: on a dark desktop, the light one's colours put on the page."""
+def tokens(theme: str) -> str:
+    """A theme's colours as `ui/window.css` sets them: the light ones first, the dark ones under
+    `prefers-color-scheme: dark`."""
     css = (Path(__file__).parent.parent / "ui" / "window.css").read_text()
-    light = css[css.index(":root {") + len(":root {"):css.index("}", css.index(":root {"))].replace("\n", " ").strip()
-    forced = theme == "light" and browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
+    start = css.index(":root {", 0 if theme == "light" else css.index("prefers-color-scheme: dark")) + len(":root {")
+    return css[start:css.index("}", start)].replace("\n", " ").strip()
+
+
+def shot_themed(browser, name: str, theme: str) -> None:
+    """A screenshot in its theme: the system's, or, where the desktop shows the other one, the theme's
+    colours put on the page — a dark one on a light desktop as a light one on a dark desktop (D89)."""
+    forced = (theme == "dark") != browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
     if forced:
-        browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: light'", light)
+        browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
         time.sleep(0.3)
     shot(browser, name)
     if forced:
@@ -1196,19 +1211,9 @@ def first_run(now: dt.datetime) -> None:
             window.env.update(GTK_THEME="Adwaita:dark")
         return window
 
-    # The light theme's colours, as `ui/window.css` sets them first.
-    css = (Path(__file__).parent.parent / "ui" / "window.css").read_text()
-    light = css[css.index(":root {") + len(":root {"):css.index("}", css.index(":root {"))].replace("\n", " ").strip()
-
     def seen(browser, name: str) -> None:
         time.sleep(0.4)  # the card's arrival, 180 ms, ended
-        forced = "light" in name and browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
-        if forced:
-            browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: light'", light)
-            time.sleep(0.3)  # the choices' borders, which ease to their colour
-        shot(browser, name)
-        if forced:
-            browser.execute_script("document.documentElement.style.cssText = ''")
+        shot_themed(browser, name, "light" if "light" in name.split("-") else "dark")
 
     def until_question(browser) -> bool:
         return wait_for(browser, lambda b: "Vos réunions parlent-elles" in b.execute_script(welcome) or "Do your meetings" in b.execute_script(welcome), 10)
@@ -2310,7 +2315,7 @@ def microphone_chosen(now: dt.datetime) -> None:
                 (taping / "mic-gone").touch()
                 check(f"{short} {theme}: gone a third time, said", wait_for(browser, lambda b: b.execute_script(said) == gone, 5), browser.execute_script(said))
                 stop_from_small(browser)
-                check(f"{short} {theme}: stopped, at rest", wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8))
+                check(f"{short} {theme}: stopped, at rest", wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and not b.find_element(By.ID, "small-stop").is_displayed(), 8))
                 # A press within half a second of the last is the same one, for the shell.
                 time.sleep(0.8)
                 press(browser, "small-record")
@@ -2318,7 +2323,7 @@ def microphone_chosen(now: dt.datetime) -> None:
                 time.sleep(1)
                 check(f"{short} {theme}: the next recording does not say the last one's gone", browser.execute_script(said) != gone, browser.execute_script(said))
                 stop_from_small(browser)
-                wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8)
+                wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and not b.find_element(By.ID, "small-stop").is_displayed(), 8)
             # Kept for another start; Auto again takes the name away, from the file and the next start.
             with window as browser:
                 options(browser)
@@ -2346,7 +2351,7 @@ def microphone_chosen(now: dt.datetime) -> None:
                 check(f"{short} {theme}: on Auto the recording names none", "--microphone" not in args.read_text(), args.read_text())
                 wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8)
                 stop_from_small(browser)
-                wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8)
+                wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and not b.find_element(By.ID, "small-stop").is_displayed(), 8)
 
     # What the fr light window above does not need twice: the other states, once.
     taping = WORK / "microphones-states"
@@ -2412,7 +2417,7 @@ def microphone_chosen(now: dt.datetime) -> None:
             check("the next recording takes the earlier choice", "--microphone alsa_laptop" in args.read_text(), args.read_text())
             wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8)
             stop_from_small(browser)
-            wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-rest').hidden"), 8)
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and not b.find_element(By.ID, "small-stop").is_displayed(), 8)
         finally:
             window.file.parent.chmod(0o755)
             window.file.chmod(0o644)
@@ -2442,9 +2447,9 @@ def microphone_chosen(now: dt.datetime) -> None:
 
 
 def bar_window(now: dt.datetime) -> None:
-    """AX. The bar as a window (D90, board 8): no title bar, « Masquer la barre »; hidden during a
+    """AY. The bar as a window (D90, board 8): no title bar, « Masquer la barre »; hidden during a
     recording, it never comes back by itself — the tray's « Afficher la barre » brings it back."""
-    print("AX. the bar without a title bar; hidden while recording, it stays hidden whatever happens, the tray stops and brings it back (D90)")
+    print("AY. the bar without a title bar; hidden while recording, it stays hidden whatever happens, the tray stops and brings it back (D90)")
     taping = WORK / "bar-hidden"
     taping.mkdir()
     hidden = "return document.visibilityState"
@@ -3308,8 +3313,6 @@ def two_panes(now: dt.datetime) -> None:
         "## 1.\n\n" + "Un compte rendu assez long pour que son texte aille à la ligne bien avant le bord de sa carte. " * 6 + "\n\n"
         "## 2.\n\n- Mettre à jour le planning — Marc — aujourd’hui\n\n## 3.\n\n- Un serveur est gardé pour la démonstration.\n"
     )
-    css = (Path(__file__).parent.parent / "ui" / "window.css").read_text()
-    light = css[css.index(":root {") + len(":root {"):css.index("}", css.index(":root {"))].replace("\n", " ").strip()
     box = lambda b, selector: b.execute_script(
         "const e = document.querySelector(arguments[0]); if (!e || !e.offsetParent && getComputedStyle(e).position !== 'fixed') return null;"
         "const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom];", selector)
@@ -3318,14 +3321,9 @@ def two_panes(now: dt.datetime) -> None:
     sideways = lambda b: b.execute_script("return document.documentElement.scrollWidth > window.innerWidth")
 
     def seen(browser, name: str) -> None:
-        """A screenshot in the theme its name says: the light one put on the page over a dark desktop."""
-        forced = "light" in name and browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
-        if forced:
-            browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: light'", light)
+        """A screenshot in the theme its name says."""
         time.sleep(0.3)
-        shot(browser, name)
-        if forced:
-            browser.execute_script("document.documentElement.style.cssText = ''")
+        shot_themed(browser, name, "light" if "light" in name.split("-") else "dark")
 
     with Window(meetings, "fr_FR.UTF-8") as browser:
         browser.set_window_size(1100, 800)
@@ -4094,18 +4092,11 @@ def context_written(now: dt.datetime) -> None:
     model.write_bytes(b"\0" * 16)
     settings = (f'after = "minutes"\nreminder = false\nmodel = "{model}"\n'
                 'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n')
-    css = (Path(__file__).parent.parent / "ui" / "window.css").read_text()
-    light = css[css.index(":root {") + len(":root {"):css.index("}", css.index(":root {"))].replace("\n", " ").strip()
 
     def seen(browser, name: str) -> None:
-        """A screenshot in the theme its name says: the light one put on the page over a dark desktop."""
-        forced = "light" in name and browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
-        if forced:
-            browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: light'", light)
-            time.sleep(0.3)
-        shot(browser, name)
-        if forced:
-            browser.execute_script("document.documentElement.style.cssText = ''")
+        """A screenshot in the theme its name says."""
+        time.sleep(0.3)
+        shot_themed(browser, name, "light" if "light" in name.split("-") else "dark")
 
     def recording(name: str, language: str, dark: bool = False) -> tuple["Window", Path]:
         meetings = WORK / f"context-{name}"
@@ -4162,7 +4153,7 @@ def context_written(now: dt.datetime) -> None:
         check("what is typed is the meeting's context.txt, whole, as typed", kept, (meeting / "context.txt").read_text() if (meeting / "context.txt").exists() else None)
         check("nothing is left beside it", sorted(p.name for p in meeting.iterdir()) == ["context.txt", "session.json"], sorted(p.name for p in meeting.iterdir()))
         time.sleep(0.3)
-        check("open and written, it holds in its window — 440 wide", fits(browser)[0] <= fits(browser)[1]
+        check("open and written, it holds in the bar — 440 wide, as tall as it shows", fits(browser)[0] <= fits(browser)[1]
               and browser.execute_script("return innerWidth") == 440, (fits(browser), browser.execute_script("return [innerWidth, innerHeight]")))
         seen(browser, "d59-2-small-open-light")
         # Another script: said in the count, the window still whole.
@@ -4483,18 +4474,11 @@ def confidential_kept(now: dt.datetime) -> None:
     switch = lambda b, id_: b.find_element(By.ID, id_)
     focused = lambda b: b.execute_script("return document.activeElement.id")
     left = "return document.getElementById('confidential-left')?.hidden ? '' : (document.getElementById('confidential-left')?.innerText || '')"
-    css = (Path(__file__).parent.parent / "ui" / "window.css").read_text()
-    light = css[css.index(":root {") + len(":root {"):css.index("}", css.index(":root {"))].replace("\n", " ").strip()
 
     def seen(browser, name: str) -> None:
-        """A screenshot in the theme its name says: the light one put on the page over a dark desktop."""
-        forced = "light" in name and browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
-        if forced:
-            browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: light'", light)
-            time.sleep(0.3)
-        shot(browser, name)
-        if forced:
-            browser.execute_script("document.documentElement.style.cssText = ''")
+        """A screenshot in the theme its name says."""
+        time.sleep(0.3)
+        shot_themed(browser, name, "light" if "light" in name.split("-") else "dark")
 
     def window(folder: Path, language: str, more: str, small: bool = False, dark: bool = False) -> "Window":
         made = Window(folder, language, more, ollama=base, small=small)
@@ -4528,8 +4512,8 @@ def confidential_kept(now: dt.datetime) -> None:
         check("turned on by the keyboard, the meeting's file confidential is written, empty, nothing beside it",
               marked and (meeting / "confidential").read_bytes() == b"" and names(meeting) == ["confidential", "session.json"], names(meeting))
         time.sleep(0.3)
-        check("on, with its context, the window holds whole — 440 wide", fits(browser)[0] <= fits(browser)[1]
-              and browser.execute_script("return innerWidth") == 440, fits(browser))
+        check("on, with its context, the bar holds whole — 440 wide, as tall as it shows", fits(browser)[0] <= fits(browser)[1]
+              and browser.execute_script("return innerWidth") == 440, (fits(browser), browser.execute_script("return [innerWidth, innerHeight]")))
         seen(browser, "d60-2-small-on-light")
         stop_from_small(browser)
         made = wait_for(browser, lambda b: front(meeting, "provider") == "local", 20)
@@ -5276,6 +5260,55 @@ def window_looks(now: dt.datetime) -> None:
         said = browser.execute_script("const c = document.querySelector('.turned'); return c ? getComputedStyle(c).animationName : null")
         check("a chip turned: it does not move", turned and said == "none", said)
         check("the full window: nothing moved, nothing can", browser.execute_script(MOVING) == [], browser.execute_script(MOVING))
+
+
+def pages_seen(now: dt.datetime) -> None:
+    """AX. The window's pages in both themes, at 1920 and 420 CSS px, for the eye against D89's boards."""
+    print("AX. the list, a meeting's page and Settings in the light and the dark theme the system asks, at 1920 and 420 CSS px (D89)")
+    meetings = WORK / "pages"
+    titles = ["Point produit de la semaine", "Revue du budget T4", "Entretien — poste de développeur",
+              "Atelier sur la feuille de route", "Comité de pilotage", "Rétrospective de l’équipe"]
+    names = [f"2026-10-{day:02d}_10-00" for day in range(18, 18 + len(titles))]
+    for index, (name, title) in enumerate(zip(names, titles)):
+        folder = meetings / name
+        session(folder, now - dt.timedelta(days=2 * (len(titles) - index)), 25 + 5 * index, {"local.wav": 1000})
+        (folder / "minutes.md").write_text(
+            f"---\ncontract: minutes/v2\nmade: 2026-10-23T11:00:00+02:00\nprovider: local\nmodel: m\ncontext: null\ntitle: {json.dumps(title)}\n---\n\n"
+            "## 1.\n\nLe calendrier est validé ; la démonstration est avancée d’une semaine.\n\n"
+            "## 2.\n\n- Mettre à jour le planning — Marc — vendredi\n- Relancer le fournisseur — Paul — non précisé\n\n"
+            "## 3.\n\n- Un serveur est gardé pour la démonstration.\n")
+    lines = [
+        {"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0", "language": "fr", "context": None},
+        *({"type": "segment", "speaker": "me", "track": "local", "voice": None, "start": 6.0 * i, "end": 6.0 * i + 5,
+           "text": "Une phrase de la réunion, inventée pour l’essai, assez longue pour aller à la ligne."} for i in range(8)),
+        {"type": "complete", "duration": 1500.0},
+    ]
+    (meetings / names[-1] / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
+    for theme in ("light", "dark"):
+        window = Window(meetings, "fr_FR.UTF-8", "reminder = false\n")
+        # The theme asked of GTK, as a desktop asks it: WebKitGTK's prefers-color-scheme follows it.
+        window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+        with window as browser:
+            dark = browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
+            check(f"{theme}: the page's theme is the one the system asks", dark == (theme == "dark"), dark)
+            for width, height in ((1920, 1080), (420, 900)):
+                browser.set_window_size(width, height)
+                if not wait_for(browser, lambda b: b.execute_script("return innerWidth") == width, 3):
+                    # The window's frame took its share of what was asked: asked again, by what was missing.
+                    browser.set_window_size(2 * width - browser.execute_script("return innerWidth"), height)
+                    wait_for(browser, lambda b: b.execute_script("return innerWidth") == width, 5)
+                got = browser.execute_script("return innerWidth")
+                check(f"{theme}: the page {width} CSS px wide", got == width, got)
+                for page, address in (("list", "#/"), ("meeting", f"#/meeting/{names[-1]}"), ("settings", "#/settings")):
+                    browser.execute_script("location.hash = arguments[0]", address)
+                    shown = {"list": "#sidebar", "meeting": "#meeting", "settings": "#settings"}[page]
+                    there = wait_for(browser, lambda b: b.find_element(By.CSS_SELECTOR, shown).is_displayed(), 10)
+                    if page == "meeting":
+                        there = there and wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, ".transcript .lines li"), 10)
+                    check(f"{theme}, {width} px: {page} shown", bool(there))
+                    browser.execute_script("document.getElementById('list').scrollTop = 0; scrollTo(0, 0)")
+                    time.sleep(0.4)
+                    shot_themed(browser, f"d89-{page}-{width}-{theme}", theme)
 
 
 def trial_over(now: dt.datetime) -> None:
@@ -7102,6 +7135,7 @@ def main() -> int:
     nothing_silent(now)
     gestures_answer(now)
     window_looks(now)
+    pages_seen(now)
     actions_rows(now)
     announced(now)
     heard_checked(now)

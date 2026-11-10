@@ -2906,7 +2906,7 @@ function showSmall(words) {
   row.append(handle, time, element("span", "bar-space"), start, stop, more, toFull, hide);
   // No title bar (D90, board 8): the bar is moved by its handle, or its row anywhere but a control.
   row.addEventListener("mousedown", (event) => {
-    if (event.button === 0 && !event.target.closest("button, input, textarea")) invoke("bar_drag");
+    if (event.button === 0 && !event.target.closest("button, input, textarea, select")) invoke("bar_drag");
   });
   const rest = element("div", "small-rest");
   let open = false;
