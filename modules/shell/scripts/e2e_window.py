@@ -4517,6 +4517,8 @@ def confidential_kept(now: dt.datetime) -> None:
         ActionChains(browser).send_keys(Keys.ENTER).perform()
         started = wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
         press(browser, "small-more")
+        # The options drawn before they are read: the bar grows to hold them after the press.
+        wait_for(browser, lambda b: b.find_element(By.CSS_SELECTOR, "#small .confidential").is_displayed(), 5)
         row = browser.find_element(By.CSS_SELECTOR, "#small .confidential")
         check("recording, the bar's options offer « Réunion confidentielle — rien ne quitte cet ordinateur », off",
               started and "Réunion confidentielle" in row.text and "Rien ne quitte cet ordinateur" in row.text
@@ -6794,6 +6796,11 @@ def main() -> int:
         clock = browser.find_element(By.CSS_SELECTOR, "#small .time").text
         check("it shows the time recorded and the levels, moving as sound comes", clock.startswith("00:00:0") and clock != "00:00:00" and len(moving) > 1, (clock, moving))
         check("the meeting's level too", "50%" in browser.find_element(By.ID, "level-others").get_attribute("style"))
+        # Each side's colour as board 5 draws it: here in the accent, the meeting in green.
+        colours = browser.execute_script(
+            "const as = (v) => { const t = document.createElement('i'); t.style.color = `var(${v})`; document.body.append(t); const c = getComputedStyle(t).color; t.remove(); return c; };"
+            " return [getComputedStyle(document.getElementById('level-me')).backgroundColor === as('--accent'), getComputedStyle(document.getElementById('level-others')).backgroundColor === as('--ok')]")
+        check("your level in the accent, the meeting's in green (board 5)", colours == [True, True], colours)
         # What each side is recorded from, named under its level, and followed (D33).
         # Read from the page: WebKitWebDriver leaves this line out of an element's text, though drawn (shot 6-small-devices).
         named = lambda b: tuple(b.execute_script("return ['device-me', 'device-others'].map(id => document.getElementById(id).textContent)"))

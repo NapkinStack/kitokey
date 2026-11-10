@@ -304,7 +304,8 @@ body.small-window .frame { display: none; }
 #small .meter { display: flex; align-items: center; gap: 6px; color: var(--soft); }
 #small .meter .track { flex: 1 1 auto; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
 #small .meter .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }
-#level-others { background: var(--ok); }
+/* The meeting's in green, as board 5 draws it: as specific as the rule it follows, and after it. */
+#small .meter #level-others { background: var(--ok); }
 #small .meter.quiet .track { height: 0; border-top: 2px dashed var(--edge); border-radius: 0; background: none; }
 #small .meter.quiet .fill { display: none; }
 #small .bar-lines { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; }
