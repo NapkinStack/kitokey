@@ -2956,7 +2956,8 @@ async function checkSound(words, back) {
     }, 600);
   });
   const paint = ({ open, heard: listened, call: held }) => {
-    if (!open) return;
+    // Its listening ended by the shell — a recording started elsewhere, the panel given up —: it goes.
+    if (!open) return end();
     for (const [index, device, fill, track] of [[0, meDevice, meFill, meTrack], [1, othersDevice, othersFill, othersTrack]]) {
       device.textContent = listened.unavailable[index] ? words.check_unavailable : listened.devices[index] ?? "";
       fill.style.width = `${Math.round(listened.levels[index] * 100)}%`;

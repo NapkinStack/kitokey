@@ -2601,6 +2601,32 @@ def sound_checked(now: dt.datetime) -> None:
             opened(browser)
             took = closed_within(window, browser, lambda b: ActionChains(b).send_keys(Keys.ESCAPE).perform())
             check("closed by Escape: no stream of Kitokey's left within one second", took is not None and took <= 1.0, took)
+            ended = WORK / "listen-ended"
+            # A recording started elsewhere — the tray — while the panel shows: capture stops listening
+            # within a second, before it records, and the panel goes.
+            (WORK / "recorder-args").unlink(missing_ok=True)
+            opened(browser)
+            ended.unlink(missing_ok=True)
+            asked = time.time()
+            tray_click("Démarrer")
+            started = wait_for(None, lambda b: (WORK / "recorder-args").is_file() and ended.is_file(), 5)
+            check("a recording started from the tray while the panel shows: capture stopped listening within a second, before it records",
+                  started and float(ended.read_text()) - asked <= 1.0 and float(ended.read_text()) <= (WORK / "recorder-args").stat().st_mtime,
+                  [started, ended.is_file() and float(ended.read_text()) - asked])
+            check("the panel goes with its listening", wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3))
+            browser.execute_script("window.__TAURI__.core.invoke('record')")
+            wait_for(browser, lambda b: not b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 8)
+            # A panel that stops asking — its page gone, as a crash leaves it —: the shell gives its listening up.
+            opened(browser)
+            ended.unlink(missing_ok=True)
+            browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                   " asked === 'sound_check_now' ? new Promise(() => {}) : real.invoke(asked, ...rest) }; window.restoreInvoke = () => { window.__TAURI__.core = real; };")
+            asked = time.time()
+            given_up = wait_for(None, lambda b: ended.is_file(), 5)
+            check("a panel that stops asking: its listening given up within 2.5 s", given_up and float(ended.read_text()) - asked <= 2.5,
+                  ended.is_file() and float(ended.read_text()) - asked)
+            browser.execute_script("window.restoreInvoke()")
+            check("asking again, the panel finds nothing open and goes", wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3))
             # A recording started from the panel: the panel goes, capture stops listening before it records.
             (WORK / "recorder-args").unlink(missing_ok=True)
             opened(browser)
