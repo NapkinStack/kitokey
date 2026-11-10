@@ -80,6 +80,10 @@ const ICONS = {
   "chevron-left": ["m15 18-6-6 6-6"],
   "chevron-down": ["m6 9 6 6 6-6"],
   "chevron-up": ["m18 15-6-6-6 6"],
+  mic: ["M12 19v3", "M19 10v2a7 7 0 0 1-14 0v-2", ["rect", { x: 9, y: 2, width: 6, height: 13, rx: 3 }]],
+  "mic-off": ["M12 19v3", "M15 9.34V5a3 3 0 0 0-5.68-1.33", "M16.95 16.95A7 7 0 0 1 5 12v-2", "M18.89 13.23A7 7 0 0 0 19 12v-2", "m2 2 20 20", "M9 9v3a3 3 0 0 0 5.12 2.12"],
+  "volume-2": ["M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z", "M16 9a5 5 0 0 1 0 6", "M19.364 18.364a9 9 0 0 0 0-12.728"],
+  "volume-x": ["M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z", ["line", { x1: 22, x2: 16, y1: 9, y2: 15 }], ["line", { x1: 16, x2: 22, y1: 9, y2: 15 }]],
   x: ["M18 6 6 18", "m6 6 12 12"],
   "arrow-right": ["M5 12h14", "m12 5 7 7-7 7"],
   "maximize-2": ["M15 3h6v6", "m21 3-7 7", "m3 21 7-7", "M9 21H3v-6"],
@@ -822,8 +826,8 @@ function sought() {
 
 // How long the small window says the reminder, in seconds (D50).
 const ANNOUNCED_FOR = 15;
-// How long a side's ✓ shows before it fades, in milliseconds (D49).
-const CHECK_SHOWN = 2500;
+// How long a side is silent before the bar says it, in seconds (D90).
+const SILENT_SAID = 120;
 
 const element = (tag, className, text) => {
   const made = document.createElement(tag);
@@ -2901,11 +2905,10 @@ function showSmall(words) {
     if (event.button === 0 && !event.target.closest("button, input, textarea, select")) invoke("bar_drag");
   });
   const rest = element("div", "small-rest");
-  rest.id = "small-options";
   let open = false;
   const unfoldOptions = (now, back) => {
     open = now;
-    rest.hidden = !open || recording;
+    options.hidden = !open;
     more.setAttribute("aria-expanded", String(open));
     more.title = open ? words.bar_less : words.bar_more;
     more.setAttribute("aria-label", more.title);
@@ -2913,11 +2916,6 @@ function showSmall(words) {
     if (back) more.focus();
   };
   more.addEventListener("click", () => unfoldOptions(!open, false));
-  rest.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || event.defaultPrevented) return;
-    event.preventDefault();
-    unfoldOptions(false, true);
-  });
   // Which microphone the next recording takes (D74): the name, opened on Auto and what capture lists,
   // over what is under it, as a menu is. Nothing is offered where capture lists none. Read when it
   // opens, never watched: a device arriving opens nothing.
@@ -3048,11 +3046,13 @@ function showSmall(words) {
   rest.append(microphone);
 
   const live = element("div", "small-live");
-  // Each level under what it is recorded from, as the system names it (D33); before that name, a
-  // check that turns ✓ when the side is heard, then fades; under it, what a silence asks (D49).
+  // A thin meter for each side in the row (D90, board 5), named by its side and, in its tooltip, by
+  // what it is recorded from (D33). Its health in a grey line under the row: a side silent for two
+  // minutes, a microphone that sends nothing, a side with no device — never as an error (D49).
   const checks = [];
-  const meter = (label, id, device, says) => {
-    const row = element("div", "meter");
+  const meter = (label, id, device, glyphs, says) => {
+    const row = element("span", "meter");
+    row.append(icon(glyphs[0]));
     const bar = element("span", "track");
     bar.setAttribute("role", "meter");
     bar.setAttribute("aria-label", label);
@@ -3061,21 +3061,15 @@ function showSmall(words) {
     const fill_ = element("span", "fill");
     fill_.id = id;
     bar.append(fill_);
-    const said = element("span", "said");
-    const named = element("span", "device");
+    const named = element("span", "device unseen");
     named.id = device;
-    const mark = element("span", "check");
-    mark.append(icon("check"));
-    const status = element("span", "check-said");
-    status.setAttribute("role", "status");
-    mark.append(status);
-    const slot = element("span", "slot");
-    slot.append(mark, named);
-    said.append(element("span", "side", label), slot);
+    row.append(bar, named);
     const sentence = element("p", "says check-says");
+    const said = element("span");
+    sentence.append(icon(glyphs[1]), said);
     sentence.setAttribute("role", "status");
-    row.append(said, bar, sentence);
-    checks.push({ slot, status, sentence, says, heard: fill(words.small_heard, label), since: 0 });
+    sentence.hidden = true;
+    checks.push({ row, sentence, said, says, glyphs, quiet: false });
     return row;
   };
   // The reminder where the user looks, the recording's first seconds, its announcement one click
@@ -3101,16 +3095,18 @@ function showSmall(words) {
     }
     setTimeout(() => (said_copied.textContent = ""), 2000);
   });
-  const meters = element("div", "meters");
+  const meters = element("span", "meters");
   meters.append(
-    meter(words.small_mic, "level-me", "device-me", { silent: words.small_silent_me, nothing: words.small_nothing, waiting: words.small_waiting_me }),
-    meter(words.small_meeting, "level-others", "device-others", { silent: words.small_silent_others, waiting: words.small_waiting_others }),
+    meter(words.small_mic, "level-me", "device-me", ["mic", "mic-off"], { silent: words.bar_silent_me, nothing: words.small_nothing, waiting: words.small_waiting_me }),
+    meter(words.small_meeting, "level-others", "device-others", ["volume-2", "volume-x"], { silent: words.bar_silent_others, waiting: words.small_waiting_others }),
   );
+  meters.hidden = true;
+  time.after(meters);
   const note = element("p", "says", words.small_note);
   note.id = "small-note";
   note.hidden = true;
-  // The meeting's context (D59): closed by default, opened in place of the note — Arrêter never
-  // moves. Kept as it is typed, once the meeting's folder holds its session.
+  // The meeting's context (D59), in the options while recording: kept as it is typed, once the
+  // meeting's folder holds its session.
   const meeting = { name: null, saved: null, typed: null, refused: null };
   // What could not be kept: it outlasts the recording (D67).
   const unkept = new Map();
@@ -3147,33 +3143,7 @@ function showSmall(words) {
   field.area.setAttribute("aria-label", words.context_label);
   const opened = element("div", "small-context");
   opened.append(field.area, field.count);
-  opened.hidden = true;
-  const disclose = element("button", "open disclose");
-  disclose.type = "button";
-  disclose.id = "small-context-toggle";
-  disclose.setAttribute("aria-controls", "small-context");
-  const toggled = element("span", "", words.context_add);
-  disclose.append(toggled, element("span", "chevron", "▾"));
-  const unfold = (open) => {
-    opened.hidden = !open;
-    disclose.setAttribute("aria-expanded", String(open));
-    toggled.textContent = open ? words.context_open : field.area.value.trim() ? words.context_edit : words.context_add;
-    disclose.lastChild.textContent = open ? "▴" : "▾";
-    note.hidden = open || note.dataset.follows !== "true";
-    // Open, the window is full: the switch keeps its name, its words said to a screen reader (D60).
-    live.classList.toggle("context-open", open);
-  };
-  unfold(false);
-  disclose.addEventListener("click", () => {
-    unfold(opened.hidden);
-    if (!opened.hidden) field.area.focus();
-  });
-  field.area.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    unfold(false);
-    disclose.focus();
-  });
-  // Said confidential (D60): under Arrêter, above the context; kept as it is turned, once the
+  // Said confidential (D60), above the context in the options; kept as it is turned, once the
   // meeting's folder holds its session.
   const secret = confidentialSwitch(words, "small-confidential");
   const mark = { wanted: null, refused: 0 };
@@ -3199,9 +3169,20 @@ function showSmall(words) {
     secret.row.classList.toggle("on", secret.box.checked);
     marked();
   });
-  live.append(announce, meters, secret.row, disclose, opened, note);
+  live.append(secret.row, opened, note);
   live.hidden = true;
-  page.replaceChildren(row, unkeptSaid, rest, live);
+  const lines = element("div", "bar-lines");
+  lines.append(announce, ...checks.map((check) => check.sentence), unkeptSaid);
+  const options = element("div", "bar-options");
+  options.id = "small-options";
+  options.append(rest, live);
+  options.hidden = true;
+  options.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    event.preventDefault();
+    unfoldOptions(false, true);
+  });
+  page.replaceChildren(row, lines, options);
 
   // The shortcut, in ●'s and ■'s tooltips, as the desktop grants it.
   const paintKeys = async () => {
@@ -3233,16 +3214,18 @@ function showSmall(words) {
       closePicks(false);
       // Back at rest, and the first time: what capture lists now.
       if (!now.recording) readPicks();
-      // Under the switch while recording; under the row at rest.
-      if (now.recording) secret.row.after(unkeptSaid);
-      else row.after(unkeptSaid);
       recording = now.recording;
       start.disabled = false;
       named(start, words.record_start);
       stop.disabled = false;
       named(stop, words.record_stop);
       start.hidden = recording;
-      stop.hidden = time.hidden = !recording;
+      stop.hidden = time.hidden = meters.hidden = !recording;
+      // At rest, the bar is its row: the recording's lines go with it (the ticks stop at the stop).
+      if (!recording) {
+        for (const check of checks) check.sentence.hidden = true;
+        announce.hidden = true;
+      }
       handle.classList.toggle("live", recording);
       const dot = handle.querySelector(".dot");
       dot.setAttribute("r", recording ? "2.2" : "1.6");
@@ -3254,11 +3237,11 @@ function showSmall(words) {
       secret.row.classList.remove("on");
       field.area.value = "";
       field.painted();
-      unfold(false);
+      rest.hidden = recording;
       live.hidden = !recording;
-      // Recording, the options wait for D90's next row: the live view holds what they would.
-      more.hidden = recording || microphone.hidden;
-      unfoldOptions(open && !recording, false);
+      // Each state opens closed: the row alone.
+      more.hidden = !recording && microphone.hidden;
+      unfoldOptions(false, false);
       if (!recording) paintKeys();
       // Opened at rest, the recording's gesture has the focus.
       if (first && !recording) start.focus();
@@ -3279,32 +3262,30 @@ function showSmall(words) {
       fill_.style.width = `${percent}%`;
       fill_.parentElement.setAttribute("aria-valuenow", String(percent));
     }
-    for (const [index, id] of ["device-me", "device-others"].entries()) {
-      const named = document.getElementById(id);
-      named.textContent = now.devices[index] ?? "";
-      named.title = now.devices[index] ?? "";
-      // Its name hidden while the context is open: said on its meter still (D60).
-      named.closest(".meter").title = now.devices[index] ?? "";
-    }
     // Written when it changes alone: a tick that rewrites text under a click loses it in WebKitGTK.
     for (const [index, check] of checks.entries()) {
+      const device = now.devices[index] ?? "";
+      const named = check.row.querySelector(".device");
+      if (named.textContent !== device) named.textContent = device;
+      if (check.row.title !== device) check.row.title = device;
+      // Silent two minutes, said; a device's state at once; the microphone chosen gone says more (D74).
       const state = now.checks[index];
-      if (check.slot.dataset.check !== state) {
-        check.slot.dataset.check = state;
-        check.since = performance.now();
-        check.status.textContent = state === "heard" ? check.heard : "";
+      const silent = state === "silent" && (now.silent_for[index] ?? 0) >= SILENT_SAID;
+      const says = index === 0 && now.microphone_gone ? words.small_microphone_gone : state === "silent" && !silent ? "" : check.says[state] ?? "";
+      if (check.said.textContent !== says) check.said.textContent = says;
+      check.sentence.hidden = says === "" || !recording;
+      const quiet = silent || state === "nothing" || state === "waiting";
+      if (check.quiet !== quiet) {
+        check.quiet = quiet;
+        check.row.classList.toggle("quiet", quiet);
+        check.row.firstChild.replaceWith(icon(check.glyphs[Number(quiet)]));
       }
-      // Under its check, in the room kept there; the microphone chosen gone says more than its silence (D74).
-      const says = index === 0 && now.microphone_gone ? words.small_microphone_gone : check.says[state] ?? "";
-      if (check.sentence.textContent !== says) check.sentence.textContent = says;
-      check.slot.classList.toggle("faded", state === "heard" && performance.now() - check.since >= CHECK_SHOWN);
     }
     announcement = now.announcement;
-    announce.hidden = announcement === null;
+    announce.hidden = announcement === null || !recording;
     announce.classList.toggle("gone", now.seconds >= ANNOUNCED_FOR);
     stop.disabled ||= !now.recording;
-    note.dataset.follows = String(now.transcript_follows);
-    note.hidden = !now.transcript_follows || !opened.hidden;
+    note.hidden = !now.transcript_follows;
     // The meeting's folder there: what it holds already is shown, what was typed before is kept.
     if (now.meeting !== meeting.name) {
       const another = meeting.name !== null;
@@ -3320,7 +3301,6 @@ function showSmall(words) {
         if (meeting.typed === null && meeting.name === now.meeting) {
           field.area.value = meeting.saved;
           field.painted();
-          if (opened.hidden) unfold(false);
         }
       }
     }

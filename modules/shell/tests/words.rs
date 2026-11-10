@@ -1229,54 +1229,46 @@ fn a_list_waiting_on_its_key_says_so_and_what_stays_offered() {
 }
 
 #[test]
-fn the_small_window_says_a_silence_as_the_notifications_do() {
-    // D49: the same gesture as the notification's, in each language; the side's own.
+fn the_bar_says_a_silence_as_the_notifications_do() {
+    // D49: the same gesture as the notification's, in each language; the side's own. D90: a
+    // silence of two minutes said as such, the recording going on — never as an error.
     let cases = [
         (
             Language::French,
             "Votre micro",
             "Le son de la réunion",
             "pas coupé sur l’appareil lui-même, et qu’il est prêt",
+            "rien depuis 2\u{a0}min — l’enregistrement continue",
         ),
         (
             Language::English,
             "Your microphone",
             "The meeting’s sound",
             "not muted on the device itself, and that it is ready",
+            "nothing for 2 min — the recording goes on",
         ),
     ];
-    for (language, me, others, gesture) in cases {
+    for (language, me, others, gesture, silent) in cases {
         let page = words::window(language);
         assert_eq!(page.small_mic, me);
         assert_eq!(page.small_meeting, others);
         let told = words::of(&Said::Nothing, true, language).unwrap();
         assert!(told.body.contains(gesture), "{}", told.body);
         assert!(page.small_nothing.contains(gesture), "{}", page.small_nothing);
+        assert!(page.bar_silent_me.contains(silent) && page.bar_silent_others.contains(silent));
         for said in [
-            page.small_silent_me,
-            page.small_silent_others,
+            page.bar_silent_me,
+            page.bar_silent_others,
             page.small_nothing,
             page.small_waiting_me,
             page.small_waiting_others,
         ] {
             assert!(
                 !said.is_empty() && said.chars().count() <= 110,
-                "too long for two lines of the small window: {said}"
+                "too long for two lines of the bar: {said}"
             );
         }
     }
-    assert!(words::window(Language::French).small_silent_me.contains("parlez"));
-    assert!(
-        words::window(Language::French)
-            .small_silent_others
-            .contains("jouer un son dans l’appel")
-    );
-    assert!(words::window(Language::English).small_silent_me.contains("say something"));
-    assert!(
-        words::window(Language::English)
-            .small_silent_others
-            .contains("play a sound in the call")
-    );
 }
 /// The wording table of the UX review, §10 (D47): its sentences, as they are read. A row left out
 /// here is one the table's sentence would make false: said in the pull request.

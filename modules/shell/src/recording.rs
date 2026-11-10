@@ -142,14 +142,36 @@ pub struct Checks {
     /// A silence capture said: it says it once per silence (`recording/v1`), and neither a device
     /// changed nor a side back from waiting makes it say it again.
     silence: [Option<Check>; 2],
+    /// When capture said a side silent, for the bar to say it once two minutes have passed (D90).
+    silent_since: [Option<Instant>; 2],
 }
+
+/// How long a side was silent before capture said it (`recording/v1`'s `silent`).
+const SAID_SILENT_AFTER: f64 = 10.0;
 
 impl Checks {
     pub fn heard(&mut self, said: &Said) {
+        self.heard_at(said, Instant::now());
+    }
+
+    /// What a recording said, at a given time.
+    pub fn heard_at(&mut self, said: &Said, at: Instant) {
         let side = |source: &Source| usize::from(*source == Source::Others);
-        let (at, check) = match said {
+        match said {
+            Said::Heard(source) | Said::Lost(source) | Said::Unavailable(source, _) => self.silent_since[side(source)] = None,
+            _ => {}
+        }
+        let (index, check) = match said {
             Said::Unavailable(source, _) | Said::Lost(source) => (side(source), Check::Waiting),
-            Said::Moved(source, _) => (side(source), self.silence[side(source)].unwrap_or(Check::Listening)),
+            // Back on a device and still silent: its silence counted from the device back, the time
+            // with none being no silence.
+            Said::Moved(source, _) => {
+                let check = self.silence[side(source)].unwrap_or(Check::Listening);
+                if check == Check::Silent {
+                    self.silent_since[side(source)].get_or_insert(at);
+                }
+                (side(source), check)
+            }
             // The zeros a recording keeps in the place of a side with no device are remembered
             // for when it has one, and no news until then.
             Said::Silent(source) => {
@@ -157,6 +179,7 @@ impl Checks {
                 if self.now[side(source)] == Check::Waiting {
                     return;
                 }
+                self.silent_since[side(source)].get_or_insert(at);
                 (side(source), Check::Silent)
             }
             Said::Nothing => {
@@ -178,11 +201,19 @@ impl Checks {
             }
             _ => return,
         };
-        self.now[at] = check;
+        self.now[index] = check;
     }
 
     pub fn now(&self) -> [Check; 2] {
         self.now
+    }
+
+    /// How long each side has been silent, in seconds, while it is said silent: none otherwise.
+    pub fn silent_for(&self, at: Instant) -> [Option<f64>; 2] {
+        [0, 1].map(|side| {
+            let since = self.silent_since[side].filter(|_| self.now[side] == Check::Silent)?;
+            Some(at.saturating_duration_since(since).as_secs_f64() + SAID_SILENT_AFTER)
+        })
     }
 }
 

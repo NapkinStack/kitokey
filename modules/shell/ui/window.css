@@ -298,44 +298,24 @@ body.small-window .frame { display: none; }
 #small .danger { display: inline-grid; place-items: center; width: 28px; min-height: 28px; padding: 0; }
 #small .stop-square { width: 10px; height: 10px; border-radius: 2px; background: var(--surface); }
 #small .small-rest, #small .small-live { padding: 8px 16px 14px; border-top: 1px solid var(--line); }
-#small > .small-said { margin: 0; padding: 0 16px 8px; }
-/* The room of the two sentences a silence may say is kept under the meters: Arrêter never moves as
-   the recording goes (D49). */
-.meters { display: grid; grid-template-columns: max-content 1fr; align-items: center; align-content: start; gap: 4px 16px; height: 122px; }
-.meter { display: contents; }
-.meter .said { white-space: nowrap; min-width: 110px; gap: 0; line-height: 18px; }
-.meter .device { color: var(--soft); font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* A side's check in its device's slot (D49): a ring listening, ✓ heard, then gone; the slot's height
-   held, so that nothing under it moves. */
-.meter .slot { display: flex; align-items: center; height: 16px; max-width: 190px; line-height: 16px; }
-.check { position: relative; flex: none; width: 14px; height: 14px; margin-right: 5px; border-radius: 50%; border: 1.5px solid var(--soft); }
-.check-said { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.slot[data-check="listening"] .check { animation: beat 1.6s ease-in-out infinite; }
-.slot[data-check="nothing"] .check { border-color: var(--ink); }
-.slot[data-check="waiting"] .check { display: none; }
-.slot[data-check="heard"] .check { border-color: var(--ok); background: var(--ok); animation: check-pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1); transition: opacity 500ms ease, width 300ms ease 400ms, margin-right 300ms ease 400ms, border-width 0s linear 700ms; }
-.check .glyph { display: none; position: absolute; inset: 0; width: 100%; height: 100%; stroke: var(--surface); stroke-width: 3; }
-.slot[data-check="heard"] .check .glyph { display: block; }
-.slot.faded .check { opacity: 0; width: 0; margin-right: 0; border-width: 0; }
-@keyframes check-pop { from { transform: scale(0.4); } }
-.check-says { grid-column: 1 / -1; margin: -2px 0 0; font-size: 12px; line-height: 1.25; animation: check-says 300ms ease; }
-.check-says:empty { height: 0; margin: 0; overflow: hidden; }
-@keyframes check-says { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .slot[data-check] .check { animation: none; transition: none; }
-  .check-says { animation: none; }
-}
-.meter .track { height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
-.meter .fill { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--accent); transition: width 90ms linear; }
-#level-others { background: var(--ok); }
-.small-announce { display: flex; flex-wrap: wrap; align-items: baseline; align-content: flex-start; gap: 0 10px; height: 32px; font-size: 12px; line-height: 1.3; color: var(--soft); }
-.small-announce[hidden] { display: none; }
-.small-announce.gone { visibility: hidden; }
+/* A thin meter for each side in the row (D90, board 5): its icon, a 4 px track; a side silent two
+   minutes, or with nothing to record, dashed and its icon crossed, said in a grey line under the row. */
+#small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; margin-left: 8px; }
+#small .meter { display: flex; align-items: center; gap: 6px; color: var(--soft); }
+#small .meter .track { flex: 1 1 auto; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+#small .meter .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }
+/* The meeting's in green, as board 5 draws it: as specific as the rule it follows, and after it. */
+#small .meter #level-others { background: var(--ok); }
+#small .meter.quiet .track { height: 0; border-top: 2px dashed var(--edge); border-radius: 0; background: none; }
+#small .meter.quiet .fill { display: none; }
+#small .bar-lines { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; }
+#small .bar-lines > :last-child:not([hidden]) { margin-bottom: 8px; }
+#small .check-says { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; line-height: 1.3; color: var(--soft); }
+#small .small-announce { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; font-size: 12px; line-height: 1.3; color: var(--soft); }
+#small .small-announce.gone { display: none; }
 #small .small-announce .link, #small .small-announce .says { font-size: 12px; line-height: 1.3; }
-#small .small-live { gap: 5px; }
-#small .small-live .disclose { min-height: 28px; }
-.small-live.context-open .small-announce { display: none; }
 #small #small-note { font-size: 12px; line-height: 1.25; }
+#small .bar-lines .small-said { margin: 0; }
 .small-rest, .small-live { display: flex; flex-direction: column; gap: 12px; }
 #small .link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
 /* The microphone's name, and its list under it, the bar growing to hold it (D74, D90). */
@@ -449,11 +429,6 @@ body.small-window .frame { display: none; }
 .chip.locked .lock { color: inherit; }
 #small .confidential .name { font-size: 14px; }
 #small .confidential .says { font-size: 12.5px; }
-/* The context open, the small window is full: the switch on one line, its words still read; the
-   devices' names in their meters' titles alone. */
-.small-live.context-open .meter .device { display: none; }
-.small-live.context-open .meter .said { flex-direction: row; align-items: center; gap: 6px; }
-.small-live.context-open .confidential .says { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* The window in two panes (D61's board): the meetings in a sidebar of 280 px, the one chosen in the
    pane beside it, as wide as the window leaves it; under 840 px, one at a time. */
