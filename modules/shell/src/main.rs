@@ -319,6 +319,7 @@ fn main() {
             recording_now,
             small_window,
             bar_fit,
+            bar_drag,
             full_window,
             minutes_asked,
             minutes_again,
@@ -654,8 +655,9 @@ fn show_welcome(app: &AppHandle) {
 }
 
 /// The recording bar's width and its row's height (D90, the decider's boards of 2026-11-08): made
-/// at its row's height, the smallest it is — GTK grows a window the user cannot resize, and
-/// shrinks it back no lower than the size it was made at —, as tall as it holds after that.
+/// at its row's height, the smallest it is, as tall as it holds after that. Without the system's
+/// title bar (board 8): on GNOME, GTK counts its own title bar and shadows inside the size asked —
+/// 440 × 44 asked left a web view of 388 × 1.
 const BAR: (f64, f64) = (440.0, 44.0);
 /// As tall as the bar may grow: what it holds beyond that scrolls.
 const BAR_TALLEST: f64 = 720.0;
@@ -676,7 +678,7 @@ fn show_small(app: &AppHandle) {
     let _ = WebviewWindowBuilder::new(app, "small", WebviewUrl::App("index.html#/small".into()))
         .title("Kitokey")
         .inner_size(BAR.0, BAR.1)
-        .resizable(false)
+        .decorations(false)
         .always_on_top(recording)
         .build();
 }
@@ -1143,7 +1145,21 @@ async fn small_window(app: AppHandle) {
 #[tauri::command]
 fn bar_fit(window: tauri::WebviewWindow, height: f64) {
     if window.label() == "small" && height.is_finite() {
-        let _ = window.set_size(tauri::LogicalSize::new(BAR.0, height.clamp(BAR.1, BAR_TALLEST)));
+        // Its size bounded to the one asked: the user does not resize the bar, its content does.
+        let size = tauri::LogicalSize::new(BAR.0, height.clamp(BAR.1, BAR_TALLEST));
+        let _ = window.set_min_size(Some(tauri::LogicalSize::new(BAR.0, BAR.1)));
+        let _ = window.set_max_size(Some(tauri::LogicalSize::new(BAR.0, BAR_TALLEST)));
+        let _ = window.set_size(size);
+        let _ = window.set_min_size(Some(size));
+        let _ = window.set_max_size(Some(size));
+    }
+}
+
+/// The bar's handle, or its row, pressed (D90): the system moves the bar as the pointer goes.
+#[tauri::command]
+fn bar_drag(window: tauri::WebviewWindow) {
+    if window.label() == "small" {
+        let _ = window.start_dragging();
     }
 }
 
