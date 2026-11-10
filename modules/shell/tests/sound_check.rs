@@ -167,3 +167,22 @@ while true; do sleep 0.05; done"#,
     assert!(asked.elapsed() < Duration::from_millis(1500), "{:?}", asked.elapsed());
     assert!(!Path::new(&format!("/proc/{pid}")).exists(), "the program is gone");
 }
+
+#[test]
+fn a_later_microphone_said_without_headset_is_not_known_to_be_one() {
+    let folder = tempfile::tempdir().unwrap();
+    let check = played(
+        folder.path(),
+        r#"echo '{"event":"device","source":"me","device":"AirPods Pro","headset":true}'
+while [ ! -e "$here/moved" ]; do sleep 0.02; done
+echo '{"event":"device","source":"me","device":"Digital Microphone"}'
+read line"#,
+        None,
+    );
+    assert!(once(&check, |heard| heard.headset).headset);
+    fs::write(folder.path().join("moved"), "").unwrap();
+    let heard = once(&check, |heard| heard.devices[0].as_deref() == Some("Digital Microphone"));
+    // recording/v1: absent, not known — the Bluetooth sentence is no longer owed.
+    assert!(!heard.headset, "{heard:?}");
+    check.stop();
+}
