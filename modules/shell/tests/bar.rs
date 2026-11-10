@@ -63,7 +63,9 @@ fn the_bar_is_440_by_44_its_controls_28() {
         "the bar's window is made 440 × 44"
     );
     // Without the system's title bar (board 8): GNOME counts it inside the size asked.
-    let small = SHELL.split_once("fn show_small(").map_or("", |(_, after)| after);
+    // Checked out with CRLF on Windows: the function's end is read on `\n` alone.
+    let shell = SHELL.replace("\r\n", "\n");
+    let small = shell.split_once("fn show_small(").map_or("", |(_, after)| after);
     let small = small.split_once("\n}\n").map_or("", |(body, _)| body);
     assert!(small.contains(".decorations(false)"), "the bar is drawn without a title bar");
     assert!(SHELL.contains("window.start_dragging()"), "the bar is moved by its handle");
