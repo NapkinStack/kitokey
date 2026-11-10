@@ -25,7 +25,8 @@ pub struct Heard {
     pub unavailable: [bool; 2],
     /// How loud each side is now, from 0 to 1.
     pub levels: [f32; 2],
-    /// The microphone listened to is a Bluetooth headset's: in its call profile while the panel shows.
+    /// capture said the microphone listened to is a Bluetooth headset's — it may switch to its call
+    /// profile while the panel shows; false when it said not, or nothing: not known.
     pub headset: bool,
     /// Whether the meeting's side rose above silence since a test sound was asked; none, none asked.
     pub test: Option<bool>,
@@ -146,13 +147,13 @@ fn heard(state: &mut State, line: &str) {
             let index = side(source);
             state.heard.devices[index] = name;
             state.heard.unavailable[index] = false;
-            // Only the microphone's first `device` says it; `others`' never does.
-            if source == Source::Me
-                && let Some(headset) = serde_json::from_str::<Value>(line)
+            // Only the microphone's first `device` says it; absent — on a later one — it is not known
+            // (`recording/v1`), and the panel says nothing of a headset. `others`' is never read.
+            if source == Source::Me {
+                let said = serde_json::from_str::<Value>(line)
                     .ok()
-                    .and_then(|event| event["headset"].as_bool())
-            {
-                state.heard.headset = headset;
+                    .and_then(|event| event["headset"].as_bool());
+                state.heard.headset = said == Some(true);
             }
         }
         Some(Said::Lost(source)) => state.heard.devices[side(source)] = None,
