@@ -275,7 +275,9 @@ WebDriver — WebKitGTK's own (`WebKitWebDriver`, in Fedora's `webkit2gtk4.1-dev
 are read after it, and kept in `$NSTACK_EVIDENCE` (`.evidence/e2e/`), in `logs/` with the pages'
 screenshots in `shots/`: every warning and error must be one a scenario provokes, declared with it
 in the manifest's `evidence.provoked`, and each one declared must be logged — any other fails the
-run, quoted. `nstack e2e shell` audits the same logs after the run.
+run, quoted. `nstack e2e shell` audits the same logs after the run. A screenshot whose name says its
+theme is in that theme — the one the scenario asks of GTK (`GTK_THEME`), else its colours put on the
+page — and its mean lightness is checked, a dark one dark (D89).
 
 The manifest's `e2e` runs it in a GNOME of its own, never shown (`scripts/headless.sh`): the
 user's desktop is never reached, so a run holds nobody's screen, microphone nor notifications.
