@@ -2625,6 +2625,57 @@ def sound_checked(now: dt.datetime) -> None:
         subprocess.run(["pactl", "unload-module", mic], capture_output=True)
 
 
+def bar_window(now: dt.datetime) -> None:
+    """AY. The bar as a window (D90, board 8): no title bar, « Masquer la barre »; hidden during a
+    recording, it never comes back by itself — the tray's « Afficher la barre » brings it back."""
+    print("AY. the bar without a title bar; hidden while recording, it stays hidden whatever happens, the tray stops and brings it back (D90)")
+    taping = WORK / "bar-hidden"
+    taping.mkdir()
+    hidden = "return document.visibilityState"
+    with Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True) as browser:
+        wait_for(browser, lambda b: b.find_element(By.ID, "small-hide").is_displayed(), 8)
+        got = browser.execute_script("const h = document.getElementById('small-hide'); return [h.getAttribute('aria-label'), h.title, h.getBoundingClientRect().height, h.textContent.trim(), outerHeight - innerHeight]")
+        check("« Masquer la barre »: an icon of 28 px, named by its words; no title bar over the row", got[:4] == ["Masquer la barre", "Masquer la barre", 28, ""] and got[4] == 0, got)
+        check("shown, the tray offers no « Afficher la barre »", "Afficher la barre" not in tray_labels(), tray_labels())
+        press(browser, "small-record")
+        wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed() and tray_colour() == "red", 10)
+        press(browser, "small-hide")
+        gone = wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
+        check("hidden during a recording: the bar goes, the recording goes on, the tray's icon red", gone and tray_colour() == "red", browser.execute_script(hidden))
+        # After the recording's entry, as board 8 sets it.
+        check("the tray offers « Afficher la barre », after « Arrêter l’enregistrement »",
+              wait_for(None, lambda b: tray_labels()[1:3] == ["Arrêter l’enregistrement", "Afficher la barre"], 5), tray_labels())
+        # Whatever happens but a gesture: a device changes, the microphone goes and comes back.
+        (taping / "move").touch()
+        (taping / "mic-gone").touch()
+        time.sleep(1)
+        (taping / "mic-back").write_text("Mic")
+        time.sleep(2)
+        check("a device changed, the microphone gone and back: the bar stays hidden", browser.execute_script(hidden) == "hidden", browser.execute_script(hidden))
+        # The tray's stop, the gesture the shortcut shares (toggle_recording): stopped, the bar still hidden.
+        tray_click("Arrêter l’enregistrement")
+        stopped = wait_for(None, lambda b: tray_colour() == "blue", 15)
+        time.sleep(1)
+        check("stopped from the tray, as the shortcut stops: the bar does not come back by itself", stopped and browser.execute_script(hidden) == "hidden", browser.execute_script(hidden))
+        tray_click("Afficher la barre")
+        back = wait_for(browser, lambda b: b.execute_script(hidden) == "visible", 5)
+        check("« Afficher la barre » brings it back, at rest, and leaves the menu", back and browser.find_element(By.ID, "small-record").is_displayed()
+              and wait_for(None, lambda b: "Afficher la barre" not in tray_labels(), 5), tray_labels())
+        # At rest too: hidden, « Ouvrir Kitokey » opens the window left, the bar.
+        press(browser, "small-hide")
+        wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
+        tray_click("Ouvrir Kitokey")
+        check("hidden at rest, « Ouvrir Kitokey » shows it again", wait_for(browser, lambda b: b.execute_script(hidden) == "visible", 5), browser.execute_script(hidden))
+        # Hidden, then closed by another path — the full window opened on a page, as a notification
+        # does —: the tray offers no bar that is gone.
+        press(browser, "small-hide")
+        wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
+        wait_for(None, lambda b: "Afficher la barre" in tray_labels(), 5)
+        browser.execute_script("window.__TAURI__.core.invoke('full_window', {page: '#/settings'})")
+        check("hidden, then closed for the full window on a page: « Afficher la barre » leaves the menu",
+              wait_for(None, lambda b: "Afficher la barre" not in tray_labels(), 5), tray_labels())
+
+
 def meeting_named(now: dt.datetime) -> None:
     """AL. A meeting named by its minutes (D48): the title in the row and the page, as text."""
     print("AL. a meeting takes the title its minutes give it — the date beneath it in the list, above it on the page; as text; made again, the new one (D48)")
@@ -6903,8 +6954,8 @@ def main() -> int:
         rest = wait_for(browser, lambda b: b.execute_script(row)["size"] == [440, 44], 5)
         got = browser.execute_script(row)
         check("at rest the bar is 440 × 44: one row, the mark as its handle, nothing to scroll", rest and got["row"] == 44 and got["mark"] == 1 and got["scroll"][0] <= got["scroll"][1], got)
-        check("● then the whole window, each 28 px, an icon alone named by its words, its tooltip the same",
-              [b[0] for b in got["buttons"]] == ["small-record", "small-full"] and all(b[1] == b[2] == 28 and b[3] == "" and b[4] and b[5].startswith(b[4]) for b in got["buttons"])
+        check("● then the whole window and « Masquer la barre », each 28 px, an icon alone named by its words, its tooltip the same",
+              [b[0] for b in got["buttons"]] == ["small-record", "small-full", "small-hide"] and all(b[1] == b[2] == 28 and b[3] == "" and b[4] and b[5].startswith(b[4]) for b in got["buttons"])
               and got["buttons"][1][4] == "Toute la fenêtre", got["buttons"])
         keys = browser.execute_script("return window.__TAURI__.core.invoke('header')")["shortcut"]
         check("●'s tooltip: « Démarrer un enregistrement », the shortcut beside when granted", got["buttons"][0][5] == (f"Démarrer un enregistrement ({keys})" if keys else "Démarrer un enregistrement"), [got["buttons"][0][5], keys])
@@ -6913,7 +6964,7 @@ def main() -> int:
         for _ in range(3):
             browser.switch_to.active_element.send_keys(Keys.TAB)
             reached.append(browser.execute_script("return document.activeElement.id"))
-        check("Tab reaches each of its controls, then comes back round", reached[:2] == ["small-full", "small-record"], reached)
+        check("Tab reaches each of its controls, then comes back round", reached == ["small-full", "small-hide", "small-record"], reached)
         shot(browser, "6-small-rest")
         start.click()
         wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop"))
@@ -7306,6 +7357,7 @@ def main() -> int:
     heard_checked(now)
     microphone_chosen(now)
     sound_checked(now)
+    bar_window(now)
     meeting_named(now)
     word_after_a_gap(now)
     minutes_checked(now)

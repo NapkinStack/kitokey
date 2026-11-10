@@ -80,6 +80,7 @@ const ICONS = {
   "chevron-left": ["m15 18-6-6 6-6"],
   "chevron-down": ["m6 9 6 6 6-6"],
   "chevron-up": ["m18 15-6-6-6 6"],
+  minus: ["M5 12h14"],
   mic: ["M12 19v3", "M19 10v2a7 7 0 0 1-14 0v-2", ["rect", { x: 9, y: 2, width: 6, height: 13, rx: 3 }]],
   "mic-off": ["M12 19v3", "M15 9.34V5a3 3 0 0 0-5.68-1.33", "M16.95 16.95A7 7 0 0 1 5 12v-2", "M18.89 13.23A7 7 0 0 0 19 12v-2", "m2 2 20 20", "M9 9v3a3 3 0 0 0 5.12 2.12"],
   "volume-2": ["M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z", "M16 9a5 5 0 0 1 0 6", "M19.364 18.364a9 9 0 0 0 0-12.728"],
@@ -3073,8 +3074,11 @@ function showSmall(words) {
   // « Plus d’options » (D90): what is rarer, under the row; Escape closes it.
   const more = iconButton("chevron-down", words.bar_more, "small-more");
   more.setAttribute("aria-controls", "small-options");
+  // « Masquer la barre » (D90): hidden, a recording goes on; the tray brings it back, nothing else.
+  const hide = iconButton("minus", words.bar_hide, "small-hide");
+  hide.addEventListener("click", () => invoke("bar_hide"));
   const row = element("div", "bar-row");
-  row.append(handle, time, element("span", "bar-space"), start, stop, more, toFull);
+  row.append(handle, time, element("span", "bar-space"), start, stop, more, toFull, hide);
   // No title bar (D90, board 8): the bar is moved by its handle, or its row anywhere but a control.
   row.addEventListener("mousedown", (event) => {
     if (event.button === 0 && !event.target.closest("button, input, textarea, select")) invoke("bar_drag");
