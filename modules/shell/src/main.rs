@@ -1059,6 +1059,11 @@ struct Now {
 
 #[tauri::command]
 fn recording_now(shell: State<'_, Shell>) -> Now {
+    // One lock for both: a second `lock()` in the same expression waits on the first for ever.
+    let (checks, silent_for) = {
+        let checks = shell.checks.lock().unwrap();
+        (checks.now(), checks.silent_for(Instant::now()))
+    };
     let (started, levels) = *shell.meter.lock().unwrap();
     let recording = shell.recording.lock().unwrap().is_some();
     let meeting = shell
@@ -1077,8 +1082,8 @@ fn recording_now(shell: State<'_, Shell>) -> Now {
         seconds: started.map_or(0.0, |started| started.elapsed().as_secs_f64()),
         levels,
         devices: shell.devices.lock().unwrap().names(),
-        checks: shell.checks.lock().unwrap().now(),
-        silent_for: shell.checks.lock().unwrap().silent_for(Instant::now()),
+        checks,
+        silent_for,
         microphone_gone: *shell.microphone_gone.lock().unwrap(),
         transcript_follows: shell.settings.lock().unwrap().after != settings::After::Nothing,
         meeting,
