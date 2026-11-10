@@ -175,6 +175,9 @@ fn heard(state: &mut State, line: &str) {
 #[derive(Default)]
 pub struct Slot {
     held: Option<(SoundCheck, Instant, String)>,
+    /// Counted at each opening and each close: an opening that finds it moved while its program
+    /// started was closed meanwhile.
+    generation: u64,
 }
 
 /// Why no listening opened: a recording runs — never both (ADR-0015's amendment) —, or the program
@@ -183,6 +186,8 @@ pub struct Slot {
 pub enum Refused {
     Recording,
     NotStarted(String),
+    /// The panel closed while it started: the listening started meanwhile is stopped, never kept.
+    Closed,
 }
 
 impl Slot {
@@ -206,6 +211,8 @@ impl Slot {
 
     /// The listening taken out, to be stopped: the panel closed, or a recording starting.
     pub fn take(&mut self) -> Option<SoundCheck> {
+        // A close that lands while a listening starts wins over it (`open`).
+        self.generation += 1;
         self.held.take().map(|(check, ..)| check)
     }
 
@@ -238,8 +245,22 @@ pub fn open<R>(
     if recording.is_some() {
         return Err(Refused::Recording);
     }
+    let ticket = {
+        let mut slot = slot.lock().unwrap();
+        slot.generation += 1;
+        slot.generation
+    };
     let started = start().map_err(|error| Refused::NotStarted(error.to_string()))?;
-    let before = slot.lock().unwrap().held.replace((started, Instant::now(), label.to_string()));
+    let mut held = slot.lock().unwrap();
+    if held.generation != ticket {
+        // Closed while it started: stopped here, never kept for the watchdog to find.
+        drop(held);
+        drop(recording);
+        started.stop();
+        return Err(Refused::Closed);
+    }
+    let before = held.held.replace((started, Instant::now(), label.to_string()));
+    drop(held);
     drop(recording);
     Ok(before.map(|(check, ..)| check))
 }
