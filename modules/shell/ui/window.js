@@ -3221,6 +3221,11 @@ function showSmall(words) {
       named(stop, words.record_stop);
       start.hidden = recording;
       stop.hidden = time.hidden = meters.hidden = !recording;
+      // At rest, the bar is its row: the recording's lines go with it (the ticks stop at the stop).
+      if (!recording) {
+        for (const check of checks) check.sentence.hidden = true;
+        announce.hidden = true;
+      }
       handle.classList.toggle("live", recording);
       const dot = handle.querySelector(".dot");
       dot.setAttribute("r", recording ? "2.2" : "1.6");
@@ -3268,8 +3273,7 @@ function showSmall(words) {
       const silent = state === "silent" && (now.silent_for[index] ?? 0) >= SILENT_SAID;
       const says = index === 0 && now.microphone_gone ? words.small_microphone_gone : state === "silent" && !silent ? "" : check.says[state] ?? "";
       if (check.said.textContent !== says) check.said.textContent = says;
-      // Said while a recording runs alone: at rest, the bar is its row.
-      check.sentence.hidden = says === "" || !now.recording;
+      check.sentence.hidden = says === "" || !recording;
       const quiet = silent || state === "nothing" || state === "waiting";
       if (check.quiet !== quiet) {
         check.quiet = quiet;
@@ -3278,7 +3282,7 @@ function showSmall(words) {
       }
     }
     announcement = now.announcement;
-    announce.hidden = announcement === null || !now.recording;
+    announce.hidden = announcement === null || !recording;
     announce.classList.toggle("gone", now.seconds >= ANNOUNCED_FOR);
     stop.disabled ||= !now.recording;
     note.hidden = !now.transcript_follows;
