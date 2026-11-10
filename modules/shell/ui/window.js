@@ -3268,7 +3268,8 @@ function showSmall(words) {
       const silent = state === "silent" && (now.silent_for[index] ?? 0) >= SILENT_SAID;
       const says = index === 0 && now.microphone_gone ? words.small_microphone_gone : state === "silent" && !silent ? "" : check.says[state] ?? "";
       if (check.said.textContent !== says) check.said.textContent = says;
-      check.sentence.hidden = says === "";
+      // Said while a recording runs alone: at rest, the bar is its row.
+      check.sentence.hidden = says === "" || !now.recording;
       const quiet = silent || state === "nothing" || state === "waiting";
       if (check.quiet !== quiet) {
         check.quiet = quiet;
@@ -3277,7 +3278,7 @@ function showSmall(words) {
       }
     }
     announcement = now.announcement;
-    announce.hidden = announcement === null;
+    announce.hidden = announcement === null || !now.recording;
     announce.classList.toggle("gone", now.seconds >= ANNOUNCED_FOR);
     stop.disabled ||= !now.recording;
     note.hidden = !now.transcript_follows;
