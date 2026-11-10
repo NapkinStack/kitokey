@@ -42,7 +42,7 @@ order of the events, and what each means, are said here and nowhere else.
 | `level` | `source`; `level`: how loud it is now, from 0 (silence) to 1 (the loudest it can be), a number | About ten times a second for each source being recorded, after `started` and before `stopped`: for a meter that moves as sound comes (cycle 03, D22). Also while listening (*Listening*, below) |
 | `microphone_gone` | none | The microphone named at the start (*A microphone named*, below) was not found or could not be looked for, before `started`; or, after it, was seen to have gone: `me` is recorded as with no name |
 | `microphone_back` | none | The microphone said gone is there again, whether a stream follows or not (*A microphone named*, below) |
-| `device` | `source`; `device`: the name the system gives the device, or `null` | This source is now recorded from another device: the user chose another default, or the one recorded was taken away and the system named another — or, for `others`, a call plays on an output other than the default, or left it for the default (cycle 04, D41) — or, for `me`, a call holds a microphone other than the one recorded, or no longer does (cycle 05, D66). Its track goes on, in the form it opened with (`session-audio`). `null`: the system names no device for it, or the call let go of it, and nothing comes from it before a `device` names one. Said at each change, after `started` and before `stopped`; of a source said `unavailable`, as *A microphone that waits* says, below. While listening, as *Listening* says, with `headset` — optional: `true` when `me`'s device is a Bluetooth headset's microphone, `false` when it is not; absent, not known |
+| `device` | `source`; `device`: the name the system gives the device, or `null` | This source is now recorded from another device: the user chose another default, or the one recorded was taken away and the system named another — or, for `others`, a call plays on an output other than the default, or left it for the default (cycle 04, D41) — or, for `me`, a call holds a microphone other than the one recorded, or no longer does (cycle 05, D66). Its track goes on, in the form it opened with (`session-audio`). `null`: the system names no device for it, or the call let go of it, and nothing comes from it before a `device` names one. Said at each change, after `started` and before `stopped`; of a source said `unavailable`, as *A microphone that waits* says, below. While listening, as *Listening* says, with `headset` — optional: `true` when `me`'s device is a Bluetooth headset's microphone, `false` when it is not; absent, not known. Never said by a recording |
 | `stopped` | `folder`; `seconds`: the recording's length, a number | The session's files are whole and `session.json` says `stopped`. **Last**, and only when the recording was stopped as below |
 | `microphone` | `name`: what the start takes; `description`: as a person reads it | One microphone of what `microphones` lists (*A microphone named*, below). Never said by a recording |
 
@@ -143,9 +143,10 @@ session's folder, no file anywhere; only its log, as any run (*Its log*).
   opened, and `device` at each change. **Never `started` nor `stopped`**: there is no folder to name, nor a
   length; nor `silent`, `heard` or `microphone_back`: the meter says it.
 - **A headset** (cycle 09, D88, additive). `me`'s first `device` says `headset: true` when what it
-  listens to is a Bluetooth headset's microphone — the headset then in its call profile while it
-  listens —, `false` when it is not. Absent — on `others`, on a later `device`, or where the system does
-  not tell: today, all but Linux with PipeWire —, not known.
+  listens to is a Bluetooth headset's microphone — which may switch to its call profile while it
+  listens, as above —, `false` when it is not. Absent — on `others`, on a later `device`, or where the
+  system does not tell: today, all but Linux with PipeWire —, not known: a later `device` of `me` without
+  it says nothing of the new microphone. A recording never says `headset`.
 - **A microphone named that goes while it listens**: nothing takes its place, and no line says it —
   `me`'s `level` falls to 0 and stays there, still said ten times a second, until it is stopped; the error
   stream may hold a line of the system's about that stream, which is no failure. Whoever wants another
