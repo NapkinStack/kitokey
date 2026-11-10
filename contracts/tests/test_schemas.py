@@ -136,8 +136,8 @@ def test_the_comparator_refuses_a_schemas_breaks_wherever_they_are(path, tmp_pat
 
 # The fields a page says may be absent: `stopped`, while a session is recording; a segment's
 # `track` and `voice`, in a transcript written before they were; a `silent`'s `nothing`, said by
-# a capture that knows it (#361).
-OPTIONAL = {"stopped", "track", "voice", "nothing"}
+# a capture that knows it (#361); a `device`'s `headset`, said by a capture that listens (D88).
+OPTIONAL = {"stopped", "track", "voice", "nothing", "headset"}
 SHOWN_AS_LINES = {
     "transcript/v1/line.schema.json",
     "recording/v1/event.schema.json",
@@ -252,6 +252,8 @@ EXAMPLES = {
             {"event": "level", "source": "me", "level": 0.42},
             {"event": "device", "source": "me", "device": "Headset Microphone"},
             {"event": "device", "source": "others", "device": None},
+            {"event": "device", "source": "me", "device": "Headset Microphone", "headset": True},
+            {"event": "device", "source": "me", "device": "Digital Microphone", "headset": False},
             {"event": "stopped", "folder": "<sessions-folder>/2026-10-13_14-05", "seconds": 1912.4},
             {"event": "microphone_gone"},
             {"event": "microphone_back"},
@@ -283,6 +285,8 @@ EXAMPLES = {
             {"event": "device", "device": "Headset Microphone"},
             {"event": "device", "source": "room", "device": "Headset Microphone"},
             {"event": "device", "source": "me", "device": 7},
+            {"event": "device", "source": "me", "device": "Headset Microphone", "headset": "yes"},
+            {"event": "device", "source": "me", "device": "Headset Microphone", "headset": None},
             {"source": "me"},
         ],
     ),
@@ -619,3 +623,13 @@ def test_recording_v1_shows_listening_in_lines_a_recording_says_and_neither_star
     # Only what a recording says too, of its sources: no folder, so no `started`, no `stopped`.
     assert {line["event"] for line in lines} == {"device", "level"}
     assert [line["source"] for line in lines if line["event"] == "device"][:2] == ["me", "others"]
+
+
+def test_recording_v1_shows_listening_say_whether_me_is_a_headset_s():
+    reads = jsonschema.Draft202012Validator(json.loads((CONTRACTS / "recording/v1/event.schema.json").read_text()))
+    heading = "Valid — listening on a Bluetooth headset's microphone"
+    lines = [json.loads(line) for line in shown("recording/v1/README.md", heading)[0].splitlines()]
+    assert [line for line in lines if not reads.is_valid(line)] == []
+    # `me`'s first device says it is a headset's; `others`' says nothing of it.
+    assert lines[0] == {**lines[0], "event": "device", "source": "me", "headset": True}
+    assert lines[1]["event"] == "device" and "headset" not in lines[1]
