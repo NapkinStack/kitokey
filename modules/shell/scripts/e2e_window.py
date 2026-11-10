@@ -2496,8 +2496,8 @@ def microphone_chosen(now: dt.datetime) -> None:
 
 
 def sound_checked(now: dt.datetime) -> None:
-    """AX. « Vérifier le son » (D88, board 7), from Settings: capture listens only while the panel shows."""
-    print("AX. « Vérifier le son » from Settings: each side's device and meter, the headset's sentence; a test sound played and said heard or not, never during a call; no stream of Kitokey's left within a second of closing; a recording started from it (D88)")
+    """AZ. « Vérifier le son » (D88, board 7), from Settings: capture listens only while the panel shows."""
+    print("AZ. « Vérifier le son » from Settings: each side's device and meter, the headset's sentence; a test sound played and said heard or not, never during a call; no stream of Kitokey's left within a second of closing; a recording started from it (D88)")
     sessions = WORK / "sessions-check"
     sessions.mkdir(exist_ok=True)
     mic = subprocess.run(["pactl", "load-module", "module-null-sink", "sink_name=kitokey_e2e_check_mic", "media.class=Audio/Source/Virtual"],
