@@ -103,6 +103,10 @@ const ICONS = {
   "lock-open": [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2, ry: 2 }], "M7 11V7a5 5 0 0 1 9.9-1"],
   "file-text": ["M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z", "M14 2v5a1 1 0 0 0 1 1h5", "M10 9H8", "M16 13H8", "M16 17H8"],
   captions: [["rect", { width: 18, height: 14, x: 3, y: 5, rx: 2, ry: 2 }], "M7 15h4M15 15h2M7 11h2M13 11h4"],
+  "audio-lines": ["M2 10v3", "M6 6v11", "M10 3v18", "M14 8v7", "M18 5v13", "M22 10v3"],
+  bluetooth: ["m7 7 10 10-5 5V2l5 5L7 17"],
+  info: [["circle", { cx: 12, cy: 12, r: 10 }], "M12 16v-4", "M12 8h.01"],
+  "circle-check": [["circle", { cx: 12, cy: 12, r: 10 }], "m9 12 2 2 4-4"],
   pencil: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
 };
 function icon(name) {
@@ -2670,7 +2674,18 @@ function showSettings(shown, minutes, words) {
     save({ language: speaksPick.value });
   });
   speaks.append(speaksSaid, speaksPick);
-  more.append(speaks, remind, offer, start, keys, where, keep);
+  // « Vérifier le son » (D88): the microphone and the meeting's sound, before a recording — the panel
+  // the bar opens too.
+  const check = element("div", "row");
+  const checkSaid = element("span", "said");
+  checkSaid.append(element("span", "name", words.check_sound), element("span", "says", words.check_sound_says));
+  const checkButton = element("button", "open with-icon");
+  checkButton.type = "button";
+  checkButton.id = "check-sound-open";
+  checkButton.append(icon("audio-lines"), element("span", "", words.check_sound));
+  checkButton.addEventListener("click", () => checkSound(words, checkButton));
+  check.append(checkSaid, checkButton);
+  more.append(speaks, remind, check, offer, start, keys, where, keep);
   parts.push(more);
 
   // The transcription model's state: there and ready; else said, and offered, by paintModel.
@@ -2829,6 +2844,166 @@ function showAgreement(name, agreement, words, session) {
 
 // The mark, alone in the accent, the bar's handle (D90; the decider, 2026-11-08): its dot red and
 // larger while recording, its stem cut further, as the tray's icon draws it.
+// « Vérifier le son » (D88, board 7): a modal panel over the page that opened it. capture listens only
+// while it shows: each side's device and an 8 px meter, a headset's sentence, a test sound and what was
+// heard of it — never while a call holds a microphone —, and a recording started from here. Closed by ×,
+// Escape or the recording, the listening ends with it, and the focus goes back to `back`.
+let checking = null;
+async function checkSound(words, back) {
+  if (checking) return;
+  const dialog = element("dialog", "check-sound");
+  dialog.id = "check-sound";
+  dialog.setAttribute("aria-labelledby", "check-sound-title");
+  const head = element("div", "check-head");
+  const title = element("h2", "", words.check_sound);
+  title.id = "check-sound-title";
+  const close = iconButton("x", words.check_close, "check-sound-close");
+  head.append(barMark(), title, close);
+  const side = (glyph, name, id, kind) => {
+    const source = element("div", `check-source ${kind}`);
+    const top = element("div", "check-top");
+    const device = element("span", "check-device", "");
+    device.id = `check-device-${id}`;
+    top.append(icon(glyph), element("span", "check-name", name), device);
+    const track = element("div", "check-track");
+    const fill = element("span", "check-fill");
+    fill.id = `check-level-${id}`;
+    track.append(fill);
+    // A meter a screen reader reads as one, from 0 to 100.
+    track.setAttribute("role", "meter");
+    track.setAttribute("aria-label", name);
+    track.setAttribute("aria-valuemin", "0");
+    track.setAttribute("aria-valuemax", "100");
+    track.setAttribute("aria-valuenow", "0");
+    source.append(top, track);
+    return [source, device, fill, track];
+  };
+  const [me, meDevice, meFill, meTrack] = side("mic", words.small_mic, "me", "near");
+  const [others, othersDevice, othersFill, othersTrack] = side("volume-2", words.small_meeting, "others", "far");
+  const said = (glyph, id, kind) => {
+    const line = element("p", `check-said ${kind}`);
+    line.id = id;
+    line.hidden = true;
+    line.append(icon(glyph), element("span", ""));
+    return line;
+  };
+  const bluetooth = said("bluetooth", "check-bluetooth", "info");
+  bluetooth.lastChild.textContent = words.check_bluetooth;
+  const call = said("info", "check-call", "info");
+  call.lastChild.textContent = words.check_call;
+  const heard = said("circle-check", "check-heard", "okay");
+  heard.lastChild.textContent = words.check_heard;
+  const missed = said("info", "check-missed", "info");
+  missed.lastChild.textContent = words.check_not_heard;
+  const failed = said("info", "check-failed", "info");
+  failed.lastChild.textContent = words.check_failed;
+  for (const line of [heard, missed, failed]) line.setAttribute("role", "status");
+  const play = element("button", "open with-icon");
+  play.type = "button";
+  play.id = "check-play";
+  play.append(icon("volume-2"), element("span", "", words.check_play));
+  const record = element("button", "primary with-icon");
+  record.type = "button";
+  record.id = "check-record";
+  record.append(element("span", "dot"), element("span", "", words.record_start));
+  const actions = element("div", "check-actions");
+  actions.append(play, record);
+  const note = element("p", "check-note", words.check_open_note);
+  dialog.append(head, me, others, bluetooth, call, heard, missed, failed, actions, note);
+  document.body.append(dialog);
+  let testing = false;
+  let poll = null;
+  const end = async (then) => {
+    if (!checking) return;
+    checking = null;
+    clearInterval(poll);
+    await window.__TAURI__.core.invoke("sound_check_close").catch(() => {});
+    if (dialog.open) dialog.close();
+    dialog.remove();
+    if (then) await then();
+    // Its button, as the page is now: drawn again meanwhile, it is found by its id.
+    else (document.getElementById(back?.id) ?? back)?.focus();
+  };
+  checking = end;
+  close.addEventListener("click", () => end());
+  // Escape closes the panel as a dialog does — and the listening with it.
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    end();
+  });
+  record.addEventListener("click", () => end(() => window.__TAURI__.core.invoke("record")));
+  // Its window hidden or its page left: the panel goes, and the microphone with it.
+  const hidden = () => {
+    if (checking !== end) return document.removeEventListener("visibilitychange", hidden);
+    if (document.visibilityState === "hidden") end();
+  };
+  document.addEventListener("visibilitychange", hidden);
+  play.addEventListener("click", async () => {
+    testing = true;
+    play.disabled = true;
+    heard.hidden = missed.hidden = true;
+    await window.__TAURI__.core.invoke("sound_check_mark");
+    await testSound();
+    // What the meeting's side heard of it, a moment after it ended: the system's latency.
+    setTimeout(async () => {
+      const now = await window.__TAURI__.core.invoke("sound_check_now").catch(() => null);
+      testing = false;
+      if (!now?.open) return;
+      heard.hidden = now.heard.test !== true;
+      missed.hidden = now.heard.test === true;
+      paint(now);
+    }, 600);
+  });
+  const paint = ({ open, heard: listened, call: held }) => {
+    if (!open) return;
+    for (const [index, device, fill, track] of [[0, meDevice, meFill, meTrack], [1, othersDevice, othersFill, othersTrack]]) {
+      device.textContent = listened.unavailable[index] ? words.check_unavailable : listened.devices[index] ?? "";
+      fill.style.width = `${Math.round(listened.levels[index] * 100)}%`;
+      track.setAttribute("aria-valuenow", String(Math.round(listened.levels[index] * 100)));
+    }
+    bluetooth.hidden = !listened.headset;
+    failed.hidden = !listened.ended;
+    // A call holds a microphone: no sound played, it would go into the call (D88).
+    call.hidden = !held;
+    play.disabled = testing || held || listened.ended;
+    if (held) heard.hidden = missed.hidden = true;
+  };
+  dialog.showModal();
+  const { opened } = await window.__TAURI__.core.invoke("sound_check_open").catch(() => ({ opened: false }));
+  if (!opened) {
+    failed.lastChild.textContent = words.check_recording;
+    failed.hidden = false;
+    play.disabled = record.disabled = true;
+    return;
+  }
+  poll = setInterval(async () => {
+    const now = await window.__TAURI__.core.invoke("sound_check_now").catch(() => null);
+    if (now && checking) paint(now);
+  }, 100);
+}
+
+// The test sound (D88): two short notes on the system's default output, drawn here — no file, no
+// library —; its context closed once played, so that no stream of Kitokey's stays open.
+async function testSound() {
+  const context = new AudioContext();
+  const gain = context.createGain();
+  gain.connect(context.destination);
+  const start = context.currentTime + 0.05;
+  for (const [frequency, at] of [[660, 0], [880, 0.25]]) {
+    const note = context.createOscillator();
+    note.frequency.value = frequency;
+    note.connect(gain);
+    note.start(start + at);
+    note.stop(start + at + 0.22);
+  }
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(0.3, start + 0.02);
+  gain.gain.setValueAtTime(0.3, start + 0.45);
+  gain.gain.linearRampToValueAtTime(0, start + 0.5);
+  await new Promise((done) => setTimeout(done, 650));
+  await context.close();
+}
+
 function barMark() {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
