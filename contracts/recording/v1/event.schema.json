@@ -202,22 +202,6 @@
       ]
     },
     {
-      "description": "Said by `listen` (D88), never by a recording: whether an application other than Kitokey records from a microphone — a call, as far as the system's graph tells.",
-      "type": "object",
-      "properties": {
-        "event": {
-          "const": "call"
-        },
-        "held": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "event",
-        "held"
-      ]
-    },
-    {
       "description": "An event this version does not name: a consumer ignores it.",
       "type": "object",
       "properties": {
@@ -234,8 +218,7 @@
               "device",
               "microphone_gone",
               "microphone",
-              "microphone_back",
-              "call"
+              "microphone_back"
             ]
           }
         }

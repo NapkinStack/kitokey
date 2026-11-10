@@ -254,8 +254,6 @@ EXAMPLES = {
             {"event": "device", "source": "others", "device": None},
             {"event": "device", "source": "me", "device": "Headset Microphone", "headset": True},
             {"event": "device", "source": "me", "device": "Digital Microphone", "headset": False},
-            {"event": "call", "held": True},
-            {"event": "call", "held": False},
             {"event": "stopped", "folder": "<sessions-folder>/2026-10-13_14-05", "seconds": 1912.4},
             {"event": "microphone_gone"},
             {"event": "microphone_back"},
@@ -289,9 +287,6 @@ EXAMPLES = {
             {"event": "device", "source": "me", "device": 7},
             {"event": "device", "source": "me", "device": "Headset Microphone", "headset": "yes"},
             {"event": "device", "source": "me", "device": "Headset Microphone", "headset": None},
-            {"event": "call"},
-            {"event": "call", "held": "yes"},
-            {"event": "call", "held": None},
             {"source": "me"},
         ],
     ),
@@ -630,14 +625,11 @@ def test_recording_v1_shows_listening_in_lines_a_recording_says_and_neither_star
     assert [line["source"] for line in lines if line["event"] == "device"][:2] == ["me", "others"]
 
 
-def test_recording_v1_shows_listening_say_a_headset_and_a_call_after_the_devices():
+def test_recording_v1_shows_listening_say_whether_me_is_a_headset_s():
     reads = jsonschema.Draft202012Validator(json.loads((CONTRACTS / "recording/v1/event.schema.json").read_text()))
     heading = "Valid — listening on a Bluetooth headset's microphone"
     lines = [json.loads(line) for line in shown("recording/v1/README.md", heading)[0].splitlines()]
     assert [line for line in lines if not reads.is_valid(line)] == []
-    events = [line["event"] for line in lines]
-    # The devices first, `me`'s saying it is a headset's; then whether a call holds a microphone,
-    # before the first level; then again at each change.
-    assert events[:3] == ["device", "device", "call"] and "level" in events[3:]
-    assert lines[0] == {**lines[0], "source": "me", "headset": True}
-    assert [line["held"] for line in lines if line["event"] == "call"] == [False, True]
+    # `me`'s first device says it is a headset's; `others`' says nothing of it.
+    assert lines[0] == {**lines[0], "event": "device", "source": "me", "headset": True}
+    assert lines[1]["event"] == "device" and "headset" not in lines[1]
