@@ -2483,12 +2483,25 @@ def meeting_named(now: dt.datetime) -> None:
         check("the search finds a meeting by its title", found)
         browser.execute_script("const f = document.getElementById('find'); f.value = ''; f.dispatchEvent(new Event('input'))")
         head = "return [...document.querySelectorAll('#meeting .named > *')].map(e => [e.tagName, e.className, e.textContent])"
+        # From the title's last letter to its length and weight, and their bottoms (D89, board 4): the
+        # title's own text, not its box, which may be as wide as the date above it.
+        beside_title = ("const w = document.createTreeWalker(document.querySelector('#meeting h1'), NodeFilter.SHOW_TEXT); let t = null; while (w.nextNode()) if (w.currentNode.textContent.trim()) t = w.currentNode;"
+                        " const r = document.createRange(); r.selectNodeContents(t); const rs = [...r.getClientRects()], h = rs[rs.length - 1], l = document.querySelector('#meeting .lasts').getBoundingClientRect();"
+                        " return [Math.round(l.left - h.right), Math.round(l.bottom - h.bottom)]")
         # The page left goes at once: nothing there until the page asked for is drawn.
         at_head = lambda b, line, part=2: (found[line][part] if len(found := b.execute_script(head)) > line else "")
         browser.execute_script(f"location.hash = '#/meeting/{named.name}'")
         page = wait_for(browser, lambda b: at_head(b, 1, 0) == "H1" and at_head(b, 1, 2) == long, 10)
         got = browser.execute_script(head)
         check("on its page: the date above, the title its heading", page and got[0][0] != "H1" and "·" in got[0][2], got)
+        # D89, board 4: how long and how heavy beside the title, on its line — never on the date's above
+        # it; read where the title holds on one line beside them, 1920 wide.
+        was = browser.get_window_size()
+        browser.set_window_size(1920, 1080)
+        wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 5)
+        beside = browser.execute_script(beside_title)
+        check("on its page: its length and weight beside the title, on the title's line (D89)", 0 < beside[0] <= 24 and abs(beside[1]) < 6, beside)
+        browser.set_window_size(was["width"], was["height"])
         shot(browser, "d48-named")
         browser.execute_script(f"location.hash = '#/meeting/{marked.name}'")
         as_text = wait_for(browser, lambda b: at_head(b, 1, 2).startswith("<img"), 10)
@@ -2512,6 +2525,13 @@ def meeting_named(now: dt.datetime) -> None:
         check("the minutes made again: the meeting takes the new title", again, browser.execute_script(head))
         retitled = wait_for(browser, lambda b: b.execute_script(rows_said)[0][0] == "Un nouveau nom", 10)
         check("its row too", retitled, browser.execute_script(rows_said)[0])
+        # A title shorter than its date: its length and weight after its last letter all the same.
+        written(named, "minutes/v2", "Point")
+        browser.execute_script("location.hash = '#/'")
+        browser.execute_script(f"location.hash = '#/meeting/{named.name}'")
+        short = wait_for(browser, lambda b: at_head(b, 1, 2) == "Point", 10)
+        beside = browser.execute_script(beside_title)
+        check("a title shorter than its date: its length and weight just after it, on its line (D89)", short and 0 < beside[0] <= 24 and abs(beside[1]) < 6, beside)
 
 
 def minutes_checked(now: dt.datetime) -> None:
