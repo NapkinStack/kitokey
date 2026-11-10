@@ -693,26 +693,49 @@ fn show_small(app: &AppHandle) {
         .inner_size(BAR.0, BAR.1)
         .decorations(false)
         .always_on_top(recording);
-    // Where it was left, where the system lets an application place itself: GNOME chooses.
-    if let Some([x, y]) = shell.settings().bar_at {
+    // Where it was left, where the system lets an application place itself (Windows, macOS) and
+    // a screen holds it still: GNOME chooses, and a screen gone leaves the system to choose too.
+    if !cfg!(target_os = "linux")
+        && let Some([x, y]) = shell.settings().bar_at
+        && on_a_screen(app, x, y)
+    {
         bar = bar.position(f64::from(x), f64::from(y));
     }
     if let Ok(window) = bar.build() {
+        bar_shown(app, true);
         let app = app.clone();
-        window.on_window_event(move |event| {
-            if let tauri::WindowEvent::Moved(_) = event {
-                bar_moved(&app);
-            }
+        window.on_window_event(move |event| match event {
+            // GNOME says « Moved » at each configure, at (0, 0): no place to keep there.
+            tauri::WindowEvent::Moved(_) if !cfg!(target_os = "linux") => bar_moved(&app),
+            // Closed by any path — the full window opened on a page, a notification —: nothing
+            // left to show from the tray.
+            tauri::WindowEvent::Destroyed => bar_shown(&app, true),
+            _ => {}
         });
     }
 }
 
-/// The tray's « Afficher la barre »: in its menu while the bar is hidden, before « Ouvrir Kitokey ».
+/// Whether a screen of this computer holds the point, in logical pixels: a place kept on a screen
+/// since unplugged is not used.
+fn on_a_screen(app: &AppHandle, x: i32, y: i32) -> bool {
+    app.available_monitors().is_ok_and(|monitors| {
+        monitors.iter().any(|monitor| {
+            let scale = monitor.scale_factor();
+            let at = monitor.position().to_logical::<f64>(scale);
+            let size = monitor.size().to_logical::<f64>(scale);
+            let (x, y) = (f64::from(x), f64::from(y));
+            x >= at.x && y >= at.y && x < at.x + size.width && y < at.y + size.height
+        })
+    })
+}
+
+/// The tray's « Afficher la barre »: in its menu while the bar is hidden, after the recording's
+/// entry, as board 8 sets it.
 fn bar_shown(app: &AppHandle, shown: bool) {
     let shell = app.state::<Shell>();
     let _ = shell.menu.remove(&shell.show_bar);
     if !shown {
-        let _ = shell.menu.insert(&shell.show_bar, 0);
+        let _ = shell.menu.insert(&shell.show_bar, 2);
     }
 }
 
@@ -730,6 +753,10 @@ fn bar_moved(app: &AppHandle) {
         let Some(window) = app.get_webview_window("small") else {
             return;
         };
+        // Minimized, Windows says it is at (-32000, -32000): no place the user left it.
+        if window.is_minimized().unwrap_or(true) {
+            return;
+        }
         let (Ok(place), Ok(scale)) = (window.outer_position(), window.scale_factor()) else {
             return;
         };

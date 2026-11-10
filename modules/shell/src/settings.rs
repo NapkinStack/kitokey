@@ -131,7 +131,8 @@ pub struct Settings {
     /// The full window's sidebar folded by the user (D61): opened again as it was left.
     pub folded: bool,
     /// Where the user left the recording bar, in the screen's logical pixels (D90): it opens there
-    /// again where the system lets an application place itself — Windows, macOS —, never on GNOME.
+    /// again where the system lets an application place itself — Windows, macOS —, a screen holding
+    /// it still; never written nor read on Linux, where GNOME chooses.
     pub bar_at: Option<[i32; 2]>,
     /// The language Kitokey speaks, chosen by the user (D64); none, the system's.
     pub language: Option<Language>,

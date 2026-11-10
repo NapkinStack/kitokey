@@ -2463,7 +2463,9 @@ def bar_window(now: dt.datetime) -> None:
         press(browser, "small-hide")
         gone = wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
         check("hidden during a recording: the bar goes, the recording goes on, the tray's icon red", gone and tray_colour() == "red", browser.execute_script(hidden))
-        check("the tray offers « Afficher la barre », first", wait_for(None, lambda b: tray_labels()[:1] == ["Afficher la barre"], 5), tray_labels())
+        # After the recording's entry, as board 8 sets it.
+        check("the tray offers « Afficher la barre », after « Arrêter l’enregistrement »",
+              wait_for(None, lambda b: tray_labels()[1:3] == ["Arrêter l’enregistrement", "Afficher la barre"], 5), tray_labels())
         # Whatever happens but a gesture: a device changes, the microphone goes and comes back.
         (taping / "move").touch()
         (taping / "mic-gone").touch()
@@ -2485,6 +2487,14 @@ def bar_window(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
         tray_click("Ouvrir Kitokey")
         check("hidden at rest, « Ouvrir Kitokey » shows it again", wait_for(browser, lambda b: b.execute_script(hidden) == "visible", 5), browser.execute_script(hidden))
+        # Hidden, then closed by another path — the full window opened on a page, as a notification
+        # does —: the tray offers no bar that is gone.
+        press(browser, "small-hide")
+        wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
+        wait_for(None, lambda b: "Afficher la barre" in tray_labels(), 5)
+        browser.execute_script("window.__TAURI__.core.invoke('full_window', {page: '#/settings'})")
+        check("hidden, then closed for the full window on a page: « Afficher la barre » leaves the menu",
+              wait_for(None, lambda b: "Afficher la barre" not in tray_labels(), 5), tray_labels())
 
 
 def meeting_named(now: dt.datetime) -> None:
