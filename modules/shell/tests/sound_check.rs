@@ -14,10 +14,18 @@ use kitokey_shell::sound_check::{Heard, SoundCheck};
 
 static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
+/// Held across every script written and every program started here: a program started while
+/// another thread's script is open for writing inherits that descriptor until it execs, and the
+/// script then cannot be run — "text file busy" (ETXTBSY, the fork/exec race). A test that fails
+/// does not poison it for the others.
+fn spawning() -> std::sync::MutexGuard<'static, ()> {
+    ONE_AT_A_TIME.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// The program played here, given what `listen` is given. One at a time: a script still open for
 /// writing in one thread while another starts a program cannot be run — "text file busy".
 fn played(folder: &Path, script: &str, microphone: Option<&str>) -> SoundCheck {
-    let _held = ONE_AT_A_TIME.lock().unwrap();
+    let _held = spawning();
     let path = folder.join("kitokey-capture");
     fs::write(&path, format!("#!/bin/bash\nhere=$(dirname \"$0\")\n{script}\n")).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
@@ -195,8 +203,9 @@ use kitokey_shell::sound_check::{Refused, Slot, open};
 const LISTENS: &str = r#"echo '{"event":"device","source":"others","device":"Speaker"}'
 read line"#;
 
+/// The script alone; whoever runs it holds `spawning` across the start.
 fn script(folder: &Path) -> std::path::PathBuf {
-    let _held = ONE_AT_A_TIME.lock().unwrap();
+    let _held = spawning();
     let path = folder.join("kitokey-capture");
     fs::write(&path, format!("#!/bin/bash\n{LISTENS}\n")).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
@@ -223,6 +232,7 @@ fn a_recording_that_starts_while_a_listening_opens_finds_it_to_stop() {
             open(&recording, &slot, "main", || {
                 // Slow to start, as a program is: a recording asked meanwhile waits for it.
                 std::thread::sleep(Duration::from_millis(300));
+                let _held = spawning();
                 SoundCheck::start(&program, None)
             })
         });
@@ -242,7 +252,11 @@ fn a_listening_unasked_too_long_is_given_up_and_one_asked_is_kept() {
     let folder = tempfile::tempdir().unwrap();
     let program = script(folder.path());
     let (recording, slot) = (Mutex::new(None::<()>), Mutex::new(Slot::default()));
-    open(&recording, &slot, "main", || SoundCheck::start(&program, None)).unwrap();
+    open(&recording, &slot, "main", || {
+        let _held = spawning();
+        SoundCheck::start(&program, None)
+    })
+    .unwrap();
     let unasked = Duration::from_millis(200);
     std::thread::sleep(Duration::from_millis(120));
     assert!(slot.lock().unwrap().asked().is_some());
@@ -259,11 +273,37 @@ fn a_listening_ends_with_the_window_that_opened_it_alone() {
     let folder = tempfile::tempdir().unwrap();
     let program = script(folder.path());
     let (recording, slot) = (Mutex::new(None::<()>), Mutex::new(Slot::default()));
-    open(&recording, &slot, "main", || SoundCheck::start(&program, None)).unwrap();
+    open(&recording, &slot, "main", || {
+        let _held = spawning();
+        SoundCheck::start(&program, None)
+    })
+    .unwrap();
     assert!(
         slot.lock().unwrap().of_window("small").is_none(),
         "another window's end is not its own"
     );
     slot.lock().unwrap().of_window("main").expect("its window gone: it goes").stop();
     assert!(!slot.lock().unwrap().is_open());
+}
+
+#[test]
+fn a_close_while_a_listening_opens_wins() {
+    let folder = tempfile::tempdir().unwrap();
+    let program = script(folder.path());
+    let recording: Mutex<Option<()>> = Mutex::new(None);
+    let slot = Mutex::new(Slot::default());
+    std::thread::scope(|scope| {
+        let opening = scope.spawn(|| {
+            open(&recording, &slot, "main", || {
+                std::thread::sleep(Duration::from_millis(300));
+                let _held = spawning();
+                SoundCheck::start(&program, None)
+            })
+        });
+        std::thread::sleep(Duration::from_millis(50));
+        // The panel closed while its listening starts: nothing to take yet.
+        assert!(slot.lock().unwrap().take().is_none());
+        assert!(matches!(opening.join().unwrap(), Err(Refused::Closed)));
+    });
+    assert!(!slot.lock().unwrap().is_open(), "the listening started meanwhile is not kept");
 }

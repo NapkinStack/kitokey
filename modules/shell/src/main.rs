@@ -1271,7 +1271,8 @@ async fn sound_check_open(app: AppHandle, window: tauri::WebviewWindow) -> Sound
     });
     let before = match opened {
         Ok(before) => before,
-        Err(sound_check::Refused::Recording) => return SoundCheckOpened { opened: false },
+        // A recording runs; or the panel closed while its listening started — stopped already.
+        Err(sound_check::Refused::Recording | sound_check::Refused::Closed) => return SoundCheckOpened { opened: false },
         Err(sound_check::Refused::NotStarted(error)) => {
             tracing::error!(detail = %error, "shell.sound_check_failed");
             return SoundCheckOpened { opened: false };
