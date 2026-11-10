@@ -2593,7 +2593,10 @@ def sound_checked(now: dt.datetime) -> None:
             took = closed_within(window, browser, lambda b: press(b, "check-sound-close"))
             check("closed by ×: no stream of Kitokey's left within one second", took is not None and took <= 1.0, took)
             check("capture was told « stop »", (WORK / "listen-told").is_file() and (WORK / "listen-told").read_text() == "stop\n")
-            back = browser.execute_script("return [document.getElementById('check-sound') === null, document.activeElement.id]")
+            # The streams go before the panel: it waits for capture's end, then leaves.
+            gone_back = "return [document.getElementById('check-sound') === null, document.activeElement.id]"
+            wait_for(browser, lambda b: b.execute_script(gone_back) == [True, "check-sound-open"], 3)
+            back = browser.execute_script(gone_back)
             check("the panel is gone, the focus back on its button", back == [True, "check-sound-open"], back)
             opened(browser)
             took = closed_within(window, browser, lambda b: ActionChains(b).send_keys(Keys.ESCAPE).perform())
