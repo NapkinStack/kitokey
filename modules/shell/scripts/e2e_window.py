@@ -6763,8 +6763,8 @@ def main() -> int:
         rest = wait_for(browser, lambda b: b.execute_script(row)["size"] == [440, 44], 5)
         got = browser.execute_script(row)
         check("at rest the bar is 440 × 44: one row, the mark as its handle, nothing to scroll", rest and got["row"] == 44 and got["mark"] == 1 and got["scroll"][0] <= got["scroll"][1], got)
-        check("● then the whole window, each 28 px, an icon alone named by its words, its tooltip the same",
-              [b[0] for b in got["buttons"]] == ["small-record", "small-full"] and all(b[1] == b[2] == 28 and b[3] == "" and b[4] and b[5].startswith(b[4]) for b in got["buttons"])
+        check("● then the whole window and « Masquer la barre », each 28 px, an icon alone named by its words, its tooltip the same",
+              [b[0] for b in got["buttons"]] == ["small-record", "small-full", "small-hide"] and all(b[1] == b[2] == 28 and b[3] == "" and b[4] and b[5].startswith(b[4]) for b in got["buttons"])
               and got["buttons"][1][4] == "Toute la fenêtre", got["buttons"])
         keys = browser.execute_script("return window.__TAURI__.core.invoke('header')")["shortcut"]
         check("●'s tooltip: « Démarrer un enregistrement », the shortcut beside when granted", got["buttons"][0][5] == (f"Démarrer un enregistrement ({keys})" if keys else "Démarrer un enregistrement"), [got["buttons"][0][5], keys])
@@ -6773,7 +6773,7 @@ def main() -> int:
         for _ in range(3):
             browser.switch_to.active_element.send_keys(Keys.TAB)
             reached.append(browser.execute_script("return document.activeElement.id"))
-        check("Tab reaches each of its controls, then comes back round", reached[:2] == ["small-full", "small-record"], reached)
+        check("Tab reaches each of its controls, then comes back round", reached == ["small-full", "small-hide", "small-record"], reached)
         shot(browser, "6-small-rest")
         start.click()
         wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop"))
