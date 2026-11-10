@@ -143,6 +143,10 @@
             "string",
             "null"
           ]
+        },
+        "headset": {
+          "description": "Said by `listen` (D88): true when the device listened to is a Bluetooth headset's microphone, which the active stream switches to its call profile; false when it is not. Absent: not known.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -198,6 +202,22 @@
       ]
     },
     {
+      "description": "Said by `listen` (D88), never by a recording: whether an application other than Kitokey records from a microphone — a call, as far as the system's graph tells.",
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "call"
+        },
+        "held": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "event",
+        "held"
+      ]
+    },
+    {
       "description": "An event this version does not name: a consumer ignores it.",
       "type": "object",
       "properties": {
@@ -214,7 +234,8 @@
               "device",
               "microphone_gone",
               "microphone",
-              "microphone_back"
+              "microphone_back",
+              "call"
             ]
           }
         }

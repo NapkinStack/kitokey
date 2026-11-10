@@ -42,8 +42,9 @@ order of the events, and what each means, are said here and nowhere else.
 | `level` | `source`; `level`: how loud it is now, from 0 (silence) to 1 (the loudest it can be), a number | About ten times a second for each source being recorded, after `started` and before `stopped`: for a meter that moves as sound comes (cycle 03, D22). Also while listening (*Listening*, below) |
 | `microphone_gone` | none | The microphone named at the start (*A microphone named*, below) was not found or could not be looked for, before `started`; or, after it, was seen to have gone: `me` is recorded as with no name |
 | `microphone_back` | none | The microphone said gone is there again, whether a stream follows or not (*A microphone named*, below) |
-| `device` | `source`; `device`: the name the system gives the device, or `null` | This source is now recorded from another device: the user chose another default, or the one recorded was taken away and the system named another — or, for `others`, a call plays on an output other than the default, or left it for the default (cycle 04, D41) — or, for `me`, a call holds a microphone other than the one recorded, or no longer does (cycle 05, D66). Its track goes on, in the form it opened with (`session-audio`). `null`: the system names no device for it, or the call let go of it, and nothing comes from it before a `device` names one. Said at each change, after `started` and before `stopped`; of a source said `unavailable`, as *A microphone that waits* says, below. While listening, as *Listening* says |
+| `device` | `source`; `device`: the name the system gives the device, or `null` | This source is now recorded from another device: the user chose another default, or the one recorded was taken away and the system named another — or, for `others`, a call plays on an output other than the default, or left it for the default (cycle 04, D41) — or, for `me`, a call holds a microphone other than the one recorded, or no longer does (cycle 05, D66). Its track goes on, in the form it opened with (`session-audio`). `null`: the system names no device for it, or the call let go of it, and nothing comes from it before a `device` names one. Said at each change, after `started` and before `stopped`; of a source said `unavailable`, as *A microphone that waits* says, below. While listening, as *Listening* says, with `headset` — optional: `true` when `me`'s device is a Bluetooth headset's microphone, `false` when it is not; absent, not known |
 | `stopped` | `folder`; `seconds`: the recording's length, a number | The session's files are whole and `session.json` says `stopped`. **Last**, and only when the recording was stopped as below |
+| `call` | `held`: `true` or `false` | Whether an application other than Kitokey records from a microphone — a call, as far as the system tells. Said while listening only (*Listening*, below), never by a recording |
 | `microphone` | `name`: what the start takes; `description`: as a person reads it | One microphone of what `microphones` lists (*A microphone named*, below). Never said by a recording |
 
 **Stopping**: the line `stop` on the program's input, an interrupt or a termination signal.
@@ -137,11 +138,19 @@ session's folder, no file anywhere; only its log, as any run (*Its log*).
   active, a headset's too**: a Bluetooth headset may switch to its call profile while it listens, and
   the system restores it once listening ends (ADR-0015, its amendment of 2026-11-07). It follows no call
   after its start; what the system moves on its own is said by `device`, as while recording.
-- **What it says**, in the lines a recording says, of the same meaning: `microphone_gone` first, when the
-  name given is not there; `unavailable` for a source that could not be opened; then `device` for each
-  source opened, `me` before `others`, naming it; then `level`, about ten times a second for each source
-  opened, and `device` at each change. **Never `started` nor `stopped`**: there is no folder to name, nor a
-  length; nor `silent`, `heard` or `microphone_back`: the meter says it.
+- **What it says**, in the lines a recording says, of the same meaning, and `call`, its own:
+  `microphone_gone` first, when the name given is not there; `unavailable` for a source that could not
+  be opened; then `device` for each source opened, `me` before `others`, naming it; then `call`, where
+  the system tells it; then `level`, about ten times a second for each source opened, and `device` at
+  each change. **Never `started` nor `stopped`**: there is no folder to name, nor a length; nor
+  `silent`, `heard` or `microphone_back`: the meter says it.
+- **A headset, a call** (cycle 09, D88, additive). `me`'s `device` says `headset: true` when what it
+  listens to is a Bluetooth headset's microphone — the headset then in its call profile while it
+  listens —, `false` when it is not; absent, as on a later `device` or where the system does not tell,
+  not known. `call` says whether an application other than Kitokey — a call, as far as can be told —
+  records from a microphone: once before the first `level`, then at each change, the system read about
+  once a second. Not said, not known: today, all but Linux with PipeWire. Whoever plays a sound to test
+  the meeting's side does not while `held` is `true`: on loudspeakers it would reach the call.
 - **A microphone named that goes while it listens**: nothing takes its place, and no line says it —
   `me`'s `level` falls to 0 and stays there, still said ten times a second, until it is stopped; the error
   stream may hold a line of the system's about that stream, which is no failure. Whoever wants another
@@ -272,6 +281,18 @@ Valid — listening, the microphone and the meeting's sound heard, then stopped 
 {"event":"level","source":"others","level":0.0}
 {"event":"level","source":"me","level":0.61}
 {"event":"level","source":"others","level":0.38}
+```
+
+Valid — listening on a Bluetooth headset's microphone, then a call taking a microphone:
+
+```text
+{"event":"device","source":"me","device":"AirPods Pro","headset":true}
+{"event":"device","source":"others","device":"AirPods Pro"}
+{"event":"call","held":false}
+{"event":"level","source":"me","level":0.52}
+{"event":"level","source":"others","level":0.0}
+{"event":"call","held":true}
+{"event":"level","source":"me","level":0.47}
 ```
 
 To refuse: a line that is not a JSON object with an `event`.
