@@ -158,16 +158,20 @@ impl Checks {
     pub fn heard_at(&mut self, said: &Said, at: Instant) {
         let side = |source: &Source| usize::from(*source == Source::Others);
         match said {
-            Said::Silent(source) => {
-                self.silent_since[side(source)].get_or_insert(at);
-            }
             Said::Heard(source) | Said::Lost(source) | Said::Unavailable(source, _) => self.silent_since[side(source)] = None,
             _ => {}
         }
-        let side = |source: &Source| usize::from(*source == Source::Others);
-        let (at, check) = match said {
+        let (index, check) = match said {
             Said::Unavailable(source, _) | Said::Lost(source) => (side(source), Check::Waiting),
-            Said::Moved(source, _) => (side(source), self.silence[side(source)].unwrap_or(Check::Listening)),
+            // Back on a device and still silent: its silence counted from the device back, the time
+            // with none being no silence.
+            Said::Moved(source, _) => {
+                let check = self.silence[side(source)].unwrap_or(Check::Listening);
+                if check == Check::Silent {
+                    self.silent_since[side(source)].get_or_insert(at);
+                }
+                (side(source), check)
+            }
             // The zeros a recording keeps in the place of a side with no device are remembered
             // for when it has one, and no news until then.
             Said::Silent(source) => {
@@ -175,6 +179,7 @@ impl Checks {
                 if self.now[side(source)] == Check::Waiting {
                     return;
                 }
+                self.silent_since[side(source)].get_or_insert(at);
                 (side(source), Check::Silent)
             }
             Said::Nothing => {
@@ -196,7 +201,7 @@ impl Checks {
             }
             _ => return,
         };
-        self.now[at] = check;
+        self.now[index] = check;
     }
 
     pub fn now(&self) -> [Check; 2] {

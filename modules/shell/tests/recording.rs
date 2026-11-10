@@ -438,4 +438,21 @@ fn a_side_is_said_silent_for_as_long_as_capture_has_not_heard_it() {
     checks.heard_at(&Said::Lost(Source::Others), later(150));
     checks.heard_at(&Said::Silent(Source::Others), later(160));
     assert_eq!(checks.silent_for(later(400)), [None, None]);
+    // A device back, the side still silent: said again, counted from the device back.
+    checks.heard_at(&Said::Moved(Source::Others, Some("Casque".into())), later(400));
+    assert_eq!(checks.silent_for(later(400)), [None, Some(10.0)]);
+    assert_eq!(checks.silent_for(later(510)), [None, Some(120.0)]);
+}
+
+#[test]
+fn a_new_silence_is_counted_from_its_own_start() {
+    let start = Instant::now();
+    let mut checks = Checks::default();
+    let later = |seconds| start + Duration::from_secs(seconds);
+    checks.heard_at(&Said::Silent(Source::Me), later(10));
+    checks.heard_at(&Said::Heard(Source::Me), later(100));
+    assert_eq!(checks.silent_for(later(110)), [None, None]);
+    // Silent again: two minutes from this silence, not from the one before.
+    checks.heard_at(&Said::Silent(Source::Me), later(300));
+    assert_eq!(checks.silent_for(later(310)), [Some(20.0), None]);
 }
