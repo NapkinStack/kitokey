@@ -67,7 +67,7 @@ meeting's own choice, never Settings' (cycle 09's D91):
 
 | Field | Meaning |
 |---|---|
-| `transcription`, optional | Who hears the meeting: `{"engine": "whisper", "model": …}`, a Whisper model of this computer named by its file's name alone, never a path; `{"engine": "speechanalyzer"}`, Apple's SpeechAnalyzer; or `{"engine": "service", "provider": …, "model": …}`, a service's address as `kitokey-transcription --provider` takes it, and its model's name |
+| `transcription`, optional | Who hears the meeting: `{"engine": "whisper", "model": …}`, a Whisper model of this computer named by its file's name alone, never a path — no `/` nor `\`, never `.` or `..`; `{"engine": "speechanalyzer"}`, Apple's SpeechAnalyzer; or `{"engine": "service", "provider": …, "model": …}`, a service's address as `kitokey-transcription --provider` takes it, and its model's name |
 | `minutes`, optional | Who writes the minutes: `provider`, an address as `kitokey-summary` takes it, and `model`, the model's name as it knows it |
 
 - **A part absent is Settings' choice**, as they are when the meeting is made or made again; a file absent is
@@ -77,6 +77,10 @@ meeting's own choice, never Settings' (cycle 09's D91):
 - **`confidential` comes first**: a meeting said confidential is heard and written on this computer alone, whatever
   this file names.
 - **Never a key**: whether a service may be sent the meeting is asked as it is for Settings' choice.
+- **It names, it points nowhere**: a model's file and a service's address say who makes the transcript and the
+  minutes; no reader follows them to find the session, which is all in its folder, as version 1 says.
+- **A field it does not name is left aside** — a `model` beside `speechanalyzer` among them: the objects stay
+  open for what a later change adds.
 - **What it names may be gone** — a model removed, a service no longer set —: the file says what was chosen, never
   that it can still be used.
 - **Written whole** — a file beside, renamed over it — once `session.json` is there, and replaced whole when the

@@ -547,6 +547,12 @@ EXAMPLES["session-audio/v3/models.schema.json"] = (
         {"transcription": {"engine": "whisper"}},
         {"transcription": {"engine": "whisper", "model": ""}},
         {"transcription": {"engine": "whisper", "model": "ggml-small.bin\n"}},
+        # A Whisper model is named by its file alone: never a path, absolute or relative, nor a folder.
+        {"transcription": {"engine": "whisper", "model": "/etc/passwd"}},
+        {"transcription": {"engine": "whisper", "model": "../../x.bin"}},
+        {"transcription": {"engine": "whisper", "model": "C:\\m\\x.bin"}},
+        {"transcription": {"engine": "whisper", "model": ".."}},
+        {"transcription": {"engine": "whisper", "model": "."}},
         {"transcription": {"engine": "service", "model": "whisper-1"}},
         {"transcription": {"engine": "service", "provider": "https://api.openai.com/v1"}},
         {"transcription": {"engine": "another", "model": "m"}},

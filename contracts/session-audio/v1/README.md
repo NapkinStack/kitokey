@@ -33,7 +33,8 @@ and nowhere else.
 
 **The folder.** One session, one folder, named by the local day and hour the recording
 started: `2026-10-13_14-05`. A second session in the same minute takes `-2`. Everything a
-session is lives in it; nothing in it points outside it.
+session is lives in it; nothing in it points outside it — `models.json` names a model's file and a service's
+address, which no reader follows: it names who makes, never where the session is.
 
 | File | Written by | Holds |
 |---|---|---|
