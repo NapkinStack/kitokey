@@ -2884,17 +2884,46 @@ def bar_opened(now: dt.datetime) -> None:
                     back = wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null") and b.execute_script(focused) == "small-check", 3)
                     check(f"{name}: Escape closes the panel, the focus back on « {said['check']} »", back, browser.execute_script(focused))
                     fit(browser, f"{name}: the panel closed, the bar back to its options")
+                    # × by Enter: the panel goes, capture stops listening, the bar back to its options.
+                    keys(browser, Keys.ENTER)
+                    wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("inside"), 5)
+                    for _ in range(8):
+                        if browser.execute_script(focused) == "check-sound-close":
+                            break
+                        keys(browser, Keys.TAB)
+                    ended = WORK / "listen-ended"
+                    ended.unlink(missing_ok=True)
+                    keys(browser, Keys.ENTER)
+                    back = wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null") and b.execute_script(focused) == "small-check", 3)
+                    check(f"{name}: × by Enter closes the panel, capture stops listening, the focus back on « {said['check']} »",
+                          back and wait_for(None, lambda b: ended.is_file(), 3), [browser.execute_script(focused), ended.is_file()])
+                    fit(browser, f"{name}: closed by ×, the bar back to its options")
                     keys(browser, Keys.ESCAPE)
                     folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44 and b.execute_script(focused) == "small-more", 3)
                     check(f"{name}: Escape closes the options, 44 high, the focus on « Plus d’options »", folded, [browser.execute_script("return innerHeight"), browser.execute_script(focused)])
-                    # Recording, by the keyboard: ● is before « Plus d’options ».
+                    # « Avancé » left open, a recording started from the panel by the keyboard: the panel goes,
+                    # the focus follows to ■, « Avancé » is closed in the new state.
+                    keys(browser, Keys.ENTER)
+                    wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
+                    tabbed(browser, 5)
+                    keys(browser, Keys.ENTER)
                     back_tab(browser)
                     keys(browser, Keys.ENTER)
-                    started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 8)
+                    wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("inside"), 5)
+                    for _ in range(8):
+                        if browser.execute_script(focused) == "check-record":
+                            break
+                        keys(browser, Keys.TAB)
+                    keys(browser, Keys.ENTER)
+                    started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed() and b.execute_script("return document.getElementById('check-sound') === null"), 8)
+                    held = wait_for(browser, lambda b: b.execute_script(focused) == "small-stop", 3)
+                    check(f"{name}: recording started from the panel by Enter: the panel gone, the focus on ■", started and held, browser.execute_script(focused))
+                    got = browser.execute_script("return [document.getElementById('small-advanced').getAttribute('aria-expanded'), document.getElementById('small-advanced-panel').hidden]")
+                    check(f"{name}: « {said['advanced']} », open at rest, is closed once recording", got == ["false", True], got)
                     reached = to_more(browser)
                     keys(browser, Keys.ENTER)
                     opened = wait_for(browser, lambda b: b.find_element(By.ID, "small-context").is_displayed(), 3)
-                    check(f"{name}: recording, started by Enter, « Plus d’options » opened by Enter", started and reached and opened, browser.execute_script(focused))
+                    check(f"{name}: recording, « Plus d’options » opened by Enter", reached and opened, browser.execute_script(focused))
                     order = tabbed(browser, 6)
                     check(f"{name}: recording, Tab goes to the context, the microphone, « Confidentielle », then « Avancé »",
                           order == ["small-full", "small-hide", "small-context", "small-microphone", "small-confidential", "small-advanced"], order)
@@ -2915,6 +2944,8 @@ def bar_opened(now: dt.datetime) -> None:
                         check(f"{name}: « {said['settings']} » asks for the whole window on Settings", asked == ["full_window", {"page": "#/settings"}], asked)
                     stop_from_small(browser)
                     wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 8)
+                    got = browser.execute_script("return [document.getElementById('small-advanced').getAttribute('aria-expanded'), document.getElementById('small-advanced-panel').hidden]")
+                    check(f"{name}: « {said['advanced']} », open while recording, is closed once at rest", got == ["false", True], got)
     finally:
         listed.unlink(missing_ok=True)
         subprocess.run(["pactl", "unload-module", mic], capture_output=True)

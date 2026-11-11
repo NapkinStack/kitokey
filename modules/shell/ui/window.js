@@ -3491,8 +3491,12 @@ function showSmall(words) {
       unfoldAdvanced(false);
       unfoldOptions(false, false);
       if (!recording) paintKeys();
-      // Opened at rest, the recording's gesture has the focus.
+      // Opened at rest, the recording's gesture has the focus; after, a focus left on nothing — ● or ■
+      // gone with its state, « Vérifier le son »'s panel closed by its start — follows to the state's
+      // own gesture, as the full window's button gives it back (`paintRecord`).
+      const at = document.activeElement;
       if (first && !recording) start.focus();
+      else if (!first && (!at || at === document.body || at.getClientRects().length === 0)) (recording ? stop : start).focus();
     }
     if (!recording) {
       // A start that failed late: the shell has let it go, and no recording will come to give it back.
