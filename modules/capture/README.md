@@ -47,7 +47,8 @@ second as a recording is — and when its input closes, unlike a recording, so t
 a shell that crashed. `me` is what a recording would take — the microphone named with
 `--microphone`, else the call's, else the default input — opened **actively**, a headset's too: a
 Bluetooth headset may switch to its call profile while it listens, and the system restores it after
-(ADR-0015's amendment of 2026-11-07). It is never part of a recording.
+(ADR-0015's amendment of 2026-11-07); `me`'s first `device` says `headset: true` then, `false` for any
+other microphone — absent where the graph does not read (D88). It is never part of a recording.
 
 **`nstack e2e capture`** runs the scenarios without a call and without a voice: for about
 three minutes the system's default output and input are two silent devices of its own, a note
@@ -61,7 +62,8 @@ microphone; what it saw is in `.evidence/e2e.txt`, its logs in `$NSTACK_EVIDENCE
 error the manifest's `evidence.provoked` does not declare is said. A real call, a real microphone and a
 headset stay a person's to try. Scenario P listens, stopped by `stop`, by a TERM signal and by its input closed, and with a named
 microphone taken away (nothing said, its level at 0): each note's
-level is seen, the run's folder is left as it was, and a stand-in headset runs while it listens alone.
+level is seen, the run's folder is left as it was, and a stand-in headset runs while it listens alone,
+said `headset: true` — the e2e's own microphone `false`.
 
 ## What it says while it runs
 

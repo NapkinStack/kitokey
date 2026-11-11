@@ -287,6 +287,27 @@ pub fn listened(dump: &str, ours: u64, name: Option<&str>) -> Result<(Me, bool),
     Ok((me, found.is_none()))
 }
 
+/// Whether what `listen` opens for the local side (`listened`) is a headset's microphone, read as
+/// [`Me`] reads it: the microphone held by its name, or the default input (D88). An active stream on
+/// it switches the headset to its call profile: the panel says so.
+pub fn headset(dump: &str, me: &Me) -> Result<bool, String> {
+    let graph = Graph::read(dump)?;
+    Ok(match me {
+        Me::Hold(microphone) => graph
+            .nodes
+            .iter()
+            .find(|(_, node)| node.name == microphone.name)
+            .is_some_and(|(id, _)| graph.loopback_behind(*id, &mut BTreeSet::new())),
+        Me::Default | Me::Wait => graph.default_is_a_headset(),
+    })
+}
+
+/// What `listen` says of a headset on `me`'s first `device` (D88): the graph read at its start, or
+/// nothing — not known, never `false` — where it was not read or does not read.
+pub fn listened_headset(dump: Option<&str>, me: &Me) -> Option<bool> {
+    headset(dump?, me).ok()
+}
+
 /// The microphones that can be named at the start, each its id and what a person reads, by what a
 /// person reads, then by id.
 pub fn microphones(dump: &str) -> Result<Vec<(String, String)>, String> {
@@ -461,6 +482,16 @@ impl Graph {
         match self.nodes.iter().find(|(_, node)| node.name == *name) {
             Some((id, _)) => self.loopback_behind(*id, &mut BTreeSet::new()),
             None => name.starts_with("bluez_"),
+        }
+    }
+
+    /// Whether the default input is a headset's, as `listen` says it (D88): as `default_waits` reads it,
+    /// but a name with no node is a headset's only as a headset's input — a headset's output's monitor
+    /// chosen as the default input is no microphone. `default_waits` keeps its own reading: a recording's.
+    fn default_is_a_headset(&self) -> bool {
+        match &self.default_source {
+            Some(name) if !self.nodes.values().any(|node| node.name == *name) => name.starts_with("bluez_input."),
+            _ => self.default_waits(),
         }
     }
 

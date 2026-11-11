@@ -980,3 +980,49 @@ fn a_graph_read_at_the_start_decides_by_the_name_given() {
         (Me::Default, false)
     );
 }
+
+#[test]
+fn listening_says_whether_me_is_a_headset_s() {
+    // D88: the panel's Bluetooth sentence.
+    let dump = |graph: &[Value]| Value::Array(graph.to_vec()).to_string();
+    let mut headset = sources();
+    headset.push(default_source(AIRPODS));
+    let mut laptop = sources();
+    laptop.push(default_source("alsa_input.laptop"));
+    // The default input listened to: a headset's, or not.
+    assert_eq!(call::headset(&dump(&headset), &Me::Default), Ok(true));
+    assert_eq!(call::headset(&dump(&laptop), &Me::Default), Ok(false));
+    // A microphone held by its name: the headset's, or the laptop's, whatever the default.
+    assert_eq!(call::headset(&dump(&laptop), &held(AIRPODS, "AirPods", false)), Ok(true));
+    let digital = held("alsa_input.laptop", "Digital Microphone", false);
+    assert_eq!(call::headset(&dump(&headset), &digital), Ok(false));
+    // A graph that does not read is said so: not known.
+    assert!(call::headset("not a graph", &Me::Default).is_err());
+}
+
+#[test]
+fn listening_without_a_graph_knows_no_headset() {
+    // D88: not known is said by no `headset` at all, never `false`.
+    assert_eq!(call::listened_headset(None, &Me::Default), None);
+    assert_eq!(call::listened_headset(Some("not a graph"), &Me::Default), None);
+    let mut headset = sources();
+    headset.push(default_source(AIRPODS));
+    let dump = Value::Array(headset).to_string();
+    assert_eq!(call::listened_headset(Some(&dump), &Me::Default), Some(true));
+}
+
+#[test]
+fn a_default_source_named_but_not_in_the_graph_is_a_headset_s_only_as_a_headset_s_input() {
+    // The node not found: the name alone is read, and a headset's output's monitor is no microphone.
+    let dump = |name: &str| {
+        let mut graph = sources();
+        graph.push(default_source(name));
+        Value::Array(graph).to_string()
+    };
+    assert_eq!(call::headset(&dump("bluez_input.00:00:5E:00:53:02"), &Me::Default), Ok(true));
+    assert_eq!(
+        call::headset(&dump("bluez_output.00_00_5E_00_53_02.1.monitor"), &Me::Default),
+        Ok(false)
+    );
+    assert_eq!(call::headset(&dump("alsa_input.gone"), &Me::Default), Ok(false));
+}
