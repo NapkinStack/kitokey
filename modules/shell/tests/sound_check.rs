@@ -307,3 +307,33 @@ fn a_close_while_a_listening_opens_wins() {
     });
     assert!(!slot.lock().unwrap().is_open(), "the listening started meanwhile is not kept");
 }
+
+#[test]
+fn a_listening_started_for_a_panel_closed_meanwhile_is_gone_when_the_opening_answers() {
+    let folder = tempfile::tempdir().unwrap();
+    let program = {
+        let _held = spawning();
+        let path = folder.path().join("kitokey-capture");
+        fs::write(&path, format!("#!/bin/bash\necho $$ > \"$(dirname \"$0\")/pid\"\n{LISTENS}\n")).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    };
+    let recording: Mutex<Option<()>> = Mutex::new(None);
+    let slot = Mutex::new(Slot::default());
+    std::thread::scope(|scope| {
+        let opening = scope.spawn(|| {
+            open(&recording, &slot, "main", || {
+                let _held = spawning();
+                let started = SoundCheck::start(&program, None);
+                // Its program running, the panel closes before it is stored.
+                std::thread::sleep(Duration::from_millis(300));
+                started
+            })
+        });
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(slot.lock().unwrap().take().is_none());
+        assert!(matches!(opening.join().unwrap(), Err(Refused::Closed)));
+    });
+    let pid = fs::read_to_string(folder.path().join("pid")).unwrap().trim().to_string();
+    assert!(!Path::new(&format!("/proc/{pid}")).exists(), "the program started meanwhile is gone");
+}

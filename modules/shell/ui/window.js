@@ -2972,6 +2972,12 @@ async function checkSound(words, back) {
   };
   dialog.showModal();
   const { opened } = await window.__TAURI__.core.invoke("sound_check_open").catch(() => ({ opened: false }));
+  // Closed while it opened — a close sent before the shell counted this opening finds nothing to
+  // stop —: what opened is closed now, and nothing is asked again.
+  if (checking !== end) {
+    if (opened) await window.__TAURI__.core.invoke("sound_check_close").catch(() => {});
+    return;
+  }
   if (!opened) {
     failed.lastChild.textContent = words.check_recording;
     failed.hidden = false;

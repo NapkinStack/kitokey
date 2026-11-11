@@ -2601,6 +2601,19 @@ def sound_checked(now: dt.datetime) -> None:
             opened(browser)
             took = closed_within(window, browser, lambda b: ActionChains(b).send_keys(Keys.ESCAPE).perform())
             check("closed by Escape: no stream of Kitokey's left within one second", took is not None and took <= 1.0, took)
+            # A close sent before the shell counted the opening — the opening's answer held back 0.6 s —:
+            # nothing of it is left once it answers.
+            browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                   " asked === 'sound_check_open' ? new Promise((done) => setTimeout(done, 600)).then(() => real.invoke(asked, ...rest))"
+                                   " : real.invoke(asked, ...rest) }; window.restoreInvoke = () => { window.__TAURI__.core = real; };")
+            press(browser, "check-sound-open")
+            press(browser, "check-sound-close")
+            closed_early = time.monotonic()
+            time.sleep(0.8)
+            none_left = wait_for(None, lambda b: kitokey_streams(window) == [], 1.0)
+            check("closed before its opening was counted: no stream of Kitokey's left within a second of the opening's answer",
+                  none_left, [kitokey_streams(window), time.monotonic() - closed_early])
+            browser.execute_script("window.restoreInvoke()")
             ended = WORK / "listen-ended"
             # A recording started elsewhere — the tray — while the panel shows: capture stops listening
             # within a second, before it records, and the panel goes.
@@ -2650,6 +2663,20 @@ def sound_checked(now: dt.datetime) -> None:
             check("never listening while a recording runs", refused == {"opened": False}, refused)
             browser.execute_script("window.__TAURI__.core.invoke('record')")
             wait_for(browser, lambda b: not b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 8)
+        # The bar hidden with the panel open in it (D90 opens it there): the page hidden closes the panel
+        # under WebKitGTK (`visibilitychange`), and capture stops listening within a second.
+        with Window(sessions, "fr_FR.UTF-8", small=True) as browser:
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-hide").is_displayed(), 8)
+            browser.execute_script("checkSound(words, null)")
+            wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("me"), 5)
+            ended = WORK / "listen-ended"
+            ended.unlink(missing_ok=True)
+            asked = time.time()
+            # The panel is modal: the bar's own « Masquer la barre » is asked as its button asks it.
+            browser.execute_script("window.__TAURI__.core.invoke('bar_hide')")
+            gone = wait_for(None, lambda b: ended.is_file(), 3)
+            check("the bar hidden with the panel open: capture stops listening within a second",
+                  gone and float(ended.read_text()) - asked <= 1.0, ended.is_file() and float(ended.read_text()) - asked)
         flag("headset").unlink(missing_ok=True)
         with Window(sessions, "en_US.UTF-8") as browser:
             browser.execute_script("location.hash = '#/settings'")
