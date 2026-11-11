@@ -2487,11 +2487,16 @@ def microphone_chosen(now: dt.datetime) -> None:
     args.unlink(missing_ok=True)
     with Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n', small=True) as browser:
         time.sleep(1.5)
-        check("where capture lists none — macOS, Windows —, no list is offered", not browser.execute_script(state)["shown"] and not browser.find_element(By.ID, "small-more").is_displayed(), browser.execute_script(state))
+        check("where capture lists none — macOS, Windows —, no list is offered; the options still hold « Vérifier le son » (D90)",
+              not browser.execute_script(state)["shown"] and browser.find_element(By.ID, "small-more").is_displayed(), browser.execute_script(state))
         press(browser, "small-record")
         wait_for(browser, lambda b: args.exists(), 8)
         check("and the recording names none", "--microphone" not in args.read_text(), args.read_text())
         wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8)
+        press(browser, "small-more")
+        opened = wait_for(browser, lambda b: b.find_element(By.ID, "small-context").is_displayed(), 3)
+        check("recording, where capture lists none: no microphone in the options, nothing said of changing it (D90)",
+              opened and not browser.find_element(By.ID, "small-microphone").is_displayed() and not browser.find_element(By.ID, "small-microphone-next").is_displayed())
         stop_from_small(browser)
 
 
@@ -2772,6 +2777,147 @@ def bar_window(now: dt.datetime) -> None:
         browser.execute_script("window.__TAURI__.core.invoke('full_window', {page: '#/settings'})")
         check("hidden, then closed for the full window on a page: « Afficher la barre » leaves the menu",
               wait_for(None, lambda b: "Afficher la barre" not in tray_labels(), 5), tray_labels())
+
+
+def bar_opened(now: dt.datetime) -> None:
+    """BA. The bar opened (D90, board 6): at rest, the microphone, « Vérifier le son » — D88's panel in
+    the bar — and « Avancé » closed; recording, the context, the microphone recorded, « Confidentielle »
+    and « Avancé », « Vérifier le son » not offered: the meters are in the row."""
+    print("BA. the bar opened: at rest the microphone, « Vérifier le son » opening its panel in the bar, « Avancé » closed; recording the context, the microphone recorded, « Confidentielle » — keyboard alone, both themes, French and English, nothing overflowing (D90)")
+    listed = WORK / "microphones"
+    listed.write_text(json.dumps({"event": "microphone", "name": "alsa_laptop", "description": "Digital Microphone"}) + "\n")
+    mic = subprocess.run(["pactl", "load-module", "module-null-sink", "sink_name=kitokey_e2e_check_mic", "media.class=Audio/Source/Virtual"],
+                         capture_output=True, text=True).stdout.strip()
+    focused = "const a = document.activeElement; return a.id || a.className"
+    # Every element of the opened bar inside its window, no text cut, nothing to scroll; the window as
+    # tall as the bar shows (bar_fit).
+    fits = ("const e = document.scrollingElement; const o = document.getElementById('small-options');"
+            "const out = [...o.querySelectorAll('*')].filter(x => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0"
+            " && (r.left < -0.5 || r.right > innerWidth + 0.5 || r.bottom > innerHeight + 0.5); }).map(x => x.id || x.className.baseVal || x.className);"
+            "const cut = [...o.querySelectorAll('button, p, .name, .says')].filter(x => x.getClientRects().length && x.scrollWidth > x.clientWidth + 1).map(x => x.textContent);"
+            "return {scroll: [e.scrollHeight, e.clientHeight, e.scrollWidth, e.clientWidth], out, cut, size: [innerWidth, innerHeight],"
+            " page: Math.ceil(document.getElementById('small').getBoundingClientRect().height)}")
+    panel = ("const d = document.getElementById('check-sound'); if (!d || !d.open) return null; const r = d.getBoundingClientRect();"
+             "const cut = [...d.querySelectorAll('button, .check-said span, h2')].filter(x => x.getClientRects().length && (x.getBoundingClientRect().right > r.right + 0.5 || x.scrollWidth > x.clientWidth + 1)).map(x => x.textContent);"
+             "return {inside: r.left >= -0.5 && r.top >= -0.5 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5, cut, height: Math.ceil(r.height), size: [innerWidth, innerHeight], active: d.contains(document.activeElement)}")
+    def keys(browser, *pressed) -> None:
+        ActionChains(browser).send_keys(*pressed).perform()
+        time.sleep(0.2)
+    def back_tab(browser) -> None:
+        ActionChains(browser).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+        time.sleep(0.2)
+    def tabbed(browser, count: int) -> list[str]:
+        reached = []
+        for _ in range(count):
+            keys(browser, Keys.TAB)
+            reached.append(browser.execute_script(focused))
+        return reached
+    def to_more(browser) -> bool:
+        for _ in range(8):
+            if browser.execute_script(focused) == "small-more":
+                return True
+            keys(browser, Keys.TAB)
+        return browser.execute_script(focused) == "small-more"
+    def fit(browser, what: str) -> None:
+        holds = lambda got: (got["scroll"][0] <= got["scroll"][1] and got["scroll"][2] <= got["scroll"][3] and not got["out"] and not got["cut"]
+                             and got["size"][0] == 440 and abs(got["size"][1] - got["page"]) <= 1)
+        wait_for(browser, lambda b: holds(b.execute_script(fits)), 3)
+        got = browser.execute_script(fits)
+        check(f"{what}: 440 wide, as tall as it shows, nothing overflows or is cut", holds(got), got)
+    try:
+        for language, (short, said) in {
+            "fr_FR.UTF-8": ("fr", {"check": "Vérifier le son", "advanced": "Avancé", "models": "Chaque réunion prend les modèles choisis dans les Réglages.",
+                                   "settings": "Ouvrir les Réglages", "recorded": "Enregistré : Mic. Le changer vaut pour le prochain enregistrement."}),
+            "en_US.UTF-8": ("en", {"check": "Check the sound", "advanced": "Advanced", "models": "Each meeting takes the models chosen in Settings.",
+                                   "settings": "Open Settings", "recorded": "Recorded: Mic. Changing it applies to the next recording."}),
+        }.items():
+            for theme in ("light", "dark"):
+                name = f"{short} {theme}"
+                taping = WORK / f"bar-opened-{short}-{theme}"
+                taping.mkdir()
+                window = Window(taping, language, 'after = "nothing"\nreminder = false\n', small=True)
+                if theme == "dark":
+                    window.env.update(GTK_THEME="Adwaita:dark")
+                with window as browser:
+                    wait_for(browser, lambda b: b.execute_script(focused) == "small-record", 10)
+                    # At rest, by the keyboard alone: « Plus d’options », Enter.
+                    reached = to_more(browser)
+                    keys(browser, Keys.ENTER)
+                    opened = wait_for(browser, lambda b: b.execute_script("return innerHeight") > 44 and any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
+                    check(f"{name}: at rest, « Plus d’options » reached by Tab opens the options under the row by Enter", reached and opened, browser.execute_script("return innerHeight"))
+                    if not opened:
+                        continue
+                    order = tabbed(browser, 5)
+                    check(f"{name}: at rest, Tab goes from the row to the microphone, « Vérifier le son », then « Avancé »",
+                          order == ["small-full", "small-hide", "small-microphone", "small-check", "small-advanced"], order)
+                    got = browser.execute_script("const c = document.getElementById('small-check'); const a = document.getElementById('small-advanced');"
+                                                 " return [c.textContent, c.querySelectorAll('svg.glyph').length, a.textContent, a.getAttribute('aria-expanded'),"
+                                                 " document.getElementById('small-advanced-panel').hidden, a.getAttribute('aria-controls')]")
+                    check(f"{name}: « {said['check']} », labelled with its icon; « {said['advanced']} », closed",
+                          got == [said["check"], 1, said["advanced"], "false", True, "small-advanced-panel"], got)
+                    fit(browser, f"{name}: at rest, opened")
+                    shot_themed(browser, f"d90-opened-rest-{short}-{theme}", theme)
+                    # « Avancé »: opened by Enter, it says where the models are chosen; closed by Enter.
+                    keys(browser, Keys.ENTER)
+                    got = browser.execute_script("const p = document.getElementById('small-advanced-panel'); const a = document.getElementById('small-advanced');"
+                                                 " return [a.getAttribute('aria-expanded'), p.hidden, p.querySelector('.says').textContent, document.getElementById('small-advanced-settings').textContent]")
+                    check(f"{name}: « {said['advanced']} » opened by Enter says the meeting takes Settings' models, and opens Settings",
+                          got == ["true", False, said["models"], said["settings"]], got)
+                    fit(browser, f"{name}: « {said['advanced']} » open")
+                    shot_themed(browser, f"d90-opened-advanced-{short}-{theme}", theme)
+                    keys(browser, Keys.ENTER)
+                    got = browser.execute_script("return [document.getElementById('small-advanced').getAttribute('aria-expanded'), document.getElementById('small-advanced-panel').hidden]")
+                    check(f"{name}: Enter closes « {said['advanced']} »", got == ["false", True] and browser.execute_script(focused) == "small-advanced", got)
+                    # « Vérifier le son » by the keyboard: D88's panel, in the bar, the bar as tall as it.
+                    back_tab(browser)
+                    (WORK / "listen-args").unlink(missing_ok=True)
+                    on = browser.execute_script(focused)
+                    keys(browser, Keys.ENTER)
+                    shown = wait_for(browser, lambda b: b.execute_script(panel) and (WORK / "listen-args").is_file(), 5)
+                    wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("inside"), 3)
+                    got = browser.execute_script(panel)
+                    check(f"{name}: Enter on « {said['check']} » opens its panel, capture listening", on == "small-check" and shown, [on, got])
+                    check(f"{name}: the panel inside the bar, the bar as tall as it, nothing cut, the focus inside",
+                          got and got["inside"] and not got["cut"] and got["size"][0] == 440 and got["size"][1] >= got["height"] and got["active"], got)
+                    shot_themed(browser, f"d90-opened-check-{short}-{theme}", theme)
+                    keys(browser, Keys.ESCAPE)
+                    back = wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null") and b.execute_script(focused) == "small-check", 3)
+                    check(f"{name}: Escape closes the panel, the focus back on « {said['check']} »", back, browser.execute_script(focused))
+                    fit(browser, f"{name}: the panel closed, the bar back to its options")
+                    keys(browser, Keys.ESCAPE)
+                    folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44 and b.execute_script(focused) == "small-more", 3)
+                    check(f"{name}: Escape closes the options, 44 high, the focus on « Plus d’options »", folded, [browser.execute_script("return innerHeight"), browser.execute_script(focused)])
+                    # Recording, by the keyboard: ● is before « Plus d’options ».
+                    back_tab(browser)
+                    keys(browser, Keys.ENTER)
+                    started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 8)
+                    reached = to_more(browser)
+                    keys(browser, Keys.ENTER)
+                    opened = wait_for(browser, lambda b: b.find_element(By.ID, "small-context").is_displayed(), 3)
+                    check(f"{name}: recording, started by Enter, « Plus d’options » opened by Enter", started and reached and opened, browser.execute_script(focused))
+                    order = tabbed(browser, 6)
+                    check(f"{name}: recording, Tab goes to the context, the microphone, « Confidentielle », then « Avancé »",
+                          order == ["small-full", "small-hide", "small-context", "small-microphone", "small-confidential", "small-advanced"], order)
+                    got = browser.execute_script("return [document.getElementById('small-check').getClientRects().length, document.getElementById('small-microphone-next').textContent]")
+                    check(f"{name}: recording, « {said['check']} » is not offered; the microphone says the one recorded, and that a change is for the next",
+                          got == [0, said["recorded"]], got)
+                    fit(browser, f"{name}: recording, opened")
+                    shot_themed(browser, f"d90-opened-recording-{short}-{theme}", theme)
+                    keys(browser, Keys.ENTER)
+                    fit(browser, f"{name}: recording, « {said['advanced']} » open")
+                    if (short, theme) == ("en", "dark"):
+                        # « Open Settings » asks for the whole window on Settings, as « The whole window » does.
+                        browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                               " asked === 'full_window' ? (window.asked = [asked, ...rest], Promise.resolve()) : real.invoke(asked, ...rest) };"
+                                               " window.restoreInvoke = () => { window.__TAURI__.core = real; };")
+                        press(browser, "small-advanced-settings")
+                        asked = browser.execute_script("const a = window.asked; window.restoreInvoke(); return a")
+                        check(f"{name}: « {said['settings']} » asks for the whole window on Settings", asked == ["full_window", {"page": "#/settings"}], asked)
+                    stop_from_small(browser)
+                    wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 8)
+    finally:
+        listed.unlink(missing_ok=True)
+        subprocess.run(["pactl", "unload-module", mic], capture_output=True)
 
 
 def meeting_named(now: dt.datetime) -> None:
@@ -7052,17 +7198,17 @@ def main() -> int:
         rest = wait_for(browser, lambda b: b.execute_script(row)["size"] == [440, 44], 5)
         got = browser.execute_script(row)
         check("at rest the bar is 440 × 44: one row, the mark as its handle, nothing to scroll", rest and got["row"] == 44 and got["mark"] == 1 and got["scroll"][0] <= got["scroll"][1], got)
-        check("● then the whole window and « Masquer la barre », each 28 px, an icon alone named by its words, its tooltip the same",
-              [b[0] for b in got["buttons"]] == ["small-record", "small-full", "small-hide"] and all(b[1] == b[2] == 28 and b[3] == "" and b[4] and b[5].startswith(b[4]) for b in got["buttons"])
-              and got["buttons"][1][4] == "Toute la fenêtre", got["buttons"])
+        check("●, « Plus d’options », the whole window and « Masquer la barre », each 28 px, an icon alone named by its words, its tooltip the same",
+              [b[0] for b in got["buttons"]] == ["small-record", "small-more", "small-full", "small-hide"] and all(b[1] == b[2] == 28 and b[3] == "" and b[4] and b[5].startswith(b[4]) for b in got["buttons"])
+              and got["buttons"][2][4] == "Toute la fenêtre", got["buttons"])
         keys = browser.execute_script("return window.__TAURI__.core.invoke('header')")["shortcut"]
         check("●'s tooltip: « Démarrer un enregistrement », the shortcut beside when granted", got["buttons"][0][5] == (f"Démarrer un enregistrement ({keys})" if keys else "Démarrer un enregistrement"), [got["buttons"][0][5], keys])
         check("the last meeting and the shortcut's line are no longer in it (D90)", got["gone"] == 0, got)
         reached = []
-        for _ in range(3):
+        for _ in range(4):
             browser.switch_to.active_element.send_keys(Keys.TAB)
             reached.append(browser.execute_script("return document.activeElement.id"))
-        check("Tab reaches each of its controls, then comes back round", reached == ["small-full", "small-hide", "small-record"], reached)
+        check("Tab reaches each of its controls, then comes back round", reached == ["small-more", "small-full", "small-hide", "small-record"], reached)
         shot(browser, "6-small-rest")
         start.click()
         wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop"))
@@ -7456,6 +7602,7 @@ def main() -> int:
     microphone_chosen(now)
     sound_checked(now)
     bar_window(now)
+    bar_opened(now)
     meeting_named(now)
     word_after_a_gap(now)
     minutes_checked(now)
