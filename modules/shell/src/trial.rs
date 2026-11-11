@@ -25,6 +25,8 @@ pub const MADE_FILE: &str = ".kitokey-trial-meetings";
 /// The days the trial lasts at least, and the meetings it holds at least.
 pub const DAYS: i64 = 14;
 pub const MEETINGS: usize = 10;
+/// The count of the next name beside the day, one for the process (`beside`).
+static NEXT: AtomicU64 = AtomicU64::new(0);
 
 /// Keeps `now` as the trial's first day, unless a day is kept already: the day kept is given
 /// back. The folder of meetings is made when it is not there. A day's file that does not read is
@@ -57,7 +59,6 @@ pub fn begin(meetings: &Path, now: i64) -> io::Result<i64> {
 /// while, its deletion pending, and making it again answers « Access is denied », not « already
 /// there » (#705).
 fn beside(meetings: &Path) -> io::Result<(std::path::PathBuf, fs::File)> {
-    static NEXT: AtomicU64 = AtomicU64::new(0);
     for _ in 0..1000 {
         let count = NEXT.fetch_add(1, Ordering::Relaxed);
         let path = meetings.join(format!("{DAY_FILE}-{}-{count}.tmp", std::process::id()));
@@ -161,5 +162,20 @@ mod tests {
         fs::remove_file(&first).unwrap();
         let (second, _file) = beside(meetings.path()).unwrap();
         assert_ne!(first, second);
+    }
+
+    /// A name an earlier start left, under this process's id, is passed over, never an error.
+    #[test]
+    fn a_name_left_beside_the_day_is_passed_over() {
+        let meetings = tempfile::tempdir().unwrap();
+        let next = NEXT.load(Ordering::Relaxed);
+        let left: Vec<_> = (next..next + 50)
+            .map(|count| meetings.path().join(format!("{DAY_FILE}-{}-{count}.tmp", std::process::id())))
+            .collect();
+        for path in &left {
+            fs::write(path, "").unwrap();
+        }
+        let (path, _file) = beside(meetings.path()).unwrap();
+        assert!(!left.contains(&path), "{path:?}");
     }
 }
