@@ -95,19 +95,23 @@ shows in it (D33) — the time and ■ in the row, the mark's dot red —, above
 the stop; then it comes back to rest. While recording, the row holds a thin meter for each side
 (D49, D90), named by what it records from; a side silent two minutes is said in a grey line under
 the row — the recording goes on —, a microphone that sends nothing or a side with no device at
-once, and ■ stays where it is as they come; the context, « Confidentielle » and what follows the
-stop are under « Plus d’options ». One window at a time: going from one
+once, and ■ stays where it is as they come. « Plus d’options » opens, under the row ([board 6](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/6-bar-opened-light.png)),
+at rest the microphone, « Vérifier le son » and « Avancé »; recording, the context, the microphone —
+the one recorded, a change being for the next recording —, « Confidentielle » and what follows the
+stop, then « Avancé ». « Avancé » is closed by default and says, until D91 offers a meeting's own
+models, that each meeting takes Settings', with a way to them. Escape closes the options. One window at a time: going from one
 to the other replaces it, and the one left — `window` in the settings, `small` or `full` — is the
 one reopened. A settings file that cannot be read opens the full window, where it is said.
 
 On Linux, its name of the microphone opens *Auto* and what capture lists (D74, `recording/v1`), by keyboard
 alone, inside the window: the choice is kept (`microphone` in the settings) and applies to the next
 recording; a device arriving opens nothing, and is there when the name is opened. Where capture lists none
-— macOS, Windows — no list is offered. A name gone: capture says so and Auto stands in, the window and a
+— macOS, Windows — no list is offered, and the options hold the rest. A name gone: capture says so and Auto stands in, the window and a
 notification say it, until capture says it is back.
 
 **« Vérifier le son »** (D88, [board 7](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/7-check-the-sound-light.png)),
-from *Settings*, opens a panel over the page: capture listens (`recording/v1`, *Listening*) only while
+from *Settings* or the bar at rest, opens a panel over the page — in the bar, in place of its row and
+options, the bar as tall as the panel; it is not offered while recording, the row's meters being there: capture listens (`recording/v1`, *Listening*) only while
 it shows — each side's device and an 8 px meter; the microphone's stream active, so that a Bluetooth
 headset switches to its call profile, said in one sentence when capture says `headset`. « Jouer un son
 de test » plays two short notes on the system's output, drawn by the page — no file, no library —, and

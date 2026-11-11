@@ -80,6 +80,7 @@ const ICONS = {
   "chevron-left": ["m15 18-6-6 6-6"],
   "chevron-down": ["m6 9 6 6 6-6"],
   "chevron-up": ["m18 15-6-6-6 6"],
+  "chevron-right": ["m9 18 6-6-6-6"],
   minus: ["M5 12h14"],
   mic: ["M12 19v3", "M19 10v2a7 7 0 0 1-14 0v-2", ["rect", { x: 9, y: 2, width: 6, height: 13, rx: 3 }]],
   "mic-off": ["M12 19v3", "M15 9.34V5a3 3 0 0 0-5.68-1.33", "M16.95 16.95A7 7 0 0 1 5 12v-2", "M18.89 13.23A7 7 0 0 0 19 12v-2", "m2 2 20 20", "M9 9v3a3 3 0 0 0 5.12 2.12"],
@@ -3048,7 +3049,14 @@ function showSmall(words) {
   document.body.classList.add("small-window");
   const invoke = (...asked) => window.__TAURI__.core.invoke(...asked);
   const full = (where) => invoke("full_window", { page: where ?? null });
-  new ResizeObserver(() => invoke("bar_fit", { height: Math.ceil(page.getBoundingClientRect().height) }).catch(() => {})).observe(page);
+  // As tall as it shows — « Vérifier le son »'s panel too, while it shows in place of the options.
+  const fit = () => {
+    const panel = document.getElementById("check-sound");
+    const height = Math.max(page.getBoundingClientRect().height, panel?.open ? panel.getBoundingClientRect().height : 0);
+    invoke("bar_fit", { height: Math.ceil(height) }).catch(() => {});
+  };
+  const fits = new ResizeObserver(fit);
+  fits.observe(page);
   const toFull = iconButton("maximize-2", words.small_full, "small-full");
   toFull.addEventListener("click", () => full());
   const handle = element("span", "handle");
@@ -3186,8 +3194,6 @@ function showSmall(words) {
     // The list and whether it read are taken; the choice, only if none was made since it was asked.
     known = { ...read, chosen: asked === choicesMade ? read.chosen : known.chosen };
     microphone.hidden = known.list.length === 0 && !known.unread && known.chosen === null;
-    // Nothing to choose, no options yet at rest (D90's next row adds them).
-    if (recording === false) more.hidden = microphone.hidden;
     paintPick();
     if (!picks.hidden && !same) {
       drawPicks();
@@ -3238,7 +3244,49 @@ function showSmall(words) {
   document.addEventListener("click", (event) => {
     if (!microphone.contains(event.target)) closePicks(false);
   });
-  rest.append(microphone);
+  // Recording, the microphone says the one recorded; a choice made then is for the next recording.
+  const micNext = element("p", "says");
+  micNext.id = "small-microphone-next";
+  micNext.hidden = true;
+  // « Vérifier le son » (D88), at rest alone: D88's panel in the bar, in place of the options. Never
+  // while recording — capture does not listen then, and the row's meters say each side.
+  const check = element("div", "small-check");
+  const checkButton = element("button", "open with-icon");
+  checkButton.type = "button";
+  checkButton.id = "small-check";
+  checkButton.append(icon("audio-lines"), element("span", "", words.check_sound));
+  checkButton.addEventListener("click", () => {
+    checkSound(words, checkButton);
+    const panel = document.getElementById("check-sound");
+    if (!panel) return;
+    fits.observe(panel);
+    panel.addEventListener("close", fit);
+  });
+  check.append(checkButton, element("span", "says", words.check_sound_says));
+  rest.append(microphone, check);
+  // « Avancé » (D91's entry), closed by default: until D91 offers a meeting's own models, it says where
+  // they are chosen, and opens Settings.
+  const advanced = element("div", "small-advanced");
+  const advance = element("button", "disclose-advanced");
+  advance.type = "button";
+  advance.id = "small-advanced";
+  advance.setAttribute("aria-controls", "small-advanced-panel");
+  advance.append(icon("chevron-right"), element("span", "", words.bar_advanced));
+  const advancedPanel = element("div", "small-advanced-panel");
+  advancedPanel.id = "small-advanced-panel";
+  const toSettings = element("button", "link", words.bar_advanced_settings);
+  toSettings.type = "button";
+  toSettings.id = "small-advanced-settings";
+  toSettings.addEventListener("click", () => full("#/settings"));
+  advancedPanel.append(element("p", "says", words.bar_advanced_says), toSettings);
+  const unfoldAdvanced = (now) => {
+    advance.setAttribute("aria-expanded", String(now));
+    advance.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
+    advancedPanel.hidden = !now;
+  };
+  advance.addEventListener("click", () => unfoldAdvanced(advance.getAttribute("aria-expanded") !== "true"));
+  unfoldAdvanced(false);
+  advanced.append(advance, advancedPanel);
 
   const live = element("div", "small-live");
   // A thin meter for each side in the row (D90, board 5), named by its side and, in its tooltip, by
@@ -3338,7 +3386,7 @@ function showSmall(words) {
   field.area.setAttribute("aria-label", words.context_label);
   const opened = element("div", "small-context");
   opened.append(field.area, field.count);
-  // Said confidential (D60), above the context in the options; kept as it is turned, once the
+  // Said confidential (D60), under the microphone in the options; kept as it is turned, once the
   // meeting's folder holds its session.
   const secret = confidentialSwitch(words, "small-confidential");
   const mark = { wanted: null, refused: 0 };
@@ -3364,13 +3412,13 @@ function showSmall(words) {
     secret.row.classList.toggle("on", secret.box.checked);
     marked();
   });
-  live.append(secret.row, opened, note);
+  live.append(opened, micNext, secret.row, note);
   live.hidden = true;
   const lines = element("div", "bar-lines");
   lines.append(announce, ...checks.map((check) => check.sentence), unkeptSaid);
   const options = element("div", "bar-options");
   options.id = "small-options";
-  options.append(rest, live);
+  options.append(rest, live, advanced);
   options.hidden = true;
   options.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -3434,12 +3482,21 @@ function showSmall(words) {
       field.painted();
       rest.hidden = recording;
       live.hidden = !recording;
+      // The microphone in each state's options: recording, after the context, as board 6 has it.
+      if (recording) opened.after(microphone);
+      else rest.prepend(microphone);
+      // No list where capture lists none: nothing to change, nothing said of it.
+      micNext.hidden = !recording || microphone.hidden;
       // Each state opens closed: the row alone.
-      more.hidden = !recording && microphone.hidden;
+      unfoldAdvanced(false);
       unfoldOptions(false, false);
       if (!recording) paintKeys();
-      // Opened at rest, the recording's gesture has the focus.
+      // Opened at rest, the recording's gesture has the focus; after, a focus left on nothing — ● or ■
+      // gone with its state, « Vérifier le son »'s panel closed by its start — follows to the state's
+      // own gesture, as the full window's button gives it back (`paintRecord`).
+      const at = document.activeElement;
       if (first && !recording) start.focus();
+      else if (!first && (!at || at === document.body || at.getClientRects().length === 0)) (recording ? stop : start).focus();
     }
     if (!recording) {
       // A start that failed late: the shell has let it go, and no recording will come to give it back.
@@ -3449,6 +3506,8 @@ function showSmall(words) {
       }
       return;
     }
+    const recorded = now.devices[0] ? fill(words.bar_microphone_recorded, now.devices[0]) : words.bar_microphone_next;
+    if (micNext.textContent !== recorded) micNext.textContent = recorded;
     const whole = Math.floor(now.seconds);
     time.textContent = [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60].map((n) => String(n).padStart(2, "0")).join(":");
     for (const [index, id] of ["level-me", "level-others"].entries()) {
