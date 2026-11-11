@@ -32,7 +32,11 @@ const SILENT: &[(&str, usize, &str)] = &[
         "returns no `Result`: false, nothing opened — the panel says it; it cannot fail otherwise",
     ),
     ("sound_check_now", 2, "returns no `Result`: it cannot fail"),
-    ("sound_check_close", 1, "returns no `Result`: it cannot fail, and ends what it can"),
+    (
+        "sound_check_close",
+        2,
+        "returns no `Result`: it cannot fail, and ends what it can — the panel's close, and a close of what opened after the panel closed",
+    ),
     (
         "model_fetch",
         2,

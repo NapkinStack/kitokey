@@ -335,5 +335,8 @@ fn a_listening_started_for_a_panel_closed_meanwhile_is_gone_when_the_opening_ans
         assert!(matches!(opening.join().unwrap(), Err(Refused::Closed)));
     });
     let pid = fs::read_to_string(folder.path().join("pid")).unwrap().trim().to_string();
-    assert!(!Path::new(&format!("/proc/{pid}")).exists(), "the program started meanwhile is gone");
+    assert!(
+        !Path::new(&format!("/proc/{pid}")).exists(),
+        "the program started meanwhile is gone"
+    );
 }
