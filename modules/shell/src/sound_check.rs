@@ -202,10 +202,16 @@ impl Slot {
         Some(check.now())
     }
 
-    /// A test sound is about to play.
-    pub fn mark(&self) {
-        if let Some((check, ..)) = &self.held {
-            check.mark();
+    /// A test sound is about to play: listened to for, and allowed — but while a call holds a
+    /// microphone (`call_held`), where it would reach the call through the speakers, and when nothing
+    /// listens (D88). Whether it may play.
+    pub fn mark(&self, call_held: bool) -> bool {
+        match &self.held {
+            Some((check, ..)) if !call_held => {
+                check.mark();
+                true
+            }
+            _ => false,
         }
     }
 

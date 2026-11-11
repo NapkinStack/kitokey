@@ -2843,8 +2843,6 @@ function showAgreement(name, agreement, words, session) {
   send.focus();
 }
 
-// The mark, alone in the accent, the bar's handle (D90; the decider, 2026-11-08): its dot red and
-// larger while recording, its stem cut further, as the tray's icon draws it.
 // « Vérifier le son » (D88, board 7): a modal panel over the page that opened it. capture listens only
 // while it shows: each side's device and an 8 px meter, a headset's sentence, a test sound and what was
 // heard of it — never while a call holds a microphone —, and a recording started from here. Closed by ×,
@@ -2914,8 +2912,9 @@ async function checkSound(words, back) {
   document.body.append(dialog);
   let testing = false;
   let poll = null;
+  // This panel's own: a late answer of a panel closed before cannot close the one opened after it.
   const end = async (then) => {
-    if (!checking) return;
+    if (checking !== end) return;
     checking = null;
     clearInterval(poll);
     await window.__TAURI__.core.invoke("sound_check_close").catch(() => {});
@@ -2939,17 +2938,24 @@ async function checkSound(words, back) {
     if (document.visibilityState === "hidden") end();
   };
   document.addEventListener("visibilitychange", hidden);
+  // Not offered before the shell's first answer says no call holds a microphone (`paint`).
+  play.disabled = true;
   play.addEventListener("click", async () => {
     testing = true;
     play.disabled = true;
     heard.hidden = missed.hidden = true;
-    await window.__TAURI__.core.invoke("sound_check_mark");
+    // The shell refuses it while a call holds a microphone: then nothing plays.
+    const { marked } = await window.__TAURI__.core.invoke("sound_check_mark").catch(() => ({ marked: false }));
+    if (!marked) {
+      testing = false;
+      return;
+    }
     await testSound();
     // What the meeting's side heard of it, a moment after it ended: the system's latency.
     setTimeout(async () => {
       const now = await window.__TAURI__.core.invoke("sound_check_now").catch(() => null);
       testing = false;
-      if (!now?.open) return;
+      if (!now?.open || checking !== end) return;
       heard.hidden = now.heard.test !== true;
       missed.hidden = now.heard.test === true;
       paint(now);
@@ -2963,7 +2969,8 @@ async function checkSound(words, back) {
       fill.style.width = `${Math.round(listened.levels[index] * 100)}%`;
       track.setAttribute("aria-valuenow", String(Math.round(listened.levels[index] * 100)));
     }
-    bluetooth.hidden = !listened.headset;
+    // A call holds the microphone: its sentence alone — the headset stays in its call profile after.
+    bluetooth.hidden = !listened.headset || held;
     failed.hidden = !listened.ended;
     // A call holds a microphone: no sound played, it would go into the call (D88).
     call.hidden = !held;
@@ -2986,7 +2993,7 @@ async function checkSound(words, back) {
   }
   poll = setInterval(async () => {
     const now = await window.__TAURI__.core.invoke("sound_check_now").catch(() => null);
-    if (now && checking) paint(now);
+    if (now && checking === end) paint(now);
   }, 100);
 }
 
@@ -3012,6 +3019,8 @@ async function testSound() {
   await context.close();
 }
 
+// The mark, alone in the accent, the bar's handle (D90; the decider, 2026-11-08): its dot red and
+// larger while recording, its stem cut further, as the tray's icon draws it.
 function barMark() {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");

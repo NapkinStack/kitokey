@@ -2582,9 +2582,20 @@ def sound_checked(now: dt.datetime) -> None:
             try:
                 held = wait_for(browser, lambda b: "check-call" in dict(b.execute_script(panel)["shown"]), 8)
                 got = browser.execute_script(panel)
-                check("a call holds a microphone: no test sound, the sentence of the board",
-                      held and got["play"] and dict(got["shown"]).get("check-call") == "Un appel tient le micro\u00a0: pas de son de test, il partirait dans l’appel. Faites jouer un son dans l’appel et regardez la jauge.", got)
+                check("a call holds a microphone: no test sound, the sentence of the board, alone — no headset's",
+                      held and got["play"] and dict(got["shown"]).get("check-call") == "Un appel tient le micro\u00a0: pas de son de test, il partirait dans l’appel. Faites jouer un son dans l’appel et regardez la jauge."
+                      and "check-bluetooth" not in dict(got["shown"]), got)
                 shot_themed(browser, "check-sound-call-light", "light")
+                refused = browser.execute_script("return window.__TAURI__.core.invoke('sound_check_mark')")
+                check("the shell refuses a test sound while a call holds a microphone", refused == {"marked": False}, refused)
+                # Closed and opened again, « Jouer un son de test » pressed at once, the call still held: nothing plays.
+                press(browser, "check-sound-close")
+                wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3)
+                press(browser, "check-sound-open")
+                browser.execute_script("document.getElementById('check-play').click()")
+                time.sleep(1.0)
+                outputs = [kind for kind in kitokey_streams(window) if kind == "Stream/Output/Audio"]
+                check("pressed at once while a call holds a microphone: no sound, no stream on the output", outputs == [] and not played_to(window), [outputs, played_to(window)])
             finally:
                 call.terminate()
                 call.wait(timeout=5)
@@ -2663,6 +2674,27 @@ def sound_checked(now: dt.datetime) -> None:
             check("never listening while a recording runs", refused == {"opened": False}, refused)
             browser.execute_script("window.__TAURI__.core.invoke('record')")
             wait_for(browser, lambda b: not b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 8)
+        # Its window destroyed with the panel open — the full window replaced by the bar —: the shell
+        # ends the listening on the window's end, within a second; the page can say nothing then. The
+        # driver's window is the one destroyed: what it says of that is not this check's.
+        ended = WORK / "listen-ended"
+        asked, gone = None, False
+        try:
+            with Window(sessions, "fr_FR.UTF-8") as browser:
+                browser.execute_script("location.hash = '#/settings'")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "check-sound-open"), 8)
+                opened(browser)
+                ended.unlink(missing_ok=True)
+                asked = time.time()
+                try:
+                    browser.execute_script("window.__TAURI__.core.invoke('small_window')")
+                except (NoSuchWindowException, WebDriverException):
+                    pass
+                gone = wait_for(None, lambda b: ended.is_file(), 3)
+        except (NoSuchWindowException, WebDriverException):
+            gone = gone or ended.is_file()
+        check("its window destroyed with the panel open: capture stops listening within a second",
+              asked is not None and gone and float(ended.read_text()) - asked <= 1.0, asked and ended.is_file() and float(ended.read_text()) - asked)
         # The bar hidden with the panel open in it (D90 opens it there): the page hidden closes the panel
         # under WebKitGTK (`visibilitychange`), and capture stops listening within a second.
         with Window(sessions, "fr_FR.UTF-8", small=True) as browser:

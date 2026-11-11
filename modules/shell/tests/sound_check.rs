@@ -340,3 +340,24 @@ fn a_listening_started_for_a_panel_closed_meanwhile_is_gone_when_the_opening_ans
         "the program started meanwhile is gone"
     );
 }
+
+#[test]
+fn no_test_sound_is_marked_while_a_call_holds_a_microphone() {
+    let folder = tempfile::tempdir().unwrap();
+    let program = script(folder.path());
+    let (recording, slot) = (Mutex::new(None::<()>), Mutex::new(Slot::default()));
+    open(&recording, &slot, "main", || {
+        let _held = spawning();
+        SoundCheck::start(&program, None)
+    })
+    .unwrap();
+    // A call holds a microphone: refused, nothing listened to for a sound that must not play.
+    assert!(!slot.lock().unwrap().mark(true));
+    assert_eq!(slot.lock().unwrap().asked().unwrap().test, None);
+    // None: marked.
+    assert!(slot.lock().unwrap().mark(false));
+    assert_eq!(slot.lock().unwrap().asked().unwrap().test, Some(false));
+    slot.lock().unwrap().take().unwrap().stop();
+    // Nothing open: nothing marked.
+    assert!(!slot.lock().unwrap().mark(false));
+}
