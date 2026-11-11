@@ -2847,9 +2847,9 @@ def bar_opened(now: dt.datetime) -> None:
                     check(f"{name}: at rest, « Plus d’options » reached by Tab opens the options under the row by Enter", reached and opened, browser.execute_script("return innerHeight"))
                     if not opened:
                         continue
-                    order = tabbed(browser, 5)
-                    check(f"{name}: at rest, Tab goes from the row to the microphone, « Vérifier le son », then « Avancé »",
-                          order == ["small-full", "small-hide", "small-microphone", "small-check", "small-advanced"], order)
+                    order = tabbed(browser, 6)
+                    check(f"{name}: at rest, Tab goes from the row to the context (D91), the microphone, « Vérifier le son », then « Avancé »",
+                          order == ["small-full", "small-hide", "small-context", "small-microphone", "small-check", "small-advanced"], order)
                     got = browser.execute_script("const c = document.getElementById('small-check'); const a = document.getElementById('small-advanced');"
                                                  " return [c.textContent, c.querySelectorAll('svg.glyph').length, a.textContent, a.getAttribute('aria-expanded'),"
                                                  " document.getElementById('small-advanced-panel').hidden, a.getAttribute('aria-controls')]")
@@ -2905,7 +2905,7 @@ def bar_opened(now: dt.datetime) -> None:
                     # the focus follows to ■, « Avancé » is closed in the new state.
                     keys(browser, Keys.ENTER)
                     wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
-                    tabbed(browser, 5)
+                    tabbed(browser, 6)
                     keys(browser, Keys.ENTER)
                     back_tab(browser)
                     keys(browser, Keys.ENTER)
@@ -2949,6 +2949,177 @@ def bar_opened(now: dt.datetime) -> None:
     finally:
         listed.unlink(missing_ok=True)
         subprocess.run(["pactl", "unload-module", mic], capture_output=True)
+
+
+def context_before_start(now: dt.datetime) -> None:
+    """BB. The context typed before the start (D91, board 6): in the opened bar at rest, kept for the
+    next recording until the user clears it, and said so; the new meeting's context.txt once its
+    session.json is there, under D59's rules; another meeting being made does not close the field."""
+    print("BB. the context before the start: typed at rest, kept until cleared and said so, the next meeting's context.txt, open while another is made (D91)")
+    model = WORK / "before-model.bin"
+    model.write_bytes(b"\0" * 16)
+    settings = f'after = "transcript"\nreminder = false\nmodel = "{model}"\n'
+    focused = "const a = document.activeElement; return a.id || a.className"
+    field = ("const a = document.getElementById('small-context'); const k = document.getElementById('small-context-kept');"
+             "return {value: a.value, placeholder: a.placeholder, closed: a.readOnly || a.disabled, shown: a.getClientRects().length > 0,"
+             " count: document.getElementById('small-context-count').textContent, kept: k ? k.textContent : null,"
+             " kept_shown: !!k && k.getClientRects().length > 0, described: (a.getAttribute('aria-describedby') || '').split(' ')}")
+    fits = ("const e = document.scrollingElement; const o = document.getElementById('small-options');"
+            "const out = [...o.querySelectorAll('*')].filter(x => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0"
+            " && (r.left < -0.5 || r.right > innerWidth + 0.5 || r.bottom > innerHeight + 0.5); }).map(x => x.id || x.className.baseVal || x.className);"
+            "const cut = [...o.querySelectorAll('button, p, .says, .context-count')].filter(x => x.getClientRects().length && x.scrollWidth > x.clientWidth + 1).map(x => x.textContent);"
+            "return {scroll: [e.scrollHeight, e.clientHeight, e.scrollWidth, e.clientWidth], out, cut, size: [innerWidth, innerHeight],"
+            " page: Math.ceil(document.getElementById('small').getBoundingClientRect().height)}")
+
+    def keys(browser, *pressed) -> None:
+        ActionChains(browser).send_keys(*pressed).perform()
+        time.sleep(0.2)
+
+    def asked(browser, command: str, args: dict | None = None):
+        """A command of the shell, as the page asks it: its answer, or « refused: » and why."""
+        return browser.execute_async_script(
+            "const done = arguments[arguments.length - 1];"
+            "window.__TAURI__.core.invoke(arguments[0], arguments[1]).then(done, (why) => done('refused: ' + JSON.stringify(why)))",
+            command, args or {})
+
+    def opened(browser) -> bool:
+        """« Plus d’options » by the keyboard alone, from wherever the focus is in the row."""
+        for _ in range(8):
+            if browser.execute_script(focused) == "small-more":
+                break
+            keys(browser, Keys.TAB)
+        if browser.execute_script(focused) != "small-more":
+            return False
+        if browser.find_element(By.ID, "small-more").get_attribute("aria-expanded") != "true":
+            keys(browser, Keys.ENTER)
+        return wait_for(browser, lambda b: b.find_element(By.ID, "small-context").is_displayed(), 3)
+
+    def fit(browser, what: str) -> None:
+        holds = lambda got: (got["scroll"][0] <= got["scroll"][1] and got["scroll"][2] <= got["scroll"][3] and not got["out"] and not got["cut"]
+                             and got["size"][0] == 440 and abs(got["size"][1] - got["page"]) <= 1)
+        wait_for(browser, lambda b: holds(b.execute_script(fits)), 3)
+        got = browser.execute_script(fits)
+        check(f"{what}: 440 wide, as tall as it shows, nothing overflows or is cut", holds(got), got)
+
+    said = "Budget du T4 avec Inès Durand et l’équipe achats."
+    then = "Point d’étape avec Siobhán O’Neill."
+    meetings = WORK / "before-fr-light"
+    meetings.mkdir()
+    meeting = meetings / "2026-10-18_12-00"
+    with Window(meetings, "fr_FR.UTF-8", settings, small=True) as browser:
+        wait_for(browser, lambda b: b.execute_script(focused) == "small-record", 10)
+        shown = opened(browser)
+        check("fr light: at rest, « Plus d’options » opened by the keyboard shows the context's field", shown, browser.execute_script(focused))
+        if not shown:
+            return
+        order = []
+        for _ in range(3):
+            keys(browser, Keys.TAB)
+            order.append(browser.execute_script(focused))
+        check("fr light: at rest, Tab goes from the row to the context first, as board 6 has it", order == ["small-full", "small-hide", "small-context"], order)
+        got = browser.execute_script(field)
+        check("fr light: at rest, the field is D59's — empty, named, its count —, open, and says the context is kept for the next recording until cleared",
+              got["value"] == "" and got["placeholder"] == "De quoi parle la réunion\u202f? Qui y participe\u202f?" and not got["closed"]
+              and got["count"] == "400 caractères au plus · 400 restants"
+              and got["kept"] == "Gardé pour le prochain enregistrement, jusqu’à ce que vous l’effaciez." and got["kept_shown"]
+              and "small-context-kept" in got["described"], got)
+        fit(browser, "fr light: at rest, the context's field opened")
+        keys(browser, said)
+        left = 400 - len(said)
+        counted = wait_for(browser, lambda b: b.execute_script(field)["count"] == f"400 caractères au plus · {left} restants", 2)
+        check("fr light: typed at rest, the count follows", counted, browser.execute_script(field)["count"])
+        kept = wait_for(browser, lambda b: asked(b, "next_context")["text"] == said, 3)
+        check("fr light: typed at rest, the shell keeps it for the next recording; nothing is written anywhere yet",
+              kept and not any(meetings.iterdir()), [asked(browser, "next_context")["text"], sorted(p.name for p in meetings.iterdir())])
+        time.sleep(0.3)
+        shot_themed(browser, "d91-context-rest-fr-light", "light")
+        fit(browser, "fr light: at rest, a context typed")
+        keys(browser, Keys.ESCAPE)
+        keys(browser, Keys.ENTER)
+        reopened = wait_for(browser, lambda b: b.execute_script(field)["value"] == said, 3)
+        check("fr light: the options closed and opened again, the context is still there", reopened, browser.execute_script(field))
+        # Kept by the shell, not by the page: the bar drawn again shows it.
+        browser.refresh()
+        wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+        drawn = opened(browser) and wait_for(browser, lambda b: b.execute_script(field)["value"] == said, 3)
+        check("fr light: the bar drawn again, the context kept is shown", drawn, browser.execute_script(field))
+        # Over D59's 400 characters, the shell refuses it, what was kept stays.
+        refused = asked(browser, "next_context_kept", {"text": "é" * 401})
+        check("fr light: over 400 characters, the shell refuses it and keeps what it had",
+              str(refused).startswith("refused:") and asked(browser, "next_context")["text"] == said, [refused, asked(browser, "next_context")["text"]])
+        # Started with ●: the new meeting's context.txt, whole, beside its session.json.
+        press(browser, "small-record")
+        started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+        written = wait_for(None, lambda b: (meeting / "context.txt").is_file() and (meeting / "context.txt").read_text() == said, 5)
+        check("fr light: started, the context typed before is the new meeting's context.txt, whole, beside its session.json, nothing else",
+              started and written and sorted(p.name for p in meeting.iterdir()) == ["context.txt", "session.json"],
+              sorted(p.name for p in meeting.iterdir()) if meeting.exists() else None)
+        shown = opened(browser) and wait_for(browser, lambda b: b.execute_script(field)["value"] == said and not b.execute_script(field)["kept_shown"], 3)
+        check("fr light: recording, the field is this meeting's and shows it; the sentence of the next is gone", shown, browser.execute_script(field))
+        check("fr light: taken by this meeting, nothing is kept for the next", asked(browser, "next_context")["text"] == "", asked(browser, "next_context")["text"])
+        # Stopped: its transcript is made, slowly — another meeting being made —, the field open for the next.
+        (WORK / "slow-hearing").touch()
+        (WORK / "hearing-args").unlink(missing_ok=True)
+        try:
+            stop_from_small(browser)
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+            making = wait_for(None, lambda b: (WORK / "hearing-args").is_file(), 5)
+            check("fr light: back at rest, the field is empty — the next meeting's own — while the one before is made",
+                  making and opened(browser) and browser.execute_script(field)["value"] == "" and not (meeting / "transcript.jsonl").exists(),
+                  [making, browser.execute_script(field)])
+            browser.find_element(By.ID, "small-context").click()
+            keys(browser, then)
+            got = browser.execute_script(field)
+            still = not (meeting / "transcript.jsonl").exists()
+            check("fr light: another meeting being made does not close the field: typed, kept for the next",
+                  still and not got["closed"] and got["value"] == then and wait_for(browser, lambda b: asked(b, "next_context")["text"] == then, 3), [still, got])
+            heard = wait_for(None, lambda b: (meeting / "transcript.jsonl").is_file(), 15)
+            header = json.loads((meeting / "transcript.jsonl").read_text().splitlines()[0]) if heard else {}
+            check("fr light: the meeting's transcript heard the context typed before its start", header.get("context") == said, header)
+        finally:
+            (WORK / "slow-hearing").unlink(missing_ok=True)
+        # The next recording, started from the tray, takes what was kept.
+        meeting.rename(meetings / "2026-10-18_11-00")
+        tray_click("Démarrer")
+        started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+        written = wait_for(None, lambda b: (meeting / "context.txt").is_file() and (meeting / "context.txt").read_text() == then, 5)
+        check("fr light: the next recording, started from the tray, takes the context kept", started and written,
+              (meeting / "context.txt").read_text() if (meeting / "context.txt").is_file() else None)
+        stop_from_small(browser)
+        wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+        wait_for(None, lambda b: (meeting / "transcript.jsonl").is_file(), 15)
+        # Cleared by the user: nothing is kept for the next.
+        opened(browser)
+        browser.find_element(By.ID, "small-context").click()
+        keys(browser, "Pour la suite")
+        wait_for(browser, lambda b: asked(b, "next_context")["text"] == "Pour la suite", 3)
+        ActionChains(browser).key_down(Keys.CONTROL).send_keys("a").key_up(Keys.CONTROL).send_keys(Keys.BACKSPACE).perform()
+        cleared = wait_for(browser, lambda b: asked(b, "next_context")["text"] == "", 3)
+        check("fr light: cleared, nothing is kept for the next recording", cleared and browser.execute_script(field)["value"] == "",
+              [asked(browser, "next_context")["text"], browser.execute_script(field)["value"]])
+
+    meetings = WORK / "before-en-dark"
+    meetings.mkdir()
+    window = Window(meetings, "en_US.UTF-8", settings, small=True)
+    window.env.update(GTK_THEME="Adwaita:dark")
+    with window as browser:
+        wait_for(browser, lambda b: b.execute_script(focused) == "small-record", 10)
+        check("en dark: at rest, « More options » opened by the keyboard shows the context's field", opened(browser), browser.execute_script(focused))
+        browser.find_element(By.ID, "small-context").click()
+        keys(browser, "Q4 budget with Inès Durand and the purchasing team.")
+        got = browser.execute_script(field)
+        check("en dark: at rest, the field says the context is kept for the next recording until cleared",
+              got["kept"] == "Kept for the next recording, until you clear it." and got["kept_shown"]
+              and got["placeholder"] == "What is the meeting about? Who takes part?" and not got["closed"], got)
+        fit(browser, "en dark: at rest, a context typed")
+        time.sleep(0.3)
+        shot_themed(browser, "d91-context-rest-en-dark", "dark")
+        wait_for(browser, lambda b: asked(b, "next_context")["text"] == "Q4 budget with Inès Durand and the purchasing team.", 3)
+    # Kitokey quit and started again: the context typed before the start is still kept for the next.
+    with Window(meetings, "en_US.UTF-8", settings, small=True) as browser:
+        wait_for(browser, lambda b: b.execute_script(focused) == "small-record", 10)
+        again = opened(browser) and wait_for(browser, lambda b: b.execute_script(field)["value"] == "Q4 budget with Inès Durand and the purchasing team.", 3)
+        check("en: Kitokey started again, the context typed before the start is still kept", again, browser.execute_script(field))
 
 
 def meeting_named(now: dt.datetime) -> None:
@@ -7634,6 +7805,7 @@ def main() -> int:
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
+    context_before_start(now)
     meeting_named(now)
     word_after_a_gap(now)
     minutes_checked(now)

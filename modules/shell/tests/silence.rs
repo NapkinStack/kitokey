@@ -27,6 +27,11 @@ const SILENT: &[(&str, usize, &str)] = &[
     ),
     ("recording_now", 1, "returns no `Result`: it cannot fail"),
     (
+        "next_context",
+        1,
+        "returns no `Result`: it cannot fail; the bar's field at rest is then shown empty (D91)",
+    ),
+    (
         "sound_check_open",
         1,
         "returns no `Result`: false, nothing opened — the panel says it; it cannot fail otherwise",

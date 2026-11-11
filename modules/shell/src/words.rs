@@ -541,6 +541,8 @@ pub struct Window {
     /// Recording, under the microphone (D90, board 6): the one recorded, a change for the next.
     pub bar_microphone_recorded: &'static str,
     pub bar_microphone_next: &'static str,
+    /// At rest, under the context (D91, boards 5 and 6): typed before the start, it waits for the next recording.
+    pub bar_context_kept: &'static str,
     /// « Avancé » (D90, board 6), closed: until D91 offers a meeting's own models, where they are chosen.
     pub bar_advanced: &'static str,
     pub bar_advanced_says: &'static str,
@@ -963,6 +965,7 @@ pub fn window(language: Language) -> Window {
             small_microphone_gone: "The microphone you chose is not there: Auto stands in.",
             bar_microphone_recorded: "Recorded: {}. Changing it applies to the next recording.",
             bar_microphone_next: "Changing it applies to the next recording.",
+            bar_context_kept: "Kept for the next recording, until you clear it.",
             bar_advanced: "Advanced",
             bar_advanced_says: "Each meeting takes the models chosen in Settings.",
             bar_advanced_settings: "Open Settings",
@@ -1369,6 +1372,7 @@ pub fn window(language: Language) -> Window {
             small_microphone_gone: "Le micro choisi n’est pas là\u{a0}: Auto le remplace.",
             bar_microphone_recorded: "Enregistré\u{a0}: {}. Le changer vaut pour le prochain enregistrement.",
             bar_microphone_next: "Le changer vaut pour le prochain enregistrement.",
+            bar_context_kept: "Gardé pour le prochain enregistrement, jusqu’à ce que vous l’effaciez.",
             bar_advanced: "Avancé",
             bar_advanced_says: "Chaque réunion prend les modèles choisis dans les Réglages.",
             bar_advanced_settings: "Ouvrir les Réglages",

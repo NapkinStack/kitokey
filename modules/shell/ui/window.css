@@ -332,6 +332,9 @@ body.small-window .frame { display: none; }
    son » and its line; « Avancé » under a divider, closed, its chevron before its word. */
 #small #small-microphone-next { margin: -8px 0 0; font-size: 12px; line-height: 1.3; }
 #small #small-microphone-next[hidden] { display: none; }
+/* At rest, under the context (D91): the next recording keeps it, said as the count is. */
+#small #small-context-kept { margin: 0; font-size: 12px; line-height: 1.3; }
+#small #small-context-kept[hidden] { display: none; }
 .small-check { display: flex; align-items: center; gap: 10px; }
 #small .small-check .open { flex: none; min-height: 28px; padding: 0 10px; font-size: 13px; white-space: nowrap; }
 .small-check .says { min-width: 0; font-size: 12px; line-height: 1.3; }

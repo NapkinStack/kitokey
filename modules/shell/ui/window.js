@@ -3349,7 +3349,8 @@ function showSmall(words) {
   note.id = "small-note";
   note.hidden = true;
   // The meeting's context (D59), in the options while recording: kept as it is typed, once the
-  // meeting's folder holds its session.
+  // meeting's folder holds its session. At rest, the next meeting's (D91): the shell keeps it until
+  // the user clears it, and writes it as the meeting's own once its folder holds its session.
   const meeting = { name: null, saved: null, typed: null, refused: null };
   // What could not be kept: it outlasts the recording (D67).
   const unkept = new Map();
@@ -3377,15 +3378,26 @@ function showSmall(words) {
       smallSaid("context", words.context_not_saved);
     }
   };
+  const keepNext = async (text) => {
+    try {
+      await invoke("next_context_kept", { text });
+      smallSaid("context", null);
+    } catch {
+      smallSaid("context", words.context_not_saved);
+    }
+  };
   const field = contextField(words, "", (text) => {
+    if (!recording) return keepNext(text);
     meeting.typed = text;
     keep();
   }, "small-context");
   field.area.rows = 2;
   field.area.placeholder = words.context_label;
   field.area.setAttribute("aria-label", words.context_label);
+  const keptNext = element("p", "says", words.bar_context_kept);
+  keptNext.id = "small-context-kept";
   const opened = element("div", "small-context");
-  opened.append(field.area, field.count);
+  opened.append(field.area, field.count, keptNext);
   // Said confidential (D60), under the microphone in the options; kept as it is turned, once the
   // meeting's folder holds its session.
   const secret = confidentialSwitch(words, "small-confidential");
@@ -3473,18 +3485,23 @@ function showSmall(words) {
       const dot = handle.querySelector(".dot");
       dot.setAttribute("r", recording ? "2.2" : "1.6");
       dot.setAttribute("cy", recording ? "6.2" : "5.6");
-      // Each recording its own context: nothing of the one before.
+      // Each recording its own context: nothing of the one before. Recording, the field shows what was
+      // typed before the start — the shell writes it as the meeting's —; at rest, what is kept for the next.
       Object.assign(meeting, { name: null, saved: null, typed: null, refused: null });
       mark.wanted = null;
       secret.box.checked = false;
       secret.row.classList.remove("on");
-      field.area.value = "";
+      if (!recording) field.area.value = (await invoke("next_context").catch(() => ({ text: "" }))).text;
       field.painted();
+      keptNext.hidden = recording;
+      field.area.setAttribute("aria-describedby", recording ? field.count.id : `${field.count.id} ${keptNext.id}`);
       rest.hidden = recording;
       live.hidden = !recording;
-      // The microphone in each state's options: recording, after the context, as board 6 has it.
-      if (recording) opened.after(microphone);
-      else rest.prepend(microphone);
+      // The context first, then the microphone, in each state's options, as board 6 has them.
+      if (recording) {
+        live.prepend(opened);
+        opened.after(microphone);
+      } else rest.prepend(opened, microphone);
       // No list where capture lists none: nothing to change, nothing said of it.
       micNext.hidden = !recording || microphone.hidden;
       // Each state opens closed: the row alone.
