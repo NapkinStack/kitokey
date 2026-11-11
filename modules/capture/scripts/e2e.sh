@@ -556,8 +556,16 @@ check test -z "$(grep -lE '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/o5.eve
 kill "$named" "$other" "$headset" "$addressed" 2>/dev/null || true; wait "$named" "$other" "$headset" "$addressed" 2>/dev/null || true
 pactl unload-module "$mic_c"; mic_c=
 pactl unload-module "$mic_d"; mic_d=
+# O's devices gone from the graph and the default input the run's own again, before P names it: a
+# device still being taken away leaves cpal no name but `default_input`.
+pactl set-default-source kitokey_e2e_mic.monitor
+for _ in $(seq 50); do
+  pw-dump 2>/dev/null | grep -qE '"node.name": "kitokey_e2e_(mic_c|mic_d|named|other|headset|x_)' || break
+  sleep 0.1
+done
+sleep 0.5
 
-say "P. listening without recording (D88): each source heard, nothing written, stopped within a second — asked, or its input closed"
+say "P. listening without recording (D88): each source heard, nothing written, stopped within a second — asked, or its input closed; a headset said"
 # What the run's folder holds, file by file and size: listening must leave it as it was. It starts in a
 # folder of its own, its temporary files there too: they must stay empty.
 files() { find "$work" -mindepth 1 \( -path "$work/p.*" -prune \) -o -type f -printf '%P %s\n' -o -printf '%P/\n' | sort; }
@@ -577,7 +585,8 @@ stopped_within() {
   local asked=$1 as=0; wait "$2" || as=$?
   python3 -c 'import sys, time; sys.exit(0 if time.time() - float(sys.argv[1]) < float(sys.argv[2]) else "took " + str(time.time() - float(sys.argv[1])))' "$asked" "$3" && test "$as" = 0
 }
-# heard RUN ME OTHERS: each source named first, its level above the floor; no line a recording alone says.
+# heard RUN ME OTHERS: each source named first, `me` no headset's; each level above the floor; no line a
+# recording alone says.
 heard() {
   python3 - "$work/p.$1.events" "$2" "$3" <<'PY'
 import json, sys
@@ -586,7 +595,7 @@ devices = [(line["source"], line["device"]) for line in lines if line["event"] =
 loudest = {source: max([line["level"] for line in lines if line["event"] == "level" and line["source"] == source] or [0]) for source in ("me", "others")}
 said = {line["event"] for line in lines}
 named = [source for source, _ in devices[:2]] == ["me", "others"] and all(device.startswith(want) for (_, device), want in zip(devices, sys.argv[2:]))
-ok = named and min(loudest.values()) > 0.5 and said <= {"device", "level"}
+ok = named and lines[0].get("headset") is False and min(loudest.values()) > 0.5 and said <= {"device", "level"}
 print(f"    devices {devices}, loudest {loudest}, said {sorted(said)}")
 sys.exit(0 if ok else "not heard as it should be")
 PY
@@ -620,6 +629,27 @@ check unchanged
 check test -z "$(ls -A "$work/p-cwd")"
 check test -z "$(pactl list short source-outputs)"
 check logged e2e-p-stop capture.opened capture.opened capture.listening capture.listened
+# The default input changed while it listens: a later `device` of `me`, which never says `headset`
+# (`headset_said_once`, below).
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
+listen_for moved
+sleep 2
+pactl set-default-source kitokey_e2e_out.monitor
+sleep 3
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+pactl set-default-source kitokey_e2e_mic.monitor
+kill "$mic_player" 2>/dev/null || true; wait "$mic_player" 2>/dev/null || true
+moved_said() {
+  python3 - "$work/p.moved.events" <<'PY' 2>&1 | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"
+import json, sys
+mine = [line for line in map(json.loads, open(sys.argv[1])) if line["event"] == "device" and line["source"] == "me"]
+print(f"    the default input moved while listening: me's devices {[line['device'] for line in mine]}")
+sys.exit(0 if len(mine) >= 2 and mine[1]["device"] != mine[0]["device"] else "no later device of me")
+PY
+}
+check moved_said
 # A headset's default, no call: a recording waits (M); listening opens it actively — it runs from
 # capture's stream alone —, and lets it go when stopped (ADR-0015's amendment).
 mic_c=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic_c)
@@ -629,7 +659,7 @@ pactl set-default-source kitokey_e2e_headset
 check measure2 not-running kitokey_e2e_headset 1
 listen_for headset
 sleep 2
-check grep -q '"device":"kitokey_e2e_headset","event":"device","source":"me"' "$work/p.headset.events"
+check grep -q '"device":"kitokey_e2e_headset","event":"device","headset":true,"source":"me"' "$work/p.headset.events"
 check measure2 running kitokey_e2e_headset
 asked=$(date +%s.%N); echo stop >&3
 check stopped_within "$asked" "$listener" 1
@@ -667,6 +697,29 @@ check gone_unsaid
 sed 's/^/    errors: /' "$work/p.named.errors" >> .evidence/e2e.txt
 pactl unload-module "$mic_c"; mic_c=
 grep -v '"level"' "$work"/p.*.events | sed 's/^/    /' >> .evidence/e2e.txt
+# `headset` is said on listening's first `device` of `me` alone (recording/v1): never on a later one,
+# never on `others`', never by a recording — every scenario's lines read.
+headset_said_once() {
+  python3 - "$work" <<'PY' 2>&1 | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"
+import json, pathlib, sys
+wrong, listened = [], 0
+for path in sorted(pathlib.Path(sys.argv[1]).glob("*.events")):
+    lines = [json.loads(line) for line in path.read_text().splitlines() if line.startswith("{")]
+    listening = path.name.startswith("p.")
+    first = next((n for n, line in enumerate(lines) if line.get("event") == "device" and line.get("source") == "me"), None) if listening else None
+    for n, line in enumerate(lines):
+        if "headset" in line and not (listening and n == first):
+            wrong.append(f"{path.name}:{n + 1} {line}")
+    listened += listening
+by_file = {}
+for w in wrong:
+    by_file[w.split(":")[0]] = by_file.get(w.split(":")[0], 0) + 1
+print(f"    headset: {len(wrong)} line(s) where recording/v1 does not say it, in {listened} listening runs and every recording's"
+      + (f", by file {by_file}" if by_file else "") + "".join(f"\n      {w}" for w in wrong[:5]))
+sys.exit(1 if wrong or not listened else 0)
+PY
+}
+check headset_said_once
 check unchanged
 
 [ "$failed" = 0 ] && say "e2e: passed" || say "e2e: FAILED"
