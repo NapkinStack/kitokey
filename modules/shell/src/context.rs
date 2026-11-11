@@ -74,6 +74,53 @@ pub fn write(folder: &Path, text: &str) -> io::Result<()> {
     written
 }
 
+/// The context typed before the start (D91), as it is read again when Kitokey starts: none when
+/// there is none, or it cannot be read as text, or it is longer than a context may be.
+pub fn read_next(file: &Path) -> String {
+    fs::read_to_string(file)
+        .ok()
+        .filter(|text| text.chars().count() <= MOST)
+        .unwrap_or_default()
+}
+
+/// Keeps the context typed before the start for the next recording (D91) — until the user clears
+/// it, Kitokey started again too —: written whole, a file beside it then renamed over it, or removed
+/// when nothing is left of it. Refused over `MOST` characters (`InvalidInput`): what was there stays.
+pub fn keep_next(file: &Path, text: &str) -> io::Result<()> {
+    if text.chars().count() > MOST {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("a context holds {MOST} characters at most"),
+        ));
+    }
+    if text.is_empty() {
+        return match fs::remove_file(file) {
+            Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
+            _ => Ok(()),
+        };
+    }
+    if let Some(folder) = file.parent() {
+        fs::create_dir_all(folder)?;
+    }
+    let beside = file.with_extension("part");
+    let written = fs::write(&beside, text).and_then(|()| fs::rename(&beside, file));
+    if written.is_err() {
+        let _ = fs::remove_file(&beside);
+    }
+    written
+}
+
+/// The context typed before the start (D91), taken by the meeting begun: written as its own under
+/// `write`'s rules, the next one empty after; none typed, or nothing left of it, writes nothing.
+/// Refused — the folder holds no `session.json` yet —, it stays kept for the next.
+pub fn taken(folder: &Path, next: &mut String) -> io::Result<()> {
+    let text = std::mem::take(next);
+    if heard(Some(&text)).is_none() {
+        return Ok(());
+    }
+    write(folder, &text).inspect_err(|_| *next = text)
+}
+
 /// Whether the field is closed: a making of the meeting's runs (`making`), or its transcript is
 /// left unfinished.
 pub fn closed(making: bool, transcript: &Read<Transcript>) -> Option<Closed> {

@@ -196,3 +196,65 @@ fn a_transcript_left_unfinished_is_not_told_to_wait_it_will_not_finish_on_its_ow
         "sa transcription n’est pas complète\u{a0}: refaites-la d’abord."
     );
 }
+
+// The context typed before the start (D91): taken by the meeting begun, the next one empty after.
+
+#[test]
+fn the_context_typed_before_the_start_is_the_new_meetings_and_the_next_is_empty_after() {
+    let folder = meeting_folder();
+    let mut next = "Budget du T4 avec Inès Durand et l’équipe achats.".to_string();
+    context::taken(folder.path(), &mut next).unwrap();
+    assert_eq!(
+        fs::read_to_string(folder.path().join("context.txt")).unwrap(),
+        "Budget du T4 avec Inès Durand et l’équipe achats."
+    );
+    assert_eq!(next, "");
+    assert_eq!(names(folder.path()), ["context.txt", "session.json"]);
+}
+
+#[test]
+fn a_context_typed_before_the_start_is_not_written_before_the_session_and_is_kept_for_the_next() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut next = "Budget du T4".to_string();
+    let refused = context::taken(folder.path(), &mut next).unwrap_err();
+    assert_eq!(refused.kind(), ErrorKind::NotFound);
+    assert_eq!(next, "Budget du T4");
+    assert!(names(folder.path()).is_empty());
+}
+
+#[test]
+fn none_typed_before_the_start_or_cleared_writes_nothing() {
+    for typed in ["", "  \n "] {
+        let folder = meeting_folder();
+        let mut next = typed.to_string();
+        context::taken(folder.path(), &mut next).unwrap();
+        assert_eq!(next, "");
+        assert_eq!(names(folder.path()), ["session.json"]);
+    }
+}
+
+#[test]
+fn a_context_kept_for_the_next_recording_is_read_again_until_it_is_cleared() {
+    let folder = tempfile::tempdir().unwrap();
+    let file = folder.path().join("kitokey").join("next-context.txt");
+    assert_eq!(context::read_next(&file), "");
+    context::keep_next(&file, "Budget du T4\navec Inès Durand").unwrap();
+    assert_eq!(context::read_next(&file), "Budget du T4\navec Inès Durand");
+    assert_eq!(names(file.parent().unwrap()), ["next-context.txt"]);
+    context::keep_next(&file, "").unwrap();
+    assert_eq!(context::read_next(&file), "");
+    assert!(!file.exists());
+    context::keep_next(&file, "").unwrap();
+}
+
+#[test]
+fn a_context_kept_for_the_next_recording_holds_400_characters_at_most() {
+    let folder = tempfile::tempdir().unwrap();
+    let file = folder.path().join("next-context.txt");
+    context::keep_next(&file, &"é".repeat(context::MOST)).unwrap();
+    let refused = context::keep_next(&file, &"é".repeat(context::MOST + 1)).unwrap_err();
+    assert_eq!(refused.kind(), ErrorKind::InvalidInput);
+    assert_eq!(context::read_next(&file), "é".repeat(context::MOST));
+    fs::write(&file, "é".repeat(context::MOST + 1)).unwrap();
+    assert_eq!(context::read_next(&file), "");
+}

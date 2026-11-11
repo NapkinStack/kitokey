@@ -3095,6 +3095,52 @@ function showSmall(words) {
   named(stop, words.record_stop);
   stop.addEventListener("click", () => asking(stop, words.record_stopping, false, words.record_stop));
   const time = element("span", "time", "00:00:00");
+  // The context typed before the start (D91, board 5): in the row at rest, the shell keeps it for the
+  // next recording until it is cleared — its ✕, or emptied —, said under the row while one is kept.
+  // Enter in it starts the recording. Recording, the options' field is the meeting's own (D59).
+  const nextField = element("span", "next-context");
+  const nextText = element("input", "next-context-text");
+  nextText.type = "text";
+  nextText.id = "small-next-context";
+  nextText.autocomplete = "off";
+  nextText.placeholder = words.bar_context;
+  nextText.setAttribute("aria-label", words.context_label);
+  nextText.setAttribute("aria-describedby", "small-context-kept");
+  const clear = iconButton("x", words.bar_context_clear, "small-context-clear");
+  nextField.append(nextText, clear);
+  const keptNext = element("p", "says", words.bar_context_kept);
+  keptNext.id = "small-context-kept";
+  const paintNext = () => {
+    clear.hidden = nextText.value === "";
+    keptNext.hidden = recording !== false || nextText.value === "";
+  };
+  // Each change kept in turn: Enter starts once the last one is.
+  let keeping = Promise.resolve();
+  const keepNext = () => {
+    const text = nextText.value;
+    paintNext();
+    keeping = keeping
+      .then(() => invoke("next_context_kept", { text }))
+      // Refused once a recording runs, the field gone with the rest: nothing to say then.
+      .then(() => smallSaid("context", null), () => recording === false && smallSaid("context", words.context_not_saved));
+  };
+  // Never more than the shell takes, counted as it counts: in characters (D59).
+  nextText.addEventListener("input", () => {
+    const typed = [...nextText.value];
+    if (typed.length > CONTEXT_MOST) nextText.value = typed.slice(0, CONTEXT_MOST).join("");
+    keepNext();
+  });
+  nextText.addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter" || event.isComposing || start.hidden || start.disabled) return;
+    event.preventDefault();
+    await keeping;
+    start.click();
+  });
+  clear.addEventListener("click", () => {
+    nextText.value = "";
+    keepNext();
+    nextText.focus();
+  });
   // « Plus d’options » (D90): what is rarer, under the row; Escape closes it.
   const more = iconButton("chevron-down", words.bar_more, "small-more");
   more.setAttribute("aria-controls", "small-options");
@@ -3102,7 +3148,8 @@ function showSmall(words) {
   const hide = iconButton("minus", words.bar_hide, "small-hide");
   hide.addEventListener("click", () => invoke("bar_hide"));
   const row = element("div", "bar-row");
-  row.append(handle, time, element("span", "bar-space"), start, stop, more, toFull, hide);
+  const space = element("span", "bar-space");
+  row.append(handle, nextField, time, space, start, stop, more, toFull, hide);
   // No title bar (D90, board 8): the bar is moved by its handle, or its row anywhere but a control.
   row.addEventListener("mousedown", (event) => {
     if (event.button === 0 && !event.target.closest("button, input, textarea, select")) invoke("bar_drag");
@@ -3415,7 +3462,7 @@ function showSmall(words) {
   live.append(opened, micNext, secret.row, note);
   live.hidden = true;
   const lines = element("div", "bar-lines");
-  lines.append(announce, ...checks.map((check) => check.sentence), unkeptSaid);
+  lines.append(keptNext, announce, ...checks.map((check) => check.sentence), unkeptSaid);
   const options = element("div", "bar-options");
   options.id = "small-options";
   options.append(rest, live, advanced);
@@ -3462,8 +3509,11 @@ function showSmall(words) {
       named(start, words.record_start);
       stop.disabled = false;
       named(stop, words.record_stop);
-      start.hidden = recording;
-      stop.hidden = time.hidden = meters.hidden = !recording;
+      start.hidden = nextField.hidden = recording;
+      stop.hidden = time.hidden = meters.hidden = space.hidden = !recording;
+      // At rest, what the shell keeps for the next recording; taken by this one, recording (D91).
+      if (!recording) nextText.value = (await invoke("next_context").catch(() => ({ text: "" }))).text;
+      paintNext();
       // At rest, the bar is its row: the recording's lines go with it (the ticks stop at the stop).
       if (!recording) {
         for (const check of checks) check.sentence.hidden = true;

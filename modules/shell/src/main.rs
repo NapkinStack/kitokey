@@ -67,6 +67,9 @@ struct Shell {
     recording: Mutex<Option<Recording>>,
     /// The folder it records into, once it has said so.
     recorded: Mutex<Option<PathBuf>>,
+    /// The context typed in the bar before the start, kept for the next recording until the user
+    /// clears it, in `next_file` too (D91): taken by the meeting begun, whichever gesture starts it.
+    next_context: Mutex<String>,
     /// The menu's entry that starts and stops, relabelled as the recording goes.
     toggle: MenuItem<Wry>,
     /// The user asked to quit while a recording ran: it is stopped first, then Kitokey leaves.
@@ -356,6 +359,8 @@ fn main() {
             context_shown,
             context_saved,
             context_redo,
+            next_context,
+            next_context_kept,
             language_set,
             title_saved,
             confidential_set,
@@ -466,6 +471,7 @@ fn main() {
                 system,
                 recording: Mutex::new(None),
                 recorded: Mutex::new(None),
+                next_context: Mutex::new(next_file().map(|file| context::read_next(&file)).unwrap_or_default()),
                 toggle,
                 leaving: Mutex::new(false),
                 pressed: Mutex::new(None),
@@ -1646,6 +1652,41 @@ fn context_saved(shell: State<'_, Shell>, name: String, text: String) -> Result<
     }
     context::write(&folder, &text).map_err(|error| shell.told(Failure::MeetingFile, error))?;
     Ok(context_of(&shell, &folder))
+}
+
+/// The context kept for the next recording (D91), as the bar shows it at rest.
+#[derive(serde::Serialize)]
+struct NextContext {
+    text: String,
+}
+
+#[tauri::command]
+fn next_context(shell: State<'_, Shell>) -> NextContext {
+    NextContext {
+        text: shell.next_context.lock().unwrap().clone(),
+    }
+}
+
+/// Where the context kept for the next recording is, beside the settings: Kitokey started again
+/// still has it (D91).
+fn next_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("next-context.txt"))
+}
+
+/// The bar's field at rest written (D91): kept for the next recording, under D59's 400 characters.
+/// Never closed by a making: no meeting is made from it before it starts. Refused while a recording
+/// runs — a key typed as the tray or the shortcut starts one would be the meeting after's —, what
+/// is kept staying as it is.
+#[tauri::command]
+fn next_context_kept(shell: State<'_, Shell>, text: String) -> Result<(), Told> {
+    let mut next = shell.next_context.lock().unwrap();
+    if shell.recording.lock().unwrap().is_some() {
+        return Err(shell.told(Failure::Busy, "a recording runs: no context is kept for the next"));
+    }
+    let file = next_file().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for settings"))?;
+    context::keep_next(&file, &text).map_err(|error| shell.told(Failure::MeetingFile, error))?;
+    *next = text;
+    Ok(())
 }
 
 /// *Refaire avec ce contexte* (D59): the transcript made again by whoever the settings name to
@@ -3157,6 +3198,18 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
             {
                 tracing::warn!(kind = ?error.kind(), "shell.trial_not_counted");
             }
+            // The context typed before the start, the meeting's own once its folder holds its session
+            // (D91) — written before the bar is told of the meeting, which then reads it there.
+            let mut next = shell.next_context.lock().unwrap();
+            match context::taken(folder, &mut next) {
+                Ok(()) => {
+                    if let Some(Err(error)) = next_file().map(|file| context::keep_next(&file, "")) {
+                        tracing::error!(kind = ?error.kind(), "shell.context_not_cleared");
+                    }
+                }
+                Err(error) => tracing::error!(kind = ?error.kind(), "shell.context_not_taken"),
+            }
+            drop(next);
             *shell.recorded.lock().unwrap() = Some(folder.clone());
             *shell.meter.lock().unwrap() = (Some(Instant::now()), [0.0, 0.0]);
             small_recording(app, true);
