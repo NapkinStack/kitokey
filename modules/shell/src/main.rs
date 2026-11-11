@@ -33,7 +33,7 @@ use kitokey_shell::{
     licence::{self, Licence},
     log,
     meeting::{self, Read, Transcript},
-    migrate,
+    meeting_models, migrate,
     minutes::{self, Minutes},
     model::{self, Published},
     named, player,
@@ -362,6 +362,8 @@ fn main() {
             next_context,
             next_context_kept,
             language_set,
+            meeting_models_shown,
+            meeting_models_chosen,
             title_saved,
             confidential_set,
             transcript_redo,
@@ -1042,7 +1044,7 @@ fn minutes_redo(
     let chosen = match provider.zip(model) {
         Some(choice) => Some(choice),
         None => {
-            let settings = shell.read_or_told()?;
+            let settings = own(&shell.read_or_told()?, &folder);
             settings.minutes_provider.zip(settings.minutes_model)
         }
     };
@@ -1499,6 +1501,38 @@ fn language_set(shell: State<'_, Shell>, name: String, language: Option<String>)
         shell.told(failure, error)
     })?;
     tracing::info!(language = language.as_deref().unwrap_or("none"), "shell.language_set");
+    Ok(())
+}
+
+/// What a meeting chose for itself (D91), and the steps whose choice is gone: Settings' choice
+/// makes them, and the page says so.
+#[derive(serde::Serialize)]
+struct OwnModels {
+    chosen: meeting_models::Models,
+    gone: Vec<meeting_models::Step>,
+}
+
+#[tauri::command]
+fn meeting_models_shown(shell: State<'_, Shell>, name: String) -> Result<OwnModels, Told> {
+    let folder = session_folder(&shell, &name)?;
+    let settings = shell.settings();
+    let chosen = meeting_models::read(&folder);
+    let gone = meeting_models::applied(&settings, &chosen, &settings::whisper_models(&models_folder(), &settings)).gone;
+    Ok(OwnModels { chosen, gone })
+}
+
+/// The models a meeting is made with from now on, chosen in « Avancé » (D91): written whole, a
+/// part none being Settings' choice — none at all, the file removed. Settings are not touched.
+#[tauri::command]
+fn meeting_models_chosen(shell: State<'_, Shell>, name: String, chosen: meeting_models::Models) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    meeting_models::write(&folder, &chosen).map_err(|error| shell.told(Failure::MeetingFile, error))?;
+    // Which steps are the meeting's own; their models are no word of a meeting, but stay out all the same.
+    tracing::info!(
+        transcription = chosen.transcription.is_some(),
+        minutes = chosen.minutes.is_some(),
+        "shell.meeting_models_chosen"
+    );
     Ok(())
 }
 
@@ -2826,8 +2860,9 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
         }
     };
     let named = settings.minutes_provider.clone().zip(settings.minutes_model.clone());
-    // Made again with another model, this time only; or by whoever the settings name.
-    let wanted = chosen.or(settings.minutes_provider.zip(settings.minutes_model));
+    // Made again with another model, this time only; or by whoever the meeting chose, else the settings.
+    let made_with = own(&settings, &folder);
+    let wanted = chosen.or(made_with.minutes_provider.zip(made_with.minutes_model));
     // Said confidential: on this computer alone, whatever was named — Ollama silent or holding no
     // model, they wait, said, and nothing is asked nor sent (D60).
     let wanted = if confidential::marked(&folder) {
@@ -3327,9 +3362,9 @@ fn transcribe_next(app: &AppHandle) {
         let settings = shell.settings();
         let next = {
             let mut waiting = shell.waiting.lock().unwrap();
-            let at = waiting
-                .iter()
-                .position(|(folder, again)| matches!(again, Some(Again::Model(_))) || !default_model_missing_for(&settings, folder));
+            let at = waiting.iter().position(|(folder, again)| {
+                matches!(again, Some(Again::Model(_))) || !default_model_missing_for(&own(&settings, folder), folder)
+            });
             at.and_then(|at| waiting.remove(at))
         };
         match next {
@@ -3365,9 +3400,12 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
         return Ok(());
     }
     shell.transcripts_tried.lock().unwrap().insert(folder.clone(), Some(again.clone()));
-    let settings = shell.reread().map_err(|why| (Failure::SettingsUnread, why))?;
+    let read = shell.reread().map_err(|why| (Failure::SettingsUnread, why))?;
+    // The models this computer lists, as Settings name theirs: a Refaire… may pick Settings' own.
+    let listed = settings::whisper_models(&models_folder(), &read);
+    let settings = own(&read, &folder);
     let (hearer, key) = match &again {
-        Again::Model(model) if !settings::whisper_models(&models_folder(), &settings).contains(model) => {
+        Again::Model(model) if !listed.contains(model) => {
             return Err((Failure::ModelAbsent, "no model on this computer".to_string()));
         }
         Again::Model(model) => (Hearer::Model(model.clone()), None),
@@ -3470,6 +3508,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
             let named = shell
                 .reread()
                 .ok()
+                .map(|settings| own(&settings, &folder))
                 .and_then(|settings| settings.minutes_provider.zip(settings.minutes_model));
             write_minutes(&app, folder, None, named);
         }
@@ -3477,6 +3516,17 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
         transcribe_next(&app);
     });
     Ok(())
+}
+
+/// Settings as a meeting is made with them: its own models where it chose some (D91), Settings'
+/// choice for the rest and where its own is gone — logged, and said on its page.
+fn own(settings: &Settings, folder: &Path) -> Settings {
+    let chosen = meeting_models::read(folder);
+    let applied = meeting_models::applied(settings, &chosen, &settings::whisper_models(&models_folder(), settings));
+    if !applied.gone.is_empty() {
+        tracing::info!(gone = ?applied.gone, "shell.meeting_model_gone");
+    }
+    applied.settings
 }
 
 /// Who hears now, as the settings name it — Apple's SpeechAnalyzer while this Mac offers it, a
@@ -3525,7 +3575,7 @@ fn transcribe(app: &AppHandle, folder: PathBuf) {
     }
     shell.transcripts_tried.lock().unwrap().insert(folder.clone(), None);
     let _ = shell.reread();
-    let settings = shell.settings();
+    let settings = own(&shell.settings(), &folder);
     let model = &settings.model;
     let (hearer, key) = hearer_now(&shell, &settings, &folder);
     if matches!(hearer, Hearer::Model(_)) && !model.is_file() {

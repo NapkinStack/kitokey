@@ -1967,6 +1967,75 @@ def confidential_every_way(now: dt.datetime) -> None:
             server.shutdown()
 
 
+def own_models(now: dt.datetime) -> None:
+    """BC. A meeting's own models: chosen for it alone, used when it is made and made again (D91)."""
+    print("BC. a meeting's own models: written whole, used to make and make again, Settings unchanged, a model gone said (D91)")
+    meetings = WORK / "own-models"
+    meeting = meetings / "2026-11-11_09-00"
+    session(meeting, now - dt.timedelta(hours=2), 1, {"local.wav": 1000})
+    data = WORK / "data-own-models"
+    folder = data / "kitokey" / "models"
+    folder.mkdir(parents=True)
+    own = folder / "ggml-tiny-own.bin"
+    own.write_bytes(b"\0" * 16)
+    model = WORK / "own-models-settings.bin"
+    model.write_bytes(b"\0" * 16)
+    local = "http://localhost:11434/v1"
+    named = f'reminder = false\nmodel = "{model}"\nminutes_provider = "{local}"\nminutes_model = "settings-writer"\n'
+    hearing, writing = WORK / "hearing-args", WORK / "summary-args"
+    read = lambda path: path.read_text() if path.exists() else ""
+    idle = "return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)"
+    shown = "return window.__TAURI__.core.invoke('meeting_models_shown', {name: arguments[0]})"
+    window = Window(meetings, "fr_FR.UTF-8", named)
+    window.env.update(XDG_DATA_HOME=str(data))
+    with window as browser:
+        settings_before = window.file.read_text()
+        chosen = {"transcription": {"engine": "whisper", "model": own.name}, "minutes": {"provider": local, "model": "mistral-own"}}
+        browser.execute_script("return window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: arguments[1]})", meeting.name, chosen)
+        written = wait_for(browser, lambda b: (meeting / "models.json").exists(), 5)
+        check("chosen for the meeting: models.json written whole, as the contract shows it, nothing beside it",
+              written and json.loads((meeting / "models.json").read_text()) == chosen
+              and sorted(p.name for p in meeting.iterdir()) == ["local.wav", "models.json", "session.json"], sorted(p.name for p in meeting.iterdir()))
+        hearing.unlink(missing_ok=True)
+        browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", meeting.name)
+        heard = wait_for(browser, lambda b: str(own) in read(hearing) and (meeting / "transcript.jsonl").exists(), 15)
+        check("made: heard by the meeting's own Whisper model, not Settings'", heard and str(model) not in read(hearing), read(hearing))
+        wait_for(browser, lambda b: b.execute_script(idle), 15)
+        writing.unlink(missing_ok=True)
+        browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", meeting.name)
+        wrote = wait_for(browser, lambda b: "mistral-own" in read(writing) and (meeting / "minutes.md").exists(), 15)
+        check("its minutes written by the meeting's own model", wrote and "settings-writer" not in read(writing), read(writing))
+        wait_for(browser, lambda b: b.execute_script(idle), 15)
+        hearing.unlink(missing_ok=True)
+        writing.unlink(missing_ok=True)
+        browser.execute_script("window.__TAURI__.core.invoke('context_redo', {name: arguments[0]})", meeting.name)
+        again = wait_for(browser, lambda b: str(own) in read(hearing) and "mistral-own" in read(writing), 20)
+        check("made again (Refaire avec ce contexte): the meeting's own models both", again, (read(hearing), read(writing)))
+        wait_for(browser, lambda b: b.execute_script(idle), 15)
+        check("Settings unchanged by the meeting's choice", window.file.read_text() == settings_before, window.file.read_text())
+        said = browser.execute_script(shown, meeting.name)
+        check("its choice shown, none gone", said == {"chosen": chosen, "gone": []}, said)
+        # Its page says which models made its transcript and its minutes (criterion 3).
+        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        makers = lambda b: b.execute_script("return [...document.querySelectorAll('.maker')].map(m => m.textContent)")
+        both = wait_for(browser, lambda b: len(makers(b)) >= 2, 10)
+        texts = " | ".join(makers(browser)).lower()
+        check("its page says the models that made its transcript and its minutes", both and "whisper tiny own" in texts and "mistral own" in texts, texts)
+        # The model removed: Settings' choice stands in, and it is said.
+        own.unlink()
+        said = browser.execute_script(shown, meeting.name)
+        check("its model removed: said gone", said["gone"] == ["transcription"], said)
+        hearing.unlink(missing_ok=True)
+        browser.execute_script("window.__TAURI__.core.invoke('context_redo', {name: arguments[0]})", meeting.name)
+        stood = wait_for(browser, lambda b: str(model) in read(hearing), 15)
+        check("made again with its model gone: Settings' model stands in", stood, read(hearing))
+        wait_for(browser, lambda b: b.execute_script(idle), 20)
+        # None left: the file removed.
+        browser.execute_script("return window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: {}})", meeting.name)
+        removed = wait_for(browser, lambda b: not (meeting / "models.json").exists(), 5)
+        check("none chosen: models.json removed", removed)
+
+
 def minutes_copied(now: dt.datetime) -> None:
     """AJ. A meeting's minutes copied in one click, ready to paste where the user writes (D45)."""
     print("AJ. the minutes copied in one click: their Markdown, titled as the page names them, « Copié » said in place (D45)")
@@ -7835,6 +7904,7 @@ def main() -> int:
     bar_window(now)
     bar_opened(now)
     context_before_start(now)
+    own_models(now)
     meeting_named(now)
     word_after_a_gap(now)
     minutes_checked(now)
