@@ -1331,14 +1331,20 @@ fn sound_check_now(shell: State<'_, Shell>) -> SoundChecked {
     }
 }
 
-/// A test sound is about to play (D88): the meeting's side is listened to for it from now on.
+/// A test sound is asked (D88): refused while a call holds a microphone; otherwise the meeting's side
+/// is listened to for it from now on.
 #[tauri::command]
-fn sound_check_mark(shell: State<'_, Shell>) {
-    let slot = shell.sound_check.lock().unwrap();
-    if slot.is_open() {
-        tracing::info!("shell.sound_check_test");
-        slot.mark();
-    }
+fn sound_check_mark(shell: State<'_, Shell>) -> SoundCheckMarked {
+    let call = !shell.holders.lock().unwrap().is_empty();
+    let marked = shell.sound_check.lock().unwrap().mark(call);
+    tracing::info!(marked, call, "shell.sound_check_test");
+    SoundCheckMarked { marked }
+}
+
+/// Whether the test sound may play: never while a call holds a microphone, nor with nothing listening.
+#[derive(serde::Serialize)]
+struct SoundCheckMarked {
+    marked: bool,
 }
 
 /// The panel closed (D88): capture stops listening, and has ended when this answers.

@@ -530,3 +530,29 @@ body.small-window .frame { display: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+/* « Vérifier le son » (D88, board 7): a modal panel, 440 px wide at most; each side its name, its
+   device and an 8 px meter — the microphone's in the accent, the meeting's in green —, a sentence
+   per case, the test sound and the recording's start, the microphone's note under them. */
+.check-sound { width: min(440px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 8px 28px rgb(0 0 0 / 0.18); }
+.check-sound::backdrop { background: rgb(0 0 0 / 0.32); }
+.check-sound > * { margin: 0 16px; }
+.check-head { display: flex; align-items: center; gap: 12px; margin: 0; padding: 8px 8px 8px 16px; border-bottom: 1px solid var(--line); }
+.check-head .mark { width: 20px; height: 20px; flex: none; border-radius: 5px; background: var(--accent); color: var(--surface); padding: 2px; }
+.check-head h2 { flex: 1 1 auto; margin: 0; font-size: 15px; font-weight: 600; }
+.check-source { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.check-top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.check-name { font-weight: 600; }
+.check-device { margin-left: auto; color: var(--soft); font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.check-track { height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
+.check-fill { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--accent); transition: width 90ms linear; }
+.check-source.far .check-fill { background: var(--ok); }
+.check-said { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; font-size: 12.5px; line-height: 1.4; color: var(--soft); }
+.check-said .glyph { margin-top: 1px; }
+.check-said.okay { color: var(--ok); font-weight: 600; font-size: 13px; }
+.check-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+/* Both on one row at 440 px, as the board draws them: 13 px, 10 px aside; narrower, they wrap. */
+.check-actions button { font-size: 13px; padding: 0 10px; white-space: nowrap; }
+.with-icon { display: inline-flex; align-items: center; gap: 8px; }
+.check-actions .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.check-actions .open:disabled { border-style: dashed; color: var(--soft); cursor: default; }
+.check-note { margin-top: 12px; margin-bottom: 16px; font-size: 12.5px; color: var(--soft); }

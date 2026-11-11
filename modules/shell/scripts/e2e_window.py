@@ -126,6 +126,30 @@ if [ "$1" = microphones ]; then
   [ -e "$here/microphones" ] && cat "$here/microphones"
   exit 0
 fi
+# Listening for « Vérifier le son » (D88): a real stream on the run's microphone, held as capture holds
+# its own, read in the graph by the scenario; each side's level ten times a second — the meeting's loud
+# while the scenario says it hears the test sound —; ended by « stop », its input closed or a signal.
+if [ "$1" = listen ]; then
+  printf '%s\n' "$*" > "$here/listen-args"
+  rm -f "$here/listen-ended" "$here/listen-told"
+  # A program named as capture is, so that its stream is Kitokey's own for the shell's watcher (D30):
+  # a copy of pw-cat, told to record — its name no longer says it.
+  mkdir -p "$here/own"; [ -x "$here/own/kitokey-capture" ] || cp "$(command -v pw-cat)" "$here/own/kitokey-capture"
+  "$here/own/kitokey-capture" --record --target kitokey_e2e_check_mic "$here/listen.wav" & held=$!
+  ended() { kill "$held" 2>/dev/null; wait "$held" 2>/dev/null; date +%s.%N > "$here/listen-ended"; exit 0; }
+  trap ended TERM INT
+  headset=false; [ -e "$here/listen-headset" ] && headset=true
+  echo '{"event":"device","source":"me","device":"Kitokey e2e mic","headset":'$headset'}'
+  echo '{"event":"device","source":"others","device":"Kitokey e2e output"}'
+  while :; do
+    read -t 0.1 line; got=$?
+    if [ "$got" = 0 ]; then echo "$line" > "$here/listen-told"; ended; fi
+    [ "$got" -gt 128 ] || ended
+    loud=0.05; [ -e "$here/listen-loud" ] && loud=0.8
+    echo '{"event":"level","source":"me","level":0.4}'
+    echo '{"event":"level","source":"others","level":'$loud'}'
+  done
+fi
 printf '%s\\n' "$*" > "$here/recorder-args"
 folder="$2/2026-10-18_12-00"; mkdir -p "$folder"
 printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","tracks":{}}' > "$folder/session.json"
@@ -533,6 +557,31 @@ def played_to(window: "Window") -> set[str]:
                and under(int(props.get("application.process.id") or 0))}
     return {nodes.get(o["info"]["input-node-id"], {}).get("node.name", "?") for o in objects
             if o.get("type") == "PipeWire:Interface:Link" and o["info"]["output-node-id"] in streams}
+
+
+def kitokey_streams(window: "Window") -> list[str]:
+    """The streams of Kitokey's processes — the window's, under its driver, and what it started —, by class."""
+    def under(pid: int) -> bool:
+        while pid > 1:
+            if pid == window.driver_process.pid:
+                return True
+            try:
+                pid = int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[1])
+            except (OSError, IndexError, ValueError):
+                return False
+        return False
+
+    objects = json.loads(subprocess.run(["pw-dump"], capture_output=True, text=True, check=True).stdout)
+    clients = {o["id"]: (o.get("info") or {}).get("props") or {} for o in objects if o.get("type") == "PipeWire:Interface:Client"}
+    found = []
+    for o in objects:
+        props = (o.get("info") or {}).get("props") or {}
+        if o.get("type") != "PipeWire:Interface:Node" or not str(props.get("media.class", "")).startswith("Stream/"):
+            continue
+        pid = props.get("application.process.id") or clients.get(props.get("client.id"), {}).get("application.process.id") or 0
+        if under(int(pid)):
+            found.append(props["media.class"])
+    return found
 
 
 def rows(browser) -> list[tuple[str, str, str]]:
@@ -2444,6 +2493,234 @@ def microphone_chosen(now: dt.datetime) -> None:
         check("and the recording names none", "--microphone" not in args.read_text(), args.read_text())
         wait_for(browser, lambda b: b.execute_script("return !document.querySelector('.small-live').hidden"), 8)
         stop_from_small(browser)
+
+
+def sound_checked(now: dt.datetime) -> None:
+    """AZ. « Vérifier le son » (D88, board 7), from Settings: capture listens only while the panel shows."""
+    print("AZ. « Vérifier le son » from Settings: each side's device and meter, the headset's sentence; a test sound played and said heard or not, never during a call; no stream of Kitokey's left within a second of closing; a recording started from it (D88)")
+    sessions = WORK / "sessions-check"
+    sessions.mkdir(exist_ok=True)
+    mic = subprocess.run(["pactl", "load-module", "module-null-sink", "sink_name=kitokey_e2e_check_mic", "media.class=Audio/Source/Virtual"],
+                         capture_output=True, text=True).stdout.strip()
+    flag = lambda name: WORK / f"listen-{name}"
+    panel = ("const d = document.getElementById('check-sound'); if (!d) return null; const t = (id) => document.getElementById(id).textContent;"
+             " const w = (id) => document.getElementById(id).style.width;"
+             " return {open: d.open, title: t('check-sound-title'), me: t('check-device-me'), others: t('check-device-others'),"
+             " levels: [w('check-level-me'), w('check-level-others')], play: document.getElementById('check-play').disabled,"
+             " active: d.contains(document.activeElement), shown: ['check-bluetooth', 'check-call', 'check-heard', 'check-missed', 'check-failed']"
+             ".filter((id) => !document.getElementById(id).hidden).map((id) => [id, document.getElementById(id).textContent])}")
+    fits = ("const d = document.getElementById('check-sound').getBoundingClientRect(); const e = document.scrollingElement;"
+            "const cut = [...document.querySelectorAll('#check-sound button, #check-sound .check-said span')].filter(x => x.getBoundingClientRect().right > d.right + 0.5).map(x => x.textContent);"
+            "return {inside: d.left >= -0.5 && d.right <= innerWidth + 0.5 && d.top >= -0.5 && d.bottom <= innerHeight + 0.5, cut, size: [innerWidth, innerHeight]}")
+    def opened(browser) -> dict | None:
+        press(browser, "check-sound-open")
+        wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("me"), 5)
+        return browser.execute_script(panel)
+    def closed_within(window: Window, browser, gesture) -> float | None:
+        """The seconds from the gesture to the last of Kitokey's streams gone; none past three."""
+        gesture(browser)
+        asked = time.monotonic()
+        while time.monotonic() - asked < 3:
+            if not kitokey_streams(window):
+                return time.monotonic() - asked
+            time.sleep(0.05)
+        return None
+    def test_sound(window: Window, browser, heard: bool) -> tuple[set[str], dict]:
+        """« Jouer un son de test »: the outputs the page played it to; heard on the meeting's side when the scenario says so."""
+        flag("loud").unlink(missing_ok=True)
+        press(browser, "check-play")
+        played: set[str] = set()
+        until = time.monotonic() + 2
+        while time.monotonic() < until and not played:
+            played = played_to(window)
+            time.sleep(0.03)
+        if heard and played:
+            flag("loud").touch()
+        wait_for(browser, lambda b: any(id_ in ("check-heard", "check-missed") for id_, _ in b.execute_script(panel)["shown"]), 5)
+        flag("loud").unlink(missing_ok=True)
+        return played, browser.execute_script(panel)
+    try:
+        for name in ("headset", "loud"):
+            flag(name).unlink(missing_ok=True)
+        flag("headset").touch()
+        window = Window(sessions, "fr_FR.UTF-8")
+        with window as browser:
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "check-sound-open"), 8)
+            check("at rest, Settings shown, Kitokey holds no stream", kitokey_streams(window) == [], kitokey_streams(window))
+            row = browser.execute_script("const b = document.getElementById('check-sound-open'); return [b.textContent, b.querySelectorAll('svg.glyph').length]")
+            check("Settings offer « Vérifier le son », a labelled button with its icon", row == ["Vérifier le son", 1], row)
+            got = opened(browser)
+            check("the panel opens, named, the microphone and the meeting's sound each named by their device",
+                  got and got["open"] and got["title"] == "Vérifier le son" and got["me"] == "Kitokey e2e mic" and got["others"] == "Kitokey e2e output", got)
+            check("capture is asked to listen, the microphone of the settings — Auto here", (WORK / "listen-args").read_text() == "listen\n", (WORK / "listen-args").read_text())
+            wait_for(browser, lambda b: b.execute_script(panel)["levels"] == ["40%", "5%"], 3)
+            check("each meter moves with its side's level", browser.execute_script(panel)["levels"] == ["40%", "5%"], browser.execute_script(panel)["levels"])
+            check("the microphone is open while the panel shows: a stream of Kitokey's", "Stream/Input/Audio" in kitokey_streams(window), kitokey_streams(window))
+            said = dict(browser.execute_script(panel)["shown"])
+            check("a Bluetooth headset's microphone: the panel says it, in one sentence",
+                  said.get("check-bluetooth") == "Tant que ce panneau est ouvert, votre casque Bluetooth passe en qualité d’appel\u202f; il revient à la fermeture.", said)
+            check("the focus is inside the panel, a modal one", browser.execute_script(panel)["active"])
+            for width, theme in ((1920, "light"), (1920, "dark"), (420, "light"), (420, "dark")):
+                browser.set_window_size(width, 760)
+                time.sleep(0.3)
+                got = browser.execute_script(fits)
+                check(f"at {width} CSS px, {theme}: the panel is inside the window, nothing cut", got["inside"] and not got["cut"], got)
+                shot_themed(browser, f"check-sound-{width}-{theme}", theme)
+            browser.set_window_size(1100, 800)
+            played, got = test_sound(window, browser, heard=False)
+            check("« Jouer un son de test » plays on the run's output", played == {"kitokey_e2e_quiet"}, played)
+            check("not heard on the meeting's side: said, and what to do",
+                  dict(got["shown"]).get("check-missed") == "Kitokey n’a pas entendu le son de test. Vérifiez que le son sort de cet ordinateur et pas d’un autre appareil, puis rejouez-le.", got)
+            gone = wait_for(browser, lambda b: "Stream/Output/Audio" not in kitokey_streams(window), 2)
+            check("the test sound played, its stream is gone", gone, kitokey_streams(window))
+            played, got = test_sound(window, browser, heard=True)
+            check("heard on the meeting's side: said", dict(got["shown"]).get("check-heard") == "Kitokey entend le son de cet ordinateur." and "check-missed" not in dict(got["shown"]), got)
+            shot_themed(browser, "check-sound-heard-light", "light")
+            # A call holds a microphone: an application of its own, recording it.
+            call = subprocess.Popen(["pw-record", "--target", "kitokey_e2e_check_mic", str(WORK / "call-check.wav")])
+            try:
+                held = wait_for(browser, lambda b: "check-call" in dict(b.execute_script(panel)["shown"]), 8)
+                got = browser.execute_script(panel)
+                check("a call holds a microphone: no test sound, the sentence of the board, alone — no headset's",
+                      held and got["play"] and dict(got["shown"]).get("check-call") == "Un appel tient le micro\u00a0: pas de son de test, il partirait dans l’appel. Faites jouer un son dans l’appel et regardez la jauge."
+                      and "check-bluetooth" not in dict(got["shown"]), got)
+                shot_themed(browser, "check-sound-call-light", "light")
+                refused = browser.execute_script("return window.__TAURI__.core.invoke('sound_check_mark')")
+                check("the shell refuses a test sound while a call holds a microphone", refused == {"marked": False}, refused)
+                # Closed and opened again, « Jouer un son de test » pressed at once, the call still held: nothing plays.
+                press(browser, "check-sound-close")
+                wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3)
+                press(browser, "check-sound-open")
+                browser.execute_script("document.getElementById('check-play').click()")
+                time.sleep(1.0)
+                outputs = [kind for kind in kitokey_streams(window) if kind == "Stream/Output/Audio"]
+                check("pressed at once while a call holds a microphone: no sound, no stream on the output", outputs == [] and not played_to(window), [outputs, played_to(window)])
+            finally:
+                call.terminate()
+                call.wait(timeout=5)
+            freed = wait_for(browser, lambda b: not b.execute_script(panel)["play"], 8)
+            check("the call gone, the test sound is offered again", freed and "check-call" not in dict(browser.execute_script(panel)["shown"]), browser.execute_script(panel))
+            took = closed_within(window, browser, lambda b: press(b, "check-sound-close"))
+            check("closed by ×: no stream of Kitokey's left within one second", took is not None and took <= 1.0, took)
+            check("capture was told « stop »", (WORK / "listen-told").is_file() and (WORK / "listen-told").read_text() == "stop\n")
+            # The streams go before the panel: it waits for capture's end, then leaves.
+            gone_back = "return [document.getElementById('check-sound') === null, document.activeElement.id]"
+            wait_for(browser, lambda b: b.execute_script(gone_back) == [True, "check-sound-open"], 3)
+            back = browser.execute_script(gone_back)
+            check("the panel is gone, the focus back on its button", back == [True, "check-sound-open"], back)
+            opened(browser)
+            took = closed_within(window, browser, lambda b: ActionChains(b).send_keys(Keys.ESCAPE).perform())
+            check("closed by Escape: no stream of Kitokey's left within one second", took is not None and took <= 1.0, took)
+            # A close sent before the shell counted the opening — the opening's answer held back 0.6 s —:
+            # nothing of it is left once it answers.
+            browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                   " asked === 'sound_check_open' ? new Promise((done) => setTimeout(done, 600)).then(() => real.invoke(asked, ...rest))"
+                                   " : real.invoke(asked, ...rest) }; window.restoreInvoke = () => { window.__TAURI__.core = real; };")
+            press(browser, "check-sound-open")
+            press(browser, "check-sound-close")
+            closed_early = time.monotonic()
+            time.sleep(0.8)
+            none_left = wait_for(None, lambda b: kitokey_streams(window) == [], 1.0)
+            check("closed before its opening was counted: no stream of Kitokey's left within a second of the opening's answer",
+                  none_left, [kitokey_streams(window), time.monotonic() - closed_early])
+            browser.execute_script("window.restoreInvoke()")
+            ended = WORK / "listen-ended"
+            # A recording started elsewhere — the tray — while the panel shows: capture stops listening
+            # within a second, before it records, and the panel goes.
+            (WORK / "recorder-args").unlink(missing_ok=True)
+            opened(browser)
+            ended.unlink(missing_ok=True)
+            asked = time.time()
+            tray_click("Démarrer")
+            started = wait_for(None, lambda b: (WORK / "recorder-args").is_file() and ended.is_file(), 5)
+            check("a recording started from the tray while the panel shows: capture stopped listening within a second, before it records",
+                  started and float(ended.read_text()) - asked <= 1.0 and float(ended.read_text()) <= (WORK / "recorder-args").stat().st_mtime,
+                  [started, ended.is_file() and float(ended.read_text()) - asked])
+            check("the panel goes with its listening", wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3))
+            # Stopped past the half-second in which a second press is the same gesture (toggle_recording).
+            time.sleep(0.7)
+            browser.execute_script("window.__TAURI__.core.invoke('record')")
+            stopped = wait_for(browser, lambda b: not b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 8)
+            check("the recording from the tray stopped", stopped)
+            # A panel that stops asking — its page gone, as a crash leaves it —: the shell gives its listening up.
+            # Opened once the stopped recording has let go: until then the panel is refused, as it must be.
+            for _ in range(8):
+                (WORK / "listen-args").unlink(missing_ok=True)
+                opened(browser)
+                if wait_for(None, lambda b: (WORK / "listen-args").is_file(), 2):
+                    break
+                press(browser, "check-sound-close")
+                time.sleep(1)
+            ended.unlink(missing_ok=True)
+            browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                   " asked === 'sound_check_now' ? new Promise(() => {}) : real.invoke(asked, ...rest) }; window.restoreInvoke = () => { window.__TAURI__.core = real; };")
+            asked = time.time()
+            given_up = wait_for(None, lambda b: ended.is_file(), 5)
+            check("a panel that stops asking: its listening given up within 2.5 s", given_up and float(ended.read_text()) - asked <= 2.5,
+                  ended.is_file() and float(ended.read_text()) - asked)
+            browser.execute_script("window.restoreInvoke()")
+            check("asking again, the panel finds nothing open and goes", wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3))
+            # A recording started from the panel: the panel goes, capture stops listening before it records.
+            (WORK / "recorder-args").unlink(missing_ok=True)
+            opened(browser)
+            press(browser, "check-record")
+            started = wait_for(browser, lambda b: (WORK / "recorder-args").is_file(), 8)
+            check("« Démarrer un enregistrement » from the panel starts the recording, the panel closed",
+                  started and (WORK / "recorder-args").read_text().startswith("record ") and browser.execute_script("return document.getElementById('check-sound') === null"))
+            check("capture stopped listening before it records", (WORK / "listen-ended").is_file())
+            wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 5)
+            refused = browser.execute_script("return window.__TAURI__.core.invoke('sound_check_open')")
+            check("never listening while a recording runs", refused == {"opened": False}, refused)
+            browser.execute_script("window.__TAURI__.core.invoke('record')")
+            wait_for(browser, lambda b: not b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 8)
+        # Its window destroyed with the panel open — the full window replaced by the bar —: the shell
+        # ends the listening on the window's end, within a second; the page can say nothing then. The
+        # driver's window is the one destroyed: what it says of that is not this check's.
+        ended = WORK / "listen-ended"
+        asked, gone = None, False
+        try:
+            with Window(sessions, "fr_FR.UTF-8") as browser:
+                browser.execute_script("location.hash = '#/settings'")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "check-sound-open"), 8)
+                opened(browser)
+                ended.unlink(missing_ok=True)
+                asked = time.time()
+                try:
+                    browser.execute_script("window.__TAURI__.core.invoke('small_window')")
+                except (NoSuchWindowException, WebDriverException):
+                    pass
+                gone = wait_for(None, lambda b: ended.is_file(), 3)
+        except (NoSuchWindowException, WebDriverException):
+            gone = gone or ended.is_file()
+        check("its window destroyed with the panel open: capture stops listening within a second",
+              asked is not None and gone and float(ended.read_text()) - asked <= 1.0, asked and ended.is_file() and float(ended.read_text()) - asked)
+        # The bar hidden with the panel open in it (D90 opens it there): the page hidden closes the panel
+        # under WebKitGTK (`visibilitychange`), and capture stops listening within a second.
+        with Window(sessions, "fr_FR.UTF-8", small=True) as browser:
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-hide").is_displayed(), 8)
+            browser.execute_script("checkSound(words, null)")
+            wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("me"), 5)
+            ended = WORK / "listen-ended"
+            ended.unlink(missing_ok=True)
+            asked = time.time()
+            # The panel is modal: the bar's own « Masquer la barre » is asked as its button asks it.
+            browser.execute_script("window.__TAURI__.core.invoke('bar_hide')")
+            gone = wait_for(None, lambda b: ended.is_file(), 3)
+            check("the bar hidden with the panel open: capture stops listening within a second",
+                  gone and float(ended.read_text()) - asked <= 1.0, ended.is_file() and float(ended.read_text()) - asked)
+        flag("headset").unlink(missing_ok=True)
+        with Window(sessions, "en_US.UTF-8") as browser:
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "check-sound-open"), 8)
+            got = opened(browser)
+            check("in English: the panel's words; no headset, no Bluetooth sentence",
+                  got and got["title"] == "Check the sound" and "check-bluetooth" not in dict(got["shown"]), got)
+            note = browser.execute_script("return document.querySelector('#check-sound .check-note').textContent")
+            check("the microphone's note, in English", note == "The microphone stays open as long as this panel is.", note)
+            press(browser, "check-sound-close")
+    finally:
+        subprocess.run(["pactl", "unload-module", mic], capture_output=True)
 
 
 def bar_window(now: dt.datetime) -> None:
@@ -7177,6 +7454,7 @@ def main() -> int:
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
+    sound_checked(now)
     bar_window(now)
     meeting_named(now)
     word_after_a_gap(now)

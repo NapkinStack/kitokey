@@ -307,3 +307,57 @@ fn a_close_while_a_listening_opens_wins() {
     });
     assert!(!slot.lock().unwrap().is_open(), "the listening started meanwhile is not kept");
 }
+
+#[test]
+fn a_listening_started_for_a_panel_closed_meanwhile_is_gone_when_the_opening_answers() {
+    let folder = tempfile::tempdir().unwrap();
+    let program = {
+        let _held = spawning();
+        let path = folder.path().join("kitokey-capture");
+        fs::write(&path, format!("#!/bin/bash\necho $$ > \"$(dirname \"$0\")/pid\"\n{LISTENS}\n")).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    };
+    let recording: Mutex<Option<()>> = Mutex::new(None);
+    let slot = Mutex::new(Slot::default());
+    std::thread::scope(|scope| {
+        let opening = scope.spawn(|| {
+            open(&recording, &slot, "main", || {
+                let _held = spawning();
+                let started = SoundCheck::start(&program, None);
+                // Its program running, the panel closes before it is stored.
+                std::thread::sleep(Duration::from_millis(300));
+                started
+            })
+        });
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(slot.lock().unwrap().take().is_none());
+        assert!(matches!(opening.join().unwrap(), Err(Refused::Closed)));
+    });
+    let pid = fs::read_to_string(folder.path().join("pid")).unwrap().trim().to_string();
+    assert!(
+        !Path::new(&format!("/proc/{pid}")).exists(),
+        "the program started meanwhile is gone"
+    );
+}
+
+#[test]
+fn no_test_sound_is_marked_while_a_call_holds_a_microphone() {
+    let folder = tempfile::tempdir().unwrap();
+    let program = script(folder.path());
+    let (recording, slot) = (Mutex::new(None::<()>), Mutex::new(Slot::default()));
+    open(&recording, &slot, "main", || {
+        let _held = spawning();
+        SoundCheck::start(&program, None)
+    })
+    .unwrap();
+    // A call holds a microphone: refused, nothing listened to for a sound that must not play.
+    assert!(!slot.lock().unwrap().mark(true));
+    assert_eq!(slot.lock().unwrap().asked().unwrap().test, None);
+    // None: marked.
+    assert!(slot.lock().unwrap().mark(false));
+    assert_eq!(slot.lock().unwrap().asked().unwrap().test, Some(false));
+    slot.lock().unwrap().take().unwrap().stop();
+    // Nothing open: nothing marked.
+    assert!(!slot.lock().unwrap().mark(false));
+}

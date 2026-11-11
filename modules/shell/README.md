@@ -106,6 +106,16 @@ recording; a device arriving opens nothing, and is there when the name is opened
 — macOS, Windows — no list is offered. A name gone: capture says so and Auto stands in, the window and a
 notification say it, until capture says it is back.
 
+**« Vérifier le son »** (D88, [board 7](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/7-check-the-sound-light.png)),
+from *Settings*, opens a panel over the page: capture listens (`recording/v1`, *Listening*) only while
+it shows — each side's device and an 8 px meter; the microphone's stream active, so that a Bluetooth
+headset switches to its call profile, said in one sentence when capture says `headset`. « Jouer un son
+de test » plays two short notes on the system's output, drawn by the page — no file, no library —, and
+says whether the meeting's side rose above silence; never while an application holds a microphone (the
+graph D30 already reads): a call would hear it. « Démarrer un enregistrement » closes it, capture having
+stopped listening first; ×, Escape, its window hidden or a recording started from anywhere end it too. A
+panel that stops asking — it asks ten times a second — is taken for gone within about two seconds.
+
 **The first start** (D58, [its board](../../docs/project/drawings/d58-the-first-run/)) opens the
 full window on a short assistant, once — with `--window` or not, started with the session too: one
 question, are the meetings confidential; a second, who writes the minutes, only for « Rarement ou

@@ -27,6 +27,22 @@ const SILENT: &[(&str, usize, &str)] = &[
     ),
     ("recording_now", 1, "returns no `Result`: it cannot fail"),
     (
+        "sound_check_open",
+        1,
+        "returns no `Result`: false, nothing opened — the panel says it; it cannot fail otherwise",
+    ),
+    ("sound_check_now", 2, "returns no `Result`: it cannot fail"),
+    (
+        "sound_check_mark",
+        1,
+        "returns no `Result`: a refusal is `marked: false`, and then nothing plays — the call's sentence says why",
+    ),
+    (
+        "sound_check_close",
+        2,
+        "returns no `Result`: it cannot fail, and ends what it can — the panel's close, and a close of what opened after the panel closed",
+    ),
+    (
         "model_fetch",
         2,
         "returns no `Result`: how the fetch goes is said where it is shown",
