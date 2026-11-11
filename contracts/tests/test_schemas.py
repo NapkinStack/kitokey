@@ -522,6 +522,43 @@ EXAMPLES = {
     ),
 }
 
+# A meeting's own models (D91): the shell's file, said in session-audio/v3 and read for a meeting of
+# any version.
+EXAMPLES["session-audio/v3/models.schema.json"] = (
+    [
+        {},
+        {"transcription": {"engine": "whisper", "model": "ggml-large-v3-turbo-q8_0.bin"}},
+        {"transcription": {"engine": "speechanalyzer"}},
+        {
+            "transcription": {
+                "engine": "service",
+                "provider": "https://api.groq.com/openai/v1",
+                "model": "whisper-large-v3",
+            }
+        },
+        {"minutes": {"provider": "http://localhost:11434/v1", "model": "qwen3:8b"}},
+        {
+            "transcription": {"engine": "whisper", "model": "ggml-small-q8_0.bin"},
+            "minutes": {"provider": "https://openrouter.ai/api/v1", "model": "anthropic/claude-sonnet"},
+        },
+    ],
+    [
+        "a file that is no object",
+        {"transcription": {"engine": "whisper"}},
+        {"transcription": {"engine": "whisper", "model": ""}},
+        {"transcription": {"engine": "whisper", "model": "ggml-small.bin\n"}},
+        {"transcription": {"engine": "service", "model": "whisper-1"}},
+        {"transcription": {"engine": "service", "provider": "https://api.openai.com/v1"}},
+        {"transcription": {"engine": "another", "model": "m"}},
+        {"transcription": {"model": "ggml-small-q8_0.bin"}},
+        {"transcription": "ggml-small-q8_0.bin"},
+        {"minutes": {"provider": "http://localhost:11434/v1"}},
+        {"minutes": {"model": "qwen3:8b"}},
+        {"minutes": {"provider": "", "model": "qwen3:8b"}},
+        {"minutes": {"provider": "http://localhost:11434/v1", "model": 8}},
+    ],
+)
+
 # session-audio/v3's documents are v2's, named v3: what changes is the file a stopped track is kept
 # in, which no schema reads; a document named v2 is refused by v3's schema.
 for _name in ("session.schema.json", "clock.schema.json"):
@@ -633,3 +670,17 @@ def test_recording_v1_shows_listening_say_whether_me_is_a_headset_s():
     # `me`'s first device says it is a headset's; `others`' says nothing of it.
     assert lines[0] == {**lines[0], "event": "device", "source": "me", "headset": True}
     assert lines[1]["event"] == "device" and "headset" not in lines[1]
+
+
+def test_session_audio_v3_shows_a_meetings_own_models_its_schema_allows():
+    reads = jsonschema.Draft202012Validator(json.loads((CONTRACTS / "session-audio/v3/models.schema.json").read_text()))
+    documents = [
+        json.loads(block) for block in shown("session-audio/v3/README.md", "Valid, a meeting whose own models")
+    ]
+    assert documents and [document for document in documents if not reads.is_valid(document)] == []
+    # Both steps chosen: who hears, with a model of this computer named by its file alone, and who writes.
+    assert {"transcription", "minutes"} <= documents[0].keys()
+    assert "/" not in documents[0]["transcription"]["model"]
+    # The page names the file, and v1's and v2's pages say a meeting of theirs may hold it too.
+    for version in ("v1", "v2", "v3"):
+        assert "| `models.json` |" in (CONTRACTS / f"session-audio/{version}/README.md").read_text()

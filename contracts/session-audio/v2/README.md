@@ -48,6 +48,7 @@ and nowhere else.
 | `confidential` | The shell, on the user's word; optional | Nothing: an empty file. Present, it asks that the meeting be transcribed and summarised on this computer alone. Only the shell reads it, and chooses who transcribes and who writes accordingly; the steps that follow need not read it |
 | `language` | The shell, on the user's word; optional | One line, UTF-8: the language the meeting is spoken in, a code of ISO 639-1 — `fr`, `en`. Absent, or a line that is not one such code, the meeting names no language of its own. Only the shell reads it, and tells the transcription the language spoken; the steps that follow need not read it |
 | `title.txt` | The shell, on the user's word; optional | One line, UTF-8, at most 80 characters: the name the user gave the meeting, plain text, shown as text, never read as markup or as a path. Absent, blank, or more than that one line, the meeting has no name given. It is the name shown before any other: the folder keeps its own. Only the shell reads it; the steps that follow need not read it |
+| `models.json` | The shell, on the user's word; optional | The models this meeting's own transcript and minutes are made with, as [version 3's page](../v3/README.md) says it and its `models.schema.json`: a meeting of this version may hold it. Only the shell reads it; the steps that follow need not read it |
 | `derived/` | Consumers; optional | Whatever they make from the tracks. Not described here: nothing in it is a source |
 
 **`session.json`**, UTF-8:

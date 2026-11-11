@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "models.json: the models a meeting's own transcript and minutes are made with",
+  "description": "session-audio/v3 — written by the shell on the user's word, read by the shell alone, for a meeting of any version. What a schema cannot say is on the contract's page: that a part absent is Settings' choice, that `confidential` comes first, and that a part this schema refuses reads as absent.",
+  "type": "object",
+  "properties": {
+    "transcription": {
+      "description": "Who hears the meeting: a Whisper model of this computer, named by its file alone; Apple's SpeechAnalyzer; or a service, at its address, with its model's name.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "engine": {
+              "const": "whisper"
+            },
+            "model": {
+              "$ref": "#/$defs/name"
+            }
+          },
+          "required": [
+            "engine",
+            "model"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "engine": {
+              "const": "speechanalyzer"
+            }
+          },
+          "required": [
+            "engine"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "engine": {
+              "const": "service"
+            },
+            "provider": {
+              "$ref": "#/$defs/name"
+            },
+            "model": {
+              "$ref": "#/$defs/name"
+            }
+          },
+          "required": [
+            "engine",
+            "provider",
+            "model"
+          ]
+        }
+      ]
+    },
+    "minutes": {
+      "description": "Who writes the minutes: a provider's address and its model's name, as kitokey-summary takes them.",
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/name"
+        },
+        "model": {
+          "$ref": "#/$defs/name"
+        }
+      },
+      "required": [
+        "provider",
+        "model"
+      ]
+    }
+  },
+  "$defs": {
+    "name": {
+      "description": "Text of one line, never empty: never a key, and for a Whisper model never a path.",
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    }
+  }
+}
