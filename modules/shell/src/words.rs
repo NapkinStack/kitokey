@@ -538,6 +538,24 @@ pub struct Window {
     pub microphones_unread: &'static str,
     pub microphone_not_kept: &'static str,
     pub small_microphone_gone: &'static str,
+    /// « Vérifier le son » (D88, board 7): its title, and its row in Settings.
+    pub check_sound: &'static str,
+    pub check_sound_says: &'static str,
+    /// A source capture could not open; none named yet.
+    pub check_unavailable: &'static str,
+    /// The microphone listened to is a Bluetooth headset's: its call profile while the panel shows.
+    pub check_bluetooth: &'static str,
+    /// The test sound, and what was heard of it: on the meeting's side, or not, and what to do.
+    pub check_play: &'static str,
+    pub check_heard: &'static str,
+    pub check_not_heard: &'static str,
+    /// A call holds a microphone: no test sound, it would reach the call.
+    pub check_call: &'static str,
+    pub check_open_note: &'static str,
+    pub check_close: &'static str,
+    /// It could not listen; or a recording runs.
+    pub check_failed: &'static str,
+    pub check_recording: &'static str,
     /// Freeing space (D11's third board).
     pub free: &'static str,
     pub free_what: &'static str,
@@ -936,6 +954,18 @@ pub fn window(language: Language) -> Window {
             microphones_unread: "The list cannot be read for now: Auto still works. Open it again in a moment.",
             microphone_not_kept: "Your choice of microphone could not be kept: choose it again.",
             small_microphone_gone: "The microphone you chose is not there: Auto stands in.",
+            check_sound: "Check the sound",
+            check_sound_says: "Your microphone and the meeting’s sound, before a recording.",
+            check_unavailable: "Unavailable",
+            check_bluetooth: "While this panel is open, your Bluetooth headset switches to call quality; it comes back once it is closed.",
+            check_play: "Play a test sound",
+            check_heard: "Kitokey hears this computer’s sound.",
+            check_not_heard: "Kitokey did not hear the test sound. Check that the sound comes out of this computer and not another device, then play it again.",
+            check_call: "A call holds the microphone: no test sound, it would go into the call. Play a sound in the call and watch the meter.",
+            check_open_note: "The microphone stays open as long as this panel is.",
+            check_close: "Close",
+            check_failed: "Kitokey cannot listen to your microphone or the meeting’s sound for now: close this panel and open it again.",
+            check_recording: "A recording is running: its meters are in the bar.",
             free: "Free space",
             free_what: "What do you want to remove?",
             free_audio: [
@@ -1325,6 +1355,18 @@ pub fn window(language: Language) -> Window {
             microphones_unread: "La liste ne peut pas être lue pour l’instant\u{a0}: Auto fonctionne toujours. Rouvrez-la dans un instant.",
             microphone_not_kept: "Votre choix de micro n’a pas pu être gardé\u{a0}: choisissez-le de nouveau.",
             small_microphone_gone: "Le micro choisi n’est pas là\u{a0}: Auto le remplace.",
+            check_sound: "Vérifier le son",
+            check_sound_says: "Votre micro et le son de la réunion, avant un enregistrement.",
+            check_unavailable: "Indisponible",
+            check_bluetooth: "Tant que ce panneau est ouvert, votre casque Bluetooth passe en qualité d’appel\u{202f}; il revient à la fermeture.",
+            check_play: "Jouer un son de test",
+            check_heard: "Kitokey entend le son de cet ordinateur.",
+            check_not_heard: "Kitokey n’a pas entendu le son de test. Vérifiez que le son sort de cet ordinateur et pas d’un autre appareil, puis rejouez-le.",
+            check_call: "Un appel tient le micro\u{a0}: pas de son de test, il partirait dans l’appel. Faites jouer un son dans l’appel et regardez la jauge.",
+            check_open_note: "Le micro reste ouvert tant que ce panneau l’est.",
+            check_close: "Fermer",
+            check_failed: "Kitokey ne peut écouter ni votre micro ni le son de la réunion pour l’instant\u{a0}: fermez ce panneau et rouvrez-le.",
+            check_recording: "Un enregistrement est en cours\u{a0}: ses jauges sont dans la barre.",
             free: "Faire de la place",
             free_what: "Que voulez-vous retirer\u{202f}?",
             free_audio: [

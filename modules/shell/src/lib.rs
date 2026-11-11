@@ -25,6 +25,7 @@ pub mod recording;
 pub mod registry;
 pub mod sessions;
 pub mod settings;
+pub mod sound_check;
 pub mod speech;
 pub mod spoken;
 pub mod summarising;

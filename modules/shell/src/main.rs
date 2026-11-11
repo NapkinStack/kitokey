@@ -42,7 +42,7 @@ use kitokey_shell::{
     registry,
     sessions::{self, Listed},
     settings::{self, After, Engine, KeepAudio, Log, Settings},
-    speech, spoken,
+    sound_check, speech, spoken,
     summarising::{self, Summarising},
     transcription::{self, Hearer, Made, Transcription},
     trial,
@@ -171,6 +171,10 @@ struct Shell {
     refused: Mutex<bool>,
     /// A licence that could not be read was said in the log: once (D83).
     licence_unread: Mutex<bool>,
+    /// « Vérifier le son » (D88): capture listening while the panel shows (`sound_check::Slot`).
+    sound_check: Mutex<sound_check::Slot>,
+    /// The applications that hold a microphone now, as the graph says (D30): a call — no test sound then.
+    holders: Mutex<std::collections::BTreeSet<u64>>,
 }
 
 impl Shell {
@@ -303,10 +307,28 @@ fn main() {
         }))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        // « Vérifier le son »'s window destroyed with the panel open: its listening goes with it, within
+        // the second capture promises (D88) — stopped off the window's thread. A window hidden closes
+        // the panel itself (`visibilitychange`, `ui/window.js`).
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event
+                && let Some(shell) = window.app_handle().try_state::<Shell>()
+                && let Some(gone) = shell.sound_check.lock().unwrap().of_window(window.label())
+            {
+                std::thread::spawn(move || {
+                    gone.stop();
+                    tracing::info!("shell.sound_check_closed");
+                });
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             listed,
             microphones_listed,
             microphone_chosen,
+            sound_check_open,
+            sound_check_now,
+            sound_check_mark,
+            sound_check_close,
             model_fetch,
             model_offered_fetch,
             registry_refresh,
@@ -490,6 +512,8 @@ fn main() {
                 fetched: Mutex::new(None),
                 refused: Mutex::new(false),
                 licence_unread: Mutex::new(false),
+                sound_check: Mutex::default(),
+                holders: Mutex::default(),
             });
             // The trial's first day, kept at the first start on a trial licence (PDR-0005).
             let shell = app.state::<Shell>();
@@ -551,6 +575,10 @@ fn offers(app: &AppHandle) {
     let offers = Mutex::new(microphone::Offers::default());
     microphone::watch(move |change| {
         let shell = app.state::<Shell>();
+        match &change {
+            microphone::Change::Took { key, .. } => shell.holders.lock().unwrap().insert(*key),
+            microphone::Change::Let { key } => shell.holders.lock().unwrap().remove(key),
+        };
         let recording = shell.recording.lock().unwrap().is_some();
         if let Some(name) = offers.lock().unwrap().on(&change, recording, shell.settings().offer) {
             offer_recording(&app, name);
@@ -1229,6 +1257,103 @@ fn microphone_chosen(shell: State<'_, Shell>, name: Option<String>, description:
     tracing::info!(auto = settings.microphone.is_none(), "shell.microphone_chosen");
     *shell.settings.lock().unwrap() = settings;
     Ok(())
+}
+
+/// « Vérifier le son » opened (D88): capture listens, the microphone the user chose or Auto, for the
+/// window that asked. Never beside a recording — its meters are the bar's —: refused then, nothing opened.
+#[tauri::command]
+async fn sound_check_open(app: AppHandle, window: tauri::WebviewWindow) -> SoundCheckOpened {
+    let shell = app.state::<Shell>();
+    let microphone = shell.settings().microphone;
+    let program = program("kitokey-capture", "KITOKEY_CAPTURE");
+    let opened = sound_check::open(&shell.recording, &shell.sound_check, window.label(), || {
+        sound_check::SoundCheck::start(&program, microphone.as_deref())
+    });
+    let before = match opened {
+        Ok(before) => before,
+        // A recording runs; or the panel closed while its listening started — stopped already.
+        Err(sound_check::Refused::Recording | sound_check::Refused::Closed) => return SoundCheckOpened { opened: false },
+        Err(sound_check::Refused::NotStarted(error)) => {
+            tracing::error!(detail = %error, "shell.sound_check_failed");
+            return SoundCheckOpened { opened: false };
+        }
+    };
+    tracing::info!(auto = microphone.is_none(), "shell.sound_check_opened");
+    if let Some(before) = before {
+        before.stop();
+    }
+    // A panel that no longer asks — its page gone — leaves nothing open.
+    let watched = app.clone();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(Duration::from_millis(250));
+            let shell = watched.state::<Shell>();
+            let mut slot = shell.sound_check.lock().unwrap();
+            if !slot.is_open() {
+                return;
+            }
+            if let Some(gone) = slot.abandoned(SOUND_CHECK_UNASKED) {
+                drop(slot);
+                tracing::info!("shell.sound_check_abandoned");
+                gone.stop();
+                return;
+            }
+        }
+    });
+    SoundCheckOpened { opened: true }
+}
+
+/// Whether the panel's capture listens: not while a recording runs, nor when it could not be started.
+#[derive(serde::Serialize)]
+struct SoundCheckOpened {
+    opened: bool,
+}
+
+/// How long a panel may go without asking what is heard before it is taken for gone: it asks ten times a second.
+const SOUND_CHECK_UNASKED: Duration = Duration::from_secs(2);
+
+/// What the panel shows now (D88): each side's device and level, a headset's, the test sound heard, and
+/// whether a call holds a microphone — no test sound then, it would reach the call.
+#[derive(serde::Serialize)]
+struct SoundChecked {
+    open: bool,
+    heard: sound_check::Heard,
+    call: bool,
+}
+
+#[tauri::command]
+fn sound_check_now(shell: State<'_, Shell>) -> SoundChecked {
+    let heard = shell.sound_check.lock().unwrap().asked();
+    SoundChecked {
+        open: heard.is_some(),
+        heard: heard.unwrap_or_default(),
+        call: !shell.holders.lock().unwrap().is_empty(),
+    }
+}
+
+/// A test sound is about to play (D88): the meeting's side is listened to for it from now on.
+#[tauri::command]
+fn sound_check_mark(shell: State<'_, Shell>) {
+    let slot = shell.sound_check.lock().unwrap();
+    if slot.is_open() {
+        tracing::info!("shell.sound_check_test");
+        slot.mark();
+    }
+}
+
+/// The panel closed (D88): capture stops listening, and has ended when this answers.
+#[tauri::command]
+async fn sound_check_close(app: AppHandle) {
+    let _ = tauri::async_runtime::spawn_blocking(move || sound_check_stopped(&app)).await;
+}
+
+/// Ends the listening, if any, and waits for it: before a recording starts, and when the panel closes.
+fn sound_check_stopped(app: &AppHandle) {
+    let check = app.state::<Shell>().sound_check.lock().unwrap().take();
+    if let Some(check) = check {
+        check.stop();
+        tracing::info!("shell.sound_check_closed");
+    }
 }
 
 /// From the full window to the small one, at rest or recording (D35). Asynchronous, as is
@@ -2981,6 +3106,8 @@ fn start_recording(app: &AppHandle, owner: licence::Owner) {
         let _ = app.run_on_main_thread(move || show_full(&handle));
         return;
     }
+    // Never listening during a recording (`recording/v1`): the panel's capture ends first (D88).
+    sound_check_stopped(app);
     if let Err(error) = sessions::writable(&sessions) {
         tracing::error!(detail = %error, "shell.sessions_refused");
         return tell(

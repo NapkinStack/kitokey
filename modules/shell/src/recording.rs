@@ -117,7 +117,7 @@ impl Devices {
 /// Above this, a level is sound: about -40 dB of the loudest a side can be, under a voice and
 /// over the nothing of a side at rest (`recording/v1` says 0 is silence, and no more). The silence
 /// a user is told of stays capture's own measure (`silent`).
-const ABOVE_SILENCE: f32 = 0.33;
+pub const ABOVE_SILENCE: f32 = 0.33;
 
 /// What the small window says of a side being heard (D49).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Serialize)]
