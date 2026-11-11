@@ -50,6 +50,7 @@ and nowhere else.
 | `confidential` | The shell, on the user's word; optional | Nothing: an empty file. Present, it asks that the meeting be transcribed and summarised on this computer alone. Only the shell reads it, and chooses who transcribes and who writes accordingly; the steps that follow need not read it |
 | `language` | The shell, on the user's word; optional | One line, UTF-8: the language the meeting is spoken in, a code of ISO 639-1 — `fr`, `en`. Absent, or a line that is not one such code, the meeting names no language of its own. Only the shell reads it, and tells the transcription the language spoken; the steps that follow need not read it |
 | `title.txt` | The shell, on the user's word; optional | One line, UTF-8, at most 80 characters: the name the user gave the meeting, plain text, shown as text, never read as markup or as a path. Absent, blank, or more than that one line, the meeting has no name given. It is the name shown before any other: the folder keeps its own. Only the shell reads it; the steps that follow need not read it |
+| `models.json` | The shell, on the user's word; optional | The models this meeting's own transcript and minutes are made with, below — only what the user chose for it. Only the shell reads it, and names who hears and who writes accordingly; the steps that follow need not read it |
 | `derived/` | Consumers; optional | Whatever they make from the tracks. Not described here: nothing in it is a source |
 
 **`session.json`**, UTF-8:
@@ -60,6 +61,32 @@ and nowhere else.
 | `started` | string | The instant 0 of the session's clock: ISO 8601 with the local offset |
 | `stopped` | string, absent while recording | When the recording was stopped. **Absent means: still recording, or ended by a crash** |
 | `tracks` | object | For each track the session holds — `local`, `remote` — `device`: the name the system gave the source when the recording started, or when its track was gained (*A track gained later*); `changed`, when the source was recorded from another device after it: each change, in order, as `at`, seconds on the session's clock as `clock.jsonl`'s, and `device`, the name of the device from then on — `null` when the system named none, the call let go of the microphone or its stream failed: **a gap**, nothing coming from the source (*What a consumer reads*). A source that could not be opened has **no entry and no file**, unless it gains a track later |
+
+**`models.json`**, UTF-8, a JSON object ([`models.schema.json`](./models.schema.json)), on the user's word — the
+meeting's own choice, never Settings' (cycle 09's D91):
+
+| Field | Meaning |
+|---|---|
+| `transcription`, optional | Who hears the meeting: `{"engine": "whisper", "model": …}`, a Whisper model of this computer named by its file's name alone, never a path — no `/` nor `\`, never `.` or `..`; `{"engine": "speechanalyzer"}`, Apple's SpeechAnalyzer; or `{"engine": "service", "provider": …, "model": …}`, a service's address as `kitokey-transcription --provider` takes it, and its model's name |
+| `minutes`, optional | Who writes the minutes: `provider`, an address as `kitokey-summary` takes it, and `model`, the model's name as it knows it |
+
+- **A part absent is Settings' choice**, as they are when the meeting is made or made again; a file absent is
+  both. A part the schema refuses — an engine it does not name, a field missing — reads as absent, and the
+  rest of the file still reads; a file that is no JSON object reads as no file.
+- **The meeting's alone.** Settings are never changed by it, nor it by Settings.
+- **`confidential` comes first**: a meeting said confidential is heard and written on this computer alone, whatever
+  this file names.
+- **Never a key**: whether a service may be sent the meeting is asked as it is for Settings' choice.
+- **It names, it points nowhere**: a model's file and a service's address say who makes the transcript and the
+  minutes; no reader follows them to find the session, which is all in its folder, as version 1 says.
+- **A field it does not name is left aside** — a `model` beside `speechanalyzer` among them: the objects stay
+  open for what a later change adds.
+- **What it names may be gone** — a model removed, a service no longer set —: the file says what was chosen, never
+  that it can still be used.
+- **Written whole** — a file beside, renamed over it — once `session.json` is there, and replaced whole when the
+  choice changes; what the transcript and the minutes were made with is what they say themselves, their own
+  `model` (`transcript/v1`, `minutes/v3`).
+- **A meeting of any version** may hold it: versions 1 and 2's pages say so, and point here.
 
 **A track** is a WAV file while it is recorded — a FLAC file once compressed, below —, PCM, 24 bits, at the sample rate and with the channels its source
 delivered — read from the file's own header, never assumed: 48,000 samples a second in two
@@ -247,6 +274,14 @@ alone:
 {"track": "local", "sample": 2008224, "at": 43.012}
 {"track": "local", "sample": 2248224, "at": 48.012}
 {"track": "local", "sample": 2343648, "at": 51.012}
+```
+
+Valid, a meeting whose own models were chosen: heard by a smaller Whisper model of this computer, its minutes
+written by Ollama on it; Settings name others.
+
+```json
+{"transcription": {"engine": "whisper", "model": "ggml-small-q8_0.bin"},
+ "minutes": {"provider": "http://localhost:11434/v1", "model": "qwen3:8b"}}
 ```
 
 To refuse: a folder whose `session.json` is missing or names another `contract`; a track
