@@ -3095,6 +3095,52 @@ function showSmall(words) {
   named(stop, words.record_stop);
   stop.addEventListener("click", () => asking(stop, words.record_stopping, false, words.record_stop));
   const time = element("span", "time", "00:00:00");
+  // The context typed before the start (D91, board 5): in the row at rest, the shell keeps it for the
+  // next recording until it is cleared — its ✕, or emptied —, said under the row while one is kept.
+  // Enter in it starts the recording. Recording, the options' field is the meeting's own (D59).
+  const nextField = element("span", "next-context");
+  const nextText = element("input", "next-context-text");
+  nextText.type = "text";
+  nextText.id = "small-next-context";
+  nextText.autocomplete = "off";
+  nextText.placeholder = words.bar_context;
+  nextText.setAttribute("aria-label", words.context_label);
+  nextText.setAttribute("aria-describedby", "small-context-kept");
+  const clear = iconButton("x", words.bar_context_clear, "small-context-clear");
+  nextField.append(nextText, clear);
+  const keptNext = element("p", "says", words.bar_context_kept);
+  keptNext.id = "small-context-kept";
+  const paintNext = () => {
+    clear.hidden = nextText.value === "";
+    keptNext.hidden = recording !== false || nextText.value === "";
+  };
+  // Each change kept in turn: Enter starts once the last one is.
+  let keeping = Promise.resolve();
+  const keepNext = () => {
+    const text = nextText.value;
+    paintNext();
+    keeping = keeping
+      .then(() => invoke("next_context_kept", { text }))
+      // Refused once a recording runs, the field gone with the rest: nothing to say then.
+      .then(() => smallSaid("context", null), () => recording === false && smallSaid("context", words.context_not_saved));
+  };
+  // Never more than the shell takes, counted as it counts: in characters (D59).
+  nextText.addEventListener("input", () => {
+    const typed = [...nextText.value];
+    if (typed.length > CONTEXT_MOST) nextText.value = typed.slice(0, CONTEXT_MOST).join("");
+    keepNext();
+  });
+  nextText.addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter" || event.isComposing || start.hidden || start.disabled) return;
+    event.preventDefault();
+    await keeping;
+    start.click();
+  });
+  clear.addEventListener("click", () => {
+    nextText.value = "";
+    keepNext();
+    nextText.focus();
+  });
   // « Plus d’options » (D90): what is rarer, under the row; Escape closes it.
   const more = iconButton("chevron-down", words.bar_more, "small-more");
   more.setAttribute("aria-controls", "small-options");
@@ -3102,7 +3148,8 @@ function showSmall(words) {
   const hide = iconButton("minus", words.bar_hide, "small-hide");
   hide.addEventListener("click", () => invoke("bar_hide"));
   const row = element("div", "bar-row");
-  row.append(handle, time, element("span", "bar-space"), start, stop, more, toFull, hide);
+  const space = element("span", "bar-space");
+  row.append(handle, nextField, time, space, start, stop, more, toFull, hide);
   // No title bar (D90, board 8): the bar is moved by its handle, or its row anywhere but a control.
   row.addEventListener("mousedown", (event) => {
     if (event.button === 0 && !event.target.closest("button, input, textarea, select")) invoke("bar_drag");
@@ -3349,8 +3396,7 @@ function showSmall(words) {
   note.id = "small-note";
   note.hidden = true;
   // The meeting's context (D59), in the options while recording: kept as it is typed, once the
-  // meeting's folder holds its session. At rest, the next meeting's (D91): the shell keeps it until
-  // the user clears it, and writes it as the meeting's own once its folder holds its session.
+  // meeting's folder holds its session.
   const meeting = { name: null, saved: null, typed: null, refused: null };
   // What could not be kept: it outlasts the recording (D67).
   const unkept = new Map();
@@ -3378,26 +3424,15 @@ function showSmall(words) {
       smallSaid("context", words.context_not_saved);
     }
   };
-  const keepNext = async (text) => {
-    try {
-      await invoke("next_context_kept", { text });
-      smallSaid("context", null);
-    } catch {
-      smallSaid("context", words.context_not_saved);
-    }
-  };
   const field = contextField(words, "", (text) => {
-    if (!recording) return keepNext(text);
     meeting.typed = text;
     keep();
   }, "small-context");
   field.area.rows = 2;
   field.area.placeholder = words.context_label;
   field.area.setAttribute("aria-label", words.context_label);
-  const keptNext = element("p", "says", words.bar_context_kept);
-  keptNext.id = "small-context-kept";
   const opened = element("div", "small-context");
-  opened.append(field.area, field.count, keptNext);
+  opened.append(field.area, field.count);
   // Said confidential (D60), under the microphone in the options; kept as it is turned, once the
   // meeting's folder holds its session.
   const secret = confidentialSwitch(words, "small-confidential");
@@ -3427,7 +3462,7 @@ function showSmall(words) {
   live.append(opened, micNext, secret.row, note);
   live.hidden = true;
   const lines = element("div", "bar-lines");
-  lines.append(announce, ...checks.map((check) => check.sentence), unkeptSaid);
+  lines.append(keptNext, announce, ...checks.map((check) => check.sentence), unkeptSaid);
   const options = element("div", "bar-options");
   options.id = "small-options";
   options.append(rest, live, advanced);
@@ -3474,8 +3509,11 @@ function showSmall(words) {
       named(start, words.record_start);
       stop.disabled = false;
       named(stop, words.record_stop);
-      start.hidden = recording;
-      stop.hidden = time.hidden = meters.hidden = !recording;
+      start.hidden = nextField.hidden = recording;
+      stop.hidden = time.hidden = meters.hidden = space.hidden = !recording;
+      // At rest, what the shell keeps for the next recording; taken by this one, recording (D91).
+      if (!recording) nextText.value = (await invoke("next_context").catch(() => ({ text: "" }))).text;
+      paintNext();
       // At rest, the bar is its row: the recording's lines go with it (the ticks stop at the stop).
       if (!recording) {
         for (const check of checks) check.sentence.hidden = true;
@@ -3485,23 +3523,18 @@ function showSmall(words) {
       const dot = handle.querySelector(".dot");
       dot.setAttribute("r", recording ? "2.2" : "1.6");
       dot.setAttribute("cy", recording ? "6.2" : "5.6");
-      // Each recording its own context: nothing of the one before. Recording, the field shows what was
-      // typed before the start — the shell writes it as the meeting's —; at rest, what is kept for the next.
+      // Each recording its own context: nothing of the one before.
       Object.assign(meeting, { name: null, saved: null, typed: null, refused: null });
       mark.wanted = null;
       secret.box.checked = false;
       secret.row.classList.remove("on");
-      if (!recording) field.area.value = (await invoke("next_context").catch(() => ({ text: "" }))).text;
+      field.area.value = "";
       field.painted();
-      keptNext.hidden = recording;
-      field.area.setAttribute("aria-describedby", recording ? field.count.id : `${field.count.id} ${keptNext.id}`);
       rest.hidden = recording;
       live.hidden = !recording;
-      // The context first, then the microphone, in each state's options, as board 6 has them.
-      if (recording) {
-        live.prepend(opened);
-        opened.after(microphone);
-      } else rest.prepend(opened, microphone);
+      // The microphone in each state's options: recording, after the context, as board 6 has it.
+      if (recording) opened.after(microphone);
+      else rest.prepend(microphone);
       // No list where capture lists none: nothing to change, nothing said of it.
       micNext.hidden = !recording || microphone.hidden;
       // Each state opens closed: the row alone.

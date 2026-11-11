@@ -96,7 +96,7 @@ the stop; then it comes back to rest. While recording, the row holds a thin mete
 (D49, D90), named by what it records from; a side silent two minutes is said in a grey line under
 the row — the recording goes on —, a microphone that sends nothing or a side with no device at
 once, and ■ stays where it is as they come. « Plus d’options » opens, under the row ([board 6](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/6-bar-opened-light.png)),
-at rest the next meeting's context (D91), the microphone, « Vérifier le son » and « Avancé »; recording, the context, the microphone —
+at rest the microphone, « Vérifier le son » and « Avancé »; recording, the context, the microphone —
 the one recorded, a change being for the next recording —, « Confidentielle » and what follows the
 stop, then « Avancé ». « Avancé » is closed by default and says, until D91 offers a meeting's own
 models, that each meeting takes Settings', with a way to them. Escape closes the options. One window at a time: going from one
@@ -133,11 +133,12 @@ screen. The window left (`window`) is not changed by it.
 is about, who takes part — is written in the window: while recording, the small window's *Ajouter
 le contexte*, closed by default, and the meeting's page, the one being recorded too — there, the
 first of the meeting's settings row (D89), opened from it beside the spoken language and
-*Confidentielle*. Before the start, the bar's options at rest hold the next meeting's (D91): kept by
-the shell for the next recording until the user clears it, and said so — never closed by another
-meeting being made —, it is written, whichever gesture starts the recording, as the new meeting's
-own once its folder holds `session.json`; it waits in `next-context.txt` beside the settings, Kitokey
-started again too. It is kept as
+*Confidentielle*. Before the start, the bar's row at rest holds the next meeting's (D91, [board 5](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/5-bar-light.png)):
+kept by the shell for the next recording until the user clears it — its ✕, or emptied —, said under
+the row while one is kept, never closed by another meeting being made; Enter in it starts the
+recording. Whichever gesture starts it, the shell writes it as the new meeting's own once its folder
+holds `session.json`, and takes none for the next while a recording runs. It waits in
+`next-context.txt` beside the settings, Kitokey started again too. It is kept as
 it is typed as the meeting's `context.txt` (`contracts/session-audio/v2`), written whole through a
 file beside it and only once the folder holds `session.json`; 400 characters at most, counted as
 characters; another script than Latin or Cyrillic is said, Whisper keeping only the last 224

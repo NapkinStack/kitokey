@@ -1674,10 +1674,15 @@ fn next_file() -> Option<PathBuf> {
 }
 
 /// The bar's field at rest written (D91): kept for the next recording, under D59's 400 characters.
-/// Never closed by a making: no meeting is made from it before it starts.
+/// Never closed by a making: no meeting is made from it before it starts. Refused while a recording
+/// runs — a key typed as the tray or the shortcut starts one would be the meeting after's —, what
+/// is kept staying as it is.
 #[tauri::command]
 fn next_context_kept(shell: State<'_, Shell>, text: String) -> Result<(), Told> {
     let mut next = shell.next_context.lock().unwrap();
+    if shell.recording.lock().unwrap().is_some() {
+        return Err(shell.told(Failure::Busy, "a recording runs: no context is kept for the next"));
+    }
     let file = next_file().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for settings"))?;
     context::keep_next(&file, &text).map_err(|error| shell.told(Failure::MeetingFile, error))?;
     *next = text;
