@@ -2918,9 +2918,10 @@ function showAgreement(name, agreement, words, session) {
 // « Vérifier le son » (D88, board 7): a modal panel over the page that opened it. capture listens only
 // while it shows: each side's device and an 8 px meter, a headset's sentence, a test sound and what was
 // heard of it — never while a call holds a microphone —, and a recording started from here. Closed by ×,
-// Escape or the recording, the listening ends with it, and the focus goes back to `back`.
+// Escape or the recording, the listening ends with it, and the focus goes back to `back` — or, `back`
+// hidden meanwhile, to what `lost` gives it (the bar's state's own gesture).
 let checking = null;
-async function checkSound(words, back) {
+async function checkSound(words, back, lost) {
   if (checking) return;
   const dialog = element("dialog", "check-sound");
   dialog.id = "check-sound";
@@ -2995,6 +2996,7 @@ async function checkSound(words, back) {
     if (then) await then();
     // Its button, as the page is now: drawn again meanwhile, it is found by its id.
     else (document.getElementById(back?.id) ?? back)?.focus();
+    lost?.();
   };
   checking = end;
   close.addEventListener("click", () => end());
@@ -3226,6 +3228,14 @@ function showSmall(words) {
     if (event.button === 0 && !event.target.closest("button, input, textarea, select")) invoke("bar_drag");
   });
   const rest = element("div", "small-rest");
+  // The focus on something shown, or else the state's own gesture — ■ recording, ● at rest (#754): after
+  // each change of state, and once « Vérifier le son »'s panel has closed, whichever ends first. The
+  // options never fold under a focus of theirs but at a change of state: Escape and their chevron leave
+  // it on « Plus d’options ».
+  const refocus = () => {
+    const at = document.activeElement;
+    if (!at || at === document.body || at.getClientRects().length === 0) (recording ? stop : start).focus();
+  };
   let open = false;
   const unfoldOptions = (now, back) => {
     open = now;
@@ -3374,7 +3384,7 @@ function showSmall(words) {
   checkButton.id = "small-check";
   checkButton.append(icon("audio-lines"), element("span", "", words.check_sound));
   checkButton.addEventListener("click", () => {
-    checkSound(words, checkButton);
+    checkSound(words, checkButton, refocus);
     const panel = document.getElementById("check-sound");
     if (!panel) return;
     fits.observe(panel);
@@ -3653,14 +3663,10 @@ function showSmall(words) {
       unfoldOptions(false, false);
       if (!recording) paintKeys();
       // Opened at rest, the recording's gesture has the focus; after, a focus left on nothing — ● or ■
-      // gone with its state, « Vérifier le son »'s panel closed by its start — follows to the state's
-      // own gesture, as the full window's button gives it back (`paintRecord`).
-      // « Vérifier le son »'s panel, open when a recording started elsewhere — the tray, the shortcut —,
-      // closed now: the focus it held is then on nothing, and follows (#754).
-      if (checking) await checking();
-      const at = document.activeElement;
+      // gone with its state, a control of the options hidden with them — follows to the state's own
+      // gesture, as the full window's button gives it back (`paintRecord`).
       if (first && !recording) start.focus();
-      else if (!first && (!at || at === document.body || at.getClientRects().length === 0)) (recording ? stop : start).focus();
+      else if (!first) refocus();
     }
     paintModelsKept();
     if (!recording) {
