@@ -111,7 +111,7 @@ pub fn read(folder: &Path) -> Models {
 }
 
 /// Whether every part is one the contract allows: what is written is what `read` reads back.
-fn allowed(models: &Models) -> bool {
+pub fn allowed(models: &Models) -> bool {
     let hearing = models.transcription.as_ref().is_none_or(|chosen| match chosen {
         Hearing::Whisper { model } => file(model),
         Hearing::SpeechAnalyzer => true,

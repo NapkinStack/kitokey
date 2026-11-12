@@ -163,6 +163,16 @@ Settings' choice and is said (`meeting_models_shown`'s `gone`), as a microphone 
 gives way to Auto (D74). A part the contract refuses reads as absent, and is never written. `confidential` is read after: whatever the file names, a
 confidential meeting is heard and written on this computer alone.
 
+They are chosen in **« Avancé »** ([board 6](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/6-bar-opened-light.png)),
+closed by default, the same in the bar opened and in each *Refaire…*: two lists, the transcription's
+model and the minutes', each « Celui des Réglages — … » first, then the Whisper models listed,
+SpeechAnalyzer where Settings hear by it, the service Settings set, and Ollama's models here
+(`models_offered`); a confidential meeting is offered no service. At rest, the choice is the next
+recording's (`next_models_kept`, in memory): its `models.json` once its folder holds `session.json`,
+then none for the one after. Recording, it is that meeting's at once. In *Refaire…* it is kept once
+*Refaire* is pressed — *Annuler* changes nothing —, then the transcript is made again by them
+(`transcript_redo_own`) or the minutes. A model gone is said on the meeting's page and in « Avancé ».
+
 **A meeting said confidential** (D60, [its board](../../docs/project/drawings/d60-confidential/)) is
 made on this computer alone, whatever the settings name — its own models too.
 

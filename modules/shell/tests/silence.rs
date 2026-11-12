@@ -73,7 +73,7 @@ const SILENT: &[(&str, usize, &str)] = &[
         2,
         "an offer: returns `Ok` on what it reads, and is simply absent otherwise",
     ),
-    ("URL", 6, "no command: an address that does not parse is shown as it was typed"),
+    ("URL", 7, "no command: an address that does not parse is shown as it was typed"),
     ("audio.play", 1, "no command: its handler is the player's own"),
 ];
 

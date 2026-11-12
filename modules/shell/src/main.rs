@@ -70,6 +70,8 @@ struct Shell {
     /// The context typed in the bar before the start, kept for the next recording until the user
     /// clears it, in `next_file` too (D91): taken by the meeting begun, whichever gesture starts it.
     next_context: Mutex<String>,
+    /// The models chosen in the bar at rest for the next recording (D91): its own once it starts.
+    next_models: Mutex<meeting_models::Models>,
     /// The menu's entry that starts and stops, relabelled as the recording goes.
     toggle: MenuItem<Wry>,
     /// The user asked to quit while a recording ran: it is stopped first, then Kitokey leaves.
@@ -262,6 +264,9 @@ impl Shell {
 enum Again {
     Model(PathBuf),
     Settings,
+    /// By whoever the meeting's own models name, else Settings — the transcript alone: *Refaire…*
+    /// once « Avancé » chose (D91).
+    Own,
 }
 
 /// Where the tray is in the life of a recording.
@@ -364,6 +369,9 @@ fn main() {
             language_set,
             meeting_models_shown,
             meeting_models_chosen,
+            models_offered,
+            next_models_kept,
+            transcript_redo_own,
             title_saved,
             confidential_set,
             transcript_redo,
@@ -474,6 +482,7 @@ fn main() {
                 recording: Mutex::new(None),
                 recorded: Mutex::new(None),
                 next_context: Mutex::new(next_file().map(|file| context::read_next(&file)).unwrap_or_default()),
+                next_models: Mutex::new(meeting_models::Models::default()),
                 toggle,
                 leaving: Mutex::new(false),
                 pressed: Mutex::new(None),
@@ -1088,6 +1097,14 @@ fn transcript_redo(app: AppHandle, shell: State<'_, Shell>, name: String, model:
     retranscribe(&app, folder, Again::Model(model)).map_err(|(failure, detail)| shell.told(failure, detail))
 }
 
+/// *Refaire…* on a transcript (D91): made again by whoever the meeting's own models name — chosen
+/// in its « Avancé » —, else Settings; the transcript alone, its minutes left as they are.
+#[tauri::command]
+fn transcript_redo_own(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    retranscribe(&app, folder, Again::Own).map_err(|(failure, detail)| shell.told(failure, detail))
+}
+
 /// *Try again*, on a meeting whose transcript was not made: as it was last asked — made again
 /// with the model a Refaire… picked, the transcript there kept until the new one is whole.
 #[tauri::command]
@@ -1459,6 +1476,8 @@ struct Opened {
     /// system's language when neither the meeting nor the settings name one (D64, D65).
     apple: bool,
     system_language: &'static str,
+    /// The steps whose own model is gone (D91): Settings' choice makes them, said on the page.
+    models_gone: Vec<meeting_models::Step>,
 }
 
 #[tauri::command]
@@ -1483,7 +1502,14 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         meeting_language: shell.settings().meeting_language,
         apple: shell.settings().engine == Engine::SpeechAnalyzer,
         system_language: shell.system.code(),
+        models_gone: gone_of(&shell.settings(), &folder),
     })
+}
+
+/// The steps whose own model a meeting chose and cannot have now (D91).
+fn gone_of(settings: &Settings, folder: &Path) -> Vec<meeting_models::Step> {
+    let chosen = meeting_models::read(folder);
+    meeting_models::applied(settings, &chosen, &settings::whisper_models(&models_folder(), settings)).gone
 }
 
 /// The language a meeting is spoken in, said on its page (D65): a code written, or none removed —
@@ -1515,10 +1541,101 @@ struct OwnModels {
 #[tauri::command]
 fn meeting_models_shown(shell: State<'_, Shell>, name: String) -> Result<OwnModels, Told> {
     let folder = session_folder(&shell, &name)?;
-    let settings = shell.settings();
     let chosen = meeting_models::read(&folder);
-    let gone = meeting_models::applied(&settings, &chosen, &settings::whisper_models(&models_folder(), &settings)).gone;
-    Ok(OwnModels { chosen, gone })
+    Ok(OwnModels {
+        chosen,
+        gone: gone_of(&shell.settings(), &folder),
+    })
+}
+
+/// What « Avancé » offers (D91), for a meeting or — none named — the next recording: Settings'
+/// choice first, then the Whisper models of this computer, SpeechAnalyzer where Settings hear by it,
+/// the service Settings set, and Ollama's models here. A meeting said confidential is offered no
+/// service: it is made here alone, whatever is chosen (D60).
+#[derive(serde::Serialize)]
+struct ModelsOffered {
+    engine: Engine,
+    /// Settings' Whisper model, by its file's name.
+    model: String,
+    transcription_provider: Option<String>,
+    transcription_model: Option<String>,
+    minutes_provider: Option<String>,
+    minutes_model: Option<String>,
+    whisper: Vec<String>,
+    apple: bool,
+    service: Option<(String, String)>,
+    ollama_address: String,
+    ollama: Vec<String>,
+    confidential: bool,
+    chosen: meeting_models::Models,
+    gone: Vec<meeting_models::Step>,
+}
+
+#[tauri::command]
+fn models_offered(shell: State<'_, Shell>, name: Option<String>) -> Result<ModelsOffered, Told> {
+    let settings = shell.read_or_told()?;
+    let (chosen, gone, confidential) = match &name {
+        Some(name) => {
+            let folder = session_folder(&shell, name)?;
+            (
+                meeting_models::read(&folder),
+                gone_of(&settings, &folder),
+                confidential::marked(&folder),
+            )
+        }
+        None => {
+            let chosen = shell.next_models.lock().unwrap().clone();
+            let listed = settings::whisper_models(&models_folder(), &settings);
+            (chosen.clone(), meeting_models::applied(&settings, &chosen, &listed).gone, false)
+        }
+    };
+    let file_name = |path: &Path| path.file_name().map(|name| name.to_string_lossy().into_owned());
+    let base = ollama();
+    let service = settings
+        .transcription_provider
+        .clone()
+        .zip(settings.transcription_model.clone())
+        .filter(|_| !confidential);
+    Ok(ModelsOffered {
+        engine: settings.engine,
+        model: file_name(&settings.model).unwrap_or_default(),
+        whisper: settings::whisper_models(&models_folder(), &settings)
+            .iter()
+            .filter_map(|path| file_name(path))
+            .collect(),
+        apple: settings.engine == Engine::SpeechAnalyzer,
+        service,
+        ollama_address: providers::ollama_address(&base),
+        ollama: providers::ollama_models(&base),
+        transcription_provider: settings.transcription_provider,
+        transcription_model: settings.transcription_model,
+        minutes_provider: settings.minutes_provider,
+        minutes_model: settings.minutes_model,
+        confidential,
+        chosen,
+        gone,
+    })
+}
+
+/// The models chosen in the bar at rest, for the next recording (D91): taken by it once its folder
+/// holds its session, then none. A part the contract refuses is refused; refused while a recording
+/// runs — that one's own are written to it.
+#[tauri::command]
+fn next_models_kept(shell: State<'_, Shell>, chosen: meeting_models::Models) -> Result<(), Told> {
+    let mut next = shell.next_models.lock().unwrap();
+    if shell.recording.lock().unwrap().is_some() {
+        return Err(shell.told(Failure::Busy, "a recording runs: its own models are its meeting's"));
+    }
+    if !meeting_models::allowed(&chosen) {
+        return Err(shell.told(Failure::Unexpected, "a part the contract session-audio/v3 refuses"));
+    }
+    *next = chosen;
+    tracing::info!(
+        transcription = next.transcription.is_some(),
+        minutes = next.minutes.is_some(),
+        "shell.next_models_kept"
+    );
+    Ok(())
 }
 
 /// The models a meeting is made with from now on, chosen in « Avancé » (D91): written whole, a
@@ -3253,6 +3370,13 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
                 Err(error) => tracing::error!(kind = ?error.kind(), "shell.context_not_taken"),
             }
             drop(next);
+            // The models chosen at rest, the meeting's own the same way; then none for the next.
+            let models = std::mem::take(&mut *shell.next_models.lock().unwrap());
+            if models != meeting_models::Models::default()
+                && let Err(error) = meeting_models::write(folder, &models)
+            {
+                tracing::error!(kind = ?error.kind(), "shell.models_not_taken");
+            }
             *shell.recorded.lock().unwrap() = Some(folder.clone());
             *shell.meter.lock().unwrap() = (Some(Instant::now()), [0.0, 0.0]);
             small_recording(app, true);
@@ -3417,14 +3541,14 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
             return Err((Failure::ModelAbsent, "no model on this computer".to_string()));
         }
         Again::Model(model) => (Hearer::Model(model.clone()), None),
-        Again::Settings => hearer_now(&shell, &settings, &folder),
+        Again::Settings | Again::Own => hearer_now(&shell, &settings, &folder),
     };
     if let Hearer::Model(model) = &hearer
         && !model.is_file()
     {
         // Made again by the settings' Whisper, its default model missing: it waits for it and the
         // model is offered, as for a first transcript.
-        if again == Again::Settings && *model == Settings::default().model {
+        if matches!(again, Again::Settings | Again::Own) && *model == Settings::default().model {
             drop(running);
             wait(&shell, folder, Some(again));
             if !*shell.fetching.lock().unwrap() {
