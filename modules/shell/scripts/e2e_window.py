@@ -3211,6 +3211,21 @@ def bar_opened(now: dt.datetime) -> None:
                 return True
             keys(browser, Keys.TAB)
         return browser.execute_script(focused) == "small-more"
+    def answered_late(browser, late: dict) -> None:
+        # The shell's answers to the commands named, given that many ms late (0 for none): the page's own calls
+        # go through it; `__invoked` calls the shell at once.
+        browser.execute_script(
+            "if (!window.__invoked) { const t = window.__TAURI__; const core = t.core; window.__invoked = core.invoke.bind(core);"
+            " const late = Object.assign(Object.create(Object.getPrototypeOf(core)), core, {invoke: (c, a, o) => window.__late[c]"
+            " ? new Promise((r) => setTimeout(r, window.__late[c])).then(() => window.__invoked(c, a, o)) : window.__invoked(c, a, o)});"
+            " const top = Object.assign({}, t, {core: late}); try { window.__TAURI__ = top; } catch (x) {}"
+            " if (window.__TAURI__ !== top) Object.defineProperty(window, '__TAURI__', {configurable: true, writable: true, value: top}); }"
+            " window.__late = arguments[0];", late)
+    def unfold(browser) -> bool:
+        # The options opened whatever a step before left: each check after holds on its own.
+        if browser.execute_script("return document.getElementById('small-options').hidden"):
+            browser.execute_script("document.getElementById('small-more').click()")
+        return wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
     def fit(browser, what: str) -> None:
         holds = lambda got: (got["scroll"][0] <= got["scroll"][1] and got["scroll"][2] <= got["scroll"][3] and not got["out"] and not got["cut"]
                              and got["size"][0] == 440 and abs(got["size"][1] - got["page"]) <= 1)
@@ -3336,6 +3351,76 @@ def bar_opened(now: dt.datetime) -> None:
                     wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 8)
                     got = browser.execute_script("return [document.getElementById('small-advanced').getAttribute('aria-expanded'), document.getElementById('small-advanced-panel').hidden]")
                     check(f"{name}: « {said['advanced']} », open while recording, is closed once at rest", got == ["false", True], got)
+                    # Escape in the row folds the options too (board 5, #757): from « Plus d’options » itself,
+                    # the focus kept there; from the context's field, its text and the focus kept.
+                    reached = to_more(browser)
+                    keys(browser, Keys.ENTER)
+                    wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
+                    keys(browser, Keys.ESCAPE)
+                    folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44 and b.execute_script(focused) == "small-more", 3)
+                    check(f"{name}: Escape on « Plus d’options », opened, folds the options, the focus kept on it",
+                          reached and folded, [browser.execute_script("return innerHeight"), browser.execute_script(focused)])
+                    unfolded = unfold(browser)
+                    browser.execute_script("document.getElementById('small-next-context').focus()")
+                    keys(browser, "Point")
+                    # Whether the bar took the Escape, read on the document once its own listener has run.
+                    browser.execute_script("window.__escaped = []; document.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.__escaped.push(e.defaultPrevented); })")
+                    keys(browser, Keys.ESCAPE)
+                    # Folded to the row and the line saying the context kept: no longer 44 high.
+                    folded = wait_for(browser, lambda b: b.execute_script("return document.getElementById('small-options').hidden"), 3)
+                    got = browser.execute_script("const f = document.getElementById('small-next-context'); return [f.value, document.activeElement === f, window.__escaped]")
+                    check(f"{name}: Escape in the row's context folds the options, taken by the bar, its text and the focus kept", unfolded and folded and got == ["Point", True, [True]],
+                          [unfolded, browser.execute_script("return document.getElementById('small-options').hidden"), got])
+                    # The options closed, Escape in the row changes nothing and is left to whatever else hears it.
+                    browser.execute_script("window.__escaped = []")
+                    before = browser.execute_script("return [innerHeight, document.getElementById('small-options').hidden]")
+                    keys(browser, Keys.ESCAPE)
+                    got = browser.execute_script("const f = document.getElementById('small-next-context');"
+                                                 " return [innerHeight, document.getElementById('small-options').hidden, f.value, document.activeElement === f, window.__escaped]")
+                    check(f"{name}: the options closed, Escape in the row's context changes nothing, the key not taken", got == [*before, "Point", True, [False]], [before, got])
+                    browser.execute_script("document.getElementById('small-context-clear').click()")
+                    # A recording started elsewhere while « Vérifier le son » shows in the bar (#754): the panel
+                    # goes, capture stops listening, the focus follows to ■ — whichever of the panel's close and the
+                    # bar's tick ends first, each order forced by answering one of them late.
+                    for late in ({}, {"sound_check_close": 400}, {"recording_now": 300}, {"recording_now": 300, "sound_check_close": 400}):
+                        unfold(browser)
+                        browser.execute_script("document.getElementById('small-check').focus()")
+                        keys(browser, Keys.ENTER)
+                        wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("active"), 5)
+                        ended = WORK / "listen-ended"
+                        ended.unlink(missing_ok=True)
+                        answered_late(browser, late)
+                        # Half a second after the last press: a second within it is the same one (D68).
+                        time.sleep(0.6)
+                        browser.execute_script("window.__invoked('record')")
+                        started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed() and b.execute_script("return document.getElementById('check-sound') === null"), 8)
+                        # Held a while: a focus given back late by the panel's close must not take it away.
+                        time.sleep(1)
+                        got = [browser.execute_script(focused), ended.is_file()]
+                        answered_late(browser, {})
+                        check(f"{name}: a recording started elsewhere while « {said['check']} » shows, {' and '.join(f'{k} {v} ms late' for k, v in late.items()) or 'nothing late'}:"
+                              " the panel gone, capture no longer listening, the focus on ■", started and got == ["small-stop", True], [started, got])
+                        stop_from_small(browser)
+                        wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and b.execute_script(focused) == "small-record", 8)
+                    # Stopped elsewhere — the tray —, the focus on a control of the options recording, hidden at rest:
+                    # it follows to ●.
+                    tray = {"fr": ("Démarrer", "Arrêter"), "en": ("Start", "Stop")}[short]
+                    offered = lambda words: wait_for(None, lambda b: any(label.startswith(words) for label in tray_labels()), 5) and tray_click(words)
+                    for where in ("small-confidential", "small-context"):
+                        time.sleep(0.6)
+                        started = offered(tray[0]) and wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 8)
+                        browser.execute_script("document.getElementById('small-more').click()")
+                        wait_for(browser, lambda b: b.find_element(By.ID, where).is_displayed(), 3)
+                        browser.execute_script(f"document.getElementById('{where}').focus()")
+                        on = browser.execute_script(focused)
+                        # Where the focus went meanwhile, said if it fails.
+                        browser.execute_script("window.__went = []; document.addEventListener('focusin', (e) => window.__went.push(e.target.id || e.target.tagName))")
+                        time.sleep(0.6)
+                        stopped = offered(tray[1]) and wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 8)
+                        time.sleep(1)
+                        check(f"{name}: the focus on {where} recording, stopped from the tray: at rest, the focus on ●",
+                              started and on == where and stopped and browser.execute_script(focused) == "small-record",
+                              [started, on, stopped, browser.execute_script(focused), browser.execute_script("return [window.__went, document.hasFocus()]")])
     finally:
         listed.unlink(missing_ok=True)
         subprocess.run(["pactl", "unload-module", mic], capture_output=True)
