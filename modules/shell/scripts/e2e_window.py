@@ -2015,6 +2015,12 @@ def own_models(now: dt.datetime) -> None:
         check("Settings unchanged by the meeting's choice", window.file.read_text() == settings_before, window.file.read_text())
         said = browser.execute_script(shown, meeting.name)
         check("its choice shown, none gone", said == {"chosen": chosen, "gone": []}, said)
+        # Its page says which models made its transcript and its minutes (criterion 3).
+        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        makers = lambda b: b.execute_script("return [...document.querySelectorAll('.maker')].map(m => m.textContent)")
+        both = wait_for(browser, lambda b: len(makers(b)) >= 2, 10)
+        texts = " | ".join(makers(browser)).lower()
+        check("its page says the models that made its transcript and its minutes", both and "whisper tiny own" in texts and "mistral own" in texts, texts)
         # A Refaire… that picks Settings' own model — outside Kitokey's folder of models — is still offered
         # it, whatever the meeting chose: the models listed are Settings', never the meeting's overlay.
         hearing.unlink(missing_ok=True)
@@ -2043,12 +2049,6 @@ def own_models(now: dt.datetime) -> None:
               wrote and "other.example" not in read(writing) and not browser.execute_script("return location.hash").startswith("#/agree"), read(writing))
         wait_for(browser, lambda b: b.execute_script(idle), 15)
         browser.execute_script("return window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: arguments[1]})", meeting.name, chosen)
-        # Its page says which models made its transcript and its minutes (criterion 3).
-        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-        makers = lambda b: b.execute_script("return [...document.querySelectorAll('.maker')].map(m => m.textContent)")
-        both = wait_for(browser, lambda b: len(makers(b)) >= 2, 10)
-        texts = " | ".join(makers(browser)).lower()
-        check("its page says the models that made its transcript and its minutes", both and "whisper tiny own" in texts and "mistral own" in texts, texts)
         # The model removed: Settings' choice stands in, and it is said.
         own.unlink()
         said = browser.execute_script(shown, meeting.name)
