@@ -1526,7 +1526,15 @@ fn meeting_models_shown(shell: State<'_, Shell>, name: String) -> Result<OwnMode
 #[tauri::command]
 fn meeting_models_chosen(shell: State<'_, Shell>, name: String, chosen: meeting_models::Models) -> Result<(), Told> {
     let folder = session_folder(&shell, &name)?;
-    meeting_models::write(&folder, &chosen).map_err(|error| shell.told(Failure::MeetingFile, error))?;
+    meeting_models::write(&folder, &chosen).map_err(|error| {
+        // A choice the contract refuses, which « Avancé » never offers; else the folder.
+        let failure = if error.kind() == std::io::ErrorKind::InvalidInput {
+            Failure::Unexpected
+        } else {
+            Failure::MeetingFile
+        };
+        shell.told(failure, error)
+    })?;
     // Which steps are the meeting's own; their models are no word of a meeting, but stay out all the same.
     tracing::info!(
         transcription = chosen.transcription.is_some(),

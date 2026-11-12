@@ -155,10 +155,12 @@ it once the folder holds `session.json`, removed when none is left (`meeting_mod
 `src/meeting_models.rs` lays them over Settings each time the meeting is made or made again — its
 transcript, its minutes, *Réessayer*, *Refaire avec ce contexte* —; Settings are never written. A
 Whisper model is found by its file's name among the models this computer lists
-(`settings::whisper_models`), never joined to a folder; a service only if it is the one Settings
-set. One gone — removed, or the service no longer set — gives way to Settings' choice and is said
-(`meeting_models_shown`'s `gone`), as a microphone chosen and absent gives way to Auto (D74). A part
-the contract refuses reads as absent. `confidential` is read after: whatever the file names, a
+(`settings::whisper_models`), never joined to a folder; a service to hear only if it is the one
+Settings set; a provider to write only Settings' own — another of its models — or one on this
+computer, which sends nothing away: the agreement to send a meeting is never asked for a host
+Settings do not name. One gone — removed, a service no longer set, another host — gives way to
+Settings' choice and is said (`meeting_models_shown`'s `gone`), as a microphone chosen and absent
+gives way to Auto (D74). A part the contract refuses reads as absent, and is never written. `confidential` is read after: whatever the file names, a
 confidential meeting is heard and written on this computer alone.
 
 **A meeting said confidential** (D60, [its board](../../docs/project/drawings/d60-confidential/)) is

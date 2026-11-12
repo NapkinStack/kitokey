@@ -276,3 +276,150 @@ fn a_confidential_meeting_never_goes_to_a_service_whatever_the_file_names() {
         Hearer::Model(models.path().join("ggml-small-q8_0.bin"))
     );
 }
+
+#[test]
+fn a_provider_to_write_is_taken_only_when_settings_set_it_or_it_is_on_this_computer() {
+    let (models, listed) = installed(&["ggml-large-v3-turbo-q8_0.bin"]);
+    let settings = settings(models.path());
+    let minutes = |provider: &str, model: &str| Models {
+        transcription: None,
+        minutes: Some(writer(provider, model)),
+    };
+    // Another host than Settings': never sent there, nor its agreement asked — Settings write it.
+    let other = meeting_models::applied(&settings, &minutes("https://other.example/v1", "m"), &listed);
+    assert_eq!((other.settings, other.gone), (settings.clone(), vec![Step::Minutes]));
+    // Settings naming none: the same, none taken.
+    let unset = Settings {
+        minutes_provider: None,
+        minutes_model: None,
+        ..settings.clone()
+    };
+    let other = meeting_models::applied(&unset, &minutes("https://other.example/v1", "m"), &listed);
+    assert_eq!((other.settings, other.gone), (unset.clone(), vec![Step::Minutes]));
+    // Settings' own provider, with another of its models.
+    let same = meeting_models::applied(&settings, &minutes("https://openrouter.ai/api/v1", "openai/gpt-4.1-mini"), &listed);
+    assert_eq!(same.gone, vec![]);
+    assert_eq!(same.settings.minutes_provider.as_deref(), Some("https://openrouter.ai/api/v1"));
+    assert_eq!(same.settings.minutes_model.as_deref(), Some("openai/gpt-4.1-mini"));
+    // Ollama on this computer: nothing leaves it, whoever Settings name, or none.
+    for base in [&settings, &unset] {
+        let here = meeting_models::applied(base, &minutes(OLLAMA, "qwen3:8b"), &listed);
+        assert_eq!(here.gone, vec![]);
+        assert_eq!(here.settings.minutes_provider.as_deref(), Some(OLLAMA));
+        assert_eq!(here.settings.minutes_model.as_deref(), Some("qwen3:8b"));
+        assert_eq!(here.settings.minutes_agreed, base.minutes_agreed);
+    }
+}
+
+#[test]
+fn a_choice_the_contract_refuses_is_never_written() {
+    let folder = meeting_folder();
+    let kept = Models {
+        transcription: Some(whisper("ggml-small-q8_0.bin")),
+        minutes: None,
+    };
+    meeting_models::write(folder.path(), &kept).unwrap();
+    let before = fs::read(folder.path().join("models.json")).unwrap();
+    let service = |provider: &str, model: &str| Hearing::Service {
+        provider: provider.into(),
+        model: model.into(),
+    };
+    let refused = [
+        (Some(whisper("../../etc/passwd")), None),
+        (Some(whisper("C:\\m\\x.bin")), None),
+        (Some(whisper("")), None),
+        (Some(whisper(".")), None),
+        (Some(whisper("..")), None),
+        (Some(whisper("a\nb.bin")), None),
+        (Some(service("", "whisper-1")), None),
+        (Some(service(SERVICE, "")), None),
+        (Some(service(SERVICE, "a\nb")), None),
+        (None, Some(writer("", "qwen3:8b"))),
+        (None, Some(writer(OLLAMA, ""))),
+        (None, Some(writer(OLLAMA, "a\nb"))),
+        (None, Some(writer("http://localhost:11434/v1\r", "qwen3:8b"))),
+        (Some(whisper("ggml-small-q8_0.bin")), Some(writer(OLLAMA, ""))),
+    ];
+    for (transcription, minutes) in refused {
+        let chosen = Models { transcription, minutes };
+        let error = meeting_models::write(folder.path(), &chosen).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidInput, "{chosen:?}");
+        // The file there is left as it was, and nothing beside it.
+        assert_eq!(fs::read(folder.path().join("models.json")).unwrap(), before, "{chosen:?}");
+        assert_eq!(names(folder.path()), ["models.json", "session.json"], "{chosen:?}");
+    }
+}
+
+#[test]
+fn what_is_refused_by_the_contract_when_read_is_each_rule_of_its_names() {
+    let folder = meeting_folder();
+    let file = folder.path().join("models.json");
+    let cases = [
+        r#"{"transcription": {"engine": "service", "provider": "https://api.groq.com/openai/v1\nx", "model": "m"}}"#,
+        r#"{"transcription": {"engine": "service", "provider": "https://api.groq.com/openai/v1", "model": "a\rb"}}"#,
+        r#"{"transcription": {"engine": "whisper", "model": "ggml\nsmall.bin"}}"#,
+        r#"{"minutes": {"provider": "", "model": "m"}}"#,
+        r#"{"minutes": {"provider": "http://localhost:11434/v1", "model": ""}}"#,
+        r#"{"minutes": {"provider": "http://localhost:11434/v1", "model": "a\nb"}}"#,
+        r#"{"minutes": {"provider": "http://localhost:11434/v1"}}"#,
+    ];
+    for text in cases {
+        fs::write(&file, text).unwrap();
+        assert_eq!(meeting_models::read(folder.path()), Models::default(), "{text}");
+    }
+}
+
+#[test]
+fn a_failed_write_leaves_nothing_beside_the_file() {
+    let folder = meeting_folder();
+    // Something the file cannot be renamed over: the write fails, and its part goes with it.
+    fs::create_dir(folder.path().join("models.json")).unwrap();
+    fs::write(folder.path().join("models.json").join("kept"), b"x").unwrap();
+    let chosen = Models {
+        transcription: Some(Hearing::SpeechAnalyzer),
+        minutes: None,
+    };
+    assert!(meeting_models::write(folder.path(), &chosen).is_err());
+    assert_eq!(names(folder.path()), ["models.json", "session.json"]);
+}
+
+#[test]
+fn each_engine_chosen_is_the_one_heard_whatever_settings_name() {
+    let (models, listed) = installed(&["ggml-large-v3-turbo-q8_0.bin", "ggml-small-q8_0.bin", "my-ggml-tiny.bin"]);
+    // Settings hear by their service: the meeting's Whisper hears it all the same.
+    let service = Settings {
+        engine: Engine::Service,
+        ..settings(models.path())
+    };
+    assert!(matches!(Hearer::of(&service, "fr", || false), Hearer::Service { .. }));
+    let small = Models {
+        transcription: Some(whisper("ggml-small-q8_0.bin")),
+        minutes: None,
+    };
+    let applied = meeting_models::applied(&service, &small, &listed);
+    assert_eq!(applied.settings.engine, Engine::Whisper);
+    assert_eq!(
+        Hearer::of(&applied.settings, "fr", || false),
+        Hearer::Model(models.path().join("ggml-small-q8_0.bin"))
+    );
+    // SpeechAnalyzer chosen while Settings name Whisper.
+    let apple = Models {
+        transcription: Some(Hearing::SpeechAnalyzer),
+        minutes: None,
+    };
+    let applied = meeting_models::applied(&settings(models.path()), &apple, &listed);
+    assert_eq!((applied.settings.engine, applied.gone), (Engine::SpeechAnalyzer, vec![]));
+    assert_eq!(
+        Hearer::of(&applied.settings, "fr", || true),
+        Hearer::SpeechAnalyzer { language: "fr".into() }
+    );
+    // A name is the whole name: a file whose name ends with it is another file.
+    for name in ["ggml-tiny.bin", "tiny.bin", "small-q8_0.bin"] {
+        let chosen = Models {
+            transcription: Some(whisper(name)),
+            minutes: None,
+        };
+        let applied = meeting_models::applied(&settings(models.path()), &chosen, &listed);
+        assert_eq!(applied.gone, vec![Step::Transcription], "{name}");
+    }
+}

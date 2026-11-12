@@ -2015,6 +2015,34 @@ def own_models(now: dt.datetime) -> None:
         check("Settings unchanged by the meeting's choice", window.file.read_text() == settings_before, window.file.read_text())
         said = browser.execute_script(shown, meeting.name)
         check("its choice shown, none gone", said == {"chosen": chosen, "gone": []}, said)
+        # A Refaire… that picks Settings' own model — outside Kitokey's folder of models — is still offered
+        # it, whatever the meeting chose: the models listed are Settings', never the meeting's overlay.
+        hearing.unlink(missing_ok=True)
+        picked = browser.execute_script(
+            "return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]}).then(() => 'made', (why) => String(why))",
+            meeting.name, str(model))
+        redone = wait_for(browser, lambda b: str(model) in read(hearing), 15)
+        check("Refaire… with Settings' own model, beside the meeting's choice: made with it", picked == "made" and redone, (picked, read(hearing)))
+        wait_for(browser, lambda b: b.execute_script(idle), 20)
+        # A choice the contract refuses is refused, the file left as it was.
+        for wrong in ({"transcription": {"engine": "whisper", "model": "../../etc/passwd"}}, {"minutes": {"provider": local, "model": ""}}):
+            refused = browser.execute_script(
+                "return window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: arguments[1]}).then(() => 'kept', (why) => String(why))",
+                meeting.name, wrong)
+            check(f"a choice the contract refuses is refused, nothing written: {wrong}",
+                  refused != "kept" and json.loads((meeting / "models.json").read_text()) == chosen, refused)
+        # Another host than Settings' to write: Settings' writes it, and it is said gone.
+        other = {**chosen, "minutes": {"provider": "https://other.example/v1", "model": "m"}}
+        browser.execute_script("return window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: arguments[1]})", meeting.name, other)
+        said = browser.execute_script(shown, meeting.name)
+        check("a host to write that Settings do not name: said gone", said["gone"] == ["minutes"], said)
+        writing.unlink(missing_ok=True)
+        browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", meeting.name)
+        wrote = wait_for(browser, lambda b: "settings-writer" in read(writing), 15)
+        check("its minutes then written by Settings' model, no agreement asked for that host",
+              wrote and "other.example" not in read(writing) and not browser.execute_script("return location.hash").startswith("#/agree"), read(writing))
+        wait_for(browser, lambda b: b.execute_script(idle), 15)
+        browser.execute_script("return window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: arguments[1]})", meeting.name, chosen)
         # Its page says which models made its transcript and its minutes (criterion 3).
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         makers = lambda b: b.execute_script("return [...document.querySelectorAll('.maker')].map(m => m.textContent)")

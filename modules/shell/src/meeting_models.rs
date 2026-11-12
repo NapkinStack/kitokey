@@ -56,6 +56,8 @@ pub struct Models {
 pub enum Step {
     /// A Whisper model no longer listed, or a service no longer the one Settings set.
     Transcription,
+    /// A provider neither the one Settings set nor on this computer.
+    Minutes,
 }
 
 /// Settings as this meeting is made with them, and the steps whose own choice is gone.
@@ -77,17 +79,20 @@ fn file(text: &str) -> bool {
 
 fn hearing(value: &Value) -> Option<Hearing> {
     let hearing: Hearing = serde_json::from_value(value.clone()).ok()?;
-    let allowed = match &hearing {
-        Hearing::Whisper { model } => file(model),
-        Hearing::SpeechAnalyzer => true,
-        Hearing::Service { provider, model } => name(provider) && name(model),
+    let one = Models {
+        transcription: Some(hearing),
+        minutes: None,
     };
-    allowed.then_some(hearing)
+    allowed(&one).then_some(one.transcription).flatten()
 }
 
 fn writer(value: &Value) -> Option<Writer> {
     let writer: Writer = serde_json::from_value(value.clone()).ok()?;
-    (name(&writer.provider) && name(&writer.model)).then_some(writer)
+    let one = Models {
+        transcription: None,
+        minutes: Some(writer),
+    };
+    allowed(&one).then_some(one.minutes).flatten()
 }
 
 /// What the meeting chose: each part as the contract allows it, or none — a part refused reads as
@@ -105,13 +110,34 @@ pub fn read(folder: &Path) -> Models {
     }
 }
 
+/// Whether every part is one the contract allows: what is written is what `read` reads back.
+fn allowed(models: &Models) -> bool {
+    let hearing = models.transcription.as_ref().is_none_or(|chosen| match chosen {
+        Hearing::Whisper { model } => file(model),
+        Hearing::SpeechAnalyzer => true,
+        Hearing::Service { provider, model } => name(provider) && name(model),
+    });
+    hearing
+        && models
+            .minutes
+            .as_ref()
+            .is_none_or(|chosen| name(&chosen.provider) && name(&chosen.model))
+}
+
 /// The choice written whole — a file beside, renamed over it —; none left: removed. Refused before
-/// the folder holds `session.json` (`NotFound`).
+/// the folder holds `session.json` (`NotFound`), and for a part the contract refuses — a path for a
+/// Whisper model, an empty name, a line break (`InvalidInput`): nothing is written then.
 pub fn write(folder: &Path, models: &Models) -> io::Result<()> {
     if !folder.join("session.json").is_file() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
             "the meeting's folder holds no session.json yet",
+        ));
+    }
+    if !allowed(models) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "a part the contract session-audio/v3 refuses",
         ));
     }
     let target = folder.join(FILE);
@@ -131,8 +157,10 @@ pub fn write(folder: &Path, models: &Models) -> io::Result<()> {
 }
 
 /// Settings as the meeting is made with them: what it chose in place of Settings' choice, a
-/// Whisper model found by its name among `listed` — `settings::whisper_models` —, a service only
-/// the one Settings set. What cannot be used is Settings' choice, and named in `gone`.
+/// Whisper model found by its name among `listed` — `settings::whisper_models` —, a service to hear
+/// only the one Settings set, a provider to write only the one Settings set or one on this computer,
+/// which sends nothing away. What cannot be used is Settings' choice, and named in `gone`: the
+/// agreement to send a meeting is never asked for a host Settings do not name.
 pub fn applied(settings: &Settings, models: &Models, listed: &[PathBuf]) -> Applied {
     let mut made = settings.clone();
     let mut gone = Vec::new();
@@ -161,8 +189,12 @@ pub fn applied(settings: &Settings, models: &Models, listed: &[PathBuf]) -> Appl
         }
     }
     if let Some(Writer { provider, model }) = &models.minutes {
-        made.minutes_provider = Some(provider.clone());
-        made.minutes_model = Some(model.clone());
+        if settings.minutes_provider.as_deref() == Some(provider.as_str()) || crate::providers::local(provider) {
+            made.minutes_provider = Some(provider.clone());
+            made.minutes_model = Some(model.clone());
+        } else {
+            gone.push(Step::Minutes);
+        }
     }
     Applied { settings: made, gone }
 }
