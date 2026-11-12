@@ -423,3 +423,70 @@ fn each_engine_chosen_is_the_one_heard_whatever_settings_name() {
         assert_eq!(applied.gone, vec![Step::Transcription], "{name}");
     }
 }
+
+#[test]
+fn the_models_chosen_at_rest_are_kept_whole_beside_the_settings_and_read_again() {
+    let config = tempfile::tempdir().unwrap();
+    let file = config.path().join("kitokey").join("next-models.json");
+    // None kept: none read, and clearing none is no failure.
+    assert_eq!(meeting_models::read_next(&file), Models::default());
+    meeting_models::keep_next(&file, &Models::default()).unwrap();
+    let chosen = Models {
+        transcription: Some(whisper("ggml-small-q8_0.bin")),
+        minutes: Some(writer(OLLAMA, "qwen3:8b")),
+    };
+    meeting_models::keep_next(&file, &chosen).unwrap();
+    assert_eq!(meeting_models::read_next(&file), chosen);
+    assert_eq!(names(file.parent().unwrap()), ["next-models.json"]);
+    // A part the contract refuses: refused, what was kept stays as it was.
+    let refused = Models {
+        transcription: Some(whisper("../ggml-small-q8_0.bin")),
+        minutes: None,
+    };
+    assert_eq!(
+        meeting_models::keep_next(&file, &refused).unwrap_err().kind(),
+        ErrorKind::InvalidInput
+    );
+    assert_eq!(meeting_models::read_next(&file), chosen);
+    // Written by hand with a path: that part reads as absent, the other still reads.
+    fs::write(
+        &file,
+        r#"{"transcription": {"engine": "whisper", "model": "/tmp/ggml-small-q8_0.bin"}, "minutes": {"provider": "http://localhost:11434/v1", "model": "qwen3:8b"}}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        meeting_models::read_next(&file),
+        Models {
+            transcription: None,
+            minutes: Some(writer(OLLAMA, "qwen3:8b")),
+        }
+    );
+    // None left: the file goes, nothing beside it.
+    meeting_models::keep_next(&file, &Models::default()).unwrap();
+    assert!(names(file.parent().unwrap()).is_empty());
+}
+
+#[test]
+fn the_models_kept_for_the_next_are_the_meetings_own_once_it_holds_its_session_then_none() {
+    let chosen = Models {
+        transcription: Some(Hearing::SpeechAnalyzer),
+        minutes: Some(writer(OLLAMA, "qwen3:8b")),
+    };
+    // Not yet a session: refused, kept for the next.
+    let early = tempfile::tempdir().unwrap();
+    let mut next = chosen.clone();
+    assert_eq!(
+        meeting_models::taken(early.path(), &mut next).unwrap_err().kind(),
+        ErrorKind::NotFound
+    );
+    assert_eq!(next, chosen);
+    // Its session there: written as its own, none kept after.
+    let folder = meeting_folder();
+    meeting_models::taken(folder.path(), &mut next).unwrap();
+    assert_eq!(next, Models::default());
+    assert_eq!(meeting_models::read(folder.path()), chosen);
+    // None chosen: nothing written.
+    let other = meeting_folder();
+    meeting_models::taken(other.path(), &mut next).unwrap();
+    assert_eq!(names(other.path()), ["session.json"]);
+}

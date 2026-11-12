@@ -98,7 +98,11 @@ fn writer(value: &Value) -> Option<Writer> {
 /// What the meeting chose: each part as the contract allows it, or none — a part refused reads as
 /// absent, and a file that is no JSON object as no file.
 pub fn read(folder: &Path) -> Models {
-    let Some(object) = fs::read(folder.join(FILE))
+    read_file(&folder.join(FILE))
+}
+
+fn read_file(file: &Path) -> Models {
+    let Some(object) = fs::read(file)
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Map<String, Value>>(&bytes).ok())
     else {
@@ -140,20 +144,58 @@ pub fn write(folder: &Path, models: &Models) -> io::Result<()> {
             "a part the contract session-audio/v3 refuses",
         ));
     }
-    let target = folder.join(FILE);
+    whole(&folder.join(FILE), &folder.join(".models.json.part"), models)
+}
+
+/// `models` written whole at `target` — `beside` first, renamed over it —; none left: removed.
+fn whole(target: &Path, beside: &Path, models: &Models) -> io::Result<()> {
     if *models == Models::default() {
-        return match fs::remove_file(&target) {
+        return match fs::remove_file(target) {
             Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
             _ => Ok(()),
         };
     }
-    let beside = folder.join(".models.json.part");
     let text = serde_json::to_vec(models).map_err(io::Error::other)?;
-    let written = fs::write(&beside, text).and_then(|()| fs::rename(&beside, &target));
+    let written = fs::write(beside, text).and_then(|()| fs::rename(beside, target));
     if written.is_err() {
-        let _ = fs::remove_file(&beside);
+        let _ = fs::remove_file(beside);
     }
     written
+}
+
+/// The models chosen in the bar at rest for the next recording (D91), as read again when Kitokey
+/// starts: each part as the contract allows it, or none — as `read` reads a meeting's.
+pub fn read_next(file: &Path) -> Models {
+    read_file(file)
+}
+
+/// Keeps the models chosen at rest for the next recording — Kitokey started again too, as the
+/// context typed before the start is —: written whole, or removed when none is left. Refused for a
+/// part the contract refuses (`InvalidInput`): what was kept stays.
+pub fn keep_next(file: &Path, models: &Models) -> io::Result<()> {
+    if !allowed(models) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "a part the contract session-audio/v3 refuses",
+        ));
+    }
+    if *models != Models::default()
+        && let Some(folder) = file.parent()
+    {
+        fs::create_dir_all(folder)?;
+    }
+    whole(file, &file.with_extension("part"), models)
+}
+
+/// The models kept for the next recording, taken by the meeting begun: written as its own under
+/// `write`'s rules, none kept after; none chosen writes nothing. Refused — the folder holds no
+/// `session.json` yet —, they stay kept for the next.
+pub fn taken(folder: &Path, next: &mut Models) -> io::Result<()> {
+    let models = std::mem::take(next);
+    if models == Models::default() {
+        return Ok(());
+    }
+    write(folder, &models).inspect_err(|_| *next = models)
 }
 
 /// Settings as the meeting is made with them: what it chose in place of Settings' choice, a

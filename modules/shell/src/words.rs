@@ -547,7 +547,7 @@ pub struct Window {
     pub bar_context_clear: &'static str,
     pub bar_context_kept: &'static str,
     /// « Avancé » (D90, board 6; D91), closed by default, in the bar opened and in *Refaire…*: the
-    /// meeting's own models, Settings' choice first, said as such.
+    /// meeting's own models, Settings' choice first, said as such — what it holds said on it.
     pub bar_advanced: &'static str,
     pub models_transcription: &'static str,
     pub models_minutes: &'static str,
@@ -561,8 +561,10 @@ pub struct Window {
     pub models_gone_minutes: &'static str,
     /// A service the meeting chose, not used while it is said confidential (D60).
     pub models_unused_confidential: &'static str,
-    /// Under the bar's row at rest, « Avancé » closed: models chosen for the next recording (D91).
+    /// Under the bar's row at rest, « Avancé » closed: the models chosen for the next recording, named
+    /// short (D91) — one, or more joined by « · ».
     pub bar_models_kept: &'static str,
+    pub bar_model_kept: &'static str,
     /// « Vérifier le son » (D88, board 7): its title, and its row in Settings.
     pub check_sound: &'static str,
     pub check_sound_says: &'static str,
@@ -984,10 +986,10 @@ pub fn window(language: Language) -> Window {
             bar_context: "Meeting context",
             bar_context_clear: "Clear the context",
             bar_context_kept: "Kept for the next recording, until you clear it.",
-            bar_advanced: "Advanced",
+            bar_advanced: "Advanced — models",
             models_transcription: "Transcription model",
             models_minutes: "Minutes model",
-            models_settings: "Settings’ — {}",
+            models_settings: "Settings: {}",
             models_none: "none chosen",
             models_own_note: "For this meeting alone; Settings do not change.",
             models_not_kept: "This choice could not be kept: {}",
@@ -995,7 +997,8 @@ pub fn window(language: Language) -> Window {
             models_gone_transcription: "The transcription model chosen for this meeting is no longer here: Settings’ stands in.",
             models_gone_minutes: "The minutes model chosen for this meeting goes through a service Settings do not name: Settings’ stands in.",
             models_unused_confidential: "The service chosen for this meeting is not used while it is confidential: it is made on this computer.",
-            bar_models_kept: "Models kept for the next recording.",
+            bar_models_kept: "Models kept: {}",
+            bar_model_kept: "Model kept: {}",
             check_sound: "Check the sound",
             check_sound_says: "Your microphone and the meeting’s sound, before a recording.",
             check_unavailable: "Unavailable",
@@ -1402,10 +1405,10 @@ pub fn window(language: Language) -> Window {
             bar_context: "Contexte de la réunion",
             bar_context_clear: "Effacer le contexte",
             bar_context_kept: "Gardé pour le prochain enregistrement, jusqu’à ce que vous l’effaciez.",
-            bar_advanced: "Avancé",
+            bar_advanced: "Avancé — modèles",
             models_transcription: "Modèle de transcription",
             models_minutes: "Modèle du compte rendu",
-            models_settings: "Celui des Réglages — {}",
+            models_settings: "Réglages\u{a0}: {}",
             models_none: "aucun choisi",
             models_own_note: "Pour cette réunion seule\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Ce choix n’a pas pu être gardé\u{a0}: {}",
@@ -1413,7 +1416,8 @@ pub fn window(language: Language) -> Window {
             models_gone_transcription: "Le modèle de transcription choisi pour cette réunion n’est plus là\u{a0}: celui des Réglages le remplace.",
             models_gone_minutes: "Le modèle du compte rendu choisi pour cette réunion passe par un service que les Réglages ne nomment pas\u{a0}: celui des Réglages le remplace.",
             models_unused_confidential: "Le service choisi pour cette réunion n’est pas utilisé tant qu’elle est confidentielle\u{a0}: elle est faite sur cet ordinateur.",
-            bar_models_kept: "Modèles gardés pour le prochain enregistrement.",
+            bar_models_kept: "Modèles gardés\u{a0}: {}",
+            bar_model_kept: "Modèle gardé\u{a0}: {}",
             check_sound: "Vérifier le son",
             check_sound_says: "Votre micro et le son de la réunion, avant un enregistrement.",
             check_unavailable: "Indisponible",
@@ -1783,6 +1787,46 @@ pub fn test_caused(which: Cause, detail: &str, language: Language, developer: bo
         sentence.to_string()
     } else {
         format!("{sentence}\n{shown}")
+    })
+}
+
+/// Why minutes were not made by the meeting's own model, chosen in « Avancé » (D91), where the gesture
+/// is another model: `{}` its name, the page's; chosen again in *Refaire…*, never in Settings. None
+/// where the gesture is the provider's — a key, credit, an address —: `cause`'s sentence says it.
+pub fn cause_own(cause: Cause, language: Language) -> Option<&'static str> {
+    use Language::{English, French};
+    Some(match (cause, language) {
+        (Cause::TooSlow, English) => {
+            "{}, chosen for this meeting, did not answer in time: try again later, or choose a faster model in Redo…\u{a0}› Advanced."
+        }
+        (Cause::TooSlow, French) => {
+            "{}, choisi pour cette réunion, n’a pas répondu à temps\u{a0}: réessayez plus tard, ou choisissez un modèle plus rapide dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::UnknownModel, English) => {
+            "The provider does not know {}, chosen for this meeting: choose another in Redo…\u{a0}› Advanced."
+        }
+        (Cause::UnknownModel, French) => {
+            "Le fournisseur ne connaît pas {}, choisi pour cette réunion\u{a0}: choisissez-en un autre dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::Down, English) => {
+            "The provider answers that it is failing: try again later. On this computer, {}, chosen for this meeting, may be too large for the memory: choose a smaller one in Redo…\u{a0}› Advanced."
+        }
+        (Cause::Down, French) => {
+            "Le fournisseur répond qu’il est en panne\u{a0}: réessayez plus tard. Sur cet ordinateur, {}, choisi pour cette réunion, est peut-être trop gros pour la mémoire\u{a0}: choisissez-en un plus petit dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::CutShort, English) => {
+            "{}, chosen for this meeting, stopped before the end: choose one that writes longer answers in Redo…\u{a0}› Advanced."
+        }
+        (Cause::CutShort, French) => {
+            "{}, choisi pour cette réunion, s’est arrêté avant la fin\u{a0}: choisissez-en un qui écrit plus long dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::NotMinutes, English) => {
+            "{}, chosen for this meeting, did not write minutes: try again, or choose another model in Redo…\u{a0}› Advanced."
+        }
+        (Cause::NotMinutes, French) => {
+            "{}, choisi pour cette réunion, n’a pas écrit de compte rendu\u{a0}: réessayez, ou choisissez un autre modèle dans Refaire…\u{a0}› Avancé."
+        }
+        _ => return None,
     })
 }
 

@@ -1652,3 +1652,32 @@ fn what_is_left_of_the_trial_is_said_in_days_and_in_meetings_each_in_its_number(
     assert_eq!(words::window(Language::French).trial, "Essai gratuit");
     assert_eq!(words::window(Language::English).trial, "Free trial");
 }
+
+#[test]
+fn minutes_failed_by_the_meetings_own_model_name_it_and_send_to_refaire_advanced_not_settings() {
+    use kitokey_shell::summarising::Cause;
+    // Where the gesture is another model: the meeting's own named, and where it was chosen.
+    for cause in [Cause::TooSlow, Cause::UnknownModel, Cause::Down, Cause::CutShort, Cause::NotMinutes] {
+        for (language, place, settings) in [
+            (Language::English, "Redo…\u{a0}› Advanced", "settings"),
+            (Language::French, "Refaire…\u{a0}› Avancé", "réglages"),
+        ] {
+            let said = words::cause_own(cause, language).unwrap_or_else(|| panic!("{cause:?} has no sentence of its own model"));
+            assert!(
+                said.matches("{}").count() == 1 && said.contains(place) && !said.contains(settings) && !said.contains('\''),
+                "{cause:?}: {said}"
+            );
+        }
+    }
+    // Where the gesture is the provider's — a key, credit, an address —, Settings' sentence stays.
+    for cause in [
+        Cause::RefusedKey,
+        Cause::NoCredit,
+        Cause::Redirected,
+        Cause::Settings,
+        Cause::Unreachable,
+        Cause::NoSpeech,
+    ] {
+        assert_eq!(words::cause_own(cause, Language::French), None, "{cause:?}");
+    }
+}
