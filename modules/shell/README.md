@@ -149,8 +149,22 @@ they name to write — each kept in place until the new one is whole, put back i
 
 **A meeting's name** (D70): its heading clicked, a name typed, Enter — shown first in the list, its page and *Libérer de l'espace*, as text. It is kept as the meeting's `title.txt` (`contracts/session-audio/v2`), written whole through a file beside it, before the minutes' title (D48), which comes back when the name is emptied; made again, the minutes leave it. A folder is never renamed.
 
+**A meeting's own models** (D91): chosen for it alone, kept as its `models.json`
+(`contracts/session-audio/v3`, for a meeting of any version), written whole through a file beside
+it once the folder holds `session.json`, removed when none is left (`meeting_models_chosen`).
+`src/meeting_models.rs` lays them over Settings each time the meeting is made or made again — its
+transcript, its minutes, *Réessayer*, *Refaire avec ce contexte* —; Settings are never written. A
+Whisper model is found by its file's name among the models this computer lists
+(`settings::whisper_models`), never joined to a folder; a service to hear only if it is the one
+Settings set; a provider to write only Settings' own — another of its models — or one on this
+computer, which sends nothing away: the agreement to send a meeting is never asked for a host
+Settings do not name. One gone — removed, a service no longer set, another host — gives way to
+Settings' choice and is said (`meeting_models_shown`'s `gone`), as a microphone chosen and absent
+gives way to Auto (D74). A part the contract refuses reads as absent, and is never written. `confidential` is read after: whatever the file names, a
+confidential meeting is heard and written on this computer alone.
+
 **A meeting said confidential** (D60, [its board](../../docs/project/drawings/d60-confidential/)) is
-made on this computer alone, whatever the settings name.
+made on this computer alone, whatever the settings name — its own models too.
 
 ```mermaid
 flowchart LR

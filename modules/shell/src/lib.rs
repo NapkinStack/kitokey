@@ -13,6 +13,7 @@ pub mod levels;
 pub mod licence;
 pub mod log;
 pub mod meeting;
+pub mod meeting_models;
 pub mod microphone;
 pub mod migrate;
 pub mod minutes;
