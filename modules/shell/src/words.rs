@@ -990,7 +990,7 @@ pub fn window(language: Language) -> Window {
             models_transcription: "Transcription model",
             models_minutes: "Minutes model",
             models_settings: "Settings: {}",
-            models_none: "none chosen",
+            models_none: "no model chosen",
             models_own_note: "For this meeting alone; Settings do not change.",
             models_not_kept: "This choice could not be kept: {}",
             models_not_read: "The models could not be read: {}",
@@ -1409,7 +1409,7 @@ pub fn window(language: Language) -> Window {
             models_transcription: "Modèle de transcription",
             models_minutes: "Modèle du compte rendu",
             models_settings: "Réglages\u{a0}: {}",
-            models_none: "aucun choisi",
+            models_none: "aucun modèle choisi",
             models_own_note: "Pour cette réunion seule\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Ce choix n’a pas pu être gardé\u{a0}: {}",
             models_not_read: "Les modèles n’ont pas pu être lus\u{a0}: {}",
@@ -1823,25 +1823,42 @@ fn dated(tag: &str) -> bool {
     }
 }
 
-/// `name` without the first tail, after one of `separators`, that `tail` recognises.
+/// `name` without the first tail, after one of `separators`, that `tail` recognises — cut where a
+/// character begins, never inside one.
 fn without_tail<'a>(name: &'a str, separators: &[char], tail: impl Fn(&str) -> bool) -> &'a str {
-    name.char_indices()
-        .find(|&(at, c)| separators.contains(&c) && tail(&name[at + c.len_utf8()..]))
-        .map_or(name, |(at, _)| &name[..at])
+    for (at, c) in name.char_indices() {
+        let (before, from) = name.split_at(at);
+        let mut rest = from.chars();
+        rest.next();
+        if separators.contains(&c) && tail(rest.as_str()) {
+            return before;
+        }
+    }
+    name
 }
 
-/// What people say of a model (the page's `modelSaid`, the one rule): the last part of its id, without
-/// what only machines read — a file's extension, a tag "latest", a date of release, a quantisation.
+/// What JavaScript's `\s` matches: its white space and line ends — U+FEFF among them, U+0085 not.
+fn js_space(c: char) -> bool {
+    matches!(
+        c,
+        '\t' | '\n' | '\u{b}' | '\u{c}' | '\r' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'
+            ..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}'
+    )
+}
+
+/// What people say of a model: the page's `modelSaid`, character for character (`tests/model_said.rs`
+/// runs both) — the last part of its id, without what only machines read: a file's extension, a tag
+/// "latest", a date of release, a quantisation.
 pub fn model_said(model: &str) -> String {
     let mut name = model.split('/').rfind(|part| !part.is_empty()).unwrap_or(model);
-    for extension in [".gguf", ".bin"] {
-        if name.len() > extension.len() && name[name.len() - extension.len()..].eq_ignore_ascii_case(extension) {
-            name = &name[..name.len() - extension.len()];
-        }
+    // One extension, the last.
+    if let Some((before, extension)) = name.rsplit_once('.')
+        && (extension.eq_ignore_ascii_case("gguf") || extension.eq_ignore_ascii_case("bin"))
+    {
+        name = before;
     }
     // Its tag "latest", after a colon.
     if let Some((before, tag)) = name.rsplit_once(':')
-        && !before.is_empty()
         && tag.eq_ignore_ascii_case("latest")
     {
         name = before;
@@ -1850,7 +1867,7 @@ pub fn model_said(model: &str) -> String {
     name = without_tail(name, &['-', '_', ':'], dated);
     let machine = |word: &str| quantised(word) || ["qat", "k", "m", "s", "l"].contains(&word.to_ascii_lowercase().as_str());
     let mut words: Vec<&str> = name
-        .split(|c: char| c == '-' || c == '_' || c == ':' || c.is_whitespace())
+        .split(|c: char| c == '-' || c == '_' || c == ':' || js_space(c))
         .filter(|w| !w.is_empty())
         .collect();
     while words.len() > 1 && words.last().is_some_and(|word| machine(word)) {
@@ -1862,15 +1879,17 @@ pub fn model_said(model: &str) -> String {
     let short = |w: &str| (1..=2).contains(&w.len()) && w.chars().all(|c| c.is_ascii_digit());
     let mut said: Vec<String> = Vec::new();
     for word in words {
+        let mut chars = word.chars();
+        let first = chars.next();
         // A version written with dashes — claude-sonnet-4-5 — is said with its point.
         if short(word) && said.last().is_some_and(|last| last.split('.').all(short)) {
             let last = said.last_mut().expect("checked above");
             last.push('.');
             last.push_str(word);
-        } else if word.eq_ignore_ascii_case("gpt") {
+        } else if word.to_lowercase() == "gpt" {
             said.push("GPT".into());
-        } else if word.starts_with(|c: char| c.is_ascii_lowercase()) {
-            said.push(word[..1].to_ascii_uppercase() + &word[1..]);
+        } else if let Some(first) = first.filter(char::is_ascii_lowercase) {
+            said.push(format!("{}{}", first.to_ascii_uppercase(), chars.as_str()));
         } else {
             said.push(word.to_string());
         }

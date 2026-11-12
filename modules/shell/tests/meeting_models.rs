@@ -490,3 +490,39 @@ fn the_models_kept_for_the_next_are_the_meetings_own_once_it_holds_its_session_t
     meeting_models::taken(other.path(), &mut next).unwrap();
     assert_eq!(names(other.path()), ["session.json"]);
 }
+
+/// Written whole means renamed over: a reader that opened the file before still reads what was
+/// there, never a file cut or half written — for a meeting's models.json and the next ones alike.
+#[cfg(unix)]
+#[test]
+fn a_reader_of_the_models_before_a_write_reads_them_whole_never_half_written() {
+    use std::io::Read;
+    let first = Models {
+        transcription: Some(whisper("ggml-small-q8_0.bin")),
+        minutes: Some(writer(OLLAMA, "qwen3:8b")),
+    };
+    let second = Models {
+        transcription: Some(Hearing::SpeechAnalyzer),
+        minutes: None,
+    };
+    let folder = meeting_folder();
+    let config = tempfile::tempdir().unwrap();
+    let next = config.path().join("next-models.json");
+    meeting_models::write(folder.path(), &first).unwrap();
+    meeting_models::keep_next(&next, &first).unwrap();
+    for (file, write) in [
+        (
+            folder.path().join("models.json"),
+            Box::new(|| meeting_models::write(folder.path(), &second)) as Box<dyn Fn() -> std::io::Result<()>>,
+        ),
+        (next.clone(), Box::new(|| meeting_models::keep_next(&next, &second))),
+    ] {
+        let before = fs::read(&file).unwrap();
+        let mut opened = fs::File::open(&file).unwrap();
+        write().unwrap();
+        let mut read = Vec::new();
+        opened.read_to_end(&mut read).unwrap();
+        assert_eq!(read, before, "{}: what was there, whole", file.display());
+        assert_ne!(fs::read(&file).unwrap(), before, "{}: the new one in its place", file.display());
+    }
+}

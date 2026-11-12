@@ -2077,6 +2077,17 @@ def own_models(now: dt.datetime) -> None:
         check("none chosen: models.json removed", removed)
 
 
+LONG = "hf.co/unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF:UD-Q4_K_XL-very-long-name"
+LONG_SAID = "Mistral Small 3.2 24B Instruct 2506 GGUF UD Q4 K XL Very Long Name"
+# A list's chosen entry: whether it fits the list as drawn, and what is said whole under it, if anything —
+# inside the window's width.
+LONG_SHOWN = ("const s = document.getElementById(arguments[0]); const f = getComputedStyle(s); const c = document.createElement('canvas').getContext('2d');"
+              "c.font = `${f.fontSize} ${f.fontFamily}`; const text = s.options[s.selectedIndex].textContent;"
+              "const u = document.getElementById(arguments[0] + '-whole'); const shown = u && u.getClientRects().length > 0;"
+              "return {text, fit: Math.ceil(c.measureText(text).width) + 36 <= s.clientWidth, said: shown ? u.textContent : null,"
+              " inside: !shown || (u.getBoundingClientRect().right <= innerWidth && u.scrollWidth <= u.clientWidth + 1)}")
+
+
 def models_advanced(now: dt.datetime) -> None:
     """BD. « Avancé » (D91, board 6): closed by default in the bar opened and in Refaire…, the meeting's
     own models chosen there — Settings' first —, the next recording's at rest, kept with the meeting,
@@ -2085,7 +2096,8 @@ def models_advanced(now: dt.datetime) -> None:
 
     class Tags(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
-            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            # A name far longer than the bar is wide, as the explorer met one (D91's UX pass).
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}, {"name": LONG}]}).encode()
             self.send_response(200)
             self.send_header("content-length", str(len(body)))
             self.end_headers()
@@ -2134,7 +2146,7 @@ def models_advanced(now: dt.datetime) -> None:
             got = browser.execute_script(shown, "small")
             check("opened at rest: the transcription's models — Settings' first, short, then those installed and the service Settings set — and the minutes', Settings' never twice",
                   opened and got["hear"] == ["Réglages\u00a0: Whisper adv settings", "Whisper tiny adv", "whisper-1, via hears.example"]
-                  and got["write"] == ["Réglages\u00a0: Qwen3 14b", "Mistral 7b — sur cet ordinateur"]
+                  and got["write"] == ["Réglages\u00a0: Qwen3 14b", LONG_SAID + " — sur cet ordinateur", "Mistral 7b — sur cet ordinateur"]
                   and got["note"] == "Pour cette réunion seule ; les Réglages ne changent pas.", got)
             # What « Avancé » holds said on it; the note before the lists; the lists at the board's 14 px, none cut.
             looks = browser.execute_script(
@@ -2146,6 +2158,11 @@ def models_advanced(now: dt.datetime) -> None:
                 " sizes: lists.map(s => getComputedStyle(s).fontSize), fit: lists.map(fit)}")
             check("« Avancé » says it holds the models; « pour cette réunion seule » above the lists; the lists at 14 px, their choice whole",
                   looks == {"label": "Avancé — modèles", "first": "says", "sizes": ["14px", "14px"], "fit": [True, True]}, looks)
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text(LONG_SAID + " — sur cet ordinateur")
+            whole = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] is not None, 3)
+            got = browser.execute_script(LONG_SHOWN, "small-minutes-model")
+            check("fr, the bar: a model's name longer than the list is wide is said whole under it, never only cut",
+                  whole and not got["fit"] and got["said"] == got["text"] and got["inside"], got)
             Select(browser.find_element(By.ID, "small-transcription-model")).select_by_visible_text("Whisper tiny adv")
             Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
             kept = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
@@ -2153,7 +2170,11 @@ def models_advanced(now: dt.datetime) -> None:
             check("chosen at rest: kept for the next recording, nothing written, Settings unchanged",
                   kept and not any(meetings.iterdir()) and window.file.read_text() == before, sorted(p.name for p in meetings.iterdir()))
             line = "const k = document.getElementById('small-models-kept'); return k && k.getClientRects().length > 0 ? k.textContent : null"
-            check("« Avancé » open: nothing said under the row of the models kept", browser.execute_script(line) is None, browser.execute_script(line))
+            described = "return document.getElementById('small-advanced').getAttribute('aria-describedby')"
+            check("« Avancé » open: nothing said under the row of the models kept, nor described on it",
+                  browser.execute_script(line) is None and browser.execute_script(described) is None, [browser.execute_script(line), browser.execute_script(described)])
+            next_models = window.file.parent / "next-models.json"
+            check("chosen at rest: kept on disk beside the settings", next_models.exists(), sorted(p.name for p in window.file.parent.iterdir()))
             press(browser, "small-advanced")
             keptSaid = "Modèles gardés : tiny adv · Mistral 7b"
             said = wait_for(browser, lambda b: b.execute_script(line) == keptSaid, 3)
@@ -2177,7 +2198,8 @@ def models_advanced(now: dt.datetime) -> None:
             taken = wait_for(None, lambda b: own() == {"transcription": {"engine": "whisper", "model": tiny.name}, "minutes": {"provider": here, "model": "mistral:7b"}}, 5)
             check("started: the choice made at rest is the new meeting's models.json", started and taken, own())
             left = browser.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
-            check("taken by this meeting: none kept for the next", left == {}, left)
+            check("taken by this meeting: none kept for the next, nothing left on disk", left == {} and not next_models.exists(), [left, next_models.exists()])
+            check("recording: « Avancé » described by nothing kept", browser.execute_script(described) is None, browser.execute_script(described))
             # Drawn again for this meeting, closed (board 6): the options opened, then « Avancé ».
             wait_for(browser, lambda b: b.execute_script(shown, "small")["expanded"] == "false", 5)
             time.sleep(0.5)
@@ -2250,6 +2272,15 @@ def models_advanced(now: dt.datetime) -> None:
                 quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
                 check("started and stopped from the tray's icon: no models kept for the next, and none said kept",
                       quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
+                # Quit and started again after a recording took them: nothing comes back.
+                wait_for(browser, lambda b: b.execute_script(idle), 15)
+                window.__exit__()
+                browser = window.__enter__()
+                wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+                time.sleep(1)
+                check("started again after a recording took them: no models kept, none said, nothing on disk",
+                      none_kept(browser) == {} and browser.execute_script(line) is None and not next_models.exists(),
+                      [none_kept(browser), browser.execute_script(line), next_models.exists()])
                 wait_for(None, lambda b: (meeting / "transcript.jsonl").exists(), 15)
                 wait_for(browser, lambda b: b.execute_script(idle), 15)
             finally:
@@ -2299,6 +2330,15 @@ def models_advanced(now: dt.datetime) -> None:
             got = browser.execute_script(shown, "redo-panel")
             check("Refaire… of the minutes: « Avancé » closed, the meeting's own minutes model in it",
                   got["expanded"] == "false" and got["written"] == "Mistral 7b — sur cet ordinateur", got)
+            press(browser, "redo-panel-advanced")
+            Select(browser.find_element(By.ID, "redo-panel-minutes-model")).select_by_visible_text(LONG_SAID + " — sur cet ordinateur")
+            time.sleep(0.3)
+            got = browser.execute_script(LONG_SHOWN, "redo-panel-minutes-model")
+            check("fr, Refaire…: the long name whole — in its list where it fits, else said under it",
+                  (got["fit"] and got["said"] is None) or (got["said"] == got["text"] and got["inside"]), got)
+            Select(browser.find_element(By.ID, "redo-panel-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
+            gone_ = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, "redo-panel-minutes-model")["said"] is None, 3)
+            check("a name that fits: nothing said under the list", gone_, browser.execute_script(LONG_SHOWN, "redo-panel-minutes-model"))
             press(browser, "redo-do")
             wrote = wait_for(None, lambda b: "mistral:7b" in read(writing), 15)
             check("Refaire with « Avancé » left closed: made again by the meeting's own model", wrote and "qwen3:14b" not in read(writing), read(writing))
@@ -2422,6 +2462,36 @@ def models_advanced(now: dt.datetime) -> None:
                   refused == "refused" and own() == {"transcription": {"engine": "service", "provider": "https://hears.example/v1", "model": "whisper-1"}}, [refused, own()])
             (meeting / "confidential").unlink()
             full.file.write_text(kept_settings)
+        # In English, the bar and Refaire…: the long name said whole as well.
+        english = Window(meetings, "en_US.UTF-8", named, ollama=base, small=True)
+        english.env.update(XDG_DATA_HOME=str(data))
+        with english as browser:
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+            press(browser, "small-more")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-advanced") and b.find_element(By.ID, "small-advanced").is_displayed(), 5)
+            press(browser, "small-advanced")
+            wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is False, 5)
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text(LONG_SAID + " — on this computer")
+            whole = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] is not None, 3)
+            got = browser.execute_script(LONG_SHOWN, "small-minutes-model")
+            check("en, the bar: the long name said whole under its list", whole and not got["fit"] and got["said"] == got["text"] and got["inside"], got)
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_index(0)
+            wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)") == {}, 5)
+        english_full = Window(meetings, "en_US.UTF-8", named, ollama=base)
+        english_full.env.update(XDG_DATA_HOME=str(data))
+        with english_full as browser:
+            browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+            wait_for(browser, lambda b: b.execute_script(idle), 15)
+            press(browser, "redo-minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-panel-advanced"), 5)
+            press(browser, "redo-panel-advanced")
+            Select(browser.find_element(By.ID, "redo-panel-minutes-model")).select_by_visible_text(LONG_SAID + " — on this computer")
+            time.sleep(0.3)
+            got = browser.execute_script(LONG_SHOWN, "redo-panel-minutes-model")
+            check("en, Redo…: the long name whole — in its list where it fits, else said under it",
+                  (got["fit"] and got["said"] is None) or (got["said"] == got["text"] and got["inside"]), got)
+            press(browser, "redo-panel-cancel")
     finally:
         tags.shutdown()
 

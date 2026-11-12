@@ -1068,6 +1068,7 @@ function modelsAdvanced(words, prefix, offered, chosen) {
     toggle.setAttribute("aria-expanded", String(now));
     toggle.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
     panel.hidden = !now;
+    if (now) requestAnimationFrame(() => panel.querySelectorAll("select").forEach((pick) => paintWhole(pick)));
   };
   toggle.addEventListener("click", () => unfold(toggle.getAttribute("aria-expanded") !== "true"));
   unfold(false);
@@ -1126,8 +1127,24 @@ function modelsAdvanced(words, prefix, offered, chosen) {
       pick.append(option);
     }
     pick.value = gone ? "" : value;
-    row.append(element("span", "name", label), pick);
+    // A name longer than the list is wide: said whole under it — a native list never wraps.
+    const whole = element("span", "says whole");
+    whole.id = `${id}-whole`;
+    whole.hidden = true;
+    row.append(element("span", "name", label), pick, whole);
     return [row, pick];
+  };
+  const measure = document.createElement("canvas").getContext("2d");
+  const paintWhole = (pick) => {
+    const whole = pick.parentElement?.querySelector(".whole");
+    if (!whole || pick.clientWidth === 0) return;
+    const style = getComputedStyle(pick);
+    measure.font = `${style.fontSize} ${style.fontFamily}`;
+    const text = pick.options[pick.selectedIndex]?.textContent ?? "";
+    // The list's own room: its padding and its arrow, about 36 px.
+    const cut = Math.ceil(measure.measureText(text).width) + 36 > pick.clientWidth;
+    whole.textContent = cut ? text : "";
+    whole.hidden = !cut;
   };
   const gone = new Set(offered.gone);
   const [hearRow, hearPick] = list(`${prefix}-transcription-model`, words.models_transcription, hearing, ownHear, gone.has("transcription"));
@@ -1159,6 +1176,8 @@ function modelsAdvanced(words, prefix, offered, chosen) {
       said.textContent = fill(words.models_not_kept, why);
       said.hidden = false;
     }
+    paintWhole(hearPick);
+    paintWhole(writePick);
   };
   hearPick.addEventListener("change", changed);
   writePick.addEventListener("change", changed);

@@ -350,6 +350,8 @@ body.small-window .frame { display: none; }
 .models-row { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .models-row .name { font-size: 12.5px; font-weight: 600; }
 .models-row select { width: 100%; min-width: 0; font-size: 14px; text-overflow: ellipsis; }
+.models-row .whole { font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+.models-row .whole[hidden] { display: none; }
 .redo .models-advanced { margin: 4px 0 8px; }
 /* D88's panel in the bar: in place of its row and options, as wide as it, the bar as tall as the panel. */
 body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 100%; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
