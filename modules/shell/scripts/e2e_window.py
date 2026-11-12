@@ -2081,10 +2081,30 @@ LONG = "hf.co/unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF:UD-Q4_K_XL-very-l
 LONG_SAID = "Mistral Small 3.2 24B Instruct 2506 GGUF UD Q4 K XL Very Long Name"
 # A list's chosen entry: whether it fits the list as drawn, and what is said whole under it, if anything —
 # inside the window's width.
+def long_resized(browser, where: str, chosen: str) -> None:
+    """A long name chosen in Refaire… at 830 px, where it fits; then the window narrowed to 420 px and
+    widened back, never crossing 840 (the page's own break): said whole under its list once the list is
+    too narrow for it, at 12 px, and no longer once it fits again — whatever the window does after."""
+    pick = "redo-panel-minutes-model"
+    Select(browser.find_element(By.ID, pick)).select_by_visible_text(chosen)
+    time.sleep(0.5)
+    got = browser.execute_script(LONG_SHOWN, pick)
+    check(f"{where}: chosen at 830 px, the long name fits its list, nothing said under it", got["fit"] and got["said"] is None, got)
+    browser.set_window_size(420, 700)
+    narrowed = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, pick)["said"] is not None, 5)
+    got = browser.execute_script(LONG_SHOWN, pick)
+    check(f"{where}: the window narrowed to 420 px after the choice — the name said whole under its list, 12 px, inside the window",
+          narrowed and not got["fit"] and got["said"] == got["text"] and got["size"] == "12px" and got["inside"], got)
+    browser.set_window_size(830, 800)
+    widened = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, pick)["said"] is None, 5)
+    got = browser.execute_script(LONG_SHOWN, pick)
+    check(f"{where}: widened back to 830 px — it fits again, nothing said under it", widened and got["fit"], got)
+
+
 LONG_SHOWN = ("const s = document.getElementById(arguments[0]); const f = getComputedStyle(s); const c = document.createElement('canvas').getContext('2d');"
               "c.font = `${f.fontSize} ${f.fontFamily}`; const text = s.options[s.selectedIndex].textContent;"
               "const u = document.getElementById(arguments[0] + '-whole'); const shown = u && u.getClientRects().length > 0;"
-              "return {text, fit: Math.ceil(c.measureText(text).width) + 36 <= s.clientWidth, said: shown ? u.textContent : null,"
+              "return {text, fit: Math.ceil(c.measureText(text).width) + 36 <= s.clientWidth, said: shown ? u.textContent : null, size: u ? getComputedStyle(u).fontSize : null,"
               " inside: !shown || (u.getBoundingClientRect().right <= innerWidth && u.scrollWidth <= u.clientWidth + 1)}")
 
 
@@ -2161,8 +2181,16 @@ def models_advanced(now: dt.datetime) -> None:
             Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text(LONG_SAID + " — sur cet ordinateur")
             whole = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] is not None, 3)
             got = browser.execute_script(LONG_SHOWN, "small-minutes-model")
-            check("fr, the bar: a model's name longer than the list is wide is said whole under it, never only cut",
-                  whole and not got["fit"] and got["said"] == got["text"] and got["inside"], got)
+            check("fr, the bar: a model's name longer than the list is wide is said whole under it, at 12 px, never only cut",
+                  whole and not got["fit"] and got["said"] == got["text"] and got["size"] == "12px" and got["inside"], got)
+            # « Avancé » closed and opened again — drawn anew with the choice kept: said whole again.
+            press(browser, "small-advanced")
+            wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is True, 3)
+            press(browser, "small-advanced")
+            again = wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is False
+                             and b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] == LONG_SAID + " — sur cet ordinateur", 5)
+            check("fr, the bar: « Avancé » closed and opened again, the long name chosen still said whole under its list",
+                  again, browser.execute_script(LONG_SHOWN, "small-minutes-model"))
             Select(browser.find_element(By.ID, "small-transcription-model")).select_by_visible_text("Whisper tiny adv")
             Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
             kept = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
@@ -2325,17 +2353,17 @@ def models_advanced(now: dt.datetime) -> None:
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
             writing.unlink(missing_ok=True)
+            # Below the page's break at 840 px from here, so that a resize never draws the page anew.
+            browser.set_window_size(830, 800)
+            time.sleep(1.5)
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
             press(browser, "redo-minutes")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-panel-advanced"), 5)
             got = browser.execute_script(shown, "redo-panel")
             check("Refaire… of the minutes: « Avancé » closed, the meeting's own minutes model in it",
                   got["expanded"] == "false" and got["written"] == "Mistral 7b — sur cet ordinateur", got)
             press(browser, "redo-panel-advanced")
-            Select(browser.find_element(By.ID, "redo-panel-minutes-model")).select_by_visible_text(LONG_SAID + " — sur cet ordinateur")
-            time.sleep(0.3)
-            got = browser.execute_script(LONG_SHOWN, "redo-panel-minutes-model")
-            check("fr, Refaire…: the long name whole — in its list where it fits, else said under it",
-                  (got["fit"] and got["said"] is None) or (got["said"] == got["text"] and got["inside"]), got)
+            long_resized(browser, "fr, Refaire…", LONG_SAID + " — sur cet ordinateur")
             Select(browser.find_element(By.ID, "redo-panel-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
             gone_ = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, "redo-panel-minutes-model")["said"] is None, 3)
             check("a name that fits: nothing said under the list", gone_, browser.execute_script(LONG_SHOWN, "redo-panel-minutes-model"))
@@ -2343,6 +2371,8 @@ def models_advanced(now: dt.datetime) -> None:
             wrote = wait_for(None, lambda b: "mistral:7b" in read(writing), 15)
             check("Refaire with « Avancé » left closed: made again by the meeting's own model", wrote and "qwen3:14b" not in read(writing), read(writing))
             wait_for(browser, lambda b: b.execute_script(idle), 15)
+            browser.set_window_size(1100, 800)
+            time.sleep(1.5)
             # Its own model fails: the page names it, and where to choose another — Refaire… › Avancé, not Settings.
             failure = "const w = document.querySelector('#minutes-state .what'); return w ? w.textContent : ''"
             # The notification, read before the page: the same sentence.
@@ -2461,6 +2491,15 @@ def models_advanced(now: dt.datetime) -> None:
             check("a service chosen for a confidential meeting is refused, nothing written",
                   refused == "refused" and own() == {"transcription": {"engine": "service", "provider": "https://hears.example/v1", "model": "whisper-1"}}, [refused, own()])
             (meeting / "confidential").unlink()
+            # Settings naming no one to write the minutes: their entry says so in words.
+            full.file.write_text("\n".join(line for line in kept_settings.splitlines() if not line.startswith(("minutes_provider", "minutes_model"))) + "\n")
+            press(browser, "redo-transcript")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
+            press(browser, "redo-transcript-panel-advanced")
+            got = browser.execute_script(shown, "redo-transcript-panel")
+            check("Settings naming no minutes model: their entry reads « Réglages : aucun modèle choisi »",
+                  (got["write"] or [None])[0] == "Réglages\u00a0: aucun modèle choisi", got)
+            press(browser, "redo-transcript-panel-cancel")
             full.file.write_text(kept_settings)
         # In English, the bar and Refaire…: the long name said whole as well.
         english = Window(meetings, "en_US.UTF-8", named, ollama=base, small=True)
@@ -2474,23 +2513,22 @@ def models_advanced(now: dt.datetime) -> None:
             Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text(LONG_SAID + " — on this computer")
             whole = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] is not None, 3)
             got = browser.execute_script(LONG_SHOWN, "small-minutes-model")
-            check("en, the bar: the long name said whole under its list", whole and not got["fit"] and got["said"] == got["text"] and got["inside"], got)
+            check("en, the bar: the long name said whole under its list, at 12 px",
+                  whole and not got["fit"] and got["said"] == got["text"] and got["size"] == "12px" and got["inside"], got)
             Select(browser.find_element(By.ID, "small-minutes-model")).select_by_index(0)
             wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)") == {}, 5)
         english_full = Window(meetings, "en_US.UTF-8", named, ollama=base)
         english_full.env.update(XDG_DATA_HOME=str(data))
         with english_full as browser:
+            browser.set_window_size(830, 800)
+            time.sleep(1.5)
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
             wait_for(browser, lambda b: b.execute_script(idle), 15)
             press(browser, "redo-minutes")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-panel-advanced"), 5)
             press(browser, "redo-panel-advanced")
-            Select(browser.find_element(By.ID, "redo-panel-minutes-model")).select_by_visible_text(LONG_SAID + " — on this computer")
-            time.sleep(0.3)
-            got = browser.execute_script(LONG_SHOWN, "redo-panel-minutes-model")
-            check("en, Redo…: the long name whole — in its list where it fits, else said under it",
-                  (got["fit"] and got["said"] is None) or (got["said"] == got["text"] and got["inside"]), got)
+            long_resized(browser, "en, Redo…", LONG_SAID + " — on this computer")
             press(browser, "redo-panel-cancel")
     finally:
         tags.shutdown()

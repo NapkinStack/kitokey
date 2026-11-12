@@ -1068,7 +1068,6 @@ function modelsAdvanced(words, prefix, offered, chosen) {
     toggle.setAttribute("aria-expanded", String(now));
     toggle.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
     panel.hidden = !now;
-    if (now) requestAnimationFrame(() => panel.querySelectorAll("select").forEach((pick) => paintWhole(pick)));
   };
   toggle.addEventListener("click", () => unfold(toggle.getAttribute("aria-expanded") !== "true"));
   unfold(false);
@@ -1135,6 +1134,13 @@ function modelsAdvanced(words, prefix, offered, chosen) {
     return [row, pick];
   };
   const measure = document.createElement("canvas").getContext("2d");
+  // Said for the list's width as it is drawn: each change of it — « Avancé » opened, the window resized
+  // — measures again (ResizeObserver), and each choice (`changed`).
+  const sized = new ResizeObserver((entries) => {
+    for (const { target } of entries) {
+      if (target.isConnected) paintWhole(target);
+    }
+  });
   const paintWhole = (pick) => {
     const whole = pick.parentElement?.querySelector(".whole");
     if (!whole || pick.clientWidth === 0) return;
@@ -1181,6 +1187,8 @@ function modelsAdvanced(words, prefix, offered, chosen) {
   };
   hearPick.addEventListener("change", changed);
   writePick.addEventListener("change", changed);
+  sized.observe(hearPick);
+  sized.observe(writePick);
   // What a choice here changes, said before the lists.
   panel.append(element("p", "says", words.models_own_note), hearRow, writeRow, said);
   box.append(toggle, panel);

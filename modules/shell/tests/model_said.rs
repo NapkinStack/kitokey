@@ -31,6 +31,12 @@ console.log(JSON.stringify(JSON.parse(fs.readFileSync(process.argv[2], "utf8")).
         ])
         .output();
     let Ok(output) = run else {
+        // On a CI runner the comparison is owed: GitHub's Ubuntu and Windows images, where the shell's
+        // tests run, carry Node. Elsewhere — a workstation without it — said, and not compared.
+        assert!(
+            std::env::var_os("CI").is_none(),
+            "node is not there on this CI runner: the page's modelSaid cannot be compared"
+        );
         eprintln!("node is not there: the page's modelSaid is not compared");
         for id in &ids {
             words::model_said(id);
