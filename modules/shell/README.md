@@ -168,7 +168,8 @@ closed by default, the same in the bar opened and in each *Refaire…*: two list
 model and the minutes', under « Pour cette réunion seule ; les Réglages ne changent pas. », each
 « Réglages : … » first — Settings' model never offered a second time —, then the Whisper models listed,
 SpeechAnalyzer where Settings hear by it, the service Settings set, and Ollama's models here
-(`models_offered`). A confidential meeting is offered no service: Settings' entry says who makes it here
+(`models_offered`). A native list never wraps: a chosen name wider than its list is said whole under
+it, at 12 px, measured again whenever the list's width changes (a `ResizeObserver`) or a choice is made. A confidential meeting is offered no service: Settings' entry says who makes it here
 — Whisper, Ollama on this computer —, a service it chose is said unused, never shown chosen, and
 `meeting_models_chosen` refuses one; the bar draws « Avancé » again as the meeting is said
 confidential or not. Settings unreadable, it is offered from those last read, and said. At rest, the choice is the next
