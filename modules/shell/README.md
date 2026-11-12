@@ -167,9 +167,13 @@ They are chosen in **« Avancé »** ([board 6](../../docs/project/drawings/d89-
 closed by default, the same in the bar opened and in each *Refaire…*: two lists, the transcription's
 model and the minutes', each « Celui des Réglages — … » first, then the Whisper models listed,
 SpeechAnalyzer where Settings hear by it, the service Settings set, and Ollama's models here
-(`models_offered`); a confidential meeting is offered no service. At rest, the choice is the next
+(`models_offered`). A confidential meeting is offered no service: Settings' entry says who makes it here
+— Whisper, Ollama on this computer —, a service it chose is said unused, never shown chosen, and
+`meeting_models_chosen` refuses one; the bar draws « Avancé » again as the meeting is said
+confidential or not. Settings unreadable, it is offered from those last read, and said. At rest, the choice is the next
 recording's (`next_models_kept`, in memory): its `models.json` once its folder holds `session.json`,
-then none for the one after. Recording, it is that meeting's at once. In *Refaire…* it is kept once
+then none for the one after; « Avancé » closed, it is said under the row, « Modèles gardés pour le
+prochain enregistrement. » Recording, it is that meeting's at once. In *Refaire…* it is kept once
 *Refaire* is pressed — *Annuler* changes nothing —, then the transcript is made again by them
 (`transcript_redo_own`) or the minutes. A model gone is said on the meeting's page and in « Avancé ».
 

@@ -2142,6 +2142,11 @@ def models_advanced(now: dt.datetime) -> None:
                             == {"transcription": {"engine": "whisper", "model": tiny.name}, "minutes": {"provider": here, "model": "mistral:7b"}}, 5)
             check("chosen at rest: kept for the next recording, nothing written, Settings unchanged",
                   kept and not any(meetings.iterdir()) and window.file.read_text() == before, sorted(p.name for p in meetings.iterdir()))
+            line = "const k = document.getElementById('small-models-kept'); return k && k.getClientRects().length > 0 ? k.textContent : null"
+            check("« Avancé » open: nothing said under the row of the models kept", browser.execute_script(line) is None, browser.execute_script(line))
+            press(browser, "small-advanced")
+            said = wait_for(browser, lambda b: b.execute_script(line) == "Modèles gardés pour le prochain enregistrement.", 3)
+            check("« Avancé » closed with a choice for the next recording: said under the row, as the context kept is", said, browser.execute_script(line))
             press(browser, "small-record")
             started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
             taken = wait_for(None, lambda b: own() == {"transcription": {"engine": "whisper", "model": tiny.name}, "minutes": {"provider": here, "model": "mistral:7b"}}, 5)
@@ -2160,6 +2165,20 @@ def models_advanced(now: dt.datetime) -> None:
             Select(browser.find_element(By.ID, "small-minutes-model")).select_by_index(0)
             back = wait_for(None, lambda b: own() == {"transcription": {"engine": "whisper", "model": tiny.name}}, 5)
             check("recording: Settings' chosen again for the minutes, that part of models.json gone", back, own())
+            late = browser.execute_async_script(
+                "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('next_models_kept', {chosen: arguments[0]}).then(() => done('kept'), (why) => done('refused'))",
+                {"transcription": {"engine": "speechanalyzer"}})
+            nothing = browser.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
+            check("recording: no models are kept for the next — that one's own are its meeting's", late == "refused" and nothing == {}, [late, nothing])
+            offered = browser.execute_script(shown, "small")
+            check("recording: the service Settings set is offered while the meeting is not confidential",
+                  "whisper-1, via hears.example" in (offered["hear"] or []), offered)
+            browser.execute_script("document.getElementById('small-confidential').click()")
+            redrawn = wait_for(browser, lambda b: (b.execute_script(shown, "small")["hear"] or ["via"]) and not any("via" in one for one in b.execute_script(shown, "small")["hear"])
+                               and b.execute_script(shown, "small")["expanded"] == "true", 5)
+            check("said confidential while « Avancé » is open: drawn again at once, open, no service offered", redrawn, browser.execute_script(shown, "small"))
+            browser.execute_script("document.getElementById('small-confidential').click()")
+            wait_for(browser, lambda b: not (meeting / "confidential").exists() and "whisper-1, via hears.example" in (b.execute_script(shown, "small")["hear"] or []), 5)
             hearing.unlink(missing_ok=True)
             time.sleep(0.6)
             stop_from_small(browser)
@@ -2215,6 +2234,38 @@ def models_advanced(now: dt.datetime) -> None:
             check("Refaire with « Avancé » left closed: made again by the meeting's own model", wrote and "qwen3:14b" not in read(writing), read(writing))
             wait_for(browser, lambda b: b.execute_script(idle), 15)
             check("Settings unchanged by Refaire…", full.file.read_text() == before, full.file.read_text())
+            # Refaire… of the transcript: the transcript alone, by the meeting's models — its minutes untouched.
+            minutes_before = (meeting / "minutes.md").read_text()
+            hearing.unlink(missing_ok=True)
+            writing.unlink(missing_ok=True)
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 10)
+            press(browser, "redo-transcript")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
+            press(browser, "redo-transcript-do")
+            heard = wait_for(None, lambda b: str(model) in read(hearing), 15)
+            wait_for(browser, lambda b: b.execute_script(idle), 15)
+            time.sleep(2)
+            check("Refaire… of the transcript makes the transcript alone, its minutes untouched",
+                  heard and not writing.exists() and (meeting / "minutes.md").read_text() == minutes_before, (read(hearing), read(writing)))
+            # Settings unreadable: Refaire… still opens, from those last read, and says why.
+            kept_settings = full.file.read_text()
+            full.file.write_text("this is [not toml")
+            press(browser, "redo-transcript")
+            opened = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
+            if opened:
+                press(browser, "redo-transcript-panel-advanced")
+            got = browser.execute_script(shown, "redo-transcript-panel")
+            full.file.write_text(kept_settings)
+            check("Settings unreadable: Refaire… opens all the same, offering what was last read, and says it",
+                  opened and got["heard"] == "Celui des Réglages — Whisper adv settings" and bool(got["said"]), got)
+            if opened:
+                press(browser, "redo-transcript-panel-cancel")
+            else:
+                browser.execute_script("location.hash = '#/'")
+                browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 10)
             # A model gone: said on the page, Settings' standing in.
             (meeting / "models.json").write_text(json.dumps({"transcription": {"engine": "whisper", "model": tiny.name}}))
             tiny.unlink()
@@ -2231,14 +2282,31 @@ def models_advanced(now: dt.datetime) -> None:
             check("and in « Avancé »: Settings' shown, the model gone said", got["heard"] == "Celui des Réglages — Whisper adv settings"
                   and "n’est plus là" in (got["said"] or ""), got)
             press(browser, "redo-transcript-panel-cancel")
-            # Confidential: no service offered.
+            # Confidential, Settings hearing and writing by services: « Avancé » names no service at all —
+            # Settings' entry says who makes it here —; a service chosen is said unused, and refused.
+            serviced = kept_settings + ('engine = "service"\ntranscription_agreed = "hears.example"\n'
+                                        'minutes_agreed = "writes.example"\n')
+            serviced = serviced.replace(f'minutes_provider = "{here}"', 'minutes_provider = "https://writes.example/v1"').replace('minutes_model = "qwen3:14b"', 'minutes_model = "gpt-4.1-mini"')
+            full.file.write_text(serviced)
             (meeting / "confidential").write_bytes(b"")
+            (meeting / "models.json").write_text(json.dumps({"transcription": {"engine": "service", "provider": "https://hears.example/v1", "model": "whisper-1"}}))
             press(browser, "redo-transcript")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
+            press(browser, "redo-transcript-panel-advanced")
             got = browser.execute_script(shown, "redo-transcript-panel")
-            check("a confidential meeting is offered no service to hear it", got["hear"] and not any("via" in one for one in got["hear"][1:]), got)
+            check("confidential, Settings naming services: no entry names one — Settings' says Whisper and Ollama here",
+                  got["hear"] and got["write"] and not any("via" in one for one in got["hear"] + got["write"])
+                  and got["hear"][0] == "Celui des Réglages — Whisper adv settings" and got["write"][0].endswith("sur cet ordinateur"), got)
+            check("a service the confidential meeting chose: not shown chosen, said unused while confidential",
+                  got["heard"] == got["hear"][0] and "n’est pas utilisé tant qu’elle est confidentielle" in (got["said"] or ""), got)
             press(browser, "redo-transcript-panel-cancel")
+            refused = browser.execute_async_script(
+                "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: arguments[1]}).then(() => done('kept'), () => done('refused'))",
+                meeting.name, {"minutes": {"provider": "https://writes.example/v1", "model": "gpt-4.1-mini"}})
+            check("a service chosen for a confidential meeting is refused, nothing written",
+                  refused == "refused" and own() == {"transcription": {"engine": "service", "provider": "https://hears.example/v1", "model": "whisper-1"}}, [refused, own()])
             (meeting / "confidential").unlink()
+            full.file.write_text(kept_settings)
     finally:
         tags.shutdown()
 

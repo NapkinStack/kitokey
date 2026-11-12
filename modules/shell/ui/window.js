@@ -1120,7 +1120,12 @@ function modelsAdvanced(words, prefix, offered, chosen) {
   const said = element("p", "note warn");
   said.id = `${prefix}-models-said`;
   said.setAttribute("role", "status");
-  const goneSaid = [gone.has("transcription") ? words.models_gone_transcription : "", gone.has("minutes") ? words.models_gone_minutes : ""].filter(Boolean).join(" ");
+  const goneSaid = [
+    offered.unreadable ?? "",
+    gone.has("transcription") ? words.models_gone_transcription : "",
+    gone.has("minutes") ? words.models_gone_minutes : "",
+    offered.unused.length > 0 ? words.models_unused_confidential : "",
+  ].filter(Boolean).join(" ");
   said.textContent = goneSaid;
   said.hidden = goneSaid === "";
   let kept = [hearPick.value, writePick.value];
@@ -1243,7 +1248,11 @@ function minutesCard(read, words, session, transcript) {
   // ones are whole.
   const redo = iconButton("rotate-ccw", words.redo, "redo-minutes");
   redo.addEventListener("click", async () => {
-    const offered = await window.__TAURI__.core.invoke("models_offered", { name: nameOf(session) });
+    const offered = await window.__TAURI__.core.invoke("models_offered", { name: nameOf(session) }).catch((why) => {
+      redo.after(element("p", "note warn", fill(words.models_not_read, why)));
+      return null;
+    });
+    if (offered === null) return;
     const panel = redoPanel(offered, session, words, redo);
     redo.replaceWith(panel);
     panel.querySelector("button:enabled").focus();
@@ -1440,7 +1449,11 @@ function transcriptCard(read, words, session) {
   // Refaire…: another Whisper model of this computer, this time only; beside the search (board 4).
   const redo = iconButton("rotate-ccw", words.redo, "redo-transcript");
   redo.addEventListener("click", async () => {
-    const offered = await window.__TAURI__.core.invoke("models_offered", { name: nameOf(session) });
+    const offered = await window.__TAURI__.core.invoke("models_offered", { name: nameOf(session) }).catch((why) => {
+      redo.after(element("p", "note warn", fill(words.models_not_read, why)));
+      return null;
+    });
+    if (offered === null) return;
     const panel = redoTranscriptPanel(offered, session, words, redo, read.segments.some((segment) => segment.edited));
     redo.replaceWith(panel);
     panel.querySelector("button:enabled").focus();
@@ -3374,6 +3387,16 @@ function showSmall(words) {
   const advanced = element("div", "small-advanced");
   // What is drawn, and from what: drawn again only when what it offers changed, never under the user.
   let advancedDrawn = { from: null, models: null };
+  let shownConfidential = null;
+  // Chosen at rest, « Avancé » closed: said under the row, as the context kept is (D91).
+  const modelsKept = element("p", "says", words.bar_models_kept);
+  modelsKept.id = "small-models-kept";
+  modelsKept.hidden = true;
+  let nextChosen = false;
+  const paintModelsKept = () => {
+    const open = !options.hidden && advancedDrawn.models?.toggle.getAttribute("aria-expanded") === "true";
+    modelsKept.hidden = recording !== false || !nextChosen || open;
+  };
   const advancedOf = async (opened) => {
     const name = meeting.name;
     const offered = await invoke("models_offered", { name }).catch((why) => {
@@ -3382,14 +3405,18 @@ function showSmall(words) {
     });
     if (offered === null) return;
     smallSaid("models", null);
+    if (name === null) nextChosen = Boolean(offered.chosen.transcription || offered.chosen.minutes);
     const from = JSON.stringify([name, offered]);
     // The same: left as it is, opened when asked — never closed under the user.
     if (from === advancedDrawn.from && advancedDrawn.models) {
       if (opened) advancedDrawn.models.unfold(true);
       return;
     }
-    const drawn = modelsAdvanced(words, "small", offered, (chosen) =>
-      name === null ? invoke("next_models_kept", { chosen }) : invoke("meeting_models_chosen", { name, chosen }));
+    const drawn = modelsAdvanced(words, "small", offered, async (chosen) => {
+      if (name !== null) return invoke("meeting_models_chosen", { name, chosen });
+      await invoke("next_models_kept", { chosen });
+      nextChosen = Boolean(chosen.transcription || chosen.minutes);
+    });
     drawn.unfold(opened);
     drawn.toggle.addEventListener("click", () => {
       if (drawn.toggle.getAttribute("aria-expanded") === "true") advancedOf(true).then(() => document.getElementById("small-advanced")?.focus());
@@ -3526,7 +3553,7 @@ function showSmall(words) {
   live.append(opened, micNext, secret.row, note);
   live.hidden = true;
   const lines = element("div", "bar-lines");
-  lines.append(keptNext, announce, ...checks.map((check) => check.sentence), unkeptSaid);
+  lines.append(keptNext, modelsKept, announce, ...checks.map((check) => check.sentence), unkeptSaid);
   const options = element("div", "bar-options");
   options.id = "small-options";
   options.append(rest, live, advanced);
@@ -3612,6 +3639,7 @@ function showSmall(words) {
       if (first && !recording) start.focus();
       else if (!first && (!at || at === document.body || at.getClientRects().length === 0)) (recording ? stop : start).focus();
     }
+    paintModelsKept();
     if (!recording) {
       // A start that failed late: the shell has let it go, and no recording will come to give it back.
       if (start.disabled && !unanswered && !(await window.__TAURI__.core.invoke("header")).recording) {
@@ -3681,6 +3709,13 @@ function showSmall(words) {
       secret.row.classList.toggle("on", now.confidential);
     }
     if (Date.now() - mark.refused >= 5000) marked();
+    // Said confidential, or no longer: « Avancé » offers otherwise — no service then (D60) —, drawn
+    // again as it was, open or closed.
+    if (now.meeting !== null && now.confidential !== shownConfidential) {
+      shownConfidential = now.confidential;
+      advancedOf(advancedDrawn.models?.toggle.getAttribute("aria-expanded") === "true");
+    }
+    if (now.meeting === null) shownConfidential = null;
   };
   setInterval(tick, 100);
   setInterval(() => recording === false && paintKeys(), 1500);

@@ -559,6 +559,10 @@ pub struct Window {
     /// A meeting's own model gone (D91): Settings' choice stands in, as Auto does for a microphone.
     pub models_gone_transcription: &'static str,
     pub models_gone_minutes: &'static str,
+    /// A service the meeting chose, not used while it is said confidential (D60).
+    pub models_unused_confidential: &'static str,
+    /// Under the bar's row at rest, « Avancé » closed: models chosen for the next recording (D91).
+    pub bar_models_kept: &'static str,
     /// « Vérifier le son » (D88, board 7): its title, and its row in Settings.
     pub check_sound: &'static str,
     pub check_sound_says: &'static str,
@@ -989,7 +993,9 @@ pub fn window(language: Language) -> Window {
             models_not_kept: "This choice could not be kept: {}",
             models_not_read: "The models could not be read: {}",
             models_gone_transcription: "The transcription model chosen for this meeting is no longer here: Settings’ stands in.",
-            models_gone_minutes: "The minutes model chosen for this meeting is not one Settings name: Settings’ stands in.",
+            models_gone_minutes: "The minutes model chosen for this meeting goes through a service Settings do not name: Settings’ stands in.",
+            models_unused_confidential: "The service chosen for this meeting is not used while it is confidential: it is made on this computer.",
+            bar_models_kept: "Models kept for the next recording.",
             check_sound: "Check the sound",
             check_sound_says: "Your microphone and the meeting’s sound, before a recording.",
             check_unavailable: "Unavailable",
@@ -1405,7 +1411,9 @@ pub fn window(language: Language) -> Window {
             models_not_kept: "Ce choix n’a pas pu être gardé\u{a0}: {}",
             models_not_read: "Les modèles n’ont pas pu être lus\u{a0}: {}",
             models_gone_transcription: "Le modèle de transcription choisi pour cette réunion n’est plus là\u{a0}: celui des Réglages le remplace.",
-            models_gone_minutes: "Le modèle du compte rendu choisi pour cette réunion n’est pas celui des Réglages\u{a0}: celui des Réglages le remplace.",
+            models_gone_minutes: "Le modèle du compte rendu choisi pour cette réunion passe par un service que les Réglages ne nomment pas\u{a0}: celui des Réglages le remplace.",
+            models_unused_confidential: "Le service choisi pour cette réunion n’est pas utilisé tant qu’elle est confidentielle\u{a0}: elle est faite sur cet ordinateur.",
+            bar_models_kept: "Modèles gardés pour le prochain enregistrement.",
             check_sound: "Vérifier le son",
             check_sound_says: "Votre micro et le son de la réunion, avant un enregistrement.",
             check_unavailable: "Indisponible",

@@ -1569,12 +1569,20 @@ struct ModelsOffered {
     confidential: bool,
     chosen: meeting_models::Models,
     gone: Vec<meeting_models::Step>,
+    /// What the meeting chose and is not used while it is said confidential: a service.
+    unused: Vec<meeting_models::Step>,
+    /// Settings could not be read: what is offered comes from those last read, and this says why.
+    unreadable: Option<Told>,
 }
 
 #[tauri::command]
 fn models_offered(shell: State<'_, Shell>, name: Option<String>) -> Result<ModelsOffered, Told> {
-    let settings = shell.read_or_told()?;
-    let (chosen, gone, confidential) = match &name {
+    // Settings unreadable: offered from those in memory, and said — the panel still opens.
+    let (settings, unreadable) = match shell.reread() {
+        Ok(settings) => (settings, None),
+        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked, why))),
+    };
+    let (mut chosen, gone, confidential) = match &name {
         Some(name) => {
             let folder = session_folder(&shell, name)?;
             (
@@ -1591,29 +1599,55 @@ fn models_offered(shell: State<'_, Shell>, name: Option<String>) -> Result<Model
     };
     let file_name = |path: &Path| path.file_name().map(|name| name.to_string_lossy().into_owned());
     let base = ollama();
-    let service = settings
-        .transcription_provider
-        .clone()
-        .zip(settings.transcription_model.clone())
-        .filter(|_| !confidential);
+    let ollama_models = providers::ollama_models(&base);
+    // Said confidential: no service named anywhere (D60) — Settings' entry says who makes it here,
+    // and a service the meeting chose is not shown chosen: it is said unused while it is confidential.
+    let mut unused = Vec::new();
+    let (engine, hearing, writing) = if confidential {
+        if matches!(chosen.transcription, Some(meeting_models::Hearing::Service { .. })) {
+            chosen.transcription = None;
+            unused.push(meeting_models::Step::Transcription);
+        }
+        if chosen.minutes.as_ref().is_some_and(|writer| !providers::local(&writer.provider)) {
+            chosen.minutes = None;
+            unused.push(meeting_models::Step::Minutes);
+        }
+        let engine = match settings.engine {
+            Engine::SpeechAnalyzer => Engine::SpeechAnalyzer,
+            _ => Engine::Whisper,
+        };
+        let named = settings.minutes_provider.clone().zip(settings.minutes_model.clone());
+        let here = confidential::writer(named, &base, || Some(ollama_models.clone())).ok();
+        (engine, None, here)
+    } else {
+        (
+            settings.engine,
+            settings.transcription_provider.clone().zip(settings.transcription_model.clone()),
+            settings.minutes_provider.clone().zip(settings.minutes_model.clone()),
+        )
+    };
+    let (transcription_provider, transcription_model) = hearing.clone().unzip();
+    let (minutes_provider, minutes_model) = writing.unzip();
     Ok(ModelsOffered {
-        engine: settings.engine,
+        engine,
         model: file_name(&settings.model).unwrap_or_default(),
         whisper: settings::whisper_models(&models_folder(), &settings)
             .iter()
             .filter_map(|path| file_name(path))
             .collect(),
         apple: settings.engine == Engine::SpeechAnalyzer,
-        service,
+        service: hearing,
         ollama_address: providers::ollama_address(&base),
-        ollama: providers::ollama_models(&base),
-        transcription_provider: settings.transcription_provider,
-        transcription_model: settings.transcription_model,
-        minutes_provider: settings.minutes_provider,
-        minutes_model: settings.minutes_model,
+        ollama: ollama_models,
+        transcription_provider,
+        transcription_model,
+        minutes_provider,
+        minutes_model,
         confidential,
         chosen,
         gone,
+        unused,
+        unreadable,
     })
 }
 
@@ -1643,6 +1677,12 @@ fn next_models_kept(shell: State<'_, Shell>, chosen: meeting_models::Models) -> 
 #[tauri::command]
 fn meeting_models_chosen(shell: State<'_, Shell>, name: String, chosen: meeting_models::Models) -> Result<(), Told> {
     let folder = session_folder(&shell, &name)?;
+    // Said confidential: made here alone, so no service is ever chosen for it (D60).
+    let service = matches!(chosen.transcription, Some(meeting_models::Hearing::Service { .. }))
+        || chosen.minutes.as_ref().is_some_and(|writer| !providers::local(&writer.provider));
+    if service && confidential::marked(&folder) {
+        return Err(shell.told(Failure::Unexpected, "a meeting said confidential is sent to no service"));
+    }
     meeting_models::write(&folder, &chosen).map_err(|error| {
         // A choice the contract refuses, which « Avancé » never offers; else the folder.
         let failure = if error.kind() == std::io::ErrorKind::InvalidInput {
