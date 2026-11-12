@@ -3211,6 +3211,11 @@ def bar_opened(now: dt.datetime) -> None:
                 return True
             keys(browser, Keys.TAB)
         return browser.execute_script(focused) == "small-more"
+    def unfold(browser) -> bool:
+        # The options opened whatever a step before left: each check after holds on its own.
+        if browser.execute_script("return document.getElementById('small-options').hidden"):
+            browser.execute_script("document.getElementById('small-more').click()")
+        return wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
     def fit(browser, what: str) -> None:
         holds = lambda got: (got["scroll"][0] <= got["scroll"][1] and got["scroll"][2] <= got["scroll"][3] and not got["out"] and not got["cut"]
                              and got["size"][0] == 440 and abs(got["size"][1] - got["page"]) <= 1)
@@ -3345,21 +3350,19 @@ def bar_opened(now: dt.datetime) -> None:
                     folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44 and b.execute_script(focused) == "small-more", 3)
                     check(f"{name}: Escape on « Plus d’options », opened, folds the options, the focus kept on it",
                           reached and folded, [browser.execute_script("return innerHeight"), browser.execute_script(focused)])
-                    keys(browser, Keys.ENTER)
-                    wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
+                    unfolded = unfold(browser)
                     browser.execute_script("document.getElementById('small-next-context').focus()")
                     keys(browser, "Point")
                     keys(browser, Keys.ESCAPE)
-                    folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44, 3)
+                    # Folded to the row and the line saying the context kept: no longer 44 high.
+                    folded = wait_for(browser, lambda b: b.execute_script("return document.getElementById('small-options').hidden"), 3)
                     got = browser.execute_script("const f = document.getElementById('small-next-context'); return [f.value, document.activeElement === f]")
-                    check(f"{name}: Escape in the row's context folds the options, its text and the focus kept", folded and got == ["Point", True],
-                          [browser.execute_script("return innerHeight"), got])
+                    check(f"{name}: Escape in the row's context folds the options, its text and the focus kept", unfolded and folded and got == ["Point", True],
+                          [unfolded, browser.execute_script("return document.getElementById('small-options').hidden"), got])
                     browser.execute_script("document.getElementById('small-context-clear').click()")
                     # A recording started elsewhere while « Vérifier le son » shows in the bar (#754): the panel
                     # goes, the focus follows to ■.
-                    to_more(browser)
-                    keys(browser, Keys.ENTER)
-                    wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
+                    unfold(browser)
                     browser.execute_script("document.getElementById('small-check').focus()")
                     keys(browser, Keys.ENTER)
                     wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("inside"), 5)
