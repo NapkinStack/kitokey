@@ -2305,6 +2305,11 @@ def models_advanced(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.execute_script(idle), 15)
             # Its own model fails: the page names it, and where to choose another — Refaire… › Avancé, not Settings.
             failure = "const w = document.querySelector('#minutes-state .what'); return w ? w.textContent : ''"
+            # The notification, read before the page: the same sentence.
+            notified = WORK / "notified-own-minutes"
+            monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                       stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+            time.sleep(0.5)
             (WORK / "fail-minutes").touch()
             try:
                 press(browser, "redo-minutes")
@@ -2314,6 +2319,12 @@ def models_advanced(now: dt.datetime) -> None:
                 told = browser.execute_script(failure)
                 check("the meeting's own minutes model fails: the page names it, and Refaire… › Avancé to choose another",
                       failed and "Mistral 7b" in told and "Refaire…\u00a0› Avancé" in told and "réglages" not in told, told)
+                heard_own = wait_for(None, lambda b: "pas été refait" in notified.read_text(), 10)
+                since = len(notified.read_text())
+                said_own = notified.read_text()
+                check("and its notification says the same: the model named, Refaire… › Avancé, never Settings",
+                      heard_own and "Mistral 7b, choisi pour cette réunion" in said_own and "Refaire…\u00a0› Avancé" in said_own
+                      and "réglages" not in said_own, said_own[-500:])
                 # Settings' model fails: Settings' wording, as before.
                 (meeting / "models.json").unlink()
                 wait_for(browser, lambda b: b.execute_script(idle), 15)
@@ -2328,7 +2339,12 @@ def models_advanced(now: dt.datetime) -> None:
                 told = browser.execute_script(failure)
                 check("Settings' minutes model fails: Settings' wording, no « Avancé »",
                       failed and "dans les réglages de Kitokey" in told and "Avancé" not in told, told)
+                heard_settings = wait_for(None, lambda b: "pas été refait" in notified.read_text()[since:], 10)
+                said_settings = notified.read_text()[since:]
+                check("and its notification keeps Settings' wording",
+                      heard_settings and "dans les réglages de Kitokey" in said_settings and "Avancé" not in said_settings, said_settings[-500:])
             finally:
+                monitor.terminate()
                 (WORK / "fail-minutes").unlink()
                 (meeting / "models.json").write_text(json.dumps({"minutes": {"provider": here, "model": "mistral:7b"}}))
             wait_for(browser, lambda b: b.execute_script(idle), 15)

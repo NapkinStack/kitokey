@@ -2830,8 +2830,6 @@ struct Makings {
     failed: HashMap<String, String>,
     /// The minutes' cause and its gesture, in the user's language, when one was named (D29).
     failed_said: HashMap<String, String>,
-    /// The meeting's own model that failed, by meeting, where `failed_said` holds its place (D91).
-    own_model: HashMap<String, String>,
     awaiting: HashMap<String, String>,
     made: HashMap<String, u64>,
     /// Confidential meetings whose minutes wait for Ollama, and why (D60); the model it would fetch.
@@ -2875,30 +2873,16 @@ fn makings(shell: State<'_, Shell>) -> Makings {
     // Read under one hold: a second hold of the same lock in the struct below would never be
     // given, its first still held to the statement's end.
     let fetched = shell.fetched.lock().unwrap().clone();
-    let (failed, failed_said, own_model) = {
+    let (failed, failed_said) = {
         let failures = shell.minutes_failed.lock().unwrap();
         let failed = failures.iter().map(|(folder, (why, ..))| (named(folder), said(why))).collect();
-        // Failed by the meeting's own model: named, and chosen again where it was chosen — the page
-        // puts the model's name in the sentence (D91).
+        // Failed by the meeting's own model: named, and chosen again where it was chosen — the
+        // sentence its notification says too (D91).
         let causes = failures
             .iter()
-            .filter_map(|(folder, (_, cause, own))| {
-                let cause = (*cause)?;
-                let own = own.as_ref().and_then(|_| words::cause_own(cause, shell.language()));
-                Some((
-                    named(folder),
-                    own.unwrap_or_else(|| words::cause(cause, shell.language())).to_string(),
-                ))
-            })
+            .filter_map(|(folder, (_, cause, own))| Some((named(folder), words::cause_said((*cause)?, own.as_deref(), shell.language()))))
             .collect();
-        let own = failures
-            .iter()
-            .filter_map(|(folder, (_, cause, own))| {
-                words::cause_own((*cause)?, shell.language())?;
-                Some((named(folder), own.clone()?))
-            })
-            .collect();
-        (failed, causes, own)
+        (failed, causes)
     };
     let writing = shell.writing_minutes.lock().unwrap().clone();
     let by = shell.minutes_by.lock().unwrap().clone();
@@ -2957,7 +2941,6 @@ fn makings(shell: State<'_, Shell>) -> Makings {
             .collect(),
         failed,
         failed_said,
-        own_model,
         made: shell
             .minutes_made
             .lock()
@@ -3259,7 +3242,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
         let said = match made {
             summarising::Made::Written(_) if kept_beside.is_some() => words::Minutes::ReadyKeptBeside(kept_beside.unwrap_or_default()),
             summarising::Made::Written(_) => words::Minutes::Ready,
-            summarising::Made::Failed(_, cause) => words::Minutes::failed(cause, again),
+            summarising::Made::Failed(_, cause) => words::Minutes::failed_by(cause, again, own_model.as_deref(), shell.language()),
         };
         // Ready, a click opens the meeting (D44); a failure is said as ever.
         if written {

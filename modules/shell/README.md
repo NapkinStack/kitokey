@@ -178,8 +178,9 @@ the one after; « Avancé » closed, it is said under the row, naming them — �
 Qwen3 8b » —, and given with « Avancé » to a screen reader. Recording, it is that meeting's at once. In *Refaire…* it is kept once
 *Refaire* is pressed — *Annuler* changes nothing —, then the transcript is made again by them
 (`transcript_redo_own`) or the minutes. A model gone is said on the meeting's page and in « Avancé ».
-Minutes its own model failed to write name that model, and *Refaire… › Avancé* to choose another
-(`words::cause_own`); Settings' model failing, Settings are named as before.
+Minutes its own model failed to write name that model, and *Refaire… › Avancé* to choose another,
+on the page and in the notification alike (`words::cause_said`, the model said by `words::model_said`,
+the page's `modelSaid` rule); Settings' model failing, Settings are named as before.
 
 **A meeting said confidential** (D60, [its board](../../docs/project/drawings/d60-confidential/)) is
 made on this computer alone, whatever the settings name — its own models too.

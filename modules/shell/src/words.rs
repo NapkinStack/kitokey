@@ -1790,6 +1790,104 @@ pub fn test_caused(which: Cause, detail: &str, language: Language, developer: bo
     })
 }
 
+/// A quantisation's or a precision's tag, as a model's id ends with it: q4_K_M, iq3_xs, fp16, bf16,
+/// f32, int8 — what only machines read.
+fn quantised(tag: &str) -> bool {
+    let tag = tag.to_ascii_lowercase();
+    let q = tag.strip_prefix('i').unwrap_or(&tag);
+    if let Some(rest) = q.strip_prefix('q') {
+        let mut chars = rest.chars();
+        if chars.next().is_some_and(|c| c.is_ascii_digit()) {
+            let more = chars.as_str();
+            return more.is_empty()
+                || more.strip_prefix('_').is_some_and(|parts| {
+                    parts
+                        .split('_')
+                        .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric()))
+                });
+        }
+    }
+    let float = |t: &str, bits: &str| t.strip_prefix('f').is_some_and(|t| t.strip_prefix('p').unwrap_or(t) == bits);
+    float(tag.strip_prefix('b').unwrap_or(&tag), "16") || float(&tag, "32") || tag == "int4" || tag == "int8"
+}
+
+/// A date of release, as a model's id ends with it: 20241022, 2024-08-06, 06-2025.
+fn dated(tag: &str) -> bool {
+    let digits = |t: &str, n: usize| t.len() == n && t.chars().all(|c| c.is_ascii_digit());
+    let parts: Vec<&str> = tag.split('-').collect();
+    match parts[..] {
+        [one] => digits(one, 8),
+        [year, month, day] => digits(year, 4) && digits(month, 2) && digits(day, 2),
+        [month, year] => digits(month, 2) && digits(year, 4),
+        _ => false,
+    }
+}
+
+/// `name` without the first tail, after one of `separators`, that `tail` recognises.
+fn without_tail<'a>(name: &'a str, separators: &[char], tail: impl Fn(&str) -> bool) -> &'a str {
+    name.char_indices()
+        .find(|&(at, c)| separators.contains(&c) && tail(&name[at + c.len_utf8()..]))
+        .map_or(name, |(at, _)| &name[..at])
+}
+
+/// What people say of a model (the page's `modelSaid`, the one rule): the last part of its id, without
+/// what only machines read — a file's extension, a tag "latest", a date of release, a quantisation.
+pub fn model_said(model: &str) -> String {
+    let mut name = model.split('/').rfind(|part| !part.is_empty()).unwrap_or(model);
+    for extension in [".gguf", ".bin"] {
+        if name.len() > extension.len() && name[name.len() - extension.len()..].eq_ignore_ascii_case(extension) {
+            name = &name[..name.len() - extension.len()];
+        }
+    }
+    // Its tag "latest", after a colon.
+    if let Some((before, tag)) = name.rsplit_once(':')
+        && !before.is_empty()
+        && tag.eq_ignore_ascii_case("latest")
+    {
+        name = before;
+    }
+    name = without_tail(name, &['-', '_', ':', '.'], quantised);
+    name = without_tail(name, &['-', '_', ':'], dated);
+    let machine = |word: &str| quantised(word) || ["qat", "k", "m", "s", "l"].contains(&word.to_ascii_lowercase().as_str());
+    let mut words: Vec<&str> = name
+        .split(|c: char| c == '-' || c == '_' || c == ':' || c.is_whitespace())
+        .filter(|w| !w.is_empty())
+        .collect();
+    while words.len() > 1 && words.last().is_some_and(|word| machine(word)) {
+        words.pop();
+    }
+    if words.is_empty() || (words.len() == 1 && machine(words[0])) {
+        return model.to_string();
+    }
+    let short = |w: &str| (1..=2).contains(&w.len()) && w.chars().all(|c| c.is_ascii_digit());
+    let mut said: Vec<String> = Vec::new();
+    for word in words {
+        // A version written with dashes — claude-sonnet-4-5 — is said with its point.
+        if short(word) && said.last().is_some_and(|last| last.split('.').all(short)) {
+            let last = said.last_mut().expect("checked above");
+            last.push('.');
+            last.push_str(word);
+        } else if word.eq_ignore_ascii_case("gpt") {
+            said.push("GPT".into());
+        } else if word.starts_with(|c: char| c.is_ascii_lowercase()) {
+            said.push(word[..1].to_ascii_uppercase() + &word[1..]);
+        } else {
+            said.push(word.to_string());
+        }
+    }
+    said.join(" ")
+}
+
+/// The cause's sentence, said of the meeting's own model when it was its (`own`, as its id is) and the
+/// gesture is another model — then « Refaire… › Avancé » —, else Settings' sentence: the one the page
+/// and the notification both say (D91).
+pub fn cause_said(cause: Cause, own: Option<&str>, language: Language) -> String {
+    match own.zip(cause_own(cause, language)) {
+        Some((model, sentence)) => sentence.replacen("{}", &model_said(model), 1),
+        None => self::cause(cause, language).to_string(),
+    }
+}
+
 /// Why minutes were not made by the meeting's own model, chosen in « Avancé » (D91), where the gesture
 /// is another model: `{}` its name, the page's; chosen again in *Refaire…*, never in Settings. None
 /// where the gesture is the provider's — a key, credit, an address —: `cause`'s sentence says it.
@@ -2027,6 +2125,13 @@ pub enum Minutes {
     Failed(Option<Cause>),
     /// Made again (*Refaire…*) and not made: the ones there stayed; and why, as above.
     RedoFailed(Option<Cause>),
+    /// Not made by the meeting's own model (its id), for a cause whose gesture is another model: said
+    /// as the page says it (D91); `again` as for `RedoFailed`.
+    FailedOwn {
+        cause: Cause,
+        model: String,
+        again: bool,
+    },
     /// Online, and the user has not agreed to send this meeting to this host yet.
     Waiting(String),
     /// No one is chosen to write them.
@@ -2043,6 +2148,19 @@ pub enum Minutes {
 
 impl Minutes {
     /// Not made: as a first making, or as minutes made again (*Refaire…*) — the ones there stayed.
+    /// The same, by the meeting's own model when it was its (`own`): named where its gesture is another
+    /// model, else as `failed` says it.
+    pub fn failed_by(cause: Option<Cause>, again: bool, own: Option<&str>, language: Language) -> Self {
+        match (cause, own) {
+            (Some(cause), Some(model)) if cause_own(cause, language).is_some() => Minutes::FailedOwn {
+                cause,
+                model: model.to_string(),
+                again,
+            },
+            _ => Self::failed(cause, again),
+        }
+    }
+
     pub fn failed(cause: Option<Cause>, again: bool) -> Self {
         if again {
             Minutes::RedoFailed(cause)
@@ -2112,6 +2230,37 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
                 Some(cause) => format!("Celui d’avant est resté en place. {}", self::cause(*cause, language)),
                 None => "Celui d’avant est resté en place.".to_string(),
             },
+        ),
+        // By the meeting's own model: named, and chosen again in « Avancé », as its page says it (D91).
+        (
+            Minutes::FailedOwn {
+                cause,
+                model,
+                again: false,
+            },
+            English,
+        ) => (
+            "The minutes were not written",
+            format!("The transcript is untouched. {}", cause_said(*cause, Some(model), language)),
+        ),
+        (
+            Minutes::FailedOwn {
+                cause,
+                model,
+                again: false,
+            },
+            French,
+        ) => (
+            "Le compte rendu n’a pas été fait",
+            format!("La transcription est intacte. {}", cause_said(*cause, Some(model), language)),
+        ),
+        (Minutes::FailedOwn { cause, model, again: true }, English) => (
+            "The minutes were not made again",
+            format!("The previous ones stayed in place. {}", cause_said(*cause, Some(model), language)),
+        ),
+        (Minutes::FailedOwn { cause, model, again: true }, French) => (
+            "Le compte rendu n’a pas été refait",
+            format!("Celui d’avant est resté en place. {}", cause_said(*cause, Some(model), language)),
         ),
         (Minutes::Waiting(host), English) => (
             "The minutes wait for your agreement",

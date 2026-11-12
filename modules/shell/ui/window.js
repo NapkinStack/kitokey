@@ -384,11 +384,7 @@ function minutesState(name) {
   if (makings.ollama_waiting[name] !== undefined) {
     return { kind: "ollama", silent: makings.ollama_waiting[name] === "silent", busy: makings.model_fetching !== null };
   }
-  // Failed by the meeting's own model (D91): its sentence names it, as the page says a model.
-  if (makings.failed[name] !== undefined) {
-    const own = makings.own_model[name];
-    return { kind: "failed", why: makings.failed[name], said: own === undefined ? makings.failed_said[name] : fill(makings.failed_said[name], modelSaid(own)) };
-  }
+  if (makings.failed[name] !== undefined) return { kind: "failed", why: makings.failed[name], said: makings.failed_said[name] };
   return null;
 }
 
