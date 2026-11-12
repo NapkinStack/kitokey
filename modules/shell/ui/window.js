@@ -3392,7 +3392,17 @@ function showSmall(words) {
   const modelsKept = element("p", "says", words.bar_models_kept);
   modelsKept.id = "small-models-kept";
   modelsKept.hidden = true;
+  // Whether models are kept for the next recording, as the shell says it — read again at each change
+  // of state and after each choice at rest, never kept apart from it.
   let nextChosen = false;
+  const readKept = async () => {
+    const offered = await invoke("models_offered", { name: null }).catch((why) => {
+      smallSaid("models", fill(words.models_not_read, why));
+      return null;
+    });
+    nextChosen = offered !== null && Boolean(offered.chosen.transcription || offered.chosen.minutes);
+    paintModelsKept();
+  };
   const paintModelsKept = () => {
     const open = !options.hidden && advancedDrawn.models?.toggle.getAttribute("aria-expanded") === "true";
     modelsKept.hidden = recording !== false || !nextChosen || open;
@@ -3405,7 +3415,8 @@ function showSmall(words) {
     });
     if (offered === null) return;
     smallSaid("models", null);
-    if (name === null) nextChosen = Boolean(offered.chosen.transcription || offered.chosen.minutes);
+    // Asked for another meeting than the bar's now — a start or a stop meanwhile —: the later ask draws.
+    if (meeting.name !== name) return;
     const from = JSON.stringify([name, offered]);
     // The same: left as it is, opened when asked — never closed under the user.
     if (from === advancedDrawn.from && advancedDrawn.models) {
@@ -3415,14 +3426,17 @@ function showSmall(words) {
     const drawn = modelsAdvanced(words, "small", offered, async (chosen) => {
       if (name !== null) return invoke("meeting_models_chosen", { name, chosen });
       await invoke("next_models_kept", { chosen });
-      nextChosen = Boolean(chosen.transcription || chosen.minutes);
+      readKept();
     });
     drawn.unfold(opened);
     drawn.toggle.addEventListener("click", () => {
       if (drawn.toggle.getAttribute("aria-expanded") === "true") advancedOf(true).then(() => document.getElementById("small-advanced")?.focus());
     });
+    // The control the focus is on stays the one focused once drawn again (showSmall's rule).
+    const focused = advanced.contains(document.activeElement) ? document.activeElement.id : null;
     advanced.replaceChildren(drawn.box);
     advancedDrawn = { from, models: drawn };
+    if (focused) document.getElementById(focused)?.focus();
   };
 
   const live = element("div", "small-live");
@@ -3501,6 +3515,7 @@ function showSmall(words) {
     unkeptSaid.hidden = unkept.size === 0;
   };
   advancedOf(false);
+  readKept();
   const keep = async (last = false) => {
     const { name, typed } = meeting;
     if (name === null || typed === null || typed === meeting.saved) return;
@@ -3616,6 +3631,9 @@ function showSmall(words) {
       dot.setAttribute("cy", recording ? "6.2" : "5.6");
       // Each recording its own context: nothing of the one before.
       Object.assign(meeting, { name: null, saved: null, typed: null, refused: null });
+      // « Avancé » and what is said kept: of the next recording again, as the shell has them.
+      advancedOf(false);
+      readKept();
       mark.wanted = null;
       secret.box.checked = false;
       secret.row.classList.remove("on");

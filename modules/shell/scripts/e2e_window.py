@@ -2179,12 +2179,57 @@ def models_advanced(now: dt.datetime) -> None:
             check("said confidential while « Avancé » is open: drawn again at once, open, no service offered", redrawn, browser.execute_script(shown, "small"))
             browser.execute_script("document.getElementById('small-confidential').click()")
             wait_for(browser, lambda b: not (meeting / "confidential").exists() and "whisper-1, via hears.example" in (b.execute_script(shown, "small")["hear"] or []), 5)
+            # Said confidential by the window's switch while a list of « Avancé » has the focus: drawn again,
+            # the focus kept on that list (showSmall's rule).
+            browser.execute_script("document.getElementById('small-transcription-model').focus()")
+            browser.execute_script("window.__TAURI__.core.invoke('confidential_set', {name: arguments[0], on: true})", meeting.name)
+            redrawn = wait_for(browser, lambda b: not any("via" in one for one in (b.execute_script(shown, "small")["hear"] or ["via"])), 5)
+            time.sleep(0.3)
+            kept_focus = browser.execute_script("return document.activeElement.id")
+            check("said confidential from the window while a list has the focus: « Avancé » drawn again, the focus kept on that list",
+                  redrawn and kept_focus == "small-transcription-model", kept_focus)
+            browser.execute_script("window.__TAURI__.core.invoke('confidential_set', {name: arguments[0], on: false})", meeting.name)
+            wait_for(browser, lambda b: "whisper-1, via hears.example" in (b.execute_script(shown, "small")["hear"] or []), 5)
             hearing.unlink(missing_ok=True)
             time.sleep(0.6)
             stop_from_small(browser)
             heard = wait_for(None, lambda b: str(tiny) in read(hearing) and (meeting / "transcript.jsonl").exists(), 15)
             check("stopped: its transcript heard by the model chosen in the bar", heard and str(model) not in read(hearing), read(hearing))
             check("Settings unchanged by any of it", window.file.read_text() == before, window.file.read_text())
+            # Stopped by ■: nothing kept for the next, nothing said kept — as the shell has it.
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+            none_kept = lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
+            quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
+            check("stopped by ■: no models kept for the next, and none said kept", quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
+            # Chosen again at rest, then started and stopped from the tray's icon: the same.
+            wait_for(browser, lambda b: b.execute_script(idle), 15)
+            if browser.execute_script("return document.getElementById('small-options').hidden"):
+                browser.execute_script("document.getElementById('small-more').click()")
+            if browser.execute_script(shown, "small")["expanded"] != "true":
+                browser.execute_script("document.getElementById('small-advanced').click()")
+            wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is False, 5)
+            time.sleep(0.3)
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
+            wait_for(browser, lambda b: none_kept(b) != {}, 5)
+            browser.execute_script("document.getElementById('small-advanced').click()")
+            said = wait_for(browser, lambda b: b.execute_script(line) == "Modèles gardés pour le prochain enregistrement.", 3)
+            check("chosen again at rest, « Avancé » closed: said kept", said, browser.execute_script(line))
+            made = meetings / "2026-10-18_11-30"
+            meeting.rename(made)
+            try:
+                tray_click("Démarrer")
+                wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+                time.sleep(0.6)
+                tray_click("Arrêter l’enregistrement")
+                wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+                quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
+                check("started and stopped from the tray's icon: no models kept for the next, and none said kept",
+                      quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
+                wait_for(None, lambda b: (meeting / "transcript.jsonl").exists(), 15)
+                wait_for(browser, lambda b: b.execute_script(idle), 15)
+            finally:
+                shutil.rmtree(meeting, ignore_errors=True)
+                made.rename(meeting)
         # Refaire…: its « Avancé » closed, the meeting's own models in it; chosen there, kept once Refaire is pressed.
         full = Window(meetings, "fr_FR.UTF-8", named, ollama=base)
         full.env.update(XDG_DATA_HOME=str(data))
