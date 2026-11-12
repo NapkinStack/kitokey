@@ -3573,10 +3573,12 @@ function showSmall(words) {
   options.id = "small-options";
   options.append(rest, live, advanced);
   options.hidden = true;
-  options.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || event.defaultPrevented) return;
+  // Escape anywhere in the bar folds them (board 5): the focus back on « Plus d’options » from inside
+  // them, where it is from the row — a field's text left as it is.
+  page.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || event.defaultPrevented || !open) return;
     event.preventDefault();
-    unfoldOptions(false, true);
+    unfoldOptions(false, options.contains(event.target));
   });
   page.replaceChildren(row, lines, options);
 
@@ -3653,6 +3655,9 @@ function showSmall(words) {
       // Opened at rest, the recording's gesture has the focus; after, a focus left on nothing — ● or ■
       // gone with its state, « Vérifier le son »'s panel closed by its start — follows to the state's
       // own gesture, as the full window's button gives it back (`paintRecord`).
+      // « Vérifier le son »'s panel, open when a recording started elsewhere — the tray, the shortcut —,
+      // closed now: the focus it held is then on nothing, and follows (#754).
+      if (checking) await checking();
       const at = document.activeElement;
       if (first && !recording) start.focus();
       else if (!first && (!at || at === document.body || at.getClientRects().length === 0)) (recording ? stop : start).focus();

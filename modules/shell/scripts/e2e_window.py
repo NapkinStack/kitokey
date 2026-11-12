@@ -3336,6 +3336,40 @@ def bar_opened(now: dt.datetime) -> None:
                     wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 8)
                     got = browser.execute_script("return [document.getElementById('small-advanced').getAttribute('aria-expanded'), document.getElementById('small-advanced-panel').hidden]")
                     check(f"{name}: « {said['advanced']} », open while recording, is closed once at rest", got == ["false", True], got)
+                    # Escape in the row folds the options too (board 5, #757): from « Plus d’options » itself,
+                    # the focus kept there; from the context's field, its text and the focus kept.
+                    reached = to_more(browser)
+                    keys(browser, Keys.ENTER)
+                    wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
+                    keys(browser, Keys.ESCAPE)
+                    folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44 and b.execute_script(focused) == "small-more", 3)
+                    check(f"{name}: Escape on « Plus d’options », opened, folds the options, the focus kept on it",
+                          reached and folded, [browser.execute_script("return innerHeight"), browser.execute_script(focused)])
+                    keys(browser, Keys.ENTER)
+                    wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
+                    browser.execute_script("document.getElementById('small-next-context').focus()")
+                    keys(browser, "Point")
+                    keys(browser, Keys.ESCAPE)
+                    folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44, 3)
+                    got = browser.execute_script("const f = document.getElementById('small-next-context'); return [f.value, document.activeElement === f]")
+                    check(f"{name}: Escape in the row's context folds the options, its text and the focus kept", folded and got == ["Point", True],
+                          [browser.execute_script("return innerHeight"), got])
+                    browser.execute_script("document.getElementById('small-context-clear').click()")
+                    # A recording started elsewhere while « Vérifier le son » shows in the bar (#754): the panel
+                    # goes, the focus follows to ■.
+                    to_more(browser)
+                    keys(browser, Keys.ENTER)
+                    wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
+                    browser.execute_script("document.getElementById('small-check').focus()")
+                    keys(browser, Keys.ENTER)
+                    wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("inside"), 5)
+                    browser.execute_script("window.__TAURI__.core.invoke('record')")
+                    started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed() and b.execute_script("return document.getElementById('check-sound') === null"), 8)
+                    held = wait_for(browser, lambda b: b.execute_script(focused) == "small-stop", 3)
+                    check(f"{name}: a recording started elsewhere while « {said['check']} » shows: the panel gone, the focus on ■",
+                          started and held, browser.execute_script(focused))
+                    stop_from_small(browser)
+                    wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 8)
     finally:
         listed.unlink(missing_ok=True)
         subprocess.run(["pactl", "unload-module", mic], capture_output=True)
