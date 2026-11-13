@@ -3219,6 +3219,8 @@ def sound_checked(now: dt.datetime) -> None:
             late = browser.execute_async_script("const done = arguments[arguments.length - 1];"
                                                 " Promise.all(window.held.map((h) => h.ask().then((a) => { h.answer = a; return a.open; }))).then(done)")
             check("held, then asked once the first panel closed: the shell says nothing is open", took is not None and late and not any(late), [took, late])
+            # Gone from the page too, before the next opens: the same id, never read for the next one's.
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3)
             opened(browser)
             browser.execute_script("for (const h of window.held) h.done(h.answer); window.held = []; window.restoreInvoke()")
             time.sleep(1.0)
