@@ -248,10 +248,11 @@ def press(browser, element_id: str) -> None:
     browser.find_element(By.ID, element_id).click()
 
 
-def free(browser, element_id: str) -> None:
+def free(browser, element_id: str, case: str) -> None:
     """A Tester's button offered again before the next case's click: a click on it disabled is
     lost without an error, its code never asked, the last sentence read again (#799)."""
-    wait_for(browser, lambda b: b.find_element(By.ID, element_id).is_enabled(), 10)
+    if not wait_for(browser, lambda b: b.find_element(By.ID, element_id).is_enabled(), 10):
+        check(f"Tester still busy before {case}", False, f"#{element_id} disabled for 10 s")
 
 
 def context_opened(browser):
@@ -1109,12 +1110,14 @@ def service_named(now: dt.datetime) -> None:
         code = WORK / "test-code"
         try:
             for cause, sentence in TEST_CAUSES:
-                free(browser, "transcription-test")
+                free(browser, "transcription-test", f"a service, {cause}")
                 code.write_text(cause)
                 press(browser, "transcription-test")
                 held = wait_for(browser, lambda b: b.execute_script(said) == sentence, 10)
                 check(f"Tester of a service, {cause}: its own sentence, what to do, no raw text", held, browser.execute_script(said))
-            free(browser, "transcription-test")
+                # A second test in flight once the sentence is read: the next case waits for it (#799).
+                browser.find_element(By.ID, "transcription-test").click()
+            free(browser, "transcription-test", "a service, a code unknown")
             code.write_text("provider.of_a_later_version")
             press(browser, "transcription-test")
             unknown = wait_for(browser, lambda b: b.execute_script(said).startswith("Le modèle ne répond pas"), 10)
@@ -1137,6 +1140,7 @@ def service_named(now: dt.datetime) -> None:
             before = browser.find_element(By.ID, "transcription-said")
             press(browser, "developer")
             WebDriverWait(browser, 5).until(staleness_of(before))
+            free(browser, "transcription-test", "a service in developer mode")
             press(browser, "transcription-test")
             raw = wait_for(browser, lambda b: "raw words of the service" in b.execute_script(said), 10)
             told = browser.execute_script(said)
@@ -7524,14 +7528,16 @@ def main() -> int:
         code = WORK / "test-code"
         try:
             for cause, sentence in TEST_CAUSES:
-                free(browser, "minutes-test")
+                free(browser, "minutes-test", f"the minutes, {cause}")
                 code.write_text(cause)
                 press(browser, "minutes-test")
                 held = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-tested").get_attribute("textContent") == sentence, 10)
                 check(f"Tester of the minutes, {cause}: its own sentence, what to do, no raw text", held, browser.find_element(By.ID, "minutes-tested").get_attribute("textContent"))
+                # A second test in flight once the sentence is read: the next case waits for it (#799).
+                browser.find_element(By.ID, "minutes-test").click()
             # In developer mode, the sentence and the program's last line, its name off.
             changed(lambda: browser.find_element(By.ID, "developer").click())
-            free(browser, "minutes-test")
+            free(browser, "minutes-test", "the minutes in developer mode")
             press(browser, "minutes-test")
             raw = wait_for(browser, lambda b: "raw words of the provider" in b.find_element(By.ID, "minutes-tested").get_attribute("textContent"), 10)
             told = browser.find_element(By.ID, "minutes-tested").get_attribute("textContent")
@@ -7540,6 +7546,7 @@ def main() -> int:
             text = window.file.read_text()
         finally:
             code.unlink(missing_ok=True)
+        free(browser, "minutes-test", "the minutes refused")
         press(browser, "minutes-test")
         refused = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-tested").text.startswith("Le modèle ne répond pas"), 10)
         said = browser.find_element(By.ID, "minutes-tested").text
