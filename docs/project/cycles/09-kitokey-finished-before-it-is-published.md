@@ -314,12 +314,13 @@ below is unchanged, and the end date does not move for them.
 - A model picker on the start button; a router choosing models by itself; meeting types.
 - A GNOME Shell extension, or XWayland, to keep the bar above.
 - A component library, a custom font, a mascot, a theme picker.
-- macOS: cycle 10.
+- macOS: a later cycle's ([cycle 10's *Later*](10-kitokey-ready-when-you-come-back.md#later), framed 2026-11-13).
 
 ## Later
 
-- **Cycle 10, macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation, FLAC in WKWebView —
-  everything cycle 08's *Later* gave cycle 09.
+- **macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation, FLAC in WKWebView —
+  everything cycle 08's *Later* gave cycle 09; moved to [cycle 10's *Later*](10-kitokey-ready-when-you-come-back.md#later)
+  when cycle 10 was framed on the copy and UX review, 2026-11-13.
 - **Opus for old meetings**: a bench first — the trial meeting through today's engine from FLAC and from Opus
   32 and 48 kbit/s —, then, only if it holds and the decider amends ADR-0004, a compact copy after N days
   (about 43 MB an hour) ([review §3](../reviews/2026-11-06-market.md)).
