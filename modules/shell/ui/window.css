@@ -3,11 +3,14 @@
   color-scheme: light dark;
   --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
   --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
+  /* A field's, a list's, a switch's border, 3:1 on each ground (D89); --line divides, and only that. */
+  --edge: #808898;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
     --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+    --edge: #737B8C;
   }
 }
 * { box-sizing: border-box; }
@@ -17,11 +20,13 @@ body {
   margin: 0; background: var(--ground); color: var(--ink);
   font: 15px/1.45 system-ui, sans-serif;
 }
-/* An icon drawn (D69), the size of the text it stands beside. */
-.glyph { width: 1em; height: 1em; vertical-align: -0.125em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* An icon drawn (D69): Lucide's, 16 px (D89). */
+.glyph { flex: none; width: 16px; height: 16px; vertical-align: -0.125em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
-.mark { fill: var(--ink); }
-.peaks { stroke: var(--surface); }
+/* The name (D89), alone, in the ink as its board draws it; while recording, its dot red and larger. */
+.brand svg { flex: none; display: block; color: var(--ink); }
+#name-dot { fill: currentColor; }
+.brand.live #name-dot { fill: var(--red); }
 nav { display: flex; gap: 4px; }
 nav a {
   display: inline-block; padding: 8px 14px; border-radius: 9px; color: var(--ink);
@@ -35,11 +40,10 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .total strong { font-size: 26px; letter-spacing: -0.02em; }
 .total span, .legend { color: var(--soft); }
 .split { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--raised); }
-.split .audio, .swatch.audio { background: var(--accent); }
-.split .text, .swatch.text { background: var(--ok); }
+.split .audio { background: var(--accent); }
+.split .text { background: var(--ok); }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; }
 .legend li { display: flex; align-items: center; gap: 7px; }
-.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .none { color: var(--soft); }
 .group { display: flex; flex-direction: column; gap: 10px; }
 .group h2 {
@@ -59,25 +63,45 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .chip.cut { color: var(--soft); font-style: italic; }
 .session:hover { border-color: var(--accent); }
 .meeting-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
-.meeting-top .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.meeting-top .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+/* « Plus d’actions » (D89): its menu under the button, at its right edge. */
+.more { position: relative; }
+.menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 5; min-width: 220px; padding: 4px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 0.16); }
+.menu-item { display: flex; align-items: center; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; white-space: nowrap; cursor: pointer; }
+.menu-item:hover, .menu-item:focus { background: var(--raised); }
 .back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }
-.open, .search { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--raised); color: var(--ink); font: inherit; }
-.open { padding: 0 16px; font-weight: 600; cursor: pointer; }
-.search { padding: 0 12px; min-width: 200px; }
-/* In the transcript's head, the search takes the room the title leaves; Refaire… sits beside who
-   heard it, as board 2 has it (#312). */
-.top > .search { flex: 1 1 200px; max-width: 320px; }
+/* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
+.open, .search { min-height: 32px; border-radius: 8px; border: 1px solid var(--edge); background: var(--raised); color: var(--ink); font: inherit; font-size: 14px; }
+.open { padding: 0 12px; font-weight: 600; cursor: pointer; }
+/* A field is drawn on the surface, only edged (board 2's after); a button is raised. */
+.search { padding: 0 12px; min-width: 200px; background: var(--surface); }
+/* In the transcript's head, the search takes the room the title leaves, Refaire… at its right
+   (D89, board 4). */
+.top > .finding { flex: 1 1 200px; max-width: 320px; margin-left: auto; }
+.top > .finding .search { width: 100%; }
 .made { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .made > .redo { flex-basis: 100%; }
-.meeting-title { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
-.meeting-title h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.meeting-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+/* The meeting's header (D89): its title at 18 px, its actions at its right. */
+#meeting { padding-top: 0; }
+.meeting-head { display: flex; align-items: center; gap: 12px 16px; min-height: 56px; margin: 0 -24px; padding: 8px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.lasts { color: var(--soft); font-size: 13px; white-space: nowrap; }
+.lasts .length + .weighs::before { content: " · "; }
+.meeting-head .meeting-title { flex: 1 1 auto; min-width: 0; }
+.meeting-head .meeting-top { flex: none; }
+.meeting-title h1 { margin: 0; font-size: 18px; font-weight: 650; overflow-wrap: anywhere; }
 .meeting-title h1 .rename { display: block; max-width: 100%; margin: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; overflow-wrap: anywhere; cursor: text; }
 .meeting-title h1 .rename:hover { background: var(--raised); box-shadow: 0 0 0 4px var(--raised); }
-.meeting-title:has(.naming) .named { flex: 1 1 100%; }
+.meeting-title:has(.naming) h1 { flex: 1 1 100%; }
 .meeting-title h1 .naming { display: block; box-sizing: border-box; width: calc(100% + 9px); margin: -3px 0 -3px -9px; padding: 2px 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; letter-spacing: inherit; }
 .meeting-title h1 .naming::placeholder { color: var(--soft); }
 .freeable .name { overflow-wrap: anywhere; }
 .named { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* In the meeting's header, the date on a line of its own above, the name and its length and weight on
+   one line, on one baseline, just after the name however short (board 4, D48). */
+.meeting-head .named { display: contents; }
+.meeting-head .named .on { flex: 1 1 100%; }
+.meeting-head .named h1 { min-width: 0; }
 .drawn { padding: 14px 18px 10px; display: flex; flex-direction: column; gap: 8px; }
 .relief { width: 100%; height: 88px; }
 .relief polyline { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
@@ -134,29 +158,29 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .status.online::before { background: var(--accent); }
 #settings .group > .row + .row { border-top: 1px solid var(--line); padding-top: 14px; }
 .picks { display: flex; gap: 8px; align-items: center; }
-.picks input { width: 96px; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); font: inherit; }
+.picks input { width: 96px; min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
 #settings .state { flex-direction: row; align-items: center; justify-content: space-between; }
 .ready { color: var(--ok); font-weight: 700; white-space: nowrap; }
 /* The models to download (D37): a row each, its state at its end. */
 .step h3 { margin: 6px 0 0; font-size: 14px; font-weight: 700; }
 .offered { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.choice { display: flex; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); cursor: pointer; }
+.choice { display: flex; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--edge); cursor: pointer; }
 .choice:has(input:checked) { border-color: var(--accent); background: var(--raised); }
 .choice input, .row input[type="checkbox"] { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); }
 .said { display: flex; flex-direction: column; gap: 2px; flex: 1 1 320px; min-width: 0; }
 .said .name, .row > .name { font-weight: 600; }
 .says { color: var(--soft); font-size: 14px; margin: 0; }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
-select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); color: var(--ink); font: inherit; }
-.warn { padding: 12px 16px; color: var(--red); }
+select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--ink); font: inherit; }
+.warn { padding: 12px 16px; color: var(--ink); }
 /* In developer mode, a command's raw failure on the line under its sentence (D47). */
 .warn, #language-said, #context-said, #correction-said, #minutes-tested, #transcription-said, #free-said, #welcome-said { white-space: pre-line; }
 .fields { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
 .field { display: flex; flex-direction: column; gap: 5px; flex: 1 1 200px; }
 .keys { padding: 6px 10px; border-radius: 8px; background: var(--raised); font: 13.5px ui-monospace, monospace; }
-.folder input { flex: 1 1 240px; min-width: 0; min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; }
-.folder input:hover, .folder input:focus { border-color: var(--line); background: var(--ground); color: var(--ink); }
-.field input { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); font: inherit; }
+.folder input { flex: 1 1 240px; min-width: 0; min-height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; }
+.folder input:hover, .folder input:focus { border-color: var(--edge); background: var(--ground); color: var(--ink); }
+.field input { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
 
 /* The agreement before a meeting first leaves (D11's fifth board). */
 #agree { align-items: center; }
@@ -176,7 +200,7 @@ select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px sol
 .choices { display: flex; flex-wrap: wrap; gap: 10px; }
 .choices .primary { flex: 1 1 240px; }
 .choices .open { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
-.primary { min-height: 48px; padding: 0 20px; border: 0; border-radius: 12px; background: var(--accent); color: var(--surface); font: inherit; font-weight: 700; cursor: pointer; transition: transform 120ms ease, filter 120ms ease; }
+.primary { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--accent); color: var(--surface); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform 120ms ease, filter 120ms ease; }
 .primary:hover { filter: brightness(1.08); }
 .primary:active { transform: translateY(1px); }
 .link { align-self: flex-start; padding: 6px 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
@@ -187,26 +211,21 @@ select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px sol
 .fields:empty { display: none; }
 .tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); }
 .path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.path:hover { border-color: var(--line); color: var(--ink); }
+.path:hover { border-color: var(--edge); color: var(--ink); }
 
 /* The sidebar's gesture and the list's rows (D11's first board). */
 .act { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-.act .primary { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 16px; }
+.act .primary { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px; }
 .act .dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
 .act .primary.live { background: var(--red); }
 .act .primary.live .dot { animation: beat 1.2s ease-in-out infinite; }
 @keyframes beat { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .act .primary.live .dot { animation: none; } }
 .session { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px 22px; }
-.session .shape { width: 132px; display: flex; }
-.relief.small { width: 132px; height: 36px; }
-.relief.small polyline { fill: none; stroke-width: 2; stroke-linejoin: round; stroke: var(--accent); }
-.relief.small .base { stroke: var(--line); stroke-width: 1; }
-.session .length { font: 13px ui-monospace, monospace; }
+.session .length { font-size: 13px; font-variant-numeric: tabular-nums; }
 .chevron { color: var(--soft); font-size: 22px; line-height: 1; transition: transform 120ms ease; }
 .session:hover .chevron { transform: translateX(3px); color: var(--accent); }
-@media (max-width: 640px) { .session { grid-template-columns: 1fr auto; } .session .shape, .session .chevron { display: none; } }
-.relief.small.quiet polyline { stroke: none; }
+@media (max-width: 640px) { .session { grid-template-columns: 1fr auto; } .session .chevron { display: none; } }
 
 /* One meeting (D11's second board): where each step ran, the relief's span, makers in monospace. */
 .drawn .legend .range { margin-left: auto; font: 12.5px ui-monospace, monospace; color: var(--soft); }
@@ -222,7 +241,7 @@ select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px sol
 .lines li:hover .edit, .lines li:focus-within .edit, .lines .edit:focus-visible { opacity: 1; }
 .lines .edit:hover { background: var(--raised); color: var(--ink); }
 .lines .edited { margin-left: 8px; font-size: 12px; color: var(--soft); }
-.lines .correcting { width: 100%; min-height: 36px; padding: 4px 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+.lines .correcting { width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
 .corrected-since { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 8px; }
 .corrected-since .note { margin: 0; }
 .maker { font: 12.5px ui-monospace, monospace; color: var(--soft); overflow-wrap: anywhere; }
@@ -237,7 +256,6 @@ select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px sol
 
 /* Freeing space (D11's third board). */
 #free { max-width: 960px; }
-.total #free-link { margin-left: auto; display: inline-flex; align-items: center; text-decoration: none; }
 .weight .total { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .free-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -248,99 +266,109 @@ select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px sol
 .freeable .weighs { margin-left: auto; font: 600 15px ui-monospace, monospace; }
 .freeable.busy { cursor: default; opacity: 0.6; }
 .free-total { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 20px 24px; background: var(--raised); }
-.danger { min-height: 48px; padding: 0 22px; border: 0; border-radius: 12px; background: var(--red); color: var(--surface); font: inherit; font-weight: 700; cursor: pointer; }
+/* Arrêter in the small window: red, as the recording it stops. */
+.danger { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--red); color: var(--surface); font: inherit; font-weight: 700; cursor: pointer; }
 .danger:disabled, .primary:disabled, .open:disabled { opacity: 0.45; cursor: default; }
 .page-top { display: flex; align-items: baseline; gap: 18px; }
 .page-top h1 { margin: 0; font-size: 20px; }
 .free-total .total { display: flex; align-items: baseline; gap: 8px; }
 .free-total .total strong { font-size: 24px; }
 
-/* The small window while recording (D11's sixth board). */
+/* The recording bar (D90's boards): one row of 44 px on the surface, its controls 28 px; under it,
+   its options once opened, and the recording's view. */
+body.small-window { background: var(--surface); }
 body.small-window .frame { display: none; }
-#small { max-width: none; padding: 14px 20px; gap: 10px; }
-.small-top { display: flex; align-items: center; gap: 12px; }
-.live-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--red); animation: beat 1.2s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
-.small-top .time { font: 500 30px ui-monospace, monospace; letter-spacing: 0.02em; }
-.small-top .icon { margin-left: auto; width: 40px; min-height: 40px; padding: 0; font-size: 18px; }
-/* The room of the two sentences a silence may say is kept under the meters: Arrêter never moves as
-   the recording goes (D49). */
-.meters { display: grid; grid-template-columns: max-content 1fr; align-items: center; align-content: start; gap: 4px 16px; height: 122px; }
-.meter { display: contents; }
-.meter .said { white-space: nowrap; min-width: 110px; gap: 0; line-height: 18px; }
-.meter .device { color: var(--soft); font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* A side's check in its device's slot (D49): a ring listening, ✓ heard, then gone; the slot's height
-   held, so that nothing under it moves. */
-.meter .slot { display: flex; align-items: center; height: 16px; max-width: 190px; line-height: 16px; }
-.check { position: relative; flex: none; width: 14px; height: 14px; margin-right: 5px; border-radius: 50%; border: 1.5px solid var(--soft); }
-.check-said { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.slot[data-check="listening"] .check { animation: beat 1.6s ease-in-out infinite; }
-.slot[data-check="nothing"] .check { border-color: var(--red); }
-.slot[data-check="waiting"] .check { display: none; }
-.slot[data-check="heard"] .check { border-color: var(--ok); background: var(--ok); animation: check-pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1); transition: opacity 500ms ease, width 300ms ease 400ms, margin-right 300ms ease 400ms, border-width 0s linear 700ms; }
-.check .glyph { display: none; position: absolute; inset: 0; width: 100%; height: 100%; stroke: var(--surface); stroke-width: 3; }
-.slot[data-check="heard"] .check .glyph { display: block; }
-.slot.faded .check { opacity: 0; width: 0; margin-right: 0; border-width: 0; }
-@keyframes check-pop { from { transform: scale(0.4); } }
-.check-says { grid-column: 1 / -1; margin: -2px 0 0; font-size: 12px; line-height: 1.25; animation: check-says 300ms ease; }
-.check-says:empty { height: 0; margin: 0; overflow: hidden; }
-@keyframes check-says { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .slot[data-check] .check { animation: none; transition: none; }
-  .check-says { animation: none; }
-}
-.meter .track { height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
-.meter .fill { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--accent); transition: width 90ms linear; }
-#level-others { background: var(--ok); }
-#small .danger { width: 100%; }
-.small-announce { display: flex; flex-wrap: wrap; align-items: baseline; align-content: flex-start; gap: 0 10px; height: 32px; font-size: 12px; line-height: 1.3; color: var(--soft); }
-.small-announce[hidden] { display: none; }
-.small-announce.gone { visibility: hidden; }
+#small { max-width: none; padding: 0; gap: 0; }
+#small .bar-row { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 8px 0 12px; }
+#small .bar-space { flex: 1 1 auto; }
+#small .bar-row .icon-button { width: 28px; min-height: 28px; }
+/* The mark alone, in the accent: the handle; recording, its dot red and larger (the decider, 2026-11-08). */
+#small .handle { display: grid; place-items: center; margin-right: 8px; color: var(--accent); cursor: grab; }
+.mark { display: block; width: 20px; height: 20px; fill: currentColor; }
+.mark .arms { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.mark .live, .handle.live .mark .rest { display: none; }
+.handle.live .mark .live { display: inline; }
+#small .handle.live .dot { fill: var(--red); }
+#small .time { font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+/* ● to record, a red ring holding a red dot that grows under the pointer; ■ to stop, red. */
+#small .record { display: inline-grid; place-items: center; width: 28px; min-height: 28px; padding: 0; border: 2px solid var(--red); border-radius: 50%; background: transparent; cursor: pointer; }
+#small .record .record-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--red); transition: transform 90ms ease-out; }
+#small .record:hover .record-dot { transform: scale(1.15); }
+#small .record:disabled { opacity: 0.45; cursor: default; }
+#small .danger { display: inline-grid; place-items: center; width: 28px; min-height: 28px; padding: 0; }
+#small .stop-square { width: 10px; height: 10px; border-radius: 2px; background: var(--surface); }
+#small .small-rest, #small .small-live { padding: 8px 16px 14px; border-top: 1px solid var(--line); }
+/* A thin meter for each side in the row (D90, board 5): its icon, a 4 px track; a side silent two
+   minutes, or with nothing to record, dashed and its icon crossed, said in a grey line under the row. */
+#small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; margin-left: 8px; }
+#small .meter { display: flex; align-items: center; gap: 6px; color: var(--soft); }
+#small .meter .track { flex: 1 1 auto; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+#small .meter .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }
+/* The meeting's in green, as board 5 draws it: as specific as the rule it follows, and after it. */
+#small .meter #level-others { background: var(--ok); }
+#small .meter.quiet .track { height: 0; border-top: 2px dashed var(--edge); border-radius: 0; background: none; }
+#small .meter.quiet .fill { display: none; }
+#small .bar-lines { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; }
+#small .bar-lines > :last-child:not([hidden]) { margin-bottom: 8px; }
+#small .check-says { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; line-height: 1.3; color: var(--soft); }
+#small .small-announce { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; font-size: 12px; line-height: 1.3; color: var(--soft); }
+#small .small-announce.gone { display: none; }
 #small .small-announce .link, #small .small-announce .says { font-size: 12px; line-height: 1.3; }
-#small .small-live { gap: 5px; }
-#small .small-live .disclose { min-height: 34px; }
-#small .small-live .danger { min-height: 40px; }
-.small-live .small-top .time { font-size: 26px; }
-.small-live .small-top .icon { min-height: 34px; width: 34px; }
-.small-live.context-open .small-announce { display: none; }
 #small #small-note { font-size: 12px; line-height: 1.25; }
-/* At rest (D35, D34's board): the recording's gesture, the last meeting, the way to the full window. */
+#small .bar-lines .small-said { margin: 0; }
 .small-rest, .small-live { display: flex; flex-direction: column; gap: 12px; }
-.small-brand { font-weight: 700; font-size: 16px; }
-#small .primary { width: 100%; justify-content: center; }
-#small .hint { margin: -6px 0 0; padding: 0; border: 0; background: none; color: var(--soft); font: inherit; font-size: 13px; text-align: center; }
-#small .hint:enabled { cursor: pointer; text-decoration: underline; }
-#small .hint:disabled { opacity: 1; }
-#small .last { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
-#small .last .label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--soft); }
-#small .last .what { font-weight: 600; }
-#small .none { margin: 0; color: var(--soft); }
 #small .link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
-/* The microphone's name, and its list over what is under it (D74). */
+/* The microphone's name, and its list under it, the bar growing to hold it (D74, D90). */
 .small-microphone { position: relative; }
 .small-microphone[hidden] { display: none; }
-#small .small-microphone .disclose { min-height: 34px; gap: 8px; }
+#small .small-microphone .disclose { min-height: 28px; gap: 8px; }
 .small-microphone .named { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.small-microphones { position: absolute; z-index: 2; top: calc(100% + 4px); left: 0; right: 0; display: flex; flex-direction: column; gap: 4px; padding: 6px; overflow: hidden auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); }
+.small-microphones { margin-top: 4px; max-height: 240px; display: flex; flex-direction: column; gap: 4px; padding: 6px; overflow: hidden auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .small-microphones[hidden] { display: none; }
 .small-microphones .choice { flex: none; padding: 6px 10px; gap: 10px; }
 .small-microphones .said { min-width: 0; }
 .small-microphones .name, .small-microphones .says { display: block; overflow-wrap: anywhere; }
+/* The bar opened (D90, board 6): recording, the microphone recorded under its name; at rest « Vérifier le
+   son » and its line; « Avancé » under a divider, closed, its chevron before its word. */
+#small #small-microphone-next { margin: -8px 0 0; font-size: 12px; line-height: 1.3; }
+#small #small-microphone-next[hidden] { display: none; }
+/* The context before the start, in the row at rest (D91, board 5): the room the row leaves, 28 px high, its
+   ✕ inside it; under the row while one is kept, that it waits for the next recording. */
+#small .next-context { position: relative; flex: 1 1 auto; min-width: 0; margin-right: 4px; }
+#small .next-context-text { width: 100%; height: 28px; padding: 0 30px 0 8px; border: 1px solid var(--edge); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
+#small .next-context-text:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+#small .bar-row .next-context .icon-button { position: absolute; top: 2px; right: 2px; width: 24px; min-height: 24px; }
+#small #small-context-kept, #small #small-models-kept { margin: 0; font-size: 12px; line-height: 1.3; }
+.small-check { display: flex; align-items: center; gap: 10px; }
+#small .small-check .open { flex: none; min-height: 28px; padding: 0 10px; font-size: 13px; white-space: nowrap; }
+.small-check .says { min-width: 0; font-size: 12px; line-height: 1.3; }
+#small .small-advanced { padding: 8px 16px 12px; border-top: 1px solid var(--line); }
+.disclose-advanced { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 4px 0 0; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.models-advanced-panel { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.models-advanced-panel .says, .models-advanced-panel .note { margin: 0; font-size: 12px; line-height: 1.3; }
+/* Each model on its line, its name above its list, as board 6 draws them; the list as wide as the panel. */
+.models-row { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.models-row .name { font-size: 12.5px; font-weight: 600; }
+.models-row select { width: 100%; min-width: 0; font-size: 14px; text-overflow: ellipsis; }
+.models-row .whole { font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+.models-row .whole[hidden] { display: none; }
+.redo .models-advanced { margin: 4px 0 8px; }
+/* D88's panel in the bar: in place of its row and options, as wide as it, the bar as tall as the panel. */
+body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 100%; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
 .small-microphones .says { font-size: 12px; line-height: 1.25; }
 .small-microphones .says:empty { display: none; }
 .small-microphones > .says { margin: 4px 10px; }
-.small-foot { display: flex; justify-content: space-between; align-items: center; color: var(--soft); font-size: 13px; }
 
 /* What is made in the background (D25): said on the meeting's page, and on a list's row. */
 .chip.making { color: var(--accent); font-weight: 600; }
-.chip.making.failed { color: var(--red); }
+.chip.making.failed { color: var(--ink); }
 .making-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--raised); }
 .making-state .what { font-weight: 600; }
 .making-state .by { color: var(--soft); font-size: 14px; }
 .making-state .making-bar { flex-basis: 100%; height: 4px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent) 0 0 / 40% 100% no-repeat, var(--line); animation: travel 1.4s ease-in-out infinite; }
-.making-state.failed { background: transparent; border: 1px solid var(--red); }
+.making-state.failed { background: transparent; border: 1px solid var(--edge); }
 .making-state .detail { flex-basis: 100%; color: var(--soft); font-size: 13px; overflow-wrap: anywhere; }
-.making-state.failed .what { color: var(--red); font-weight: 500; }
+.making-state.failed .what { color: var(--ink); font-weight: 600; }
 @keyframes travel { from { background-position: -40% 0, 0 0; } to { background-position: 140% 0, 0 0; } }
 @media (prefers-reduced-motion: reduce) { .making-state .making-bar { animation: none; background: var(--accent); opacity: 0.5; } }
 
@@ -358,7 +386,7 @@ body.small-window .frame { display: none; }
 .welcome > .says { margin-top: -6px; }
 .welcome-choices { display: flex; flex-direction: column; gap: 10px; }
 .welcome .choice { padding: 10px 14px; gap: 10px; border-width: 1.5px; transition: border-color 120ms ease, box-shadow 120ms ease; }
-.welcome .choice:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.welcome .choice:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--edge)); }
 .welcome .choice:has(input:checked) { background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 .choice:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
 .welcome-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 4px; }
@@ -383,10 +411,27 @@ body.small-window .frame { display: none; }
   .welcome-from { text-align: left; }
 }
 
-/* A meeting's context (D59's board): a field, its count, closed while a making runs. */
-.context { padding: 18px 24px; display: flex; flex-direction: column; gap: 6px; }
+/* A meeting's settings (D89, board 4): one row of 32 px controls, their sentences under it. */
+.settings { display: flex; flex-direction: column; gap: 8px; }
+.settings-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.setting { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; min-width: 0; max-width: 100%; overflow: hidden; padding: 0 10px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--soft); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: pointer; }
+.setting:hover { background: var(--raised); }
+.setting .value { min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-weight: 500; }
+.setting select { appearance: none; -webkit-appearance: none; min-width: 0; min-height: 0; max-width: 28ch; padding: 0 4px 0 0; border: 0; background: transparent; color: var(--ink); font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.setting select:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+/* The language's list drawn as board 4's: its value and a chevron, the system's box not drawn. */
+.setting .chevron { margin-left: -4px; color: var(--soft); pointer-events: none; }
+/* « Confidentielle »'s switch (board 4): the same checkbox, its role switch, drawn as a track and
+   its knob — off at the start, the knob soft; on, the track in the accent, the knob at the end. */
+.setting input[type="checkbox"] { appearance: none; -webkit-appearance: none; flex: none; width: 32px; height: 20px; margin: 0; border: 1px solid var(--edge); border-radius: 10px; background: radial-gradient(circle closest-side, var(--soft) 82%, transparent 90%) no-repeat 2px 50% / 14px 14px, var(--raised); cursor: pointer; transition: background-position 120ms ease; }
+.setting input[type="checkbox"]:checked { border-color: var(--accent); background: radial-gradient(circle closest-side, var(--surface) 82%, transparent 90%) no-repeat calc(100% - 2px) 50% / 14px 14px, var(--accent); }
+/* Read by a screen reader, not drawn. */
+.unseen { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.settings .left { margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+/* A meeting's context (D59's board): a field, its count, closed while a making runs; opened from its row (D89). */
+.context-panel { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .context-label { font-weight: 600; font-size: 14.5px; }
-.context-text { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.4; resize: vertical; }
+.context-text { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.4; resize: vertical; }
 .context-text:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .context-text[readonly] { background: var(--raised); color: var(--soft); }
 .context-count { font-size: 12.5px; color: var(--soft); font-variant-numeric: tabular-nums; line-height: 1.35; }
@@ -401,24 +446,16 @@ body.small-window .frame { display: none; }
 #small .context-text { resize: none; }
 
 /* A meeting said confidential (D60's board): the settings' switch, a lock before its words. */
-.lock { width: 18px; height: 18px; flex: none; color: var(--soft); }
+.lock { color: var(--soft); }
 .confidential { flex-wrap: nowrap; gap: 10px; cursor: pointer; }
 .confidential .said { flex: 1 1 auto; }
 .confidential .says { font-size: 13px; }
-.confidential.on .lock, .confidential-card.on .lock { color: var(--ok); }
+.confidential.on .lock { color: var(--ok); }
 .confidential input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-.confidential-card { padding: 14px 24px; display: flex; flex-direction: column; gap: 8px; }
-.confidential-card .left { margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; background: color-mix(in srgb, var(--red) 10%, var(--surface)); }
-.confidential-card .says:empty { display: none; }
 .chip.locked { display: inline-flex; align-items: center; gap: 5px; color: var(--ok); font-weight: 600; }
-.chip.locked .lock { width: 13px; height: 13px; color: inherit; }
+.chip.locked .lock { color: inherit; }
 #small .confidential .name { font-size: 14px; }
 #small .confidential .says { font-size: 12.5px; }
-/* The context open, the small window is full: the switch on one line, its words still read; the
-   devices' names in their meters' titles alone. */
-.small-live.context-open .meter .device { display: none; }
-.small-live.context-open .meter .said { flex-direction: row; align-items: center; gap: 6px; }
-.small-live.context-open .confidential .says { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* The window in two panes (D61's board): the meetings in a sidebar of 280 px, the one chosen in the
    pane beside it, as wide as the window leaves it; under 840 px, one at a time. */
@@ -431,9 +468,12 @@ body.small-window .frame { display: none; }
 .side-top .brand { font-size: 16px; gap: 8px; }
 .side-top #fold { flex: none; }
 .sidebar .act { margin: 0; flex-direction: column; align-items: stretch; gap: 4px; }
-.sidebar .act .primary { justify-content: center; min-height: 42px; padding: 0 12px; white-space: nowrap; font-size: 14.5px; }
-.sidebar .keys { text-align: center; font: 12px ui-monospace, monospace; color: var(--soft); background: transparent; padding: 0; }
-.sidebar .search { min-width: 0; width: 100%; min-height: 38px; }
+.sidebar .act .primary { justify-content: center; min-height: 32px; padding: 0 12px; white-space: nowrap; }
+.sidebar .search { min-width: 0; width: 100%; }
+/* The search field, its icon in it (D89). */
+.finding { position: relative; }
+.finding .glyph { position: absolute; left: 10px; top: 8px; color: var(--soft); pointer-events: none; }
+.finding .search { padding-left: 32px; }
 #list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 4px 4px; margin: 0 -4px; gap: 10px; }
 .sidebar .group { gap: 2px; }
 .sidebar .group h2 { margin: 6px 0 2px 10px; font-size: 11.5px; }
@@ -442,23 +482,24 @@ body.small-window .frame { display: none; }
   display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; padding: 8px 10px;
   border: 0; border-radius: 10px; background: transparent;
 }
-.sidebar .session .line { display: flex; align-items: center; gap: 8px; }
+.sidebar .session .line { display: flex; align-items: flex-end; gap: 8px; }
+/* What a meeting holds, at its row's end: an icon each, 16 px (boards 2 and 4). */
+.marks { display: inline-flex; gap: 6px; color: var(--soft); font-size: 16px; line-height: 1; }
+.sidebar .holds:not(:has(> :not([hidden]))) { display: none; }
 .sidebar .session .when { flex: 1 1 auto; }
 .sidebar .session .day { font-size: 14px; }
 .sidebar .session .on { font-size: 12px; }
-.sidebar .session .shape, .sidebar .relief.small { width: 64px; height: 20px; }
 .sidebar .holds { gap: 4px; font-size: 11.5px; }
 .sidebar .chip { padding: 2px 6px; border-radius: 6px; }
 .sidebar .session:hover { background: var(--raised); }
 .sidebar .session[aria-current="page"] { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); box-shadow: inset 3px 0 0 var(--accent); }
 .foot { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .foot .weight { padding: 0 4px; gap: 6px; font-size: 12.5px; }
-.foot .total strong { font-size: 16px; }
-.foot .total #free-link { min-height: 30px; padding: 0 10px; font-size: 12.5px; }
-.foot .legend { font-size: 11.5px; gap: 2px 12px; }
-.foot nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.foot nav a { display: block; padding: 8px 10px; border-radius: 10px; }
-.foot nav .open { min-height: 32px; padding: 0 10px; font-size: 13px; white-space: nowrap; }
+.foot .total { gap: 4px; color: var(--soft); }
+.foot .total strong { font-size: inherit; color: var(--ink); }
+/* The foot's tools (D89): freeing space and the recording bar, Réglages at the end. */
+.foot nav { display: flex; align-items: center; gap: 4px; margin: 0 -4px; }
+.foot nav #settings-link { margin-left: auto; }
 .foot nav a[aria-current="page"] { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); }
 .pane { flex: 1; min-width: 0; container: pane / inline-size; }
 .saved-said { margin: 4px 0 0; color: var(--ok); font-size: 13px; }
@@ -469,18 +510,19 @@ body.small-window .frame { display: none; }
 .arriving > * { animation: page-arrives 120ms ease-out; }
 @keyframes page-arrives { from { opacity: 0.4; } }
 /* Folding the sidebar (D61): its button at its top, the one that brings it back at the pane's. */
-.icon-button { width: 34px; min-height: 34px; padding: 0; border-radius: 9px; border: 1px solid var(--line); background: var(--raised); color: var(--ink); font-size: 17px; cursor: pointer; }
+/* An icon button has no border (GNOME HIG, header bars): its tooltip and its name say it (D89). */
+.icon-button { display: inline-grid; place-items: center; width: 32px; min-height: 32px; padding: 0; border-radius: 8px; border: 0; background: transparent; color: var(--soft); font-size: 16px; cursor: pointer; }
+.icon-button:hover { background: var(--raised); color: var(--ink); }
 .pane > #unfold { display: none; margin: 14px 0 0 16px; }
 @media (min-width: 840px) {
   body.folded .sidebar { display: none; }
-  body.folded .pane > #unfold { display: inline-block; }
+  body.folded .pane > #unfold { display: inline-grid; }
 }
 .empty { padding: 28px 24px; }
 .small-said { margin: 8px 0 0; padding: 0; }
 .empty .card { max-width: 480px; padding: 22px 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .empty .none { margin: 0; color: var(--ink); font-weight: 600; }
 .empty .says { margin: 0; }
-.empty .primary { min-height: 40px; padding: 0 16px; }
 /* Too low for the list to hold between the gesture and the foot: the sidebar scrolls with the page. */
 @media (max-width: 839px), (max-height: 559px) {
   .sidebar { position: static; height: auto; min-height: 100vh; }
@@ -501,16 +543,43 @@ body.small-window .frame { display: none; }
   body[data-at="list"]:has(#pane-said:not([hidden])) .pane > .back { display: none; }
   .pane > .back { display: inline-block; margin: 8px 0 0 16px; }
   .pane > main { padding: 12px 16px 40px; }
+  .meeting-head { margin: 0 -16px; padding: 8px 16px; }
 }
 
 /* A little motion (D69): one fade between the small window's two states, one pop when a chip turns. */
 .small-rest, .small-live { animation: settle 160ms ease-out; }
 @keyframes settle { from { opacity: 0; } }
-.chip.turned { animation: chip-turn 180ms ease-out; }
+.turned { animation: chip-turn 180ms ease-out; }
 @keyframes chip-turn { from { opacity: 0.4; transform: scale(0.94); } }
-@media (prefers-reduced-motion: reduce) { .small-rest, .small-live, .chip.turned { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .small-rest, .small-live, .turned { animation: none; } }
 
 /* Last, for all of it: who asked for less motion is given none — hover, levels and chevrons too (D69). */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+/* « Vérifier le son » (D88, board 7): a modal panel, 440 px wide at most; each side its name, its
+   device and an 8 px meter — the microphone's in the accent, the meeting's in green —, a sentence
+   per case, the test sound and the recording's start, the microphone's note under them. */
+.check-sound { width: min(440px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 8px 28px rgb(0 0 0 / 0.18); }
+.check-sound::backdrop { background: rgb(0 0 0 / 0.32); }
+.check-sound > * { margin: 0 16px; }
+.check-head { display: flex; align-items: center; gap: 12px; margin: 0; padding: 8px 8px 8px 16px; border-bottom: 1px solid var(--line); }
+.check-head .mark { width: 20px; height: 20px; flex: none; border-radius: 5px; background: var(--accent); color: var(--surface); padding: 2px; }
+.check-head h2 { flex: 1 1 auto; margin: 0; font-size: 15px; font-weight: 600; }
+.check-source { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.check-top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.check-name { font-weight: 600; }
+.check-device { margin-left: auto; color: var(--soft); font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.check-track { height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
+.check-fill { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--accent); transition: width 90ms linear; }
+.check-source.far .check-fill { background: var(--ok); }
+.check-said { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; font-size: 12.5px; line-height: 1.4; color: var(--soft); }
+.check-said .glyph { margin-top: 1px; }
+.check-said.okay { color: var(--ok); font-weight: 600; font-size: 13px; }
+.check-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+/* Both on one row at 440 px, as the board draws them: 13 px, 10 px aside; narrower, they wrap. */
+.check-actions button { font-size: 13px; padding: 0 10px; white-space: nowrap; }
+.with-icon { display: inline-flex; align-items: center; gap: 8px; }
+.check-actions .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.check-actions .open:disabled { border-style: dashed; color: var(--soft); cursor: default; }
+.check-note { margin-top: 12px; margin-bottom: 16px; font-size: 12.5px; color: var(--soft); }

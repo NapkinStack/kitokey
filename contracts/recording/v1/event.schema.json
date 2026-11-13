@@ -143,6 +143,10 @@
             "string",
             "null"
           ]
+        },
+        "headset": {
+          "description": "Said by `listen` (D88): true when the device listened to is a Bluetooth headset's microphone, which the active stream switches to its call profile; false when it is not. Absent: not known.",
+          "type": "boolean"
         }
       },
       "required": [

@@ -33,7 +33,7 @@ use kitokey_shell::{
     licence::{self, Licence},
     log,
     meeting::{self, Read, Transcript},
-    migrate,
+    meeting_models, migrate,
     minutes::{self, Minutes},
     model::{self, Published},
     named, player,
@@ -42,7 +42,7 @@ use kitokey_shell::{
     registry,
     sessions::{self, Listed},
     settings::{self, After, Engine, KeepAudio, Log, Settings},
-    speech, spoken,
+    sound_check, speech, spoken,
     summarising::{self, Summarising},
     transcription::{self, Hearer, Made, Transcription},
     trial,
@@ -50,6 +50,9 @@ use kitokey_shell::{
 };
 
 const TRAY: &str = "kitokey";
+
+/// Why a meeting's minutes were not written, their cause when named, and the model when it was the meeting's own.
+type MinutesFailed = (String, Option<summarising::Cause>, Option<String>);
 
 /// What the shell holds while it runs.
 struct Shell {
@@ -67,6 +70,11 @@ struct Shell {
     recording: Mutex<Option<Recording>>,
     /// The folder it records into, once it has said so.
     recorded: Mutex<Option<PathBuf>>,
+    /// The context typed in the bar before the start, kept for the next recording until the user
+    /// clears it, in `next_file` too (D91): taken by the meeting begun, whichever gesture starts it.
+    next_context: Mutex<String>,
+    /// The models chosen in the bar at rest for the next recording (D91): its own once it starts.
+    next_models: Mutex<meeting_models::Models>,
     /// The menu's entry that starts and stops, relabelled as the recording goes.
     toggle: MenuItem<Wry>,
     /// The user asked to quit while a recording ran: it is stopped first, then Kitokey leaves.
@@ -120,8 +128,9 @@ struct Shell {
     minutes_waiting: Mutex<VecDeque<Queued>>,
     /// Why the last minutes of a meeting were not written, until they are (D25).
     /// With their cause, when kitokey-summary named one this version knows: one entry, so
-    /// that a later failure never shows an earlier one's cause (D29).
-    minutes_failed: Mutex<HashMap<PathBuf, (String, Option<summarising::Cause>)>>,
+    /// that a later failure never shows an earlier one's cause (D29); and the model, when it was the
+    /// meeting's own (D91): its gesture is then in *Refaire…*, not in Settings.
+    minutes_failed: Mutex<HashMap<PathBuf, MinutesFailed>>,
     /// The loopback server the opened meeting is played from, started with the first (D26).
     served: Mutex<Option<player::Served>>,
     /// How many times each meeting's minutes were written since the start: a page drawn with
@@ -146,6 +155,10 @@ struct Shell {
     /// model is needed and not there.
     menu: Menu<Wry>,
     download: MenuItem<Wry>,
+    /// The menu's « Afficher la barre », in it only while the bar is hidden (D90).
+    show_bar: MenuItem<Wry>,
+    /// When the bar was last moved: its place is kept once it stays still (D90).
+    bar_moved: Mutex<Option<Instant>>,
     /// The host the transcript being made is sent to, when a service hears it (D60).
     hearing_host: Mutex<Option<String>>,
     /// The host the minutes being written are sent to, when it is not this computer (D60).
@@ -167,6 +180,10 @@ struct Shell {
     refused: Mutex<bool>,
     /// A licence that could not be read was said in the log: once (D83).
     licence_unread: Mutex<bool>,
+    /// « Vérifier le son » (D88): capture listening while the panel shows (`sound_check::Slot`).
+    sound_check: Mutex<sound_check::Slot>,
+    /// The applications that hold a microphone now, as the graph says (D30): a call — no test sound then.
+    holders: Mutex<std::collections::BTreeSet<u64>>,
 }
 
 impl Shell {
@@ -251,6 +268,9 @@ impl Shell {
 enum Again {
     Model(PathBuf),
     Settings,
+    /// By whoever the meeting's own models name, else Settings — the transcript alone: *Refaire…*
+    /// once « Avancé » chose (D91).
+    Own,
 }
 
 /// Where the tray is in the life of a recording.
@@ -299,10 +319,28 @@ fn main() {
         }))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        // « Vérifier le son »'s window destroyed with the panel open: its listening goes with it, within
+        // the second capture promises (D88) — stopped off the window's thread. A window hidden closes
+        // the panel itself (`visibilitychange`, `ui/window.js`).
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event
+                && let Some(shell) = window.app_handle().try_state::<Shell>()
+                && let Some(gone) = shell.sound_check.lock().unwrap().of_window(window.label())
+            {
+                std::thread::spawn(move || {
+                    gone.stop();
+                    tracing::info!("shell.sound_check_closed");
+                });
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             listed,
             microphones_listed,
             microphone_chosen,
+            sound_check_open,
+            sound_check_now,
+            sound_check_mark,
+            sound_check_close,
             model_fetch,
             model_offered_fetch,
             registry_refresh,
@@ -318,6 +356,9 @@ fn main() {
             buy,
             recording_now,
             small_window,
+            bar_fit,
+            bar_drag,
+            bar_hide,
             full_window,
             minutes_asked,
             minutes_again,
@@ -327,7 +368,14 @@ fn main() {
             context_shown,
             context_saved,
             context_redo,
+            next_context,
+            next_context_kept,
             language_set,
+            meeting_models_shown,
+            meeting_models_chosen,
+            models_offered,
+            next_models_kept,
+            transcript_redo_own,
             title_saved,
             confidential_set,
             transcript_redo,
@@ -392,12 +440,14 @@ fn main() {
             let open = MenuItem::with_id(app, "open", labels.open, true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &toggle, &again, &minutes, &quit])?;
             let download = MenuItem::with_id(app, "download", "", true, None::<&str>)?;
+            let show_bar = MenuItem::with_id(app, "show_bar", labels.show_bar, true, None::<&str>)?;
             TrayIconBuilder::with_id(TRAY)
                 .icon(Image::from_bytes(include_bytes!("../icons/tray.png"))?)
                 .tooltip("Kitokey")
                 .menu(&menu.clone())
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => open_window(app),
+                    "show_bar" => show_small(app),
                     "toggle" => {
                         toggle_recording(app);
                     }
@@ -435,6 +485,8 @@ fn main() {
                 system,
                 recording: Mutex::new(None),
                 recorded: Mutex::new(None),
+                next_context: Mutex::new(next_file().map(|file| context::read_next(&file)).unwrap_or_default()),
+                next_models: Mutex::new(next_models_file().map(|file| meeting_models::read_next(&file)).unwrap_or_default()),
                 toggle,
                 leaving: Mutex::new(false),
                 pressed: Mutex::new(None),
@@ -469,6 +521,8 @@ fn main() {
                 transcripts_tried: Mutex::new(HashMap::new()),
                 menu,
                 download,
+                show_bar,
+                bar_moved: Mutex::new(None),
                 hearing_host: Mutex::new(None),
                 minutes_host: Mutex::new(None),
                 heard_here: Mutex::default(),
@@ -479,6 +533,8 @@ fn main() {
                 fetched: Mutex::new(None),
                 refused: Mutex::new(false),
                 licence_unread: Mutex::new(false),
+                sound_check: Mutex::default(),
+                holders: Mutex::default(),
             });
             // The trial's first day, kept at the first start on a trial licence (PDR-0005).
             let shell = app.state::<Shell>();
@@ -540,6 +596,10 @@ fn offers(app: &AppHandle) {
     let offers = Mutex::new(microphone::Offers::default());
     microphone::watch(move |change| {
         let shell = app.state::<Shell>();
+        match &change {
+            microphone::Change::Took { key, .. } => shell.holders.lock().unwrap().insert(*key),
+            microphone::Change::Let { key } => shell.holders.lock().unwrap().remove(key),
+        };
         let recording = shell.recording.lock().unwrap().is_some();
         if let Some(name) = offers.lock().unwrap().on(&change, recording, shell.settings().offer) {
             offer_recording(&app, name);
@@ -610,6 +670,7 @@ fn show_full(app: &AppHandle) {
     left(app, settings::Window::Full);
     if let Some(small) = app.get_webview_window("small") {
         let _ = small.close();
+        bar_shown(app, true);
     }
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
@@ -652,12 +713,16 @@ fn show_welcome(app: &AppHandle) {
     build_full(app, "#/welcome");
 }
 
-/// The small window's size, the same at rest and recording: GTK does not shrink a window the
-/// user cannot resize, and a window that changes size under the pointer is one more surprise (D35).
-const SMALL: (f64, f64) = (380.0, 400.0);
+/// The recording bar's width and its row's height (D90, the decider's boards of 2026-11-08): made
+/// at its row's height, the smallest it is, as tall as it holds after that. Without the system's
+/// title bar (board 8): on GNOME, GTK counts its own title bar and shadows inside the size asked —
+/// 440 × 44 asked left a web view of 388 × 1.
+const BAR: (f64, f64) = (440.0, 44.0);
+/// As tall as the bar may grow: what it holds beyond that scrolls.
+const BAR_TALLEST: f64 = 720.0;
 
-/// The small window, in place of the full one, which is hidden: at rest, or showing the
-/// recording above the other windows (D35, board 6).
+/// The recording bar, in place of the full window, which is hidden: at rest, or showing the
+/// recording above the other windows (D35, D90).
 fn show_small(app: &AppHandle) {
     left(app, settings::Window::Small);
     if let Some(main) = app.get_webview_window("main") {
@@ -666,15 +731,99 @@ fn show_small(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("small") {
         let _ = window.show();
         let _ = window.set_focus();
+        bar_shown(app, true);
         return;
     }
-    let recording = app.state::<Shell>().recording.lock().unwrap().is_some();
-    let _ = WebviewWindowBuilder::new(app, "small", WebviewUrl::App("index.html#/small".into()))
+    let shell = app.state::<Shell>();
+    let recording = shell.recording.lock().unwrap().is_some();
+    // Without the system's title bar (D90, board 8): moved by its handle, hidden by its own button.
+    let mut bar = WebviewWindowBuilder::new(app, "small", WebviewUrl::App("index.html#/small".into()))
         .title("Kitokey")
-        .inner_size(SMALL.0, SMALL.1)
-        .resizable(false)
-        .always_on_top(recording)
-        .build();
+        .inner_size(BAR.0, BAR.1)
+        .decorations(false)
+        .always_on_top(recording);
+    // Where it was left, where the system lets an application place itself (Windows, macOS) and
+    // a screen holds it still: GNOME chooses, and a screen gone leaves the system to choose too.
+    if !cfg!(target_os = "linux")
+        && let Some([x, y]) = shell.settings().bar_at
+        && on_a_screen(app, x, y)
+    {
+        bar = bar.position(f64::from(x), f64::from(y));
+    }
+    if let Ok(window) = bar.build() {
+        bar_shown(app, true);
+        let app = app.clone();
+        window.on_window_event(move |event| match event {
+            // GNOME says « Moved » at each configure, at (0, 0): no place to keep there.
+            tauri::WindowEvent::Moved(_) if !cfg!(target_os = "linux") => bar_moved(&app),
+            // Closed by any path — the full window opened on a page, a notification —: nothing
+            // left to show from the tray.
+            tauri::WindowEvent::Destroyed => bar_shown(&app, true),
+            _ => {}
+        });
+    }
+}
+
+/// Whether a screen of this computer holds the point, in logical pixels: a place kept on a screen
+/// since unplugged is not used.
+fn on_a_screen(app: &AppHandle, x: i32, y: i32) -> bool {
+    app.available_monitors().is_ok_and(|monitors| {
+        monitors.iter().any(|monitor| {
+            let scale = monitor.scale_factor();
+            let at = monitor.position().to_logical::<f64>(scale);
+            let size = monitor.size().to_logical::<f64>(scale);
+            let (x, y) = (f64::from(x), f64::from(y));
+            x >= at.x && y >= at.y && x < at.x + size.width && y < at.y + size.height
+        })
+    })
+}
+
+/// The tray's « Afficher la barre »: in its menu while the bar is hidden, after the recording's
+/// entry, as board 8 sets it.
+fn bar_shown(app: &AppHandle, shown: bool) {
+    let shell = app.state::<Shell>();
+    let _ = shell.menu.remove(&shell.show_bar);
+    if !shown {
+        let _ = shell.menu.insert(&shell.show_bar, 2);
+    }
+}
+
+/// The bar moved: its place kept once it has stayed still half a second, not at each step of a drag.
+fn bar_moved(app: &AppHandle) {
+    let at = Instant::now();
+    *app.state::<Shell>().bar_moved.lock().unwrap() = Some(at);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(500));
+        let shell = app.state::<Shell>();
+        if *shell.bar_moved.lock().unwrap() != Some(at) {
+            return;
+        }
+        let Some(window) = app.get_webview_window("small") else {
+            return;
+        };
+        // Minimized, Windows says it is at (-32000, -32000): no place the user left it.
+        if window.is_minimized().unwrap_or(true) {
+            return;
+        }
+        let (Ok(place), Ok(scale)) = (window.outer_position(), window.scale_factor()) else {
+            return;
+        };
+        let place = place.to_logical::<i32>(scale);
+        let _saving = shell.saving.lock().unwrap();
+        let Ok(mut settings) = shell.reread() else {
+            return;
+        };
+        if settings.bar_at == Some([place.x, place.y]) {
+            return;
+        }
+        settings.bar_at = Some([place.x, place.y]);
+        if let Some(file) = settings::file()
+            && settings::write(&file, &settings).is_ok()
+        {
+            *shell.settings.lock().unwrap() = settings;
+        }
+    });
 }
 
 /// A recording begins or ends: the small window, when open, is above the others while it runs
@@ -718,7 +867,7 @@ struct Listing {
     folder: PathBuf,
     sessions: Vec<Listed>,
     /// For each session, in the same order, who spoke over it — here, then remote — when its
-    /// transcript reads: the small relief each row draws.
+    /// transcript reads. No row draws it since D89's compact rows: taken out on its own.
     shapes: Vec<Option<[Vec<f32>; 2]>>,
     /// Whether a recording runs, and the shortcut's keys as the desktop granted them: the header's.
     recording: bool,
@@ -908,7 +1057,7 @@ fn minutes_redo(
     let chosen = match provider.zip(model) {
         Some(choice) => Some(choice),
         None => {
-            let settings = shell.read_or_told()?;
+            let settings = own(&shell.read_or_told()?, &folder);
             settings.minutes_provider.zip(settings.minutes_model)
         }
     };
@@ -950,6 +1099,14 @@ fn transcript_corrected(shell: State<'_, Shell>, name: String, track: String, st
 fn transcript_redo(app: AppHandle, shell: State<'_, Shell>, name: String, model: PathBuf) -> Result<(), Told> {
     let folder = session_folder(&shell, &name)?;
     retranscribe(&app, folder, Again::Model(model)).map_err(|(failure, detail)| shell.told(failure, detail))
+}
+
+/// *Refaire…* on a transcript (D91): made again by whoever the meeting's own models name — chosen
+/// in its « Avancé » —, else Settings; the transcript alone, its minutes left as they are.
+#[tauri::command]
+fn transcript_redo_own(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    retranscribe(&app, folder, Again::Own).map_err(|(failure, detail)| shell.told(failure, detail))
 }
 
 /// *Try again*, on a meeting whose transcript was not made: as it was last asked — made again
@@ -1036,6 +1193,8 @@ struct Now {
     devices: [Option<String>; 2],
     /// Whether each side was heard, or why not (D49).
     checks: [recording::Check; 2],
+    /// How long each side said silent has been, in seconds: the bar says it at two minutes (D90).
+    silent_for: [Option<f64>; 2],
     /// The microphone chosen is not there: Auto stands in (D74).
     microphone_gone: bool,
     /// Whether the transcript is made at the stop, by itself: the small window says so then only.
@@ -1051,6 +1210,11 @@ struct Now {
 
 #[tauri::command]
 fn recording_now(shell: State<'_, Shell>) -> Now {
+    // One lock for both: a second `lock()` in the same expression waits on the first for ever.
+    let (checks, silent_for) = {
+        let checks = shell.checks.lock().unwrap();
+        (checks.now(), checks.silent_for(Instant::now()))
+    };
     let (started, levels) = *shell.meter.lock().unwrap();
     let recording = shell.recording.lock().unwrap().is_some();
     let meeting = shell
@@ -1069,7 +1233,8 @@ fn recording_now(shell: State<'_, Shell>) -> Now {
         seconds: started.map_or(0.0, |started| started.elapsed().as_secs_f64()),
         levels,
         devices: shell.devices.lock().unwrap().names(),
-        checks: shell.checks.lock().unwrap().now(),
+        checks,
+        silent_for,
         microphone_gone: *shell.microphone_gone.lock().unwrap(),
         transcript_follows: shell.settings.lock().unwrap().after != settings::After::Nothing,
         meeting,
@@ -1123,12 +1288,149 @@ fn microphone_chosen(shell: State<'_, Shell>, name: Option<String>, description:
     Ok(())
 }
 
+/// « Vérifier le son » opened (D88): capture listens, the microphone the user chose or Auto, for the
+/// window that asked. Never beside a recording — its meters are the bar's —: refused then, nothing opened.
+#[tauri::command]
+async fn sound_check_open(app: AppHandle, window: tauri::WebviewWindow) -> SoundCheckOpened {
+    let shell = app.state::<Shell>();
+    let microphone = shell.settings().microphone;
+    let program = program("kitokey-capture", "KITOKEY_CAPTURE");
+    let opened = sound_check::open(&shell.recording, &shell.sound_check, window.label(), || {
+        sound_check::SoundCheck::start(&program, microphone.as_deref())
+    });
+    let before = match opened {
+        Ok(before) => before,
+        // A recording runs; or the panel closed while its listening started — stopped already.
+        Err(sound_check::Refused::Recording | sound_check::Refused::Closed) => return SoundCheckOpened { opened: false },
+        Err(sound_check::Refused::NotStarted(error)) => {
+            tracing::error!(detail = %error, "shell.sound_check_failed");
+            return SoundCheckOpened { opened: false };
+        }
+    };
+    tracing::info!(auto = microphone.is_none(), "shell.sound_check_opened");
+    if let Some(before) = before {
+        before.stop();
+    }
+    // A panel that no longer asks — its page gone — leaves nothing open.
+    let watched = app.clone();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(Duration::from_millis(250));
+            let shell = watched.state::<Shell>();
+            let mut slot = shell.sound_check.lock().unwrap();
+            if !slot.is_open() {
+                return;
+            }
+            if let Some(gone) = slot.abandoned(SOUND_CHECK_UNASKED) {
+                drop(slot);
+                tracing::info!("shell.sound_check_abandoned");
+                gone.stop();
+                return;
+            }
+        }
+    });
+    SoundCheckOpened { opened: true }
+}
+
+/// Whether the panel's capture listens: not while a recording runs, nor when it could not be started.
+#[derive(serde::Serialize)]
+struct SoundCheckOpened {
+    opened: bool,
+}
+
+/// How long a panel may go without asking what is heard before it is taken for gone: it asks ten times a second.
+const SOUND_CHECK_UNASKED: Duration = Duration::from_secs(2);
+
+/// What the panel shows now (D88): each side's device and level, a headset's, the test sound heard, and
+/// whether a call holds a microphone — no test sound then, it would reach the call.
+#[derive(serde::Serialize)]
+struct SoundChecked {
+    open: bool,
+    heard: sound_check::Heard,
+    call: bool,
+}
+
+#[tauri::command]
+fn sound_check_now(shell: State<'_, Shell>) -> SoundChecked {
+    let heard = shell.sound_check.lock().unwrap().asked();
+    SoundChecked {
+        open: heard.is_some(),
+        heard: heard.unwrap_or_default(),
+        call: !shell.holders.lock().unwrap().is_empty(),
+    }
+}
+
+/// A test sound is asked (D88): refused while a call holds a microphone; otherwise the meeting's side
+/// is listened to for it from now on.
+#[tauri::command]
+fn sound_check_mark(shell: State<'_, Shell>) -> SoundCheckMarked {
+    let call = !shell.holders.lock().unwrap().is_empty();
+    let marked = shell.sound_check.lock().unwrap().mark(call);
+    tracing::info!(marked, call, "shell.sound_check_test");
+    SoundCheckMarked { marked }
+}
+
+/// Whether the test sound may play: never while a call holds a microphone, nor with nothing listening.
+#[derive(serde::Serialize)]
+struct SoundCheckMarked {
+    marked: bool,
+}
+
+/// The panel closed (D88): capture stops listening, and has ended when this answers.
+#[tauri::command]
+async fn sound_check_close(app: AppHandle) {
+    let _ = tauri::async_runtime::spawn_blocking(move || sound_check_stopped(&app)).await;
+}
+
+/// Ends the listening, if any, and waits for it: before a recording starts, and when the panel closes.
+fn sound_check_stopped(app: &AppHandle) {
+    let check = app.state::<Shell>().sound_check.lock().unwrap().take();
+    if let Some(check) = check {
+        check.stop();
+        tracing::info!("shell.sound_check_closed");
+    }
+}
+
 /// From the full window to the small one, at rest or recording (D35). Asynchronous, as is
 /// `full_window`: each hides or closes the window that asked, which its own call, run where the
 /// windows are, would wait for.
 #[tauri::command]
 async fn small_window(app: AppHandle) {
     show_small(&app);
+}
+
+/// The bar asks to be as tall as what it shows (D90): its row alone, its options opened, a line
+/// added; its width the same.
+#[tauri::command]
+fn bar_fit(window: tauri::WebviewWindow, height: f64) {
+    if window.label() == "small" && height.is_finite() {
+        // Its size bounded to the one asked: the user does not resize the bar, its content does.
+        let size = tauri::LogicalSize::new(BAR.0, height.clamp(BAR.1, BAR_TALLEST));
+        let _ = window.set_min_size(Some(tauri::LogicalSize::new(BAR.0, BAR.1)));
+        let _ = window.set_max_size(Some(tauri::LogicalSize::new(BAR.0, BAR_TALLEST)));
+        let _ = window.set_size(size);
+        let _ = window.set_min_size(Some(size));
+        let _ = window.set_max_size(Some(size));
+    }
+}
+
+/// The bar's handle, or its row, pressed (D90): the system moves the bar as the pointer goes.
+#[tauri::command]
+fn bar_drag(window: tauri::WebviewWindow) {
+    if window.label() == "small" {
+        let _ = window.start_dragging();
+    }
+}
+
+/// « Masquer la barre » (D90): hidden, a recording going on; it comes back on the user's gesture
+/// alone — the tray's « Afficher la barre » or « Ouvrir Kitokey » —, never by itself.
+#[tauri::command]
+fn bar_hide(app: AppHandle, window: tauri::WebviewWindow) {
+    if window.label() == "small" {
+        let _ = window.hide();
+        bar_shown(&app, false);
+        tracing::info!("shell.bar_hidden");
+    }
 }
 
 /// From the small window to the full one, on one of its pages when named: a meeting, the
@@ -1178,6 +1480,8 @@ struct Opened {
     /// system's language when neither the meeting nor the settings name one (D64, D65).
     apple: bool,
     system_language: &'static str,
+    /// The steps whose own model is gone (D91): Settings' choice makes them, said on the page.
+    models_gone: Vec<meeting_models::Step>,
 }
 
 #[tauri::command]
@@ -1202,7 +1506,14 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         meeting_language: shell.settings().meeting_language,
         apple: shell.settings().engine == Engine::SpeechAnalyzer,
         system_language: shell.system.code(),
+        models_gone: gone_of(&shell.settings(), &folder),
     })
+}
+
+/// The steps whose own model a meeting chose and cannot have now (D91).
+fn gone_of(settings: &Settings, folder: &Path) -> Vec<meeting_models::Step> {
+    let chosen = meeting_models::read(folder);
+    meeting_models::applied(settings, &chosen, &settings::whisper_models(&models_folder(), settings)).gone
 }
 
 /// The language a meeting is spoken in, said on its page (D65): a code written, or none removed —
@@ -1220,6 +1531,179 @@ fn language_set(shell: State<'_, Shell>, name: String, language: Option<String>)
         shell.told(failure, error)
     })?;
     tracing::info!(language = language.as_deref().unwrap_or("none"), "shell.language_set");
+    Ok(())
+}
+
+/// What a meeting chose for itself (D91), and the steps whose choice is gone: Settings' choice
+/// makes them, and the page says so.
+#[derive(serde::Serialize)]
+struct OwnModels {
+    chosen: meeting_models::Models,
+    gone: Vec<meeting_models::Step>,
+}
+
+#[tauri::command]
+fn meeting_models_shown(shell: State<'_, Shell>, name: String) -> Result<OwnModels, Told> {
+    let folder = session_folder(&shell, &name)?;
+    let chosen = meeting_models::read(&folder);
+    Ok(OwnModels {
+        chosen,
+        gone: gone_of(&shell.settings(), &folder),
+    })
+}
+
+/// What « Avancé » offers (D91), for a meeting or — none named — the next recording: Settings'
+/// choice first, then the Whisper models of this computer, SpeechAnalyzer where Settings hear by it,
+/// the service Settings set, and Ollama's models here. A meeting said confidential is offered no
+/// service: it is made here alone, whatever is chosen (D60).
+#[derive(serde::Serialize)]
+struct ModelsOffered {
+    engine: Engine,
+    /// Settings' Whisper model, by its file's name.
+    model: String,
+    transcription_provider: Option<String>,
+    transcription_model: Option<String>,
+    minutes_provider: Option<String>,
+    minutes_model: Option<String>,
+    whisper: Vec<String>,
+    apple: bool,
+    service: Option<(String, String)>,
+    ollama_address: String,
+    ollama: Vec<String>,
+    confidential: bool,
+    chosen: meeting_models::Models,
+    gone: Vec<meeting_models::Step>,
+    /// What the meeting chose and is not used while it is said confidential: a service.
+    unused: Vec<meeting_models::Step>,
+    /// Settings could not be read: what is offered comes from those last read, and this says why.
+    unreadable: Option<Told>,
+}
+
+#[tauri::command]
+fn models_offered(shell: State<'_, Shell>, name: Option<String>) -> Result<ModelsOffered, Told> {
+    // Settings unreadable: offered from those in memory, and said — the panel still opens.
+    let (settings, unreadable) = match shell.reread() {
+        Ok(settings) => (settings, None),
+        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked, why))),
+    };
+    let (mut chosen, gone, confidential) = match &name {
+        Some(name) => {
+            let folder = session_folder(&shell, name)?;
+            (
+                meeting_models::read(&folder),
+                gone_of(&settings, &folder),
+                confidential::marked(&folder),
+            )
+        }
+        None => {
+            let chosen = shell.next_models.lock().unwrap().clone();
+            let listed = settings::whisper_models(&models_folder(), &settings);
+            (chosen.clone(), meeting_models::applied(&settings, &chosen, &listed).gone, false)
+        }
+    };
+    let file_name = |path: &Path| path.file_name().map(|name| name.to_string_lossy().into_owned());
+    let base = ollama();
+    let ollama_models = providers::ollama_models(&base);
+    // Said confidential: no service named anywhere (D60) — Settings' entry says who makes it here,
+    // and a service the meeting chose is not shown chosen: it is said unused while it is confidential.
+    let mut unused = Vec::new();
+    let (engine, hearing, writing) = if confidential {
+        if matches!(chosen.transcription, Some(meeting_models::Hearing::Service { .. })) {
+            chosen.transcription = None;
+            unused.push(meeting_models::Step::Transcription);
+        }
+        if chosen.minutes.as_ref().is_some_and(|writer| !providers::local(&writer.provider)) {
+            chosen.minutes = None;
+            unused.push(meeting_models::Step::Minutes);
+        }
+        let engine = match settings.engine {
+            Engine::SpeechAnalyzer => Engine::SpeechAnalyzer,
+            _ => Engine::Whisper,
+        };
+        let named = settings.minutes_provider.clone().zip(settings.minutes_model.clone());
+        let here = confidential::writer(named, &base, || Some(ollama_models.clone())).ok();
+        (engine, None, here)
+    } else {
+        (
+            settings.engine,
+            settings.transcription_provider.clone().zip(settings.transcription_model.clone()),
+            settings.minutes_provider.clone().zip(settings.minutes_model.clone()),
+        )
+    };
+    let (transcription_provider, transcription_model) = hearing.clone().unzip();
+    let (minutes_provider, minutes_model) = writing.unzip();
+    Ok(ModelsOffered {
+        engine,
+        model: file_name(&settings.model).unwrap_or_default(),
+        whisper: settings::whisper_models(&models_folder(), &settings)
+            .iter()
+            .filter_map(|path| file_name(path))
+            .collect(),
+        apple: settings.engine == Engine::SpeechAnalyzer,
+        service: hearing,
+        ollama_address: providers::ollama_address(&base),
+        ollama: ollama_models,
+        transcription_provider,
+        transcription_model,
+        minutes_provider,
+        minutes_model,
+        confidential,
+        chosen,
+        gone,
+        unused,
+        unreadable,
+    })
+}
+
+/// The models chosen in the bar at rest, for the next recording (D91): taken by it once its folder
+/// holds its session, then none. A part the contract refuses is refused; refused while a recording
+/// runs — that one's own are written to it.
+#[tauri::command]
+fn next_models_kept(shell: State<'_, Shell>, chosen: meeting_models::Models) -> Result<(), Told> {
+    let mut next = shell.next_models.lock().unwrap();
+    if shell.recording.lock().unwrap().is_some() {
+        return Err(shell.told(Failure::Busy, "a recording runs: its own models are its meeting's"));
+    }
+    if !meeting_models::allowed(&chosen) {
+        return Err(shell.told(Failure::Unexpected, "a part the contract session-audio/v3 refuses"));
+    }
+    let file = next_models_file().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for settings"))?;
+    meeting_models::keep_next(&file, &chosen).map_err(|error| shell.told(Failure::MeetingFile, error))?;
+    *next = chosen;
+    tracing::info!(
+        transcription = next.transcription.is_some(),
+        minutes = next.minutes.is_some(),
+        "shell.next_models_kept"
+    );
+    Ok(())
+}
+
+/// The models a meeting is made with from now on, chosen in « Avancé » (D91): written whole, a
+/// part none being Settings' choice — none at all, the file removed. Settings are not touched.
+#[tauri::command]
+fn meeting_models_chosen(shell: State<'_, Shell>, name: String, chosen: meeting_models::Models) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    // Said confidential: made here alone, so no service is ever chosen for it (D60).
+    let service = matches!(chosen.transcription, Some(meeting_models::Hearing::Service { .. }))
+        || chosen.minutes.as_ref().is_some_and(|writer| !providers::local(&writer.provider));
+    if service && confidential::marked(&folder) {
+        return Err(shell.told(Failure::Unexpected, "a meeting said confidential is sent to no service"));
+    }
+    meeting_models::write(&folder, &chosen).map_err(|error| {
+        // A choice the contract refuses, which « Avancé » never offers; else the folder.
+        let failure = if error.kind() == std::io::ErrorKind::InvalidInput {
+            Failure::Unexpected
+        } else {
+            Failure::MeetingFile
+        };
+        shell.told(failure, error)
+    })?;
+    // Which steps are the meeting's own; their models are no word of a meeting, but stay out all the same.
+    tracing::info!(
+        transcription = chosen.transcription.is_some(),
+        minutes = chosen.minutes.is_some(),
+        "shell.meeting_models_chosen"
+    );
     Ok(())
 }
 
@@ -1373,6 +1857,46 @@ fn context_saved(shell: State<'_, Shell>, name: String, text: String) -> Result<
     }
     context::write(&folder, &text).map_err(|error| shell.told(Failure::MeetingFile, error))?;
     Ok(context_of(&shell, &folder))
+}
+
+/// The context kept for the next recording (D91), as the bar shows it at rest.
+#[derive(serde::Serialize)]
+struct NextContext {
+    text: String,
+}
+
+#[tauri::command]
+fn next_context(shell: State<'_, Shell>) -> NextContext {
+    NextContext {
+        text: shell.next_context.lock().unwrap().clone(),
+    }
+}
+
+/// Where the context kept for the next recording is, beside the settings: Kitokey started again
+/// still has it (D91).
+fn next_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("next-context.txt"))
+}
+
+/// Where the models chosen at rest for the next recording are, beside it: kept the same way (D91).
+fn next_models_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("next-models.json"))
+}
+
+/// The bar's field at rest written (D91): kept for the next recording, under D59's 400 characters.
+/// Never closed by a making: no meeting is made from it before it starts. Refused while a recording
+/// runs — a key typed as the tray or the shortcut starts one would be the meeting after's —, what
+/// is kept staying as it is.
+#[tauri::command]
+fn next_context_kept(shell: State<'_, Shell>, text: String) -> Result<(), Told> {
+    let mut next = shell.next_context.lock().unwrap();
+    if shell.recording.lock().unwrap().is_some() {
+        return Err(shell.told(Failure::Busy, "a recording runs: no context is kept for the next"));
+    }
+    let file = next_file().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for settings"))?;
+    context::keep_next(&file, &text).map_err(|error| shell.told(Failure::MeetingFile, error))?;
+    *next = text;
+    Ok(())
 }
 
 /// *Refaire avec ce contexte* (D59): the transcript made again by whoever the settings name to
@@ -2221,7 +2745,7 @@ struct Queued {
 
 /// A making of minutes is over: its meeting free, its failure kept for its page, and the next
 /// one asked meanwhile started — those that cannot start yet (an agreement to give) left as said.
-fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<summarising::Cause>)>) {
+fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<summarising::Cause>)>, own: Option<&str>) {
     let shell = app.state::<Shell>();
     // What says it is being written goes first, the meeting freed last: nothing started in
     // between is left without its model, nor the tray's entry greyed off.
@@ -2233,7 +2757,11 @@ fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<
         } else {
             why
         };
-        shell.minutes_failed.lock().unwrap().insert(folder.to_path_buf(), (why, cause));
+        shell
+            .minutes_failed
+            .lock()
+            .unwrap()
+            .insert(folder.to_path_buf(), (why, cause, own.map(str::to_string)));
     } else {
         *shell.minutes_made.lock().unwrap().entry(folder.to_path_buf()).or_default() += 1;
     }
@@ -2347,10 +2875,12 @@ fn makings(shell: State<'_, Shell>) -> Makings {
     let fetched = shell.fetched.lock().unwrap().clone();
     let (failed, failed_said) = {
         let failures = shell.minutes_failed.lock().unwrap();
-        let failed = failures.iter().map(|(folder, (why, _))| (named(folder), said(why))).collect();
+        let failed = failures.iter().map(|(folder, (why, ..))| (named(folder), said(why))).collect();
+        // Failed by the meeting's own model: named, and chosen again where it was chosen — the
+        // sentence its notification says too (D91).
         let causes = failures
             .iter()
-            .filter_map(|(folder, (_, cause))| Some((named(folder), words::cause((*cause)?, shell.language()).to_string())))
+            .filter_map(|(folder, (_, cause, own))| Some((named(folder), words::cause_said((*cause)?, own.as_deref(), shell.language()))))
             .collect();
         (failed, causes)
     };
@@ -2502,7 +3032,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
     // Not started: said on the meeting's page as well as in a notification (D25).
     let refused = |why: String| {
         shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
-        shell.minutes_failed.lock().unwrap().insert(folder.clone(), (why, None));
+        shell.minutes_failed.lock().unwrap().insert(folder.clone(), (why, None, None));
     };
     let settings = match shell.reread() {
         Ok(settings) => settings,
@@ -2512,8 +3042,9 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
         }
     };
     let named = settings.minutes_provider.clone().zip(settings.minutes_model.clone());
-    // Made again with another model, this time only; or by whoever the settings name.
-    let wanted = chosen.or(settings.minutes_provider.zip(settings.minutes_model));
+    // Made again with another model, this time only; or by whoever the meeting chose, else the settings.
+    let made_with = own(&settings, &folder);
+    let wanted = chosen.or(made_with.minutes_provider.zip(made_with.minutes_model));
     // Said confidential: on this computer alone, whatever was named — Ollama silent or holding no
     // model, they wait, said, and nothing is asked nor sent (D60).
     let wanted = if confidential::marked(&folder) {
@@ -2597,6 +3128,11 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
     shell.minutes_waiting.lock().unwrap().retain(|queued| queued.folder != folder);
     shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
     *shell.minutes_by.lock().unwrap() = Some((model.clone(), host.clone(), Instant::now()));
+    // The meeting's own model, chosen in « Avancé » (D91): a failure names it, and where it is chosen.
+    let own_model = meeting_models::read(&folder)
+        .minutes
+        .is_some_and(|own| own.provider == provider && own.model == model)
+        .then(|| model.clone());
     *shell.minutes_host.lock().unwrap() = (!providers::local(&provider)).then(|| host.clone());
     shell.minutes_failed.lock().unwrap().remove(&folder);
     minuting(app, true);
@@ -2615,7 +3151,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
             Err(error) => {
                 let why = format!("the minutes there could not be set aside ({error}): nothing was made");
                 tracing::error!(detail = %why, "shell.minutes_failed");
-                minutes_ended(&app, &folder, Some((why, Some(summarising::Cause::Unwritable))));
+                minutes_ended(&app, &folder, Some((why, Some(summarising::Cause::Unwritable))), None);
                 let failed = words::Minutes::failed(Some(summarising::Cause::Unwritable), again);
                 return tell(&app, &words::minutes(&failed, shell.language()));
             }
@@ -2653,7 +3189,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
                 if let Some(previous) = &previous {
                     let _ = std::fs::remove_file(previous);
                 }
-                minutes_ended(&app, &folder, Some((error.to_string(), None)));
+                minutes_ended(&app, &folder, Some((error.to_string(), None)), None);
                 return tell(&app, &words::minutes(&words::Minutes::failed(None, again), shell.language()));
             }
         };
@@ -2697,6 +3233,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
                 summarising::Made::Failed(why, cause) => Some((why.clone(), *cause)),
                 summarising::Made::Written(_) => None,
             },
+            own_model.as_deref(),
         );
         if *shell.leaving.lock().unwrap() {
             return;
@@ -2705,7 +3242,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
         let said = match made {
             summarising::Made::Written(_) if kept_beside.is_some() => words::Minutes::ReadyKeptBeside(kept_beside.unwrap_or_default()),
             summarising::Made::Written(_) => words::Minutes::Ready,
-            summarising::Made::Failed(_, cause) => words::Minutes::failed(cause, again),
+            summarising::Made::Failed(_, cause) => words::Minutes::failed_by(cause, again, own_model.as_deref(), shell.language()),
         };
         // Ready, a click opens the meeting (D44); a failure is said as ever.
         if written {
@@ -2839,6 +3376,8 @@ fn start_recording(app: &AppHandle, owner: licence::Owner) {
         let _ = app.run_on_main_thread(move || show_full(&handle));
         return;
     }
+    // Never listening during a recording (`recording/v1`): the panel's capture ends first (D88).
+    sound_check_stopped(app);
     if let Err(error) = sessions::writable(&sessions) {
         tracing::error!(detail = %error, "shell.sessions_refused");
         return tell(
@@ -2882,6 +3421,29 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
             {
                 tracing::warn!(kind = ?error.kind(), "shell.trial_not_counted");
             }
+            // The context typed before the start, the meeting's own once its folder holds its session
+            // (D91) — written before the bar is told of the meeting, which then reads it there.
+            let mut next = shell.next_context.lock().unwrap();
+            match context::taken(folder, &mut next) {
+                Ok(()) => {
+                    if let Some(Err(error)) = next_file().map(|file| context::keep_next(&file, "")) {
+                        tracing::error!(kind = ?error.kind(), "shell.context_not_cleared");
+                    }
+                }
+                Err(error) => tracing::error!(kind = ?error.kind(), "shell.context_not_taken"),
+            }
+            drop(next);
+            // The models chosen at rest, the meeting's own the same way; then none for the next.
+            let mut next = shell.next_models.lock().unwrap();
+            match meeting_models::taken(folder, &mut next) {
+                Ok(()) => {
+                    if let Some(Err(error)) = next_models_file().map(|file| meeting_models::keep_next(&file, &next)) {
+                        tracing::error!(kind = ?error.kind(), "shell.models_not_cleared");
+                    }
+                }
+                Err(error) => tracing::error!(kind = ?error.kind(), "shell.models_not_taken"),
+            }
+            drop(next);
             *shell.recorded.lock().unwrap() = Some(folder.clone());
             *shell.meter.lock().unwrap() = (Some(Instant::now()), [0.0, 0.0]);
             small_recording(app, true);
@@ -2999,9 +3561,9 @@ fn transcribe_next(app: &AppHandle) {
         let settings = shell.settings();
         let next = {
             let mut waiting = shell.waiting.lock().unwrap();
-            let at = waiting
-                .iter()
-                .position(|(folder, again)| matches!(again, Some(Again::Model(_))) || !default_model_missing_for(&settings, folder));
+            let at = waiting.iter().position(|(folder, again)| {
+                matches!(again, Some(Again::Model(_))) || !default_model_missing_for(&own(&settings, folder), folder)
+            });
             at.and_then(|at| waiting.remove(at))
         };
         match next {
@@ -3037,20 +3599,23 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
         return Ok(());
     }
     shell.transcripts_tried.lock().unwrap().insert(folder.clone(), Some(again.clone()));
-    let settings = shell.reread().map_err(|why| (Failure::SettingsUnread, why))?;
+    let read = shell.reread().map_err(|why| (Failure::SettingsUnread, why))?;
+    // The models this computer lists, as Settings name theirs: a Refaire… may pick Settings' own.
+    let listed = settings::whisper_models(&models_folder(), &read);
+    let settings = own(&read, &folder);
     let (hearer, key) = match &again {
-        Again::Model(model) if !settings::whisper_models(&models_folder(), &settings).contains(model) => {
+        Again::Model(model) if !listed.contains(model) => {
             return Err((Failure::ModelAbsent, "no model on this computer".to_string()));
         }
         Again::Model(model) => (Hearer::Model(model.clone()), None),
-        Again::Settings => hearer_now(&shell, &settings, &folder),
+        Again::Settings | Again::Own => hearer_now(&shell, &settings, &folder),
     };
     if let Hearer::Model(model) = &hearer
         && !model.is_file()
     {
         // Made again by the settings' Whisper, its default model missing: it waits for it and the
         // model is offered, as for a first transcript.
-        if again == Again::Settings && *model == Settings::default().model {
+        if matches!(again, Again::Settings | Again::Own) && *model == Settings::default().model {
             drop(running);
             wait(&shell, folder, Some(again));
             if !*shell.fetching.lock().unwrap() {
@@ -3142,6 +3707,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
             let named = shell
                 .reread()
                 .ok()
+                .map(|settings| own(&settings, &folder))
                 .and_then(|settings| settings.minutes_provider.zip(settings.minutes_model));
             write_minutes(&app, folder, None, named);
         }
@@ -3149,6 +3715,17 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
         transcribe_next(&app);
     });
     Ok(())
+}
+
+/// Settings as a meeting is made with them: its own models where it chose some (D91), Settings'
+/// choice for the rest and where its own is gone — logged, and said on its page.
+fn own(settings: &Settings, folder: &Path) -> Settings {
+    let chosen = meeting_models::read(folder);
+    let applied = meeting_models::applied(settings, &chosen, &settings::whisper_models(&models_folder(), settings));
+    if !applied.gone.is_empty() {
+        tracing::info!(gone = ?applied.gone, "shell.meeting_model_gone");
+    }
+    applied.settings
 }
 
 /// Who hears now, as the settings name it — Apple's SpeechAnalyzer while this Mac offers it, a
@@ -3197,7 +3774,7 @@ fn transcribe(app: &AppHandle, folder: PathBuf) {
     }
     shell.transcripts_tried.lock().unwrap().insert(folder.clone(), None);
     let _ = shell.reread();
-    let settings = shell.settings();
+    let settings = own(&shell.settings(), &folder);
     let model = &settings.model;
     let (hearer, key) = hearer_now(&shell, &settings, &folder);
     if matches!(hearer, Hearer::Model(_)) && !model.is_file() {
@@ -3542,6 +4119,7 @@ fn relabel(app: &AppHandle) {
         let shell = app.state::<Shell>();
         let labels = words::menu(shell.language());
         let _ = shell.open.set_text(labels.open);
+        let _ = shell.show_bar.set_text(labels.show_bar);
         let _ = shell.quit.set_text(labels.quit);
         // The model's entry, while it is offered: how far it is, or what it fetches.
         let wanted = published();

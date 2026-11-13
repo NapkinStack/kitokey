@@ -14,13 +14,39 @@ use oxc_span::{GetSpan, SourceType};
 const SILENT: &[(&str, usize, &str)] = &[
     ("page_failed", 1, "the log itself: nowhere left to say it"),
     ("makings", 2, "returns no `Result`: it cannot fail"),
-    ("header", 1, "returns no `Result`: it cannot fail"),
+    ("header", 2, "returns no `Result`: it cannot fail"),
+    (
+        "bar_fit",
+        1,
+        "returns no `Result`: it cannot fail; a size refused leaves the bar as it was",
+    ),
     (
         "microphones_listed",
         1,
         "it returns a failed reading as `unread`, which the list says; the command itself cannot fail, and a later opening reads again",
     ),
     ("recording_now", 1, "returns no `Result`: it cannot fail"),
+    (
+        "next_context",
+        1,
+        "returns no `Result`: it cannot fail; the bar's field at rest is then shown empty (D91)",
+    ),
+    (
+        "sound_check_open",
+        1,
+        "returns no `Result`: false, nothing opened — the panel says it; it cannot fail otherwise",
+    ),
+    ("sound_check_now", 2, "returns no `Result`: it cannot fail"),
+    (
+        "sound_check_mark",
+        1,
+        "returns no `Result`: a refusal is `marked: false`, and then nothing plays — the call's sentence says why",
+    ),
+    (
+        "sound_check_close",
+        2,
+        "returns no `Result`: it cannot fail, and ends what it can — the panel's close, and a close of what opened after the panel closed",
+    ),
     (
         "model_fetch",
         2,
@@ -47,7 +73,7 @@ const SILENT: &[(&str, usize, &str)] = &[
         2,
         "an offer: returns `Ok` on what it reads, and is simply absent otherwise",
     ),
-    ("URL", 6, "no command: an address that does not parse is shown as it was typed"),
+    ("URL", 7, "no command: an address that does not parse is shown as it was typed"),
     ("audio.play", 1, "no command: its handler is the player's own"),
 ];
 

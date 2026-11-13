@@ -15,6 +15,7 @@ use std::{
     fs,
     io::{self, Write},
     path::Path,
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 /// The file of the folder of meetings that keeps the trial's first day.
@@ -24,6 +25,8 @@ pub const MADE_FILE: &str = ".kitokey-trial-meetings";
 /// The days the trial lasts at least, and the meetings it holds at least.
 pub const DAYS: i64 = 14;
 pub const MEETINGS: usize = 10;
+/// The count of the next name beside the day, one for the process (`beside`).
+static NEXT: AtomicU64 = AtomicU64::new(0);
 
 /// Keeps `now` as the trial's first day, unless a day is kept already: the day kept is given
 /// back. The folder of meetings is made when it is not there. A day's file that does not read is
@@ -52,8 +55,12 @@ pub fn begin(meetings: &Path, now: i64) -> io::Result<i64> {
 }
 
 /// A file of this process's own beside the day, made new: one an earlier start left is never taken.
+/// Its name is never given twice in a process: on Windows, a name just removed can stay taken a
+/// while, its deletion pending, and making it again answers « Access is denied », not « already
+/// there » (#705).
 fn beside(meetings: &Path) -> io::Result<(std::path::PathBuf, fs::File)> {
-    for count in 0..1000 {
+    for _ in 0..1000 {
+        let count = NEXT.fetch_add(1, Ordering::Relaxed);
         let path = meetings.join(format!("{DAY_FILE}-{}-{count}.tmp", std::process::id()));
         match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => return Ok((path, file)),
@@ -139,4 +146,36 @@ pub fn over(meetings: &Path, now: i64) -> bool {
 /// The trial's first day, as kept; none when it is not there or does not read.
 fn day(meetings: &Path) -> Option<i64> {
     fs::read_to_string(meetings.join(DAY_FILE)).ok()?.strip_suffix('\n')?.parse().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// On Windows a removed file's name can stay taken a while — « Access is denied » to whoever
+    /// makes it again (#705): a name beside the day is never given twice in a process.
+    #[test]
+    fn a_name_beside_the_day_is_never_given_twice() {
+        let meetings = tempfile::tempdir().unwrap();
+        let (first, file) = beside(meetings.path()).unwrap();
+        drop(file);
+        fs::remove_file(&first).unwrap();
+        let (second, _file) = beside(meetings.path()).unwrap();
+        assert_ne!(first, second);
+    }
+
+    /// A name an earlier start left, under this process's id, is passed over, never an error.
+    #[test]
+    fn a_name_left_beside_the_day_is_passed_over() {
+        let meetings = tempfile::tempdir().unwrap();
+        let next = NEXT.load(Ordering::Relaxed);
+        let left: Vec<_> = (next..next + 50)
+            .map(|count| meetings.path().join(format!("{DAY_FILE}-{}-{count}.tmp", std::process::id())))
+            .collect();
+        for path in &left {
+            fs::write(path, "").unwrap();
+        }
+        let (path, _file) = beside(meetings.path()).unwrap();
+        assert!(!left.contains(&path), "{path:?}");
+    }
 }

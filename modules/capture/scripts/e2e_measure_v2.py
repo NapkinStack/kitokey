@@ -1,8 +1,9 @@
-"""What the end-to-end scenarios measure in a session of `session-audio/v2` — never listened
-to, and the sound is a note made for the run."""
+"""What the end-to-end scenarios measure in a session of `session-audio/v2`, or of `v3` — its tracks
+kept as FLAC once stopped —, never listened to, and the sound is a note made for the run."""
 import datetime
 import json
 import os
+import signal
 import struct
 import subprocess
 import sys
@@ -21,9 +22,26 @@ FULL = 8_388_608
 SETTLED = 1.0
 
 
+def wav_or_flac(folder, name):
+    """A track's file as the contract says a reader opens it: its WAV while there, its FLAC otherwise —
+    24 bits, decoded by ffmpeg to a WAV whose lengths are not read."""
+    wav = os.path.join(folder, f"{name}.wav")
+    if os.path.exists(wav):
+        return open(wav, "rb").read(), False
+    return decoded(os.path.join(folder, f"{name}.flac")), True
+
+
+def decoded(flac):
+    """A FLAC of 24 bits as a WAV ffmpeg writes of it, every sample as the FLAC holds it."""
+    form = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_name,bits_per_raw_sample", "-of", "csv=p=0", flac],
+                          capture_output=True, text=True, check=True).stdout.strip()
+    assert form == "flac,24", f"{flac}: {form}"
+    return subprocess.run(["ffmpeg", "-v", "error", "-i", flac, "-c:a", "pcm_s24le", "-f", "wav", "-"], capture_output=True, check=True).stdout
+
+
 def track(folder, name):
     """A track read as the contract says: found by its chunks, its lengths ignored, to the end."""
-    data = open(os.path.join(folder, f"{name}.wav"), "rb").read()
+    data, kept = wav_or_flac(folder, name)
     assert data[:4] == b"RIFF" and data[8:12] == b"WAVE", f"{name}: not a track"
     at = 12
     while data[at:at + 4] != b"data":
@@ -48,7 +66,7 @@ def track(folder, name):
         peaks.append(around[len(around) * 199 // 200] if around else 0)
     return {"name": name, "rate": rate, "channels": channels, "frames": frames, "first": first, "peaks": peaks, "rests": rests,
             "said": struct.unpack("<I", data[at + 4:at + 8])[0], "bytes": len(body), "body": body,
-            "riff": struct.unpack("<I", data[4:8])[0], "file": len(data)}
+            "riff": struct.unpack("<I", data[4:8])[0], "file": len(data), "kept": kept}
 
 
 def breaks(one, hertz, told):
@@ -97,7 +115,7 @@ def onset(one):
 
 def session(folder):
     read = json.load(open(os.path.join(folder, "session.json")))
-    assert read["contract"] == "session-audio/v2", read
+    assert read["contract"] in ("session-audio/v2", "session-audio/v3"), read
     return read
 
 
@@ -348,6 +366,38 @@ def main(what, folder, *args):
         time.sleep(seconds)
         subprocess.run(["pw-cli", "send-command", str(node), "Start", "{}"], capture_output=True, check=True)
         return
+    if what == "kept":
+        # Each track a FLAC alone, beginning with what a copy of its WAV, taken while it recorded, held.
+        names = sorted(os.listdir(folder))
+        assert names == ["clock.jsonl", "local.flac", "remote.flac", "session.json"], names
+        assert session(folder)["contract"] == "session-audio/v3"
+        for name, copy in zip(("local", "remote"), args):
+            # capture's WAV: 68 bytes of header, frames of two channels of three bytes.
+            body, copied = track(folder, name)["body"], open(copy, "rb").read()[68:]
+            copied = copied[:len(copied) - len(copied) % 6]
+            assert len(copied) > 6 * 48000 and body[:len(copied)] == copied, f"{name}.flac does not hold what its WAV held"
+            print(f"    {name}.flac holds, sample for sample, the {len(copied) // 6} frames its WAV held when copied")
+        return
+    if what == "whole":
+        # Killed or stopped while compressing: each track a WAV, a FLAC, or both — never neither — read whole.
+        names = sorted(os.listdir(folder))
+        for name in ("local", "remote"):
+            assert f"{name}.wav" in names or f"{name}.flac" in names, f"{name}: neither its WAV nor its FLAC, in {names}"
+            if f"{name}.wav" in names and f"{name}.flac" in names:
+                flac = decoded(os.path.join(folder, f"{name}.flac"))
+                wav = open(os.path.join(folder, f"{name}.wav"), "rb").read()
+                assert flac[flac.index(b"data") + 8:] == wav[68:], f"{name}: its WAV and its FLAC are not one track"
+            assert track(folder, name)["frames"] > 48000, f"{name}: read, it holds nothing"
+        return print(f"    {', '.join(names)}: each track whole")
+    if what == "signal-at":
+        # Not a measure: the signal `args[1]` to the recorder `args[0]` the moment `args[2]` is in the folder.
+        pid, sent, name = int(args[0]), getattr(signal, args[1]), args[2]
+        until = time.monotonic() + 120
+        while not os.path.exists(os.path.join(folder, name)):
+            assert time.monotonic() < until, f"{name} never appeared"
+            time.sleep(0.0005)
+        os.kill(pid, sent)
+        return print(f"    {args[1]} sent as {name} appeared")
     if what == "followed":
         return followed(folder, *args)
     if what == "moves-said":
@@ -420,7 +470,7 @@ def main(what, folder, *args):
         lasted = datetime.datetime.fromisoformat(read["stopped"]).timestamp() - start
         assert set(tracks) == {"local", "remote"}, f"the session holds {sorted(tracks)}"
         for one, note in zip((tracks["local"], tracks["remote"]), (float(args[0]), float(args[1]))):
-            assert one["said"] == one["bytes"] and one["riff"] == one["file"] - 8, f"{one['name']}: its header does not carry its true length"
+            assert one["kept"] or (one["said"] == one["bytes"] and one["riff"] == one["file"] - 8), f"{one['name']}: its header does not carry its true length"
             assert abs(pitch(one) - note) < 20, f"{one['name']} holds a note at {pitch(one):.0f} Hz, not {note:.0f}"
             assert abs(one["frames"] / one["rate"] - lasted) <= 2.5, f"{one['name']} holds {one['frames'] / one['rate']:.1f} s for {lasted:.0f} s recorded"
         assert not os.path.exists(os.path.join(folder, "me.wav")), "a file of the first version beside the tracks"

@@ -164,19 +164,55 @@ sleep 0.5
 KITOKEY_TRACE=e2e-e "$bin" record "$work/v2" > "$work/e.events" 2> "$work/e.errors" &
 recorder=$!
 sleep 1; pw-play "$work/others-a.wav"
+folder=$(ls -d "$work"/v2/*/ | head -1)
+cp "$folder/local.wav" "$work/e-local.wav"; cp "$folder/remote.wav" "$work/e-remote.wav"   # what the WAVs hold then
 sleep 14                                                 # nothing plays: "silent" is owed
 pw-play "$work/others-b.wav"; sleep 1
 kill -INT "$recorder"; stopped_as=0; wait "$recorder" || stopped_as=$?
 kill "$mic_player" 2>/dev/null || true
-folder=$(ls -d "$work"/v2/*/ | head -1)
 sed 's/^/    /' "$work/e.events" "$work/e.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0 -a ! -s "$work/e.errors"
 check measure events "$work/e.events"
+# Kept as FLAC once stopped (session-audio/v3, D87): the notes measured in them as in the WAVs.
 check measure2 stopped "$folder" 440 880
-check logged e2e-e capture.opened capture.opened capture.started capture.silent capture.heard capture.stopped
-for name in local remote; do
-  check test "$(ffprobe -v error -show_entries stream=codec_name -of csv=p=0 "$folder/$name.wav")" = pcm_s24le
+check measure2 kept "$folder" "$work/e-local.wav" "$work/e-remote.wav"
+check logged e2e-e capture.opened capture.opened capture.started capture.silent capture.heard capture.stopped capture.kept capture.kept
+
+say "E2. kept as FLAC: killed while it compresses, and a second signal (D87)"
+# Three recordings of a minute at once, each stopped, then: killed as its first FLAC is being written,
+# killed as it is renamed, and a second signal as it is being written. Where the moment is caught
+# depends on the machine: whatever is left is judged whole.
+tone 440 75 "$work/me-long.wav"; tone 880 75 "$work/others-75.wav"
+pw-play --target kitokey_e2e_mic "$work/me-long.wav" & mic_player=$!
+pw-play "$work/others-75.wav" & others_player=$!
+sleep 0.5
+for run in part flac again; do
+  KITOKEY_TRACE=e2e-e2-$run "$bin" record "$work/kept-$run" > /dev/null 2> "$work/e2-$run.errors" &
+  eval "recorder_$run=$!"
 done
+sleep 65
+for run in part flac again; do
+  folder=$(ls -d "$work/kept-$run"/*/ | head -1)
+  pid=$(eval echo "\$recorder_$run")
+  case $run in
+    part) python3 scripts/e2e_measure_v2.py signal-at "$folder" "$pid" SIGKILL local.flac.part & ;;
+    flac) python3 scripts/e2e_measure_v2.py signal-at "$folder" "$pid" SIGKILL local.flac & ;;
+    again) python3 scripts/e2e_measure_v2.py signal-at "$folder" "$pid" SIGTERM local.flac.part & ;;
+  esac
+done
+sleep 0.5
+kill -INT "$recorder_part" "$recorder_flac" "$recorder_again"
+wait "$recorder_part" "$recorder_flac" 2>/dev/null || true
+again_as=0; wait "$recorder_again" || again_as=$?
+wait
+kill "$mic_player" "$others_player" 2>/dev/null || true
+for run in part flac again; do
+  folder=$(ls -d "$work/kept-$run"/*/ | head -1)
+  say "    $run: $(ls "$folder" | tr '\n' ' ')"
+  check measure2 whole "$folder"
+done
+check test "$again_as" = 0 -a ! -s "$work/e2-again.errors"
+check test -z "$(ls "$(ls -d "$work"/kept-again/*/ | head -1)" | grep '\.part$')"
 
 say "F. each source as delivered: a recording killed"
 pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
@@ -452,7 +488,7 @@ sed 's/^/    /' "$work/o3.errors" >> .evidence/e2e.txt
 check test "$stopped_as" = 0 -a ! -s "$work/o3.errors"
 check test "$(head -1 "$work/o3.events" | grep -c microphone_gone)" = 1
 check grep -q '"me":"kitokey_e2e_mic' "$work/o3.events"
-check test -s "$folder/local.wav"
+check test -s "$folder/local.flac"
 check logged e2e-o3 capture.microphone_gone capture.started capture.stopped
 
 # A name that goes during the recording: said, Auto takes over, the track going on; back, taken again.
@@ -476,7 +512,7 @@ check test "$(grep -c microphone_gone "$work/o4.events")" = 1
 check test "$(grep -c microphone_back "$work/o4.events")" = 1
 check measure2 said "$work/o4.events" me kitokey_e2e_mic kitokey_e2e_named
 check measure2 changes "$folder" kitokey_e2e_mic kitokey_e2e_named
-check test -s "$folder/local.wav"
+check test -s "$folder/local.flac"
 check logged e2e-o4 capture.started capture.microphone_gone capture.device capture.microphone_back capture.device capture.stopped
 
 # A headset's named, gone, back with no call on it: said back, what stood in closes, no stream, the
@@ -520,6 +556,171 @@ check test -z "$(grep -lE '([0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}' "$work/o5.eve
 kill "$named" "$other" "$headset" "$addressed" 2>/dev/null || true; wait "$named" "$other" "$headset" "$addressed" 2>/dev/null || true
 pactl unload-module "$mic_c"; mic_c=
 pactl unload-module "$mic_d"; mic_d=
+# O's devices gone from the graph and the default input the run's own again, before P names it: a
+# device still being taken away leaves cpal no name but `default_input`.
+pactl set-default-source kitokey_e2e_mic.monitor
+for _ in $(seq 50); do
+  pw-dump 2>/dev/null | grep -qE '"node.name": "kitokey_e2e_(mic_c|mic_d|named|other|headset|x_)' || break
+  sleep 0.1
+done
+sleep 0.5
+
+say "P. listening without recording (D88): each source heard, nothing written, stopped within a second — asked, or its input closed; a headset said"
+# What the run's folder holds, file by file and size: listening must leave it as it was. It starts in a
+# folder of its own, its temporary files there too: they must stay empty.
+files() { find "$work" -mindepth 1 \( -path "$work/p.*" -prune \) -o -type f -printf '%P %s\n' -o -printf '%P/\n' | sort; }
+# Whether it holds what it held before listening; what differs said, nothing else.
+unchanged() { diff <(echo "$before") <(files) | sed 's/^/    /' | tee -a .evidence/e2e.txt | grep -q . && return 1 || return 0; }
+mkdir -p "$work/p-cwd"
+# listen_for RUN [ARGS]: started on a pipe's input, its output in p.RUN.events; the pipe open on 3.
+listen_for() {
+  mkfifo "$work/p.$1.in"
+  (cd "$work/p-cwd" && KITOKEY_TRACE="e2e-p-$1" TMPDIR="$work/p-cwd" exec "$bin" listen "${@:2}") \
+    < "$work/p.$1.in" > "$work/p.$1.events" 2> "$work/p.$1.errors" &
+  listener=$!
+  exec 3> "$work/p.$1.in"
+}
+# stopped_within PID SECONDS: the program ends well within that long of what was just asked.
+stopped_within() {
+  local asked=$1 as=0; wait "$2" || as=$?
+  python3 -c 'import sys, time; sys.exit(0 if time.time() - float(sys.argv[1]) < float(sys.argv[2]) else "took " + str(time.time() - float(sys.argv[1])))' "$asked" "$3" && test "$as" = 0
+}
+# heard RUN ME OTHERS: each source named first, `me` no headset's; each level above the floor; no line a
+# recording alone says.
+heard() {
+  python3 - "$work/p.$1.events" "$2" "$3" <<'PY'
+import json, sys
+lines = [json.loads(line) for line in open(sys.argv[1])]
+devices = [(line["source"], line["device"]) for line in lines if line["event"] == "device"]
+loudest = {source: max([line["level"] for line in lines if line["event"] == "level" and line["source"] == source] or [0]) for source in ("me", "others")}
+said = {line["event"] for line in lines}
+named = [source for source, _ in devices[:2]] == ["me", "others"] and all(device.startswith(want) for (_, device), want in zip(devices, sys.argv[2:]))
+ok = named and lines[0].get("headset") is False and min(loudest.values()) > 0.5 and said <= {"device", "level"}
+print(f"    devices {devices}, loudest {loudest}, said {sorted(said)}")
+sys.exit(0 if ok else "not heard as it should be")
+PY
+}
+before=$(files)
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
+pw-play --target kitokey_e2e_out "$work/others-long.wav" & others_player=$!
+sleep 0.5
+listen_for stop
+sleep 3
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+check heard stop kitokey_e2e_mic kitokey_e2e_out
+check test ! -s "$work/p.stop.errors"
+# A termination signal, as the shell closing the panel.
+listen_for term
+sleep 2
+asked=$(date +%s.%N); kill -TERM "$listener"
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+check heard term kitokey_e2e_mic kitokey_e2e_out
+# Its input closed, as by a shell that crashed while the panel showed: no microphone outlives it.
+listen_for eof
+sleep 2
+asked=$(date +%s.%N); exec 3>&-
+check stopped_within "$asked" "$listener" 1
+check heard eof kitokey_e2e_mic kitokey_e2e_out
+kill "$mic_player" "$others_player" 2>/dev/null || true; wait "$mic_player" "$others_player" 2>/dev/null || true
+check unchanged
+check test -z "$(ls -A "$work/p-cwd")"
+check test -z "$(pactl list short source-outputs)"
+check logged e2e-p-stop capture.opened capture.opened capture.listening capture.listened
+# The default input changed while it listens: a later `device` of `me`, which never says `headset`
+# (`headset_said_once`, below).
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
+listen_for moved
+sleep 2
+pactl set-default-source kitokey_e2e_out.monitor
+sleep 3
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+pactl set-default-source kitokey_e2e_mic.monitor
+kill "$mic_player" 2>/dev/null || true; wait "$mic_player" 2>/dev/null || true
+moved_said() {
+  python3 - "$work/p.moved.events" <<'PY' 2>&1 | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"
+import json, sys
+mine = [line for line in map(json.loads, open(sys.argv[1])) if line["event"] == "device" and line["source"] == "me"]
+print(f"    the default input moved while listening: me's devices {[line['device'] for line in mine]}")
+sys.exit(0 if len(mine) >= 2 and mine[1]["device"] != mine[0]["device"] else "no later device of me")
+PY
+}
+check moved_said
+# A headset's default, no call: a recording waits (M); listening opens it actively — it runs from
+# capture's stream alone —, and lets it go when stopped (ADR-0015's amendment).
+mic_c=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic_c)
+stand_in kitokey_e2e_headset "bluez5.loopback=true"; headset=$!
+sleep 1
+pactl set-default-source kitokey_e2e_headset
+check measure2 not-running kitokey_e2e_headset 1
+listen_for headset
+sleep 2
+check grep -q '"device":"kitokey_e2e_headset","event":"device","headset":true,"source":"me"' "$work/p.headset.events"
+check measure2 running kitokey_e2e_headset
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+sleep 1
+check measure2 not-running kitokey_e2e_headset 2
+kill "$headset" 2>/dev/null || true; wait "$headset" 2>/dev/null || true
+pactl set-default-source kitokey_e2e_mic.monitor
+# A microphone named, taken away while it listens: what it says then, and it still stops as asked.
+stand_in kitokey_e2e_named; named=$!
+pw-play --target kitokey_e2e_mic_c "$work/660-long.wav" & named_player=$!
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
+sleep 1
+listen_for named --microphone kitokey_e2e_named
+sleep 2
+kill "$named" 2>/dev/null || true; wait "$named" 2>/dev/null || true
+sleep 3
+asked=$(date +%s.%N); echo stop >&3
+check stopped_within "$asked" "$listener" 1
+exec 3>&-
+kill "$named_player" "$mic_player" 2>/dev/null || true; wait "$named_player" "$mic_player" 2>/dev/null || true
+# As recording/v1 says: no line says it, `me`'s level falls to 0 and stays there, still said.
+gone_unsaid() {
+  python3 - "$work/p.named.events" <<'PY' 2>&1 | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"
+import json, sys
+lines = [json.loads(line) for line in open(sys.argv[1])]
+said = [line for line in lines if line["event"] != "level"]
+me = [line["level"] for line in lines if line["event"] == "level" and line["source"] == "me"]
+print(f"    named, gone while listening: {said}; me's levels by half-seconds {[max(me[n:n + 5]) for n in range(0, len(me), 5)]}")
+ok = [line["event"] for line in said] == ["device", "device"] and max(me[:15]) > 0.5 and len(me) > 40 and max(me[-15:]) == 0
+sys.exit(0 if ok else "not as recording/v1 says")
+PY
+}
+check gone_unsaid
+sed 's/^/    errors: /' "$work/p.named.errors" >> .evidence/e2e.txt
+pactl unload-module "$mic_c"; mic_c=
+grep -v '"level"' "$work"/p.*.events | sed 's/^/    /' >> .evidence/e2e.txt
+# `headset` is said on listening's first `device` of `me` alone (recording/v1): never on a later one,
+# never on `others`', never by a recording — every scenario's lines read.
+headset_said_once() {
+  python3 - "$work" <<'PY' 2>&1 | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"
+import json, pathlib, sys
+wrong, listened = [], 0
+for path in sorted(pathlib.Path(sys.argv[1]).glob("*.events")):
+    lines = [json.loads(line) for line in path.read_text().splitlines() if line.startswith("{")]
+    listening = path.name.startswith("p.")
+    first = next((n for n, line in enumerate(lines) if line.get("event") == "device" and line.get("source") == "me"), None) if listening else None
+    for n, line in enumerate(lines):
+        if "headset" in line and not (listening and n == first):
+            wrong.append(f"{path.name}:{n + 1} {line}")
+    listened += listening
+by_file = {}
+for w in wrong:
+    by_file[w.split(":")[0]] = by_file.get(w.split(":")[0], 0) + 1
+print(f"    headset: {len(wrong)} line(s) where recording/v1 does not say it, in {listened} listening runs and every recording's"
+      + (f", by file {by_file}" if by_file else "") + "".join(f"\n      {w}" for w in wrong[:5]))
+sys.exit(1 if wrong or not listened else 0)
+PY
+}
+check headset_said_once
+check unchanged
 
 [ "$failed" = 0 ] && say "e2e: passed" || say "e2e: FAILED"
 exit "$failed"

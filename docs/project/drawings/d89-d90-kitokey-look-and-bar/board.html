@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>D89 — D90 : l’allure de Kitokey et sa barre</title>
+<!-- The source of the images beside it, rendered at 1280 px by chromium-browser --headless.
+     The colours are ui/window.css's, both themes; --edge is a proposal (README, contrast).
+     ?dark draws the dark theme; ?only=N draws board N alone. Icons: Lucide 1.14.0, inline,
+     ISC (modules/shell/ui/LUCIDE-LICENSE). Everything is drawn at its size unless a title says
+     otherwise. Yellow = the author's notes and measures, never part of the interface. -->
+<style>
+  :root {
+    --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
+    --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
+    --on-accent: #FFFFFF; --edge: #808898; --current: #E3EAFB;
+    --note: #7A5A00; --note-ground: #FFF6DB; --note-line: #C9A227;
+  }
+  :root.dark {
+    --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
+    --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+    --on-accent: #1E2129; --edge: #737B8C; --current: #26324D;
+    --note: #F2CC6B; --note-ground: #2E2A1E; --note-line: #8C7330;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1280px; padding: 32px 34px 8px; background: var(--ground); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
+  section { margin-bottom: 40px; }
+  h2 { margin: 0 0 14px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  p { margin: 0; }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: var(--note-ground); color: var(--note); font-size: 13px; line-height: 1.45; }
+  .note b { display: block; margin-bottom: 2px; }
+  .note ul { margin: 4px 0 0; padding-left: 18px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .cap { font-size: 12px; color: var(--soft); }
+  .tab { font-variant-numeric: tabular-nums; }
+  /* An author's measure or keyboard order: yellow, never the interface's. */
+  .m { display: inline-flex; align-items: center; padding: 0 5px; height: 18px; border-radius: 4px; background: var(--note-ground); color: var(--note); border: 1px dashed var(--note-line); font: 600 11px/1 system-ui, sans-serif; white-space: nowrap; }
+  .k { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--note); color: var(--note-ground); font: 700 11px/1 system-ui, sans-serif; }
+  .anchor { position: relative; }
+  .pin { position: absolute; z-index: 3; }
+
+  /* Icons: Lucide's, inline, 16 or 20 CSS px, stroke 2 as the set draws them. */
+  svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  svg.i.l { width: 20px; height: 20px; }
+
+  /* The controls: 32 px, 28 in the bar, on a 4 px grid; one accent; red for recording alone. */
+  .ib { width: 32px; height: 32px; border-radius: 8px; display: inline-grid; place-items: center; color: var(--soft); flex: none; }
+  .ib.on { background: var(--raised); color: var(--ink); }
+  .ib.sm { width: 28px; height: 28px; border-radius: 6px; }
+  .ib.focus, .focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pb { height: 32px; padding: 0 12px; border-radius: 8px; background: var(--accent); color: var(--on-accent); display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 14px; white-space: nowrap; flex: none; }
+  .pb.sm { height: 28px; padding: 0 10px; border-radius: 6px; font-size: 13px; gap: 6px; }
+  .pb.rec { background: var(--red); }
+  .pb .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .sb { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--ink); display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; white-space: nowrap; flex: none; }
+  .sb.sm { height: 28px; padding: 0 10px; border-radius: 6px; font-size: 13px; }
+  .sb.off { color: var(--soft); border-style: dashed; }
+  .fld { height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--ink); display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 0; }
+  .fld.sm { height: 28px; border-radius: 6px; font-size: 13px; padding: 0 8px; }
+  .fld .ph { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .fld .val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .fld svg.i { color: var(--soft); }
+  .sel { justify-content: space-between; }
+  .area { border-radius: 8px; border: 1px solid var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--surface); padding: 6px 10px; font-size: 13px; line-height: 20px; height: 68px; }
+  .sw { width: 32px; height: 20px; border-radius: 10px; background: var(--raised); border: 1px solid var(--edge); position: relative; flex: none; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--soft); }
+  .sw.yes { background: var(--accent); border-color: var(--accent); }
+  .sw.yes::after { left: 14px; background: var(--on-accent); }
+  .tip { position: absolute; z-index: 4; padding: 4px 8px; border-radius: 6px; background: var(--ink); color: var(--ground); font-size: 12px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.18); }
+  .tip kbd { font: inherit; opacity: .75; margin-left: 6px; }
+
+  /* A window drawn at its size. */
+  .win { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--ground); box-shadow: 0 6px 24px rgba(0,0,0,.12); display: flex; flex: none; }
+  .crop { position: relative; }
+  .crop::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: linear-gradient(transparent, var(--ground)); }
+
+  /* ——— Board 1 · the mark ——— */
+  .marks { display: flex; align-items: flex-end; gap: 28px; }
+  .glyph-dot { fill: currentColor; }
+  .tray { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 8px; }
+  .tray.darkbar { background: #000; color: #FFF; }
+  .tray.lightbar { background: #F3F3F3; color: #15171C; border: 1px solid #D9DDE5; }
+  .tray .sizes { display: flex; gap: 22px; align-items: center; }
+  .tray .one { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; }
+  .zoom { image-rendering: pixelated; }
+  .grid24 { background-color: var(--surface); background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 10px 10px; border: 1px solid var(--line); }
+
+  /* ——— Board 2 & 4 · the window ——— */
+  .side { width: 280px; flex: none; background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+  .pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  /* before: today's sizes, read from window.css */
+  .b-side { padding: 16px 12px; gap: 14px; }
+  .b-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; flex: 1; }
+  .b-ib { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); display: grid; place-items: center; font-size: 18px; }
+  .b-primary { height: 40px; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 15px; }
+  .b-primary i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+  .b-keys { text-align: center; font: 12.5px ui-monospace, monospace; color: var(--soft); margin-top: -6px; }
+  .b-open { height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--raised); font-weight: 600; display: inline-flex; align-items: center; font-size: 15px; }
+  .b-search { height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--raised); color: var(--soft); display: flex; align-items: center; font-size: 15px; }
+  .b-item { padding: 12px 14px; border-radius: 12px; background: var(--current); box-shadow: inset 3px 0 0 var(--accent); display: flex; flex-direction: column; gap: 4px; }
+  .b-item b { font-size: 15px; }
+  .b-chip { align-self: flex-start; padding: 4px 9px; border-radius: 8px; background: var(--raised); font-size: 13px; }
+  .b-pane { padding: 28px 24px; gap: 22px; }
+  .b-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .b-h1 { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
+  /* after */
+  .a-top { height: 56px; padding: 0 12px 0 16px; display: flex; align-items: center; gap: 8px; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; flex: 1; }
+  .a-act { padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
+  .a-act .pb { width: 100%; }
+  .a-list { padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden; }
+  .a-week { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--soft); padding: 8px 8px 4px; }
+  .a-item { padding: 6px 8px; border-radius: 8px; display: flex; flex-direction: column; gap: 0; }
+  .a-item b { font-size: 14px; font-weight: 600; }
+  .a-item .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--soft); height: 20px; }
+  .a-item .meta .has { margin-left: auto; display: flex; gap: 6px; }
+  .a-item .meta .has svg.i { width: 16px; height: 16px; }
+  .a-item.current { background: var(--current); box-shadow: inset 3px 0 0 var(--accent); }
+  .a-foot { border-top: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .a-foot .space { font-size: 12px; color: var(--soft); }
+  .a-foot .space b { color: var(--ink); }
+  .split { height: 4px; border-radius: 2px; background: var(--raised); display: flex; overflow: hidden; }
+  .split i { background: var(--accent); width: 70%; } .split i + i { background: var(--ok); width: 3%; }
+  .a-foot .tools { display: flex; align-items: center; gap: 4px; margin: 0 -4px; }
+  .a-head { height: 56px; padding: 0 16px 0 24px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .a-head .t { flex: 1; display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+  .a-head .t b { font-size: 18px; font-weight: 650; white-space: nowrap; }
+  .a-head .t span { font-size: 13px; color: var(--soft); white-space: nowrap; }
+  .a-body { padding: 16px 24px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; flex: 1; }
+  .props { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .prop { height: 32px; padding: 0 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--soft); white-space: nowrap; }
+  .prop b { color: var(--ink); font-weight: 500; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .chead { display: flex; align-items: center; gap: 4px; height: 32px; }
+  .chead .lbl { flex: 1; font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--soft); }
+  .by { font-size: 12px; color: var(--soft); }
+  .wave { height: 56px; }
+  .player { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--soft); }
+  .play { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
+  .play svg.i { fill: currentColor; }
+  .card h4 { margin: 4px 0 0; font-size: 14px; }
+  .acts { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .acts td { padding: 6px 12px 6px 0; border-top: 1px solid var(--line); }
+  .acts tr:first-child td { border-top: 0; }
+  .acts .who { color: var(--accent); font-weight: 600; width: 1%; white-space: nowrap; }
+  .acts .when { font-size: 12px; color: var(--soft); width: 1%; white-space: nowrap; text-align: right; padding-right: 0; }
+  .tl { display: grid; grid-template-columns: 44px 1fr; gap: 2px 12px; font-size: 14px; }
+  .tl time { font-size: 12px; color: var(--soft); padding-top: 2px; }
+  .tl .w { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .tl .w.far { color: var(--ok); }
+
+  /* ——— Board 3 · icons ——— */
+  table.icons { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 13px; }
+  table.icons th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--soft); padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  table.icons td { padding: 6px 12px; border-top: 1px solid var(--line); vertical-align: middle; }
+  table.icons tr:nth-child(2) td { border-top: 0; }
+  table.icons td.n { font: 12px ui-monospace, monospace; color: var(--soft); white-space: nowrap; }
+  table.icons td.g { width: 1%; white-space: nowrap; } table.icons td.g .ib { width: 24px; }
+  .swatches { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+  .swatch { display: flex; align-items: center; gap: 12px; padding: 6px 12px; font-size: 13px; border-top: 1px solid var(--line); }
+  .swatch:first-child { border-top: 0; }
+  .swatch .c { width: 64px; height: 24px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 600; flex: none; }
+  .swatch .t { color: var(--soft); }
+  .anat { display: flex; gap: 28px; align-items: flex-end; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .anat .one { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+
+  /* ——— Board 5 & 6 · the bar ——— */
+  .bar { width: 440px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 8px 28px rgba(0,0,0,.16); flex: none; overflow: hidden; }
+  .bar .strip { height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; }
+  .bar .strip > .gap { width: 4px; }
+  .bar .handle { width: 28px; height: 28px; display: grid; place-items: center; cursor: move; flex: none; }
+  .live { width: 10px; height: 10px; border-radius: 50%; background: var(--red); flex: none; margin: 0 4px 0 6px; }
+  .time { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; width: 64px; }
+  .meters { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; padding: 0 8px; }
+  .mt { display: flex; align-items: center; gap: 6px; height: 16px; color: var(--soft); }
+  .mt .track { flex: 1; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+  .mt .fill { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+  .mt.far .fill { background: var(--ok); }
+  .mt.quiet .track { background: repeating-linear-gradient(90deg, var(--raised) 0 4px, transparent 4px 6px); }
+  .bar .said { padding: 0 12px 10px 16px; margin-top: -4px; font-size: 12px; color: var(--soft); display: flex; align-items: center; gap: 6px; }
+  .panel { border-top: 1px solid var(--line); padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .prow { display: flex; flex-direction: column; gap: 4px; }
+  .prow label, .plabel { font-size: 12px; font-weight: 600; color: var(--soft); display: flex; align-items: center; gap: 6px; }
+  .pline { display: flex; align-items: center; gap: 8px; min-height: 28px; font-size: 13px; }
+  .pline .grow { flex: 1; min-width: 0; }
+  .hint { font-size: 12px; color: var(--soft); }
+  .disc { display: flex; align-items: center; gap: 6px; height: 28px; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .disc svg.i { color: var(--soft); }
+  .sep { height: 1px; background: var(--line); margin: 0 -16px; }
+  .cmp { display: flex; gap: 40px; align-items: flex-start; }
+  .ghost { border: 2px dashed var(--note-line); border-radius: 12px; display: grid; place-items: center; color: var(--note); font-size: 12px; font-weight: 600; text-align: center; }
+
+  /* ——— Board 6 · Vérifier le son ——— */
+  .chk .src { display: flex; flex-direction: column; gap: 4px; }
+  .chk .src .top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .chk .src .top b { font-weight: 600; }
+  .chk .src .top .dev { margin-left: auto; color: var(--soft); font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chk .big { height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
+  .chk .big i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+  .chk .far .big i { background: var(--ok); }
+  .okay { color: var(--ok); font-weight: 600; display: flex; gap: 6px; align-items: flex-start; font-size: 13px; }
+  .info { color: var(--soft); display: flex; gap: 6px; align-items: flex-start; font-size: 12px; line-height: 1.4; }
+  .info svg.i { margin-top: 1px; }
+  .actions { display: flex; gap: 8px; align-items: center; }
+
+  /* ——— Board 7 · systems ——— */
+  .sys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .sys .card { gap: 10px; padding: 14px; }
+  .sys .title { font-size: 14px; font-weight: 700; }
+  .sys dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 8px; font-size: 12.5px; }
+  .sys dt { color: var(--soft); }
+  .sys dd { margin: 0; }
+  .osbar { height: 28px; border-radius: 6px; display: flex; align-items: center; gap: 10px; padding: 0 10px; font-size: 12px; }
+  .osbar.gnome { background: #000; color: #fff; justify-content: space-between; }
+  .osbar.win11 { background: #F3F3F3; color: #15171C; border: 1px solid #D9DDE5; justify-content: flex-end; }
+  .osbar.mac { background: #F3F3F3; color: #15171C; border: 1px solid #D9DDE5; justify-content: flex-end; }
+  .osbar .grp { display: flex; align-items: center; gap: 8px; }
+  .osbar .pill { padding: 1px 8px; border-radius: 10px; background: #333; display: flex; align-items: center; gap: 6px; }
+  .menu { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.14); padding: 4px; font-size: 13px; }
+  .menu div { padding: 4px 10px; border-radius: 4px; }
+  .menu .hl { background: var(--raised); font-weight: 600; }
+  .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+  .hidden-board { display: none !important; }
+</style>
+<script>
+  if (location.search.includes("dark")) document.documentElement.classList.add("dark");
+</script>
+</head>
+<body>
+
+<!-- Lucide 1.14.0, ISC — one symbol per icon, drawn inline. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-folder-open" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+<symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="3" width="5" height="18" rx="1"/><rect x="5" y="3" width="5" height="18" rx="1"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="i-lock-open" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
+<symbol id="i-panel-left-close" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></symbol>
+<symbol id="i-picture-in-picture-2" viewBox="0 0 24 24"><path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4"/><rect width="10" height="7" x="12" y="13" rx="2"/></symbol>
+<symbol id="i-hard-drive" viewBox="0 0 24 24"><path d="M10 16h.01"/><path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="M21.946 12.013H2.054"/><path d="M6 16h.01"/></symbol>
+<symbol id="i-ellipsis" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-maximize-2" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-audio-lines" viewBox="0 0 24 24"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></symbol>
+<symbol id="i-volume-2" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></symbol>
+<symbol id="i-volume-x" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></symbol>
+<symbol id="i-file-text" viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+<symbol id="i-captions" viewBox="0 0 24 24"><rect width="18" height="14" x="3" y="5" rx="2" ry="2"/><path d="M7 15h4M15 15h2M7 11h2M13 11h4"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-sliders-horizontal" viewBox="0 0 24 24"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></symbol>
+<symbol id="i-message-square-text" viewBox="0 0 24 24"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M7 11h10"/><path d="M7 15h6"/><path d="M7 7h8"/></symbol>
+<symbol id="i-languages" viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></symbol>
+<symbol id="i-square" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/></symbol>
+<symbol id="i-bluetooth" viewBox="0 0 24 24"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></symbol>
+<symbol id="i-circle-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+<!-- Kitokey's mark, on Lucide's 24 grid, stroke 3. A: K, its upper arm a dot. B: K, its upper arm ending in a dot. -->
+<symbol id="mark-a" viewBox="0 0 24 24"><path d="M7 4.5v15M8.5 12 17 19.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15.5" cy="7.25" r="3.25" style="fill:var(--dot,currentColor)"/></symbol>
+<symbol id="mark-a-rec" viewBox="0 0 24 24"><path d="M7 4.5v15M8.5 12 17 19.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="7" r="4" style="fill:var(--dot-rec)"/></symbol>
+<symbol id="mark-b" viewBox="0 0 24 24"><path d="M7 4.5v15M8.5 12 17 19.5M8.5 12l3.75-3.3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15.2" cy="6.1" r="2.75" style="fill:var(--dot,currentColor)"/></symbol>
+<symbol id="tile-a" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2253CF"/><use href="#mark-a" x="12" y="12" width="40" height="40" style="color:#FFFFFF"/></symbol>
+<symbol id="tile-b" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2253CF"/><use href="#mark-b" x="12" y="12" width="40" height="40" style="color:#FFFFFF"/></symbol>
+</defs>
+</svg>
+
+<!-- ═══════════════ 1 · LA MARQUE ═══════════════ -->
+<section data-board="1">
+  <h2>1 · La marque de Kitokey — D89 · proposition A, une variante B</h2>
+  <div class="row" style="gap:40px">
+    <div class="col">
+      <h3>A — « K », son bras haut devenu le point d’enregistrement</h3>
+      <div class="marks">
+        <svg width="128" height="128"><use href="#tile-a"/></svg>
+        <svg width="64" height="64"><use href="#tile-a"/></svg>
+        <svg width="48" height="48"><use href="#tile-a"/></svg>
+        <svg width="32" height="32"><use href="#tile-a"/></svg>
+        <svg width="24" height="24"><use href="#tile-a"/></svg>
+        <svg width="16" height="16"><use href="#tile-a"/></svg>
+      </div>
+      <div class="cap tab">128 · 64 · 48 · 32 · 24 · 16 px — l’icône des applications, du Store, du .deb et du .rpm</div>
+      <h3 style="margin-top:12px">B — variante : le bras haut entier, terminé par le point</h3>
+      <div class="marks">
+        <svg width="64" height="64"><use href="#tile-b"/></svg>
+        <svg width="32" height="32"><use href="#tile-b"/></svg>
+        <svg width="24" height="24"><use href="#tile-b"/></svg>
+        <svg width="16" height="16"><use href="#tile-b"/></svg>
+      </div>
+    </div>
+    <div class="col">
+      <h3>Construction — grille de 24, trait 3, comme Lucide à 1,5 ×</h3>
+      <div class="anchor" style="width:240px;height:240px">
+        <div class="grid24" style="width:240px;height:240px"></div>
+        <svg class="pin" style="left:0;top:0;color:var(--ink);opacity:.9" width="240" height="240"><use href="#mark-a"/></svg>
+        <svg class="pin" style="left:0;top:0" width="240" height="240" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" fill="none" stroke="var(--note-line)" stroke-width=".1" stroke-dasharray=".4 .3"/><circle cx="15.5" cy="7.25" r=".25" fill="var(--note)"/></svg>
+      </div>
+      <div class="cap" style="max-width:240px">Le fût et le bras bas : trait 3, bouts ronds. Le point : rayon 3,25, centré en (15,5 ; 7,25). Rien sous 2 px à 16 px.</div>
+    </div>
+    <div class="col" style="flex:1">
+      <h3>La même marque dans l’en-tête de la fenêtre — 20 px</h3>
+      <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 16px"><svg width="20" height="20"><use href="#tile-a"/></svg>Kitokey</div>
+      <div class="note"><b>Propositions</b>
+        <ul>
+          <li>Un monogramme : le « K » de Kitokey, dont le bras haut devient un point — le voyant d’un enregistreur. Deux traits et un disque : lisible à 16 px, sans détail qui s’efface.</li>
+          <li>Le carreau prend l’accent (#2253CF), la seule couleur de marque ; il ne change pas avec le thème, comme les icônes d’applications.</li>
+          <li>A est proposée ; B se lit plus vite comme un « K » mais s’empâte à 16 px. Un seul des deux est gardé.</li>
+          <li>La recherche de marque déposée pour « Kitokey » (Plus tard du cycle 08) passe avant toute publication de la marque.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:28px">L’icône de la barre système — au repos, puis pendant un enregistrement · 16, 22 et 24 px, à taille réelle puis grossie 4 ×</h3>
+  <div class="row" style="gap:20px">
+    <div class="tray darkbar" style="--dot-rec:#FF7A72">
+      <div class="cap" style="color:#C8CCD4">Barre sombre — GNOME, Windows sombre, macOS sombre</div>
+      <div class="sizes">
+        <div class="one"><svg width="16" height="16"><use href="#mark-a"/></svg>16</div>
+        <div class="one"><svg width="22" height="22"><use href="#mark-a"/></svg>22</div>
+        <div class="one"><svg width="24" height="24"><use href="#mark-a"/></svg>24</div>
+        <div class="one"><svg width="64" height="64"><use href="#mark-a"/></svg>repos ×4</div>
+        <div class="one"><svg width="16" height="16"><use href="#mark-a-rec"/></svg>16</div>
+        <div class="one"><svg width="22" height="22"><use href="#mark-a-rec"/></svg>22</div>
+        <div class="one"><svg width="24" height="24"><use href="#mark-a-rec"/></svg>24</div>
+        <div class="one"><svg width="64" height="64"><use href="#mark-a-rec"/></svg>enregistre ×4</div>
+      </div>
+    </div>
+    <div class="tray lightbar" style="--dot-rec:#C2352D">
+      <div class="cap" style="color:#4C5464">Barre claire — Windows clair, macOS clair</div>
+      <div class="sizes">
+        <div class="one"><svg width="16" height="16"><use href="#mark-a"/></svg>16</div>
+        <div class="one"><svg width="22" height="22"><use href="#mark-a"/></svg>22</div>
+        <div class="one"><svg width="24" height="24"><use href="#mark-a"/></svg>24</div>
+        <div class="one"><svg width="64" height="64"><use href="#mark-a"/></svg>repos ×4</div>
+        <div class="one"><svg width="16" height="16"><use href="#mark-a-rec"/></svg>16</div>
+        <div class="one"><svg width="22" height="22"><use href="#mark-a-rec"/></svg>22</div>
+        <div class="one"><svg width="24" height="24"><use href="#mark-a-rec"/></svg>24</div>
+        <div class="one"><svg width="64" height="64"><use href="#mark-a-rec"/></svg>enregistre ×4</div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>Propositions</b>Au repos, la marque seule, de la couleur de la barre (blanche sur une barre sombre, encre sur une claire ; un « template » sur macOS). Pendant un enregistrement, le point grossit (rayon 3,25 → 4) et devient rouge — #FF7A72 sur une barre sombre (8,3:1 sur le noir), #C2352D sur une claire (4,9:1) : le seul rouge de la marque, et la forme change aussi, pas la couleur seule. Son nom pour les lecteurs d’écran : « Kitokey » au repos, « Kitokey — enregistrement en cours » ensuite, comme le menu le dit déjà. Le point ne clignote pas dans la barre système.</div>
+</section>
+
+<!-- ═══════════════ 2 · AVANT / APRÈS ═══════════════ -->
+<section data-board="2">
+  <h2>2 · La fenêtre, avant et après — l’en-tête et le haut d’une réunion, à taille réelle (D89)</h2>
+  <h3>Avant — aujourd’hui (window.css)</h3>
+  <div class="crop" style="height:430px;overflow:hidden">
+    <div class="win" style="width:1212px;height:520px">
+      <aside class="side b-side">
+        <div style="display:flex;align-items:center;gap:8px"><span class="b-brand"><svg width="24" height="24" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="var(--ink)"/><path d="M12 46 L26 20 L37 40 M33 32 L40 24 L52 46" fill="none" stroke="var(--surface)" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/></svg>Kitokey</span><span class="b-ib">⇤</span></div>
+        <div class="b-primary"><i></i>Démarrer un enregistrement</div>
+        <div class="b-keys">Super + Alt + M</div>
+        <div class="b-search">Chercher dans les réunions</div>
+        <div class="a-week" style="font-size:13px">Cette semaine</div>
+        <div class="b-item"><b>sam. 31 oct. · 16:47</b><span style="font:13px ui-monospace,monospace;color:var(--soft)">42 min</span><span class="b-chip">Compte rendu</span></div>
+      </aside>
+      <div class="pane b-pane">
+        <div style="display:flex;justify-content:flex-end"><span class="b-open">Ouvrir le dossier</span></div>
+        <div><div class="b-h1">sam. 31 oct. · 16:47</div><div style="color:var(--soft)">42 min</div></div>
+        <div class="b-card"><div style="display:flex;align-items:center;gap:12px"><b style="flex:1;font-size:16px">🔒 Réunion confidentielle<br><span style="font-weight:400;color:var(--soft);font-size:15px">Rien ne quitte cet ordinateur</span></b><span style="width:24px;height:24px;border:2px solid var(--line);border-radius:6px"></span></div>
+          <div style="display:flex;align-items:center"><b style="flex:1">Langue parlée</b><span class="b-open" style="font-weight:400">Celle des Réglages — détectée ▾</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cap" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><span class="m">Replier · 40</span><span class="m">Démarrer · 40</span><span class="m">Chercher · 44</span><span class="m">Ouvrir le dossier · 44</span><span class="m">Langue parlée · 44</span><span class="m">titre · 28 px</span></div>
+  <h3 style="margin-top:20px">Après — 32 px, icônes de 16, une seule action nommée par écran</h3>
+  <div class="crop anchor" style="height:470px;overflow:hidden">
+    <div class="win" style="width:1212px;height:560px" data-window="after"></div>
+    <div class="tip" style="left:1060px;top:52px">Ouvrir le dossier</div>
+  </div>
+  <div class="cap" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><span class="m">Replier · 32</span><span class="m">Démarrer · 32</span><span class="m">Chercher · 32</span><span class="m">Ouvrir le dossier · 32</span><span class="m">Langue parlée · 32</span><span class="m">titre · 18 px</span><span class="m">en-tête · 56</span></div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Avant, sept contrôles de 40 à 44 px et un titre de 28 px ; après, des contrôles de 32 px, un en-tête de 56 px, un titre de 18 px. La liste montre deux réunions de plus dans la même hauteur.</li>
+      <li>Une seule action nommée et pleine dans la fenêtre : « Démarrer un enregistrement » (rouge « Arrêter » pendant un enregistrement). Le raccourci passe dans son infobulle et dans l’écran vide ; sa ligne sous le bouton disparaît.</li>
+      <li>Les autres actions deviennent des boutons-icônes sans bord, chacun avec une infobulle et un nom accessible (planche 3) ; « Confidentielle », la langue et le contexte deviennent une ligne de réglages de 32 px au lieu de deux cartes.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════ 3 · ICÔNES ET TAILLES ═══════════════ -->
+<section data-board="3">
+  <h2>3 · Les icônes, les tailles, les couleurs — D89</h2>
+  <div class="row" style="gap:24px">
+    <div style="flex:1.35">
+      <table class="icons">
+        <tr><th></th><th>Lucide</th><th>Infobulle et nom — français</th><th>English</th><th>Où</th></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-panel-left-close"/></svg></span></td><td class="n">panel-left-close</td><td>Replier la barre latérale</td><td>Fold the sidebar</td><td>fenêtre</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-search"/></svg></span></td><td class="n">search</td><td>Chercher dans les réunions</td><td>Search the meetings</td><td>fenêtre</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-hard-drive"/></svg></span></td><td class="n">hard-drive</td><td>Faire de la place</td><td>Free space</td><td>fenêtre</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-picture-in-picture-2"/></svg></span></td><td class="n">picture-in-picture-2</td><td>La barre d’enregistrement <span class="m">nouveau</span></td><td>The recording bar</td><td>fenêtre</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-settings"/></svg></span></td><td class="n">settings</td><td>Réglages</td><td>Settings</td><td>fenêtre</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-folder-open"/></svg></span></td><td class="n">folder-open</td><td>Ouvrir le dossier</td><td>Open the folder</td><td>réunion</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-ellipsis"/></svg></span></td><td class="n">ellipsis</td><td>Plus d’actions <span class="m">nouveau</span></td><td>More actions</td><td>réunion</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-copy"/></svg></span></td><td class="n">copy</td><td>Copier le compte rendu</td><td>Copy the minutes</td><td>réunion</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-rotate-ccw"/></svg></span></td><td class="n">rotate-ccw</td><td>Refaire…</td><td>Redo…</td><td>réunion</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-play"/></svg></span><span class="ib"><svg class="i"><use href="#i-pause"/></svg></span></td><td class="n">play · pause</td><td>Écouter · Pause</td><td>Listen · Pause</td><td>réunion</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-chevron-down"/></svg></span><span class="ib"><svg class="i"><use href="#i-chevron-up"/></svg></span></td><td class="n">chevron-down · up</td><td>Plus d’options · Moins d’options <span class="m">nouveau</span></td><td>More options · Fewer options</td><td>barre</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-maximize-2"/></svg></span></td><td class="n">maximize-2</td><td>Toute la fenêtre</td><td>The whole window</td><td>barre</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-minus"/></svg></span></td><td class="n">minus</td><td>Masquer la barre <span class="m">nouveau</span></td><td>Hide the bar</td><td>barre</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-x"/></svg></span></td><td class="n">x</td><td>Effacer le contexte <span class="m">nouveau</span></td><td>Clear the context</td><td>barre</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-audio-lines"/></svg></span></td><td class="n">audio-lines</td><td>Vérifier le son</td><td>Check the sound</td><td>barre, Réglages</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-mic"/></svg></span><span class="ib"><svg class="i"><use href="#i-volume-2"/></svg></span></td><td class="n">mic · volume-2</td><td>Votre micro · Le son de la réunion</td><td>Your microphone · The meeting’s sound</td><td>jauges</td></tr>
+        <tr><td class="g"><span class="ib"><svg class="i"><use href="#i-file-text"/></svg></span><span class="ib"><svg class="i"><use href="#i-captions"/></svg></span><span class="ib"><svg class="i"><use href="#i-lock"/></svg></span></td><td class="n">file-text · captions<br>lock</td><td>Compte rendu · Transcription · Confidentielle</td><td>Minutes · Transcript · Confidential</td><td>liste</td></tr>
+      </table>
+    </div>
+    <div class="col" style="flex:1">
+      <h3>Les tailles — grille de 4 px</h3>
+      <div class="anat">
+        <div class="one"><span class="pb"><span class="dot"></span>Démarrer un enregistrement</span><span class="m">action nommée · 32</span></div>
+        <div class="one"><span class="ib on"><svg class="i"><use href="#i-settings"/></svg></span><span class="m">icône · 32</span></div>
+        <div class="one"><span class="pb sm"><span class="dot"></span>Enregistrer</span><span class="m">barre · 28</span></div>
+        <div class="one"><span class="ib sm on"><svg class="i"><use href="#i-maximize-2"/></svg></span><span class="m">barre · 28</span></div>
+        <div class="one"><span class="fld" style="width:248px"><svg class="i"><use href="#i-search"/></svg><span class="ph">Chercher dans les réunions</span></span><span class="m">champ · 32</span></div>
+        <div class="one"><span style="display:flex;gap:8px;align-items:flex-end;color:var(--ink)"><svg class="i"><use href="#i-mic"/></svg><svg class="i l"><use href="#i-mic"/></svg></span><span class="m">icônes · 16 · 20</span></div>
+      </div>
+      <h3 style="margin-top:8px">Les couleurs — une couleur d’accent, le rouge pour l’enregistrement seul</h3>
+      <div class="swatches">
+        <div class="swatch"><div class="c" style="background:var(--accent);color:var(--on-accent)">Accent</div><div class="t">l’action, le lien, le focus ; « Ici — votre micro »</div></div>
+        <div class="swatch"><div class="c" style="background:var(--red);color:var(--on-accent)">Rouge</div><div class="t">enregistrement en cours, rien d’autre</div></div>
+        <div class="swatch"><div class="c" style="background:var(--ok);color:var(--on-accent)">Vert</div><div class="t">entendu, prêt ; « La réunion »</div></div>
+        <div class="swatch"><div class="c" style="background:var(--surface);color:var(--soft);border:1px solid var(--edge)">Bord</div><div class="t">--edge, des champs <span class="m">nouveau</span></div></div>
+        <div class="swatch"><div class="c" style="background:var(--raised);color:var(--ink)">Relief</div><div class="t">survol, piste des jauges</div></div>
+      </div>
+      <div class="note"><b>Propositions</b>
+        <ul>
+          <li>Lucide seul, 16 px partout, 20 px pour les rares icônes isolées ; les cinq déjà dans <code>window.js</code> restent.</li>
+          <li>Les boutons-icônes n’ont pas de bord (GNOME HIG, barres d’en-tête) ; leur infobulle vient au survol et au focus clavier, avec le raccourci quand il y en a un.</li>
+          <li>Un jeton <code>--edge</code> pour le bord des champs, des listes et des interrupteurs : <code>--line</code> (1,36:1) ne les distingue pas du fond au seuil de 3:1 (WCAG 1.4.11). <code>--line</code> reste pour les séparateurs.</li>
+          <li>Le vert reste la couleur de « La réunion » dans les jauges, l’onde et la transcription, et de « entendu » : une couleur d’état, pas un second accent.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 4 · LA PAGE D'UNE RÉUNION ═══════════════ -->
+<section data-board="4">
+  <h2>4 · La page d’une réunion, après — fenêtre de 1212 × 760, à taille réelle (D89)</h2>
+  <div class="win" style="width:1212px;height:760px" data-window="after" data-full></div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>L’en-tête de la réunion : son titre (cliquer le renomme, comme aujourd’hui), sa durée et son poids ; à droite, deux boutons-icônes : « Ouvrir le dossier » et « Plus d’actions » (Renommer, Copier un diagnostic).</li>
+      <li>Sous lui, une ligne de réglages de la réunion, 32 px : le contexte (cliquer l’ouvre), la langue parlée, « Confidentielle » et son interrupteur. Les modèles qui ont fait la transcription et le compte rendu restent écrits sur leur carte (D91, critère 3).</li>
+      <li>Dans chaque carte, ses actions en icônes : copier, refaire. Quand une étape manque, son bouton nommé — « Faire le compte rendu » — est la seule action pleine de la carte.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════ 5 · LA BARRE ═══════════════ -->
+<section data-board="5">
+  <h2>5 · La barre — au repos et pendant un enregistrement, 440 × 44 px, à taille réelle (D90, D91)</h2>
+  <div class="row" style="gap:40px">
+    <div class="col" style="gap:20px">
+      <div class="col" style="gap:6px"><h3>Au repos</h3><div data-bar="rest"></div></div>
+      <div class="col" style="gap:6px"><h3>Au repos, le contexte saisi avant de démarrer (D91)</h3><div class="anchor" style="margin-bottom:30px" data-bar="rest-context"></div>
+        <div class="cap">Gardé pour le prochain enregistrement, jusqu’à ce que vous l’effaciez.</div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement</h3><div data-bar="rec"></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement, un côté muet depuis 2 minutes</h3><div data-bar="rec-quiet"></div></div>
+      <div class="col" style="gap:6px"><h3>L’ordre au clavier</h3><div class="anchor" data-bar="rest-keys"></div><div class="anchor" style="margin-top:8px" data-bar="rec-keys"></div></div>
+    </div>
+    <div class="col" style="flex:1">
+      <h3>La place prise — avant, la petite fenêtre (380 × 400) ; après, la barre (440 × 44)</h3>
+      <div class="cmp">
+        <div class="ghost" style="width:190px;height:200px">380 × 400<br>152 000 px²</div>
+        <div class="col" style="gap:8px"><div class="ghost" style="width:220px;height:22px">440 × 44</div><div class="cap">19 360 px² : près de 8 fois moins, à 50 %</div></div>
+      </div>
+      <div class="note"><b>Propositions</b>
+        <ul>
+          <li><b style="display:inline">Au repos</b>, la barre tient : la marque (qui sert de poignée), le contexte de la prochaine réunion, « Enregistrer », « Plus d’options », « Toute la fenêtre », « Masquer la barre ». La dernière réunion n’y est plus.</li>
+          <li>« Enregistrer » est le mot court de la barre <span class="m">nouveau</span> ; son infobulle dit « Démarrer un enregistrement » et le raccourci. Toute la fenêtre garde le libellé long.</li>
+          <li><b style="display:inline">Pendant un enregistrement</b> : le point rouge (il bat, sauf si le système demande moins d’animations), le temps en chiffres tabulaires, une jauge fine par côté — micro et haut-parleur, 4 px —, « Arrêter » en rouge, puis les trois mêmes boutons-icônes. La barre ne change ni de taille ni de place au démarrage.</li>
+          <li>Un côté muet depuis 2 minutes : sa jauge en pointillés, son icône barrée, et une ligne de plus, en gris, jamais en rouge ni en erreur : « La réunion : rien depuis 2 min ». Elle s’efface dès que le son revient.</li>
+          <li>Masquée pendant un enregistrement, la barre ne revient pas d’elle-même ; l’icône de la barre système (« Afficher la barre ») ou le raccourci la ramènent, et le raccourci arrête toujours.</li>
+          <li>Échap replie les options ; Entrée dans le contexte démarre l’enregistrement.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-board="6">
+  <h2>6 · La barre ouverte — contexte, micro, « Confidentielle », « Vérifier le son », « Avancé » (D90, D91)</h2>
+  <div class="row" style="gap:24px">
+    <div class="col" style="gap:6px"><h3>Ouverte au repos, « Avancé » fermé</h3><div class="anchor" data-bar="open"></div></div>
+    <div class="col" style="gap:6px"><h3>« Avancé » ouvert</h3><div data-bar="open-advanced"></div></div>
+  </div>
+  <div class="row" style="gap:24px;margin-top:20px">
+    <div class="col" style="gap:6px"><h3>Ouverte pendant un enregistrement</h3><div data-bar="open-rec"></div></div>
+    <div class="note" style="flex:1;margin-top:22px"><b>Propositions</b>
+      <ul>
+        <li>« Plus d’options » ouvre la barre vers le bas, à la même largeur ; la barre devient une petite fenêtre de 440 px de large, la hauteur de ce qu’elle montre. Rien n’y défile.</li>
+        <li>Le contexte : le champ de D59 (400 caractères, son compte), écrit dans <code>context.txt</code> une fois <code>session.json</code> là ; avant le démarrage, il dit qu’il est gardé pour le prochain.</li>
+        <li>Le micro : le choix d’aujourd’hui (« Auto » ou un micro nommé). Pendant un enregistrement, il dit celui qui est enregistré ; le changer vaut pour le prochain, comme aujourd’hui.</li>
+        <li>« Confidentielle » : l’interrupteur de D60, pour la prochaine réunion au repos, pour celle-ci pendant l’enregistrement.</li>
+        <li>« Vérifier le son » ouvre la planche 7 à la place des options ; il n’est pas offert pendant un enregistrement, où les jauges sont déjà là.</li>
+        <li>« Avancé », fermé par défaut : le modèle de la transcription et celui du compte rendu, chacun sur « Celui des Réglages » ; un choix ici vaut pour cette réunion seule et les Réglages ne changent pas. Le même « Avancé » est dans « Refaire… ».</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7 · VÉRIFIER LE SON ═══════════════ -->
+<section data-board="7">
+  <h2>7 · « Vérifier le son » — avant un enregistrement, depuis la barre ou les Réglages (D88)</h2>
+  <div class="row" style="gap:24px;flex-wrap:wrap">
+    <div class="col" style="gap:6px"><h3>Ouvert — un casque Bluetooth</h3><div data-bar="check"></div></div>
+    <div class="col" style="gap:6px"><h3>Après « Jouer un son de test »</h3><div data-bar="check-heard"></div></div>
+  </div>
+  <div class="row" style="gap:24px;margin-top:20px">
+    <div class="col" style="gap:6px"><h3>Le son de test pas entendu</h3><div data-bar="check-missed"></div></div>
+    <div class="col" style="gap:6px"><h3>Un appel tient déjà le micro</h3><div data-bar="check-call"></div></div>
+  </div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Deux sources, chacune son nom d’appareil et une jauge de 8 px qui bouge avec le son : « Votre micro » (accent) et « Le son de la réunion » (vert). Le micro n’est ouvert que tant que ce panneau est affiché ; en le fermant, Kitokey ne tient plus aucun flux dans la seconde.</li>
+      <li>Avec un casque Bluetooth, une phrase, en gris : le casque passe en qualité d’appel tant que le panneau est ouvert et revient à la fermeture (l’écart à l’ADR-0015, écrit dans l’ADR d’abord).</li>
+      <li>« Jouer un son de test » est un bouton nommé, par exception aux boutons-icônes : l’action n’a pas d’icône qui la dise seule. Le résultat est dit en une phrase de <code>words.rs</code> ; pas entendu, la phrase dit quoi faire.</li>
+      <li>Un appel tient déjà le micro : aucun son n’est joué (il partirait dans l’appel par les haut-parleurs) ; le panneau dit de faire jouer un son dans l’appel et de regarder la jauge.</li>
+      <li>« Démarrer un enregistrement » démarre d’ici : le panneau se ferme et les jauges continuent dans la barre. Dans les Réglages, « Vérifier le son » ouvre le même panneau.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════ 8 · SUR CHAQUE SYSTÈME ═══════════════ -->
+<section data-board="8">
+  <h2>8 · Ce qu’est la barre sur chaque système (D90)</h2>
+  <div class="sys">
+    <div class="card">
+      <div class="title">Windows 11</div>
+      <div class="osbar win11"><span class="grp"><svg width="16" height="16" style="--dot-rec:#C2352D"><use href="#mark-a-rec"/></svg><span class="tab">FRA&nbsp;&nbsp;10:42</span></span></div>
+      <dl><dt>Au-dessus</dt><dd>oui, pendant un enregistrement ; au repos, une fenêtre ordinaire</dd><dt>Déplacer</dt><dd>en la tirant par sa marque ou son fond</dd><dt>Rouverte</dt><dd>là où vous l’avez laissée</dd><dt>Le signe</dt><dd>la barre, et l’icône rouge dans la zone de notification</dd></dl>
+      <div class="menu" style="width:230px"><div class="hl">Arrêter l’enregistrement</div><div>Afficher la barre</div><hr><div>Ouvrir Kitokey</div><div>Quitter Kitokey</div></div>
+      <div class="cap">Le menu de l’icône, pendant un enregistrement, la barre masquée — le même sur chaque système.</div>
+    </div>
+    <div class="card">
+      <div class="title">macOS</div>
+      <div class="osbar mac"><span class="grp"><svg width="16" height="16" style="--dot-rec:#C2352D"><use href="#mark-a-rec"/></svg><span class="tab">ven. 7 nov. 10:42</span></span></div>
+      <dl><dt>Au-dessus</dt><dd>oui, pendant un enregistrement</dd><dt>Déplacer</dt><dd>en la tirant</dd><dt>Rouverte</dt><dd>là où vous l’avez laissée</dd><dt>Le signe</dt><dd>la barre, l’icône de la barre des menus ; macOS ajoute son point orange (micro) et violet (son du système)</dd></dl>
+      <div class="cap">Cycle 10 : dessiné ici, construit avec le Mac.</div>
+    </div>
+    <div class="card">
+      <div class="title">GNOME, Wayland — avec une barre système</div>
+      <div class="osbar gnome"><span>Activités</span><span class="tab">ven. 7 nov. 10:42</span><span class="grp"><svg width="16" height="16" style="--dot-rec:#FF7A72"><use href="#mark-a-rec"/></svg><svg class="i"><use href="#i-mic"/></svg></span></div>
+      <dl><dt>Au-dessus</dt><dd>non : aucune application ne peut s’y mettre (tauri #3117). Une fenêtre ordinaire, que vous gardez au-dessus depuis son menu</dd><dt>Déplacer</dt><dd>en la tirant ; GNOME choisit où elle s’ouvre</dd><dt>Le signe</dt><dd>l’icône rouge, où l’extension AppIndicator donne une barre système</dd></dl>
+      <div class="menu" style="width:220px"><div>Réduire</div><div>Maximiser</div><div>Déplacer</div><hr><div class="hl">✓ Toujours au premier plan</div><hr><div>Fermer</div></div>
+      <div class="cap">Le menu de la fenêtre : Alt + Espace.</div>
+    </div>
+    <div class="card">
+      <div class="title">GNOME, Wayland — sans barre système</div>
+      <div class="osbar gnome"><span>Activités</span><span class="tab">ven. 7 nov. 10:42</span><span class="grp"><svg class="i"><use href="#i-mic"/></svg></span></div>
+      <dl><dt>Au-dessus</dt><dd>non, comme à côté ; son menu de fenêtre l’y garde</dd><dt>Déplacer</dt><dd>en la tirant</dd><dt>Le signe</dt><dd>la barre elle-même, et l’indicateur de micro de GNOME</dd></dl>
+      <div class="info"><svg class="i"><use href="#i-info"/></svg><span>Cet indicateur dit qu’<b>un</b> micro est utilisé — celui d’un appel aussi —, pas que Kitokey enregistre. Le README le dit ainsi.</span></div>
+    </div>
+  </div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Le menu de l’icône, sur chaque système : « Arrêter l’enregistrement » d’abord pendant un enregistrement, puis « Afficher la barre » <span class="m">nouveau</span> quand elle est masquée, « Ouvrir Kitokey », « Quitter Kitokey ».</li>
+      <li>Sur GNOME, aucune extension ni XWayland pour forcer la barre au-dessus (hors périmètre du cycle). « Toujours au premier plan » est le choix de l’utilisateur ; Kitokey ne le défait pas.</li>
+      <li>L’indicateur de micro de GNOME est dessiné ici avec l’icône Lucide <code>mic</code> : GNOME dessine le sien. Qu’un flux passif l’allume n’est pas vérifié (cycle 09, D89, à confirmer).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ———————————————— templates ———————————————— -->
+<template id="t-side-after">
+  <aside class="side">
+    <div class="a-top"><span class="brand"><svg width="20" height="20"><use href="#tile-a"/></svg>Kitokey</span><span class="ib" data-tip="Replier la barre latérale"><svg class="i"><use href="#i-panel-left-close"/></svg></span></div>
+    <div class="a-act"><span class="pb"><span class="dot"></span>Démarrer un enregistrement</span><span class="fld"><svg class="i"><use href="#i-search"/></svg><span class="ph">Chercher dans les réunions</span></span></div>
+    <div class="a-list">
+      <div class="a-week">Cette semaine</div>
+      <div class="a-item current"><b>sam. 31 oct. · 16:47</b><span class="meta tab">42 min<span class="has"><svg class="i"><use href="#i-file-text"/></svg><svg class="i"><use href="#i-captions"/></svg></span></span></div>
+      <div class="a-item"><b>ven. 30 oct. · 14:05</b><span class="meta tab">1 h 12<span class="has"><svg class="i"><use href="#i-lock"/></svg><svg class="i"><use href="#i-file-text"/></svg><svg class="i"><use href="#i-captions"/></svg></span></span></div>
+      <div class="a-item"><b>jeu. 29 oct. · 09:00</b><span class="meta tab">25 min<span class="has"><svg class="i"><use href="#i-captions"/></svg></span></span></div>
+      <div class="a-week">La semaine dernière</div>
+      <div class="a-item"><b>ven. 23 oct. · 16:00</b><span class="meta tab">58 min<span class="has"><svg class="i"><use href="#i-file-text"/></svg><svg class="i"><use href="#i-captions"/></svg></span></span></div>
+      <div class="a-item"><b>mer. 21 oct. · 11:15</b><span class="meta tab">35 min<span class="has"><svg class="i"><use href="#i-file-text"/></svg><svg class="i"><use href="#i-captions"/></svg></span></span></div>
+      <div class="a-item"><b>lun. 19 oct. · 10:00</b><span class="meta tab">47 min<span class="has"><svg class="i"><use href="#i-file-text"/></svg><svg class="i"><use href="#i-captions"/></svg></span></span></div>
+      <div class="a-week">Plus tôt en octobre</div>
+      <div class="a-item"><b>jeu. 8 oct. · 14:00</b><span class="meta tab">1 h 12<span class="has"><svg class="i"><use href="#i-file-text"/></svg><svg class="i"><use href="#i-captions"/></svg></span></span></div>
+    </div>
+    <div class="a-foot">
+      <div class="space"><b>6,1 Go</b> · 14 réunions</div>
+      <div class="split"><i></i><i></i></div>
+      <div class="tools"><span class="ib"><svg class="i"><use href="#i-hard-drive"/></svg></span><span class="ib"><svg class="i"><use href="#i-picture-in-picture-2"/></svg></span><span style="flex:1"></span><span class="ib"><svg class="i"><use href="#i-settings"/></svg></span></div>
+    </div>
+  </aside>
+</template>
+
+<template id="t-pane-after">
+  <div class="pane">
+    <div class="a-head"><span class="t"><b>sam. 31 oct. · 16:47</b><span class="tab">42 min · audio 48 Mo</span></span><span class="ib" data-hover><svg class="i"><use href="#i-folder-open"/></svg></span><span class="ib"><svg class="i"><use href="#i-ellipsis"/></svg></span></div>
+    <div class="a-body">
+      <div class="props">
+        <span class="prop"><svg class="i"><use href="#i-message-square-text"/></svg>Contexte : <b>Lancement, budget du T4</b></span>
+        <span class="prop"><svg class="i"><use href="#i-languages"/></svg>Langue parlée : <b>Celle des Réglages — détectée</b><svg class="i"><use href="#i-chevron-down"/></svg></span>
+        <span class="prop"><svg class="i"><use href="#i-lock-open"/></svg>Confidentielle<span class="sw"></span></span>
+      </div>
+      <div class="card">
+        <svg class="wave" viewBox="0 0 100 56" preserveAspectRatio="none"><line x1="0" y1="28" x2="100" y2="28" stroke="var(--line)" stroke-width=".3"/><polyline fill="none" stroke="var(--accent)" stroke-width="1.5" vector-effect="non-scaling-stroke" points="0,24 4,16 8,22 12,12 16,20 20,14 24,10 28,22 32,16 36,8 40,20 44,14 48,22 52,12 56,18 60,14 64,20 68,10 72,18 76,16 80,22 84,12 88,18 92,14 96,20 100,16"/><polyline fill="none" stroke="var(--ok)" stroke-width="1.5" vector-effect="non-scaling-stroke" points="0,32 4,40 8,34 12,46 16,36 20,42 24,48 28,34 32,40 36,50 40,36 44,42 48,34 52,46 56,38 60,42 64,36 68,48 72,38 76,40 80,34 84,46 88,38 92,42 96,36 100,40"/><line x1="21" y1="0" x2="21" y2="56" stroke="var(--ink)" stroke-width=".4" opacity=".7"/></svg>
+        <div class="player"><span class="play"><svg class="i"><use href="#i-play"/></svg></span><span class="tab">08:41 / 42:05</span><span style="color:var(--accent)">● Ici — votre micro</span><span style="color:var(--ok)">● À distance — le son de l’ordinateur</span><span style="margin-left:auto">1×</span></div>
+      </div>
+      <div class="card" data-full-only>
+        <div class="chead"><span class="lbl">Compte rendu</span><span class="ib"><svg class="i"><use href="#i-copy"/></svg></span><span class="ib"><svg class="i"><use href="#i-rotate-ccw"/></svg></span></div>
+        <span class="by">Écrit par Claude Sonnet 4.5, via openrouter.ai · sam. 31 oct. 17:31</span>
+        <h4>Points saillants</h4>
+        <p style="max-width:75ch">L’ouverture aux clients est fixée au lundi 16 novembre, pour avoir le support au complet. Deux serveurs de test sont coupés pour tenir le budget du T4.</p>
+        <h4>Actions</h4>
+        <table class="acts"><tr><td class="who">Marc</td><td>Mettre à jour le planning</td><td class="when">ven. 6 nov.</td></tr><tr><td class="who">Julien</td><td>Couper deux serveurs de test</td><td class="when">non précisé</td></tr><tr><td class="who">Inès</td><td>Envoyer le budget révisé</td><td class="when">lun. 9 nov.</td></tr></table>
+      </div>
+      <div class="card" data-full-only>
+        <div class="chead"><span class="lbl">Transcription</span><span class="fld" style="width:260px"><svg class="i"><use href="#i-search"/></svg><span class="ph">Rechercher dans la transcription</span></span><span class="ib"><svg class="i"><use href="#i-rotate-ccw"/></svg></span></div>
+        <span class="by">Transcrit par Whisper large v3 turbo, sur cet ordinateur</span>
+        <div class="tl"><time class="tab">00:01</time><span><span class="w">Ici · voix 1</span><br>Bonjour à tous, merci d’être là. On a trois sujets ce matin.</span>
+          <time class="tab">00:08</time><span><span class="w far">À distance · voix 1</span><br>Bonjour Claire. Je vous entends bien, on peut commencer.</span></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+  // Icons: <svg class="i"><use href="#i-…"> stays as it is; nothing to fill.
+  // The window after (boards 2 and 4), from one template each.
+  const take = id => document.getElementById(id).content.cloneNode(true);
+  for (const win of document.querySelectorAll("[data-window=after]")) {
+    win.append(take("t-side-after"), take("t-pane-after"));
+    if (!win.hasAttribute("data-full")) {
+      win.querySelectorAll("[data-full-only]").forEach(e => e.remove());
+      win.querySelector("[data-hover]").classList.add("on");
+    }
+  }
+
+  // The bar's states (boards 5, 6, 7), drawn from small parts.
+  const I = (n, cls = "i") => `<svg class="${cls}"><use href="#i-${n}"/></svg>`;
+  const handle = `<span class="handle" title="Déplacer"><svg width="20" height="20"><use href="#tile-a"/></svg></span>`;
+  const tools = (chev = "chevron-down", on = false) =>
+    `<span class="ib sm${on ? " on" : ""}">${I(chev)}</span><span class="ib sm">${I("maximize-2")}</span><span class="ib sm">${I("minus")}</span>`;
+  const rest = (ctx, chev, on) =>
+    `<div class="strip">${handle}<span class="gap"></span>` +
+    (ctx ? `<span class="fld sm" style="flex:1"><span class="val">${ctx}</span><span class="ib sm" style="width:20px;height:20px;margin-right:-4px">${I("x")}</span></span>`
+         : `<span class="fld sm" style="flex:1"><span class="ph">Contexte de la réunion</span></span>`) +
+    `<span class="gap"></span><span class="pb sm"><span class="dot"></span>Enregistrer</span><span class="gap"></span>${tools(chev, on)}</div>`;
+  const restOpen = () =>
+    `<div class="strip">${handle}<span style="flex:1;font-weight:600;font-size:14px;padding-left:4px">Prochaine réunion</span><span class="pb sm"><span class="dot"></span>Enregistrer</span><span class="gap"></span>${tools("chevron-up", true)}</div>`;
+  const rec = (quiet, chev, on) =>
+    `<div class="strip"><span class="live"></span><span class="time">00:16:42</span>` +
+    `<span class="meters"><span class="mt">${I("mic")}<span class="track"><i class="fill" style="width:62%"></i></span></span>` +
+    (quiet ? `<span class="mt far quiet">${I("volume-x")}<span class="track"></span></span>`
+           : `<span class="mt far">${I("volume-2")}<span class="track"><i class="fill" style="width:38%"></i></span></span>`) +
+    `</span><span class="pb sm rec">${I("square")}Arrêter</span><span class="gap"></span>${tools(chev, on)}</div>` +
+    (quiet ? `<div class="said">${I("volume-x")}La réunion : rien depuis 2 min — l’enregistrement continue.</div>` : "");
+  const ctxText = "Budget du T4 avec Inès Durand et l’équipe achats";
+  const panel = (recording, advanced) => `<div class="panel">
+      <div class="prow"><label>${I("message-square-text")}Contexte${recording ? " de cette réunion" : " de la prochaine réunion"}</label>
+        <div class="area">${ctxText}</div>
+        <div class="pline" style="min-height:20px"><span class="hint grow">${recording ? "Écrit avec la réunion." : "Gardé pour le prochain enregistrement."}</span><span class="hint tab">352 restants</span></div></div>
+      <div class="prow"><label>${I("mic")}${recording ? "Micro enregistré" : "Le micro du prochain enregistrement"}</label>
+        <span class="fld sm sel"><span class="val">${recording ? "AirPods Pro" : "Auto — AirPods Pro"}</span>${I("chevron-down")}</span>
+        ${recording ? `<span class="hint">Le changer vaut pour le prochain enregistrement.</span>` : ""}</div>
+      <div class="pline"><span style="color:var(--soft)">${I("lock-open")}</span><span class="grow">Réunion confidentielle<br><span class="hint">Rien ne quitte cet ordinateur</span></span><span class="sw"></span></div>
+      ${recording ? "" : `<div class="pline"><span class="sb sm">${I("audio-lines")}Vérifier le son</span><span class="hint grow">Les deux côtés, avant l’appel.</span></div>`}
+      <div class="sep"></div>
+      <div class="disc">${I(advanced ? "chevron-down" : "chevron-right")}Avancé</div>
+      ${advanced ? `<div class="prow"><label>Modèle de transcription</label><span class="fld sm sel"><span class="val">Celui des Réglages — Whisper large v3 turbo</span>${I("chevron-down")}</span></div>
+      <div class="prow"><label>Modèle du compte rendu</label><span class="fld sm sel"><span class="val">Celui des Réglages — Claude Sonnet 4.5, via OpenRouter</span>${I("chevron-down")}</span></div>
+      <span class="hint">Pour cette réunion seule ; les Réglages ne changent pas.</span>` : ""}
+    </div>`;
+  const check = kind => {
+    const meQuiet = kind === "call";
+    const bt = `<div class="info">${I("bluetooth")}<span>Tant que ce panneau est ouvert, votre casque Bluetooth passe en qualité d’appel ; il revient à la fermeture.</span></div>`;
+    const result = {
+      open: bt,
+      heard: bt + `<div class="okay">${I("circle-check")}<span>Kitokey entend le son de cet ordinateur.</span></div>`,
+      missed: bt + `<div class="info" style="color:var(--ink)">${I("info")}<span>Kitokey n’a pas entendu le son de test. Vérifiez que le son sort de cet ordinateur et pas d’un autre appareil, puis rejouez-le.</span></div>`,
+      call: `<div class="info" style="color:var(--ink)">${I("info")}<span>Un appel tient le micro : pas de son de test, il partirait dans l’appel. Faites jouer un son dans l’appel et regardez la jauge.</span></div>`,
+    }[kind];
+    return `<div class="strip">${handle}<span style="flex:1;font-weight:600;font-size:14px;padding-left:4px">Vérifier le son</span><span class="ib sm">${I("x")}</span></div>
+    <div class="panel chk">
+      <div class="src"><div class="top">${I("mic")}<b>Votre micro</b><span class="dev">${kind === "call" ? "AirPods Pro — celui de l’appel" : "AirPods Pro"}</span></div><div class="big"><i style="width:${meQuiet ? 46 : 58}%"></i></div></div>
+      <div class="src far"><div class="top">${I("volume-2")}<b>Le son de la réunion</b><span class="dev">AirPods Pro</span></div><div class="big"><i style="width:${kind === "heard" ? 71 : kind === "missed" ? 0 : kind === "call" ? 33 : 0}%"></i></div></div>
+      ${result}
+      <div class="actions">${kind === "call" ? `<span class="sb sm off">${I("volume-2")}Jouer un son de test</span>` : `<span class="sb sm">${I("volume-2")}Jouer un son de test</span>`}<span style="flex:1"></span><span class="pb sm"><span class="dot"></span>Démarrer un enregistrement</span></div>
+      <div class="hint">Le micro reste ouvert tant que ce panneau l’est.</div>
+    </div>`;
+  };
+  const draw = {
+    "rest": () => rest(""),
+    "rest-context": () => rest(ctxText),
+    "rec": () => rec(false),
+    "rec-quiet": () => rec(true),
+    "rest-keys": () => rest(""),
+    "rec-keys": () => rec(false),
+    "open": () => restOpen() + panel(false, false),
+    "open-advanced": () => restOpen() + panel(false, true),
+    "open-rec": () => rec(false, "chevron-up", true) + panel(true, false),
+    "check": () => check("open"),
+    "check-heard": () => check("heard"),
+    "check-missed": () => check("missed"),
+    "check-call": () => check("call"),
+  };
+  for (const host of document.querySelectorAll("[data-bar]")) {
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    bar.innerHTML = draw[host.dataset.bar]();
+    host.append(bar);
+  }
+  // Keyboard order, the author's yellow numbers over the controls.
+  const order = (host, picks) => {
+    const bar = host.querySelector(".bar"), box = host.getBoundingClientRect();
+    picks.forEach((el, n) => {
+      if (!el) return;
+      const r = el.getBoundingClientRect(), k = document.createElement("span");
+      k.className = "k pin"; k.textContent = n + 1;
+      const inPanel = el.closest(".panel");
+      k.style.left = `${inPanel ? r.left - box.left - 30 : r.left - box.left + r.width / 2 - 9}px`;
+      k.style.top = `${inPanel ? r.top - box.top + r.height / 2 - 9 : r.top - box.top - 12}px`;
+      host.append(k);
+    });
+  };
+  for (const host of document.querySelectorAll("[data-bar=rest-keys]")) {
+    order(host, [host.querySelector(".fld"), host.querySelector(".pb"), ...host.querySelectorAll(".strip > .ib.sm")]);
+    host.querySelector(".pb").classList.add("focus");
+  }
+  for (const host of document.querySelectorAll("[data-bar=rec-keys]")) {
+    order(host, [host.querySelector(".pb"), ...host.querySelectorAll(".strip > .ib.sm")]);
+  }
+  // A tooltip over the opened bar's first icon, and over Enregistrer in the context bar.
+  for (const host of document.querySelectorAll("[data-bar=rest-context]")) {
+    const pb = host.querySelector(".pb"), box = host.getBoundingClientRect(), r = pb.getBoundingClientRect();
+    const tip = document.createElement("div");
+    tip.className = "tip"; tip.innerHTML = "Démarrer un enregistrement<kbd>Super + Alt + M</kbd>";
+    tip.style.left = `${r.left - box.left - 60}px`; tip.style.top = `${r.bottom - box.top + 6}px`;
+    host.append(tip);
+  }
+  for (const host of document.querySelectorAll("[data-bar=open]")) {
+    const els = [host.querySelector(".strip .pb"), ...host.querySelectorAll(".strip > .ib.sm"),
+      host.querySelector(".area"), host.querySelector(".panel .fld"), host.querySelector(".panel .sw"), host.querySelector(".panel .sb"), host.querySelector(".disc")];
+    order(host, els);
+  }
+
+  // ?only=N draws board N alone, for its own image; the page reports its height for the renderer.
+  const only = new URLSearchParams(location.search).get("only");
+  if (only) for (const s of document.querySelectorAll("section")) if (s.dataset.board !== only) s.classList.add("hidden-board");
+  document.body.dataset.h = Math.ceil(document.body.getBoundingClientRect().height);
+</script>
+</body>
+</html>

@@ -10,17 +10,18 @@ use std::{
 
 use serde_json::{Value, json};
 
-/// The tracks a session's folder holds, each by its file: version 1 names them `me.wav` and
+/// The tracks a session's folder holds, each by its files: version 1 names them `me.wav` and
 /// `others.wav`, version 2 — and a folder whose `session.json` does not read — `local.wav` and
-/// `remote.wav`.
-fn tracks(folder: &Path) -> [(&'static str, &'static str); 2] {
+/// `remote.wav`; version 3 its WAV while it is there and opens, else its FLAC, never a `.flac.part`.
+fn tracks(folder: &Path) -> [(&'static str, &'static [&'static str]); 2] {
     let contract = std::fs::read_to_string(folder.join("session.json"))
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok())
         .and_then(|session| session["contract"].as_str().map(str::to_string));
     match contract.as_deref() {
-        Some("session-audio/v1") => [("local", "me.wav"), ("remote", "others.wav")],
-        _ => [("local", "local.wav"), ("remote", "remote.wav")],
+        Some("session-audio/v1") => [("local", &["me.wav"]), ("remote", &["others.wav"])],
+        Some("session-audio/v3") => [("local", &["local.wav", "local.flac"]), ("remote", &["remote.wav", "remote.flac"])],
+        _ => [("local", &["local.wav"]), ("remote", &["remote.wav"])],
     }
 }
 
@@ -28,19 +29,20 @@ fn tracks(folder: &Path) -> [(&'static str, &'static str); 2] {
 pub fn levels(folder: &Path) -> String {
     tracks(folder)
         .iter()
-        .map(|(track, file)| {
-            let path = folder.join(file);
-            let line = if !path.is_file() {
-                json!({ "type": "levels", "track": track, "present": false })
-            } else {
-                match measured(&path) {
+        .map(|(track, files)| {
+            let there: Vec<_> = files.iter().map(|file| folder.join(file)).filter(|path| path.is_file()).collect();
+            // The first that opens; none opens, the first there is said unread.
+            let path = there.iter().find(|path| File::open(path).is_ok()).or(there.first());
+            let line = match path {
+                None => json!({ "type": "levels", "track": track, "present": false }),
+                Some(path) => match measured(path) {
                     Ok(mut line) => {
                         line["type"] = json!("levels");
                         line["track"] = json!(track);
                         line
                     }
                     Err(_) => json!({ "type": "levels", "track": track, "present": true, "read": false }),
-                }
+                },
             };
             line.to_string()
         })
@@ -120,7 +122,61 @@ fn form(file: &mut File) -> io::Result<Form> {
     Err(bad())
 }
 
+/// Each channel's peak, sum of squares and exact zeros, sample by sample.
+struct Measure {
+    peak: Vec<f64>,
+    squares: Vec<f64>,
+    zeros: Vec<u64>,
+}
+
+impl Measure {
+    fn new(channels: usize) -> Measure {
+        Measure {
+            peak: vec![0.0; channels],
+            squares: vec![0.0; channels],
+            zeros: vec![0; channels],
+        }
+    }
+
+    fn add(&mut self, channel: usize, value: f64) {
+        // What is no number is no sound, and no exact zero either: left out of both.
+        if !value.is_finite() {
+            return;
+        }
+        let value = value.abs();
+        self.peak[channel] = self.peak[channel].max(value);
+        self.squares[channel] += value * value;
+        self.zeros[channel] += u64::from(value == 0.0);
+    }
+
+    fn said(&self, format: &str, bits: u32, rate: u32, frames: u64) -> Value {
+        let decibels = |x: f64| {
+            if x > 0.0 {
+                json!((20.0 * x.log10() * 10.0).round() / 10.0)
+            } else {
+                Value::Null
+            }
+        };
+        let count = frames.max(1) as f64;
+        json!({
+            "present": true,
+            "read": true,
+            "format": format,
+            "bits": bits,
+            "rate": rate,
+            "channels": self.peak.len(),
+            "seconds": (frames as f64 / f64::from(rate.max(1)) * 100.0).round() / 100.0,
+            "peak_dbfs": self.peak.iter().map(|&p| decibels(p)).collect::<Vec<_>>(),
+            "rms_dbfs": self.squares.iter().map(|&s| decibels((s / count).sqrt())).collect::<Vec<_>>(),
+            "zeros": self.zeros.iter().map(|&z| (z as f64 / count * 1000.0).round() / 1000.0).collect::<Vec<_>>(),
+        })
+    }
+}
+
 fn measured(path: &Path) -> io::Result<Value> {
+    if crate::flac::is_flac(path) {
+        return measured_flac(path);
+    }
     let mut file = File::open(path)?;
     let form = form(&mut file)?;
     file.seek(SeekFrom::Start(form.start))?;
@@ -128,7 +184,7 @@ fn measured(path: &Path) -> io::Result<Value> {
     let frame = width * form.channels;
     let frames = form.length / frame as u64;
     let mut reader = BufReader::with_capacity(1 << 20, file.take(frames * frame as u64));
-    let (mut peak, mut squares, mut zeros) = (vec![0f64; form.channels], vec![0f64; form.channels], vec![0u64; form.channels]);
+    let mut measure = Measure::new(form.channels);
     let mut buffer = vec![0u8; frame * 4096];
     loop {
         let read = read_whole_frames(&mut reader, &mut buffer, frame)?;
@@ -142,37 +198,26 @@ fn measured(path: &Path) -> io::Result<Value> {
                 (false, 3) => f64::from(i32::from_le_bytes([0, sample[0], sample[1], sample[2]]) >> 8) / 8_388_608.0,
                 (false, _) => f64::from(i32::from_le_bytes([sample[0], sample[1], sample[2], sample[3]])) / 2_147_483_648.0,
             };
-            let channel = at % form.channels;
-            // What is no number is no sound, and no exact zero either: left out of both.
-            if !value.is_finite() {
-                continue;
-            }
-            let value = value.abs();
-            peak[channel] = peak[channel].max(value);
-            squares[channel] += value * value;
-            zeros[channel] += u64::from(value == 0.0);
+            measure.add(at % form.channels, value);
         }
     }
-    let decibels = |x: f64| {
-        if x > 0.0 {
-            json!((20.0 * x.log10() * 10.0).round() / 10.0)
-        } else {
-            Value::Null
+    let format = if form.float { "float" } else { "pcm" };
+    Ok(measure.said(format, u32::from(form.bits), form.rate, frames))
+}
+
+/// A track kept as FLAC (`session-audio/v3`), decoded whole: the same numbers its WAV gave — its
+/// samples come at the full scale of 32 bits, as a WAV of any depth is read —, or an error when it
+/// is not whole.
+fn measured_flac(path: &Path) -> io::Result<Value> {
+    let mut decoded = crate::flac::open(path)?;
+    let form = decoded.form();
+    let mut measure = Measure::new(form.channels);
+    while let Some(frame) = decoded.frame()? {
+        for (channel, &sample) in frame.iter().enumerate() {
+            measure.add(channel, f64::from(sample) / 2_147_483_648.0);
         }
-    };
-    let count = frames.max(1) as f64;
-    Ok(json!({
-        "present": true,
-        "read": true,
-        "format": if form.float { "float" } else { "pcm" },
-        "bits": form.bits,
-        "rate": form.rate,
-        "channels": form.channels,
-        "seconds": (frames as f64 / f64::from(form.rate.max(1)) * 100.0).round() / 100.0,
-        "peak_dbfs": peak.iter().map(|&p| decibels(p)).collect::<Vec<_>>(),
-        "rms_dbfs": squares.iter().map(|&s| decibels((s / count).sqrt())).collect::<Vec<_>>(),
-        "zeros": zeros.iter().map(|&z| (z as f64 / count * 1000.0).round() / 1000.0).collect::<Vec<_>>(),
-    }))
+    }
+    Ok(measure.said("flac", form.bits, form.rate, form.frames))
 }
 
 /// Fills `buffer` with as many whole frames as there are, and says how many bytes.

@@ -1,9 +1,12 @@
 //! `kitokey-capture` — records a conversation into a session's folder, with no window.
 //!
 //!     kitokey-capture record <sessions-folder>     each source as delivered, until Ctrl-C, a TERM
-//!                                                 signal, or "stop" on its input
+//!                                                 signal, or "stop" on its input; then each track
+//!                                                 kept as FLAC (session-audio/v3)
+//!     kitokey-capture record <sessions-folder> --as v2     the same, its tracks kept as WAV
 //!     kitokey-capture record <sessions-folder> --as v1     the same, in the first form
 //!     kitokey-capture record <sessions-folder> --microphone <name>     `me` from that one
+//!     kitokey-capture listen [--microphone <name>]  each source's device and level, recording nothing
 //!     kitokey-capture microphones                  what can be named, one JSON object per line
 //!     kitokey-capture devices                      what the system offers
 //!
@@ -31,7 +34,12 @@ use cpal::{
     Device, FromSample, Host, Sample, SampleFormat, SizedSample, Stream,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
-use kitokey_capture::{Event, Heard, RATE, SOURCES, Track, Watch, call, call::Me, log, new_folder, v2, write_session};
+use kitokey_capture::{
+    Event, Heard, RATE, SOURCES, Track, Watch, call,
+    call::Me,
+    keep::{self, Kept},
+    log, new_folder, v2, write_session,
+};
 use serde_json::json;
 use tracing::{error, info, warn};
 
@@ -94,7 +102,7 @@ fn say(event: Event) {
         Event::Silent { source, nothing } => info!(source = SOURCES[source], nothing, "capture.silent"),
         Event::Heard { source } => info!(source = SOURCES[source], "capture.heard"),
         Event::Stopped { folder, seconds } => info!(session = %session(folder), seconds, "capture.stopped"),
-        Event::Device { source, device } => info!(source = SOURCES[source], device, "capture.device"),
+        Event::Device { source, device, headset } => info!(source = SOURCES[source], device, headset, "capture.device"),
         Event::MicrophoneGone => warn!("capture.microphone_gone"),
         Event::MicrophoneBack => info!("capture.microphone_back"),
         Event::Level { .. } | Event::Microphone { .. } => {}
@@ -117,15 +125,19 @@ fn main() -> ExitCode {
     let _run = log::start("capture");
     let args: Vec<String> = std::env::args().skip(1).collect();
     let outcome = match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
-        ["record", sessions] | ["record", sessions, "--as", "v2"] => record_v2(Path::new(sessions), None),
-        ["record", sessions, "--microphone", name]
-        | ["record", sessions, "--as", "v2", "--microphone", name]
-        | ["record", sessions, "--microphone", name, "--as", "v2"] => record_v2(Path::new(sessions), Some(name)),
+        ["record", sessions] => record_v2(Path::new(sessions), None, v2::V3),
+        ["record", sessions, "--as", "v2"] => record_v2(Path::new(sessions), None, v2::CONTRACT),
+        ["record", sessions, "--microphone", name] => record_v2(Path::new(sessions), Some(name), v2::V3),
+        ["record", sessions, "--as", "v2", "--microphone", name] | ["record", sessions, "--microphone", name, "--as", "v2"] => {
+            record_v2(Path::new(sessions), Some(name), v2::CONTRACT)
+        }
         ["record", sessions, "--as", "v1"] => record(Path::new(sessions)),
+        ["listen"] => listen_only(None),
+        ["listen", "--microphone", name] => listen_only(Some(name)),
         ["microphones"] => microphones(),
         ["devices"] => devices(),
         _ => Err(
-            "usage: kitokey-capture record <sessions-folder> [--as v1|v2] [--microphone <name>, not with v1] | kitokey-capture microphones | kitokey-capture devices"
+            "usage: kitokey-capture record <sessions-folder> [--as v1|v2] [--microphone <name>, not with v1] | kitokey-capture listen [--microphone <name>] | kitokey-capture microphones | kitokey-capture devices"
                 .into(),
         ),
     };
@@ -394,6 +406,7 @@ fn said_moved(
         say(Event::Device {
             source: index,
             device: name.as_deref(),
+            headset: None,
         });
         kept(index, at, name.as_deref())?;
         last[index] = name;
@@ -828,7 +841,7 @@ fn record(sessions: &Path) -> Result<(), String> {
         sources: [&names[0], &names[1]],
     });
 
-    let stop = stop_asked()?;
+    let (stop, _) = stop_asked(false)?;
     // A call heard on another output than the default is followed there, where PipeWire is.
     if host.id().name() == "PipeWire" {
         follow(follower, None, zero, stop.clone());
@@ -911,12 +924,19 @@ fn record(sessions: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// True once the user asked to stop: an interrupt, a termination signal, or `stop` on the input.
-fn stop_asked() -> Result<Arc<AtomicBool>, String> {
-    let stop = Arc::new(AtomicBool::new(false));
+/// True once the user asked to stop: an interrupt, a termination signal, or `stop` on the input — or,
+/// `closed_stops`, the input closed: listening never outlives whoever asked it (`recording/v1`); and
+/// true once a signal came after that: what is being compressed is left.
+fn stop_asked(closed_stops: bool) -> Result<(Arc<AtomicBool>, Arc<AtomicBool>), String> {
+    let (stop, abandon) = (Arc::new(AtomicBool::new(false)), Arc::new(AtomicBool::new(false)));
     {
-        let stop = stop.clone();
-        ctrlc::set_handler(move || stop.store(true, Ordering::SeqCst)).map_err(|e| e.to_string())?;
+        let (stop, abandon) = (stop.clone(), abandon.clone());
+        ctrlc::set_handler(move || {
+            if stop.swap(true, Ordering::SeqCst) {
+                abandon.store(true, Ordering::SeqCst);
+            }
+        })
+        .map_err(|e| e.to_string())?;
     }
     {
         let stop = stop.clone();
@@ -926,9 +946,12 @@ fn stop_asked() -> Result<Arc<AtomicBool>, String> {
                     stop.store(true, Ordering::SeqCst);
                 }
             }
+            if closed_stops {
+                stop.store(true, Ordering::SeqCst);
+            }
         });
     }
-    Ok(stop)
+    Ok((stop, abandon))
 }
 
 /// A track being recorded as `session-audio/v2` describes it, and where its clock stands.
@@ -987,7 +1010,8 @@ impl Delivered {
 }
 
 /// Records each source as the system delivers it, with the session's clock beside (ADR-0004).
-fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
+/// Written as `contract` says: under `session-audio/v3`, each track is kept as FLAC once stopped.
+fn record_v2(sessions: &Path, microphone: Option<&str>, contract: &str) -> Result<(), String> {
     let host = host();
     let (sound, heard) = mpsc::channel::<Sound>();
     let (moved, moves) = mpsc::channel::<Move>();
@@ -998,7 +1022,7 @@ fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
 
     // A source that cannot be opened is said and has no track; the other is still recorded. The
     // local side is what the graph says (ADR-0015): it may wait, and gets its track when it is taken.
-    let stop = stop_asked()?;
+    let (stop, abandon) = stop_asked(false)?;
     let opening = Opening { zero, sound, moved };
     let (me_first, named_there) = me_now(&host, microphone);
     if !named_there {
@@ -1020,21 +1044,7 @@ fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
                     }
                 })
         } else {
-            host.default_output_device()
-                .ok_or_else(|| "the system names no default device".to_string())
-                .and_then(|device| {
-                    let closing = Arc::new(AtomicBool::new(false));
-                    open(
-                        &device,
-                        true,
-                        index,
-                        zero,
-                        None,
-                        opening.sound.clone(),
-                        (opening.moved.clone(), closing.clone()),
-                    )
-                    .map(|(stream, rate, channels)| (named_as_used(&host, &device), Feed::Cpal { stream, closing }, rate, channels))
-                })
+            open_others(&host, &opening)
         };
         match opened {
             Ok((name, stream, rate, channels)) => {
@@ -1070,7 +1080,7 @@ fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
         .map(|index| v2::Held::new(TRACKS[index], &names[index]))
         .collect();
     let stamp = |time: chrono::DateTime<chrono::Local>| time.to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
-    let session = |held: &[v2::Held]| v2::write_session(&folder, &stamp(started), None, held).map_err(|e| e.to_string());
+    let session = |held: &[v2::Held]| v2::write_session(&folder, contract, &stamp(started), None, held).map_err(|e| e.to_string());
     session(&held)?;
     say(Event::Started {
         folder: &folder,
@@ -1200,8 +1210,123 @@ fn record_v2(sessions: &Path, microphone: Option<&str>) -> Result<(), String> {
         let rate = f64::from(source.track.rate());
         seconds = seconds.max(source.track.finish().map_err(|e| e.to_string())? as f64 / rate);
     }
-    v2::write_session(&folder, &stamp(started), Some(&stamp(chrono::Local::now())), &held).map_err(|e| e.to_string())?;
+    v2::write_session(&folder, contract, &stamp(started), Some(&stamp(chrono::Local::now())), &held).map_err(|e| e.to_string())?;
     say(Event::Stopped { folder: &folder, seconds });
+    // Between `stopped` and its end, the tracks made final: a track not compressed is no failure.
+    if contract == v2::V3 {
+        for (track, kept) in keep::keep(&folder, &TRACKS, |_, _| !abandon.load(Ordering::SeqCst)) {
+            match kept {
+                Kept::Flac => info!(track, "capture.kept"),
+                Kept::Wav(reason) => warn!(track, kept = "wav", reason, "capture.not_kept"),
+                Kept::Both(reason) => warn!(track, kept = "both", reason, "capture.not_kept"),
+                Kept::Stopped => warn!(track, kept = "wav", reason = "a second signal", "capture.not_kept"),
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Opens what the default output plays, for the remote side: its name, what feeds it, and its form.
+fn open_others(host: &Host, opening: &Opening) -> Result<(String, Feed, u32, u16), String> {
+    let device = host.default_output_device().ok_or("the system names no default device")?;
+    let closing = Arc::new(AtomicBool::new(false));
+    let moved = (opening.moved.clone(), closing.clone());
+    let (stream, rate, channels) = open(&device, true, 1, opening.zero, None, opening.sound.clone(), moved)?;
+    Ok((named_as_used(host, &device), Feed::Cpal { stream, closing }, rate, channels))
+}
+
+/// Listens to the two sources and records nothing (`recording/v1`'s *Listening*, D88): each source's
+/// device, then its level ten times a second, until it is told to stop; no folder, no file. The local
+/// side is opened actively, a headset's too: the user asked to hear it (ADR-0015's amendment).
+fn listen_only(microphone: Option<&str>) -> Result<(), String> {
+    let host = host();
+    let (sound, heard) = mpsc::channel::<Sound>();
+    let (moved, moves) = mpsc::channel::<Move>();
+    // Nothing follows a call here: only the moves the system makes are named.
+    let (moves, follower) = naming(moves);
+    drop(follower);
+    let (stop, _) = stop_asked(true)?;
+    let pipewire = host.id().name() == "PipeWire";
+    let ours = u64::from(std::process::id());
+    let dump = graph().filter(|_| pipewire);
+    let (me, there) = dump
+        .as_deref()
+        .and_then(|dump| call::listened(dump, ours, microphone).ok())
+        .unwrap_or((Me::Default, microphone.is_none()));
+    // What the panel says of a headset (D88): not known where the graph does not read.
+    let headset = call::listened_headset(dump.as_deref(), &me);
+    if !there {
+        say(Event::MicrophoneGone);
+    }
+    let opening = Opening {
+        zero: Instant::now(),
+        sound,
+        moved,
+    };
+    let (mut feeds, mut meters, mut names) = (Vec::new(), [None, None], [None, None]);
+    for index in 0..2 {
+        let opened = if index == 0 {
+            open_me(&host, &me, None, &opening).and_then(|(feed, name, form)| {
+                let (rate, channels) = form.ok_or("the microphone gave no form")?;
+                Ok((name, feed, rate, channels))
+            })
+        } else {
+            open_others(&host, &opening)
+        };
+        match opened {
+            Ok((name, feed, rate, channels)) => {
+                info!(source = SOURCES[index], device = %name, rate, channels, "capture.opened");
+                feeds.push(feed);
+                meters[index] = Some(v2::Meter::new(rate, channels));
+                names[index] = Some(name);
+            }
+            Err(reason) => say(Event::Unavailable {
+                source: index,
+                reason: &call::without_address(&reason),
+            }),
+        }
+    }
+    drop(opening);
+    if meters.iter().all(Option::is_none) {
+        return Err("no source could be opened: nothing to listen to".into());
+    }
+    for (index, name) in names.iter().enumerate() {
+        if let Some(name) = name {
+            say(Event::Device {
+                source: index,
+                device: Some(name),
+                headset: headset.filter(|_| index == 0),
+            });
+        }
+    }
+    info!("capture.listening");
+    let mut metered = Instant::now();
+    while !stop.load(Ordering::SeqCst) {
+        said_moved(&moves, false, call::Local::started(true), &mut names, |_, _, _| Ok(()))?;
+        match heard.recv_timeout(Duration::from_millis(50)) {
+            Ok((index, _, samples)) => {
+                if let Some(meter) = &mut meters[index] {
+                    meter.push(&samples);
+                }
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => std::thread::sleep(Duration::from_millis(50)),
+        }
+        if metered.elapsed() >= Duration::from_millis(100) {
+            metered = Instant::now();
+            for (index, meter) in meters.iter_mut().enumerate() {
+                if let Some(meter) = meter {
+                    say(Event::Level {
+                        source: index,
+                        level: meter.level(),
+                    });
+                }
+            }
+        }
+    }
+    // Closed before the program ends: nothing of it is left open.
+    drop(feeds);
+    info!("capture.listened");
     Ok(())
 }
 

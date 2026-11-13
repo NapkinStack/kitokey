@@ -3,7 +3,9 @@
 //! 16 bits at the highest of the tracks' rates, made as it is asked for, by any range, and kept
 //! nowhere. The tracks are only read (`session-audio`: found by their chunks, their lengths
 //! ignored, read to the end); one of a lower rate is brought up with rubato, as the transcription
-//! brings its tracks down.
+//! brings its tracks down. A track kept as FLAC (`session-audio/v3`) is read as its WAV was: its
+//! form from its STREAMINFO, its frames decoded from the one asked — and a WAV removed under the mix,
+//! once kept as FLAC, is read from its FLAC, which holds the same frames.
 
 use std::{
     fs::File,
@@ -11,6 +13,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::flac::{self, Decoded};
 use rubato::{Fft, FixedSync, Resampler, WindowFunction, audioadapter_buffers::direct::InterleavedSlice};
 
 /// The mix's header: RIFF, `fmt `, `data`.
@@ -19,12 +22,16 @@ const HEADER: u64 = 44;
 /// A track as its own header says it is.
 struct Track {
     path: PathBuf,
-    /// Where its audio starts in the file, and how many whole frames follow, to the file's end.
+    /// A FLAC, read by its frames; a WAV, by its bytes.
+    flac: bool,
+    /// Where a WAV's audio starts in the file; the frame of the file this part of the track starts
+    /// at; and how many whole frames it holds, to the file's end.
     data: u64,
+    first: u64,
     frames: u64,
     rate: u32,
     channels: usize,
-    /// Bytes a sample: 2, 3 or 4 for PCM; 4 for float.
+    /// Bytes a sample of a WAV: 2, 3 or 4 for PCM; 4 for float.
     width: usize,
     float: bool,
     /// The mix's frame its frame 0 falls on: before the session's start, below zero.
@@ -58,7 +65,6 @@ impl Mix {
         let rate = read.iter().map(|(track, _)| track.rate).max()?;
         let mut tracks: Vec<Track> = Vec::new();
         for (whole, runs) in read {
-            let block = (whole.channels * whole.width) as u64;
             let frames_of = |seconds: f64| (seconds * f64::from(whole.rate)).round() as i64;
             for (index, &(from, at)) in runs.iter().enumerate() {
                 let later = &runs[index + 1..];
@@ -73,7 +79,7 @@ impl Mix {
                 if frames > 0 || (index == 0 && whole.frames == 0) {
                     tracks.push(Track {
                         path: whole.path.clone(),
-                        data: whole.data + from * block,
+                        first: from,
                         frames,
                         at: (at * f64::from(rate)).round() as i64,
                         ..whole
@@ -106,7 +112,7 @@ impl Mix {
         self.rate == other.rate
             && self.tracks.len() == other.tracks.len()
             && self.tracks.iter().zip(&other.tracks).all(|(one, two)| {
-                (&one.path, one.data, one.at, one.frames, one.rate) == (&two.path, two.data, two.at, two.frames, two.rate)
+                (&one.path, one.first, one.at, one.frames, one.rate) == (&two.path, two.first, two.at, two.frames, two.rate)
             })
     }
 
@@ -161,7 +167,7 @@ impl Mix {
         let mut sum = vec![0.0f32; count];
         for track in &self.tracks {
             if track.rate == self.rate {
-                for (into, sample) in sum.iter_mut().zip(track.mono(first as i64 - track.at, count)?) {
+                for (into, sample) in sum.iter_mut().zip(track.mono(&mut None, first as i64 - track.at, count)?) {
                     *into += sample;
                 }
             } else {
@@ -172,23 +178,66 @@ impl Mix {
     }
 }
 
+/// A track's file open for reading, kept from one piece of the track to the next.
+enum Source {
+    Wav(File),
+    Flac(Box<Decoded>),
+}
+
 impl Track {
+    /// Its file, opened: a WAV that cannot be opened — removed once kept as FLAC — is read from
+    /// its FLAC beside it, the same frames (`session-audio/v3`).
+    fn open(&self) -> io::Result<Source> {
+        if self.flac {
+            return Ok(Source::Flac(Box::new(flac::open(&self.path)?)));
+        }
+        match File::open(&self.path) {
+            Ok(file) => Ok(Source::Wav(file)),
+            Err(error) => {
+                let kept = self.path.with_extension("flac");
+                match flac::open(&kept) {
+                    Ok(decoded) if decoded.form().frames >= self.first + self.frames => Ok(Source::Flac(Box::new(decoded))),
+                    _ => Err(error),
+                }
+            }
+        }
+    }
+
     /// `count` frames from frame `from`, each one channel: the average of its channels; zero
     /// where the track has none.
-    fn mono(&self, from: i64, count: usize) -> io::Result<Vec<f32>> {
+    fn mono(&self, source: &mut Option<Source>, from: i64, count: usize) -> io::Result<Vec<f32>> {
         let mut mono = vec![0.0f32; count];
         let (start, end) = (from.max(0), (from + count as i64).min(self.frames as i64));
         if start >= end {
             return Ok(mono);
         }
-        let block = self.channels * self.width;
-        let mut bytes = vec![0u8; (end - start) as usize * block];
-        let mut file = File::open(&self.path)?;
-        file.seek(SeekFrom::Start(self.data + start as u64 * block as u64))?;
-        file.read_exact(&mut bytes)?;
-        for (frame, into) in bytes.chunks_exact(block).zip(&mut mono[(start - from) as usize..]) {
-            let total: f32 = frame.chunks_exact(self.width).map(|sample| self.sample(sample)).sum();
-            *into = total / self.channels as f32;
+        let opened = match source {
+            Some(opened) => opened,
+            None => source.insert(self.open()?),
+        };
+        let into = &mut mono[(start - from) as usize..(end - from) as usize];
+        match opened {
+            Source::Wav(file) => {
+                let block = self.channels * self.width;
+                let mut bytes = vec![0u8; into.len() * block];
+                file.seek(SeekFrom::Start(self.data + (self.first + start as u64) * block as u64))?;
+                file.read_exact(&mut bytes)?;
+                for (frame, into) in bytes.chunks_exact(block).zip(into) {
+                    let total: f32 = frame.chunks_exact(self.width).map(|sample| self.sample(sample)).sum();
+                    *into = total / self.channels as f32;
+                }
+            }
+            Source::Flac(decoded) => {
+                decoded.seek(self.first + start as u64)?;
+                for into in into {
+                    let frame = decoded
+                        .frame()?
+                        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "a track ends before its length"))?;
+                    // At the full scale of 32 bits, whatever its depth: the very value its WAV gave.
+                    let total: f32 = frame.iter().map(|&sample| sample as f32 / 2_147_483_648.0).sum();
+                    *into = total / self.channels as f32;
+                }
+            }
         }
         Ok(mono)
     }
@@ -229,8 +278,10 @@ impl Track {
         let from = self.at + start / taken * given;
         let (mut made, mut read) = (Vec::new(), start);
         let mut out = vec![0.0f32; resampler.output_frames_max()];
+        // One file opened for every piece: a FLAC decodes on from where the piece before ended.
+        let mut opened = None;
         while (made.len() as i64) < delay + first + sum.len() as i64 - from {
-            let piece = self.mono(read, chunk as usize)?;
+            let piece = self.mono(&mut opened, read, chunk as usize)?;
             read += chunk;
             let source = InterleavedSlice::new(&piece, 1, piece.len()).map_err(|e| failed(&e))?;
             let room = out.len();
@@ -252,6 +303,21 @@ fn gcd(a: u32, b: u32) -> u32 {
 
 /// A track as its header says it is, or nothing when it does not read as one.
 fn track(path: &Path) -> Option<Track> {
+    if flac::is_flac(path) {
+        let form = flac::form(path)?;
+        return (form.channels > 0 && (1_000..=768_000).contains(&form.rate)).then(|| Track {
+            path: path.to_path_buf(),
+            flac: true,
+            data: 0,
+            first: 0,
+            frames: form.frames,
+            rate: form.rate,
+            channels: form.channels,
+            width: 0,
+            float: false,
+            at: 0,
+        });
+    }
     let mut file = File::open(path).ok()?;
     let size = file.metadata().ok()?.len();
     let mut head = vec![0u8; 64 * 1024];
@@ -297,7 +363,9 @@ fn track(path: &Path) -> Option<Track> {
                 let data = (at + 8) as u64;
                 return Some(Track {
                     path: path.to_path_buf(),
+                    flac: false,
                     data,
+                    first: 0,
                     frames: size.saturating_sub(data) / (channels * width) as u64,
                     rate,
                     channels,

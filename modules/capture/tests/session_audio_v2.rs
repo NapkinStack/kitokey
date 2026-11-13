@@ -3,7 +3,7 @@
 
 use std::{f32::consts::TAU, fs, path::Path};
 
-use kitokey_capture::v2::{CONTRACT, Clock, Held, Track, write_session};
+use kitokey_capture::v2::{CONTRACT, Clock, Held, Meter, Track, V3, write_session};
 
 const SESSION: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/session-audio/v2/session.schema.json");
 
@@ -197,6 +197,29 @@ fn how_loud_a_source_is_is_measured_from_where_it_rests_and_the_track_is_untouch
 }
 
 #[test]
+fn listening_measures_as_a_track_does_and_writes_nothing() {
+    // `listen` (D88): a meter with no file, measured as a track measures, from where a source rests.
+    let folder = tempfile::tempdir().unwrap();
+    let mut track = Track::create(&folder.path().join("local.wav"), 48_000, 2).unwrap();
+    let mut meter = Meter::new(48_000, 2);
+    for (sound, heard) in [(vec![0.33; 9600], false), (tone(48_000, 2, 0.5, 0.2, 0.33), true)] {
+        for piece in sound.chunks(960) {
+            track.push(piece).unwrap();
+            meter.push(piece);
+        }
+        let level = meter.level();
+        assert_eq!(level, track.level());
+        assert_eq!(level > 0.5, heard, "{level}");
+        assert_eq!(meter.level(), 0.0, "since the last call");
+    }
+    // What is no number is not a sound; a piece that is not whole frames is not guessed at.
+    let mut resting = Meter::new(48_000, 2);
+    resting.push(&[0.33, 0.33, f32::NAN, 0.33]);
+    resting.push(&[0.9, 0.9, 0.9]);
+    assert_eq!(resting.level(), 0.0);
+}
+
+#[test]
 fn the_clock_is_one_line_per_thing_known_on_disk_when_said() {
     let folder = tempfile::tempdir().unwrap();
     let path = folder.path().join("clock.jsonl");
@@ -229,14 +252,28 @@ fn a_session_names_the_tracks_it_holds_and_says_whether_it_was_stopped() {
     let read = || -> serde_json::Value { serde_json::from_slice(&fs::read(folder.path().join("session.json")).unwrap()).unwrap() };
 
     // A microphone that could not be opened has no entry.
-    write_session(folder.path(), "2026-10-14T14:05:12+02:00", None, &[Held::new("remote", "Speaker")]).unwrap();
+    write_session(
+        folder.path(),
+        CONTRACT,
+        "2026-10-14T14:05:12+02:00",
+        None,
+        &[Held::new("remote", "Speaker")],
+    )
+    .unwrap();
     assert_eq!(
         read(),
         serde_json::json!({ "contract": CONTRACT, "started": "2026-10-14T14:05:12+02:00", "tracks": { "remote": { "device": "Speaker" } } })
     );
 
     let both = [Held::new("local", "Digital Microphone"), Held::new("remote", "Speaker")];
-    write_session(folder.path(), "2026-10-14T14:05:12+02:00", Some("2026-10-14T15:05:12+02:00"), &both).unwrap();
+    write_session(
+        folder.path(),
+        CONTRACT,
+        "2026-10-14T14:05:12+02:00",
+        Some("2026-10-14T15:05:12+02:00"),
+        &both,
+    )
+    .unwrap();
     let session = read();
     assert_eq!(session["stopped"], "2026-10-14T15:05:12+02:00");
     assert_eq!(session["tracks"]["local"]["device"], "Digital Microphone");
@@ -283,6 +320,7 @@ fn a_session_keeps_each_device_a_track_was_recorded_from_and_when() {
     local.changed.push((1302.25, Some("Digital Microphone".into())));
     write_session(
         folder.path(),
+        CONTRACT,
         "2026-10-14T14:05:12+02:00",
         None,
         &[local, Held::new("remote", "Speaker")],
@@ -302,5 +340,24 @@ fn a_session_keeps_each_device_a_track_was_recorded_from_and_when() {
         })
     );
     let schema: serde_json::Value = serde_json::from_str(&fs::read_to_string(SESSION).unwrap()).unwrap();
+    assert!(jsonschema::validator_for(&schema).unwrap().is_valid(&session), "{session}");
+}
+
+#[test]
+fn a_session_recorded_to_be_kept_as_flac_says_the_third_version_its_schema_allows() {
+    let folder = tempfile::tempdir().unwrap();
+    let both = [Held::new("local", "Digital Microphone"), Held::new("remote", "Speaker")];
+    write_session(
+        folder.path(),
+        V3,
+        "2026-10-14T14:05:12+02:00",
+        Some("2026-10-14T15:05:12+02:00"),
+        &both,
+    )
+    .unwrap();
+    let session: serde_json::Value = serde_json::from_slice(&fs::read(folder.path().join("session.json")).unwrap()).unwrap();
+    assert_eq!(session["contract"], "session-audio/v3");
+    let schema = concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/session-audio/v3/session.schema.json");
+    let schema: serde_json::Value = serde_json::from_str(&fs::read_to_string(schema).unwrap()).unwrap();
     assert!(jsonschema::validator_for(&schema).unwrap().is_valid(&session), "{session}");
 }

@@ -263,6 +263,8 @@ pub struct Menu {
     pub minutes: &'static str,
     /// The same entry while they are being written.
     pub minuting: &'static str,
+    /// Brings back the recording bar the user hid (D90).
+    pub show_bar: &'static str,
 }
 
 pub fn menu(language: Language) -> Menu {
@@ -278,6 +280,7 @@ pub fn menu(language: Language) -> Menu {
             transcribing: "Transcribing…",
             minutes: "Write the minutes of the last recording",
             minuting: "Writing the minutes…",
+            show_bar: "Show the bar",
         },
         Language::French => Menu {
             start: "Démarrer un enregistrement",
@@ -290,6 +293,7 @@ pub fn menu(language: Language) -> Menu {
             transcribing: "Transcription en cours…",
             minutes: "Rédiger le compte rendu de la dernière réunion",
             minuting: "Compte rendu en cours…",
+            show_bar: "Afficher la barre",
         },
     }
 }
@@ -304,12 +308,10 @@ pub struct Window {
     /// What a screen reader calls the window's sections.
     pub sections: &'static str,
     pub meetings: &'static str,
-    /// The weight of everything: its size, how many meetings, how long their audio lasts.
+    /// How many meetings weigh the size beside it (board 4's foot).
     pub weight: &'static str,
     /// The same, for one meeting.
     pub weight_one: &'static str,
-    pub audio_kept: &'static str,
-    pub text_kept: &'static str,
     /// A picture of the two weights, for whoever does not see it.
     pub weight_described: &'static str,
     pub this_week: &'static str,
@@ -322,6 +324,8 @@ pub struct Window {
     pub transcript: &'static str,
     pub audio: &'static str,
     pub audio_freed: &'static str,
+    /// What a meeting's audio weighs, beside its length in its header (D89).
+    pub audio_weighs: &'static str,
     pub recording: &'static str,
     pub interrupted: &'static str,
     /// No session in the folder: the folder.
@@ -331,7 +335,6 @@ pub struct Window {
     pub none_do: &'static str,
     pub list_unread: &'static str,
     pub list_unread_do: &'static str,
-    pub small_unread: &'static str,
     pub again_refused: &'static str,
     pub hearing_models_refused: &'static str,
     pub fold_not_kept: &'static str,
@@ -357,6 +360,9 @@ pub struct Window {
     /// One meeting's page.
     pub back: &'static str,
     pub open_folder: &'static str,
+    /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
+    pub more_actions: &'static str,
+    pub labelled: &'static str,
     pub minutes_title: &'static str,
     pub transcript_title: &'static str,
     pub search: &'static str,
@@ -503,17 +509,15 @@ pub struct Window {
     /// The folder the sessions go to, and the button that opens the system's dialog for it.
     pub sessions_folder: [&'static str; 2],
     pub choose: &'static str,
-    /// The small window while recording (D11's sixth board).
+    /// The recording bar, its icon in the sidebar's foot (D89), what it says (D90).
     pub small: &'static str,
     pub small_mic: &'static str,
     pub small_meeting: &'static str,
-    pub small_stop: &'static str,
     pub small_note: &'static str,
-    /// What the small window says of each side's check (D49): one heard, said to a screen reader;
-    /// a silence, as the notifications say it; a side with no device.
-    pub small_heard: &'static str,
-    pub small_silent_me: &'static str,
-    pub small_silent_others: &'static str,
+    /// What the bar says of each side (D49, D90): silent two minutes, never as an error; a
+    /// microphone that sends nothing, as the notifications say it; a side with no device.
+    pub bar_silent_me: &'static str,
+    pub bar_silent_others: &'static str,
     pub small_nothing: &'static str,
     pub small_waiting_me: &'static str,
     pub small_waiting_others: &'static str,
@@ -522,12 +526,10 @@ pub struct Window {
     pub copy_announcement: &'static str,
     pub announcement_not_copied: &'static str,
     pub small_full: &'static str,
-    /// The small window at rest (D35): no meeting yet, the last one, and the ways to the full window.
-    pub small_none: &'static str,
-    pub small_last: &'static str,
-    pub small_read: &'static str,
-    pub small_open: &'static str,
-    pub small_all: &'static str,
+    /// The bar's options (D90): opened under its row, closed again.
+    pub bar_more: &'static str,
+    pub bar_less: &'static str,
+    pub bar_hide: &'static str,
     pub small_microphone: &'static str,
     pub small_microphones: &'static str,
     pub microphone_auto: &'static str,
@@ -536,10 +538,51 @@ pub struct Window {
     pub microphones_unread: &'static str,
     pub microphone_not_kept: &'static str,
     pub small_microphone_gone: &'static str,
-    pub small_count: &'static str,
-    pub small_count_one: &'static str,
-    pub small_keys: &'static str,
-    pub small_no_keys: &'static str,
+    /// Recording, under the microphone (D90, board 6): the one recorded, a change for the next.
+    pub bar_microphone_recorded: &'static str,
+    pub bar_microphone_next: &'static str,
+    /// The context typed before the start, in the row at rest (D91, board 5): its placeholder, its ✕,
+    /// and under the row while one is kept, that it waits for the next recording.
+    pub bar_context: &'static str,
+    pub bar_context_clear: &'static str,
+    pub bar_context_kept: &'static str,
+    /// « Avancé » (D90, board 6; D91), closed by default, in the bar opened and in *Refaire…*: the
+    /// meeting's own models, Settings' choice first, said as such — what it holds said on it.
+    pub bar_advanced: &'static str,
+    pub models_transcription: &'static str,
+    pub models_minutes: &'static str,
+    pub models_settings: &'static str,
+    pub models_none: &'static str,
+    pub models_own_note: &'static str,
+    pub models_not_kept: &'static str,
+    pub models_not_read: &'static str,
+    /// A meeting's own model gone (D91): Settings' choice stands in, as Auto does for a microphone.
+    pub models_gone_transcription: &'static str,
+    pub models_gone_minutes: &'static str,
+    /// A service the meeting chose, not used while it is said confidential (D60).
+    pub models_unused_confidential: &'static str,
+    /// Under the bar's row at rest, « Avancé » closed: the models chosen for the next recording, named
+    /// short (D91) — one, or more joined by « · ».
+    pub bar_models_kept: &'static str,
+    pub bar_model_kept: &'static str,
+    /// « Vérifier le son » (D88, board 7): its title, and its row in Settings.
+    pub check_sound: &'static str,
+    pub check_sound_says: &'static str,
+    /// A source capture could not open; none named yet.
+    pub check_unavailable: &'static str,
+    /// The microphone listened to is a Bluetooth headset's: its call profile while the panel shows.
+    pub check_bluetooth: &'static str,
+    /// The test sound, and what was heard of it: on the meeting's side, or not, and what to do.
+    pub check_play: &'static str,
+    pub check_heard: &'static str,
+    pub check_not_heard: &'static str,
+    /// A call holds a microphone: no test sound, it would reach the call.
+    pub check_call: &'static str,
+    pub check_open_note: &'static str,
+    pub check_close: &'static str,
+    /// It could not listen; or a recording runs.
+    pub check_failed: &'static str,
+    pub check_recording: &'static str,
     /// Freeing space (D11's third board).
     pub free: &'static str,
     pub free_what: &'static str,
@@ -592,7 +635,6 @@ pub struct Window {
     pub transcript_model_needed: &'static str,
     pub transcript_model_coming: &'static str,
     pub ran_online: &'static str,
-    pub ran_here: &'static str,
     /// The header's button, at rest and while a recording runs.
     pub record_start: &'static str,
     pub record_stop: &'static str,
@@ -752,10 +794,8 @@ pub fn window(language: Language) -> Window {
             units: ["B", "kB", "MB", "GB"],
             sections: "Sections",
             meetings: "Meetings",
-            weight: "taken by {} meetings · {} of audio",
-            weight_one: "taken by {} meeting · {} of audio",
-            audio_kept: "Audio, as recorded — {}",
-            text_kept: "Transcripts and minutes — {}",
+            weight: "{} meetings",
+            weight_one: "{} meeting",
             weight_described: "The audio takes {}; the transcripts and minutes, {}.",
             this_week: "This week",
             last_week: "Last week",
@@ -765,13 +805,13 @@ pub fn window(language: Language) -> Window {
             transcript: "Transcript",
             audio: "Audio · {}",
             audio_freed: "Audio deleted",
+            audio_weighs: "audio {}",
             recording: "Recording now",
             interrupted: "Interrupted",
             none: "No meeting in {} yet.",
             none_do: "Start a recording: its button, its shortcut, or the tray’s icon.",
             list_unread: "The meetings in {} cannot be read.",
             list_unread_do: "Check that this folder’s disk is connected and that you may read it, then try again.",
-            small_unread: "The meetings cannot be read: open the full window.",
             again_refused: "It could not start again: {}",
             hearing_models_refused: "This service’s models could not be read, you can type one: {}",
             fold_not_kept: "The sidebar will be back as it was at the next start: {}",
@@ -793,6 +833,8 @@ pub fn window(language: Language) -> Window {
             none_found: "No meeting holds these words.",
             back: "Meetings",
             open_folder: "Open the folder",
+            more_actions: "More actions",
+            labelled: "{}:",
             minutes_title: "Minutes",
             transcript_title: "Transcript",
             search: "Search the meeting",
@@ -915,14 +957,12 @@ pub fn window(language: Language) -> Window {
                 "New meetings are written here. Those already recorded stay where they were: the window and the audio's keeping follow this folder.",
             ],
             choose: "Choose…",
-            small: "Small window",
+            small: "The recording bar",
             small_mic: "Your microphone",
             small_meeting: "The meeting’s sound",
-            small_stop: "Stop",
             small_note: "Once stopped, the transcript writes itself. You will be told.",
-            small_heard: "{}: heard",
-            small_silent_me: "Nothing heard for ten seconds: say something to try it.",
-            small_silent_others: "Nothing heard for ten seconds: play a sound in the call.",
+            bar_silent_me: "Your microphone: nothing for 2 min — the recording goes on.",
+            bar_silent_others: "The meeting: nothing for 2 min — the recording goes on.",
             small_nothing: "Nothing comes from it: check it is not muted on the device itself, and that it is ready.",
             small_waiting_me: "Your microphone is not recorded for now.",
             small_waiting_others: "The meeting’s sound is not recorded for now.",
@@ -930,11 +970,9 @@ pub fn window(language: Language) -> Window {
             copy_announcement: "Copy the announcement",
             announcement_not_copied: "Not copied.",
             small_full: "The whole window",
-            small_none: "No meeting yet.",
-            small_last: "Last meeting",
-            small_read: "Read the minutes",
-            small_open: "Open the meeting",
-            small_all: "All meetings",
+            bar_more: "More options",
+            bar_less: "Fewer options",
+            bar_hide: "Hide the bar",
             small_microphone: "Microphone: {}",
             small_microphones: "The microphone of the next recording",
             microphone_auto: "Auto",
@@ -943,10 +981,36 @@ pub fn window(language: Language) -> Window {
             microphones_unread: "The list cannot be read for now: Auto still works. Open it again in a moment.",
             microphone_not_kept: "Your choice of microphone could not be kept: choose it again.",
             small_microphone_gone: "The microphone you chose is not there: Auto stands in.",
-            small_count: "{} meetings · {}",
-            small_count_one: "{} meeting · {}",
-            small_keys: "or {}, from anywhere",
-            small_no_keys: "No shortcut granted by the desktop — choose one in Settings",
+            bar_microphone_recorded: "Recorded: {}. Changing it applies to the next recording.",
+            bar_microphone_next: "Changing it applies to the next recording.",
+            bar_context: "Meeting context",
+            bar_context_clear: "Clear the context",
+            bar_context_kept: "Kept for the next recording, until you clear it.",
+            bar_advanced: "Advanced — models",
+            models_transcription: "Transcription model",
+            models_minutes: "Minutes model",
+            models_settings: "Settings: {}",
+            models_none: "no model chosen",
+            models_own_note: "For this meeting alone; Settings do not change.",
+            models_not_kept: "This choice could not be kept: {}",
+            models_not_read: "The models could not be read: {}",
+            models_gone_transcription: "The transcription model chosen for this meeting is no longer here: Settings’ stands in.",
+            models_gone_minutes: "The minutes model chosen for this meeting goes through a service Settings do not name: Settings’ stands in.",
+            models_unused_confidential: "The service chosen for this meeting is not used while it is confidential: it is made on this computer.",
+            bar_models_kept: "Models kept: {}",
+            bar_model_kept: "Model kept: {}",
+            check_sound: "Check the sound",
+            check_sound_says: "Your microphone and the meeting’s sound, before a recording.",
+            check_unavailable: "Unavailable",
+            check_bluetooth: "While this panel is open, your Bluetooth headset switches to call quality; it comes back once it is closed.",
+            check_play: "Play a test sound",
+            check_heard: "Kitokey hears this computer’s sound.",
+            check_not_heard: "Kitokey did not hear the test sound. Check that the sound comes out of this computer and not another device, then play it again.",
+            check_call: "A call holds the microphone: no test sound, it would go into the call. Play a sound in the call and watch the meter.",
+            check_open_note: "The microphone stays open as long as this panel is.",
+            check_close: "Close",
+            check_failed: "Kitokey cannot listen to your microphone or the meeting’s sound for now: close this panel and open it again.",
+            check_recording: "A recording is running: its meters are in the bar.",
             free: "Free space",
             free_what: "What do you want to remove?",
             free_audio: [
@@ -969,7 +1033,7 @@ pub fn window(language: Language) -> Window {
             free_done: "Done: in the trash.",
             redo: "Redo…",
             redo_title: "Write the minutes again",
-            redo_with: "With which model",
+            redo_with: "Made again with this meeting’s models: “Advanced” to choose them.",
             redo_note: "The current minutes stay in place until the new ones are ready, then go to the trash.",
             redo_do: "Redo",
             on_computer: "on this computer",
@@ -996,7 +1060,6 @@ pub fn window(language: Language) -> Window {
             transcript_model_needed: "Waiting for the Whisper model.",
             transcript_model_coming: "Waiting for the Whisper model, being downloaded.",
             ran_online: "online",
-            ran_here: "on this machine",
             record_start: "Start a recording",
             record_stop: "Stop the recording",
             agree_eyebrow: "Before the first minutes online",
@@ -1147,10 +1210,8 @@ pub fn window(language: Language) -> Window {
             units: ["o", "ko", "Mo", "Go"],
             sections: "Rubriques",
             meetings: "Réunions",
-            weight: "occupés par {} réunions · {} d’audio",
-            weight_one: "occupés par {} réunion · {} d’audio",
-            audio_kept: "Audio, tel qu’enregistré — {}",
-            text_kept: "Transcriptions et comptes rendus — {}",
+            weight: "{} réunions",
+            weight_one: "{} réunion",
             weight_described: "L’audio occupe {}\u{202f}; les transcriptions et les comptes rendus, {}.",
             this_week: "Cette semaine",
             last_week: "La semaine dernière",
@@ -1160,13 +1221,13 @@ pub fn window(language: Language) -> Window {
             transcript: "Transcription",
             audio: "Audio · {}",
             audio_freed: "Audio supprimé",
+            audio_weighs: "audio {}",
             recording: "Enregistrement en cours",
             interrupted: "Interrompu",
             none: "Aucune réunion dans {} pour l’instant.",
             none_do: "Démarrez un enregistrement\u{a0}: son bouton, son raccourci, ou l’icône de la barre système.",
             list_unread: "Les réunions de {} ne peuvent pas être lues.",
             list_unread_do: "Vérifiez que le disque de ce dossier est branché et que vous pouvez le lire, puis réessayez.",
-            small_unread: "Les réunions ne peuvent pas être lues\u{a0}: ouvrez la grande fenêtre.",
             again_refused: "Impossible de recommencer\u{a0}: {}",
             hearing_models_refused: "Les modèles de ce service n’ont pas pu être lus, vous pouvez en saisir un\u{a0}: {}",
             fold_not_kept: "La barre latérale reviendra comme avant au prochain démarrage\u{a0}: {}",
@@ -1188,6 +1249,8 @@ pub fn window(language: Language) -> Window {
             none_found: "Aucune réunion ne contient ces mots.",
             back: "Réunions",
             open_folder: "Ouvrir le dossier",
+            more_actions: "Plus d’actions",
+            labelled: "{}\u{a0}:",
             minutes_title: "Compte rendu",
             transcript_title: "Transcription",
             search: "Rechercher dans la transcription",
@@ -1313,13 +1376,11 @@ pub fn window(language: Language) -> Window {
                 "Les nouvelles réunions y sont écrites. Celles déjà enregistrées restent où elles étaient\u{a0}: la fenêtre et la garde de l’audio suivent ce dossier.",
             ],
             choose: "Choisir…",
-            small: "Petite fenêtre",
+            small: "La barre d’enregistrement",
             small_mic: "Votre micro",
             small_meeting: "Le son de la réunion",
-            small_stop: "Arrêter",
-            small_heard: "{}\u{a0}: entendu",
-            small_silent_me: "Rien depuis dix secondes\u{a0}: parlez pour l’essayer.",
-            small_silent_others: "Rien depuis dix secondes\u{a0}: faites jouer un son dans l’appel.",
+            bar_silent_me: "Votre micro\u{a0}: rien depuis 2\u{a0}min — l’enregistrement continue.",
+            bar_silent_others: "La réunion\u{a0}: rien depuis 2\u{a0}min — l’enregistrement continue.",
             small_nothing: "Rien n’en arrive\u{a0}: vérifiez qu’il n’est pas coupé sur l’appareil lui-même, et qu’il est prêt.",
             small_waiting_me: "Votre micro n’est pas enregistré pour l’instant.",
             small_waiting_others: "Son de la réunion non enregistré pour l’instant.",
@@ -1328,11 +1389,9 @@ pub fn window(language: Language) -> Window {
             copy_announcement: "Copier l’annonce",
             announcement_not_copied: "Pas copiée.",
             small_full: "Toute la fenêtre",
-            small_none: "Aucune réunion pour l’instant.",
-            small_last: "Dernière réunion",
-            small_read: "Lire le compte rendu",
-            small_open: "Ouvrir la réunion",
-            small_all: "Toutes les réunions",
+            bar_more: "Plus d’options",
+            bar_less: "Moins d’options",
+            bar_hide: "Masquer la barre",
             small_microphone: "Micro\u{a0}: {}",
             small_microphones: "Le micro du prochain enregistrement",
             microphone_auto: "Auto",
@@ -1341,10 +1400,36 @@ pub fn window(language: Language) -> Window {
             microphones_unread: "La liste ne peut pas être lue pour l’instant\u{a0}: Auto fonctionne toujours. Rouvrez-la dans un instant.",
             microphone_not_kept: "Votre choix de micro n’a pas pu être gardé\u{a0}: choisissez-le de nouveau.",
             small_microphone_gone: "Le micro choisi n’est pas là\u{a0}: Auto le remplace.",
-            small_count: "{} réunions · {}",
-            small_count_one: "{} réunion · {}",
-            small_keys: "ou {}, de n’importe où",
-            small_no_keys: "Pas de raccourci clavier — en définir un",
+            bar_microphone_recorded: "Enregistré\u{a0}: {}. Le changer vaut pour le prochain enregistrement.",
+            bar_microphone_next: "Le changer vaut pour le prochain enregistrement.",
+            bar_context: "Contexte de la réunion",
+            bar_context_clear: "Effacer le contexte",
+            bar_context_kept: "Gardé pour le prochain enregistrement, jusqu’à ce que vous l’effaciez.",
+            bar_advanced: "Avancé — modèles",
+            models_transcription: "Modèle de transcription",
+            models_minutes: "Modèle du compte rendu",
+            models_settings: "Réglages\u{a0}: {}",
+            models_none: "aucun modèle choisi",
+            models_own_note: "Pour cette réunion seule\u{202f}; les Réglages ne changent pas.",
+            models_not_kept: "Ce choix n’a pas pu être gardé\u{a0}: {}",
+            models_not_read: "Les modèles n’ont pas pu être lus\u{a0}: {}",
+            models_gone_transcription: "Le modèle de transcription choisi pour cette réunion n’est plus là\u{a0}: celui des Réglages le remplace.",
+            models_gone_minutes: "Le modèle du compte rendu choisi pour cette réunion passe par un service que les Réglages ne nomment pas\u{a0}: celui des Réglages le remplace.",
+            models_unused_confidential: "Le service choisi pour cette réunion n’est pas utilisé tant qu’elle est confidentielle\u{a0}: elle est faite sur cet ordinateur.",
+            bar_models_kept: "Modèles gardés\u{a0}: {}",
+            bar_model_kept: "Modèle gardé\u{a0}: {}",
+            check_sound: "Vérifier le son",
+            check_sound_says: "Votre micro et le son de la réunion, avant un enregistrement.",
+            check_unavailable: "Indisponible",
+            check_bluetooth: "Tant que ce panneau est ouvert, votre casque Bluetooth passe en qualité d’appel\u{202f}; il revient à la fermeture.",
+            check_play: "Jouer un son de test",
+            check_heard: "Kitokey entend le son de cet ordinateur.",
+            check_not_heard: "Kitokey n’a pas entendu le son de test. Vérifiez que le son sort de cet ordinateur et pas d’un autre appareil, puis rejouez-le.",
+            check_call: "Un appel tient le micro\u{a0}: pas de son de test, il partirait dans l’appel. Faites jouer un son dans l’appel et regardez la jauge.",
+            check_open_note: "Le micro reste ouvert tant que ce panneau l’est.",
+            check_close: "Fermer",
+            check_failed: "Kitokey ne peut écouter ni votre micro ni le son de la réunion pour l’instant\u{a0}: fermez ce panneau et rouvrez-le.",
+            check_recording: "Un enregistrement est en cours\u{a0}: ses jauges sont dans la barre.",
             free: "Faire de la place",
             free_what: "Que voulez-vous retirer\u{202f}?",
             free_audio: [
@@ -1367,7 +1452,7 @@ pub fn window(language: Language) -> Window {
             free_done: "C’est fait\u{a0}: dans la corbeille.",
             redo: "Refaire…",
             redo_title: "Refaire le compte rendu",
-            redo_with: "Avec quel modèle",
+            redo_with: "Refait avec les modèles de cette réunion\u{a0}: «\u{a0}Avancé\u{a0}» pour les choisir.",
             redo_note: "Le compte rendu actuel reste en place tant que le nouveau n’est pas prêt, et se retrouve ensuite dans la corbeille.",
             redo_do: "Refaire",
             on_computer: "sur cet ordinateur",
@@ -1394,7 +1479,6 @@ pub fn window(language: Language) -> Window {
             transcript_model_needed: "En attente du modèle Whisper.",
             transcript_model_coming: "En attente du modèle Whisper, en cours de téléchargement.",
             ran_online: "en ligne",
-            ran_here: "sur cet ordinateur",
             record_start: "Démarrer un enregistrement",
             record_stop: "Arrêter l’enregistrement",
             agree_eyebrow: "Avant le premier compte rendu en ligne",
@@ -1706,6 +1790,163 @@ pub fn test_caused(which: Cause, detail: &str, language: Language, developer: bo
     })
 }
 
+/// A quantisation's or a precision's tag, as a model's id ends with it: q4_K_M, iq3_xs, fp16, bf16,
+/// f32, int8 — what only machines read.
+fn quantised(tag: &str) -> bool {
+    let tag = tag.to_ascii_lowercase();
+    let q = tag.strip_prefix('i').unwrap_or(&tag);
+    if let Some(rest) = q.strip_prefix('q') {
+        let mut chars = rest.chars();
+        if chars.next().is_some_and(|c| c.is_ascii_digit()) {
+            let more = chars.as_str();
+            return more.is_empty()
+                || more.strip_prefix('_').is_some_and(|parts| {
+                    parts
+                        .split('_')
+                        .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric()))
+                });
+        }
+    }
+    let float = |t: &str, bits: &str| t.strip_prefix('f').is_some_and(|t| t.strip_prefix('p').unwrap_or(t) == bits);
+    float(tag.strip_prefix('b').unwrap_or(&tag), "16") || float(&tag, "32") || tag == "int4" || tag == "int8"
+}
+
+/// A date of release, as a model's id ends with it: 20241022, 2024-08-06, 06-2025.
+fn dated(tag: &str) -> bool {
+    let digits = |t: &str, n: usize| t.len() == n && t.chars().all(|c| c.is_ascii_digit());
+    let parts: Vec<&str> = tag.split('-').collect();
+    match parts[..] {
+        [one] => digits(one, 8),
+        [year, month, day] => digits(year, 4) && digits(month, 2) && digits(day, 2),
+        [month, year] => digits(month, 2) && digits(year, 4),
+        _ => false,
+    }
+}
+
+/// `name` without the first tail, after one of `separators`, that `tail` recognises — cut where a
+/// character begins, never inside one.
+fn without_tail<'a>(name: &'a str, separators: &[char], tail: impl Fn(&str) -> bool) -> &'a str {
+    for (at, c) in name.char_indices() {
+        let (before, from) = name.split_at(at);
+        let mut rest = from.chars();
+        rest.next();
+        if separators.contains(&c) && tail(rest.as_str()) {
+            return before;
+        }
+    }
+    name
+}
+
+/// What JavaScript's `\s` matches: its white space and line ends — U+FEFF among them, U+0085 not.
+fn js_space(c: char) -> bool {
+    matches!(
+        c,
+        '\t' | '\n' | '\u{b}' | '\u{c}' | '\r' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'
+            ..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}'
+    )
+}
+
+/// What people say of a model: the page's `modelSaid`, character for character (`tests/model_said.rs`
+/// runs both) — the last part of its id, without what only machines read: a file's extension, a tag
+/// "latest", a date of release, a quantisation.
+pub fn model_said(model: &str) -> String {
+    let mut name = model.split('/').rfind(|part| !part.is_empty()).unwrap_or(model);
+    // One extension, the last.
+    if let Some((before, extension)) = name.rsplit_once('.')
+        && (extension.eq_ignore_ascii_case("gguf") || extension.eq_ignore_ascii_case("bin"))
+    {
+        name = before;
+    }
+    // Its tag "latest", after a colon.
+    if let Some((before, tag)) = name.rsplit_once(':')
+        && tag.eq_ignore_ascii_case("latest")
+    {
+        name = before;
+    }
+    name = without_tail(name, &['-', '_', ':', '.'], quantised);
+    name = without_tail(name, &['-', '_', ':'], dated);
+    let machine = |word: &str| quantised(word) || ["qat", "k", "m", "s", "l"].contains(&word.to_ascii_lowercase().as_str());
+    let mut words: Vec<&str> = name
+        .split(|c: char| c == '-' || c == '_' || c == ':' || js_space(c))
+        .filter(|w| !w.is_empty())
+        .collect();
+    while words.len() > 1 && words.last().is_some_and(|word| machine(word)) {
+        words.pop();
+    }
+    if words.is_empty() || (words.len() == 1 && machine(words[0])) {
+        return model.to_string();
+    }
+    let short = |w: &str| (1..=2).contains(&w.len()) && w.chars().all(|c| c.is_ascii_digit());
+    let mut said: Vec<String> = Vec::new();
+    for word in words {
+        let mut chars = word.chars();
+        let first = chars.next();
+        // A version written with dashes — claude-sonnet-4-5 — is said with its point.
+        if short(word) && said.last().is_some_and(|last| last.split('.').all(short)) {
+            let last = said.last_mut().expect("checked above");
+            last.push('.');
+            last.push_str(word);
+        } else if word.to_lowercase() == "gpt" {
+            said.push("GPT".into());
+        } else if let Some(first) = first.filter(char::is_ascii_lowercase) {
+            said.push(format!("{}{}", first.to_ascii_uppercase(), chars.as_str()));
+        } else {
+            said.push(word.to_string());
+        }
+    }
+    said.join(" ")
+}
+
+/// The cause's sentence, said of the meeting's own model when it was its (`own`, as its id is) and the
+/// gesture is another model — then « Refaire… › Avancé » —, else Settings' sentence: the one the page
+/// and the notification both say (D91).
+pub fn cause_said(cause: Cause, own: Option<&str>, language: Language) -> String {
+    match own.zip(cause_own(cause, language)) {
+        Some((model, sentence)) => sentence.replacen("{}", &model_said(model), 1),
+        None => self::cause(cause, language).to_string(),
+    }
+}
+
+/// Why minutes were not made by the meeting's own model, chosen in « Avancé » (D91), where the gesture
+/// is another model: `{}` its name, the page's; chosen again in *Refaire…*, never in Settings. None
+/// where the gesture is the provider's — a key, credit, an address —: `cause`'s sentence says it.
+pub fn cause_own(cause: Cause, language: Language) -> Option<&'static str> {
+    use Language::{English, French};
+    Some(match (cause, language) {
+        (Cause::TooSlow, English) => {
+            "{}, chosen for this meeting, did not answer in time: try again later, or choose a faster model in Redo…\u{a0}› Advanced."
+        }
+        (Cause::TooSlow, French) => {
+            "{}, choisi pour cette réunion, n’a pas répondu à temps\u{a0}: réessayez plus tard, ou choisissez un modèle plus rapide dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::UnknownModel, English) => {
+            "The provider does not know {}, chosen for this meeting: choose another in Redo…\u{a0}› Advanced."
+        }
+        (Cause::UnknownModel, French) => {
+            "Le fournisseur ne connaît pas {}, choisi pour cette réunion\u{a0}: choisissez-en un autre dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::Down, English) => {
+            "The provider answers that it is failing: try again later. On this computer, {}, chosen for this meeting, may be too large for the memory: choose a smaller one in Redo…\u{a0}› Advanced."
+        }
+        (Cause::Down, French) => {
+            "Le fournisseur répond qu’il est en panne\u{a0}: réessayez plus tard. Sur cet ordinateur, {}, choisi pour cette réunion, est peut-être trop gros pour la mémoire\u{a0}: choisissez-en un plus petit dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::CutShort, English) => {
+            "{}, chosen for this meeting, stopped before the end: choose one that writes longer answers in Redo…\u{a0}› Advanced."
+        }
+        (Cause::CutShort, French) => {
+            "{}, choisi pour cette réunion, s’est arrêté avant la fin\u{a0}: choisissez-en un qui écrit plus long dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::NotMinutes, English) => {
+            "{}, chosen for this meeting, did not write minutes: try again, or choose another model in Redo…\u{a0}› Advanced."
+        }
+        (Cause::NotMinutes, French) => {
+            "{}, choisi pour cette réunion, n’a pas écrit de compte rendu\u{a0}: réessayez, ou choisissez un autre modèle dans Refaire…\u{a0}› Avancé."
+        }
+        _ => return None,
+    })
+}
+
 /// Why minutes were not made, and what to do, as kitokey-summary coded it (summarising/v1).
 pub fn cause(cause: Cause, language: Language) -> &'static str {
     use Language::{English, French};
@@ -1903,6 +2144,13 @@ pub enum Minutes {
     Failed(Option<Cause>),
     /// Made again (*Refaire…*) and not made: the ones there stayed; and why, as above.
     RedoFailed(Option<Cause>),
+    /// Not made by the meeting's own model (its id), for a cause whose gesture is another model: said
+    /// as the page says it (D91); `again` as for `RedoFailed`.
+    FailedOwn {
+        cause: Cause,
+        model: String,
+        again: bool,
+    },
     /// Online, and the user has not agreed to send this meeting to this host yet.
     Waiting(String),
     /// No one is chosen to write them.
@@ -1919,6 +2167,19 @@ pub enum Minutes {
 
 impl Minutes {
     /// Not made: as a first making, or as minutes made again (*Refaire…*) — the ones there stayed.
+    /// The same, by the meeting's own model when it was its (`own`): named where its gesture is another
+    /// model, else as `failed` says it.
+    pub fn failed_by(cause: Option<Cause>, again: bool, own: Option<&str>, language: Language) -> Self {
+        match (cause, own) {
+            (Some(cause), Some(model)) if cause_own(cause, language).is_some() => Minutes::FailedOwn {
+                cause,
+                model: model.to_string(),
+                again,
+            },
+            _ => Self::failed(cause, again),
+        }
+    }
+
     pub fn failed(cause: Option<Cause>, again: bool) -> Self {
         if again {
             Minutes::RedoFailed(cause)
@@ -1988,6 +2249,37 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
                 Some(cause) => format!("Celui d’avant est resté en place. {}", self::cause(*cause, language)),
                 None => "Celui d’avant est resté en place.".to_string(),
             },
+        ),
+        // By the meeting's own model: named, and chosen again in « Avancé », as its page says it (D91).
+        (
+            Minutes::FailedOwn {
+                cause,
+                model,
+                again: false,
+            },
+            English,
+        ) => (
+            "The minutes were not written",
+            format!("The transcript is untouched. {}", cause_said(*cause, Some(model), language)),
+        ),
+        (
+            Minutes::FailedOwn {
+                cause,
+                model,
+                again: false,
+            },
+            French,
+        ) => (
+            "Le compte rendu n’a pas été fait",
+            format!("La transcription est intacte. {}", cause_said(*cause, Some(model), language)),
+        ),
+        (Minutes::FailedOwn { cause, model, again: true }, English) => (
+            "The minutes were not made again",
+            format!("The previous ones stayed in place. {}", cause_said(*cause, Some(model), language)),
+        ),
+        (Minutes::FailedOwn { cause, model, again: true }, French) => (
+            "Le compte rendu n’a pas été refait",
+            format!("Celui d’avant est resté en place. {}", cause_said(*cause, Some(model), language)),
         ),
         (Minutes::Waiting(host), English) => (
             "The minutes wait for your agreement",

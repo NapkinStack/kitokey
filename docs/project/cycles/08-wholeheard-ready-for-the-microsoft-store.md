@@ -1,6 +1,6 @@
 ---
 goal: "On Windows, Wholeheard is ready for the Store: its trial ends without locking a meeting, it starts with the session from its package, and the colleague on Windows records a real call from it"
-status: accepted          # proposed | accepted | closed | stopped — the decider accepts
+status: closed            # proposed | accepted | closed | stopped — the decider accepts
 accepted_on: 2026-11-03   # « 08 accepté, défauts du cadreur »; started at cycle 07's closure
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
 start: 2026-11-05         # YYYY-MM-DD
@@ -9,7 +9,7 @@ deliverables:
   - id: D83
     title: "On Windows, once the Store's trial is over, no new meeting is recorded, and every meeting is still read and exported"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given the trial's rule, when the shell's tests run, then the trial counts only the meetings the window lists that were made since Wholeheard first started on a trial licence — that day kept in a file of the folder of meetings, written once —, and is over only once 14 days have passed since that day and 10 such meetings are there; never at 9 meetings after 30 days, never at 10 meetings after 13 days; meetings copied there from elsewhere count for nothing; a folder that cannot be read, or a clock earlier than that day, is never over (PDR-0005)"
       - "Given Wholeheard on a Store licence that is a trial, the trial over — a stand-in licence that the tests give, never read by a build made for release; the trial's gate is the same on every system, only reading the Store's licence is Windows' own, so the window's e2e on Linux holds it —, when a recording is started from the window, the tray or a call's offer, then nothing is recorded, the window says why in one sentence of `words.rs`, in French and in English, and offers « Acheter », which asks the Store for the purchase or, that failing, opens Wholeheard's page in the Store — the purchase itself held by the stand-in only; every meeting is still read, played, corrected and exported; held by the window's e2e"
@@ -20,7 +20,7 @@ deliverables:
   - id: D84
     title: "On Windows, Wholeheard starts with the session from its package, and Settings say what Windows does"
     module: shell
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given the package installed and Wholeheard started once, when the user signs in again, then Wholeheard starts in the notification area alone, no window (D17), and Windows' own Startup settings list it under its name; held by the colleague on #482, a runner cannot sign in again"
       - "Given Settings' start-with-the-session switch on Windows, when it shows and is changed, then it shows Windows' state of Wholeheard's startup task and changes it there; a task turned off by the user in Windows is shown off and never turned back on by Wholeheard — Settings say where to turn it back on —, one turned off by a policy is shown off and one turned on by a policy shown on, the switch disabled in both, said in one sentence"
@@ -29,14 +29,14 @@ deliverables:
   - id: D85
     title: "Spike — does Whisper large-v3 trained for French hear a meeting better than today's model?"
     module: transcription
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given `bofenghuang/whisper-large-v3-french` as whisper.cpp reads it (`ggml-model-q5_0.bin`, MIT) and today's recommended `ggml-large-v3-turbo-q8_0.bin`, in a spike outside the shipped program, the spike's input diffed first against what the step really reads — and D76's own input diffed the same way, its 98.3 % measured again if they differ —, when each hears the module's bench, the trial meeting and the decider's call kept in `temp/real-calls` — nothing of which leaves the machine or is published —, then the module's log issue records for each: word errors where a reference exists, inventions on a silent track, duplicated words, time against the recording's length, peak memory and the model's size"
       - "Given that record, when it is read against D76's threshold — at least two points fewer word errors on the trial meeting *(framer's, no source)*, no more than one point worse on the bench, fewer inventions on silence, faster than the call lasted on this machine's CPU —, then the framer proposes an ADR to offer it in the models list (ADR-0010); below it, what was missing is recorded. A refuted result is a delivered one"
   - id: D54
     title: "On Windows, Wholeheard installs from one MSIX package the Microsoft Store can take, and removing it keeps the meetings"
     module: install
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given the Windows workflow on main, when it runs, then it leaves beside the zip Wholeheard-<version>-x64.msix, made with the Windows SDK's MakeAppx from an AppxManifest.xml that names Wholeheard, its version in four parts the last 0, its logos, the identity the decider reserved in Partner Center — or a placeholder the run says is one —, `runFullTrust` and the microphone, and the shell started with `--window`; the four programs inside it"
       - "Given that package signed for the run with a certificate made for it, when GitHub's Windows runner installs it (`Add-AppxPackage`), then Wholeheard's process starts from it with its window; when a later version is installed over it, then a meeting folder placed under Documents\\Wholeheard and the settings are still there; and when it is removed (`Remove-AppxPackage`), then the meeting folder is still there"
@@ -45,14 +45,14 @@ deliverables:
   - id: D57
     title: "The Store's listing and Wholeheard's privacy policy are written, in French and in English"
     module: null
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given the repository, when `docs/privacy.md` is read on GitHub, then it says in French and in English what Wholeheard records, where it keeps it, what leaves the machine only when the user chose a service and to which host, that nothing is sent otherwise, and how to remove it all — its URL the one Partner Center is given"
       - "Given `docs/store/listing.md`, when it is read, then it holds the Store's description, its short features and the screenshots it needs, in French and in English, said as PDR-0001's promise — the decider reads it and says it claims nothing the product does not do"
   - id: D53
     title: "On Windows, Wholeheard opens from one zip the forge made — and does a call recorded there hold both sides?"
     module: install
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given a run of the Windows workflow on main, or one started by hand, when it ends, then each program's tests pass on GitHub's Windows runner, and it leaves one artifact, Wholeheard-<version>-windows-x64.zip, holding wholeheard.exe and the three programs side by side, kept 7 days as the Mac's"
       - "Given that zip on the colleague's Windows 11, when they unpack it and open wholeheard.exe — past SmartScreen's warning on an unsigned program —, then Wholeheard's icon is in the notification area and its window opens from it, with nothing installed before it and no terminal"
@@ -60,7 +60,7 @@ deliverables:
   - id: D86
     title: "Wholeheard becomes Kitokey, and nothing of the user's is lost on the way"
     module: shell
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given Wholeheard installed and used — settings, meetings, the Whisper model, keys in the keyring —, when the user installs Kitokey's package over it (`dnf install` of the .rpm, `apt install` of the .deb), then it replaces Wholeheard's, and Kitokey starts with the same settings, the same meetings where they were, the model not fetched again and the keys kept; a carrying over cut halfway resumes at the next start and never loses a meeting"
       - "Given the repository, when it is searched for Wholeheard, then the product, its programs, its packages, its application id, its folders and its variables are named Kitokey; Wholeheard and Summit are named only where history is told and in the code that carries over what the user held under them"
@@ -69,7 +69,7 @@ deliverables:
   - id: D78
     title: "On Fedora, Wholeheard installs from Copr with dnf, and each new version comes with the system's updates"
     module: install
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given a release tag on main, when the forge's workflow runs, then it makes a source package from that tag that builds the four programs from source, the crates inside it, and Copr builds it for each Fedora release Copr still supports, its internet access left off; a build that fails fails the workflow and names the release that failed"
       - "Given the package's header, when it is read, then its licence is the repository's, GPL-3.0, and its summary and description are those of today's package"
@@ -78,7 +78,7 @@ deliverables:
   - id: D66
     title: "A recording holds the microphone the call holds, and never touches a Bluetooth headset's profile"
     module: capture
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given a call holding a microphone other than the default input, when a recording runs, then `me` records that one — its name in `session.json` and the `device` event — and, when the call changes it, follows it, the track going on; held on virtual devices by capture's e2e, a stand-in call on a source of its own"
       - "Given a source carrying `bluez5.loopback=true`, when capture records it, then its stream says its version's passive value (ADR-0015, as corrected by #574, merged after this amendment), the source never runs from it alone and no profile switch comes from it, within one known window: a default input turning into a headset during a recording stays on an active stream until a reading of the graph closes it, within a few seconds, and for as long as the graph does not read; in that window WirePlumber's decision to switch came 4 times in 10 measured, on a stand-in with no card; held by capture's e2e on a stand-in source, read in `pw-dump` — WirePlumber's decision testable on a stand-in carrying `device.id` —, and `others` is unchanged. Given no call holding a microphone, then capture records the meeting's sound and says in one sentence that the microphone waits when the default input is such a source; records the default input, as today, when it is not"
@@ -88,7 +88,7 @@ deliverables:
   - id: D56
     title: "The list of models read again is refused unless the decider's key signed it"
     module: shell
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given `registry/models.json` and its signature `models.json.minisig` on main, made with minisign by the decider's key — the public key built into the shell, the private one never in a repository —, when the list is read again on the user's gesture, then it is offered only when its signature verifies; a list unsigned, signed by another key, or changed after it was signed is refused, and the shipped list stays, said in one sentence (ADR-0010, *Rejected alternatives*)"
       - "Given a pull request that changes the list, when its checks run, then a list whose signature does not verify against the built-in key is refused; until the decider's key is given, no list is read again, and Settings and the check say it waits on that key — the colleagues' builds lose today's reading again, said in the cycle's closure"
@@ -97,7 +97,7 @@ deliverables:
   - id: D41
     title: "On Linux, a call heard on an output other than the system's default is recorded there"
     module: capture
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given a call — an application other than capture holding a microphone — whose sound plays on an output other than the system's default, when it is recorded, then the remote track holds what the call plays, and capture says `device` with that output's name"
       - "Given the call's sound moved to another output while recording, or back to the default, when it moves, then the remote track follows it within two seconds and the move is kept in `session.json` with when"
@@ -107,10 +107,12 @@ deliverables:
   - id: D27
     title: "Wholeheard installs on Ubuntu from one package, its programs built on the system they ship to"
     module: install
-    state: ready
+    state: deferred   # moved to cycle 09 at the closure, 2026-11-07
     acceptance:
       - "Given Ubuntu 24.04, when a user installs Wholeheard from one package file (`sudo apt install ./kitokey_<version>_amd64.deb`), then Wholeheard is in the applications menu and starts in the tray with nothing built and no variable set, and removing it leaves the user's meetings and settings"
       - "Given a release for a system — Fedora or Ubuntu —, when the programs are built, then they are built in a container of that system, so that no package depends on the machine that made it"
+outcome: shipped
+ended_on: 2026-11-07
 ---
 
 # Cycle 08 — Wholeheard ready for the Microsoft Store
@@ -265,7 +267,8 @@ D86's criterion 4. The end date does not move for them.
 
 ## Later
 
-- **Cycle 09, macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation. Also the start with the
+- **Cycle 09, the finish before publishing**: proposed on 2026-11-06 ([its page](09-kitokey-finished-before-it-is-published.md)), from the decider's feedback that day.
+- **Cycle 10, macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation. Also the start with the
   session on macOS, today written where macOS never reads it (D84's note), and Foresight read again (the market
   review of 2026-11-03, row 6).
 - **The name**: Kitokey, chosen by the decider on 2026-11-04 ([PDR-0006](../../pdr/0006-the-product-is-named-kitokey.md)).
@@ -288,6 +291,56 @@ D86's criterion 4. The end date does not move for them.
 
 ## Closure
 
-<Written at the end.>
+**Closed on 2026-11-07, shipped, on the decider's word that day:** « je te laisse le poste libre 1h, avance en
+autonomie le projet, mets a jour au fur et a mesure. nous avions mis en place un plan a afaire avant la
+publication, enchaine ». The plan is [cycle 09](09-kitokey-finished-before-it-is-published.md); one accepted
+cycle at a time, so this one closes first. D83 is accepted from its record by `nstack deliver --write-states`.
+The eleven others move to cycle 09, their criteria as they stand: what is left of each waits on a person, the
+next tag, or the collaborator's pull request — or is D85, the agents' spike, not started. 1 of 12 accepted.
 
-**Documents brought current:** <at the closure>
+```mermaid
+flowchart LR
+    A["Built, sheets passed:<br/>D83 the trial"]:::done
+    P["Published, one gesture or<br/>tag left: D78 · D86"]:::wait
+    T["A person's trial, key or reading:<br/>D53 D54 D57 D66 D56 D41 D27"]:::wait
+    O["Not finished by an agent:<br/>D84 (#675) · D85 spike"]:::own
+    A --> X["Accepted"]:::end8
+    P --> N["Cycle 09"]:::next
+    T --> N
+    O --> N
+    classDef done fill:#065f46,color:#fff
+    classDef wait fill:#92400e,color:#fff
+    classDef own fill:#5b21b6,color:#fff
+    classDef end8 fill:#0f766e,color:#fff
+    classDef next fill:#1e3a8a,color:#fff
+```
+
+**Legend** — green: built and verified · amber: a person's gesture or the next tag left · violet: an agent's
+work left · teal: accepted · blue: the next cycle.
+
+**State, by what is true on `main` 170561f.** Only what was not proven is listed: each pull request's sheet
+holds the rest.
+
+| Deliverable | Pull requests | Not proven |
+|---|---|---|
+| D83 the trial | #673, #676, #678 to #682 | The Store's real trial, after the first submission (D54) |
+| D78 Copr | #657 to #659, #661, #662, #686 | Criteria 1 to 3 held by the first publication, tag `v0.2.0`, [run 42352754065](https://github.com/NapkinStack/kitokey/actions/runs/42352754065): Copr build 11283208 on Fedora 43, 44 and 45, the e2e installed, ran and removed it on each. Criterion 4, `dnf upgrade` from the previous Copr version: the next tag |
+| D86 Kitokey | #648 to #654, #663 to #666 | Criterion 4 held by the same run (`@napkinstack/kitokey`). Criterion 1: the decider's word on the rpm installed over Wholeheard on 2026-11-06 |
+| D84 started with the session | #675 open (the collaborator) | All four |
+| D85 spike, Whisper for French | — | Not started |
+| D53, D54, D57, D66, D56, D41, D27 | Cycles 04 to 08; #540, #643, #644 open | A person's trial, key or reading, unchanged |
+
+**The goal.** D83 holds: once the Store's trial is over, no meeting is locked. **Not reached**: no package has
+been submitted, and nobody has recorded a real call from it on Windows.
+
+**Also done in this cycle, outside its deliverables:** Kitokey is published on Copr as `@napkinstack/kitokey`
+(the Fedora group `napkinstack-labs`, under the alias `napkinstack` in Copr, the decider's choice), and
+kitokey.com is bought (PDR-0006, #687).
+
+**Success criteria**: none moved.
+
+**Dependency with a date**: the Windows builds and #482 not remade within 48 hours of the acceptance — missed a
+third time; the Partner Center account not asked yet. Both move with D53 and D54.
+
+**Documents brought current:** PDR-0006, the domains (#687); the install module's README, Copr's project
+(#686); NapkinStack 0.27.0 (#688).

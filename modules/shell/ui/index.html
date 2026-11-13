@@ -13,35 +13,38 @@
 <aside id="sidebar" class="sidebar">
   <div class="side-top">
     <div class="brand">
-      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" class="mark"></rect><path d="M12 46 L26 20 L37 40 M33 32 L40 24 L52 46" fill="none" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" class="peaks"></path></svg>
-      <span>Kitokey</span>
+      <!-- The name alone (D89, the decider 2026-11-09: no mark beside it): its i the mark's stem, cut by the record dot. -->
+      <!-- The name: drawn by scripts/name.py, never by hand. -->
+<svg id="name" role="img" aria-label="Kitokey" width="66.6" height="17.5" viewBox="7.2 -77.1 370.2 97.3">
+<!-- Montserrat Bold, Version 9.000: SIL Open Font License 1.1. -->
+<mask id="name-cut" maskUnits="userSpaceOnUse" x="7.2" y="-77.1" width="370.2" height="97.3"><rect x="7.2" y="-77.1" width="370.2" height="97.3" fill="#fff"></rect><circle id="name-gap" cx="78.1" cy="-66.4" r="14.2" data-rest="14.2" data-live="17.1" fill="#000"></circle></mask>
+<g mask="url(#name-cut)" fill="currentColor"><path d="M7.2 0H22.8V-13.7L30.4 -21L47.3 0H66.2L41.8 -31L64.2 -53.8H45.6L22.8 -32.3V-74.2H7.2ZM70.3 0H85.9V-53.8H70.3ZM120.4 0.8C125.2 0.8 129.9 -0.3 133.1 -2.6L128.9 -13.6C127.2 -12.3 124.9 -11.6 122.6 -11.6C118.4 -11.6 115.9 -14.1 115.9 -18.7V-41.8H129.3V-53.8H115.9V-65.7H100.3V-53.8H92V-41.8H100.3V-18.5C100.3 -5.7 107.7 0.8 120.4 0.8ZM163.8 0.8C180.9 0.8 193.3 -10.7 193.3 -26.9C193.3 -43.1 180.9 -54.6 163.8 -54.6C146.7 -54.6 134.2 -43.1 134.2 -26.9C134.2 -10.7 146.7 0.8 163.8 0.8ZM163.8 -12C156 -12 150 -17.6 150 -26.9C150 -36.2 156 -41.8 163.8 -41.8C171.6 -41.8 177.5 -36.2 177.5 -26.9C177.5 -17.6 171.6 -12 163.8 -12ZM201.7 0H217.3V-13.7L224.9 -21L241.8 0H260.7L236.3 -31L258.7 -53.8H240.1L217.3 -32.3V-74.2H201.7ZM289.6 0.8C299.3 0.8 306.8 -2.2 311.8 -7.9L303.5 -16.9C299.8 -13.4 295.7 -11.7 290 -11.7C281.8 -11.7 276.1 -15.8 274.6 -22.5H315.3C315.4 -23.8 315.6 -25.5 315.6 -26.7C315.6 -44 303.4 -54.6 287.6 -54.6C271.2 -54.6 258.9 -43 258.9 -26.9C258.9 -10.9 271 0.8 289.6 0.8ZM274.5 -31.6C275.6 -38.4 280.6 -42.8 287.7 -42.8C294.7 -42.8 299.8 -38.4 300.9 -31.6ZM330.8 20.2C340.5 20.2 347.9 16.3 353.1 3.3L377.4 -53.8H362.4L347.2 -17.2L332.1 -53.8H316L339.3 0.4L339.1 0.9C337 5.7 334.6 7.6 330.3 7.6C327.2 7.6 323.9 6.3 321.5 4.2L315.8 15.3C319.3 18.4 325.3 20.2 330.8 20.2Z"></path><rect x="70.3" y="-66.4" width="15.6" height="13.6"></rect></g>
+<circle id="name-dot" cx="78.1" cy="-66.4" r="7.8" data-rest="7.8" data-live="10.7"></circle>
+</svg>
+<!-- The name's end. -->
     </div>
-    <button type="button" id="fold" class="icon-button" aria-keyshortcuts="Control+B Meta+B">⇤</button>
+    <button type="button" id="fold" class="icon-button" aria-keyshortcuts="Control+B Meta+B"></button>
   </div>
-  <div class="act"><button type="button" id="record" class="primary"><span class="dot" aria-hidden="true"></span><span id="record-said"></span></button><kbd id="header-keys" class="keys" hidden></kbd><p id="refused" class="note" role="status" hidden></p><button type="button" id="buy" class="primary" hidden></button></div>
-  <input type="search" id="find" class="search" autocomplete="off" spellcheck="false">
+  <div class="act"><button type="button" id="record" class="primary"><span class="dot" aria-hidden="true"></span><span id="record-said"></span></button><p id="refused" class="note" role="status" hidden></p><button type="button" id="buy" class="primary" hidden></button></div>
+  <div class="finding"><input type="search" id="find" class="search" autocomplete="off" spellcheck="false"></div>
   <main id="list">
     <p id="none-found" class="none" role="status" hidden></p>
     <div id="groups"></div>
   </main>
   <div class="foot">
     <section id="weight" class="weight" aria-live="polite" hidden>
-      <div class="total"><strong id="total"></strong> <span id="taken"></span><a href="#/free" id="free-link" class="open"></a></div>
+      <div class="total"><strong id="total"></strong> · <span id="taken"></span></div>
       <div id="bar" class="split" role="img"><span id="bar-audio" class="audio"></span><span id="bar-text" class="text"></span></div>
-      <ul class="legend">
-        <li><span class="swatch audio" aria-hidden="true"></span><span id="audio-kept"></span></li>
-        <li><span class="swatch text" aria-hidden="true"></span><span id="text-kept"></span></li>
-      </ul>
     </section>
-    <nav id="sections"><a href="#/settings" id="settings-link"></a><button type="button" id="small-link" class="open" hidden></button></nav>
+    <nav id="sections"><a href="#/free" id="free-link" class="icon-button" hidden></a><button type="button" id="small-link" class="icon-button" hidden></button><a href="#/settings" id="settings-link" class="icon-button"></a></nav>
   </div>
 </aside>
 <div id="pane" class="pane">
-  <button type="button" id="unfold" class="icon-button" aria-keyshortcuts="Control+B Meta+B">⇥</button>
+  <button type="button" id="unfold" class="icon-button" aria-keyshortcuts="Control+B Meta+B"></button>
   <a href="#/" id="pane-back" class="back"></a>
   <p id="pane-said" class="note warn" role="status" hidden></p>
   <button type="button" id="pane-again" class="open" hidden></button>
-  <section id="empty" class="empty" hidden><div class="card"><p id="none" class="none"></p><p id="none-do" class="says"></p><button type="button" id="empty-record" class="primary"></button><button type="button" id="empty-again" class="primary" hidden></button></div></section>
+  <section id="empty" class="empty" hidden><div class="card"><p id="none" class="none"></p><p id="none-do" class="says"></p><kbd id="empty-keys" class="keys" hidden></kbd><button type="button" id="empty-record" class="primary"></button><button type="button" id="empty-again" class="primary" hidden></button></div></section>
   <main id="meeting" hidden></main>
   <main id="settings" hidden></main>
   <main id="agree" hidden></main>

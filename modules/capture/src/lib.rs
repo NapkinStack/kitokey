@@ -6,6 +6,7 @@
 //! 16,000 samples a second, centred, and on disk as soon as it is heard.
 
 pub mod call;
+pub mod keep;
 pub mod log;
 pub mod v2;
 
@@ -58,6 +59,9 @@ pub enum Event<'a> {
     Device {
         source: usize,
         device: Option<&'a str>,
+        /// Said while listening (D88): whether the device is a Bluetooth headset's microphone; none,
+        /// not known — and not said.
+        headset: Option<bool>,
     },
     /// The recording is whole: its folder, and its length in seconds.
     Stopped {
@@ -87,7 +91,13 @@ impl Event<'_> {
                 json!({ "event": "started", "folder": folder, "sources": { "me": me, "others": others } })
             }
             Event::Silent { source, nothing } => json!({ "event": "silent", "source": SOURCES[source], "nothing": nothing }),
-            Event::Device { source, device } => json!({ "event": "device", "source": SOURCES[source], "device": device }),
+            Event::Device { source, device, headset } => {
+                let mut line = json!({ "event": "device", "source": SOURCES[source], "device": device });
+                if let Some(headset) = headset {
+                    line["headset"] = headset.into();
+                }
+                line
+            }
             Event::Heard { source } => json!({ "event": "heard", "source": SOURCES[source] }),
             // Rounded to a hundredth: a meter shows no more, and a line stays short.
             Event::Level { source, level } => {

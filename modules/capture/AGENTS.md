@@ -22,7 +22,10 @@ Records the audio sources of a conversation into a session.
   `src/main.rs` holds the devices, the clock and the signals. A promise of the contract is
   tested in `tests/session_audio.rs`, on sound made there.
 - `src/v2.rs` is the same for `session-audio/v2` — tracks as delivered and the clock
-  (ADR-0004) — tested in `tests/session_audio_v2.rs`. The program writes it on `--as v2`.
+  (ADR-0004) — tested in `tests/session_audio_v2.rs`. The program writes it on `--as v2`, and
+  `session-audio/v3` unasked: the same, each track then kept as FLAC by `src/keep.rs`.
+- `src/keep.rs` keeps a stopped track as FLAC (`session-audio/v3`, ADR-0016), in the contract's order; it is
+  told each step and may be stopped at any, which is how `tests/keep.rs` takes the folder a kill leaves there.
 - A point of the clock is the instant the system handed a piece of sound over, not the one
   it says the sound was captured at: measured on 2026-10-13, that one moved by whole periods
   of 21 ms from a piece to the next, and was wrong for the first.
@@ -39,7 +42,8 @@ Records the audio sources of a conversation into a session.
 - A `bluez5.loopback=true` source, or a filter fed by one, is never opened actively: `me` is
   passive on it (`call::passive_value`, by the running PipeWire's version: `in` to 1.6, `in-follow`
   from 1.7) while a call holds it, and has no stream otherwise (ADR-0015), named at the start or not
-  (D74). A Bluetooth address reaches no log, event or session: `call::without_address`; a
+  (D74). `listen` alone opens it actively, recording nothing, never during a recording (ADR-0015's
+  amendment, D88), and says so in `me`'s first `device`, `headset: true` (`call::headset`). A Bluetooth address reaches no log, event or session: `call::without_address`; a
   microphone's name to `microphones` and `--microphone` is `call::microphone_id`, which holds none.
 - The recording's loop never waits on the system: `Following` opens on a thread and polls.
 
@@ -76,8 +80,8 @@ Records the audio sources of a conversation into a session.
 
 ## Areas not to change without approval
 
-- The format of the files and of `session.json`: it is `contracts/session-audio/v1`, and `v2`
-  with `--as v2`; the events said while recording: `contracts/recording/v1`.
+- The format of the files and of `session.json`: it is `contracts/session-audio/v3`, `v2` with
+  `--as v2`, and `v1` with `--as v1`; the events said while recording: `contracts/recording/v1`.
 
 ## Non-standard commands
 

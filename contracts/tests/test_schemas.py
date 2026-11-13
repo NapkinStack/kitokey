@@ -136,8 +136,8 @@ def test_the_comparator_refuses_a_schemas_breaks_wherever_they_are(path, tmp_pat
 
 # The fields a page says may be absent: `stopped`, while a session is recording; a segment's
 # `track` and `voice`, in a transcript written before they were; a `silent`'s `nothing`, said by
-# a capture that knows it (#361).
-OPTIONAL = {"stopped", "track", "voice", "nothing"}
+# a capture that knows it (#361); a `device`'s `headset`, said by a capture that listens (D88).
+OPTIONAL = {"stopped", "track", "voice", "nothing", "headset"}
 SHOWN_AS_LINES = {
     "transcript/v1/line.schema.json",
     "recording/v1/event.schema.json",
@@ -252,6 +252,8 @@ EXAMPLES = {
             {"event": "level", "source": "me", "level": 0.42},
             {"event": "device", "source": "me", "device": "Headset Microphone"},
             {"event": "device", "source": "others", "device": None},
+            {"event": "device", "source": "me", "device": "Headset Microphone", "headset": True},
+            {"event": "device", "source": "me", "device": "Digital Microphone", "headset": False},
             {"event": "stopped", "folder": "<sessions-folder>/2026-10-13_14-05", "seconds": 1912.4},
             {"event": "microphone_gone"},
             {"event": "microphone_back"},
@@ -283,6 +285,8 @@ EXAMPLES = {
             {"event": "device", "device": "Headset Microphone"},
             {"event": "device", "source": "room", "device": "Headset Microphone"},
             {"event": "device", "source": "me", "device": 7},
+            {"event": "device", "source": "me", "device": "Headset Microphone", "headset": "yes"},
+            {"event": "device", "source": "me", "device": "Headset Microphone", "headset": None},
             {"source": "me"},
         ],
     ),
@@ -518,6 +522,58 @@ EXAMPLES = {
     ),
 }
 
+# A meeting's own models (D91): the shell's file, said in session-audio/v3 and read for a meeting of
+# any version.
+EXAMPLES["session-audio/v3/models.schema.json"] = (
+    [
+        {},
+        {"transcription": {"engine": "whisper", "model": "ggml-large-v3-turbo-q8_0.bin"}},
+        {"transcription": {"engine": "speechanalyzer"}},
+        {
+            "transcription": {
+                "engine": "service",
+                "provider": "https://api.groq.com/openai/v1",
+                "model": "whisper-large-v3",
+            }
+        },
+        {"minutes": {"provider": "http://localhost:11434/v1", "model": "qwen3:8b"}},
+        {
+            "transcription": {"engine": "whisper", "model": "ggml-small-q8_0.bin"},
+            "minutes": {"provider": "https://openrouter.ai/api/v1", "model": "anthropic/claude-sonnet"},
+        },
+    ],
+    [
+        "a file that is no object",
+        {"transcription": {"engine": "whisper"}},
+        {"transcription": {"engine": "whisper", "model": ""}},
+        {"transcription": {"engine": "whisper", "model": "ggml-small.bin\n"}},
+        # A Whisper model is named by its file alone: never a path, absolute or relative, nor a folder.
+        {"transcription": {"engine": "whisper", "model": "/etc/passwd"}},
+        {"transcription": {"engine": "whisper", "model": "../../x.bin"}},
+        {"transcription": {"engine": "whisper", "model": "C:\\m\\x.bin"}},
+        {"transcription": {"engine": "whisper", "model": ".."}},
+        {"transcription": {"engine": "whisper", "model": "."}},
+        {"transcription": {"engine": "service", "model": "whisper-1"}},
+        {"transcription": {"engine": "service", "provider": "https://api.openai.com/v1"}},
+        {"transcription": {"engine": "another", "model": "m"}},
+        {"transcription": {"model": "ggml-small-q8_0.bin"}},
+        {"transcription": "ggml-small-q8_0.bin"},
+        {"minutes": {"provider": "http://localhost:11434/v1"}},
+        {"minutes": {"model": "qwen3:8b"}},
+        {"minutes": {"provider": "", "model": "qwen3:8b"}},
+        {"minutes": {"provider": "http://localhost:11434/v1", "model": 8}},
+    ],
+)
+
+# session-audio/v3's documents are v2's, named v3: what changes is the file a stopped track is kept
+# in, which no schema reads; a document named v2 is refused by v3's schema.
+for _name in ("session.schema.json", "clock.schema.json"):
+    _allowed, _refused = json.loads(
+        json.dumps(EXAMPLES[f"session-audio/v2/{_name}"]).replace("session-audio/v2", "session-audio/v3")
+    )
+    EXAMPLES[f"session-audio/v3/{_name}"] = (_allowed, _refused)
+EXAMPLES["session-audio/v3/session.schema.json"][1].append(EXAMPLES["session-audio/v2/session.schema.json"][0][0])
+
 
 @pytest.mark.parametrize("path", SCHEMAS, ids=NAMES)
 def test_a_schema_allows_what_its_page_shows_and_refuses_what_its_page_refuses(path):
@@ -601,3 +657,36 @@ def test_session_audio_v2_shows_a_track_gained_late_opening_on_zeros_its_clock_n
     # A gap under 1.5 s: no silence at all, the point alone says it.
     assert "sample" in local[-2] and "sample" in local[-1]
     assert changed[2]["at"] < local[-1]["at"] and local[-1]["at"] - local[-2]["at"] > 1
+
+
+def test_recording_v1_shows_listening_in_lines_a_recording_says_and_neither_start_nor_stop():
+    reads = jsonschema.Draft202012Validator(json.loads((CONTRACTS / "recording/v1/event.schema.json").read_text()))
+    lines = [json.loads(line) for line in shown("recording/v1/README.md", "Valid — listening")[0].splitlines()]
+    assert [line for line in lines if not reads.is_valid(line)] == []
+    # Only what a recording says too, of its sources: no folder, so no `started`, no `stopped`.
+    assert {line["event"] for line in lines} == {"device", "level"}
+    assert [line["source"] for line in lines if line["event"] == "device"][:2] == ["me", "others"]
+
+
+def test_recording_v1_shows_listening_say_whether_me_is_a_headset_s():
+    reads = jsonschema.Draft202012Validator(json.loads((CONTRACTS / "recording/v1/event.schema.json").read_text()))
+    heading = "Valid — listening on a Bluetooth headset's microphone"
+    lines = [json.loads(line) for line in shown("recording/v1/README.md", heading)[0].splitlines()]
+    assert [line for line in lines if not reads.is_valid(line)] == []
+    # `me`'s first device says it is a headset's; `others`' says nothing of it.
+    assert lines[0] == {**lines[0], "event": "device", "source": "me", "headset": True}
+    assert lines[1]["event"] == "device" and "headset" not in lines[1]
+
+
+def test_session_audio_v3_shows_a_meetings_own_models_its_schema_allows():
+    reads = jsonschema.Draft202012Validator(json.loads((CONTRACTS / "session-audio/v3/models.schema.json").read_text()))
+    documents = [
+        json.loads(block) for block in shown("session-audio/v3/README.md", "Valid, a meeting whose own models")
+    ]
+    assert documents and [document for document in documents if not reads.is_valid(document)] == []
+    # Both steps chosen: who hears, with a model of this computer named by its file alone, and who writes.
+    assert {"transcription", "minutes"} <= documents[0].keys()
+    assert "/" not in documents[0]["transcription"]["model"]
+    # The page names the file, and v1's and v2's pages say a meeting of theirs may hold it too.
+    for version in ("v1", "v2", "v3"):
+        assert "| `models.json` |" in (CONTRACTS / f"session-audio/{version}/README.md").read_text()

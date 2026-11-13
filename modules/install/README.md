@@ -53,7 +53,7 @@ from [`docs/privacy.md`](../../docs/privacy.md)'s Linux line.
 ## On Fedora, from Copr (D78)
 
 ```bash
-sudo dnf copr enable @napkinstack-labs/kitokey
+sudo dnf copr enable @napkinstack/kitokey
 sudo dnf install kitokey          # each new version then comes with the system's updates
 ```
 
@@ -75,13 +75,13 @@ artefacts given, `kitokey.spec` builds from the source package (`from_source`): 
 one assembles released by its own `release` command, as `nstack release` does (`assemble.sh`,
 written by `srpm.sh`), each program saying the tag's version (`--version`, `KITOKEY_VERSION`); it
 ships `LICENSE`. The project
-`@napkinstack-labs/kitokey` belongs to a Fedora group, so that installing names no person; the token is
+`@napkinstack/kitokey` belongs to a Fedora group (`napkinstack-labs` in Fedora's accounts, `@napkinstack` in Copr), so that installing names no person; the token is
 the forge's secret `COPR_CONFIG`. Copr builds on x86_64 only: transcription's whisper.cpp is built
 for x86-64-v3 (`modules/transcription/.cargo/config.toml`). By hand, from the repository's root:
 
 ```bash
 bash modules/install/copr/srpm.sh v0.2.0 0.2.0 dist/copr             # the source package, in a Fedora container
-KITOKEY_TARGET=fedora-44 KITOKEY_VERSION=0.2.0 bash modules/install/scripts/e2e.sh copr:@napkinstack-labs/kitokey
+KITOKEY_TARGET=fedora-44 KITOKEY_VERSION=0.2.0 bash modules/install/scripts/e2e.sh copr:@napkinstack/kitokey
 ```
 
 On a Mac, `nstack release` makes `dist/install/Kitokey-<version>-macos-arm64.zip`: the app,

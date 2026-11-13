@@ -1,6 +1,7 @@
 //! D69: the page draws its icons, and each theme's text reads on what it is written on, from the files.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::LazyLock;
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{StringLiteral, TemplateElement};
@@ -11,8 +12,9 @@ use oxc_span::SourceType;
 const PAGE: &str = include_str!("../ui/window.js");
 const STYLE: &str = include_str!("../ui/window.css");
 const HTML: &str = include_str!("../ui/index.html");
-/// The glyphs a font would draw as an icon (UX review §8), and the back arrow beside them.
-const GLYPHS: [char; 7] = ['›', '‹', '⤢', '✓', '✔', '→', '×'];
+/// The glyphs a font would draw as an icon (UX review §8), and the back arrow beside them; the
+/// sidebar's fold arrows and a line's pencil, Lucide's since D89.
+const GLYPHS: [char; 10] = ['›', '‹', '⤢', '✓', '✔', '→', '×', '⇤', '⇥', '✎'];
 /// The same, written otherwise.
 const ESCAPES: [&str; 12] = [
     "\\203A", "\\2039", "\\2922", "\\2713", "\\2714", "\\2192", "\\D7", "&times;", "&rarr;", "&rsaquo;", "&lsaquo;", "&#",
@@ -235,7 +237,7 @@ fn a_pair_below_aa_is_refused() {
 #[test]
 fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
     let style = without_css_comments(STYLE);
-    for selector in [".small-rest, .small-live {", ".chip.turned {"] {
+    for selector in [".small-rest, .small-live {", ".turned {"] {
         let rule = style
             .split(selector)
             .skip(1)
@@ -258,5 +260,440 @@ fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
             .unwrap();
         assert!(ms <= 200, "{selector} {ms} ms");
     }
-    assert!(style.contains("prefers-reduced-motion: reduce) { .small-rest, .small-live, .chip.turned { animation: none; } }"));
+    assert!(style.contains("prefers-reduced-motion: reduce) { .small-rest, .small-live, .turned { animation: none; } }"));
+}
+
+/// Each pair of colours the theme uses (D89's first round of drawings, *Contrast, both themes*), read
+/// from the file in both themes: text 4.5:1 (WCAG 2.2, 1.4.3), a control's edge or a meter 3:1 (1.4.11).
+/// `--line` is no pair: it divides, and borders no control (the test below).
+const PAIRS: [(&str, &str, f64); 22] = [
+    ("var(--ink)", "var(--ground)", 4.5),
+    ("var(--ink)", "var(--surface)", 4.5),
+    ("var(--ink)", "var(--raised)", 4.5),
+    ("var(--soft)", "var(--ground)", 4.5),
+    ("var(--soft)", "var(--surface)", 4.5),
+    ("var(--soft)", "var(--raised)", 4.5),
+    ("var(--ink)", SELECTED, 4.5),
+    ("var(--soft)", SELECTED, 4.5),
+    ("var(--accent)", "var(--surface)", 4.5),
+    ("var(--accent)", "var(--ground)", 4.5),
+    ("var(--accent)", SELECTED, 4.5),
+    // The primary's words, on the accent; Arrêter's, on the red.
+    ("var(--surface)", "var(--accent)", 4.5),
+    ("var(--surface)", "var(--red)", 4.5),
+    ("var(--red)", "var(--surface)", 4.5),
+    ("var(--ok)", "var(--surface)", 4.5),
+    ("var(--accent)", "var(--raised)", 3.0),
+    ("var(--ok)", "var(--raised)", 3.0),
+    ("var(--edge)", "var(--surface)", 3.0),
+    ("var(--edge)", "var(--ground)", 3.0),
+    ("var(--edge)", "var(--raised)", 3.0),
+    // The mark, in the accent, while recording its dot red.
+    ("var(--accent)", "var(--surface)", 3.0),
+    ("var(--red)", "var(--raised)", 3.0),
+];
+/// The selected row's ground, as the sidebar mixes it.
+const SELECTED: &str = "color-mix(in srgb, var(--accent) 13%, var(--surface))";
+
+fn below_their_threshold(style: &str) -> Vec<String> {
+    let style = without_css_comments(style);
+    let mut below = Vec::new();
+    for (index, theme) in themes(&style).iter().enumerate() {
+        for (front, ground, need) in PAIRS {
+            let (Some(a), Some(b)) = (value(front, theme), value(ground, theme)) else {
+                below.push(format!("theme {index}: {front} on {ground} cannot be read"));
+                continue;
+            };
+            let ratio = contrast(a, b);
+            if ratio < need {
+                below.push(format!("theme {index}: {front} on {ground} {ratio:.2} < {need}"));
+            }
+        }
+    }
+    below
+}
+
+#[test]
+fn each_pair_of_the_theme_reaches_its_threshold_in_both_themes() {
+    assert!(STYLE.contains(SELECTED), "the selected row is mixed otherwise: say so here");
+    assert_eq!(below_their_threshold(STYLE), Vec::<String>::new());
+    // An edge as faint as a divider is refused, in the dark theme as in the light one.
+    let faint = STYLE.replacen("--edge: #737B8C", "--edge: #343946", 1);
+    assert!(
+        below_their_threshold(&faint)
+            .iter()
+            .any(|line| line.starts_with("theme 1: var(--edge)")),
+        "a faint edge passed"
+    );
+}
+
+/// Each rule of the style, its selector and its body, comments aside.
+fn rules(style: &str) -> Vec<(String, String)> {
+    without_css_comments(style)
+        .split('}')
+        .filter_map(|rule| rule.rsplit_once('{'))
+        .map(|(selector, body)| (selector.trim().to_string(), body.to_string()))
+        .collect()
+}
+
+/// What draws a recording, the one use of the red (D89): the header's button and the name's dot while it
+/// records, a row's live chip, the bar's ● and ■, its handle's dot while it records (D90).
+const RECORDING: [&str; 7] = [
+    ".brand.live #name-dot",
+    ".chip.live",
+    ".act .primary.live",
+    "#small .handle.live .dot",
+    "#small .record",
+    "#small .record .record-dot",
+    ".danger",
+];
+
+/// CSS Color 4's named colours, its table of 148 (https://www.w3.org/TR/css-color-4/#named-colors):
+/// a colour written by its name is a value as `#RRGGBB` is, `crimson` a red as `red` is.
+const NAMED_COLOURS: &str = "\
+aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood \
+cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod \
+darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon \
+darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray \
+dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green \
+greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon \
+lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon \
+lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen \
+magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue \
+mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy \
+oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip \
+peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown \
+seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal \
+thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen";
+
+/// Whether a text names a colour among its words, a word keeping its hyphens: `white-space` names none.
+fn names_a_colour(text: &str) -> bool {
+    static NAMED: LazyLock<BTreeSet<&str>> = LazyLock::new(|| NAMED_COLOURS.split_whitespace().collect());
+    text.to_lowercase()
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
+        .any(|word| NAMED.contains(word))
+}
+
+/// The rules that are no recording's and still draw red: by the token, by its value written out, by
+/// a colour's name — any of CSS Color 4's — or function. Outside the theme's tokens, a colour is a
+/// token: a value written in a rule — `#C2352D` on a border — is refused whatever it is, but a shadow's black.
+fn red_outside_a_recording(style: &str) -> Vec<String> {
+    rules(style)
+        .into_iter()
+        .filter(|(selector, _)| !selector.ends_with(":root") && !RECORDING.contains(&selector.as_str()))
+        .filter(|(_, body)| {
+            let body = body.to_lowercase();
+            let literal = names_a_colour(&body)
+                || body.split(|c: char| !(c.is_ascii_alphanumeric() || c == '#')).any(|word| {
+                    word.starts_with('#') && [4, 5, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit())
+                });
+            let function = ["rgb(", "rgba(", "hsl(", "hsla("].iter().any(|f| {
+                body.replace(f, "\u{0}")
+                    .split('\u{0}')
+                    .skip(1)
+                    .any(|args| !args.trim_start().starts_with("0 0 0"))
+            });
+            body.contains("var(--red)") || literal || function
+        })
+        .map(|(selector, _)| selector)
+        .collect()
+}
+
+/// A colour the page would set by value, or the red token it would name: the page draws a state by a
+/// class, never by a colour (D89).
+fn colours_in_page(page: &str) -> Vec<String> {
+    let allocator = Allocator::default();
+    let parsed = Parser::new(&allocator, page, SourceType::mjs()).parse();
+    assert!(parsed.diagnostics.is_empty(), "the page does not parse");
+    let mut texts = Texts::default();
+    texts.visit_program(&parsed.program);
+    texts
+        .0
+        .into_iter()
+        .filter(|text| {
+            let lower = text.to_lowercase();
+            let hex = lower
+                .split(|c: char| !(c.is_ascii_alphanumeric() || c == '#'))
+                .any(|word| word.starts_with('#') && [4, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit()));
+            hex || names_a_colour(&lower) || lower.contains("--red") || ["rgb(", "rgba(", "hsl(", "hsla("].iter().any(|f| lower.contains(f))
+        })
+        .collect()
+}
+
+#[test]
+fn red_says_a_recording_and_nothing_else() {
+    assert_eq!(red_outside_a_recording(STYLE), Vec::<String>::new());
+    assert_eq!(colours_in_page(PAGE), Vec::<String>::new());
+    assert_eq!(
+        PAGE.matches("\"danger\"").count(),
+        1,
+        "the red button is the small window's Arrêter alone"
+    );
+    // The red written out on a failure's border, named, or by its function, is refused as the token is.
+    for red in [
+        "#C2352D",
+        "#c2352d",
+        "red",
+        "crimson",
+        "Tomato",
+        "darkred",
+        "firebrick",
+        "rgb(194, 53, 45)",
+        "var(--red)",
+    ] {
+        let mutated = STYLE.replacen(
+            ".making-state.failed { background: transparent; border: 1px solid var(--edge); }",
+            &format!(".making-state.failed {{ background: transparent; border: 1px solid {red}; }}"),
+            1,
+        );
+        assert_ne!(mutated, STYLE);
+        assert_eq!(red_outside_a_recording(&mutated), vec![".making-state.failed".to_string()], "{red}");
+    }
+    // A shadow's black stays a shadow.
+    assert!(red_outside_a_recording(".menu { box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); }").is_empty());
+    // Set by the page by value, or by the token.
+    for set in [
+        "mark.style.fill = \"#C2352D\";",
+        "row.style.borderColor = \"#f00\";",
+        "row.style.color = `rgb(194 53 45)`;",
+        "row.style.color = \"red\";",
+        "row.style.color = \"crimson\";",
+        "row.style.cssText = \"border-color: tomato\";",
+        "row.style.setProperty(\"background\", `indianred`);",
+        "row.style.setProperty(\"color\", \"var(--red)\");",
+    ] {
+        assert_eq!(colours_in_page(&format!("{PAGE}\n{set}")).len(), 1, "{set}");
+    }
+}
+
+/// The controls of the window and Settings (D89): 32 px high; the small window's are D90's. A
+/// meeting's settings row and its « Plus d’actions » menu, board 4's. Each must be found, so that
+/// none leaves the scan below by a renamed rule.
+const CONTROLS: [&str; 12] = [
+    ".open, .search",
+    "select",
+    ".picks input",
+    ".field input",
+    ".primary",
+    ".danger",
+    ".act .primary",
+    ".sidebar .act .primary",
+    ".icon-button",
+    ".folder input",
+    ".setting",
+    ".menu-item",
+];
+
+/// What makes a rule a control's: an element a user presses or types in, or a class or id the page
+/// gives one. A rule whose selector ends on one of them and sets a height sets 32 px.
+const CONTROL_PARTS: [&str; 21] = [
+    "input",
+    "select",
+    "textarea",
+    "button",
+    ".open",
+    ".search",
+    ".primary",
+    ".danger",
+    ".icon-button",
+    ".edit",
+    ".correcting",
+    ".rename",
+    ".naming",
+    ".link",
+    ".path",
+    ".line-time",
+    ".disclose",
+    "#free-link",
+    ".choice",
+    ".setting",
+    ".menu-item",
+];
+
+/// The heights a control keeps under 32 px, each with its reason: a box to tick, a switch's track
+/// inside its setting, a time in a line of text that is a link and no button.
+const SMALLER: [(&str, f64); 5] = [
+    (".choice input, .row input[type=\"checkbox\"]", 20.0),
+    // A switch's track, inside its 32 px setting.
+    (".setting input[type=\"checkbox\"]", 20.0),
+    (".remember input", 20.0),
+    (".freeable input", 20.0),
+    (".line-time", 24.0),
+];
+
+/// Each property that sets a box's height: one of them at another than its control's height contradicts it.
+const HEIGHTS: [&str; 6] = [
+    "min-height",
+    "height",
+    "max-height",
+    "block-size",
+    "min-block-size",
+    "max-block-size",
+];
+
+fn px(body: &str, name: &str) -> Option<f64> {
+    body.split(';')
+        .filter_map(|one| one.split_once(':'))
+        .rfind(|(key, _)| key.trim() == name)
+        .and_then(|(_, value)| value.trim().strip_suffix("px")?.parse::<f64>().ok())
+}
+
+/// The ids the page's frame gives to what is no control. Every other id is taken for a control's — the
+/// frame's buttons and fields, and each id the script gives —, so that a control named by its id
+/// (`#record`) is measured too.
+fn ids_of_no_control(html: &str) -> Vec<String> {
+    html.split('<')
+        .filter_map(|tag| {
+            let name = tag.split([' ', '>', '\n']).next()?;
+            let id = tag.split('>').next()?.split(" id=\"").nth(1)?.split('"').next()?;
+            (!["button", "input", "select", "textarea", "a"].contains(&name)).then(|| format!("#{id}"))
+        })
+        .collect()
+}
+
+/// Whether one compound of a selector (`.lines .correcting:hover`'s last) names a control's part.
+fn names_a_control(selector: &str) -> bool {
+    static NO_CONTROL: LazyLock<Vec<String>> = LazyLock::new(|| ids_of_no_control(HTML));
+    selector.split(',').any(|one| {
+        let last = one.trim().rsplit([' ', '>']).next().unwrap_or_default();
+        let id = last.split_once('#').map(|(_, id)| {
+            let end = id
+                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+                .unwrap_or(id.len());
+            format!("#{}", &id[..end])
+        });
+        if id.is_some_and(|id| !NO_CONTROL.contains(&id)) {
+            return true;
+        }
+        CONTROL_PARTS.iter().any(|part| {
+            let at = if part.starts_with(['.', '#']) {
+                last.match_indices(part).map(|(at, _)| at).collect::<Vec<_>>()
+            } else if last.starts_with(part) {
+                vec![0]
+            } else {
+                vec![]
+            };
+            at.into_iter()
+                .any(|at| !last[at + part.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+        })
+    })
+}
+
+/// Each rule of the window that names a control and sets its height, at another than 32 px.
+fn controls_not_32(style: &str) -> Vec<String> {
+    rules(style)
+        .into_iter()
+        .filter(|(selector, _)| !selector.contains("small") && names_a_control(selector))
+        .filter_map(|(selector, body)| {
+            let allowed = SMALLER.iter().find(|(name, _)| *name == selector).map_or(32.0, |(_, px)| *px);
+            let set: Vec<String> = HEIGHTS
+                .iter()
+                .filter_map(|name| px(&body, name))
+                .filter(|set| *set != allowed)
+                .map(|set| set.to_string())
+                .collect();
+            (!set.is_empty()).then(|| format!("{selector}: {}", set.join(", ")))
+        })
+        .collect()
+}
+
+#[test]
+fn controls_are_32_px_high_on_a_4_px_grid() {
+    let all = rules(STYLE);
+    for control in CONTROLS {
+        let found = all
+            .iter()
+            .find(|(selector, _)| selector == control)
+            .unwrap_or_else(|| panic!("{control}"));
+        assert_eq!(px(&found.1, "min-height"), Some(32.0), "{control}");
+    }
+    for (selector, _) in SMALLER {
+        assert!(
+            all.iter().any(|(found, _)| found == selector),
+            "{selector} is no longer in the style: take it out"
+        );
+    }
+    assert_eq!(controls_not_32(STYLE), Vec::<String>::new());
+    // A control the list above does not name is measured all the same.
+    for wrong in [
+        ".lines .correcting { min-height: 36px; }",
+        ".foot nav #free-link { min-height: 28px; }",
+        ".lines .edit { min-height: 40px; }",
+        "#record { min-height: 40px; }",
+        ".sidebar #find:focus { height: 28px; }",
+    ] {
+        assert_eq!(controls_not_32(&format!("{STYLE}\n{wrong}")).len(), 1, "{wrong}");
+    }
+    // A height that contradicts the 32 px its control keeps, in the control's own rule.
+    for (property, set) in [
+        ("height", "40px"),
+        ("block-size", "40px"),
+        ("max-height", "24px"),
+        ("max-block-size", "24px"),
+    ] {
+        let mutated = STYLE.replacen(
+            ".primary { min-height: 32px;",
+            &format!(".primary {{ min-height: 32px; {property}: {set};"),
+            1,
+        );
+        assert_ne!(mutated, STYLE);
+        assert_eq!(
+            controls_not_32(&mutated),
+            vec![format!(".primary: {}", set.trim_end_matches("px"))],
+            "{property}"
+        );
+    }
+    assert!(
+        names_a_control(".step select")
+            && names_a_control("#small .link:hover")
+            && !names_a_control(".linked")
+            && !names_a_control(".open-row span")
+            && names_a_control("#record")
+            && names_a_control(".more #more-actions:hover")
+            && !names_a_control("#welcome")
+            && !names_a_control("#list")
+    );
+    assert!(ids_of_no_control(HTML).contains(&"#groups".to_string()) && !ids_of_no_control(HTML).contains(&"#find".to_string()));
+    // Every height the window sets is on the grid; the small window's are D90's.
+    let off: Vec<String> = all
+        .iter()
+        .filter(|(selector, _)| !selector.contains("small"))
+        .filter_map(|(selector, body)| {
+            px(body, "min-height")
+                .filter(|px| px % 4.0 != 0.0)
+                .map(|px| format!("{selector}: {px}"))
+        })
+        .collect();
+    assert_eq!(off, Vec::<String>::new());
+}
+
+/// What a field, a list's choice or a switch is drawn with: never `--line`, which a ground hides
+/// (1.36:1); `--edge` instead.
+const FIELDS: [&str; 8] = [
+    "input",
+    "select",
+    "textarea",
+    ".open",
+    ".search",
+    ".choice",
+    ".context-text",
+    ".setting",
+];
+
+#[test]
+fn a_control_is_edged_and_a_line_only_divides() {
+    for (selector, body) in rules(STYLE) {
+        let bordered_by_line = body
+            .split(';')
+            .filter_map(|one| one.split_once(':'))
+            .any(|(key, value)| key.trim().starts_with("border") && value.contains("var(--line)"));
+        let a_control = selector
+            .split(',')
+            .any(|one| FIELDS.iter().any(|field| one.trim().split(' ').any(|part| part.starts_with(field))));
+        assert!(!(bordered_by_line && a_control), "{selector} borders a control with --line");
+    }
+    for control in [".open, .search", "select", ".field input", ".context-text", ".setting"] {
+        let found = rules(STYLE).into_iter().find(|(selector, _)| selector == control).unwrap();
+        assert!(found.1.contains("var(--edge)"), "{control}");
+    }
 }

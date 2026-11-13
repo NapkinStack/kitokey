@@ -131,9 +131,15 @@ fn named(url: &str, token: &str, offered: &Offered) -> Option<Arc<Mix>> {
     if parts.next().is_some() || given != token || number.parse::<u64>().ok()? != offered.number || what != "mix" {
         return None;
     }
-    // A track replaced by a link meanwhile is not followed.
+    // A track replaced by a link meanwhile is not followed. A WAV kept as FLAC meanwhile
+    // (`session-audio/v3`) is still there: the mix reads it from its FLAC.
     let there = |path: &PathBuf| std::fs::symlink_metadata(path).is_ok_and(|data| data.is_file());
-    offered.tracks.iter().all(|(path, _)| there(path)).then(|| offered.mix.clone())?
+    let kept = |path: &PathBuf| path.extension().is_some_and(|extension| extension == "wav") && there(&path.with_extension("flac"));
+    offered
+        .tracks
+        .iter()
+        .all(|(path, _)| there(path) || kept(path))
+        .then(|| offered.mix.clone())?
 }
 
 type Body = BoxBody<Bytes, io::Error>;
