@@ -1,7 +1,7 @@
 ---
 goal: "After a stop, the user knows where their meeting is and is told once when it is ready; a redo says what it will make, dates what it made and can go back; and Kitokey says all of it in one voice, in French and in English"
 status: proposed          # proposed | accepted | closed | stopped — the decider accepts
-# accepted_on: YYYY-MM-DD # the day of the decider's word; cycle 09 running, this cycle stays proposed and starts at its closure
+accepted_on: 2026-11-13   # « cycle 10 accepté »; cycle 09 running, this cycle stays proposed and starts at its closure
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
 start: 2026-11-21         # cycle 09's end, its closure's day; earlier if cycle 09 closes earlier
 end: 2026-12-05           # start + appetite: the first day the cycle is over — the circuit breaker
@@ -38,6 +38,10 @@ deliverables:
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
+> **Accepted by the decider on 2026-11-13**, on their word that day in the working session: « cycle 10
+> accepté ». The two defaults below — « vous » and « summary » — are confirmed with it, and each open question
+> is settled by its default. It starts at cycle 09's closure.
+>
 > **Proposed by the framer on 2026-11-13**, on the decider's word that day — « on cadre et on ouvre tout en
 > issue (toujours expert sans over-ingé) » —, after they accepted D91 the same day. Its sources are the UX
 > audit of Kitokey 0.2.5 and the review of its sentences, both of 2026-11-13, filed as issues #769 to #783,
