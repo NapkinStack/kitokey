@@ -14,6 +14,7 @@ deliverables:
       - "Given a recording stopped from the bar, when its meeting is made, then the bar at rest names it — « Réunion de 17:31 » / \"Meeting at 17:31\" — and its stage — transcription, then summary, then ready with « Ouvrir » to its page —, in a polite live region, until its page is opened or another recording starts; a step that fails is said there, with « Ouvrir »; held by the window's e2e on its played engines, in French and in English, both themes, by keyboard alone"
       - "Given the meeting's page while it is made, when it shows, then one bar across both steps names the step and gives « environ N min », estimated from the audio's length and the speed last measured on this machine for each step and model — none measured yet, the step alone and no number —, never moving back; and « Annuler » ends the running step within two seconds, keeps what is whole — a complete transcript stays —, and the page says what was stopped and how to make it again; held by the e2e and by tests of the estimate"
       - "Given a meeting made after a stop, when its last step ends — written or failed —, then exactly one notification is sent for it, and only when no window of Kitokey has the focus — none when one has —, naming the meeting, a click opening its page; « Transcription prête » is no longer sent on its own when a summary follows; held by the e2e reading the notifications, once with a window focused and once without"
+      - "Given any making started from a meeting's page — after a stop, from the redo panel, or from the model chosen on the page (D93) —, when the user presses « Annuler », then it ends within two seconds, the version already whole stays shown, and the user may at once choose another model and start again, without restarting Kitokey; held by the e2e: a making started with model A, cancelled within two seconds, model B chosen, started again — the version shown says B made it (the decider, 2026-11-13)"
   - id: D93
     title: "Redo says what it will make before it starts, each version says when it was made and with which model, and the previous one can come back"
     module: shell
@@ -23,6 +24,7 @@ deliverables:
       - "Given a transcript and a summary, when their page shows, then each says when it was made beside its model — « Transcrit le 13 nov. à 09:42 · Whisper small », « Compte rendu du 13 nov. à 09:45 · Qwen3 8B » — in the system's language and local time; the summary's time is the `made` every version of `minutes` carries; the transcript's is an optional `made` on `transcript/v1`'s `complete` line — RFC 3339 with its offset, as `edited` is —, added to the contract's page and schema in its own pull request, then written by transcription in its own, before the shell reads it; a transcript without it shows its model alone; held by the contract's tests on both sides, transcription's tests and the e2e"
       - "Given a transcript or a summary replaced by a redo, when the new one is whole, then the one replaced — the last one only — stays in the meeting's folder under a name no step reads, said in one line of prose on the contract's page, in place of going to the trash; the page offers « Revenir à la version précédente » with that version's time and model; going back swaps the two, a person's corrections kept; the next redo sends the older one to the trash, as today. Cut first when the breaker nears, said at the closure"
       - "Given Settings' model missing, or the meeting's folder not writable, when the redo panel shows, then its start button stays with a model that is there, or the panel says which of the two is wrong and what to do — never a setting the user did not touch (#771); given a redo that failed beside the version kept, then the page says the last redo failed and why, never « non fait » beside what it shows (#772); given the panel open, when the window crosses 840 CSS px either way, then the panel, its choice and the focus stay (#777); held by the e2e"
+      - "Given a meeting's page — its transcript and summary made, or one of them waiting for a model —, when it shows, then each shows its model as a choice on the page itself, without opening the redo panel — « Transcrit le 13 nov. à 09:42 · Whisper small ▾ »; choosing a model starts nothing: it is kept as this meeting's own model, in D91's `models.json` (`session-audio/v3`, no contract changed), and the button that starts the making names what it does; a meeting said confidential is offered local models alone, as in D91; held by the e2e (the decider, 2026-11-13)"
   - id: D94
     title: "Kitokey speaks in one voice, in French and in English, from a guide kept in the repository"
     module: shell
@@ -38,6 +40,15 @@ deliverables:
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
+> **Amended on the decider's word of 2026-11-13**, after they recorded a meeting with Kitokey: « je viens
+> d'enregistrer une reunion, avant de refaire je ne peux pas choisir un model dans la fenetre de la reunon pour
+> cette meme reuinon (pas dans les reglage globale), j'aimerai pouvoir choisir dans le fenetre aussi meme avant
+> de devoir "refaire" pour la transcription et pour le resumé de la meme maniere. autre point: on lance la
+> transcription/resumé une fois en cours on ne peut pas les arreté, ex d'un cas d'utilisation: je choisit dans
+> la fenetre de reu un model pour transcrire/résumé, je lance et je m'appercoit que je me suis trompé de model,
+> je ne peux pas interrompre pour changer de model et relancer. » It adds D93's criterion 5 and D92's
+> criterion 4; the appetite is unchanged, the cut order below says what goes first.
+>
 > **Accepted by the decider on 2026-11-13**, on their word that day in the working session: « cycle 10
 > accepté ». The two defaults below — « vous » and « summary » — are confirmed with it, and each open question
 > is settled by its default. It starts at cycle 09's closure.
@@ -125,11 +136,17 @@ contract's and the producer's own pull requests · blue: the decider's gesture.
 - Where the last speeds are kept is the author's choice, in the shell's own state; nothing of a meeting in it.
 - Cancel ends a step's program as the shell already does when it quits; a transcript cancelled half-way is
   what `transcript/v1` calls not finished, and Refaire makes it again.
+- Criterion 4, on the decider's word of 2026-11-13: one « Annuler » for every making the page starts, so that a
+  wrong model is corrected at once. A summary cancelled leaves none, or the one before; nothing half-written.
 
 ### D93
 
 - #779 and its clarification, #771, #772, #777. The words of each button are D94's guide's; this deliverable
   holds the behaviour.
+- Criterion 5, on the decider's word of 2026-11-13: the model chosen where it is shown, as MacWhisper exposes its
+  models ([scan §1](../reviews/2026-11-13-market.md)). It reuses D91's choice — the same list, the same
+  `models.json`, the same rule for a confidential meeting —, moved out of « Avancé » onto the page; the redo
+  panel's « Avancé » reads the same choice. No contract changes.
 - **The contract**: an optional field on an object `transcript/v1` leaves open, as `track` (#118) and
   `edited` (ADR-0014) were added — no new version; the comparator judges it (`contracts/AGENTS.md`). Three
   pull requests, in this order: the contract's page and schema, transcription writing it, the shell reading
@@ -196,8 +213,12 @@ contract's and the producer's own pull requests · blue: the decider's gesture.
 
 **Not blocking**, each *(framer, to confirm)*:
 
-- **The appetite**: two weeks, as cycles 08 and 09. Cut in this order when the breaker nears: D93's going
-  back (criterion 3), then D92's estimate — the step said, no number —, then D94's rewrite of Settings.
+- **The appetite**: two weeks, as cycles 08 and 09, unchanged by the amendment of 2026-11-13. Its two
+  criteria reuse what exists — D91's choice and `models.json`, the cancel D92 already builds —: about two
+  days more, which two weeks hold only by cutting. Cut in this order when the breaker nears: D93's going back
+  (criterion 3) — now the likeliest cut —, then D92's estimate — the step said, no number —, then D94's
+  rewrite of Settings. The model chosen on the page (D93, criterion 5) and the cancel (D92, criterion 4) are
+  never cut before them.
 - **The start**: cycle 09's closure. Default: its end, 2026-11-21 — its remaining work is mostly people's
   trials, which keep their cycle. Closing cycle 09 earlier is the decider's choice at its closure; its open
   deliverables are then deferred to its *Later*, never moved here: this cycle holds three.
