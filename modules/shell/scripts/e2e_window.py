@@ -7030,6 +7030,7 @@ def main() -> int:
         browser.find_element(By.ID, "find").send_keys(Keys.TAB)
         focused = browser.execute_script("return document.activeElement.className")
         check("then the first meeting", "session" in focused, focused)
+        check("settings readable, meetings listed: no banner (#770)", browser.execute_script("return document.getElementById('settings-banner-live').childElementCount") == 0)
         browser.execute_script("[...document.querySelectorAll('#groups .session')].at(-1).focus()")
         browser.switch_to.active_element.send_keys(Keys.TAB)
         focused = browser.execute_script("return document.activeElement.id")
@@ -7458,6 +7459,13 @@ def main() -> int:
                                         " return b && b.parentElement.id === 'settings-banner-live'")
         check("broken while a meeting's page is open: the banner comes, inside its live region", came and inside,
               [browser.execute_script(banner), inside, browser.execute_script("return location.hash")])
+        # Read before, the last settings read are held: the meetings stay listed, and the banner says so —
+        # never « not shown » then (#770, ines).
+        listed_still = browser.execute_script("return [...document.querySelectorAll('#groups a')].some(a => (a.getAttribute('href') || '').endsWith('/kept'))")
+        kept_said = ("Les réglages ne peuvent pas être lus\u00a0: les derniers lus restent en usage, et aucun changement n’est enregistré"
+                     " tant que le fichier n’est pas corrigé.")
+        check("broken while the window is open: the meetings still listed, the banner says the last settings read stay in use",
+              listed_still and (browser.execute_script(banner) or [None])[0] == kept_said, [listed_still, browser.execute_script(banner)])
         browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
         # Under 840 px, at the list: above the list, inside the window, nothing cut (`#pane-said`'s rule).

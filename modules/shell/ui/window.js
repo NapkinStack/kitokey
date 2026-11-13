@@ -4281,18 +4281,19 @@ async function draw(mine, again) {
   document.getElementById("empty").hidden = !listed || listing.sessions.length > 0 || listing.settings_unread;
   // Put in its live region when it comes, taken out when it goes — never drawn again meanwhile, which
   // a screen reader would say again at each listing.
+  // Its sentence what is true: the defaults listed, or the last settings read held (#770).
   const live = document.getElementById("settings-banner-live");
-  const unread = listing.settings_unread && !settings;
-  if (unread !== (live.firstChild !== null)) {
+  const sentence = !listing.settings_unread || settings ? null : listing.settings_kept ? words.settings_banner_kept : words.settings_banner;
+  if (sentence !== (document.getElementById("settings-banner-said")?.textContent ?? null)) {
     const banner = element("div", "banner");
     banner.id = "settings-banner";
-    const said = element("p", "", words.settings_banner);
+    const said = element("p", "", sentence);
     said.id = "settings-banner-said";
     const link = element("a", "link", words.settings);
     link.id = "settings-banner-link";
     link.href = "#/settings";
     banner.append(said, link);
-    live.replaceChildren(...(unread ? [banner] : []));
+    live.replaceChildren(...(sentence ? [banner] : []));
   }
   // No meeting yet: under 840 px, the sidebar and what to do, one under the other.
   document.body.classList.toggle("no-meeting", listing.sessions.length === 0);
