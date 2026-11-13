@@ -7476,6 +7476,7 @@ def main() -> int:
                                         " const k = document.getElementById('settings-banner-link').getBoundingClientRect();"
                                         " return {above: b.bottom <= l.top + 0.5, inside: b.left >= -0.5 && b.right <= innerWidth + 0.5, link: k.right <= b.right + 0.5 && k.width > 0}")
         shot_themed(browser, "settings-banner-420-light", "light")
+        shot_themed(browser, "settings-banner-420-dark", "dark")
         check("under 840 px: the banner above the list, inside the window, its link whole", narrow == {"above": True, "inside": True, "link": True}, narrow)
         browser.set_window_size(1100, 800)
         time.sleep(0.4)
