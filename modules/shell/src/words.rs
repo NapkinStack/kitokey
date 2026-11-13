@@ -547,7 +547,7 @@ pub struct Window {
     pub bar_context_clear: &'static str,
     pub bar_context_kept: &'static str,
     /// « Avancé » (D90, board 6; D91), closed by default, in the bar opened and in *Refaire…*: the
-    /// meeting's own models, Settings' choice first, said as such.
+    /// meeting's own models, Settings' choice first, said as such — what it holds said on it.
     pub bar_advanced: &'static str,
     pub models_transcription: &'static str,
     pub models_minutes: &'static str,
@@ -561,8 +561,10 @@ pub struct Window {
     pub models_gone_minutes: &'static str,
     /// A service the meeting chose, not used while it is said confidential (D60).
     pub models_unused_confidential: &'static str,
-    /// Under the bar's row at rest, « Avancé » closed: models chosen for the next recording (D91).
+    /// Under the bar's row at rest, « Avancé » closed: the models chosen for the next recording, named
+    /// short (D91) — one, or more joined by « · ».
     pub bar_models_kept: &'static str,
+    pub bar_model_kept: &'static str,
     /// « Vérifier le son » (D88, board 7): its title, and its row in Settings.
     pub check_sound: &'static str,
     pub check_sound_says: &'static str,
@@ -984,18 +986,19 @@ pub fn window(language: Language) -> Window {
             bar_context: "Meeting context",
             bar_context_clear: "Clear the context",
             bar_context_kept: "Kept for the next recording, until you clear it.",
-            bar_advanced: "Advanced",
+            bar_advanced: "Advanced — models",
             models_transcription: "Transcription model",
             models_minutes: "Minutes model",
-            models_settings: "Settings’ — {}",
-            models_none: "none chosen",
+            models_settings: "Settings: {}",
+            models_none: "no model chosen",
             models_own_note: "For this meeting alone; Settings do not change.",
             models_not_kept: "This choice could not be kept: {}",
             models_not_read: "The models could not be read: {}",
             models_gone_transcription: "The transcription model chosen for this meeting is no longer here: Settings’ stands in.",
             models_gone_minutes: "The minutes model chosen for this meeting goes through a service Settings do not name: Settings’ stands in.",
             models_unused_confidential: "The service chosen for this meeting is not used while it is confidential: it is made on this computer.",
-            bar_models_kept: "Models kept for the next recording.",
+            bar_models_kept: "Models kept: {}",
+            bar_model_kept: "Model kept: {}",
             check_sound: "Check the sound",
             check_sound_says: "Your microphone and the meeting’s sound, before a recording.",
             check_unavailable: "Unavailable",
@@ -1402,18 +1405,19 @@ pub fn window(language: Language) -> Window {
             bar_context: "Contexte de la réunion",
             bar_context_clear: "Effacer le contexte",
             bar_context_kept: "Gardé pour le prochain enregistrement, jusqu’à ce que vous l’effaciez.",
-            bar_advanced: "Avancé",
+            bar_advanced: "Avancé — modèles",
             models_transcription: "Modèle de transcription",
             models_minutes: "Modèle du compte rendu",
-            models_settings: "Celui des Réglages — {}",
-            models_none: "aucun choisi",
+            models_settings: "Réglages\u{a0}: {}",
+            models_none: "aucun modèle choisi",
             models_own_note: "Pour cette réunion seule\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Ce choix n’a pas pu être gardé\u{a0}: {}",
             models_not_read: "Les modèles n’ont pas pu être lus\u{a0}: {}",
             models_gone_transcription: "Le modèle de transcription choisi pour cette réunion n’est plus là\u{a0}: celui des Réglages le remplace.",
             models_gone_minutes: "Le modèle du compte rendu choisi pour cette réunion passe par un service que les Réglages ne nomment pas\u{a0}: celui des Réglages le remplace.",
             models_unused_confidential: "Le service choisi pour cette réunion n’est pas utilisé tant qu’elle est confidentielle\u{a0}: elle est faite sur cet ordinateur.",
-            bar_models_kept: "Modèles gardés pour le prochain enregistrement.",
+            bar_models_kept: "Modèles gardés\u{a0}: {}",
+            bar_model_kept: "Modèle gardé\u{a0}: {}",
             check_sound: "Vérifier le son",
             check_sound_says: "Votre micro et le son de la réunion, avant un enregistrement.",
             check_unavailable: "Indisponible",
@@ -1786,6 +1790,163 @@ pub fn test_caused(which: Cause, detail: &str, language: Language, developer: bo
     })
 }
 
+/// A quantisation's or a precision's tag, as a model's id ends with it: q4_K_M, iq3_xs, fp16, bf16,
+/// f32, int8 — what only machines read.
+fn quantised(tag: &str) -> bool {
+    let tag = tag.to_ascii_lowercase();
+    let q = tag.strip_prefix('i').unwrap_or(&tag);
+    if let Some(rest) = q.strip_prefix('q') {
+        let mut chars = rest.chars();
+        if chars.next().is_some_and(|c| c.is_ascii_digit()) {
+            let more = chars.as_str();
+            return more.is_empty()
+                || more.strip_prefix('_').is_some_and(|parts| {
+                    parts
+                        .split('_')
+                        .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric()))
+                });
+        }
+    }
+    let float = |t: &str, bits: &str| t.strip_prefix('f').is_some_and(|t| t.strip_prefix('p').unwrap_or(t) == bits);
+    float(tag.strip_prefix('b').unwrap_or(&tag), "16") || float(&tag, "32") || tag == "int4" || tag == "int8"
+}
+
+/// A date of release, as a model's id ends with it: 20241022, 2024-08-06, 06-2025.
+fn dated(tag: &str) -> bool {
+    let digits = |t: &str, n: usize| t.len() == n && t.chars().all(|c| c.is_ascii_digit());
+    let parts: Vec<&str> = tag.split('-').collect();
+    match parts[..] {
+        [one] => digits(one, 8),
+        [year, month, day] => digits(year, 4) && digits(month, 2) && digits(day, 2),
+        [month, year] => digits(month, 2) && digits(year, 4),
+        _ => false,
+    }
+}
+
+/// `name` without the first tail, after one of `separators`, that `tail` recognises — cut where a
+/// character begins, never inside one.
+fn without_tail<'a>(name: &'a str, separators: &[char], tail: impl Fn(&str) -> bool) -> &'a str {
+    for (at, c) in name.char_indices() {
+        let (before, from) = name.split_at(at);
+        let mut rest = from.chars();
+        rest.next();
+        if separators.contains(&c) && tail(rest.as_str()) {
+            return before;
+        }
+    }
+    name
+}
+
+/// What JavaScript's `\s` matches: its white space and line ends — U+FEFF among them, U+0085 not.
+fn js_space(c: char) -> bool {
+    matches!(
+        c,
+        '\t' | '\n' | '\u{b}' | '\u{c}' | '\r' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'
+            ..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}'
+    )
+}
+
+/// What people say of a model: the page's `modelSaid`, character for character (`tests/model_said.rs`
+/// runs both) — the last part of its id, without what only machines read: a file's extension, a tag
+/// "latest", a date of release, a quantisation.
+pub fn model_said(model: &str) -> String {
+    let mut name = model.split('/').rfind(|part| !part.is_empty()).unwrap_or(model);
+    // One extension, the last.
+    if let Some((before, extension)) = name.rsplit_once('.')
+        && (extension.eq_ignore_ascii_case("gguf") || extension.eq_ignore_ascii_case("bin"))
+    {
+        name = before;
+    }
+    // Its tag "latest", after a colon.
+    if let Some((before, tag)) = name.rsplit_once(':')
+        && tag.eq_ignore_ascii_case("latest")
+    {
+        name = before;
+    }
+    name = without_tail(name, &['-', '_', ':', '.'], quantised);
+    name = without_tail(name, &['-', '_', ':'], dated);
+    let machine = |word: &str| quantised(word) || ["qat", "k", "m", "s", "l"].contains(&word.to_ascii_lowercase().as_str());
+    let mut words: Vec<&str> = name
+        .split(|c: char| c == '-' || c == '_' || c == ':' || js_space(c))
+        .filter(|w| !w.is_empty())
+        .collect();
+    while words.len() > 1 && words.last().is_some_and(|word| machine(word)) {
+        words.pop();
+    }
+    if words.is_empty() || (words.len() == 1 && machine(words[0])) {
+        return model.to_string();
+    }
+    let short = |w: &str| (1..=2).contains(&w.len()) && w.chars().all(|c| c.is_ascii_digit());
+    let mut said: Vec<String> = Vec::new();
+    for word in words {
+        let mut chars = word.chars();
+        let first = chars.next();
+        // A version written with dashes — claude-sonnet-4-5 — is said with its point.
+        if short(word) && said.last().is_some_and(|last| last.split('.').all(short)) {
+            let last = said.last_mut().expect("checked above");
+            last.push('.');
+            last.push_str(word);
+        } else if word.to_lowercase() == "gpt" {
+            said.push("GPT".into());
+        } else if let Some(first) = first.filter(char::is_ascii_lowercase) {
+            said.push(format!("{}{}", first.to_ascii_uppercase(), chars.as_str()));
+        } else {
+            said.push(word.to_string());
+        }
+    }
+    said.join(" ")
+}
+
+/// The cause's sentence, said of the meeting's own model when it was its (`own`, as its id is) and the
+/// gesture is another model — then « Refaire… › Avancé » —, else Settings' sentence: the one the page
+/// and the notification both say (D91).
+pub fn cause_said(cause: Cause, own: Option<&str>, language: Language) -> String {
+    match own.zip(cause_own(cause, language)) {
+        Some((model, sentence)) => sentence.replacen("{}", &model_said(model), 1),
+        None => self::cause(cause, language).to_string(),
+    }
+}
+
+/// Why minutes were not made by the meeting's own model, chosen in « Avancé » (D91), where the gesture
+/// is another model: `{}` its name, the page's; chosen again in *Refaire…*, never in Settings. None
+/// where the gesture is the provider's — a key, credit, an address —: `cause`'s sentence says it.
+pub fn cause_own(cause: Cause, language: Language) -> Option<&'static str> {
+    use Language::{English, French};
+    Some(match (cause, language) {
+        (Cause::TooSlow, English) => {
+            "{}, chosen for this meeting, did not answer in time: try again later, or choose a faster model in Redo…\u{a0}› Advanced."
+        }
+        (Cause::TooSlow, French) => {
+            "{}, choisi pour cette réunion, n’a pas répondu à temps\u{a0}: réessayez plus tard, ou choisissez un modèle plus rapide dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::UnknownModel, English) => {
+            "The provider does not know {}, chosen for this meeting: choose another in Redo…\u{a0}› Advanced."
+        }
+        (Cause::UnknownModel, French) => {
+            "Le fournisseur ne connaît pas {}, choisi pour cette réunion\u{a0}: choisissez-en un autre dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::Down, English) => {
+            "The provider answers that it is failing: try again later. On this computer, {}, chosen for this meeting, may be too large for the memory: choose a smaller one in Redo…\u{a0}› Advanced."
+        }
+        (Cause::Down, French) => {
+            "Le fournisseur répond qu’il est en panne\u{a0}: réessayez plus tard. Sur cet ordinateur, {}, choisi pour cette réunion, est peut-être trop gros pour la mémoire\u{a0}: choisissez-en un plus petit dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::CutShort, English) => {
+            "{}, chosen for this meeting, stopped before the end: choose one that writes longer answers in Redo…\u{a0}› Advanced."
+        }
+        (Cause::CutShort, French) => {
+            "{}, choisi pour cette réunion, s’est arrêté avant la fin\u{a0}: choisissez-en un qui écrit plus long dans Refaire…\u{a0}› Avancé."
+        }
+        (Cause::NotMinutes, English) => {
+            "{}, chosen for this meeting, did not write minutes: try again, or choose another model in Redo…\u{a0}› Advanced."
+        }
+        (Cause::NotMinutes, French) => {
+            "{}, choisi pour cette réunion, n’a pas écrit de compte rendu\u{a0}: réessayez, ou choisissez un autre modèle dans Refaire…\u{a0}› Avancé."
+        }
+        _ => return None,
+    })
+}
+
 /// Why minutes were not made, and what to do, as kitokey-summary coded it (summarising/v1).
 pub fn cause(cause: Cause, language: Language) -> &'static str {
     use Language::{English, French};
@@ -1983,6 +2144,13 @@ pub enum Minutes {
     Failed(Option<Cause>),
     /// Made again (*Refaire…*) and not made: the ones there stayed; and why, as above.
     RedoFailed(Option<Cause>),
+    /// Not made by the meeting's own model (its id), for a cause whose gesture is another model: said
+    /// as the page says it (D91); `again` as for `RedoFailed`.
+    FailedOwn {
+        cause: Cause,
+        model: String,
+        again: bool,
+    },
     /// Online, and the user has not agreed to send this meeting to this host yet.
     Waiting(String),
     /// No one is chosen to write them.
@@ -1999,6 +2167,19 @@ pub enum Minutes {
 
 impl Minutes {
     /// Not made: as a first making, or as minutes made again (*Refaire…*) — the ones there stayed.
+    /// The same, by the meeting's own model when it was its (`own`): named where its gesture is another
+    /// model, else as `failed` says it.
+    pub fn failed_by(cause: Option<Cause>, again: bool, own: Option<&str>, language: Language) -> Self {
+        match (cause, own) {
+            (Some(cause), Some(model)) if cause_own(cause, language).is_some() => Minutes::FailedOwn {
+                cause,
+                model: model.to_string(),
+                again,
+            },
+            _ => Self::failed(cause, again),
+        }
+    }
+
     pub fn failed(cause: Option<Cause>, again: bool) -> Self {
         if again {
             Minutes::RedoFailed(cause)
@@ -2068,6 +2249,37 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
                 Some(cause) => format!("Celui d’avant est resté en place. {}", self::cause(*cause, language)),
                 None => "Celui d’avant est resté en place.".to_string(),
             },
+        ),
+        // By the meeting's own model: named, and chosen again in « Avancé », as its page says it (D91).
+        (
+            Minutes::FailedOwn {
+                cause,
+                model,
+                again: false,
+            },
+            English,
+        ) => (
+            "The minutes were not written",
+            format!("The transcript is untouched. {}", cause_said(*cause, Some(model), language)),
+        ),
+        (
+            Minutes::FailedOwn {
+                cause,
+                model,
+                again: false,
+            },
+            French,
+        ) => (
+            "Le compte rendu n’a pas été fait",
+            format!("La transcription est intacte. {}", cause_said(*cause, Some(model), language)),
+        ),
+        (Minutes::FailedOwn { cause, model, again: true }, English) => (
+            "The minutes were not made again",
+            format!("The previous ones stayed in place. {}", cause_said(*cause, Some(model), language)),
+        ),
+        (Minutes::FailedOwn { cause, model, again: true }, French) => (
+            "Le compte rendu n’a pas été refait",
+            format!("Celui d’avant est resté en place. {}", cause_said(*cause, Some(model), language)),
         ),
         (Minutes::Waiting(host), English) => (
             "The minutes wait for your agreement",

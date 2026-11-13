@@ -51,6 +51,9 @@ use kitokey_shell::{
 
 const TRAY: &str = "kitokey";
 
+/// Why a meeting's minutes were not written, their cause when named, and the model when it was the meeting's own.
+type MinutesFailed = (String, Option<summarising::Cause>, Option<String>);
+
 /// What the shell holds while it runs.
 struct Shell {
     /// What the user chose: read at start, changed from the window.
@@ -125,8 +128,9 @@ struct Shell {
     minutes_waiting: Mutex<VecDeque<Queued>>,
     /// Why the last minutes of a meeting were not written, until they are (D25).
     /// With their cause, when kitokey-summary named one this version knows: one entry, so
-    /// that a later failure never shows an earlier one's cause (D29).
-    minutes_failed: Mutex<HashMap<PathBuf, (String, Option<summarising::Cause>)>>,
+    /// that a later failure never shows an earlier one's cause (D29); and the model, when it was the
+    /// meeting's own (D91): its gesture is then in *Refaire…*, not in Settings.
+    minutes_failed: Mutex<HashMap<PathBuf, MinutesFailed>>,
     /// The loopback server the opened meeting is played from, started with the first (D26).
     served: Mutex<Option<player::Served>>,
     /// How many times each meeting's minutes were written since the start: a page drawn with
@@ -482,7 +486,7 @@ fn main() {
                 recording: Mutex::new(None),
                 recorded: Mutex::new(None),
                 next_context: Mutex::new(next_file().map(|file| context::read_next(&file)).unwrap_or_default()),
-                next_models: Mutex::new(meeting_models::Models::default()),
+                next_models: Mutex::new(next_models_file().map(|file| meeting_models::read_next(&file)).unwrap_or_default()),
                 toggle,
                 leaving: Mutex::new(false),
                 pressed: Mutex::new(None),
@@ -1663,6 +1667,8 @@ fn next_models_kept(shell: State<'_, Shell>, chosen: meeting_models::Models) -> 
     if !meeting_models::allowed(&chosen) {
         return Err(shell.told(Failure::Unexpected, "a part the contract session-audio/v3 refuses"));
     }
+    let file = next_models_file().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for settings"))?;
+    meeting_models::keep_next(&file, &chosen).map_err(|error| shell.told(Failure::MeetingFile, error))?;
     *next = chosen;
     tracing::info!(
         transcription = next.transcription.is_some(),
@@ -1870,6 +1876,11 @@ fn next_context(shell: State<'_, Shell>) -> NextContext {
 /// still has it (D91).
 fn next_file() -> Option<PathBuf> {
     settings::file().map(|file| file.with_file_name("next-context.txt"))
+}
+
+/// Where the models chosen at rest for the next recording are, beside it: kept the same way (D91).
+fn next_models_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("next-models.json"))
 }
 
 /// The bar's field at rest written (D91): kept for the next recording, under D59's 400 characters.
@@ -2734,7 +2745,7 @@ struct Queued {
 
 /// A making of minutes is over: its meeting free, its failure kept for its page, and the next
 /// one asked meanwhile started — those that cannot start yet (an agreement to give) left as said.
-fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<summarising::Cause>)>) {
+fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<summarising::Cause>)>, own: Option<&str>) {
     let shell = app.state::<Shell>();
     // What says it is being written goes first, the meeting freed last: nothing started in
     // between is left without its model, nor the tray's entry greyed off.
@@ -2746,7 +2757,11 @@ fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<
         } else {
             why
         };
-        shell.minutes_failed.lock().unwrap().insert(folder.to_path_buf(), (why, cause));
+        shell
+            .minutes_failed
+            .lock()
+            .unwrap()
+            .insert(folder.to_path_buf(), (why, cause, own.map(str::to_string)));
     } else {
         *shell.minutes_made.lock().unwrap().entry(folder.to_path_buf()).or_default() += 1;
     }
@@ -2860,10 +2875,12 @@ fn makings(shell: State<'_, Shell>) -> Makings {
     let fetched = shell.fetched.lock().unwrap().clone();
     let (failed, failed_said) = {
         let failures = shell.minutes_failed.lock().unwrap();
-        let failed = failures.iter().map(|(folder, (why, _))| (named(folder), said(why))).collect();
+        let failed = failures.iter().map(|(folder, (why, ..))| (named(folder), said(why))).collect();
+        // Failed by the meeting's own model: named, and chosen again where it was chosen — the
+        // sentence its notification says too (D91).
         let causes = failures
             .iter()
-            .filter_map(|(folder, (_, cause))| Some((named(folder), words::cause((*cause)?, shell.language()).to_string())))
+            .filter_map(|(folder, (_, cause, own))| Some((named(folder), words::cause_said((*cause)?, own.as_deref(), shell.language()))))
             .collect();
         (failed, causes)
     };
@@ -3015,7 +3032,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
     // Not started: said on the meeting's page as well as in a notification (D25).
     let refused = |why: String| {
         shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
-        shell.minutes_failed.lock().unwrap().insert(folder.clone(), (why, None));
+        shell.minutes_failed.lock().unwrap().insert(folder.clone(), (why, None, None));
     };
     let settings = match shell.reread() {
         Ok(settings) => settings,
@@ -3111,6 +3128,11 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
     shell.minutes_waiting.lock().unwrap().retain(|queued| queued.folder != folder);
     shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
     *shell.minutes_by.lock().unwrap() = Some((model.clone(), host.clone(), Instant::now()));
+    // The meeting's own model, chosen in « Avancé » (D91): a failure names it, and where it is chosen.
+    let own_model = meeting_models::read(&folder)
+        .minutes
+        .is_some_and(|own| own.provider == provider && own.model == model)
+        .then(|| model.clone());
     *shell.minutes_host.lock().unwrap() = (!providers::local(&provider)).then(|| host.clone());
     shell.minutes_failed.lock().unwrap().remove(&folder);
     minuting(app, true);
@@ -3129,7 +3151,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
             Err(error) => {
                 let why = format!("the minutes there could not be set aside ({error}): nothing was made");
                 tracing::error!(detail = %why, "shell.minutes_failed");
-                minutes_ended(&app, &folder, Some((why, Some(summarising::Cause::Unwritable))));
+                minutes_ended(&app, &folder, Some((why, Some(summarising::Cause::Unwritable))), None);
                 let failed = words::Minutes::failed(Some(summarising::Cause::Unwritable), again);
                 return tell(&app, &words::minutes(&failed, shell.language()));
             }
@@ -3167,7 +3189,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
                 if let Some(previous) = &previous {
                     let _ = std::fs::remove_file(previous);
                 }
-                minutes_ended(&app, &folder, Some((error.to_string(), None)));
+                minutes_ended(&app, &folder, Some((error.to_string(), None)), None);
                 return tell(&app, &words::minutes(&words::Minutes::failed(None, again), shell.language()));
             }
         };
@@ -3211,6 +3233,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
                 summarising::Made::Failed(why, cause) => Some((why.clone(), *cause)),
                 summarising::Made::Written(_) => None,
             },
+            own_model.as_deref(),
         );
         if *shell.leaving.lock().unwrap() {
             return;
@@ -3219,7 +3242,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
         let said = match made {
             summarising::Made::Written(_) if kept_beside.is_some() => words::Minutes::ReadyKeptBeside(kept_beside.unwrap_or_default()),
             summarising::Made::Written(_) => words::Minutes::Ready,
-            summarising::Made::Failed(_, cause) => words::Minutes::failed(cause, again),
+            summarising::Made::Failed(_, cause) => words::Minutes::failed_by(cause, again, own_model.as_deref(), shell.language()),
         };
         // Ready, a click opens the meeting (D44); a failure is said as ever.
         if written {
@@ -3411,12 +3434,16 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
             }
             drop(next);
             // The models chosen at rest, the meeting's own the same way; then none for the next.
-            let models = std::mem::take(&mut *shell.next_models.lock().unwrap());
-            if models != meeting_models::Models::default()
-                && let Err(error) = meeting_models::write(folder, &models)
-            {
-                tracing::error!(kind = ?error.kind(), "shell.models_not_taken");
+            let mut next = shell.next_models.lock().unwrap();
+            match meeting_models::taken(folder, &mut next) {
+                Ok(()) => {
+                    if let Some(Err(error)) = next_models_file().map(|file| meeting_models::keep_next(&file, &next)) {
+                        tracing::error!(kind = ?error.kind(), "shell.models_not_cleared");
+                    }
+                }
+                Err(error) => tracing::error!(kind = ?error.kind(), "shell.models_not_taken"),
             }
+            drop(next);
             *shell.recorded.lock().unwrap() = Some(folder.clone());
             *shell.meter.lock().unwrap() = (Some(Instant::now()), [0.0, 0.0]);
             small_recording(app, true);

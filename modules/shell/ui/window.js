@@ -1085,16 +1085,33 @@ function modelsAdvanced(words, prefix, offered, chosen) {
     offered.engine === "speechanalyzer" ? "SpeechAnalyzer"
     : offered.engine === "service" && offered.transcription_model ? `${offered.transcription_model}${fill(words.written_via, via(offered.transcription_provider ?? ""))}`
     : spoken(offered.model);
-  const settingsWrite = offered.minutes_provider && offered.minutes_model ? writerSaid(offered.minutes_provider, offered.minutes_model) : words.models_none;
+  // Settings' entry short: the model alone, where a service is named only when it sends the meeting away.
+  const settingsWrite =
+    offered.minutes_provider && offered.minutes_model ? `${modelSaid(offered.minutes_model)}${here(offered.minutes_provider) ? "" : fill(words.written_via, via(offered.minutes_provider))}`
+    : words.models_none;
+  // Settings' own choice, as an entry of its list would be: offered once, as Settings' — unless it is the
+  // meeting's own, which stays shown as chosen.
+  const settingsHearing =
+    offered.engine === "speechanalyzer" ? JSON.stringify({ engine: "speechanalyzer" })
+    : offered.engine === "service" && offered.transcription_model ? JSON.stringify({ engine: "service", provider: offered.transcription_provider, model: offered.transcription_model })
+    : JSON.stringify({ engine: "whisper", model: offered.model });
+  const settingsWriting = offered.minutes_provider && offered.minutes_model ? JSON.stringify({ provider: offered.minutes_provider, model: offered.minutes_model }) : "";
+  const ownHear = offered.chosen.transcription ? JSON.stringify(offered.chosen.transcription) : "";
+  const ownWrite = offered.chosen.minutes ? JSON.stringify({ provider: offered.chosen.minutes.provider, model: offered.chosen.minutes.model }) : "";
   const hearing = [["", fill(words.models_settings, settingsHear)]];
-  for (const model of offered.whisper) hearing.push([JSON.stringify({ engine: "whisper", model }), spoken(model)]);
-  if (offered.apple) hearing.push([JSON.stringify({ engine: "speechanalyzer" }), "SpeechAnalyzer"]);
+  const offer = (list, value, said, settings, own) => {
+    if (value !== settings || value === own) list.push([value, said]);
+  };
+  for (const model of offered.whisper) offer(hearing, JSON.stringify({ engine: "whisper", model }), spoken(model), settingsHearing, ownHear);
+  if (offered.apple) offer(hearing, JSON.stringify({ engine: "speechanalyzer" }), "SpeechAnalyzer", settingsHearing, ownHear);
   if (offered.service) {
     const [provider, model] = offered.service;
-    hearing.push([JSON.stringify({ engine: "service", provider, model }), `${model}${fill(words.written_via, via(provider))}`]);
+    offer(hearing, JSON.stringify({ engine: "service", provider, model }), `${model}${fill(words.written_via, via(provider))}`, settingsHearing, ownHear);
   }
   const writing = [["", fill(words.models_settings, settingsWrite)]];
-  for (const model of offered.ollama) writing.push([JSON.stringify({ provider: offered.ollama_address, model }), writerSaid(offered.ollama_address, model)]);
+  for (const model of offered.ollama) {
+    offer(writing, JSON.stringify({ provider: offered.ollama_address, model }), writerSaid(offered.ollama_address, model), settingsWriting, ownWrite);
+  }
   const list = (id, label, options, value, gone) => {
     const row = element("label", "models-row");
     row.htmlFor = id;
@@ -1109,12 +1126,34 @@ function modelsAdvanced(words, prefix, offered, chosen) {
       pick.append(option);
     }
     pick.value = gone ? "" : value;
-    row.append(element("span", "name", label), pick);
+    // A name longer than the list is wide: said whole under it — a native list never wraps.
+    const whole = element("span", "says whole");
+    whole.id = `${id}-whole`;
+    whole.hidden = true;
+    row.append(element("span", "name", label), pick, whole);
     return [row, pick];
   };
+  const measure = document.createElement("canvas").getContext("2d");
+  // Said for the list's width as it is drawn: each change of it — « Avancé » opened, the window resized
+  // — measures again (ResizeObserver), and each choice (`changed`). Painted at the next frame, never in
+  // the observer's own turn: the line it shows or hides changes the bar's height, which the bar's own
+  // observer answers by resizing the window — in the same turn, the browser reports a loop as an error.
+  const sized = new ResizeObserver((entries) => {
+    const picks = entries.map(({ target }) => target);
+    requestAnimationFrame(() => picks.filter((pick) => pick.isConnected).forEach((pick) => paintWhole(pick)));
+  });
+  const paintWhole = (pick) => {
+    const whole = pick.parentElement?.querySelector(".whole");
+    if (!whole || pick.clientWidth === 0) return;
+    const style = getComputedStyle(pick);
+    measure.font = `${style.fontSize} ${style.fontFamily}`;
+    const text = pick.options[pick.selectedIndex]?.textContent ?? "";
+    // The list's own room: its padding and its arrow, about 36 px.
+    const cut = Math.ceil(measure.measureText(text).width) + 36 > pick.clientWidth;
+    whole.textContent = cut ? text : "";
+    whole.hidden = !cut;
+  };
   const gone = new Set(offered.gone);
-  const ownHear = offered.chosen.transcription ? JSON.stringify(offered.chosen.transcription) : "";
-  const ownWrite = offered.chosen.minutes ? JSON.stringify({ provider: offered.chosen.minutes.provider, model: offered.chosen.minutes.model }) : "";
   const [hearRow, hearPick] = list(`${prefix}-transcription-model`, words.models_transcription, hearing, ownHear, gone.has("transcription"));
   const [writeRow, writePick] = list(`${prefix}-minutes-model`, words.models_minutes, writing, ownWrite, gone.has("minutes"));
   const said = element("p", "note warn");
@@ -1144,10 +1183,15 @@ function modelsAdvanced(words, prefix, offered, chosen) {
       said.textContent = fill(words.models_not_kept, why);
       said.hidden = false;
     }
+    paintWhole(hearPick);
+    paintWhole(writePick);
   };
   hearPick.addEventListener("change", changed);
   writePick.addEventListener("change", changed);
-  panel.append(hearRow, writeRow, element("p", "says", words.models_own_note), said);
+  sized.observe(hearPick);
+  sized.observe(writePick);
+  // What a choice here changes, said before the lists.
+  panel.append(element("p", "says", words.models_own_note), hearRow, writeRow, said);
   box.append(toggle, panel);
   return { box, toggle, panel, models, unfold };
 }
@@ -3398,10 +3442,19 @@ function showSmall(words) {
   // What is drawn, and from what: drawn again only when what it offers changed, never under the user.
   let advancedDrawn = { from: null, models: null };
   let shownConfidential = null;
-  // Chosen at rest, « Avancé » closed: said under the row, as the context kept is (D91).
-  const modelsKept = element("p", "says", words.bar_models_kept);
+  // Chosen at rest, « Avancé » closed: said under the row, naming them short, as the context kept is
+  // (D91); given with « Avancé » to a screen reader while it is shown.
+  const modelsKept = element("p", "says");
   modelsKept.id = "small-models-kept";
   modelsKept.hidden = true;
+  const keptNamed = (chosen) => {
+    const hear = chosen.transcription;
+    const named = [
+      !hear ? null : hear.engine === "whisper" ? spoken(hear.model).replace(/^Whisper /, "") : hear.engine === "service" ? hear.model : "SpeechAnalyzer",
+      chosen.minutes ? modelSaid(chosen.minutes.model) : null,
+    ].filter(Boolean);
+    return named.length === 0 ? "" : fill(named.length === 1 ? words.bar_model_kept : words.bar_models_kept, named.join(" · "));
+  };
   // Whether models are kept for the next recording, as the shell says it — read again at each change
   // of state and after each choice at rest, never kept apart from it.
   let nextChosen = false;
@@ -3411,11 +3464,15 @@ function showSmall(words) {
       return null;
     });
     nextChosen = offered !== null && Boolean(offered.chosen.transcription || offered.chosen.minutes);
+    if (offered !== null) modelsKept.textContent = keptNamed(offered.chosen);
     paintModelsKept();
   };
   const paintModelsKept = () => {
     const open = !options.hidden && advancedDrawn.models?.toggle.getAttribute("aria-expanded") === "true";
     modelsKept.hidden = recording !== false || !nextChosen || open;
+    const toggle = advancedDrawn.models?.toggle;
+    if (toggle && modelsKept.hidden) toggle.removeAttribute("aria-describedby");
+    else if (toggle) toggle.setAttribute("aria-describedby", modelsKept.id);
   };
   const advancedOf = async (opened) => {
     const name = meeting.name;
@@ -3446,6 +3503,7 @@ function showSmall(words) {
     const focused = advanced.contains(document.activeElement) ? document.activeElement.id : null;
     advanced.replaceChildren(drawn.box);
     advancedDrawn = { from, models: drawn };
+    paintModelsKept();
     if (focused) document.getElementById(focused)?.focus();
   };
 

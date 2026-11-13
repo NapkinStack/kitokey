@@ -2077,6 +2077,37 @@ def own_models(now: dt.datetime) -> None:
         check("none chosen: models.json removed", removed)
 
 
+LONG = "hf.co/unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF:UD-Q4_K_XL-very-long-name"
+LONG_SAID = "Mistral Small 3.2 24B Instruct 2506 GGUF UD Q4 K XL Very Long Name"
+# A list's chosen entry: whether it fits the list as drawn, and what is said whole under it, if anything —
+# inside the window's width.
+def long_resized(browser, where: str, chosen: str) -> None:
+    """A long name chosen in Refaire… at 830 px, where it fits; then the window narrowed to 420 px and
+    widened back, never crossing 840 (the page's own break): said whole under its list once the list is
+    too narrow for it, at 12 px, and no longer once it fits again — whatever the window does after."""
+    pick = "redo-panel-minutes-model"
+    Select(browser.find_element(By.ID, pick)).select_by_visible_text(chosen)
+    time.sleep(0.5)
+    got = browser.execute_script(LONG_SHOWN, pick)
+    check(f"{where}: chosen at 830 px, the long name fits its list, nothing said under it", got["fit"] and got["said"] is None, got)
+    browser.set_window_size(420, 700)
+    narrowed = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, pick)["said"] is not None, 5)
+    got = browser.execute_script(LONG_SHOWN, pick)
+    check(f"{where}: the window narrowed to 420 px after the choice — the name said whole under its list, 12 px, inside the window",
+          narrowed and not got["fit"] and got["said"] == got["text"] and got["size"] == "12px" and got["inside"], got)
+    browser.set_window_size(830, 800)
+    widened = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, pick)["said"] is None, 5)
+    got = browser.execute_script(LONG_SHOWN, pick)
+    check(f"{where}: widened back to 830 px — it fits again, nothing said under it", widened and got["fit"], got)
+
+
+LONG_SHOWN = ("const s = document.getElementById(arguments[0]); const f = getComputedStyle(s); const c = document.createElement('canvas').getContext('2d');"
+              "c.font = `${f.fontSize} ${f.fontFamily}`; const text = s.options[s.selectedIndex].textContent;"
+              "const u = document.getElementById(arguments[0] + '-whole'); const shown = u && u.getClientRects().length > 0;"
+              "return {text, fit: Math.ceil(c.measureText(text).width) + 36 <= s.clientWidth, said: shown ? u.textContent : null, size: u ? getComputedStyle(u).fontSize : null,"
+              " inside: !shown || (u.getBoundingClientRect().right <= innerWidth && u.scrollWidth <= u.clientWidth + 1)}")
+
+
 def models_advanced(now: dt.datetime) -> None:
     """BD. « Avancé » (D91, board 6): closed by default in the bar opened and in Refaire…, the meeting's
     own models chosen there — Settings' first —, the next recording's at rest, kept with the meeting,
@@ -2085,7 +2116,8 @@ def models_advanced(now: dt.datetime) -> None:
 
     class Tags(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
-            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            # A name far longer than the bar is wide, as the explorer met one (D91's UX pass).
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}, {"name": LONG}]}).encode()
             self.send_response(200)
             self.send_header("content-length", str(len(body)))
             self.end_headers()
@@ -2132,10 +2164,33 @@ def models_advanced(now: dt.datetime) -> None:
             press(browser, "small-advanced")
             opened = wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is False, 5)
             got = browser.execute_script(shown, "small")
-            check("opened at rest: the transcription's models — Settings' first, those installed, the service Settings set — and the minutes', Settings' first",
-                  opened and got["hear"] == ["Celui des Réglages — Whisper adv settings", "Whisper adv settings", "Whisper tiny adv", "whisper-1, via hears.example"]
-                  and got["write"] == ["Celui des Réglages — Qwen3 14b — sur cet ordinateur", "Mistral 7b — sur cet ordinateur", "Qwen3 14b — sur cet ordinateur"]
+            check("opened at rest: the transcription's models — Settings' first, short, then those installed and the service Settings set — and the minutes', Settings' never twice",
+                  opened and got["hear"] == ["Réglages\u00a0: Whisper adv settings", "Whisper tiny adv", "whisper-1, via hears.example"]
+                  and got["write"] == ["Réglages\u00a0: Qwen3 14b", LONG_SAID + " — sur cet ordinateur", "Mistral 7b — sur cet ordinateur"]
                   and got["note"] == "Pour cette réunion seule ; les Réglages ne changent pas.", got)
+            # What « Avancé » holds said on it; the note before the lists; the lists at the board's 14 px, none cut.
+            looks = browser.execute_script(
+                "const p = document.getElementById('small-advanced-panel'); const c = document.createElement('canvas').getContext('2d');"
+                "const fit = (s) => { const f = getComputedStyle(s); c.font = `${f.fontSize} ${f.fontFamily}`;"
+                " return Math.ceil(c.measureText(s.options[s.selectedIndex].textContent).width) + 36 <= s.clientWidth; };"
+                "const lists = [...p.querySelectorAll('select')];"
+                "return {label: document.getElementById('small-advanced').textContent, first: p.firstElementChild.className,"
+                " sizes: lists.map(s => getComputedStyle(s).fontSize), fit: lists.map(fit)}")
+            check("« Avancé » says it holds the models; « pour cette réunion seule » above the lists; the lists at 14 px, their choice whole",
+                  looks == {"label": "Avancé — modèles", "first": "says", "sizes": ["14px", "14px"], "fit": [True, True]}, looks)
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text(LONG_SAID + " — sur cet ordinateur")
+            whole = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] is not None, 3)
+            got = browser.execute_script(LONG_SHOWN, "small-minutes-model")
+            check("fr, the bar: a model's name longer than the list is wide is said whole under it, at 12 px, never only cut",
+                  whole and not got["fit"] and got["said"] == got["text"] and got["size"] == "12px" and got["inside"], got)
+            # « Avancé » closed and opened again — drawn anew with the choice kept: said whole again.
+            press(browser, "small-advanced")
+            wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is True, 3)
+            press(browser, "small-advanced")
+            again = wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is False
+                             and b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] == LONG_SAID + " — sur cet ordinateur", 5)
+            check("fr, the bar: « Avancé » closed and opened again, the long name chosen still said whole under its list",
+                  again, browser.execute_script(LONG_SHOWN, "small-minutes-model"))
             Select(browser.find_element(By.ID, "small-transcription-model")).select_by_visible_text("Whisper tiny adv")
             Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
             kept = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
@@ -2143,16 +2198,36 @@ def models_advanced(now: dt.datetime) -> None:
             check("chosen at rest: kept for the next recording, nothing written, Settings unchanged",
                   kept and not any(meetings.iterdir()) and window.file.read_text() == before, sorted(p.name for p in meetings.iterdir()))
             line = "const k = document.getElementById('small-models-kept'); return k && k.getClientRects().length > 0 ? k.textContent : null"
-            check("« Avancé » open: nothing said under the row of the models kept", browser.execute_script(line) is None, browser.execute_script(line))
+            described = "return document.getElementById('small-advanced').getAttribute('aria-describedby')"
+            check("« Avancé » open: nothing said under the row of the models kept, nor described on it",
+                  browser.execute_script(line) is None and browser.execute_script(described) is None, [browser.execute_script(line), browser.execute_script(described)])
+            next_models = window.file.parent / "next-models.json"
+            check("chosen at rest: kept on disk beside the settings", next_models.exists(), sorted(p.name for p in window.file.parent.iterdir()))
             press(browser, "small-advanced")
-            said = wait_for(browser, lambda b: b.execute_script(line) == "Modèles gardés pour le prochain enregistrement.", 3)
-            check("« Avancé » closed with a choice for the next recording: said under the row, as the context kept is", said, browser.execute_script(line))
+            keptSaid = "Modèles gardés : tiny adv · Mistral 7b"
+            said = wait_for(browser, lambda b: b.execute_script(line) == keptSaid, 3)
+            check("« Avancé » closed with a choice for the next recording: said under the row, naming them, as the context kept is", said, browser.execute_script(line))
+            told = browser.execute_script("const k = document.getElementById('small-models-kept'); const c = document.getElementById('small-context-kept');"
+                                          "return {size: getComputedStyle(k).fontSize, context: getComputedStyle(c).fontSize,"
+                                          " described: document.getElementById('small-advanced').getAttribute('aria-describedby')}")
+            check("the models kept: 12 px as the context's line, and given to a screen reader with « Avancé »",
+                  told == {"size": "12px", "context": "12px", "described": "small-models-kept"}, told)
+            # Kitokey quit and started again: the models chosen at rest are still the next recording's, and said.
+            window.__exit__()
+            browser = window.__enter__()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+            again = wait_for(browser, lambda b: b.execute_script(line) == keptSaid, 5)
+            chosen_again = browser.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
+            check("started again: the models chosen at rest still kept for the next recording, and said",
+                  again and chosen_again == {"transcription": {"engine": "whisper", "model": tiny.name}, "minutes": {"provider": here, "model": "mistral:7b"}},
+                  [browser.execute_script(line), chosen_again])
             press(browser, "small-record")
             started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
             taken = wait_for(None, lambda b: own() == {"transcription": {"engine": "whisper", "model": tiny.name}, "minutes": {"provider": here, "model": "mistral:7b"}}, 5)
             check("started: the choice made at rest is the new meeting's models.json", started and taken, own())
             left = browser.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
-            check("taken by this meeting: none kept for the next", left == {}, left)
+            check("taken by this meeting: none kept for the next, nothing left on disk", left == {} and not next_models.exists(), [left, next_models.exists()])
+            check("recording: « Avancé » described by nothing kept", browser.execute_script(described) is None, browser.execute_script(described))
             # Drawn again for this meeting, closed (board 6): the options opened, then « Avancé ».
             wait_for(browser, lambda b: b.execute_script(shown, "small")["expanded"] == "false", 5)
             time.sleep(0.5)
@@ -2212,8 +2287,8 @@ def models_advanced(now: dt.datetime) -> None:
             Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
             wait_for(browser, lambda b: none_kept(b) != {}, 5)
             browser.execute_script("document.getElementById('small-advanced').click()")
-            said = wait_for(browser, lambda b: b.execute_script(line) == "Modèles gardés pour le prochain enregistrement.", 3)
-            check("chosen again at rest, « Avancé » closed: said kept", said, browser.execute_script(line))
+            said = wait_for(browser, lambda b: b.execute_script(line) == "Modèle gardé\u00a0: Mistral 7b", 3)
+            check("chosen again at rest, « Avancé » closed: said kept, naming the one", said, browser.execute_script(line))
             made = meetings / "2026-10-18_11-30"
             meeting.rename(made)
             try:
@@ -2225,6 +2300,15 @@ def models_advanced(now: dt.datetime) -> None:
                 quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
                 check("started and stopped from the tray's icon: no models kept for the next, and none said kept",
                       quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
+                # Quit and started again after a recording took them: nothing comes back.
+                wait_for(browser, lambda b: b.execute_script(idle), 15)
+                window.__exit__()
+                browser = window.__enter__()
+                wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+                time.sleep(1)
+                check("started again after a recording took them: no models kept, none said, nothing on disk",
+                      none_kept(browser) == {} and browser.execute_script(line) is None and not next_models.exists(),
+                      [none_kept(browser), browser.execute_script(line), next_models.exists()])
                 wait_for(None, lambda b: (meeting / "transcript.jsonl").exists(), 15)
                 wait_for(browser, lambda b: b.execute_script(idle), 15)
             finally:
@@ -2243,7 +2327,7 @@ def models_advanced(now: dt.datetime) -> None:
             got = browser.execute_script(shown, "redo-transcript-panel")
             check("Refaire… of the transcript: « Avancé » closed by default, the meeting's own model chosen in it",
                   got["expanded"] == "false" and got["hidden"] is True and got["heard"] == "Whisper tiny adv"
-                  and got["written"] == "Celui des Réglages — Qwen3 14b — sur cet ordinateur", got)
+                  and got["written"] == "Réglages\u00a0: Qwen3 14b", got)
             # Annuler: nothing changed.
             press(browser, "redo-transcript-panel-advanced")
             Select(browser.find_element(By.ID, "redo-transcript-panel-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
@@ -2269,14 +2353,70 @@ def models_advanced(now: dt.datetime) -> None:
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
             writing.unlink(missing_ok=True)
+            # Below the page's break at 840 px from here, so that a resize never draws the page anew.
+            browser.set_window_size(830, 800)
+            time.sleep(1.5)
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
             press(browser, "redo-minutes")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-panel-advanced"), 5)
             got = browser.execute_script(shown, "redo-panel")
             check("Refaire… of the minutes: « Avancé » closed, the meeting's own minutes model in it",
                   got["expanded"] == "false" and got["written"] == "Mistral 7b — sur cet ordinateur", got)
+            press(browser, "redo-panel-advanced")
+            long_resized(browser, "fr, Refaire…", LONG_SAID + " — sur cet ordinateur")
+            Select(browser.find_element(By.ID, "redo-panel-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
+            gone_ = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, "redo-panel-minutes-model")["said"] is None, 3)
+            check("a name that fits: nothing said under the list", gone_, browser.execute_script(LONG_SHOWN, "redo-panel-minutes-model"))
             press(browser, "redo-do")
             wrote = wait_for(None, lambda b: "mistral:7b" in read(writing), 15)
             check("Refaire with « Avancé » left closed: made again by the meeting's own model", wrote and "qwen3:14b" not in read(writing), read(writing))
+            wait_for(browser, lambda b: b.execute_script(idle), 15)
+            browser.set_window_size(1100, 800)
+            time.sleep(1.5)
+            # Its own model fails: the page names it, and where to choose another — Refaire… › Avancé, not Settings.
+            failure = "const w = document.querySelector('#minutes-state .what'); return w ? w.textContent : ''"
+            # The notification, read before the page: the same sentence.
+            notified = WORK / "notified-own-minutes"
+            monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                       stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+            time.sleep(0.5)
+            (WORK / "fail-minutes").touch()
+            try:
+                press(browser, "redo-minutes")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+                press(browser, "redo-do")
+                failed = wait_for(browser, lambda b: "pas été fait" in b.execute_script(failure), 15)
+                told = browser.execute_script(failure)
+                check("the meeting's own minutes model fails: the page names it, and Refaire… › Avancé to choose another",
+                      failed and "Mistral 7b" in told and "Refaire…\u00a0› Avancé" in told and "réglages" not in told, told)
+                heard_own = wait_for(None, lambda b: "pas été refait" in notified.read_text(), 10)
+                since = len(notified.read_text())
+                said_own = notified.read_text()
+                check("and its notification says the same: the model named, Refaire… › Avancé, never Settings",
+                      heard_own and "Mistral 7b, choisi pour cette réunion" in said_own and "Refaire…\u00a0› Avancé" in said_own
+                      and "réglages" not in said_own, said_own[-500:])
+                # Settings' model fails: Settings' wording, as before.
+                (meeting / "models.json").unlink()
+                wait_for(browser, lambda b: b.execute_script(idle), 15)
+                browser.execute_script("location.hash = '#/'")
+                browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+                press(browser, "redo-minutes")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+                writing.unlink(missing_ok=True)
+                press(browser, "redo-do")
+                failed = wait_for(browser, lambda b: "qwen3:14b" in read(writing) and "pas été fait" in b.execute_script(failure), 15)
+                told = browser.execute_script(failure)
+                check("Settings' minutes model fails: Settings' wording, no « Avancé »",
+                      failed and "dans les réglages de Kitokey" in told and "Avancé" not in told, told)
+                heard_settings = wait_for(None, lambda b: "pas été refait" in notified.read_text()[since:], 10)
+                said_settings = notified.read_text()[since:]
+                check("and its notification keeps Settings' wording",
+                      heard_settings and "dans les réglages de Kitokey" in said_settings and "Avancé" not in said_settings, said_settings[-500:])
+            finally:
+                monitor.terminate()
+                (WORK / "fail-minutes").unlink()
+                (meeting / "models.json").write_text(json.dumps({"minutes": {"provider": here, "model": "mistral:7b"}}))
             wait_for(browser, lambda b: b.execute_script(idle), 15)
             check("Settings unchanged by Refaire…", full.file.read_text() == before, full.file.read_text())
             # Refaire… of the transcript: the transcript alone, by the meeting's models — its minutes untouched.
@@ -2304,7 +2444,7 @@ def models_advanced(now: dt.datetime) -> None:
             got = browser.execute_script(shown, "redo-transcript-panel")
             full.file.write_text(kept_settings)
             check("Settings unreadable: Refaire… opens all the same, offering what was last read, and says it",
-                  opened and got["heard"] == "Celui des Réglages — Whisper adv settings" and bool(got["said"]), got)
+                  opened and got["heard"] == "Réglages\u00a0: Whisper adv settings" and bool(got["said"]), got)
             if opened:
                 press(browser, "redo-transcript-panel-cancel")
             else:
@@ -2324,7 +2464,7 @@ def models_advanced(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
             press(browser, "redo-transcript-panel-advanced")
             got = browser.execute_script(shown, "redo-transcript-panel")
-            check("and in « Avancé »: Settings' shown, the model gone said", got["heard"] == "Celui des Réglages — Whisper adv settings"
+            check("and in « Avancé »: Settings' shown, the model gone said", got["heard"] == "Réglages\u00a0: Whisper adv settings"
                   and "n’est plus là" in (got["said"] or ""), got)
             press(browser, "redo-transcript-panel-cancel")
             # Confidential, Settings hearing and writing by services: « Avancé » names no service at all —
@@ -2341,7 +2481,7 @@ def models_advanced(now: dt.datetime) -> None:
             got = browser.execute_script(shown, "redo-transcript-panel")
             check("confidential, Settings naming services: no entry names one — Settings' says Whisper and Ollama here",
                   got["hear"] and got["write"] and not any("via" in one for one in got["hear"] + got["write"])
-                  and got["hear"][0] == "Celui des Réglages — Whisper adv settings" and got["write"][0].endswith("sur cet ordinateur"), got)
+                  and got["hear"][0] == "Réglages\u00a0: Whisper adv settings" and got["write"][0].startswith("Réglages\u00a0: "), got)
             check("a service the confidential meeting chose: not shown chosen, said unused while confidential",
                   got["heard"] == got["hear"][0] and "n’est pas utilisé tant qu’elle est confidentielle" in (got["said"] or ""), got)
             press(browser, "redo-transcript-panel-cancel")
@@ -2351,7 +2491,45 @@ def models_advanced(now: dt.datetime) -> None:
             check("a service chosen for a confidential meeting is refused, nothing written",
                   refused == "refused" and own() == {"transcription": {"engine": "service", "provider": "https://hears.example/v1", "model": "whisper-1"}}, [refused, own()])
             (meeting / "confidential").unlink()
+            # Settings naming no one to write the minutes: their entry says so in words.
+            full.file.write_text("\n".join(line for line in kept_settings.splitlines() if not line.startswith(("minutes_provider", "minutes_model"))) + "\n")
+            press(browser, "redo-transcript")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
+            press(browser, "redo-transcript-panel-advanced")
+            got = browser.execute_script(shown, "redo-transcript-panel")
+            check("Settings naming no minutes model: their entry reads « Réglages : aucun modèle choisi »",
+                  (got["write"] or [None])[0] == "Réglages\u00a0: aucun modèle choisi", got)
+            press(browser, "redo-transcript-panel-cancel")
             full.file.write_text(kept_settings)
+        # In English, the bar and Refaire…: the long name said whole as well.
+        english = Window(meetings, "en_US.UTF-8", named, ollama=base, small=True)
+        english.env.update(XDG_DATA_HOME=str(data))
+        with english as browser:
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+            press(browser, "small-more")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-advanced") and b.find_element(By.ID, "small-advanced").is_displayed(), 5)
+            press(browser, "small-advanced")
+            wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is False, 5)
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text(LONG_SAID + " — on this computer")
+            whole = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] is not None, 3)
+            got = browser.execute_script(LONG_SHOWN, "small-minutes-model")
+            check("en, the bar: the long name said whole under its list, at 12 px",
+                  whole and not got["fit"] and got["said"] == got["text"] and got["size"] == "12px" and got["inside"], got)
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_index(0)
+            wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)") == {}, 5)
+        english_full = Window(meetings, "en_US.UTF-8", named, ollama=base)
+        english_full.env.update(XDG_DATA_HOME=str(data))
+        with english_full as browser:
+            browser.set_window_size(830, 800)
+            time.sleep(1.5)
+            browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+            wait_for(browser, lambda b: b.execute_script(idle), 15)
+            press(browser, "redo-minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-panel-advanced"), 5)
+            press(browser, "redo-panel-advanced")
+            long_resized(browser, "en, Redo…", LONG_SAID + " — on this computer")
+            press(browser, "redo-panel-cancel")
     finally:
         tags.shutdown()
 
@@ -3234,9 +3412,9 @@ def bar_opened(now: dt.datetime) -> None:
         check(f"{what}: 440 wide, as tall as it shows, nothing overflows or is cut", holds(got), got)
     try:
         for language, (short, said) in {
-            "fr_FR.UTF-8": ("fr", {"check": "Vérifier le son", "advanced": "Avancé", "models": "Pour cette réunion seule\u202f; les Réglages ne changent pas.",
+            "fr_FR.UTF-8": ("fr", {"check": "Vérifier le son", "advanced": "Avancé — modèles", "models": "Pour cette réunion seule\u202f; les Réglages ne changent pas.",
                                    "settings": ["Modèle de transcription", "Modèle du compte rendu"], "recorded": "Enregistré : Mic. Le changer vaut pour le prochain enregistrement."}),
-            "en_US.UTF-8": ("en", {"check": "Check the sound", "advanced": "Advanced", "models": "For this meeting alone; Settings do not change.",
+            "en_US.UTF-8": ("en", {"check": "Check the sound", "advanced": "Advanced — models", "models": "For this meeting alone; Settings do not change.",
                                    "settings": ["Transcription model", "Minutes model"], "recorded": "Recorded: Mic. Changing it applies to the next recording."}),
         }.items():
             for theme in ("light", "dark"):
@@ -7612,7 +7790,7 @@ def main() -> int:
         offered = redo_offered(browser, "redo-panel", "minutes")
         check(
             "Refaire offers, in its « Avancé », Settings' model first, then the models on this computer",
-            offered == ["Celui des Réglages — Qwen3 14b — sur cet ordinateur", "Mistral 7b — sur cet ordinateur", "Qwen3 14b — sur cet ordinateur"],
+            offered == ["Réglages\u00a0: Qwen3 14b", "Mistral 7b — sur cet ordinateur"],
             offered,
         )
         before = (asked / "minutes.md").read_text()
@@ -7767,8 +7945,8 @@ def main() -> int:
         wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"))
         offered = redo_offered(browser, "redo-transcript-panel", "transcription")
         check("Refaire offers, in its « Avancé », Settings' model first, then the Whisper models of this computer",
-              offered == ["Celui des Réglages — Whisper large v3 turbo", "Whisper large v3 turbo", "Whisper small"], offered)
-        redo_pick(browser, "redo-transcript-panel", "transcription", 2)
+              offered == ["Réglages\u00a0: Whisper large v3 turbo", "Whisper small"], offered)
+        redo_pick(browser, "redo-transcript-panel", "transcription", 1)
         browser.find_element(By.ID, "redo-transcript-do").click()
         redone = wait_for(browser, lambda b: sorted(trash_files.glob("transcript-before-*.jsonl")), 10)
         trashed = sorted(trash_files.glob("transcript-before-*.jsonl"))
@@ -7820,7 +7998,7 @@ def main() -> int:
         press(browser, "redo-transcript")
         wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"))
         paths = [browser.execute_script("return window.__TAURI__.core.invoke('settings_shown').then(s => s.model)")]
-        redo_pick(browser, "redo-transcript-panel", "transcription", 2)
+        redo_pick(browser, "redo-transcript-panel", "transcription", 1)
         browser.find_element(By.ID, "redo-transcript-do").click()
         making_ = wait_for(browser, lambda b: "Transcription en cours" in heard_state(b), 3)
         shot(browser, "7-transcript-making")

@@ -165,17 +165,23 @@ confidential meeting is heard and written on this computer alone.
 
 They are chosen in **« Avancé »** ([board 6](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/6-bar-opened-light.png)),
 closed by default, the same in the bar opened and in each *Refaire…*: two lists, the transcription's
-model and the minutes', each « Celui des Réglages — … » first, then the Whisper models listed,
+model and the minutes', under « Pour cette réunion seule ; les Réglages ne changent pas. », each
+« Réglages : … » first — Settings' model never offered a second time —, then the Whisper models listed,
 SpeechAnalyzer where Settings hear by it, the service Settings set, and Ollama's models here
-(`models_offered`). A confidential meeting is offered no service: Settings' entry says who makes it here
+(`models_offered`). A native list never wraps: a chosen name wider than its list is said whole under
+it, at 12 px, measured again whenever the list's width changes (a `ResizeObserver`) or a choice is made. A confidential meeting is offered no service: Settings' entry says who makes it here
 — Whisper, Ollama on this computer —, a service it chose is said unused, never shown chosen, and
 `meeting_models_chosen` refuses one; the bar draws « Avancé » again as the meeting is said
 confidential or not. Settings unreadable, it is offered from those last read, and said. At rest, the choice is the next
-recording's (`next_models_kept`, in memory): its `models.json` once its folder holds `session.json`,
-then none for the one after; « Avancé » closed, it is said under the row, « Modèles gardés pour le
-prochain enregistrement. » Recording, it is that meeting's at once. In *Refaire…* it is kept once
+recording's (`next_models_kept`), kept in `next-models.json` beside the settings, written whole,
+Kitokey started again too: its `models.json` once its folder holds `session.json`, then none for
+the one after; « Avancé » closed, it is said under the row, naming them — « Modèles gardés : small ·
+Qwen3 8b » —, and given with « Avancé » to a screen reader. Recording, it is that meeting's at once. In *Refaire…* it is kept once
 *Refaire* is pressed — *Annuler* changes nothing —, then the transcript is made again by them
 (`transcript_redo_own`) or the minutes. A model gone is said on the meeting's page and in « Avancé ».
+Minutes its own model failed to write name that model, and *Refaire… › Avancé* to choose another,
+on the page and in the notification alike (`words::cause_said`, the model said by `words::model_said`,
+the page's `modelSaid` rule); Settings' model failing, Settings are named as before.
 
 **A meeting said confidential** (D60, [its board](../../docs/project/drawings/d60-confidential/)) is
 made on this computer alone, whatever the settings name — its own models too.

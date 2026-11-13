@@ -1652,3 +1652,92 @@ fn what_is_left_of_the_trial_is_said_in_days_and_in_meetings_each_in_its_number(
     assert_eq!(words::window(Language::French).trial, "Essai gratuit");
     assert_eq!(words::window(Language::English).trial, "Free trial");
 }
+
+#[test]
+fn minutes_failed_by_the_meetings_own_model_name_it_and_send_to_refaire_advanced_not_settings() {
+    use kitokey_shell::summarising::Cause;
+    // Where the gesture is another model: the meeting's own named, and where it was chosen.
+    for cause in [Cause::TooSlow, Cause::UnknownModel, Cause::Down, Cause::CutShort, Cause::NotMinutes] {
+        for (language, place, settings) in [
+            (Language::English, "Redo…\u{a0}› Advanced", "settings"),
+            (Language::French, "Refaire…\u{a0}› Avancé", "réglages"),
+        ] {
+            let said = words::cause_own(cause, language).unwrap_or_else(|| panic!("{cause:?} has no sentence of its own model"));
+            assert!(
+                said.matches("{}").count() == 1 && said.contains(place) && !said.contains(settings) && !said.contains('\''),
+                "{cause:?}: {said}"
+            );
+        }
+    }
+    // Where the gesture is the provider's — a key, credit, an address —, Settings' sentence stays.
+    for cause in [
+        Cause::RefusedKey,
+        Cause::NoCredit,
+        Cause::Redirected,
+        Cause::Settings,
+        Cause::Unreachable,
+        Cause::NoSpeech,
+    ] {
+        assert_eq!(words::cause_own(cause, Language::French), None, "{cause:?}");
+    }
+}
+
+#[test]
+fn a_model_is_said_as_the_page_says_it() {
+    // Each as the page's modelSaid says it (node, on window.js's function, 2026-11-12).
+    for (model, said) in [
+        ("mistral:latest", "Mistral"),
+        ("mistral:7b", "Mistral 7b"),
+        ("qwen3:8b", "Qwen3 8b"),
+        ("anthropic/claude-sonnet-4-5", "Claude Sonnet 4.5"),
+        ("gpt-4.1-mini", "GPT 4.1 Mini"),
+        ("llama3.1:8b-instruct-q4_K_M", "Llama3.1 8b Instruct"),
+        ("deepseek-coder:6.7b", "Deepseek Coder 6.7b"),
+        ("gemma3:27b-it-qat", "Gemma3 27b It"),
+        ("mistral-small3.2:24b-instruct-2506-q4_K_M", "Mistral Small3.2 24b Instruct 2506"),
+        ("openai/gpt-4o-2024-08-06", "GPT 4o"),
+        ("Qwen/Qwen2.5-7B-Instruct-GGUF", "Qwen2.5 7B Instruct GGUF"),
+        ("model.Q5_K_M.gguf", "Model"),
+        ("phi4:14b-fp16", "Phi4 14b"),
+        ("q4_K_M", "q4_K_M"),
+        ("llama-3-8b-int8", "Llama 3 8b"),
+        ("claude-3-5-haiku-20241022", "Claude 3.5 Haiku"),
+        ("x/", "X"),
+        ("a b", "A B"),
+    ] {
+        assert_eq!(words::model_said(model), said, "{model}");
+    }
+}
+
+#[test]
+fn a_notice_of_minutes_failed_by_the_meetings_own_model_says_what_its_page_says() {
+    use kitokey_shell::{summarising::Cause, words::Minutes};
+    for (language, place, settings) in [
+        (Language::English, "Redo…\u{a0}› Advanced", "settings"),
+        (Language::French, "Refaire…\u{a0}› Avancé", "réglages"),
+    ] {
+        for again in [false, true] {
+            let own = words::minutes(
+                &Minutes::failed_by(Some(Cause::NotMinutes), again, Some("mistral:latest"), language),
+                language,
+            );
+            let page = words::cause_said(Cause::NotMinutes, Some("mistral:latest"), language);
+            assert!(
+                own.body.ends_with(&page) && page.starts_with("Mistral, ") && page.contains(place) && !own.body.contains(settings),
+                "{}",
+                own.body
+            );
+            // The title as for any failure of the same kind.
+            assert_eq!(
+                own.title,
+                words::minutes(&Minutes::failed(Some(Cause::NotMinutes), again), language).title
+            );
+            // Settings' model, or a cause that is the provider's: today's notice, word for word.
+            for (cause, by) in [(Cause::NotMinutes, None), (Cause::RefusedKey, Some("mistral:latest"))] {
+                let notice = words::minutes(&Minutes::failed_by(Some(cause), again, by, language), language);
+                let before = words::minutes(&Minutes::failed(Some(cause), again), language);
+                assert_eq!((notice.title, notice.body), (before.title, before.body));
+            }
+        }
+    }
+}
