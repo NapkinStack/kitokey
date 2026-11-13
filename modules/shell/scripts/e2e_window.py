@@ -248,6 +248,13 @@ def press(browser, element_id: str) -> None:
     browser.find_element(By.ID, element_id).click()
 
 
+def free(browser, element_id: str) -> None:
+    """A Tester's button offered again: no test in flight. One still running — a click `press`
+    repeats after the driver raised an error once it had clicked — disables it: the next case's
+    click would be lost, its code never asked, the last sentence read again (#799)."""
+    wait_for(browser, lambda b: b.find_element(By.ID, element_id).is_enabled(), 10)
+
+
 def context_opened(browser):
     """A meeting's context, opened from its settings row when it is closed (D89)."""
     toggle = browser.find_element(By.ID, "context-toggle")
@@ -1103,10 +1110,12 @@ def service_named(now: dt.datetime) -> None:
         code = WORK / "test-code"
         try:
             for cause, sentence in TEST_CAUSES:
+                free(browser, "transcription-test")
                 code.write_text(cause)
                 press(browser, "transcription-test")
                 held = wait_for(browser, lambda b: b.execute_script(said) == sentence, 10)
                 check(f"Tester of a service, {cause}: its own sentence, what to do, no raw text", held, browser.execute_script(said))
+            free(browser, "transcription-test")
             code.write_text("provider.of_a_later_version")
             press(browser, "transcription-test")
             unknown = wait_for(browser, lambda b: b.execute_script(said).startswith("Le modèle ne répond pas"), 10)
@@ -7516,12 +7525,14 @@ def main() -> int:
         code = WORK / "test-code"
         try:
             for cause, sentence in TEST_CAUSES:
+                free(browser, "minutes-test")
                 code.write_text(cause)
                 press(browser, "minutes-test")
                 held = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-tested").get_attribute("textContent") == sentence, 10)
                 check(f"Tester of the minutes, {cause}: its own sentence, what to do, no raw text", held, browser.find_element(By.ID, "minutes-tested").get_attribute("textContent"))
             # In developer mode, the sentence and the program's last line, its name off.
             changed(lambda: browser.find_element(By.ID, "developer").click())
+            free(browser, "minutes-test")
             press(browser, "minutes-test")
             raw = wait_for(browser, lambda b: "raw words of the provider" in b.find_element(By.ID, "minutes-tested").get_attribute("textContent"), 10)
             told = browser.find_element(By.ID, "minutes-tested").get_attribute("textContent")
