@@ -2273,6 +2273,12 @@ def models_advanced(now: dt.datetime) -> None:
             check("Settings unchanged by any of it", window.file.read_text() == before, window.file.read_text())
             # Stopped by ■: nothing kept for the next, nothing said kept — as the shell has it.
             wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+            # Stopped with « Avancé » open on that meeting's models: drawn again for the next recording,
+            # closed, Settings' first — never left open on the meeting that ended (#766, P5).
+            rest = wait_for(browser, lambda b: b.execute_script(shown, "small")["heard"] == "Réglages : Whisper adv settings", 3)
+            got = browser.execute_script(shown, "small")
+            check("stopped by ■ with « Avancé » open: drawn again for the next recording, closed, Settings' first",
+                  rest and got["expanded"] == "false" and got["written"] == "Réglages : Qwen3 14b", got)
             none_kept = lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
             quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
             check("stopped by ■: no models kept for the next, and none said kept", quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
