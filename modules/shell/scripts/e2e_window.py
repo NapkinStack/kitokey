@@ -7448,20 +7448,53 @@ def main() -> int:
                   "return l && [l.getAttribute('role'), getComputedStyle(l).display !== 'none', l.childElementCount]")
         check("the file read: the banner's live region there, rendered, empty", browser.execute_script(region) == ["status", True, 0],
               browser.execute_script(region))
+        # On a meeting's page when it breaks: the banner there too.
+        browser.execute_script("location.hash = '#/meeting/kept'")
+        wait_for(browser, lambda b: not b.find_element(By.ID, "meeting").get_attribute("hidden"), 5)
         window.file.write_text(held + 'keep_audio = "x"\n')
         browser.execute_script("window.dispatchEvent(new Event('focus'))")
         came = wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
         inside = browser.execute_script("const b = document.getElementById('settings-banner'); window.firstBanner = b;"
                                         " return b && b.parentElement.id === 'settings-banner-live'")
-        check("broken while the window is open: the banner comes, inside its live region", came and inside, [browser.execute_script(banner), inside])
+        check("broken while a meeting's page is open: the banner comes, inside its live region", came and inside,
+              [browser.execute_script(banner), inside, browser.execute_script("return location.hash")])
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
+        # Under 840 px, at the list: above the list, inside the window, nothing cut (`#pane-said`'s rule).
+        browser.set_window_size(420, 760)
+        time.sleep(0.4)
+        narrow = browser.execute_script("const b = document.getElementById('settings-banner').getBoundingClientRect();"
+                                        " const l = document.getElementById('list').getBoundingClientRect();"
+                                        " const k = document.getElementById('settings-banner-link').getBoundingClientRect();"
+                                        " return {above: b.bottom <= l.top + 0.5, inside: b.left >= -0.5 && b.right <= innerWidth + 0.5, link: k.right <= b.right + 0.5 && k.width > 0}")
+        shot_themed(browser, "settings-banner-420-light", "light")
+        check("under 840 px: the banner above the list, inside the window, its link whole", narrow == {"above": True, "inside": True, "link": True}, narrow)
+        browser.set_window_size(1100, 800)
+        time.sleep(0.4)
         browser.execute_script("window.dispatchEvent(new Event('focus'))")
         time.sleep(1)
         same = browser.execute_script("return document.getElementById('settings-banner') === window.firstBanner")
         check("listed again, still unreadable: the same banner, not put in anew", same, same)
+        # A file it may not read — another path than a file that does not parse (`settings::read`).
         window.file.write_text(held)
+        window.file.chmod(0)
+        try:
+            browser.execute_script("window.dispatchEvent(new Event('focus'))")
+            check("a settings file it may not read: the same banner, still there",
+                  wait_for(browser, lambda b: b.execute_script("return document.getElementById('settings-banner') === window.firstBanner"), 5))
+        finally:
+            window.file.chmod(0o644)
         browser.execute_script("window.dispatchEvent(new Event('focus'))")
         check("fixed again: the banner goes, its live region left empty",
               wait_for(browser, lambda b: b.execute_script(region) == ["status", True, 0], 5), browser.execute_script(region))
+        # No settings file at all — a first start —: nothing unreadable, no banner.
+        window.file.unlink()
+        window.__exit__()
+        browser = window.__enter__()
+        first = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('listed').then(l => l.settings_unread)") is False, 10)
+        time.sleep(0.5)
+        check("no settings file, a first start: not said unreadable, no banner", first and browser.execute_script(region) == ["status", True, 0],
+              browser.execute_script(region))
     # Who writes the minutes: an Ollama made here, an online service, an address of the user's. A
     # key goes to the scenario's own keyring, which lives as long as the program.
     class Tags(http.server.BaseHTTPRequestHandler):
