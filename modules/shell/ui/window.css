@@ -146,7 +146,13 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .minutes .body table.actions .long { min-width: 14ch; white-space: normal; overflow-wrap: break-word; }
 .minutes .body table.actions .unsettled { color: var(--soft); font-weight: 400; }
 /* The settings (D11's fourth board): cards, each titled inside; a step per model, on a raised ground. */
-#settings { max-width: 720px; }
+/* Settings: one column centred at a maximum width, as GNOME's adaptive preferences (D95); nothing
+   wider than its card — a long name breaks, a choice narrows to its card (#782). */
+#settings { max-width: 720px; width: 100%; margin-inline: auto; overflow-wrap: anywhere; }
+#settings select { max-width: 100%; min-width: 0; }
+#settings .picks { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.general-advanced { display: flex; flex-direction: column; gap: 12px; }
+#settings .choices { display: flex; flex-direction: column; gap: 10px; }
 #settings .group { margin: 0; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--line); }
 #settings .group h2 { font-size: 17px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--ink); margin: 0; }
 .step { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--raised); }
@@ -156,7 +162,7 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .status.here::before { background: var(--ok); }
 .status:empty { display: none; }
 .status.online::before { background: var(--accent); }
-#settings .group > .row + .row { border-top: 1px solid var(--line); padding-top: 14px; }
+#settings .group > .row + .row, .general-advanced > .row + .row { border-top: 1px solid var(--line); padding-top: 14px; }
 .picks { display: flex; gap: 8px; align-items: center; }
 .picks input { width: 96px; min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
 #settings .state { flex-direction: row; align-items: center; justify-content: space-between; }

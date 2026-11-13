@@ -197,12 +197,14 @@ TEST_CAUSES = [
     ("provider.down", "Le fournisseur répond qu’il est en panne\u00a0: réessayez plus tard. Sur cet ordinateur, ce modèle est peut-être trop gros pour la mémoire\u00a0: choisissez-en un plus petit."),
     ("provider.unreachable", "Le fournisseur n’a pas pu être joint\u00a0: vérifiez qu’il tourne, ou le réseau, puis réessayez."),
 ]
-# Settings in at most three groups (D95): each card's heading, in order; and the group the
+# Settings in at most three groups (D95): each group's heading, in order — the trial's line is no group; and the group the
 # transcription model's state is said in — no card of its own any more (#782).
-SETTINGS_GROUPS = """return [[...document.querySelectorAll('#settings > section')].map(s => s.querySelector('h2')?.textContent ?? ''),
+SETTINGS_GROUPS = """return [[...document.querySelectorAll('#settings > section:has(> h2)')].map(s => s.querySelector('h2')?.textContent ?? ''),
   document.getElementById('model-state')?.closest('#settings > section')?.querySelector('h2')?.textContent ?? null,
   document.getElementById('developer')?.closest('#settings > section')?.querySelector('h2')?.textContent ?? null,
-  document.getElementById('developer')?.getClientRects().length ?? null]"""
+  document.getElementById('developer')?.getClientRects().length ?? null,
+  [...document.querySelectorAll('#settings .name')].filter(n => n.textContent === arguments[0])
+    .map(n => [n.closest('#settings > section')?.querySelector('h2')?.textContent ?? null, n.closest('.card') === n.closest('#settings > section')])]"""
 # Whatever of Settings goes past its card or the window: each element's box measured, and a box
 # whose text spills past it — not the page's scroll alone, which saw nothing at 420 px (#782).
 SETTINGS_OVERFLOW = """const out = [], width = document.documentElement.clientWidth;
@@ -303,6 +305,13 @@ def tester_click(browser, element_id: str, case: str) -> None:
         if wait_for(browser, lambda b: b.execute_script(CLICKS_COUNTED, element_id) > before, 1):
             return
     check(f"Tester never started for {case}", False, f"#{element_id} clicked twice, no click taken")
+
+
+def advanced_unfolded(browser):
+    """Settings' « Avancé », folded at the bottom of « Général » (D95), unfolded; its developer switch."""
+    if browser.find_element(By.ID, "general-advanced").get_attribute("aria-expanded") != "true":
+        press(browser, "general-advanced")
+    return browser.find_element(By.ID, "developer")
 
 
 def context_opened(browser):
@@ -1188,6 +1197,7 @@ def service_named(now: dt.datetime) -> None:
         code.write_text(TEST_CAUSES[-1][0])
         try:
             before = browser.find_element(By.ID, "transcription-said")
+            advanced_unfolded(browser)
             press(browser, "developer")
             WebDriverWait(browser, 5).until(staleness_of(before))
             free(browser, "transcription-test", "a service in developer mode")
@@ -1866,9 +1876,10 @@ echo '{{"available":true,"installed":true,"supported":true}}'
                   [o.text for o in pick.options] == ["Langue du système", "Français", "English"]
                   and pick.first_selected_option.get_attribute("value") == "" and label == "Langue de Kitokey",
                   ([o.text for o in pick.options], label))
-            grouped = browser.execute_script(SETTINGS_GROUPS)
-            check("Settings in three groups, in order; the model's state said in « Modèles »; « Avancé » folded in « Général » (D95)",
-                  grouped == [["Après un enregistrement", "Modèles", "Général"], "Modèles", "Général", 0], grouped)
+            grouped = browser.execute_script(SETTINGS_GROUPS, "Modèle de transcription")
+            check("Settings in three groups, in order; the model's state said once, a line of « Modèles », no card of its own (#782);"
+                  " « Avancé » folded in « Général » (D95)",
+                  grouped == [["Après un enregistrement", "Modèles", "Général"], "Modèles", "Général", 0, [["Modèles", True]]], grouped)
             redo(browser)
             wait_for(browser, lambda b: "Transcription prête" in notified.read_text(), 15)
             before = by_settings(browser, "Transcription prête")
@@ -1883,8 +1894,9 @@ echo '{{"available":true,"installed":true,"supported":true}}'
                   saved and spoken and label == "Language of Kitokey"
                   and browser.execute_script("return document.activeElement.id") == "app-language",
                   (window.file.read_text(), sections(browser), label))
-            grouped = browser.execute_script(SETTINGS_GROUPS)
-            check("in English too: three groups, in order (D95)", grouped == [["After a recording", "Models", "General"], "Models", "General", 0], grouped)
+            grouped = browser.execute_script(SETTINGS_GROUPS, "Transcription model")
+            check("in English too: three groups, in order (D95)",
+                  grouped == [["After a recording", "Models", "General"], "Models", "General", 0, [["Models", True]]], grouped)
             check("the tray's menu speaks it at once, with no restart", wait_for(browser, lambda b: tray_labels() == english, 5), tray_labels())
             mark = len(notified.read_text())
             after = by_settings(browser, "Transcript ready")
@@ -7352,7 +7364,7 @@ def main() -> int:
         # The user changes the file by hand while Kitokey runs: the next save keeps it.
         window.file.write_text(window.file.read_text().replace("keep_audio = 30", "keep_audio = 90 # by hand"))
         changed(lambda: browser.find_element(By.ID, "reminder").click())
-        changed(lambda: browser.find_element(By.ID, "developer").click())
+        changed(lambda: advanced_unfolded(browser).click())
         # When an application takes the microphone (D30, board 4): offer to record by default;
         # nothing chosen here, then the offer again, each written.
         offer_on = read(browser, lambda b: Select(b.find_element(By.ID, "offer")).first_selected_option.get_attribute("value")) == "offer"
@@ -7397,7 +7409,7 @@ def main() -> int:
         check("the logs' level chosen is in the file", 'log = "debug"' in window.file.read_text(), window.file.read_text())
         changed(lambda: Select(browser.find_element(By.ID, "log-level")).select_by_value("info"))
         check("the usual level chosen again is in the file", 'log = "info"' in window.file.read_text(), window.file.read_text())
-        changed(lambda: browser.find_element(By.ID, "developer").click())
+        changed(lambda: advanced_unfolded(browser).click())
         check("the developer mode turned off again is said so in the file, and hides its rows",
               "developer = false" in window.file.read_text() and not browser.find_elements(By.ID, "log-level"), window.file.read_text())
         failed = browser.find_element(By.ID, "not-saved").is_displayed()
@@ -7485,7 +7497,7 @@ def main() -> int:
         window.file.write_text(held)
         browser.execute_script("window.dispatchEvent(new Event('focus'))")
         wait_for(browser, lambda b: not b.find_element(By.ID, "reminder").get_attribute("disabled"), 5)
-        changed(lambda: browser.find_element(By.ID, "developer").click())
+        changed(lambda: advanced_unfolded(browser).click())
         check("developer mode on again, to read a failure", "developer = true" in window.file.read_text(), window.file.read_text())
         held = window.file.read_text()
         lines = [line for line in held.splitlines() if not line.startswith("keep_audio")] + ["keep_audio = 0"]
@@ -7608,13 +7620,13 @@ def main() -> int:
                 # A second test in flight once the sentence is read: the next case waits for it (#799).
                 tester_click(browser, "minutes-test", f"the minutes, {cause} again")
             # In developer mode, the sentence and the program's last line, its name off.
-            changed(lambda: browser.find_element(By.ID, "developer").click())
+            changed(lambda: advanced_unfolded(browser).click())
             free(browser, "minutes-test", "the minutes in developer mode")
             tester_click(browser, "minutes-test", "the minutes in developer mode")
             raw = wait_for(browser, lambda b: "raw words of the provider" in b.find_element(By.ID, "minutes-tested").get_attribute("textContent"), 10)
             told = browser.find_element(By.ID, "minutes-tested").get_attribute("textContent")
             check("Tester in developer mode: the cause, then the raw line alone", raw and told.startswith(TEST_CAUSES[-1][1]) and "kitokey-summary:" not in told and "earlier line" not in told, told)
-            changed(lambda: browser.find_element(By.ID, "developer").click())
+            changed(lambda: advanced_unfolded(browser).click())
             text = window.file.read_text()
         finally:
             code.unlink(missing_ok=True)
@@ -7928,6 +7940,7 @@ def main() -> int:
               (state(browser), heard.read_text()[-400:]))
         # The developer mode shows what the program said, under the sentence; never in a notice (D29).
         to_settings()
+        advanced_unfolded(browser)
         press(browser, "developer")
         wait_for(browser, lambda b: "developer = true" in window.file.read_text(), 5)
         browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
@@ -7943,6 +7956,7 @@ def main() -> int:
         check("and each track's level, after the logs: one line a track, numbers only",
               lines.count('"type":"levels"') == 2 and lines.rstrip().endswith("}") and '"track":"remote"' in lines.splitlines()[-1], lines[-400:])
         to_settings()
+        advanced_unfolded(browser)
         press(browser, "developer")
         wait_for(browser, lambda b: "developer = false" in window.file.read_text(), 5)
         settled = window.file.read_text()
