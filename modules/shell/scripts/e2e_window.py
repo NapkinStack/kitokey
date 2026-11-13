@@ -3167,8 +3167,13 @@ def sound_checked(now: dt.datetime) -> None:
                 # Closed and opened again, « Jouer un son de test » pressed at once, the call still held: nothing plays.
                 press(browser, "check-sound-close")
                 wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3)
-                press(browser, "check-sound-open")
-                browser.execute_script("document.getElementById('check-play').click()")
+                # Opened and pressed in one script: the panel is drawn before its first await, so no answer
+                # of the shell's can have come — what is read is the button as offered before it (#751).
+                offered = browser.execute_script("document.getElementById('check-sound-open').click();"
+                                                 " const play = document.getElementById('check-play');"
+                                                 " const disabled = play.disabled; play.click(); return disabled")
+                check("pressed at once while a call holds a microphone: « Jouer un son de test » not offered before the shell's first answer",
+                      offered is True, offered)
                 # Read from the press on, not a second after: the half-second sound would be over (#751).
                 heard_out, outputs, stamps = set(), [], []
                 until = time.monotonic() + 1.5
