@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # The module's end-to-end scenarios (cycle 01, D3), on sound made here and on devices made
-# for the run: nobody is recorded. It needs a PipeWire or PulseAudio desktop; where there is
-# none — a CI runner — or where a microphone is in use, it says so and runs nothing.
-#
-# For about two minutes the system's default output and input are two silent devices of its
-# own; they are put back whatever happens.
+# for the run: nobody is recorded. It runs on a PipeWire and a WirePlumber of its own, as
+# private_graph.sh does: their own runtime folder, no hardware monitored, the desktop's graph
+# never spoken to. No microphone or speaker of the computer, nor one connected during the run,
+# can be opened, and the desktop's defaults are never moved — on the desktop's graph, AirPods
+# connected during a run were taken as the default input (2026-11-13). Where PipeWire is
+# missing — a CI runner — it says so and runs nothing.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p .evidence
@@ -13,16 +14,7 @@ say() { echo "$*" | tee -a .evidence/e2e.txt; }
 # The run's logs, where NapkinStack reads them after it (nstack e2e capture).
 evidence=${NSTACK_EVIDENCE:-$PWD/.evidence/e2e}
 
-if ! command -v pactl >/dev/null || ! pactl info >/dev/null 2>&1; then
-  say "e2e: NOT RUN — no sound server here"; exit 77
-fi
-if [ -n "$(pactl list short source-outputs)" ]; then
-  say "e2e: NOT RUN — an application holds a microphone: a call may be in progress"; exit 77
-fi
-if pactl list short sinks | awk -v d="$(pactl get-default-sink)" '$2 == d && $NF == "RUNNING" {found = 1} END {exit !found}'; then
-  say "e2e: NOT RUN — the system is playing sound: its output would be taken from it"; exit 77
-fi
-for tool in ffmpeg ffprobe pw-play pw-dump pw-cli pw-loopback pw-metadata python3; do
+for tool in pipewire wireplumber pipewire-pulse pactl ffmpeg ffprobe pw-play pw-dump pw-cli pw-loopback pw-metadata python3; do
   command -v "$tool" >/dev/null || { say "e2e: NOT RUN — $tool is missing"; exit 77; }
 done
 
@@ -34,30 +26,101 @@ for _ in $(seq 60); do [ "$(cut -d. -f1 /proc/loadavg)" -lt "$quiet" ] && break;
 if [ "$(cut -d. -f1 /proc/loadavg)" -ge "$quiet" ]; then
   say "e2e: NOT RUN — the machine is busy (load $(cut -d' ' -f1 /proc/loadavg), $(nproc) processors): a clock cannot be measured on it"; exit 77
 fi
-bin=${CARGO_TARGET_DIR:-$PWD/target}/release/kitokey-capture   # where cargo built it
+bin=$(realpath "${CARGO_TARGET_DIR:-$PWD/target}/release/kitokey-capture")   # where cargo built it
 work=$(mktemp -d)
 # Its logs in the run's evidence, this run's alone, never the user's (ADR-0007).
 export KITOKEY_LOG_DIR="$evidence/logs"
 rm -rf "$KITOKEY_LOG_DIR"
-# A run that was killed outright could not put anything back: its devices are removed first,
-# and the system falls back on its own.
-for stale in $(pactl list short modules | awk '/(kitokey|wholeheard)_e2e_/ {print $1}'); do
-  say "e2e: a device of an earlier run that was killed is removed"; pactl unload-module "$stale" || true
-done
-old_sink=$(pactl get-default-sink); old_source=$(pactl get-default-source)
-out=$(pactl load-module module-null-sink sink_name=kitokey_e2e_out)
-mic=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic)
+
+# The desktop's defaults, read before the run and after it: the run never speaks to its graph, so
+# they are the same, unless someone changed them meanwhile. "none" where there is no desktop.
+graph_vars="XDG_RUNTIME_DIR PIPEWIRE_RUNTIME_DIR PIPEWIRE_REMOTE PULSE_SERVER XDG_CONFIG_HOME XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME DBUS_SESSION_BUS_ADDRESS DISPLAY WAYLAND_DISPLAY"
+# shellcheck disable=SC2086
+desktop=$(declare -p $graph_vars 2>/dev/null || true)
+desktop_defaults() {
+  # shellcheck disable=SC2086
+  ( unset $graph_vars; eval "$desktop"
+    echo "$(pactl get-default-sink 2>/dev/null || echo none) $(pactl get-default-source 2>/dev/null || echo none)" )
+}
+desktop_before=$(desktop_defaults)
+
+# The run's own graph, as private_graph.sh's. A socket's path is short: never under a long folder.
+graph=$(mktemp -d /tmp/wh-XXXXXX)
+export XDG_RUNTIME_DIR=$graph/rt PIPEWIRE_RUNTIME_DIR=$graph/rt XDG_CONFIG_HOME=$graph/cfg XDG_STATE_HOME=$graph/state
+export XDG_CACHE_HOME=$graph/cache XDG_DATA_HOME=$graph/data DBUS_SESSION_BUS_ADDRESS=disabled:
+unset PIPEWIRE_REMOTE PULSE_SERVER DISPLAY WAYLAND_DISPLAY
+mkdir -p "$graph/rt" "$graph/cfg/wireplumber/wireplumber.conf.d"
+chmod 700 "$graph/rt"
+cat > "$graph/cfg/wireplumber/wireplumber.conf.d/90-no-hardware.conf" <<CONF
+wireplumber.profiles = { main = { monitor.alsa = disabled, monitor.bluez = disabled, monitor.bluez-midi = disabled, monitor.alsa-midi = disabled, monitor.v4l2 = disabled, monitor.libcamera = disabled, support.logind = disabled, support.reserve-device = disabled, support.portal-permissionstore = disabled } }
+CONF
+pipewire > "$graph/pipewire.log" 2>&1 & daemon=$!
+for _ in $(seq 20); do [ -S "$graph/rt/pipewire-0" ] && break; sleep 0.25; done
+wireplumber > "$graph/wireplumber.log" 2>&1 & manager=$!
+pipewire-pulse > "$graph/pipewire-pulse.log" 2>&1 & pulse=$!
+for _ in $(seq 20); do pactl info > /dev/null 2>&1 && break; sleep 0.25; done
 restore() {
+  status=$?
   pkill -P $$ 2>/dev/null || true
-  pactl set-default-sink "$old_sink" 2>/dev/null || true
-  pactl set-default-source "$old_source" 2>/dev/null || true
-  pactl unload-module "$out" 2>/dev/null || true
-  pactl unload-module "$mic" 2>/dev/null || true
-  # Scenario J's own, when it was stopped before it took them away.
-  for module in ${mic_b:-} ${out_b:-} ${out_c:-} ${mic_c:-} ${mic_d:-}; do pactl unload-module "$module" 2>/dev/null || true; done
-  rm -rf "$work"
+  kill "$pulse" "$manager" "$daemon" 2>/dev/null || true
+  wait "$pulse" "$manager" "$daemon" 2>/dev/null || true
+  rm -rf "$work" "$graph"
+  if [ -e "$work.real" ]; then
+    say "e2e: NOT RUN — a real device appeared: $(cat "$work.real")"; rm -f "$work.real"; exit 77
+  fi
+  exit "$status"
 }
 trap restore EXIT
+trap 'exit 77' TERM
+
+# The guard, the whole run long: in the run's graph no device, and no source or sink but the run's
+# own `kitokey_e2e_*`; no capture of this run holding a sound card of the computer directly. One
+# seen: every capture of this run and the graph killed at once, the run NOT RUN — exit 77, as a run
+# that cannot run here (.nstack/handbook/09-platform.md).
+real_devices() {
+  python3 - "$bin" <<'GUARD'
+import json, os, subprocess, sys
+seen = []
+try:  # a graph slow to answer is read again half a second later; the cards below are read anyway
+    dump = subprocess.run(["pw-dump"], capture_output=True, text=True, timeout=5).stdout
+except subprocess.TimeoutExpired:
+    dump = ""
+# A device of any kind, or a source or sink not the run's own: streams (Stream/…) are the programs'.
+for obj in json.loads(dump or "[]"):
+    props = (obj.get("info") or {}).get("props") or {}
+    name = str(props.get("node.name") or props.get("device.name") or obj.get("id"))
+    device = obj.get("type", "").endswith(":Device")
+    stranger = str(props.get("media.class", "")).startswith("Audio/") and not name.startswith("kitokey_e2e_")
+    if device or stranger:
+        seen.append(f"{name} ({props.get('media.class') or obj.get('type')})")
+for pid in filter(str.isdigit, os.listdir("/proc")):
+    try:
+        if os.readlink(f"/proc/{pid}/exe") != sys.argv[1]:
+            continue
+        held = [os.readlink(f"/proc/{pid}/fd/{fd}") for fd in os.listdir(f"/proc/{pid}/fd")]
+    except OSError:
+        continue
+    seen += [f"{card} held by {pid}" for card in held if card.startswith("/dev/snd/pcm")]
+print(", ".join(seen))
+sys.exit(1 if seen else 0)
+GUARD
+}
+stop_all() {
+  echo "$1" > "$work.real"
+  for pid in /proc/[0-9]*; do
+    [ "$(readlink "$pid/exe" 2>/dev/null)" = "$bin" ] && kill -KILL "${pid#/proc/}" 2>/dev/null
+  done
+  kill -KILL "$daemon" 2>/dev/null || true
+  kill -TERM $$
+}
+if ! seen=$(real_devices); then stop_all "$seen"; fi
+( while sleep 0.5; do seen=$(real_devices) || { stop_all "$seen"; break; }; done ) & guard=$!
+# The guard's own trial: E2E_INTRUDER=<seconds> brings a sink not the run's that long after, as a
+# headset connecting — the run must end NOT RUN, exit 77, naming it.
+[ -z "${E2E_INTRUDER:-}" ] || { sleep "$E2E_INTRUDER"; pactl load-module module-null-sink sink_name=intruder > /dev/null; } &
+
+out=$(pactl load-module module-null-sink sink_name=kitokey_e2e_out)
+mic=$(pactl load-module module-null-sink sink_name=kitokey_e2e_mic)
 pactl set-default-sink kitokey_e2e_out
 pactl set-default-source kitokey_e2e_mic.monitor
 
@@ -722,5 +785,8 @@ PY
 check headset_said_once
 check unchanged
 
+kill "$guard" 2>/dev/null || true; wait "$guard" 2>/dev/null || true
+say "The desktop's defaults, before and after the run: $desktop_before"
+check test "$(desktop_defaults)" = "$desktop_before"
 [ "$failed" = 0 ] && say "e2e: passed" || say "e2e: FAILED"
 exit "$failed"
