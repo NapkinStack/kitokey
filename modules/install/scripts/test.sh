@@ -121,6 +121,16 @@ check("the identity named is the one identity.json holds, for x64",
       said.get("Name") == identity["name"] and said.get("Publisher") == identity["publisher"]
       and said.get("ProcessorArchitecture") == "x64", said)
 check("Kitokey is its name", written.findtext("m:Properties/m:DisplayName", namespaces=ns) == "Kitokey")
+# D84: the session starts Kitokey from its package, a startup task Windows turns on at the first start.
+uap5 = "{http://schemas.microsoft.com/appx/manifest/uap/windows10/5}"
+tasks = [(extension.attrib, extension.find(f"{uap5}StartupTask"))
+         for extension in written.iterfind(f"m:Applications/m:Application/m:Extensions/{uap5}Extension", ns)
+         if extension.get("Category") == "windows.startupTask"]
+check("one startup task, for kitokey.exe, on at the first start, named Kitokey",
+      len(tasks) == 1 and tasks[0][0].get("Executable") == "kitokey.exe"
+      and tasks[0][0].get("EntryPoint") == "Windows.FullTrustApplication" and tasks[0][1] is not None
+      and tasks[0][1].get("TaskId") == "KitokeyStartupTask" and tasks[0][1].get("Enabled") == "true"
+      and tasks[0][1].get("DisplayName") == "Kitokey", tasks)
 placeholder = {**identity, "placeholder": True}
 check("a placeholder identity is said, and that the package is not to be submitted",
       any("placeholder" in line and "not submitted" in line for line in msix.notices("1.2.3", placeholder)))
