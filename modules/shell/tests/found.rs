@@ -202,7 +202,7 @@ fn a_program_started_later_has_a_later_start() {
 }
 
 #[test]
-fn a_kept_file_that_cannot_be_read_is_removed() {
+fn a_kept_file_that_cannot_be_read_is_set_aside_never_deleted() {
     use std::os::unix::fs::PermissionsExt;
     let sessions = tempfile::tempdir().unwrap();
     let file = sessions.path().join("recording.json");
@@ -211,18 +211,29 @@ fn a_kept_file_that_cannot_be_read_is_removed() {
     if fs::read(&file).is_ok() {
         return; // run as a user who reads anything: there is no unreadable file to make
     }
-    assert!(recording::find(&file, now()).is_none());
+    let at = now();
+    assert!(recording::find(&file, at).is_none());
     assert!(!file.exists(), "nothing is left to find");
+    let aside = sessions.path().join(format!("recording.json.unreadable-{at}"));
+    fs::set_permissions(&aside, fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(fs::read_to_string(&aside).unwrap(), "{}", "renamed whole, not removed");
 }
 
 #[test]
-fn a_folder_in_the_kept_file_s_place_is_removed_and_keeping_works_again() {
+fn a_folder_in_the_kept_file_s_place_is_set_aside_whole_and_keeping_works_again() {
     let sessions = tempfile::tempdir().unwrap();
     let file = sessions.path().join("recording.json");
     fs::create_dir_all(file.join("inside")).unwrap();
     fs::write(file.join("inside/x"), "x").unwrap();
-    assert!(recording::find(&file, now()).is_none());
-    assert!(!file.exists(), "the folder is gone");
+    let at = now();
+    assert!(recording::find(&file, at).is_none());
+    assert!(!file.exists(), "nothing is left to find");
+    let aside = sessions.path().join(format!("recording.json.unreadable-{at}"));
+    assert_eq!(
+        fs::read_to_string(aside.join("inside/x")).unwrap(),
+        "x",
+        "what it held, kept intact"
+    );
     let kept = Kept::of(std::process::id(), &session(sessions.path())).unwrap();
     recording::keep(&file, &kept).unwrap();
     assert!(file.is_file());

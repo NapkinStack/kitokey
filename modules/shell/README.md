@@ -34,7 +34,9 @@ recording in progress, its tray and bar at ■, its length counted from `session
 stopped by a termination signal (`recording/v1`), its transcript following as usual; a `stopped`
 already written is a recording ending. Its levels, devices and silences went with the output of the
 shell that read them: none are shown. A program gone, another under its number or a file that does
-not read finds nothing, and the file is removed; the session left is listed as it is. Not found: a
+not read finds nothing, and the file is removed; one that cannot be read — a file, or a folder in
+its place — is set aside as `recording.json.unreadable-<seconds>`, never deleted. The session left is
+listed as it is. Not found: a
 recording whose shell was ended before capture said `started`, and on macOS and Windows, which have
 no `/proc`.
 

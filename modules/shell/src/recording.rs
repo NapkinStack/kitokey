@@ -493,18 +493,24 @@ const LOOKED_AT_EVERY: Duration = Duration::from_millis(200);
 
 /// The recording a Kitokey ended before this one left running, as `file` keeps it — or none:
 /// nothing kept, a file that cannot be read or does not read, a program gone or another under its
-/// number. What finds nothing is removed, a folder in the file's place too: nothing is left to find.
+/// number. What finds nothing is removed — what cannot be read, a file or a folder in its place, is set
+/// aside as `<file>.unreadable-<now>`, never deleted: nothing is left to find.
 /// `now`: seconds since 1970.
 pub fn find(file: &Path, now: i64) -> Option<Found> {
     let text = match fs::read(file) {
         Ok(text) => text,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return None,
-        // Not readable — no permission, or a folder in its place —: removed, or every later `keep` fails.
+        // Not readable — no permission, or a folder in its place —: set aside, never deleted (it may
+        // not be the shell's), so that the next `keep` works.
         Err(error) => {
-            warn!(kind = ?error.kind(), "shell.recording_unread");
-            let removed = if file.is_dir() { fs::remove_dir_all(file) } else { forget(file) };
-            if let Err(error) = removed {
-                warn!(kind = ?error.kind(), "shell.recording_not_forgotten");
+            let aside = file.with_file_name(format!(
+                "{}.unreadable-{now}",
+                file.file_name().unwrap_or_default().to_string_lossy()
+            ));
+            let name = aside.file_name().unwrap_or_default().to_string_lossy().to_string();
+            match fs::rename(file, &aside) {
+                Ok(()) => warn!(kind = ?error.kind(), aside = %name, "shell.recording_unread"),
+                Err(moved) => warn!(kind = ?error.kind(), not_set_aside = ?moved.kind(), "shell.recording_unread"),
             }
             return None;
         }
