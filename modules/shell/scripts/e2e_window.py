@@ -255,6 +255,29 @@ def free(browser, element_id: str, case: str) -> None:
         check(f"Tester still busy before {case}", False, f"#{element_id} disabled for 10 s")
 
 
+# Each click a button of the page took, counted by its id: a disabled one takes none.
+CLICKS_COUNTED = """if (!window.e2eClicks) {
+  window.e2eClicks = {};
+  document.addEventListener("click", (event) => {
+    const id = event.target.closest("button")?.id;
+    if (id) window.e2eClicks[id] = (window.e2eClicks[id] ?? 0) + 1;
+  }, true);
+}
+return window.e2eClicks[arguments[0]] ?? 0;"""
+
+
+def tester_click(browser, element_id: str, case: str) -> None:
+    """A click on Tester confirmed taken — its handler starts a test at once —, made once more if
+    lost; lost twice, a named failure (#799). Not the "testing" sentence: a test of the fake
+    program ends before a poll would read it."""
+    for _ in range(2):
+        before = browser.execute_script(CLICKS_COUNTED, element_id)
+        press(browser, element_id)
+        if wait_for(browser, lambda b: b.execute_script(CLICKS_COUNTED, element_id) > before, 1):
+            return
+    check(f"Tester never started for {case}", False, f"#{element_id} clicked twice, no click taken")
+
+
 def context_opened(browser):
     """A meeting's context, opened from its settings row when it is closed (D89)."""
     toggle = browser.find_element(By.ID, "context-toggle")
@@ -1112,14 +1135,14 @@ def service_named(now: dt.datetime) -> None:
             for cause, sentence in TEST_CAUSES:
                 free(browser, "transcription-test", f"a service, {cause}")
                 code.write_text(cause)
-                press(browser, "transcription-test")
+                tester_click(browser, "transcription-test", f"a service, {cause}")
                 held = wait_for(browser, lambda b: b.execute_script(said) == sentence, 10)
                 check(f"Tester of a service, {cause}: its own sentence, what to do, no raw text", held, browser.execute_script(said))
                 # A second test in flight once the sentence is read: the next case waits for it (#799).
-                browser.find_element(By.ID, "transcription-test").click()
+                tester_click(browser, "transcription-test", f"a service, {cause} again")
             free(browser, "transcription-test", "a service, a code unknown")
             code.write_text("provider.of_a_later_version")
-            press(browser, "transcription-test")
+            tester_click(browser, "transcription-test", "a service, a code unknown")
             unknown = wait_for(browser, lambda b: b.execute_script(said).startswith("Le modèle ne répond pas"), 10)
             check("a code unknown is read as no code: today's sentence", unknown and "vérifiez son adresse, son nom et sa clé" in browser.execute_script(said), browser.execute_script(said))
         finally:
@@ -1141,7 +1164,7 @@ def service_named(now: dt.datetime) -> None:
             press(browser, "developer")
             WebDriverWait(browser, 5).until(staleness_of(before))
             free(browser, "transcription-test", "a service in developer mode")
-            press(browser, "transcription-test")
+            tester_click(browser, "transcription-test", "a service in developer mode")
             raw = wait_for(browser, lambda b: "raw words of the service" in b.execute_script(said), 10)
             told = browser.execute_script(said)
             check("Tester of a service in developer mode: the cause, then the raw line alone",
@@ -7530,15 +7553,15 @@ def main() -> int:
             for cause, sentence in TEST_CAUSES:
                 free(browser, "minutes-test", f"the minutes, {cause}")
                 code.write_text(cause)
-                press(browser, "minutes-test")
+                tester_click(browser, "minutes-test", f"the minutes, {cause}")
                 held = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-tested").get_attribute("textContent") == sentence, 10)
                 check(f"Tester of the minutes, {cause}: its own sentence, what to do, no raw text", held, browser.find_element(By.ID, "minutes-tested").get_attribute("textContent"))
                 # A second test in flight once the sentence is read: the next case waits for it (#799).
-                browser.find_element(By.ID, "minutes-test").click()
+                tester_click(browser, "minutes-test", f"the minutes, {cause} again")
             # In developer mode, the sentence and the program's last line, its name off.
             changed(lambda: browser.find_element(By.ID, "developer").click())
             free(browser, "minutes-test", "the minutes in developer mode")
-            press(browser, "minutes-test")
+            tester_click(browser, "minutes-test", "the minutes in developer mode")
             raw = wait_for(browser, lambda b: "raw words of the provider" in b.find_element(By.ID, "minutes-tested").get_attribute("textContent"), 10)
             told = browser.find_element(By.ID, "minutes-tested").get_attribute("textContent")
             check("Tester in developer mode: the cause, then the raw line alone", raw and told.startswith(TEST_CAUSES[-1][1]) and "kitokey-summary:" not in told and "earlier line" not in told, told)
@@ -7547,7 +7570,7 @@ def main() -> int:
         finally:
             code.unlink(missing_ok=True)
         free(browser, "minutes-test", "the minutes refused")
-        press(browser, "minutes-test")
+        tester_click(browser, "minutes-test", "the minutes refused")
         refused = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-tested").text.startswith("Le modèle ne répond pas"), 10)
         said = browser.find_element(By.ID, "minutes-tested").text
         check(
