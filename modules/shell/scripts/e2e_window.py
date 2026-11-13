@@ -7441,6 +7441,27 @@ def main() -> int:
             "return [...document.querySelectorAll('#groups a')].map(a => a.getAttribute('href')).join(' ')"), 5)
         check("the file fixed: the banner gone, the meeting listed", gone,
               [browser.execute_script(banner), browser.execute_script("return document.getElementById('groups').textContent")])
+        # Broken while the window is open: the banner comes into a live region already there, empty —
+        # what a screen reader announces (ARIA APG, MDN « ARIA live regions »); a region filled before
+        # it is shown is not. Listed again, the same banner: never put in anew, never said again.
+        region = ("const l = document.getElementById('settings-banner-live');"
+                  "return l && [l.getAttribute('role'), getComputedStyle(l).display !== 'none', l.childElementCount]")
+        check("the file read: the banner's live region there, rendered, empty", browser.execute_script(region) == ["status", True, 0],
+              browser.execute_script(region))
+        window.file.write_text(held + 'keep_audio = "x"\n')
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        came = wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
+        inside = browser.execute_script("const b = document.getElementById('settings-banner'); window.firstBanner = b;"
+                                        " return b && b.parentElement.id === 'settings-banner-live'")
+        check("broken while the window is open: the banner comes, inside its live region", came and inside, [browser.execute_script(banner), inside])
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        time.sleep(1)
+        same = browser.execute_script("return document.getElementById('settings-banner') === window.firstBanner")
+        check("listed again, still unreadable: the same banner, not put in anew", same, same)
+        window.file.write_text(held)
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        check("fixed again: the banner goes, its live region left empty",
+              wait_for(browser, lambda b: b.execute_script(region) == ["status", True, 0], 5), browser.execute_script(region))
     # Who writes the minutes: an Ollama made here, an online service, an address of the user's. A
     # key goes to the scenario's own keyring, which lives as long as the program.
     class Tags(http.server.BaseHTTPRequestHandler):

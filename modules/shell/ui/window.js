@@ -729,8 +729,6 @@ function paintRefused(refused) {
 
 function show({ words, folder, sessions, recording, stopping, shortcut, folded, unreadable, refused }) {
   document.documentElement.lang = words.locale;
-  document.getElementById("settings-banner-said").textContent = words.settings_banner;
-  document.getElementById("settings-banner-link").textContent = words.settings;
   // The header's gesture, as the board has it: start or stop, with the shortcut beside.
   // The sidebar's secondary actions: icons, each with its tooltip and its name; the header's one
   // action stays the recording's (D69, D89).
@@ -4281,7 +4279,21 @@ async function draw(mine, again) {
   notShown(false);
   // The settings unreadable, the folder listed is not the user's: said, never « no meeting » (#770).
   document.getElementById("empty").hidden = !listed || listing.sessions.length > 0 || listing.settings_unread;
-  document.getElementById("settings-banner").hidden = !listing.settings_unread || settings;
+  // Put in its live region when it comes, taken out when it goes — never drawn again meanwhile, which
+  // a screen reader would say again at each listing.
+  const live = document.getElementById("settings-banner-live");
+  const unread = listing.settings_unread && !settings;
+  if (unread !== (live.firstChild !== null)) {
+    const banner = element("div", "banner");
+    banner.id = "settings-banner";
+    const said = element("p", "", words.settings_banner);
+    said.id = "settings-banner-said";
+    const link = element("a", "link", words.settings);
+    link.id = "settings-banner-link";
+    link.href = "#/settings";
+    banner.append(said, link);
+    live.replaceChildren(...(unread ? [banner] : []));
+  }
   // No meeting yet: under 840 px, the sidebar and what to do, one under the other.
   document.body.classList.toggle("no-meeting", listing.sessions.length === 0);
   document.getElementById("agree").hidden = agreement === null;
