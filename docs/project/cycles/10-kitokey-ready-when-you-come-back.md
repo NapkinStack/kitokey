@@ -1,5 +1,5 @@
 ---
-goal: "After a stop, the user knows where their meeting is and is told once when it is ready; a redo says what it will make, dates what it made and can go back; and Kitokey says all of it in one voice, in French and in English"
+goal: "After a stop, the user knows where their meeting is and is told once when it is ready; a redo says what it will make, dates what it made and can go back; Settings are put in order, a service set up in a few guided steps; and Kitokey says all of it in one voice, in French and in English"
 status: proposed          # proposed | accepted | closed | stopped — the decider accepts
 accepted_on: 2026-11-13   # « cycle 10 accepté »; cycle 09 running, this cycle stays proposed and starts at its closure
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
@@ -34,12 +34,26 @@ deliverables:
       - "Given `src/words.rs`, still the one source of every sentence, when the shell's tests run, then each sentence carries a comment saying where it shows, when, its length limit and its placeholders; each has the same placeholders in French and in English; no straight apostrophe in either; a notification's title holds at most 50 characters and a list's label at most 18; none says a word the guide's lexicon refuses — « fournisseur », « segment », « tu » in French; « provider », « keyring », « minutes » for the summary in English —; the tests that freeze sentences change in the same pull request as them"
       - "Given the review page of 2026-11-13, when D94's sentences are written, then each is the version the decider ticked there, pasted in D94's acceptance issue, and otherwise the review's Claude version; the sentences no code reads are removed (`ran_online`, `context_edit`, `context_open`, and any other the author's search finds, listed in the sheet)"
       - "Given a settings file the shell cannot read, when it says so, then the notification and the window say in the user's language which setting is wrong and what to do, with no sentence of `settings.rs` in them — the technical detail in the log and behind « Développeur » only (#783); held by a test for each refusal `settings.rs` makes, in both languages, and by the e2e"
+  - id: D95
+    title: "Settings are put in order: three groups, and a model or a service set up in a few guided steps"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given Settings, when they show, then they hold at most three groups, as GNOME's preferences do — « Après un enregistrement », « Modèles », « Général » —, their content centred at a maximum width; the card that repeats the transcription model's state is gone (#782); held by the e2e, which reads the groups and their order, in French and in English"
+      - "Given the « Modèles » group, when the user sets up the transcription or the summary, then it is one guided path: on this computer (Whisper, Ollama) or a named service (OpenRouter, OpenAI, Mistral); for a service, its key, tested at once, a refusal said in plain words with its cause; then the model chosen from a readable list, each said as `modelSaid` says it; no raw identifier is shown and no address is typed in the common case — a service of the user's own address folded under « Avancé »; held by the e2e setting up a service with a false key, then a good one, against a stand-in server made for the run"
+      - "Given the window under 840 CSS px down to 420, when Settings show, then nothing overflows its card or the window — measured on each element's box, not the page's scroll alone, the overflow the audit saw at 420 px, which no check sees today (#782) —; given the e2e, then its screenshots of Settings in both themes at 1920 and 420 CSS px are in the sheet beside the audit's of 0.2.5"
 ---
 
 # Cycle 10 — Kitokey ready when you come back
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
+> **Amended again on the decider's word of 2026-11-13**: « je penses qu'il faut aussi revoir la partie de config
+> des llm dans kitokey qui peut sembler difficile dans l'onglet reglage. de maniere générale la partie reglage
+> devrait être optimiser, amélioré niveau ux/ui, je penses que les choses devrait être mieux agencé, ca fait un
+> peut "four tout" ». It adds D95, from #782 moved out of *Later*; the appetite is the decider's to settle
+> (*Open questions*).
+>
 > **Amended on the decider's word of 2026-11-13**, after they recorded a meeting with Kitokey: « je viens
 > d'enregistrer une reunion, avant de refaire je ne peux pas choisir un model dans la fenetre de la reunon pour
 > cette meme reuinon (pas dans les reglage globale), j'aimerai pouvoir choisir dans le fenetre aussi meme avant
@@ -102,6 +116,7 @@ Read in [the market scan of 2026-11-13](../reviews/2026-11-13-market.md) (§1 pr
 | A summary made again | Fireflies, Fathom, Zoom, Granola, Jamie regenerate in place on an explicit gesture; Zoom offers to revert to the previous one, Fathom to the default *(third-party for Zoom)*; Otter overwriting edits is the anti-pattern *(third-party)* | D93: a start button that names what it makes, one version back, corrections kept |
 | When a version was made | No leader documents a « generated at » time nor a history of versions: a documentation gap, not a confirmed absence | D93: a date beside the model, modest; no history beyond one |
 | Sentences in two languages | gettext and Fluent are the field's formats; the review weighed them: with two languages held by the team, `words.rs`' exhaustive structs make a missing translation a compile error, which neither does | D94 keeps `words.rs`, with gettext's and Fluent's translator comments as `///` |
+| Preferences | GNOME HIG: preferences in a few named groups, content at a maximum width that adapts ([adaptive](https://developer.gnome.org/hig/guidelines/adaptive.html), scan §2); MacWhisper's « redesigned AI services screen » with a key of the user's own (scan §1) | D95: three groups, a service named and its key tested, no address in the common case |
 | A product's voice | GNOME HIG *Writing style* ([guidelines](https://developer.gnome.org/hig/guidelines/writing-style.html)), Mailchimp *Voice and tone* ([styleguide](https://styleguide.mailchimp.com/voice-and-tone/)), Google's *Writing helpful error messages* ([course](https://developers.google.com/tech-writing/error-messages)) — cited by the copy review, not read again by the framer | D94's guide; French software for work addresses the user as « vous » (Apple, Google, Microsoft, Zoom, Notion — the review's observation, not checked screen by screen) |
 
 **Two defaults the decider confirms by accepting this cycle** *(framer, to confirm)*: the user is addressed
@@ -118,6 +133,8 @@ flowchart LR
     C["transcript/v1: `made`<br/>contract, then transcription"]:::contract --> R
     P --> W["D94 the sentences rewritten<br/>one PR an area"]:::build
     R --> W
+    G --> S["D95 Settings in order"]:::build
+    S --> W
     Q["The decider's choices<br/>on the review page"]:::person --> W
     classDef first fill:#92400e,color:#fff
     classDef build fill:#065f46,color:#fff
@@ -172,6 +189,19 @@ contract's and the producer's own pull requests · blue: the decider's gesture.
 - `settings.rs`' sentences to the user move into `words.rs`, where the module's `AGENTS.md` says every
   sentence lives.
 
+### D95
+
+- #782, the audit of 0.2.5 (« Réunions sans titre, Réglages longs »: one 670 px column stuck left, raw ids,
+  internal sentences) and the decider's word above. It reorders what exists — the services offered
+  (`providers.rs`: OpenRouter, OpenAI, Mistral), Ollama's models, Whisper's list, the test of a service,
+  `modelSaid` —: no new setting, no new service, no contract.
+- **Before D94's rewrite of Settings**: the sentences of Settings are rewritten once, by D94, in D95's
+  groups. The models listed in « Modèles » are the same list D93's choice on the page offers.
+- **No drawing first**: no rule of the project asks one for a surface rebuilt (`docs/project/rules/` holds
+  none on UX; `framing.md` §2 asks one only of a deliverable whose product is a drawing). D11's board 4,
+  built since, is no longer the bar: the product and its screenshots are (`framing.md` §2); the sheet sets
+  the new ones beside the audit's.
+
 ## What needs a person
 
 | Deliverable | Who | The literal gesture |
@@ -190,7 +220,7 @@ contract's and the producer's own pull requests · blue: the decider's gesture.
 - Fluent, gettext, a third language, a translation platform.
 - Renaming `minutes` in the files, the contracts or the code.
 - Withdrawing a notification already sent; a notification per step.
-- « Je vois que ça enregistre » and « Installé sans aide »: *Later*.
+- « Je vois que ça enregistre » and « Installé sans aide »: *Later*, but #782, which D95 holds.
 
 ## Later
 
@@ -198,7 +228,7 @@ contract's and the producer's own pull requests · blue: the decider's gesture.
   the reminder to tell participants (#780); a capture left running by a killed shell taken back at launch
   (#773); the bar while recording as its board (#774).
 - **« Installé sans aide »**: the first launch says what « Plus tard » costs and offers Retry without Ollama
-  (#781); Settings in three groups, plain words (#782); unreadable settings never make the meetings look lost
+  (#781); unreadable settings never make the meetings look lost
   (#770); the polish of the 0.2.4 pass (#775).
 - A meeting named by its title, given or proposed by the summary (#504).
 - **macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation, FLAC in WKWebView — moved from
@@ -213,15 +243,17 @@ contract's and the producer's own pull requests · blue: the decider's gesture.
 
 **Not blocking**, each *(framer, to confirm)*:
 
-- **The appetite**: two weeks, as cycles 08 and 09, unchanged by the amendment of 2026-11-13. Its two
-  criteria reuse what exists — D91's choice and `models.json`, the cancel D92 already builds —: about two
-  days more, which two weeks hold only by cutting. Cut in this order when the breaker nears: D93's going back
-  (criterion 3) — now the likeliest cut —, then D92's estimate — the step said, no number —, then D94's
-  rewrite of Settings. The model chosen on the page (D93, criterion 5) and the cancel (D92, criterion 4) are
-  never cut before them.
+- **The appetite** — the decider's to settle, one of two:
+  - **two weeks, as accepted** — four deliverables do not fit whole: D95 is about the size of D92 (the audit:
+    M), the amendments add about two days. Cut in this order when the breaker nears: D93's going back
+    (criterion 3), then D92's estimate — the step said, no number —, then D94's rewrite of the notifications.
+    Never cut before them: the model chosen on the page (D93, 5), the cancel (D92, 4), D95.
+  - **three weeks**, `end` 2026-12-12 — nothing cut. The framer's recommendation is two weeks: the cut order
+    keeps everything the decider asked for on 2026-11-13, and loses only a revert no leader documents.
+  Default, without a word: two weeks. The gesture: « 2 semaines » or « 3 semaines ».
 - **The start**: cycle 09's closure. Default: its end, 2026-11-21 — its remaining work is mostly people's
   trials, which keep their cycle. Closing cycle 09 earlier is the decider's choice at its closure; its open
-  deliverables are then deferred to its *Later*, never moved here: this cycle holds three.
+  deliverables are then deferred to its *Later*, never moved here: this cycle holds four.
 - **« vous » and « summary »**: the defaults above, confirmed by accepting the cycle.
 - **#773** — a capture left running after a crash, nothing on screen to stop it: in *Later* by the decider's
   scope; the audit calls it blocking. If the decider judges it a defect in production, it is an out-of-cycle
