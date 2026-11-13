@@ -1135,11 +1135,12 @@ function modelsAdvanced(words, prefix, offered, chosen) {
   };
   const measure = document.createElement("canvas").getContext("2d");
   // Said for the list's width as it is drawn: each change of it — « Avancé » opened, the window resized
-  // — measures again (ResizeObserver), and each choice (`changed`).
+  // — measures again (ResizeObserver), and each choice (`changed`). Painted at the next frame, never in
+  // the observer's own turn: the line it shows or hides changes the bar's height, which the bar's own
+  // observer answers by resizing the window — in the same turn, the browser reports a loop as an error.
   const sized = new ResizeObserver((entries) => {
-    for (const { target } of entries) {
-      if (target.isConnected) paintWhole(target);
-    }
+    const picks = entries.map(({ target }) => target);
+    requestAnimationFrame(() => picks.filter((pick) => pick.isConnected).forEach((pick) => paintWhole(pick)));
   });
   const paintWhole = (pick) => {
     const whole = pick.parentElement?.querySelector(".whole");
