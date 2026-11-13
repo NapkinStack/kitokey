@@ -2301,8 +2301,22 @@ def models_advanced(now: dt.datetime) -> None:
                 tray_click("Démarrer")
                 wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
                 time.sleep(0.6)
+                # « Avancé » opened on this meeting's models, then stopped from the tray: the bar's own
+                # stop is not the only one that draws it again for the next (#766, P5).
+                wait_for(browser, lambda b: b.execute_script(shown, "small")["expanded"] == "false", 5)
+                time.sleep(0.5)
+                if browser.execute_script("return document.getElementById('small-options').hidden"):
+                    browser.execute_script("document.getElementById('small-more').click()")
+                browser.execute_script("document.getElementById('small-advanced').click()")
+                ours = wait_for(browser, lambda b: b.execute_script(shown, "small")["written"] == "Mistral 7b — sur cet ordinateur"
+                                and b.execute_script(shown, "small")["expanded"] == "true", 5)
+                check("recording from the tray: « Avancé » open on this meeting's models", ours, browser.execute_script(shown, "small"))
                 tray_click("Arrêter l’enregistrement")
                 wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+                rest = wait_for(browser, lambda b: b.execute_script(shown, "small")["written"] == "Réglages\u00a0: Qwen3 14b", 3)
+                got = browser.execute_script(shown, "small")
+                check("stopped from the tray with « Avancé » open: drawn again for the next recording, closed, Settings' first",
+                      rest and got["expanded"] == "false" and got["heard"] == "Réglages\u00a0: Whisper adv settings", got)
                 quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
                 check("started and stopped from the tray's icon: no models kept for the next, and none said kept",
                       quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
@@ -2315,6 +2329,9 @@ def models_advanced(now: dt.datetime) -> None:
                 check("started again after a recording took them: no models kept, none said, nothing on disk",
                       none_kept(browser) == {} and browser.execute_script(line) is None and not next_models.exists(),
                       [none_kept(browser), browser.execute_script(line), next_models.exists()])
+                got = browser.execute_script(shown, "small")
+                check("started again: « Avancé » closed, Settings' first in both lists",
+                      got["expanded"] == "false" and got["heard"] == "Réglages\u00a0: Whisper adv settings" and got["written"] == "Réglages\u00a0: Qwen3 14b", got)
                 wait_for(None, lambda b: (meeting / "transcript.jsonl").exists(), 15)
                 wait_for(browser, lambda b: b.execute_script(idle), 15)
             finally:
