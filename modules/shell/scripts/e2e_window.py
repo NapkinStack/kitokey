@@ -7430,6 +7430,7 @@ def main() -> int:
         check("started with the settings unreadable: the list never says no meeting", browser.execute_script(empty_said) is None,
               browser.execute_script(empty_said))
         browser.execute_script("window.bannerBefore = document.getElementById('settings-banner')")
+        said_before = browser.execute_script(banner)
         browser.find_element(By.ID, "settings-banner-link").click()
         there = wait_for(browser, lambda b: b.find_elements(By.ID, "settings-unreadable") and b.find_element(By.ID, "settings-unreadable").is_displayed(), 5)
         check("the banner's link opens Réglages, which says why; the banner is not shown twice there",
@@ -7440,8 +7441,7 @@ def main() -> int:
         same = browser.execute_script("const b = document.getElementById('settings-banner');"
                                       " return b === window.bannerBefore && b.parentElement.id === 'settings-banner-live'")
         check("back from Réglages: the same node, the same words — not put in anew, so not said again (T10)",
-              same and browser.execute_script(banner)[0] == "Les réglages ne peuvent pas être lus : vos réunions ne sont pas affichées.",
-              [same, browser.execute_script(banner)])
+              same and browser.execute_script(banner) == said_before, [same, browser.execute_script(banner), said_before])
         window.file.write_text(held)
         browser.execute_script("window.dispatchEvent(new Event('focus'))")
         gone = wait_for(browser, lambda b: b.execute_script(banner) is None and "kept" in b.execute_script(
