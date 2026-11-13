@@ -555,6 +555,8 @@ fn main() {
             if let Err(why) = read {
                 tell(app.handle(), &words::trouble(&Trouble::Settings(why), language));
             }
+            // A recording a Kitokey ended before this one left running: shown, and stopped from here (#773).
+            found(app.handle());
             shortcut(app.handle());
             offers(app.handle());
             // The audio kept longer than the settings say goes to the trash, now and every hour.
@@ -1876,6 +1878,37 @@ fn next_context(shell: State<'_, Shell>) -> NextContext {
 /// still has it (D91).
 fn next_file() -> Option<PathBuf> {
     settings::file().map(|file| file.with_file_name("next-context.txt"))
+}
+
+/// Where the recording running is kept, beside the settings, while it runs (#773).
+fn recording_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("recording.json"))
+}
+
+/// A recording a Kitokey ended before this one left running (#773) — its shell killed, the
+/// computer's session closed under it —: shown as the recording in progress, counted from its
+/// session's start, and stopped by the same gestures; its transcript follows its stop as usual.
+/// Its levels, devices and silences went with the output of the shell that read them: none said.
+fn found(app: &AppHandle) {
+    let Some(found) = recording_file().and_then(|file| recording::find(&file, seconds_now())) else {
+        return;
+    };
+    let shell = app.state::<Shell>();
+    tracing::info!(
+        session = %found.folder.file_name().unwrap_or_default().to_string_lossy(),
+        seconds = found.seconds,
+        stopping = found.stopping,
+        "shell.recording_found"
+    );
+    *shell.recording.lock().unwrap() = Some(found.recording);
+    *shell.stopping.lock().unwrap() = found.stopping;
+    *shell.recorded.lock().unwrap() = Some(found.folder);
+    let since = Instant::now().checked_sub(Duration::from_secs_f64(found.seconds));
+    *shell.meter.lock().unwrap() = (Some(since.unwrap_or_else(Instant::now)), [0.0, 0.0]);
+    show(app, if found.stopping { Shown::Stopping } else { Shown::Recording });
+    small_recording(app, true);
+    let (app, said) = (app.clone(), found.said);
+    std::thread::spawn(move || listen(&app, &said, None, true));
 }
 
 /// Where the models chosen at rest for the next recording are, beside it: kept the same way (D91).
@@ -3393,16 +3426,17 @@ fn start_recording(app: &AppHandle, owner: licence::Owner) {
             let app = app.clone();
             // On a trial licence, the meeting is counted as made here (PDR-0005).
             let trial = (licence == Ok(Licence::Trial)).then_some(sessions);
-            std::thread::spawn(move || listen(&app, &said, trial.as_deref()));
+            std::thread::spawn(move || listen(&app, &said, trial.as_deref(), false));
         }
         Err(error) => tell(app, &words::trouble(&Trouble::NoRecorder(error.to_string()), shell.language())),
     }
 }
 
 /// Tells the user what a recording says, until it has ended; then the tray is at rest again.
-fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
+/// `found`: a recording found running (#773), started already, which says nothing but its end.
+fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>, found: bool) {
     let shell = app.state::<Shell>();
-    let mut started = false;
+    let mut started = found;
     let mut stopped = None;
     // What the devices are: what is said of one gone, or back, depends on the other.
     let mut sides = words::Sides::default();
@@ -3444,6 +3478,18 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
                 Err(error) => tracing::error!(kind = ?error.kind(), "shell.models_not_taken"),
             }
             drop(next);
+            // Kept beside the settings while it runs: a Kitokey started again finds it (#773).
+            let kept = shell
+                .recording
+                .lock()
+                .unwrap()
+                .as_ref()
+                .and_then(|running| recording::Kept::of(running.id(), folder));
+            if let (Some(file), Some(kept)) = (recording_file(), kept)
+                && let Err(error) = recording::keep(&file, &kept)
+            {
+                tracing::warn!(kind = ?error.kind(), "shell.recording_not_kept");
+            }
             *shell.recorded.lock().unwrap() = Some(folder.clone());
             *shell.meter.lock().unwrap() = (Some(Instant::now()), [0.0, 0.0]);
             small_recording(app, true);
@@ -3473,6 +3519,9 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
         if let Some(notice) = notice {
             tell(app, &notice);
         }
+    }
+    if let Some(Err(error)) = recording_file().map(|file| recording::forget(&file)) {
+        tracing::warn!(kind = ?error.kind(), "shell.recording_not_forgotten");
     }
     shell.recorded.lock().unwrap().take();
     *shell.meter.lock().unwrap() = (None, [0.0, 0.0]);
