@@ -249,9 +249,8 @@ def press(browser, element_id: str) -> None:
 
 
 def free(browser, element_id: str) -> None:
-    """A Tester's button offered again: no test in flight. One still running — a click `press`
-    repeats after the driver raised an error once it had clicked — disables it: the next case's
-    click would be lost, its code never asked, the last sentence read again (#799)."""
+    """A Tester's button offered again before the next case's click: a click on it disabled is
+    lost without an error, its code never asked, the last sentence read again (#799)."""
     wait_for(browser, lambda b: b.find_element(By.ID, element_id).is_enabled(), 10)
 
 
