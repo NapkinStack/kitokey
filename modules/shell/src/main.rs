@@ -167,9 +167,15 @@ struct Shell {
     /// made again here, their end is no failure to tell (D60).
     heard_here: Mutex<std::collections::HashSet<PathBuf>>,
     written_here: Mutex<std::collections::HashSet<PathBuf>>,
-    /// Makings the user cancelled (« Annuler », D92), until their program is said ended: no
-    /// failure then, nothing told, nothing made after them.
-    cancelling: Mutex<std::collections::HashSet<PathBuf>>,
+    /// Makings the user cancelled (« Annuler », D92), by meeting and kind, until their program is
+    /// said ended: no failure then, nothing told, nothing made after them. A mark is set only under
+    /// its kind's lock — `transcription`, `writing_minutes` — while that making runs for the meeting,
+    /// and taken under it as the making ends or begins: never left to a later one.
+    cancelling: Mutex<std::collections::HashSet<(PathBuf, Kind)>>,
+    /// The meeting taken from each line and not yet begun, and whether « Annuler » withdrew it
+    /// meanwhile: its start, under its kind's lock, then begins nothing (D92).
+    promoted_transcript: Mutex<Option<(PathBuf, bool)>>,
+    promoted_minutes: Mutex<Option<(PathBuf, bool)>>,
     /// What was last cancelled of a meeting — its transcript or its minutes —, said on its page
     /// until a making of it starts again.
     stopped: Mutex<HashMap<PathBuf, &'static str>>,
@@ -544,6 +550,8 @@ fn main() {
                 heard_here: Mutex::default(),
                 written_here: Mutex::default(),
                 cancelling: Mutex::default(),
+                promoted_transcript: Mutex::default(),
+                promoted_minutes: Mutex::default(),
                 stopped: Mutex::default(),
                 left: Mutex::default(),
                 ollama_waiting: Mutex::default(),
@@ -1089,25 +1097,70 @@ fn minutes_redo(
 #[tauri::command]
 fn making_cancelled(shell: State<'_, Shell>, name: String) -> Result<(), Told> {
     let folder = session_folder(&shell, &name)?;
-    // Out of the lines first: nothing of it starts in its place meanwhile.
-    shell.waiting.lock().unwrap().retain(|(queued, _)| *queued != folder);
-    shell.minutes_waiting.lock().unwrap().retain(|queued| queued.folder != folder);
-    // Marked before its program is stopped: its end, whenever it comes, finds it.
+    // Out of the lines; taken from one and not yet begun, withdrawn: its start begins nothing.
+    let withdraw = |slot: &Mutex<Option<(PathBuf, bool)>>| {
+        if let Some((taken, withdrawn)) = slot.lock().unwrap().as_mut()
+            && *taken == folder
+        {
+            *withdrawn = true;
+        }
+    };
+    {
+        let mut waiting = shell.waiting.lock().unwrap();
+        waiting.retain(|(queued, _)| *queued != folder);
+        withdraw(&shell.promoted_transcript);
+    }
+    {
+        let mut waiting = shell.minutes_waiting.lock().unwrap();
+        waiting.retain(|queued| queued.folder != folder);
+        withdraw(&shell.promoted_minutes);
+    }
+    // Being made: marked under its kind's lock — a start in progress is waited for, an end already
+    // taken leaves nothing to mark —, then stopped; its end finds the mark.
     let running = shell.transcription.lock().unwrap();
     if let (Some(transcription), true) = (running.as_ref(), shell.hearing.lock().unwrap().as_deref() == Some(folder.as_path())) {
-        shell.cancelling.lock().unwrap().insert(folder.clone());
+        shell.cancelling.lock().unwrap().insert((folder.clone(), Kind::Transcript));
         transcription.cancel();
     }
     drop(running);
-    if shell.writing_minutes.lock().unwrap().as_deref() == Some(folder.as_path()) {
-        shell.cancelling.lock().unwrap().insert(folder.clone());
+    let writing = shell.writing_minutes.lock().unwrap();
+    if writing.as_deref() == Some(folder.as_path()) {
+        shell.cancelling.lock().unwrap().insert((folder.clone(), Kind::Minutes));
         // Not started yet — the keyring asked first —: its start finds it marked, and ends it.
         if let Some(making) = shell.minuting.lock().unwrap().as_ref() {
             making.cancel();
         }
     }
+    drop(writing);
     tracing::info!(session = %name, "shell.making_cancelled");
     Ok(())
+}
+
+/// What a making makes, for the marks « Annuler » leaves (D92).
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+enum Kind {
+    Transcript,
+    Minutes,
+}
+
+/// The slot of a meeting taken from a line freed once its start has been tried — begun, or not —,
+/// unless it already holds the next one taken.
+fn free(slot: &Mutex<Option<(PathBuf, bool)>>, folder: &Path) {
+    let mut slot = slot.lock().unwrap();
+    if slot.as_ref().is_some_and(|(taken, _)| taken == folder) {
+        *slot = None;
+    }
+}
+
+/// Whether the meeting taken from a line was withdrawn by « Annuler » before it began: then
+/// nothing begins, and the slot is freed (D92).
+fn withdrawn(slot: &Mutex<Option<(PathBuf, bool)>>, folder: &Path) -> bool {
+    let mut slot = slot.lock().unwrap();
+    let withdrawn = slot.as_ref().is_some_and(|(taken, withdrawn)| *withdrawn && taken == folder);
+    if withdrawn {
+        *slot = None;
+    }
+    withdrawn
 }
 
 /// A line of a meeting's transcript corrected on the user's word (D62, ADR-0014): once complete,
@@ -2848,16 +2901,31 @@ fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<
 fn minutes_next(app: &AppHandle) {
     let shell = app.state::<Shell>();
     minuting(app, false);
-    *shell.writing_minutes.lock().unwrap() = None;
+    {
+        // Freed with any mark an « Annuler » pressed after its end left: none ends a later making.
+        let mut writing = shell.writing_minutes.lock().unwrap();
+        if let Some(ended) = writing.take() {
+            shell.cancelling.lock().unwrap().remove(&(ended, Kind::Minutes));
+        }
+    }
     if *shell.leaving.lock().unwrap() {
         return;
     }
     loop {
-        let Some(next) = shell.minutes_waiting.lock().unwrap().pop_front() else {
+        // Taken from the line under its lock, and said taken: « Annuler » meanwhile withdraws it.
+        let next = {
+            let mut waiting = shell.minutes_waiting.lock().unwrap();
+            let next = waiting.pop_front();
+            *shell.promoted_minutes.lock().unwrap() = next.as_ref().map(|next| (next.folder.clone(), false));
+            next
+        };
+        let Some(next) = next else {
             return;
         };
         // Started, or set aside (an agreement to give, a reason it cannot): the next one then.
+        let taken = next.folder.clone();
         write_minutes_from(app, next.folder, next.agreed.as_deref(), next.chosen, true);
+        free(&shell.promoted_minutes, &taken);
         if shell.writing_minutes.lock().unwrap().is_some() {
             return;
         }
@@ -3217,7 +3285,13 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
         drop(writing);
         return write_minutes_from(app, folder, agreed_now, again.then_some((provider, model)), from_line);
     }
+    // Taken from the line and withdrawn by « Annuler » since: nothing begins (D92).
+    if withdrawn(&shell.promoted_minutes, &folder) {
+        return;
+    }
+    // Begun, under the lock « Annuler » marks under: a mark left from before ends nothing of it.
     *writing = Some(folder.clone());
+    shell.cancelling.lock().unwrap().remove(&(folder.clone(), Kind::Minutes));
     drop(writing);
     // Started: out of the line, its agreement given, its last failure gone.
     shell.minutes_waiting.lock().unwrap().retain(|queued| queued.folder != folder);
@@ -3230,9 +3304,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
         .then(|| model.clone());
     *shell.minutes_host.lock().unwrap() = (!providers::local(&provider)).then(|| host.clone());
     shell.minutes_failed.lock().unwrap().remove(&folder);
-    // Begun again: no longer said stopped, and a cancel left from a making that never began ends none.
     shell.stopped.lock().unwrap().remove(&folder);
-    shell.cancelling.lock().unwrap().remove(&folder);
     minuting(app, true);
     let app = app.clone();
     // The keyring may ask the user first: never on the window's and the tray's thread.
@@ -3273,7 +3345,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
                 // Said confidential as it started: ended at once.
                 if here() {
                     making.end();
-                } else if shell.cancelling.lock().unwrap().contains(&folder) {
+                } else if shell.cancelling.lock().unwrap().contains(&(folder.clone(), Kind::Minutes)) {
                     // Cancelled before its program started — the keyring asked first —: ended at once.
                     making.cancel();
                 }
@@ -3303,7 +3375,8 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
             .unwrap_or(summarising::Made::Failed(String::new(), None));
         shell.minuting.lock().unwrap().take();
         // Cancelled by the user (D92), and not written meanwhile: no failure, nothing told.
-        let cancelled = shell.cancelling.lock().unwrap().remove(&folder) && matches!(made, summarising::Made::Failed(..));
+        let cancelled =
+            shell.cancelling.lock().unwrap().remove(&(folder.clone(), Kind::Minutes)) && matches!(made, summarising::Made::Failed(..));
         let ended_here = matches!(made, summarising::Made::Failed(..)) && !cancelled && here();
         // Replaced, the earlier minutes go to the trash — refused, they stay beside, and it is said.
         let mut kept_beside = None;
@@ -3626,6 +3699,8 @@ fn hearing(shell: &Shell, folder: &Path, hearer: &Hearer) {
     };
     shell.transcripts_failed.lock().unwrap().remove(folder);
     shell.stopped.lock().unwrap().remove(folder);
+    // Begun, under the lock « Annuler » marks under: a mark left from before ends nothing of it.
+    shell.cancelling.lock().unwrap().remove(&(folder.to_path_buf(), Kind::Transcript));
 }
 
 /// How a transcript's making ended, for what follows it.
@@ -3647,7 +3722,7 @@ fn heard(shell: &Shell, folder: &Path, made: &Made) -> Heard {
     shell.hearing_host.lock().unwrap().take();
     let here = shell.heard_here.lock().unwrap().remove(folder);
     // Written all the same, as it was cancelled: written it is.
-    let cancelled = shell.cancelling.lock().unwrap().remove(folder) && !matches!(made, Made::Written(_));
+    let cancelled = shell.cancelling.lock().unwrap().remove(&(folder.to_path_buf(), Kind::Transcript)) && !matches!(made, Made::Written(_));
     if cancelled {
         shell.stopped.lock().unwrap().insert(folder.to_path_buf(), "transcript");
     }
@@ -3691,12 +3766,19 @@ fn transcribe_next(app: &AppHandle) {
             let at = waiting.iter().position(|(folder, again)| {
                 matches!(again, Some(Again::Model(_))) || !default_model_missing_for(&own(&settings, folder), folder)
             });
-            at.and_then(|at| waiting.remove(at))
+            let next = at.and_then(|at| waiting.remove(at));
+            // Said taken: « Annuler » meanwhile withdraws it (D92).
+            *shell.promoted_transcript.lock().unwrap() = next.as_ref().map(|(folder, _)| (folder.clone(), false));
+            next
         };
+        let taken = next.as_ref().map(|(folder, _)| folder.clone());
         match next {
             None => return,
             Some((folder, None)) => transcribe(app, folder),
             Some((folder, Some(again))) => retranscribe_or_say(app, folder, again),
+        }
+        if let Some(taken) = taken {
+            free(&shell.promoted_transcript, &taken);
         }
         if shell.transcription.lock().unwrap().is_some() {
             return;
@@ -3719,6 +3801,10 @@ fn retranscribe_or_say(app: &AppHandle, folder: PathBuf, again: Again) {
 fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (Failure, String)> {
     let shell = app.state::<Shell>();
     let mut running = shell.transcription.lock().unwrap();
+    // Taken from the line and withdrawn by « Annuler » since: nothing begins (D92).
+    if withdrawn(&shell.promoted_transcript, &folder) {
+        return Ok(());
+    }
     if running.is_some() {
         // One at a time: it waits its turn, said on its page — the one being made too.
         drop(running);
@@ -3905,6 +3991,10 @@ fn hearer_now(shell: &Shell, settings: &Settings, folder: &Path) -> (Hearer, Opt
 fn transcribe(app: &AppHandle, folder: PathBuf) {
     let shell = app.state::<Shell>();
     let mut running = shell.transcription.lock().unwrap();
+    // Taken from the line and withdrawn by « Annuler » since: nothing begins (D92).
+    if withdrawn(&shell.promoted_transcript, &folder) {
+        return;
+    }
     if running.is_some() {
         wait(&shell, folder, None);
         return;

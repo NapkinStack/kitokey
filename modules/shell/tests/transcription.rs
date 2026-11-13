@@ -345,3 +345,34 @@ sleep 60"#,
     assert!(gone(&child), "its child, deaf to TERM, still runs");
     assert!(pressed.elapsed() <= Duration::from_secs(2));
 }
+
+#[test]
+fn cancelled_its_group_is_told_term_first_and_given_the_grace_to_end_by_it() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    // A child of the program, in its group, that ends on TERM saying so: TERM sent to the leader
+    // alone, or KILL at once, and it never says it.
+    let (transcription, said) = made(
+        folder.path(),
+        r#"( trap 'echo TERM > "$1/told"; exit 0' TERM; echo $$ > "$1/child"; sleep 60 & wait ) &
+sleep 60"#,
+    );
+    let child = folder.path().join("session/child");
+    for _ in 0..50 {
+        if fs::read_to_string(&child).is_ok_and(|pid| !pid.trim().is_empty()) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(child.exists(), "the program never started its child");
+    transcription.cancel();
+    said.recv_timeout(Duration::from_secs(2)).expect("not ended within two seconds");
+    assert_eq!(
+        fs::read_to_string(folder.path().join("session/told"))
+            .ok()
+            .as_deref()
+            .map(str::trim),
+        Some("TERM"),
+        "its child was not told TERM within the grace"
+    );
+}
