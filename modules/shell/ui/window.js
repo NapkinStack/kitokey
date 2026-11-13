@@ -4283,7 +4283,10 @@ async function draw(mine, again) {
   // a screen reader would say again at each listing.
   // Its sentence what is true: the defaults listed, or the last settings read held (#770).
   const live = document.getElementById("settings-banner-live");
-  const sentence = !listing.settings_unread || settings ? null : listing.settings_kept ? words.settings_banner_kept : words.settings_banner;
+  // Hidden on Réglages, never emptied: a live region says a change of its words, not of its
+  // visibility (WAI-ARIA) — back on the list, the same banner, not said again.
+  live.hidden = settings;
+  const sentence = !listing.settings_unread ? null : listing.settings_kept ? words.settings_banner_kept : words.settings_banner;
   if (sentence !== (document.getElementById("settings-banner-said")?.textContent ?? null)) {
     const banner = element("div", "banner");
     banner.id = "settings-banner";

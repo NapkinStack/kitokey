@@ -902,8 +902,12 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
     let asked = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let shell = app.state::<Shell>();
-        // Read anew: fixed meanwhile, the user's folder is listed again (#770).
-        let settings_unread = shell.reread().is_err();
+        // Read anew: fixed meanwhile, the user's folder is listed again (#770). Not during a save:
+        // the file read just before its rename would put the settings it replaced back in memory.
+        let settings_unread = {
+            let _saving = shell.saving.lock().unwrap();
+            shell.reread().is_err()
+        };
         let recorded = shell.recorded.lock().unwrap().clone();
         let sessions = sessions::list(&shell.settings().sessions, recorded.as_deref());
         let mut kept = shell.shapes.lock().unwrap();
