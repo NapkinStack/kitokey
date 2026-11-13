@@ -3225,11 +3225,25 @@ def sound_checked(now: dt.datetime) -> None:
                 # Closed and opened again, « Jouer un son de test » pressed at once, the call still held: nothing plays.
                 press(browser, "check-sound-close")
                 wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3)
-                press(browser, "check-sound-open")
-                browser.execute_script("document.getElementById('check-play').click()")
-                time.sleep(1.0)
-                outputs = [kind for kind in kitokey_streams(window) if kind == "Stream/Output/Audio"]
-                check("pressed at once while a call holds a microphone: no sound, no stream on the output", outputs == [] and not played_to(window), [outputs, played_to(window)])
+                # Opened and pressed in one script: the panel is drawn before its first await, so no answer
+                # of the shell's can have come — what is read is the button as offered before it (#751).
+                offered = browser.execute_script("document.getElementById('check-sound-open').click();"
+                                                 " const play = document.getElementById('check-play');"
+                                                 " const disabled = play.disabled; play.click(); return disabled")
+                check("pressed at once while a call holds a microphone: « Jouer un son de test » not offered before the shell's first answer",
+                      offered is True, offered)
+                # Read from the press on, not a second after: the half-second sound would be over (#751).
+                heard_out, outputs, stamps = set(), [], []
+                until = time.monotonic() + 1.5
+                while time.monotonic() < until:
+                    stamps.append(time.monotonic())
+                    heard_out |= played_to(window)
+                    outputs += [kind for kind in kitokey_streams(window) if kind == "Stream/Output/Audio"]
+                    time.sleep(0.03)
+                widest = max((b - a for a, b in zip(stamps, stamps[1:])), default=0.0)
+                print(f"  G2 sampling: {len(stamps)} samples in 1.5 s, widest gap {widest * 1000:.0f} ms")
+                check("pressed at once while a call holds a microphone: no sound, no stream on the output, from the press on",
+                      outputs == [] and not heard_out, [outputs, heard_out, len(stamps), round(widest, 3)])
             finally:
                 call.terminate()
                 call.wait(timeout=5)
@@ -3259,6 +3273,29 @@ def sound_checked(now: dt.datetime) -> None:
             check("closed before its opening was counted: no stream of Kitokey's left within a second of the opening's answer",
                   none_left, [kitokey_streams(window), time.monotonic() - closed_early])
             browser.execute_script("window.restoreInvoke()")
+            # A closed panel's late answers never act on the one opened after it (#751): its polls held,
+            # sent to the shell once it is closed — « nothing open » —, given back with the next panel open.
+            opened(browser)
+            browser.execute_script("const real = window.__TAURI__.core; window.held = []; window.holding = true;"
+                                   " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'sound_check_now' && window.holding"
+                                   " ? new Promise((done) => window.held.push({ ask: () => real.invoke(asked, ...rest), done })) : real.invoke(asked, ...rest) };"
+                                   " window.restoreInvoke = () => { window.__TAURI__.core = real; };")
+            time.sleep(0.3)
+            browser.execute_script("window.holding = false")
+            took = closed_within(window, browser, lambda b: press(b, "check-sound-close"))
+            late = browser.execute_async_script("const done = arguments[arguments.length - 1];"
+                                                " Promise.all(window.held.map((h) => h.ask().then((a) => { h.answer = a; return a.open; }))).then(done)")
+            check("held, then asked once the first panel closed: the shell says nothing is open", took is not None and late and not any(late), [took, late])
+            # Gone from the page too, before the next opens: the same id, never read for the next one's.
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3)
+            opened(browser)
+            browser.execute_script("for (const h of window.held) h.done(h.answer); window.held = []; window.restoreInvoke()")
+            time.sleep(1.0)
+            kept = browser.execute_script("const d = document.getElementById('check-sound'); return d !== null && d.open")
+            check("the closed panel's late answers given back: the one opened after it stays open, listening",
+                  kept and "Stream/Input/Audio" in kitokey_streams(window), [kept, kitokey_streams(window)])
+            press(browser, "check-sound-close")
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3)
             ended = WORK / "listen-ended"
             # A recording started elsewhere — the tray — while the panel shows: capture stops listening
             # within a second, before it records, and the panel goes.
@@ -3308,9 +3345,9 @@ def sound_checked(now: dt.datetime) -> None:
             check("never listening while a recording runs", refused == {"opened": False}, refused)
             browser.execute_script("window.__TAURI__.core.invoke('record')")
             wait_for(browser, lambda b: not b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 8)
-        # Its window destroyed with the panel open — the full window replaced by the bar —: the shell
-        # ends the listening on the window's end, within a second; the page can say nothing then. The
-        # driver's window is the one destroyed: what it says of that is not this check's.
+        # Its window hidden with the panel open — the full window replaced by the bar, which only hides
+        # it (`show_small` → `main.hide()`) —: the page hidden closes the panel (`visibilitychange`), and
+        # capture stops listening within a second.
         ended = WORK / "listen-ended"
         asked, gone = None, False
         try:
@@ -3322,6 +3359,28 @@ def sound_checked(now: dt.datetime) -> None:
                 asked = time.time()
                 try:
                     browser.execute_script("window.__TAURI__.core.invoke('small_window')")
+                except (NoSuchWindowException, WebDriverException):
+                    pass
+                gone = wait_for(None, lambda b: ended.is_file(), 3)
+        except (NoSuchWindowException, WebDriverException):
+            gone = gone or ended.is_file()
+        check("its window hidden for the bar with the panel open: capture stops listening within a second",
+              asked is not None and gone and float(ended.read_text()) - asked <= 1.0, asked and ended.is_file() and float(ended.read_text()) - asked)
+        # Its window destroyed with the panel open — the bar replaced by the full window, which closes
+        # it; the full window replaced by the bar is only hidden (#751) —: the shell ends the listening
+        # on the window's end, within a second; the page can say nothing then. The driver's window is
+        # the one destroyed: what it says of that is not this check's.
+        ended = WORK / "listen-ended"
+        asked, gone = None, False
+        try:
+            with Window(sessions, "fr_FR.UTF-8", small=True) as browser:
+                wait_for(browser, lambda b: b.find_element(By.ID, "small-hide").is_displayed(), 8)
+                browser.execute_script("checkSound(words, null)")
+                wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("me"), 5)
+                ended.unlink(missing_ok=True)
+                asked = time.time()
+                try:
+                    browser.execute_script("window.__TAURI__.core.invoke('full_window', {page: null})")
                 except (NoSuchWindowException, WebDriverException):
                     pass
                 gone = wait_for(None, lambda b: ended.is_file(), 3)
