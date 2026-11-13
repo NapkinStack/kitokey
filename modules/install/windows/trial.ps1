@@ -52,6 +52,12 @@ try {
                 Where-Object { $_ -like '*"message":"shell.licence_read"*' })
         }
         $before = @(& $licenceRead).Count
+        # The package's startup task as Windows holds it at this start (D84), said in the shell's log.
+        $taskRead = {
+            @(Get-ChildItem $logs -Filter 'shell.*.jsonl' -ErrorAction SilentlyContinue | Get-Content |
+                Where-Object { $_ -like '*"message":"shell.startup_task"*' })
+        }
+        $tasksBefore = @(& $taskRead).Count
         Start-Process "shell:AppsFolder\$($Installed.PackageFamilyName)!Kitokey"
         $process = Wait-For 'its process with a window, from the package' 90 {
             Get-Process kitokey -ErrorAction SilentlyContinue |
@@ -70,6 +76,13 @@ try {
         $answer = $read | ConvertFrom-Json
         Write-Output "  the Store answered: licence $($answer.licence), refused $($answer.refused)"
         Check 'a recording is not refused by the licence read' ($answer.refused -eq $false)
+        $task = Wait-For 'the startup task read at this start, in the log' 30 {
+            $lines = @(& $taskRead)
+            if ($lines.Count -gt $tasksBefore) { $lines[-1] }
+        }
+        $state = ($task | ConvertFrom-Json).state
+        Write-Output "  the startup task, as Windows holds it: $state"
+        Check "the startup task's state is one Windows names: $state" ($state -in 'Disabled', 'DisabledByUser', 'Enabled', 'DisabledByPolicy', 'EnabledByPolicy')
         Stop-Process -Id $process.Id -Force
         Wait-For 'its process gone' 30 { -not (Get-Process kitokey -ErrorAction SilentlyContinue) } | Out-Null
     }
