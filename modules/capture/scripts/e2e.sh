@@ -96,10 +96,11 @@ restore() {
     say "e2e: NOT RUN — a real device appeared: $(cat "$work.real")"
     # The guard's trial passes only stopped by its intruder: stopped by anything else, or not at all, it fails.
     if [ -n "${E2E_INTRUDER:-}" ] && ! grep -q "intruder_${E2E_INTRUDER%%:*}" "$work.real"; then
-      say "  FAIL  the guard stopped the run, not at intruder_${E2E_INTRUDER%%:*}"; rm -f "$work.real"; exit 1
+      say "  FAIL  the guard stopped the run, not at intruder_${E2E_INTRUDER%%:*}"; rm -f "$work.real" "$work.trial"; exit 1
     fi
-    rm -f "$work.real"; exit 77
+    rm -f "$work.real" "$work.trial"; exit 77
   fi
+  if [ -e "$work.trial" ]; then say "  FAIL  $(cat "$work.trial")"; rm -f "$work.trial"; exit 1; fi
   if [ -n "${E2E_INTRUDER:-}" ]; then say "  FAIL  the guard let intruder_${E2E_INTRUDER%%:*} through"; exit 1; fi
   exit "$status"
 }
@@ -113,7 +114,7 @@ trap 'exit 77' TERM
 # `sleep` runs out first, the sound already cut), NOT RUN — exit 77, as a run that cannot run here
 # (.nstack/handbook/09-platform.md).
 real_devices() {
-  python3 - <<'GUARD'
+  PATH="${trial_bin:-}$PATH" python3 - <<'GUARD'
 import json, os, subprocess, sys
 seen = []
 try:
@@ -148,20 +149,51 @@ stop_all() {
   kill -KILL "$daemon" 2>/dev/null || true
   kill -TERM $$
 }
+# The device trial's intruder: no Device factory runs without hardware or a bus (the installed SPA
+# ones are api.alsa.{pcm,acp,compress.offload}.device, api.bluez5.device, api.libcamera.device), and
+# `api.alsa.enum.udev` in the seal made none (2026-11-14). The guard's pw-dump answers for it then: the
+# graph's own dump, and the Device as pw-dump prints one once the trial brings it.
+if [[ ${E2E_INTRUDER:-} == device:* ]]; then
+  mkdir -p "$graph/trial" && trial_bin=$graph/trial:
+  cat > "$graph/trial/pw-dump" <<SHIM
+#!/bin/sh
+$(command -v pw-dump) | python3 -c '
+import json, os, sys
+dump = json.load(sys.stdin)
+if os.path.exists("$graph/intruder_device"):
+    dump.append({"id": 100000, "type": "PipeWire:Interface:Device", "info": {"props": {"device.name": "intruder_device"}}})
+json.dump(dump, sys.stdout)'
+SHIM
+  chmod +x "$graph/trial/pw-dump"
+fi
 if ! seen=$(real_devices); then stop_all "$seen"; fi
 ( while sleep 0.5; do seen=$(real_devices) || { stop_all "$seen"; break; }; done ) & guard=$!
 # The guard's own trial: E2E_INTRUDER=<sink|source|device>:<seconds> brings one not the run's that
 # long after the start, as a headset or a card appearing — the run must end NOT RUN, exit 77, naming it
 # (`intruder_sink`, `intruder_source`, `intruder_device`); stopped by anything else, or not, it fails.
+# The trial ends at once when it proves nothing: its intruder not in the guard's pw-dump within 3 s,
+# or there and the run not stopped 3 s later — never a whole run to learn it.
 if [ -n "${E2E_INTRUDER:-}" ]; then
   (
+    kind=${E2E_INTRUDER%%:*}
     sleep "${E2E_INTRUDER#*:}"
-    case ${E2E_INTRUDER%%:*} in
+    case $kind in
       sink) pactl load-module module-null-sink sink_name=intruder_sink > /dev/null ;;
       source) pw-cli create-node adapter factory.name=support.null-audio-sink node.name=intruder_source \
                 media.class=Audio/Source/Virtual object.linger=true audio.position=[FL,FR] > /dev/null ;;
-      device) { echo "create-device api.alsa.enum.udev { device.name = intruder_device }"; sleep 600; } | pw-cli > /dev/null ;;
+      device) touch "$graph/intruder_device" ;;
     esac
+    there=
+    for _ in $(seq 12); do
+      if PATH="${trial_bin:-}$PATH" pw-dump 2>/dev/null | grep -q "\"intruder_$kind\""; then there=1; break; fi
+      sleep 0.25
+    done
+    if [ -z "$there" ]; then   # the guard may have stopped the graph first: then it saw it
+      [ -e "$work.real" ] || { echo "the trial's intruder did not appear: intruder_$kind" > "$work.trial"; kill -TERM $$; }
+      exit 0
+    fi
+    sleep 3
+    echo "the guard let intruder_$kind through" > "$work.trial"; kill -TERM $$
   ) &
 fi
 
