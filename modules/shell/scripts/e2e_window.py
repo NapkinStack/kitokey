@@ -215,7 +215,8 @@ for (const card of document.querySelectorAll('#settings > *')) {
   for (const e of card.querySelectorAll('*')) {
     if (e.tagName === 'OPTION' || !e.getClientRects().length) continue;
     const r = e.getBoundingClientRect();
-    const spills = e.clientWidth > 0 && e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX === 'visible';
+    // A box that holds more than its width — spilling, hidden or scrolled —, but a field, which scrolls its own text.
+    const spills = !['INPUT', 'SELECT', 'TEXTAREA'].includes(e.tagName) && e.clientWidth > 0 && e.scrollWidth > e.clientWidth + 1;
     if (r.width > 0 && (r.left < c.left - 0.5 || r.right > c.right + 0.5) || spills)
       out.push(`${e.id || e.className || e.tagName}: ${Math.round(r.left)}–${Math.round(r.right)} in ${Math.round(c.left)}–${Math.round(c.right)}${spills ? ', spills' : ''}`);
   }
@@ -1880,6 +1881,25 @@ echo '{{"available":true,"installed":true,"supported":true}}'
             check("Settings in three groups, in order; the model's state said once, a line of « Modèles », no card of its own (#782);"
                   " « Avancé » folded in « Général » (D95)",
                   grouped == [["Après un enregistrement", "Modèles", "Général"], "Modèles", "Général", 0, [["Modèles", True]]], grouped)
+            # The keyboard alone (WAI-ARIA APG, Disclosure): Tab from Settings' top to « Avancé », Enter
+            # unfolds it, Tab reaches its switch; each stop's focus seen.
+            browser.execute_script("document.querySelector('#settings input, #settings select, #settings button').focus()")
+            stop = "const e = document.activeElement; return [e.id || e.className || e.tagName, e.matches(':focus-visible')]"
+            stops = []
+            for _ in range(80):
+                ActionChains(browser).send_keys(Keys.TAB).perform()
+                stops.append(browser.execute_script(stop))
+                if stops[-1][0] == "general-advanced":
+                    break
+            ActionChains(browser).send_keys(Keys.ENTER).perform()
+            opened = browser.find_element(By.ID, "general-advanced").get_attribute("aria-expanded")
+            ActionChains(browser).send_keys(Keys.TAB).perform()
+            stops.append(browser.execute_script(stop))
+            print(f"        Settings' stops: {[name for name, _ in stops]}")
+            check("by the keyboard alone: Tab reaches « Avancé », Enter unfolds it, Tab reaches its switch; the focus seen at each stop (D95)",
+                  stops[-2][0] == "general-advanced" and opened == "true" and stops[-1][0] == "developer" and all(seen_ for _, seen_ in stops),
+                  (opened, [s_ for s_ in stops if not s_[1]] or stops[-3:]))
+            press(browser, "general-advanced")
             redo(browser)
             wait_for(browser, lambda b: "Transcription prête" in notified.read_text(), 15)
             before = by_settings(browser, "Transcription prête")
@@ -4831,6 +4851,14 @@ def two_panes(now: dt.datetime) -> None:
             drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "app-language") and b.find_element(By.ID, "app-language").is_displayed(), 10)
             over = browser.execute_script(SETTINGS_OVERFLOW)
             check(f"Settings, {width} px wide: nothing past its card or the window, each box measured (D95, #782)", drawn and over == [], over)
+            if width == 420:
+                # « Avancé » unfolded, the developer mode on: the logs' level and folder measured too.
+                advanced_unfolded(browser).click()
+                logs = wait_for(browser, lambda b: b.find_elements(By.ID, "open-logs") and b.find_element(By.ID, "open-logs").is_displayed(), 5)
+                over = browser.execute_script(SETTINGS_OVERFLOW)
+                check("Settings, 420 px, « Avancé » unfolded and the developer mode on: nothing past its card or the window (D95)", logs and over == [], over)
+                advanced_unfolded(browser).click()
+                wait_for(browser, lambda b: not b.find_elements(By.ID, "open-logs"), 5)
             if width in (1920, 420):
                 seen(browser, f"d95-settings-{width}-light")
                 seen(browser, f"d95-settings-{width}-dark")
@@ -7365,6 +7393,9 @@ def main() -> int:
         window.file.write_text(window.file.read_text().replace("keep_audio = 30", "keep_audio = 90 # by hand"))
         changed(lambda: browser.find_element(By.ID, "reminder").click())
         changed(lambda: advanced_unfolded(browser).click())
+        # Drawn again by the switch: « Avancé » still unfolded — read, never pressed (D95).
+        unfolded = read(browser, lambda b: b.find_element(By.ID, "general-advanced").get_attribute("aria-expanded"))
+        check("the developer mode turned on: Settings drawn again, « Avancé » still unfolded (D95)", unfolded == "true", unfolded)
         # When an application takes the microphone (D30, board 4): offer to record by default;
         # nothing chosen here, then the offer again, each written.
         offer_on = read(browser, lambda b: Select(b.find_element(By.ID, "offer")).first_selected_option.get_attribute("value")) == "offer"

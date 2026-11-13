@@ -147,8 +147,10 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .minutes .body table.actions .unsettled { color: var(--soft); font-weight: 400; }
 /* The settings (D11's fourth board): cards, each titled inside; a step per model, on a raised ground. */
 /* Settings: one column centred at a maximum width, as GNOME's adaptive preferences (D95); nothing
-   wider than its card — a long name breaks, a choice narrows to its card (#782). */
-#settings { max-width: 720px; width: 100%; margin-inline: auto; overflow-wrap: anywhere; }
+   wider than its card — a choice narrows to it, and what holds an unbreakable string breaks
+   anywhere: a folder's path, a model's id, a host; never a label's words (#782). */
+#settings { max-width: 720px; width: 100%; margin-inline: auto; }
+#settings .path, #settings code, #offered .name { overflow-wrap: anywhere; }
 #settings select { max-width: 100%; min-width: 0; }
 #settings .picks { flex-wrap: wrap; min-width: 0; max-width: 100%; }
 .general-advanced { display: flex; flex-direction: column; gap: 12px; }
