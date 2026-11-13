@@ -1,10 +1,10 @@
 ---
 goal: "After a stop, the user knows where their meeting is and is told once when it is ready; a redo says what it will make, dates what it made and can go back; Settings are put in order, a service set up in a few guided steps; and Kitokey says all of it in one voice, in French and in English"
-status: proposed          # proposed | accepted | closed | stopped — the decider accepts
-accepted_on: 2026-11-13   # « cycle 10 accepté »; cycle 09 running, this cycle stays proposed and starts at its closure
+status: accepted          # proposed | accepted | closed | stopped — the decider accepts
+accepted_on: 2026-11-13   # « cycle 10 accepté »; started at cycle 09's closure, the same day
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
-start: 2026-11-21         # cycle 09's end, its closure's day; earlier if cycle 09 closes earlier
-end: 2026-12-05           # start + appetite: the first day the cycle is over — the circuit breaker
+start: 2026-11-13         # cycle 09's closure, early, on the decider's « on enchaine des que possible »
+end: 2026-11-27           # start + appetite: the first day the cycle is over — the circuit breaker
 deliverables:
   - id: D92
     title: "After the stop, the bar names the meeting and its stage, the page gives an estimate and Cancel, and one notification says it is ready"
@@ -207,6 +207,14 @@ contract's and the producer's own pull requests · blue: the decider's gesture.
 | Deliverable | Who | The literal gesture |
 |---|---|---|
 | D94 | The decider | Open the review page of 2026-11-13 from the link in D94's acceptance issue, opened by its author; tick the version you prefer line by line — the 20 of the diagnostic and every sentence on what leaves the machine at least —, press « Copier mes choix » and paste them in that issue. Untouched lines keep Claude's version |
+| Cycle 09's PDR-0005 | The decider | Read [PDR-0005](../../pdr/0005-on-windows-the-trial-ends-without-locking-the-meetings.md) and say « PDR-0005 acceptée », or what changes |
+| Cycle 09's D57 | The decider | Read [`docs/store/listing.md`](../../store/listing.md); say « l'annonce ne promet rien de faux », or which line does |
+| Cycle 09's D54, submission | The decider | In [Partner Center](https://partner.microsoft.com/dashboard), with a company's account: reserve the product's name and give an agent the identity Partner Center shows. Set *Free trial* to **Unlimited** (PDR-0005). Read the Store's licence terms beside GPL-3.0, answer the age questionnaire, and submit the package an agent built from that identity |
+| Cycle 09's D53, D54 on Windows, D84 | The colleague on Windows 11 | [#482](https://github.com/NapkinStack/wholeheard/issues/482), updated first by an agent with the run's link: the package signed for the run; a real call of five minutes; then sign out and in again: Kitokey in the notification area, no window. Answered there |
+| Cycle 09's D66, trial | The decider | On a build of `main`: AirPods, a WhatsApp Web call, five starts and stops, the answers on [#494](https://github.com/NapkinStack/kitokey/issues/494); then « ADR-0015 acceptée », or what falls |
+| Cycle 09's D41 | The decider | [#449](https://github.com/NapkinStack/kitokey/issues/449): a call on the earbuds, the default on the speaker |
+| Cycle 09's D56 | The decider | As [cycle 07](07-wholeheard-from-the-systems-updater.md#what-needs-a-person) says, in a terminal of your own, never through an agent: a minisign key, its `.pub` alone given to an agent |
+| Cycle 09's D27 | Anyone on Ubuntu 24.04 | [#255](https://github.com/NapkinStack/kitokey/issues/255): the `.deb` of a build of `main`, one real call of five minutes, the answer there |
 
 ## Dependency with a date
 
