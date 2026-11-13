@@ -2240,8 +2240,10 @@ fn startup_shown() -> (bool, bool, Option<autostart::Held>) {
     }
 }
 
+/// Async, so off the main thread: the licence (D83) and, on Windows, the startup task (D84) are
+/// each waited for up to 5 s, which would hold the window's messages.
 #[tauri::command]
-fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> SettingsShown {
+async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<SettingsShown, Told> {
     let (autostart, autostart_offered, autostart_held) = startup_shown();
     let (settings, unreadable) = match shell.reread() {
         Ok(settings) => (settings, None),
@@ -2261,7 +2263,7 @@ fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> SettingsShown {
         .collect();
     let trial =
         licence::left(&shell.licence(owner(&app)), &settings.sessions, seconds_now()).map(|left| words::trial_left(left, shell.language()));
-    SettingsShown {
+    Ok(SettingsShown {
         shortcut: shell.shortcut.lock().unwrap().clone(),
         shortcut_settings: keyboard_settings().is_some(),
         sessions_said: match dirs::home_dir().and_then(|home| settings.sessions.strip_prefix(home).ok().map(PathBuf::from)) {
@@ -2304,7 +2306,7 @@ fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> SettingsShown {
         log: settings.log,
         unreadable,
         trial,
-    }
+    })
 }
 
 /// One choice the page changed.
