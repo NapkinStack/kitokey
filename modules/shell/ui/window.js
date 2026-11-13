@@ -2658,10 +2658,12 @@ function showSettings(shown, minutes, words) {
   startBox.id = "autostart";
   startBox.setAttribute("role", "switch");
   startBox.checked = shown.autostart;
-  startBox.disabled = locked;
+  // On Windows, held by the user or a policy (D84): shown as Windows holds it, never moved here.
+  const held = { user: words.autostart_held[0], policy: words.autostart_held[1] }[shown.autostart_held];
+  startBox.disabled = locked || held !== undefined;
   startBox.addEventListener("change", () => save({ autostart: startBox.checked }));
   const startSaid = element("span", "said");
-  startSaid.append(element("span", "name", words.autostart[0]), element("span", "says", words.autostart[1]));
+  startSaid.append(element("span", "name", words.autostart[0]), element("span", "says", held ?? words.autostart[1]));
   start.append(startSaid, startBox);
   const keep = element("div", "row");
   const keepSaid = element("label", "said");
@@ -2802,7 +2804,8 @@ function showSettings(shown, minutes, words) {
   checkButton.append(icon("audio-lines"), element("span", "", words.check_sound));
   checkButton.addEventListener("click", () => checkSound(words, checkButton));
   check.append(checkSaid, checkButton);
-  more.append(speaks, remind, check, offer, start, keys, where, keep);
+  // Outside Windows' package, no startup task: nothing offered (D84).
+  more.append(speaks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, where, keep);
   parts.push(more);
 
   // The transcription model's state: there and ready; else said, and offered, by paintModel.

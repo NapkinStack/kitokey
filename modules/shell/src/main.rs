@@ -427,6 +427,15 @@ fn main() {
                     Err(error) => tracing::warn!(kind = ?error.kind(), "shell.autostart_refused"),
                 }
             }
+            // On Windows, the package's startup task as Windows holds it at this start (D84), for the
+            // trial to record; none outside a package.
+            if cfg!(windows) {
+                match autostart::task() {
+                    Ok(Some(task)) => tracing::info!(state = ?task, "shell.startup_task"),
+                    Ok(None) => {}
+                    Err(detail) => tracing::warn!(%detail, "shell.startup_task_unread"),
+                }
+            }
             let read = settings::file().map_or_else(|| Ok(Settings::default()), |file| settings::read(&file));
             // The first run (D58): never set up, nothing recorded — the assistant, once.
             let welcome = read.as_ref().is_ok_and(settings::welcome_due);
@@ -2204,8 +2213,13 @@ struct SettingsShown {
     reminder: bool,
     /// A call another application starts is offered to be recorded (D30).
     offer: bool,
-    /// Kitokey starts with the user's session (D32): its entry, as the desktop reads it.
+    /// Kitokey starts with the user's session (D32): its entry, as the desktop reads it; on
+    /// Windows, the package's startup task, as Windows holds it (D84).
     autostart: bool,
+    /// Whether the switch is offered: not on Windows outside a package, which has no task.
+    autostart_offered: bool,
+    /// Who holds the switch when Kitokey cannot move it: the user in Windows, or a policy.
+    autostart_held: Option<autostart::Held>,
     keep_audio: KeepAudio,
     model: PathBuf,
     /// Who hears: the model above, Apple's SpeechAnalyzer (D42), or a service the user named (D43),
@@ -2239,8 +2253,31 @@ fn models_folder() -> PathBuf {
     Settings::default().model.parent().map(PathBuf::from).unwrap_or_default()
 }
 
+/// Settings' start-with-the-session switch: on or off, whether it is offered, and who holds it.
+/// The desktop's entry where there is one (D32); else the package's startup task (D84), none
+/// outside a package, a task that cannot be read not offered and said in the log.
+fn startup_shown() -> (bool, bool, Option<autostart::Held>) {
+    if let Some(entry) = autostart::file() {
+        return (autostart::on(&entry), true, None);
+    }
+    match autostart::task() {
+        Ok(Some(task)) => {
+            let (on, held) = autostart::shown(task);
+            (on, true, held)
+        }
+        Ok(None) => (false, false, None),
+        Err(detail) => {
+            tracing::warn!(%detail, "shell.startup_task_unread");
+            (false, false, None)
+        }
+    }
+}
+
+/// Async, so off the main thread: the licence (D83) and, on Windows, the startup task (D84) are
+/// each waited for up to 5 s, which would hold the window's messages.
 #[tauri::command]
-fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> SettingsShown {
+async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<SettingsShown, Told> {
+    let (autostart, autostart_offered, autostart_held) = startup_shown();
     let (settings, unreadable) = match shell.reread() {
         Ok(settings) => (settings, None),
         Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked, why))),
@@ -2259,7 +2296,7 @@ fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> SettingsShown {
         .collect();
     let trial =
         licence::left(&shell.licence(owner(&app)), &settings.sessions, seconds_now()).map(|left| words::trial_left(left, shell.language()));
-    SettingsShown {
+    Ok(SettingsShown {
         shortcut: shell.shortcut.lock().unwrap().clone(),
         shortcut_settings: keyboard_settings().is_some(),
         sessions_said: match dirs::home_dir().and_then(|home| settings.sessions.strip_prefix(home).ok().map(PathBuf::from)) {
@@ -2271,7 +2308,9 @@ fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> SettingsShown {
         after: settings.after,
         reminder: settings.reminder,
         offer: settings.offer,
-        autostart: autostart::file().is_some_and(|entry| autostart::on(&entry)),
+        autostart,
+        autostart_offered,
+        autostart_held,
         keep_audio: settings.keep_audio,
         model: settings.model,
         engine: settings.engine,
@@ -2300,7 +2339,7 @@ fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> SettingsShown {
         log: settings.log,
         unreadable,
         trial,
-    }
+    })
 }
 
 /// One choice the page changed.
@@ -2356,9 +2395,10 @@ fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Re
     }
     // The entry first: the settings say what Kitokey wrote of it, once it is written.
     if let Some(on) = change.autostart {
-        let entry =
-            autostart::file().ok_or_else(|| shell.told(Failure::Autostart, "this system names no folder for the session's start"))?;
-        autostart::set(&entry, on).map_err(|error| shell.told(Failure::Autostart, error))?;
+        match autostart::file() {
+            Some(entry) => autostart::set(&entry, on).map_err(|error| shell.told(Failure::Autostart, error))?,
+            None => autostart::turn(on).map_err(|error| shell.told(Failure::Autostart, error))?,
+        }
         settings.autostart = Some(on);
     }
     if let Some(developer) = change.developer {

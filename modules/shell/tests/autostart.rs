@@ -132,3 +132,33 @@ fn at_the_start_a_wholeheard_user_who_had_it_start_with_the_session_keeps_it_und
     assert!(matches!(start.carried, Ok(true)) && matches!(start.written, Ok(false)), "{start:?}");
     assert!(!autostart::on(&entry) && !before.exists());
 }
+
+// On Windows, the package's startup task (D84): Windows' Startup settings are the setting, and
+// what Settings show is what Windows says of the task.
+
+#[test]
+fn each_state_of_the_windows_startup_task_is_shown_as_windows_holds_it() {
+    use autostart::{Held, Task};
+    assert_eq!(autostart::shown(Task::Enabled), (true, None));
+    assert_eq!(autostart::shown(Task::Disabled), (false, None));
+    // Turned off by the user in Windows: shown off, and only Windows turns it back on.
+    assert_eq!(autostart::shown(Task::DisabledByUser), (false, Some(Held::User)));
+    assert_eq!(autostart::shown(Task::DisabledByPolicy), (false, Some(Held::Policy)));
+    assert_eq!(autostart::shown(Task::EnabledByPolicy), (true, Some(Held::Policy)));
+}
+
+#[test]
+fn the_task_read_is_the_one_the_package_manifest_declares() {
+    assert_eq!(autostart::TASK_ID, "KitokeyStartupTask");
+}
+
+#[test]
+fn outside_windows_there_is_no_startup_task_and_the_entry_is_the_setting() {
+    if cfg!(windows) {
+        // No entry under AppData\Roaming\autostart, which Windows never reads.
+        assert!(autostart::file().is_none());
+    } else {
+        assert!(autostart::file().is_some());
+        assert_eq!(autostart::task(), Ok(None));
+    }
+}
