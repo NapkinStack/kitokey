@@ -7411,6 +7411,36 @@ def main() -> int:
         said = not_saved()
         check("developer mode on, the raw text is under the sentence of the command that failed, without its path", said == f"{refused}\n{raw}", said)
         check("developer mode on, the raw text is under the settings file's sentence too", unreadable() == f"{locked_said}\n{raw}", unreadable())
+        # Started with that file unreadable (#770): the folder it names is not known, so its meetings
+        # are not listed — a banner says so on every page but Réglages, and leads there; the list
+        # never says « Aucune réunion ». The file fixed, the banner goes and the meeting is listed.
+        session(elsewhere / "kept", now - dt.timedelta(hours=1), 10, {"transcript.jsonl": 100})
+        window.__exit__()
+        browser = window.__enter__()
+        banner = ("const b = document.getElementById('settings-banner');"
+                  "return b && b.getClientRects().length > 0 ? [document.getElementById('settings-banner-said').textContent,"
+                  " document.getElementById('settings-banner-link').textContent, document.getElementById('settings-banner-link').getAttribute('href')] : null")
+        empty_said = "const e = document.getElementById('empty'); return e.getClientRects().length > 0 ? e.textContent : null"
+        shown = wait_for(browser, lambda b: b.execute_script(banner) is not None, 10)
+        check("started with the settings unreadable: a banner says the meetings are not shown, and leads to Réglages",
+              shown and browser.execute_script(banner)
+              == ["Les réglages ne peuvent pas être lus : vos réunions ne sont pas affichées.", "Réglages", "#/settings"],
+              browser.execute_script(banner))
+        check("started with the settings unreadable: the list never says no meeting", browser.execute_script(empty_said) is None,
+              browser.execute_script(empty_said))
+        browser.find_element(By.ID, "settings-banner-link").click()
+        there = wait_for(browser, lambda b: b.find_elements(By.ID, "settings-unreadable") and b.find_element(By.ID, "settings-unreadable").is_displayed(), 5)
+        check("the banner's link opens Réglages, which says why; the banner is not shown twice there",
+              there and browser.execute_script(banner) is None, browser.execute_script(banner))
+        browser.execute_script("location.hash = '#/'")
+        kept_shown = wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
+        check("back on the list: the banner still there", kept_shown, browser.execute_script(banner))
+        window.file.write_text(held)
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        gone = wait_for(browser, lambda b: b.execute_script(banner) is None and "kept" in b.execute_script(
+            "return [...document.querySelectorAll('#groups a')].map(a => a.getAttribute('href')).join(' ')"), 5)
+        check("the file fixed: the banner gone, the meeting listed", gone,
+              [browser.execute_script(banner), browser.execute_script("return document.getElementById('groups').textContent")])
     # Who writes the minutes: an Ollama made here, an online service, an address of the user's. A
     # key goes to the scenario's own keyring, which lives as long as the program.
     class Tags(http.server.BaseHTTPRequestHandler):

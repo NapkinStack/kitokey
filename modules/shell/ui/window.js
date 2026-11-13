@@ -729,6 +729,8 @@ function paintRefused(refused) {
 
 function show({ words, folder, sessions, recording, stopping, shortcut, folded, unreadable, refused }) {
   document.documentElement.lang = words.locale;
+  document.getElementById("settings-banner-said").textContent = words.settings_banner;
+  document.getElementById("settings-banner-link").textContent = words.settings;
   // The header's gesture, as the board has it: start or stop, with the shortcut beside.
   // The sidebar's secondary actions: icons, each with its tooltip and its name; the header's one
   // action stays the recording's (D69, D89).
@@ -4277,7 +4279,9 @@ async function draw(mine, again) {
   if (mine !== drawing) return;
   if (pageNotShown) document.getElementById("pane-said").hidden = true;
   notShown(false);
-  document.getElementById("empty").hidden = !listed || listing.sessions.length > 0;
+  // The settings unreadable, the folder listed is not the user's: said, never « no meeting » (#770).
+  document.getElementById("empty").hidden = !listed || listing.sessions.length > 0 || listing.settings_unread;
+  document.getElementById("settings-banner").hidden = !listing.settings_unread || settings;
   // No meeting yet: under 840 px, the sidebar and what to do, one under the other.
   document.body.classList.toggle("no-meeting", listing.sessions.length === 0);
   document.getElementById("agree").hidden = agreement === null;
