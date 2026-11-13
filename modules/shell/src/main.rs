@@ -3428,7 +3428,8 @@ fn write_minutes_from(
             },
             own_model.as_deref(),
         );
-        if *shell.leaving.lock().unwrap() {
+        // Written all the same after « Annuler »: kept, being whole, and nothing told (D92).
+        if *shell.leaving.lock().unwrap() || cancel.cancelled() {
             return;
         }
         let written = matches!(made, summarising::Made::Written(_));
@@ -3931,6 +3932,11 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
             }
             return transcribe_next(&app);
         }
+        // Written all the same after « Annuler »: kept, being whole, but nothing follows it — no
+        // notification, no minutes made with a model the user was changing (D92).
+        if cancel.cancelled() {
+            return transcribe_next(&app);
+        }
         // Made again and ready, its click opens the meeting as after a stop (D44).
         match &made {
             Made::Written(_) => tell_opening(&app, &words::made(&made, shell.language()), folder.clone()),
@@ -4084,6 +4090,11 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
         // Ended for its meeting said confidential: made again here, first in line; cancelled,
         // nothing told, nothing made after it.
         if here != Heard::Ended {
+            return transcribe_next(&app);
+        }
+        // Written all the same after « Annuler »: kept, being whole, but nothing follows it — no
+        // notification, no minutes made with a model the user was changing (D92).
+        if cancel.cancelled() {
             return transcribe_next(&app);
         }
         let notice = words::made(&made, shell.language());

@@ -105,6 +105,8 @@ fi
 # Held, as a long meeting heard (D92): a transcript begun, its number and its child's — deaf to TERM — noted, then waits.
 if [ -e "$(dirname "$0")/hold-hearing" ]; then
   printf '{"type":"header","contract":"transcript/v1","engine":"%s","model":"%s","language":null,"context":null}\n' "$engine" "$model" > "$1/transcript.jsonl"
+  # Told to stop, it finishes all the same when the scenario says so: a transcript written after « Annuler ».
+  [ -e "$(dirname "$0")/hold-hearing-finish" ] && trap 'printf '"'"'{"type":"complete","duration":1.0}\n'"'"' >> "$1/transcript.jsonl"; exit 0' TERM
   echo $$ > "$(dirname "$0")/held-hearing"; ( trap '' TERM; exec sleep 60 ) & echo $! > "$(dirname "$0")/held-hearing-child"; sleep 60; exit 0
 fi
 context=$(python3 -c "$CONTEXT" "$1")
@@ -2152,7 +2154,8 @@ def cancelled_at_once(now: dt.datetime) -> None:
     for model in (a, b):
         model.write_bytes(b"\0" * 16)
     local = "http://localhost:11434/v1"
-    window = Window(meetings, "fr_FR.UTF-8", f'reminder = false\nmodel = "{a}"\nminutes_provider = "{local}"\nminutes_model = "writer-a"\n')
+    # The minutes follow a transcript (`after`): none must follow one written after « Annuler ».
+    window = Window(meetings, "fr_FR.UTF-8", f'reminder = false\nafter = "minutes"\nmodel = "{a}"\nminutes_provider = "{local}"\nminutes_model = "writer-a"\n')
     window.env.update(XDG_DATA_HOME=str(data))
     sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
     idle = "return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)"
@@ -2231,6 +2234,40 @@ def cancelled_at_once(now: dt.datetime) -> None:
         browser.execute_script("return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", fresh.name, str(b))
         made = wait_for(browser, lambda b: (fresh / "transcript.jsonl").exists() and b.execute_script(idle), 15)
         check("then another model makes it whole at once", made and '"model":"ggml-tiny-b"' in (fresh / "transcript.jsonl").read_text())
+        # Written all the same after « Annuler » (the decider's decision, 2026-11-13): kept, being
+        # whole, shown as written — never said stopped —, and nothing follows it: no notification,
+        # no minutes made with the model the user was changing, though the settings chain them.
+        finished = meetings / "2026-11-13_18-30"
+        session(finished, now - dt.timedelta(minutes=20), 1, {"local.wav": 1000})
+        held.unlink(missing_ok=True)
+        (WORK / "summary-args").unlink(missing_ok=True)
+        (WORK / "hold-hearing").touch()
+        (WORK / "hold-hearing-finish").touch()
+        notified = WORK / "notified-cancelled-finished"
+        monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                   stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+        try:
+            time.sleep(0.5)
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", finished.name)
+            running = wait_for(browser, lambda b: held.exists(), 15)
+            browser.execute_script(f"location.hash = '#/meeting/{finished.name}'")
+            offered = running and wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 10)
+            check("finishing all the same: « Annuler » on its page", offered)
+            if offered:
+                press(browser, "making-cancel")
+                ended = wait_for(browser, lambda b: b.execute_script(idle), 3)
+                whole = (finished / "transcript.jsonl").read_text() if (finished / "transcript.jsonl").exists() else ""
+                check("written all the same after « Annuler »: kept whole", ended and '"type":"complete"' in whole, whole)
+                time.sleep(3)
+                stopped = browser.execute_script("const s = document.getElementById('making-stopped'); return s ? s.textContent : ''")
+                check("written all the same: not said stopped on its page", stopped == "", stopped)
+                check("written all the same: no minutes made after it, though the settings chain them",
+                      not (WORK / "summary-args").exists() and not (finished / "minutes.md").exists())
+                check("written all the same: no notification", "member=Notify" not in notified.read_text(), notified.read_text()[-300:])
+        finally:
+            monitor.terminate()
+            (WORK / "hold-hearing").unlink(missing_ok=True)
+            (WORK / "hold-hearing-finish").unlink(missing_ok=True)
 
 
 LONG = "hf.co/unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF:UD-Q4_K_XL-very-long-name"
