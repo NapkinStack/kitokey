@@ -35,10 +35,11 @@ const SIZES: [&str; 6] = ["height", "min-height", "max-height", "width", "min-wi
 /// Whether a selector reaches one of the bar's controls: under `#small`, its last part a button,
 /// an icon button, ● or ■ — the text field's own clear button aside, 24 by design.
 fn reaches_a_control(selector: &str) -> bool {
-    let last = selector.rsplit(' ').next().unwrap_or("");
+    // Its state aside: `:hover`, `:disabled` size the same control.
+    let last = selector.rsplit(' ').next().unwrap_or("").split(':').next().unwrap_or("");
     let mut parts = last.split('.');
     let element = parts.next().unwrap_or("");
-    selector.starts_with("#small")
+    selector.starts_with("#small ")
         && !selector.contains(".next-context")
         && (element == "button" || parts.any(|class| ["icon-button", "record", "danger"].contains(&class)))
 }
@@ -169,4 +170,5 @@ fn the_bar_is_440_by_44_its_controls_28() {
         off_size(&format!("{STYLE}\n#small .bar-row button.icon-button {{ min-height: 32px }}")).len(),
         1
     );
+    assert_eq!(off_size(&format!("{STYLE}\n#small .record:hover {{ height: 40px }}")).len(), 1);
 }
