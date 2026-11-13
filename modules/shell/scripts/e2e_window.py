@@ -3170,13 +3170,17 @@ def sound_checked(now: dt.datetime) -> None:
                 press(browser, "check-sound-open")
                 browser.execute_script("document.getElementById('check-play').click()")
                 # Read from the press on, not a second after: the half-second sound would be over (#751).
-                heard_out, outputs = set(), []
+                heard_out, outputs, stamps = set(), [], []
                 until = time.monotonic() + 1.5
                 while time.monotonic() < until:
+                    stamps.append(time.monotonic())
                     heard_out |= played_to(window)
                     outputs += [kind for kind in kitokey_streams(window) if kind == "Stream/Output/Audio"]
                     time.sleep(0.03)
-                check("pressed at once while a call holds a microphone: no sound, no stream on the output, from the press on", outputs == [] and not heard_out, [outputs, heard_out])
+                widest = max((b - a for a, b in zip(stamps, stamps[1:])), default=0.0)
+                print(f"  G2 sampling: {len(stamps)} samples in 1.5 s, widest gap {widest * 1000:.0f} ms")
+                check("pressed at once while a call holds a microphone: no sound, no stream on the output, from the press on",
+                      outputs == [] and not heard_out, [outputs, heard_out, len(stamps), round(widest, 3)])
             finally:
                 call.terminate()
                 call.wait(timeout=5)
@@ -3278,6 +3282,27 @@ def sound_checked(now: dt.datetime) -> None:
             check("never listening while a recording runs", refused == {"opened": False}, refused)
             browser.execute_script("window.__TAURI__.core.invoke('record')")
             wait_for(browser, lambda b: not b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 8)
+        # Its window hidden with the panel open — the full window replaced by the bar, which only hides
+        # it (`show_small` → `main.hide()`) —: the page hidden closes the panel (`visibilitychange`), and
+        # capture stops listening within a second.
+        ended = WORK / "listen-ended"
+        asked, gone = None, False
+        try:
+            with Window(sessions, "fr_FR.UTF-8") as browser:
+                browser.execute_script("location.hash = '#/settings'")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "check-sound-open"), 8)
+                opened(browser)
+                ended.unlink(missing_ok=True)
+                asked = time.time()
+                try:
+                    browser.execute_script("window.__TAURI__.core.invoke('small_window')")
+                except (NoSuchWindowException, WebDriverException):
+                    pass
+                gone = wait_for(None, lambda b: ended.is_file(), 3)
+        except (NoSuchWindowException, WebDriverException):
+            gone = gone or ended.is_file()
+        check("its window hidden for the bar with the panel open: capture stops listening within a second",
+              asked is not None and gone and float(ended.read_text()) - asked <= 1.0, asked and ended.is_file() and float(ended.read_text()) - asked)
         # Its window destroyed with the panel open — the bar replaced by the full window, which closes
         # it; the full window replaced by the bar is only hidden (#751) —: the shell ends the listening
         # on the window's end, within a second; the page can say nothing then. The driver's window is
