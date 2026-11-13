@@ -532,16 +532,37 @@ check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|
 check test ! -e "$work/sessions/given"         # no second recording was started
 found=$(cat "$work"/state/kitokey/logs/shell.*.jsonl 2>/dev/null | grep '"message":"shell.recording_found"' | grep -o '"seconds":[0-9.]*' | tail -1 | cut -d: -f2 || true)
 check test "${found%.*}" -ge 90 2>/dev/null      # its length counted from the session's start
+# Started again while it shows the recording found: the running one keeps it, nothing started anew.
+again
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"
 click 3; sleep 1
 check is "$(cat "$work/sessions/told")" "signal"
 check is "$(kill -0 "$recorder" 2>/dev/null && echo recording || echo ended)" "ended"
 check grep -q '"stopped"' "$work/sessions/2026-11-13_09-00/session.json"
 check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
 check is "$(tail -1 "$work/sessions/heard")" "$work/sessions/2026-11-13_09-00 --model $work/model.bin"
+check test ! -e "$work/config/kitokey/recording.json"   # nothing kept once it ended
 click 6
+rm -rf "$work/sessions/2026-11-13_09-00"
+# Killed outright (SIGKILL), as a crash leaves it: found all the same, and Quit stops it first (as B).
+start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"
+click 3
+recorder=$(cat "$work/sessions/recorder")
+kill -KILL "$app"; wait "$app" 2>/dev/null || true; app=""
+check kill -0 "$recorder"
+start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"; sleep 1
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"
+click 6
+check is "$(cat "$work/sessions/told")" "signal"
+check is "$(kill -0 "$recorder" 2>/dev/null && echo recording || echo ended) $(kill -0 "$app" 2>/dev/null && echo running || echo gone)" "ended gone"
+check grep -q '"stopped"' "$work/sessions/2026-11-13_09-00/session.json"
+check test ! -e "$work/config/kitokey/recording.json"
 # Started once more: nothing is left to find.
 start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"; sleep 1
 check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"
 click 6
 rm -rf "$work/sessions/2026-11-13_09-00" "$work/sessions/recorder"
 
