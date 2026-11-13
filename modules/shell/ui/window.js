@@ -385,6 +385,8 @@ function minutesState(name) {
     return { kind: "ollama", silent: makings.ollama_waiting[name] === "silent", busy: makings.model_fetching !== null };
   }
   if (makings.failed[name] !== undefined) return { kind: "failed", why: makings.failed[name], said: makings.failed_said[name] };
+  // Cancelled by the user (D92): said, until it is made again.
+  if (makings.stopped[name] === "minutes") return { kind: "stopped" };
   return null;
 }
 
@@ -398,7 +400,25 @@ function transcriptState(name) {
   }
   if (waiting >= 0) return { kind: "waiting", before: waiting + 1 };
   if (makings.transcripts_failed[name] !== undefined) return { kind: "failed", why: makings.transcripts_failed[name] };
+  if (makings.stopped[name] === "transcript") return { kind: "stopped" };
   return null;
+}
+
+// The card whose « Annuler » was pressed: once it says stopped, the focus goes to what makes it again.
+let cancelledFrom = null;
+
+// « Annuler » (D92): what is made of the meeting ends within two seconds, or leaves the line.
+function cancelButton(said, id) {
+  const cancel = element("button", "open", words.making_cancel);
+  cancel.type = "button";
+  if (id) cancel.id = id;
+  cancel.addEventListener("click", async () => {
+    cancel.disabled = true;
+    cancelledFrom = said.id;
+    await window.__TAURI__.core.invoke("making_cancelled", { name: said.dataset.name }).catch(() => {});
+    readMakings();
+  });
+  return cancel;
 }
 
 // One card's state, said where its content is: what makes it and for how long, its place in
@@ -406,9 +426,9 @@ function transcriptState(name) {
 function paintState(said, shown, of) {
   said.hidden = shown === null;
   said.className = `making-state ${shown?.kind ?? ""}`;
-  // Being made, waiting, or failed with Try again: not offered a second time.
+  // Being made, waiting, or failed with Try again: not offered a second time. Stopped, it is.
   const offered = document.getElementById(of.offer);
-  if (offered) offered.hidden = shown !== null;
+  if (offered) offered.hidden = shown !== null && shown.kind !== "stopped";
   // Drawn again only when it says something else — a link or a button under the pointer or the
   // keyboard's focus stays the same one —; while it is made, only its time moves.
   const { seconds, ...same } = shown ?? {};
@@ -423,9 +443,15 @@ function paintState(said, shown, of) {
   said.dataset.key = key;
   if (shown === null) return said.replaceChildren();
   if (shown.kind === "making") {
-    said.replaceChildren(element("span", "what", of.making), element("span", "by", `${by} · ${minutes}`), element("span", "making-bar"));
+    said.replaceChildren(element("span", "what", of.making), element("span", "by", `${by} · ${minutes}`), element("span", "making-bar"), cancelButton(said, "making-cancel"));
   } else if (shown.kind === "waiting") {
-    said.replaceChildren(element("span", "what", fill(words.minutes_waiting, shown.before)));
+    said.replaceChildren(element("span", "what", fill(words.minutes_waiting, shown.before)), cancelButton(said));
+  } else if (shown.kind === "stopped") {
+    const stopped = element("span", "what", of.stopped);
+    stopped.id = "making-stopped";
+    said.replaceChildren(stopped);
+    if (cancelledFrom === said.id && offered && !offered.hidden) offered.focus();
+    cancelledFrom = null;
   } else if (shown.kind === "model") {
     if (shown.coming) said.replaceChildren(element("span", "what", words.transcript_model_coming));
     else said.replaceChildren(element("span", "what", words.transcript_model_needed), modelFetch(shown.busy));
@@ -541,9 +567,10 @@ function paintMakings() {
   paintModel();
   paintOffered();
   for (const chip_ of document.querySelectorAll(".chip.making")) {
-    // The minutes' state first; else the transcript's, which comes before them.
-    const minutes = minutesState(chip_.dataset.name);
-    const transcript = transcriptState(chip_.dataset.name);
+    // The minutes' state first; else the transcript's, which comes before them. Stopped: no chip.
+    const chipped = (state) => (state?.kind === "stopped" ? null : state);
+    const minutes = chipped(minutesState(chip_.dataset.name));
+    const transcript = chipped(transcriptState(chip_.dataset.name));
     const state = minutes ?? transcript;
     chip_.hidden = state === null;
     if (state === null) continue;
@@ -556,7 +583,7 @@ function paintMakings() {
   const minutes = document.getElementById("minutes-state");
   if (minutes) {
     paintState(minutes, minutesState(minutes.dataset.name), {
-      offer: "make-minutes", again: "minutes-again", ask: "minutes_again", making: words.minutes_making, not_made: words.minutes_not_made,
+      offer: "make-minutes", again: "minutes-again", ask: "minutes_again", making: words.minutes_making, not_made: words.minutes_not_made, stopped: words.minutes_stopped,
     });
   }
   // No line corrected while the transcript is made or waits to be (D62): its pencils hidden.
@@ -564,12 +591,12 @@ function paintMakings() {
     if (pencil.parentElement.querySelector(".correcting")) continue;
     const kind = transcriptState(pencil.dataset.name)?.kind;
     // Nor while its minutes are written: they read the transcript before (#528's verification).
-    pencil.hidden = (kind !== undefined && kind !== "failed") || minutesState(pencil.dataset.name)?.kind === "making";
+    pencil.hidden = (kind !== undefined && kind !== "failed" && kind !== "stopped") || minutesState(pencil.dataset.name)?.kind === "making";
   }
   const transcript = document.getElementById("transcript-state");
   if (transcript) {
     paintState(transcript, transcriptState(transcript.dataset.name), {
-      offer: "make-transcript", again: "transcript-again", ask: "transcript_again", making: words.transcript_making, not_made: words.transcript_not_made,
+      offer: "make-transcript", again: "transcript-again", ask: "transcript_again", making: words.transcript_making, not_made: words.transcript_not_made, stopped: words.transcript_stopped,
     });
   }
   paintContext();

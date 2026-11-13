@@ -637,6 +637,11 @@ pub struct Window {
     /// A transcript waiting for the default Whisper model: offered in the menu, or coming.
     pub transcript_model_needed: &'static str,
     pub transcript_model_coming: &'static str,
+    /// The button that ends what is being made of a meeting, or takes it out of the line (D92).
+    pub making_cancel: &'static str,
+    /// Said on its page once the user cancelled its transcript, or its minutes: what was there stays.
+    pub transcript_stopped: &'static str,
+    pub minutes_stopped: &'static str,
     pub ran_online: &'static str,
     /// The header's button, at rest and while a recording runs.
     pub record_start: &'static str,
@@ -1066,6 +1071,9 @@ pub fn window(language: Language) -> Window {
             minutes_unsaved_none: "Not saved yet — no minutes are written until it is.",
             transcript_model_needed: "Waiting for the Whisper model.",
             transcript_model_coming: "Waiting for the Whisper model, being downloaded.",
+            making_cancel: "Cancel",
+            transcript_stopped: "Transcription stopped. You can start it again, with another model if you like.",
+            minutes_stopped: "Minutes stopped. You can start them again, with another model if you like.",
             ran_online: "online",
             record_start: "Start a recording",
             record_stop: "Stop the recording",
@@ -1489,6 +1497,9 @@ pub fn window(language: Language) -> Window {
             minutes_unsaved_none: "Pas encore enregistré — aucun compte rendu n’est fait tant que ce n’est pas le cas.",
             transcript_model_needed: "En attente du modèle Whisper.",
             transcript_model_coming: "En attente du modèle Whisper, en cours de téléchargement.",
+            making_cancel: "Annuler",
+            transcript_stopped: "Transcription arrêtée. Vous pouvez la relancer, avec un autre modèle si besoin.",
+            minutes_stopped: "Compte rendu arrêté. Vous pouvez le relancer, avec un autre modèle si besoin.",
             ran_online: "en ligne",
             record_start: "Démarrer un enregistrement",
             record_stop: "Arrêter l’enregistrement",
