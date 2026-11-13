@@ -192,8 +192,15 @@ impl Summarising {
     /// Stops the program on the user's word, « Annuler » (D92), as a transcript's: within two
     /// seconds, without waiting here; the minutes there stay.
     pub fn cancel(&self) {
+        (self.stopper())();
+    }
+
+    /// The same, to be held by the making's token (`crate::cancel::Cancel::hold`).
+    pub fn stopper(&self) -> impl FnOnce() + Send + 'static {
         let program = Arc::clone(&self.program);
-        thread::spawn(move || crate::transcription::cancel(&program));
+        move || {
+            thread::spawn(move || crate::transcription::cancel(&program));
+        }
     }
 }
 
