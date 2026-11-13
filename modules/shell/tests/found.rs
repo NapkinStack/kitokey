@@ -145,17 +145,87 @@ fn nothing_is_found_of_a_program_gone_and_the_file_is_removed() {
 fn another_program_under_the_number_kept_is_not_found_nor_signalled() {
     let sessions = tempfile::tempdir().unwrap();
     let mut child = recorder(sessions.path(), "");
+    // The number given again by the system: what was kept is the start of another real program, started later.
+    std::thread::sleep(Duration::from_millis(200));
+    let mut other = Command::new("sleep").arg("5").spawn().unwrap();
     let mut kept = Kept::of(child.id(), &session(sessions.path())).unwrap();
-    // The number given again by the system to a program started at another time.
-    kept.since += 1;
+    let theirs = recording::since(other.id());
+    other.kill().unwrap();
+    other.wait().unwrap();
     let file = sessions.path().join("recording.json");
-    recording::keep(&file, &kept).unwrap();
-    assert!(recording::find(&file, now()).is_none());
-    assert!(!file.exists());
+    let found = theirs.filter(|theirs| *theirs != kept.since).map(|theirs| {
+        kept.since = theirs;
+        recording::keep(&file, &kept).unwrap();
+        recording::find(&file, now()).is_some()
+    });
     std::thread::sleep(Duration::from_millis(300));
-    assert!(child.try_wait().unwrap().is_none(), "left running: it is not the one kept");
+    let running = child.try_wait().unwrap().is_none();
     child.kill().unwrap();
     let _ = child.wait();
+    assert_eq!(found, Some(false), "another program's start: not found");
+    assert!(!file.exists());
+    assert!(running, "left running: it is not the one kept");
+}
+
+#[test]
+fn a_recording_found_whose_program_is_gone_before_the_stop_is_sent_no_signal() {
+    let sessions = tempfile::tempdir().unwrap();
+    let mut child = recorder(sessions.path(), "");
+    let (_, found) = kept_and_found(sessions.path(), &child);
+    let mut found = found.expect("found running");
+    // Gone between the start and ■: ended, not yet waited for, its number still the system's.
+    unsafe_kill(child.id());
+    std::thread::sleep(Duration::from_millis(300));
+    let refused = found
+        .recording
+        .stop()
+        .expect_err("no signal sent to a number no longer the recording's");
+    assert_eq!(refused.kind(), std::io::ErrorKind::NotFound);
+    let _ = child.wait();
+}
+
+/// Ended outright, as a crash ends it, never waited for here.
+fn unsafe_kill(id: u32) {
+    Command::new("kill").args(["-KILL", &id.to_string()]).status().unwrap();
+}
+
+#[test]
+fn a_program_started_later_has_a_later_start() {
+    let own = recording::since(std::process::id()).unwrap();
+    std::thread::sleep(Duration::from_millis(200));
+    let mut child = Command::new("sleep").arg("5").spawn().unwrap();
+    let later = recording::since(child.id());
+    child.kill().unwrap();
+    child.wait().unwrap();
+    let later = later.unwrap();
+    assert!(own > 0 && later > own, "its start in the system's ticks: {own}, then {later}");
+}
+
+#[test]
+fn a_kept_file_that_cannot_be_read_is_removed() {
+    use std::os::unix::fs::PermissionsExt;
+    let sessions = tempfile::tempdir().unwrap();
+    let file = sessions.path().join("recording.json");
+    fs::write(&file, "{}").unwrap();
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::read(&file).is_ok() {
+        return; // run as a user who reads anything: there is no unreadable file to make
+    }
+    assert!(recording::find(&file, now()).is_none());
+    assert!(!file.exists(), "nothing is left to find");
+}
+
+#[test]
+fn a_folder_in_the_kept_file_s_place_is_removed_and_keeping_works_again() {
+    let sessions = tempfile::tempdir().unwrap();
+    let file = sessions.path().join("recording.json");
+    fs::create_dir_all(file.join("inside")).unwrap();
+    fs::write(file.join("inside/x"), "x").unwrap();
+    assert!(recording::find(&file, now()).is_none());
+    assert!(!file.exists(), "the folder is gone");
+    let kept = Kept::of(std::process::id(), &session(sessions.path())).unwrap();
+    recording::keep(&file, &kept).unwrap();
+    assert!(file.is_file());
 }
 
 #[test]

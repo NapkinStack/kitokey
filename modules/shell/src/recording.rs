@@ -492,14 +492,20 @@ pub struct Found {
 const LOOKED_AT_EVERY: Duration = Duration::from_millis(200);
 
 /// The recording a Kitokey ended before this one left running, as `file` keeps it — or none:
-/// nothing kept, a file that does not read, a program gone or another under its number. A file that
-/// finds nothing is removed: nothing is left to find. `now`: seconds since 1970.
+/// nothing kept, a file that cannot be read or does not read, a program gone or another under its
+/// number. What finds nothing is removed, a folder in the file's place too: nothing is left to find.
+/// `now`: seconds since 1970.
 pub fn find(file: &Path, now: i64) -> Option<Found> {
     let text = match fs::read(file) {
         Ok(text) => text,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return None,
+        // Not readable — no permission, or a folder in its place —: removed, or every later `keep` fails.
         Err(error) => {
             warn!(kind = ?error.kind(), "shell.recording_unread");
+            let removed = if file.is_dir() { fs::remove_dir_all(file) } else { forget(file) };
+            if let Err(error) = removed {
+                warn!(kind = ?error.kind(), "shell.recording_not_forgotten");
+            }
             return None;
         }
     };
