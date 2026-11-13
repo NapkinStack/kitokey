@@ -34,6 +34,9 @@ Records the audio sources of a conversation into a session.
   for one system (ADR-0002's success criterion). `src/passive.rs` and `src/call.rs` are the
   exceptions the ADRs name (ADR-0011, ADR-0015), and the first is the only file that knows the
   `pipewire` crate.
+- libFLAC is compiled with the MSVC runtime the Rust build links: `.cargo/config.toml` names
+  `cmake/msvc-runtime.cmake`, which sets `/MT` under `+crt-static` — CMake (CMP0091) ignores the
+  flag cmake-rs passes. Without it, `windows-app.yml` fails to link (`__imp_fread`).
 - `src/call.rs` decides from the graph, nothing else; `Following` in `src/main.rs` applies it, polled
   by the main loop, closing before it opens. `Me` and `Step` are tested in `tests/call.rs`.
 
