@@ -71,10 +71,15 @@ graph=$(mktemp -d /tmp/wh-XXXXXX)
 export XDG_RUNTIME_DIR=$graph/rt PIPEWIRE_RUNTIME_DIR=$graph/rt XDG_CONFIG_HOME=$graph/cfg XDG_STATE_HOME=$graph/state
 export XDG_CACHE_HOME=$graph/cache XDG_DATA_HOME=$graph/data DBUS_SESSION_BUS_ADDRESS=disabled:
 unset PIPEWIRE_REMOTE PULSE_SERVER DISPLAY WAYLAND_DISPLAY
-mkdir -p "$graph/rt" "$graph/cfg/wireplumber/wireplumber.conf.d"
+mkdir -p "$graph/rt" "$graph/cfg/wireplumber/wireplumber.conf.d" "$graph/cfg/pipewire/pipewire-pulse.conf.d"
 chmod 700 "$graph/rt"
 cat > "$graph/cfg/wireplumber/wireplumber.conf.d/90-no-hardware.conf" <<CONF
 wireplumber.profiles = { main = { monitor.alsa = disabled, monitor.bluez = disabled, monitor.bluez-midi = disabled, monitor.alsa-midi = disabled, monitor.v4l2 = disabled, monitor.libcamera = disabled, support.logind = disabled, support.reserve-device = disabled, support.portal-permissionstore = disabled } }
+CONF
+# pipewire-pulse's fallback sink, `auto_null`, off where its own configuration says it is: only the
+# run's sinks in this graph (2026-11-13, a guard stopping every run at it).
+cat > "$graph/cfg/pipewire/pipewire-pulse.conf.d/90-no-always-sink.conf" <<CONF
+pulse.properties = { pulse.cmd.always-sink = false }
 CONF
 pipewire > "$graph/pipewire.log" 2>&1 & daemon=$!
 for _ in $(seq 20); do [ -S "$graph/rt/pipewire-0" ] && break; sleep 0.25; done
@@ -88,8 +93,14 @@ restore() {
   wait "$pulse" "$manager" "$daemon" 2>/dev/null || true
   rm -rf "$work" "$graph"
   if [ -e "$work.real" ]; then
-    say "e2e: NOT RUN — a real device appeared: $(cat "$work.real")"; rm -f "$work.real"; exit 77
+    say "e2e: NOT RUN — a real device appeared: $(cat "$work.real")"
+    # The guard's trial passes only stopped by its intruder: stopped by anything else, or not at all, it fails.
+    if [ -n "${E2E_INTRUDER:-}" ] && ! grep -q "intruder_${E2E_INTRUDER%%:*}" "$work.real"; then
+      say "  FAIL  the guard stopped the run, not at intruder_${E2E_INTRUDER%%:*}"; rm -f "$work.real"; exit 1
+    fi
+    rm -f "$work.real"; exit 77
   fi
+  if [ -n "${E2E_INTRUDER:-}" ]; then say "  FAIL  the guard let intruder_${E2E_INTRUDER%%:*} through"; exit 1; fi
   exit "$status"
 }
 trap restore EXIT
@@ -140,7 +151,8 @@ stop_all() {
 if ! seen=$(real_devices); then stop_all "$seen"; fi
 ( while sleep 0.5; do seen=$(real_devices) || { stop_all "$seen"; break; }; done ) & guard=$!
 # The guard's own trial: E2E_INTRUDER=<sink|source|device>:<seconds> brings one not the run's that
-# long after the start, as a headset or a card appearing — the run must end NOT RUN, exit 77, naming it.
+# long after the start, as a headset or a card appearing — the run must end NOT RUN, exit 77, naming it
+# (`intruder_sink`, `intruder_source`, `intruder_device`); stopped by anything else, or not, it fails.
 if [ -n "${E2E_INTRUDER:-}" ]; then
   (
     sleep "${E2E_INTRUDER#*:}"
@@ -148,7 +160,7 @@ if [ -n "${E2E_INTRUDER:-}" ]; then
       sink) pactl load-module module-null-sink sink_name=intruder_sink > /dev/null ;;
       source) pw-cli create-node adapter factory.name=support.null-audio-sink node.name=intruder_source \
                 media.class=Audio/Source/Virtual object.linger=true audio.position=[FL,FR] > /dev/null ;;
-      device) { echo "create-device api.alsa.enum.udev"; sleep 600; } | pw-cli > /dev/null ;;
+      device) { echo "create-device api.alsa.enum.udev { device.name = intruder_device }"; sleep 600; } | pw-cli > /dev/null ;;
     esac
   ) &
 fi
