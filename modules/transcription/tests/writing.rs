@@ -161,3 +161,26 @@ fn the_end_is_the_last_line_and_a_transcript_that_is_there_is_not_started_again(
     assert_eq!(fs::read(folder.path().join("transcript.jsonl")).unwrap(), before);
     assert_eq!(types(folder.path()).last().unwrap(), "complete");
 }
+
+/// `made` is this computer's own time, not UTC: written by a child of this test under a zone
+/// with no summer time, it says that zone's offset. Unix only: chrono reads `TZ` there.
+#[cfg(unix)]
+#[test]
+fn the_complete_line_says_when_in_the_computers_own_time_zone() {
+    const NAME: &str = "the_complete_line_says_when_in_the_computers_own_time_zone";
+    if let Some(folder) = std::env::var_os("KITOKEY_TEST_WRITE_IN") {
+        let mut transcript = Transcript::start(Path::new(&folder), &making()).unwrap();
+        transcript.complete(1.0).unwrap();
+        return;
+    }
+    let folder = tempfile::tempdir().unwrap();
+    let status = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", NAME, "--test-threads=1"])
+        .env("TZ", "Asia/Kolkata")
+        .env("KITOKEY_TEST_WRITE_IN", folder.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let made = lines(folder.path()).last().unwrap()["made"].as_str().unwrap().to_string();
+    assert!(made.ends_with("+05:30"), "{made} is not Kolkata's time");
+}
