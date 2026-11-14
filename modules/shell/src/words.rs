@@ -471,6 +471,9 @@ pub struct Window {
     pub offer_choices: [&'static str; 2],
     /// Started with the user's session (D32): its name and line.
     pub autostart: [&'static str; 2],
+    /// On Windows, the switch held (D84): by the user in Windows' Startup settings, where it is
+    /// turned back on; by a policy.
+    pub autostart_held: [&'static str; 2],
     pub keep_audio: [&'static str; 2],
     /// The settings' last card, and its one switch: what a program said of a failure, shown on
     /// the page under the sentence (D29).
@@ -927,6 +930,10 @@ pub fn window(language: Language) -> Window {
                 "Start Kitokey when you log in",
                 "In the tray, no window: a call is offered even after a restart.",
             ],
+            autostart_held: [
+                "Turned off in Windows: turn it back on in Settings › Apps › Startup.",
+                "Set by your organisation: it cannot be changed here.",
+            ],
             advanced_title: "Advanced",
             developer: [
                 "Developer mode",
@@ -1347,6 +1354,10 @@ pub fn window(language: Language) -> Window {
             autostart: [
                 "Lancer Kitokey à l’ouverture de session",
                 "Dans la barre système, sans fenêtre\u{a0}: un appel vous est proposé même après un redémarrage.",
+            ],
+            autostart_held: [
+                "Désactivé dans Windows\u{a0}: réactivez-le dans Paramètres › Applications › Démarrage.",
+                "Défini par votre organisation\u{a0}: il ne peut pas être changé ici.",
             ],
             advanced_title: "Avancé",
             developer: [

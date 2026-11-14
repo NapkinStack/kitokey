@@ -47,6 +47,14 @@ Settings' *Lancer Kitokey à l'ouverture de session* writes or removes it, and r
 desktop's tools leave it (`Hidden`, `X-GNOME-Autostart-enabled`). `autostart` in the settings
 file says Kitokey wrote it once: turned off, it is never written again by itself.
 
+**On Windows** (D84), the package declares a startup task, `KitokeyStartupTask` (`install`'s
+manifest), that Windows turns on at the first start; nothing is written under
+`AppData\Roaming\autostart`. The same switch reads and changes the task through `StartupTask`
+(`src/autostart.rs`): turned off by the user in Windows' Startup settings, or set by a policy, it is
+shown as Windows holds it, disabled, with the sentence saying why. The zip has no task: the switch
+is not offered. Each start says the task's state in the log, `shell.startup_task`, for the Windows
+trial to record.
+
 **What the user held under an earlier name** — Wholeheard until D86, Summit until D28 — is carried
 over at the start, before anything is read (`src/migrate.rs`, `keys`, `autostart`), the latest name
 first, each step doing what is left of it so that an interrupted one is done at the next start:
