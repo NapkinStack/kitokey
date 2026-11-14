@@ -3851,7 +3851,8 @@ def microphone_latest_answer(now: dt.datetime) -> None:
 def microphone_rollback(now: dt.datetime) -> None:
     """BM. The bar's microphone (#839): a choice refused by the shell while a later one stands never puts the
     bar back. A then B chosen, both saves held in the page; A's refused, then B's let through: the bar names B
-    throughout, the refusal is said while B waits, and B kept takes it away."""
+    throughout, the refusal is said while B waits, and B kept takes it away. Then two choices both refused:
+    the bar goes back to what the shell last kept, never to a choice it refused."""
     print("BM. the bar's microphone: an earlier choice refused while a later one stands never puts the bar back (#839)")
     captured = WORK / "microphones"
     left = captured.read_text() if captured.exists() else None
@@ -3903,6 +3904,18 @@ def microphone_rollback(now: dt.datetime) -> None:
         check("B let through: Auto kept in the settings, the bar names it, nothing left said (#839)",
               kept and gone and "Auto" in browser.execute_script(name),
               (window.file.read_text(), browser.execute_script(name), browser.execute_script(said)))
+        # Both refused, from Auto kept: the headset, then « Digital Microphone »; each refused in turn.
+        # The bar goes back to what the shell last kept, Auto — never to the headset, never kept.
+        chosen = choose(browser, 2) and choose(browser, 1) and wait_for(browser, lambda b: saves(b) == 4, 3)
+        check("from Auto kept, the headset then Digital chosen, both saves held: the bar names Digital",
+              chosen and "Digital Microphone" in browser.execute_script(name), (chosen, browser.execute_script(name)))
+        browser.execute_script("window.saves[2].refuse()")
+        wait_for(browser, lambda b: refused in b.execute_script(said), 3)
+        browser.execute_script("window.saves[3].refuse()")
+        time.sleep(0.5)
+        check("both refused: the bar names Auto, the microphone the shell kept, never the headset; the refusal said (#839)",
+              "Auto" in browser.execute_script(name) and refused in browser.execute_script(said) and 'microphone = ' not in window.file.read_text(),
+              (browser.execute_script(name), browser.execute_script(said), window.file.read_text()))
         browser.execute_script("window.restoreCore()")
     # What capture lists is left as the scenarios before had it.
     if left is None:
