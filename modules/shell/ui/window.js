@@ -4299,7 +4299,27 @@ async function draw(mine, again) {
   if (mine !== drawing) return;
   if (pageNotShown) document.getElementById("pane-said").hidden = true;
   notShown(false);
-  document.getElementById("empty").hidden = !listed || listing.sessions.length > 0;
+  // The settings unreadable, the folder listed is not the user's: said, never « no meeting » (#770).
+  document.getElementById("empty").hidden = !listed || listing.sessions.length > 0 || listing.settings_unread;
+  // Put in its live region when it comes, taken out when it goes — never drawn again meanwhile, which
+  // a screen reader would say again at each listing.
+  // Its sentence what is true: the defaults listed, or the last settings read held (#770).
+  const live = document.getElementById("settings-banner-live");
+  // Hidden on Réglages, never emptied: a live region says a change of its words, not of its
+  // visibility (WAI-ARIA) — back on the list, the same banner, not said again.
+  live.hidden = settings;
+  const sentence = !listing.settings_unread ? null : listing.settings_kept ? words.settings_banner_kept : words.settings_banner;
+  if (sentence !== (document.getElementById("settings-banner-said")?.textContent ?? null)) {
+    const banner = element("div", "banner");
+    banner.id = "settings-banner";
+    const said = element("p", "", sentence);
+    said.id = "settings-banner-said";
+    const link = element("a", "link", words.settings);
+    link.id = "settings-banner-link";
+    link.href = "#/settings";
+    banner.append(said, link);
+    live.replaceChildren(...(sentence ? [banner] : []));
+  }
   // No meeting yet: under 840 px, the sidebar and what to do, one under the other.
   document.body.classList.toggle("no-meeting", listing.sessions.length === 0);
   document.getElementById("agree").hidden = agreement === null;

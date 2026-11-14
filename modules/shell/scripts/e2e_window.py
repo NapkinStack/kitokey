@@ -7228,6 +7228,7 @@ def main() -> int:
         browser.find_element(By.ID, "find").send_keys(Keys.TAB)
         focused = browser.execute_script("return document.activeElement.className")
         check("then the first meeting", "session" in focused, focused)
+        check("settings readable, meetings listed: no banner (#770)", browser.execute_script("return document.getElementById('settings-banner-live').childElementCount") == 0)
         browser.execute_script("[...document.querySelectorAll('#groups .session')].at(-1).focus()")
         browser.switch_to.active_element.send_keys(Keys.TAB)
         focused = browser.execute_script("return document.activeElement.id")
@@ -7612,6 +7613,104 @@ def main() -> int:
         said = not_saved()
         check("developer mode on, the raw text is under the sentence of the command that failed, without its path", said == f"{refused}\n{raw}", said)
         check("developer mode on, the raw text is under the settings file's sentence too", unreadable() == f"{locked_said}\n{raw}", unreadable())
+        # Started with that file unreadable (#770): the folder it names is not known, so its meetings
+        # are not listed — a banner says so on every page but Réglages, and leads there; the list
+        # never says « Aucune réunion ». The file fixed, the banner goes and the meeting is listed.
+        session(elsewhere / "kept", now - dt.timedelta(hours=1), 10, {"transcript.jsonl": 100})
+        window.__exit__()
+        browser = window.__enter__()
+        banner = ("const b = document.getElementById('settings-banner');"
+                  "return b && b.getClientRects().length > 0 ? [document.getElementById('settings-banner-said').textContent,"
+                  " document.getElementById('settings-banner-link').textContent, document.getElementById('settings-banner-link').getAttribute('href')] : null")
+        empty_said = "const e = document.getElementById('empty'); return e.getClientRects().length > 0 ? e.textContent : null"
+        shown = wait_for(browser, lambda b: b.execute_script(banner) is not None, 10)
+        check("started with the settings unreadable: a banner says the meetings are not shown, and leads to Réglages",
+              shown and browser.execute_script(banner)
+              == ["Les réglages ne peuvent pas être lus : vos réunions ne sont pas affichées.", "Réglages", "#/settings"],
+              browser.execute_script(banner))
+        check("started with the settings unreadable: the list never says no meeting", browser.execute_script(empty_said) is None,
+              browser.execute_script(empty_said))
+        browser.execute_script("window.bannerBefore = document.getElementById('settings-banner')")
+        said_before = browser.execute_script(banner)
+        browser.find_element(By.ID, "settings-banner-link").click()
+        there = wait_for(browser, lambda b: b.find_elements(By.ID, "settings-unreadable") and b.find_element(By.ID, "settings-unreadable").is_displayed(), 5)
+        check("the banner's link opens Réglages, which says why; the banner is not shown twice there",
+              there and browser.execute_script(banner) is None, browser.execute_script(banner))
+        browser.execute_script("location.hash = '#/'")
+        kept_shown = wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
+        check("back on the list: the banner still there", kept_shown, browser.execute_script(banner))
+        same = browser.execute_script("const b = document.getElementById('settings-banner');"
+                                      " return b === window.bannerBefore && b.parentElement.id === 'settings-banner-live'")
+        check("back from Réglages: the same node, the same words — not put in anew, so not said again (T10)",
+              same and browser.execute_script(banner) == said_before, [same, browser.execute_script(banner), said_before])
+        window.file.write_text(held)
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        gone = wait_for(browser, lambda b: b.execute_script(banner) is None and "kept" in b.execute_script(
+            "return [...document.querySelectorAll('#groups a')].map(a => a.getAttribute('href')).join(' ')"), 5)
+        check("the file fixed: the banner gone, the meeting listed", gone,
+              [browser.execute_script(banner), browser.execute_script("return document.getElementById('groups').textContent")])
+        # Broken while the window is open: the banner comes into a live region already there, empty —
+        # what a screen reader announces (ARIA APG, MDN « ARIA live regions »); a region filled before
+        # it is shown is not. Listed again, the same banner: never put in anew, never said again.
+        region = ("const l = document.getElementById('settings-banner-live');"
+                  "return l && [l.getAttribute('role'), getComputedStyle(l).display !== 'none', l.childElementCount]")
+        check("the file read: the banner's live region there, rendered, empty", browser.execute_script(region) == ["status", True, 0],
+              browser.execute_script(region))
+        # On a meeting's page when it breaks: the banner there too.
+        browser.execute_script("location.hash = '#/meeting/kept'")
+        wait_for(browser, lambda b: not b.find_element(By.ID, "meeting").get_attribute("hidden"), 5)
+        window.file.write_text(held + 'keep_audio = "x"\n')
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        came = wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
+        inside = browser.execute_script("const b = document.getElementById('settings-banner'); window.firstBanner = b;"
+                                        " return b && b.parentElement.id === 'settings-banner-live'")
+        check("broken while a meeting's page is open: the banner comes, inside its live region", came and inside,
+              [browser.execute_script(banner), inside, browser.execute_script("return location.hash")])
+        # Read before, the last settings read are held: the meetings stay listed, and the banner says so —
+        # never « not shown » then (#770, ines).
+        listed_still = browser.execute_script("return [...document.querySelectorAll('#groups a')].some(a => (a.getAttribute('href') || '').endsWith('/kept'))")
+        kept_said = ("Les réglages ne peuvent pas être lus\u00a0: les derniers lus restent en usage, et aucun changement n’est enregistré"
+                     " tant que le fichier n’est pas corrigé.")
+        check("broken while the window is open: the meetings still listed, the banner says the last settings read stay in use",
+              listed_still and (browser.execute_script(banner) or [None])[0] == kept_said, [listed_still, browser.execute_script(banner)])
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
+        # Under 840 px, at the list: above the list, inside the window, nothing cut (`#pane-said`'s rule).
+        browser.set_window_size(420, 760)
+        time.sleep(0.4)
+        narrow = browser.execute_script("const b = document.getElementById('settings-banner').getBoundingClientRect();"
+                                        " const l = document.getElementById('list').getBoundingClientRect();"
+                                        " const k = document.getElementById('settings-banner-link').getBoundingClientRect();"
+                                        " return {above: b.bottom <= l.top + 0.5, inside: b.left >= -0.5 && b.right <= innerWidth + 0.5, link: k.right <= b.right + 0.5 && k.width > 0}")
+        shot_themed(browser, "settings-banner-420-light", "light")
+        shot_themed(browser, "settings-banner-420-dark", "dark")
+        check("under 840 px: the banner above the list, inside the window, its link whole", narrow == {"above": True, "inside": True, "link": True}, narrow)
+        browser.set_window_size(1100, 800)
+        time.sleep(0.4)
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        time.sleep(1)
+        same = browser.execute_script("return document.getElementById('settings-banner') === window.firstBanner")
+        check("listed again, still unreadable: the same banner, not put in anew", same, same)
+        # A file it may not read — another path than a file that does not parse (`settings::read`).
+        window.file.write_text(held)
+        window.file.chmod(0)
+        try:
+            browser.execute_script("window.dispatchEvent(new Event('focus'))")
+            check("a settings file it may not read: the same banner, still there",
+                  wait_for(browser, lambda b: b.execute_script("return document.getElementById('settings-banner') === window.firstBanner"), 5))
+        finally:
+            window.file.chmod(0o644)
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        check("fixed again: the banner goes, its live region left empty",
+              wait_for(browser, lambda b: b.execute_script(region) == ["status", True, 0], 5), browser.execute_script(region))
+        # No settings file at all — a first start —: nothing unreadable, no banner.
+        window.file.unlink()
+        window.__exit__()
+        browser = window.__enter__()
+        first = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('listed').then(l => l.settings_unread)") is False, 10)
+        time.sleep(0.5)
+        check("no settings file, a first start: not said unreadable, no banner", first and browser.execute_script(region) == ["status", True, 0],
+              browser.execute_script(region))
     # Who writes the minutes: an Ollama made here, an online service, an address of the user's. A
     # key goes to the scenario's own keyring, which lives as long as the program.
     class Tags(http.server.BaseHTTPRequestHandler):

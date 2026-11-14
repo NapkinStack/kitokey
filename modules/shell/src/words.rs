@@ -335,6 +335,10 @@ pub struct Window {
     pub none_do: &'static str,
     pub list_unread: &'static str,
     pub list_unread_do: &'static str,
+    /// The settings file cannot be read: said above every page but Settings (#770) — never read since
+    /// Kitokey started, then read before and its last settings held.
+    pub settings_banner: &'static str,
+    pub settings_banner_kept: &'static str,
     pub again_refused: &'static str,
     pub hearing_models_refused: &'static str,
     pub fold_not_kept: &'static str,
@@ -817,6 +821,8 @@ pub fn window(language: Language) -> Window {
             none_do: "Start a recording: its button, its shortcut, or the tray’s icon.",
             list_unread: "The meetings in {} cannot be read.",
             list_unread_do: "Check that this folder’s disk is connected and that you may read it, then try again.",
+            settings_banner: "Settings cannot be read: your meetings are not shown.",
+            settings_banner_kept: "Settings cannot be read: the last ones read stay in use, and no change is saved until the file is fixed.",
             again_refused: "It could not start again: {}",
             hearing_models_refused: "This service’s models could not be read, you can type one: {}",
             fold_not_kept: "The sidebar will be back as it was at the next start: {}",
@@ -1238,6 +1244,8 @@ pub fn window(language: Language) -> Window {
             none_do: "Démarrez un enregistrement\u{a0}: son bouton, son raccourci, ou l’icône de la barre système.",
             list_unread: "Les réunions de {} ne peuvent pas être lues.",
             list_unread_do: "Vérifiez que le disque de ce dossier est branché et que vous pouvez le lire, puis réessayez.",
+            settings_banner: "Les réglages ne peuvent pas être lus\u{a0}: vos réunions ne sont pas affichées.",
+            settings_banner_kept: "Les réglages ne peuvent pas être lus\u{a0}: les derniers lus restent en usage, et aucun changement n’est enregistré tant que le fichier n’est pas corrigé.",
             again_refused: "Impossible de recommencer\u{a0}: {}",
             hearing_models_refused: "Les modèles de ce service n’ont pas pu être lus, vous pouvez en saisir un\u{a0}: {}",
             fold_not_kept: "La barre latérale reviendra comme avant au prochain démarrage\u{a0}: {}",
