@@ -665,8 +665,15 @@ function savedSaid(saved) {
   savedFor = setTimeout(() => savedSentence.remove(), 1500);
 }
 
+// Each reading of the makings numbered: an answer a later reading has overtaken is dropped — the
+// latest wins, never a making said still made over the stop that followed it (D92).
+let makingsAsked = 0;
+
 async function readMakings() {
-  makings = await window.__TAURI__.core.invoke("makings").catch(() => null);
+  const asked = ++makingsAsked;
+  const read = await window.__TAURI__.core.invoke("makings").catch(() => null);
+  if (asked !== makingsAsked) return;
+  makings = read;
   // Only the meeting shown: its page hidden, the last one opened is no longer in front.
   const opened = document.getElementById("meeting").hidden ? null : document.getElementById("minutes-state")?.dataset.name;
   // The minutes or the transcript of the meeting shown written since its page was drawn, however

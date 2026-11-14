@@ -2222,6 +2222,15 @@ def cancelled_at_once(now: dt.datetime) -> None:
                 said_after = time.monotonic() - pressed
                 check(f"{what}: the page says what was stopped, within two seconds of « Annuler » ({said_after:.2f} s)",
                       said_in_time and said_after <= 2, stopped_said(browser))
+                # And it stays said: no reading answered late draws the making again over it, « Annuler » back.
+                flicker = []
+                for _ in range(20):
+                    seen = browser.execute_script("const s = document.getElementById('making-stopped'); const c = document.getElementById('making-cancel');"
+                                                  " return [s ? s.textContent : '', !!c && c.getClientRects().length > 0]")
+                    if "arrêté" not in seen[0].lower() or seen[1]:
+                        flicker.append(seen)
+                    time.sleep(0.1)
+                check(f"{what}: said stopped for the two seconds after, never drawn again as made", said_in_time and not flicker, flicker[:3])
                 check(f"{what}: a refusal said before is gone with the gesture that followed it",
                       not browser.execute_script("return document.querySelector('.note.warn[data-refused]')"))
                 time.sleep(2)
