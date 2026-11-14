@@ -358,8 +358,9 @@ sleep 0.5
 kill -INT "$recorder_part" "$recorder_flac" "$recorder_again"
 wait "$recorder_part" "$recorder_flac" 2>/dev/null || true
 again_as=0; wait "$recorder_again" || again_as=$?
-# Its signallers alone: the graph's daemons are children of this script too, and never end.
-wait "${signallers[@]}" 2>/dev/null || true
+# Its signallers alone — the graph's daemons are children of this script too, and never end —, each
+# judged: one that failed sent nothing, and the folders after would be those of recordings merely stopped.
+for signaller in "${signallers[@]}"; do check wait "$signaller"; done
 kill "$mic_player" "$others_player" 2>/dev/null || true
 for run in part flac again; do
   folder=$(ls -d "$work/kept-$run"/*/ | head -1)

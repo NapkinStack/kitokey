@@ -358,6 +358,15 @@ def call_followed(folder, events, call, default, heard, left, after):
     assert not near(left), f"remote: {left} Hz, played on the output the call had left, is in its track"
 
 
+def ended(pid):
+    """The process is gone, or has ended and waits for its parent to read its status."""
+    try:
+        with open(f"/proc/{pid}/stat") as stat:
+            return stat.read().rpartition(")")[2].split()[0] == "Z"
+    except FileNotFoundError:
+        return True
+
+
 def main(what, folder, *args):
     if what == "pause":
         # Not a measure: stops the recorder's own stream for a track, then starts it again.
@@ -391,12 +400,22 @@ def main(what, folder, *args):
         return print(f"    {', '.join(names)}: each track whole")
     if what == "signal-at":
         # Not a measure: the signal `args[1]` to the recorder `args[0]` the moment `args[2]` is in the folder.
+        # Exits 0 once sent, and when the recorder ended before the moment: on a fast machine a `.part`
+        # comes and goes between two looks, and what is left is judged whole all the same. Exits 1
+        # otherwise: the moment not come in two minutes with the recorder still running, or a failure.
         pid, sent, name = int(args[0]), getattr(signal, args[1]), args[2]
         until = time.monotonic() + 120
         while not os.path.exists(os.path.join(folder, name)):
-            assert time.monotonic() < until, f"{name} never appeared"
+            if ended(pid):
+                return print(f"    {args[1]} not sent: the recorder ended before {name} appeared")
+            assert time.monotonic() < until, f"{name} never appeared, the recorder still running"
             time.sleep(0.0005)
-        os.kill(pid, sent)
+        try:
+            if ended(pid):
+                raise ProcessLookupError
+            os.kill(pid, sent)
+        except ProcessLookupError:
+            return print(f"    {args[1]} not sent: the recorder ended as {name} appeared")
         return print(f"    {args[1]} sent as {name} appeared")
     if what == "followed":
         return followed(folder, *args)
