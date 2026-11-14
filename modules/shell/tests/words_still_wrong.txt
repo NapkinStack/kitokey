@@ -87,6 +87,7 @@ lexicon window.minutes_making[0] "Writing the minutes" « minutes »
 lexicon window.minutes_not_copied[0] "The minutes could not be copied." « minutes »
 lexicon window.minutes_not_made[0] "The minutes were not written. The transcript is untouched." « minutes »
 lexicon window.minutes_step[0] "Minutes" « minutes »
+lexicon window.minutes_stopped[0] "Minutes stopped. You can start them again, with another model if you like." « minutes »
 lexicon window.minutes_title[0] "Minutes" « minutes »
 lexicon window.minutes_unsaved[0] "Not saved yet — the minutes are still written by {}." « minutes »
 lexicon window.minutes_unsaved_none[0] "Not saved yet — no minutes are written until it is." « minutes »
