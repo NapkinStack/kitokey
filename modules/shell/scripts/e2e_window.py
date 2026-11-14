@@ -903,19 +903,23 @@ def models_listed(now: dt.datetime) -> None:
 
 
 def list_refreshed(now: dt.datetime) -> None:
-    """W. The list of models is read again only signed by the decider's key: until it is built in, none is (D40, D56)."""
-    print("W. Settings: no list of models read again until the decider's key is built in, and it is said (D40, D56)")
-    # When registry::PUBLIC_KEY is set, this scenario changes: the button is back, its host shown,
-    # and an unsigned list served here is refused. The signed path is the shell's tests'
-    # (tests/registry_fetch.rs), with a key of their own: no window can hold a key a test made.
-    asked = []
+    """W. The list of models is read again only signed by the decider's key, built in (D40, D56)."""
+    print("W. Settings: a list of models read again is taken only signed by the decider's key; refused, it is said (D40, D56)")
+    # Served here: the list on main, with the decider's signature of it (registry/models.json.minisig),
+    # none, or the list changed after it was signed. A key a test made is the shell's tests' only
+    # (tests/registry_fetch.rs): no window holds one.
+    registry = Path(__file__).parent.parent / "registry"
+    shipped, signature = (registry / "models.json").read_bytes(), (registry / "models.json.minisig").read_bytes()
+    asked, serving = [], {"list": shipped, "signature": signature}
 
     class List(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             asked.append(self.path)
-            self.send_response(404)
-            self.send_header("Content-Length", "0")
+            body = serving["signature"] if self.path.endswith(".minisig") else serving["list"]
+            self.send_response(404 if body is None else 200)
+            self.send_header("Content-Length", str(len(body or b"")))
             self.end_headers()
+            self.wfile.write(body or b"")
 
         def log_message(self, *_):
             pass
@@ -930,20 +934,34 @@ def list_refreshed(now: dt.datetime) -> None:
     window.env.update(KITOKEY_REGISTRY=f"http://{at}/models.json")
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
-        waits = wait_for(browser, lambda b: "attend la clé qui la signe" in b.execute_script(said), 10)
-        check("Settings say the list waits on the key that signs it, and the models stay offered",
-              waits and "restent proposés" in browser.execute_script(said)
-              and browser.find_elements(By.CSS_SELECTOR, '[data-offered="ggml-small-q8_0.bin"]'),
-              browser.execute_script(said))
-        check("no button offers to read it again", not browser.find_elements(By.ID, "offered-refresh"))
-        # Asked all the same, it is refused, and logged so, with nothing asked of anyone.
-        browser.execute_script("window.__TAURI__.core.invoke('registry_refresh').then(() => { window.listRead = 'read'; }, () => { window.listRead = 'refused'; })")
-        answered = wait_for(browser, lambda b: b.execute_script("return window.listRead || ''"), 10)
-        check("asked all the same, it is refused, and nothing crosses the network",
-              answered and browser.execute_script("return window.listRead") == "refused" and asked == [],
-              (browser.execute_script("return window.listRead"), asked))
-    server.shutdown()
+        button = wait_for(browser, lambda b: b.find_elements(By.ID, "offered-refresh"), 10)
+        check("the key built in: a button offers to read the list again, its host shown, nothing said of a key awaited",
+              button and at in browser.find_element(By.ID, "offered-refresh").text and "attend la clé" not in browser.execute_script(said)
+              and asked == [], (browser.execute_script(said), asked))
 
+        def read_again(what: str, list_: bytes, signature: bytes | None) -> str:
+            """The list served as `what` says, the button pressed: what the page says after it."""
+            serving.update(list=list_, signature=signature)
+            asked.clear()
+            browser.find_element(By.ID, "offered-refresh").click()
+            wait_for(browser, lambda b: b.execute_script(said) or len(asked) == 2 and b.find_elements(By.ID, "offered-refresh")
+                     and b.find_element(By.ID, "offered-refresh").is_enabled(), 10)
+            time.sleep(0.5)
+            return browser.execute_script(said)
+
+        for what, list_, signature_ in [("unsigned", shipped, None),
+                                        ("changed after the decider signed it", shipped.replace(b'"version": 1', b'"version":  1', 1), signature),
+                                        ("its signature none", shipped, b"<html>")]:
+            refusal = read_again(what, list_, signature_)
+            check(f"a list {what}: refused, said, the models shipped still offered",
+                  "n’a pas pu être mise à jour" in refusal and "restent proposés" in refusal
+                  and asked == ["/models.json", "/models.json.minisig"]
+                  and browser.find_elements(By.CSS_SELECTOR, '[data-offered="ggml-small-q8_0.bin"]'), (refusal, asked))
+        taken = read_again("the decider's", shipped, signature)
+        check("the list the decider signed: taken, nothing said against it, its models offered",
+              "n’a pas pu" not in taken and asked == ["/models.json", "/models.json.minisig"]
+              and browser.find_elements(By.CSS_SELECTOR, '[data-offered="ggml-small-q8_0.bin"]'), (taken, asked))
+    server.shutdown()
 
 def speech_offered(now: dt.datetime) -> None:
     """X. On a Mac, Apple's SpeechAnalyzer is offered among who hears, its model fetched on the click (D42)."""

@@ -221,3 +221,55 @@ fn the_list_in_the_repository_verifies_or_waits_on_the_key_and_the_check_says_wh
     // Straight to the error stream: what the test harness captures would not be seen when it passes.
     writeln!(std::io::stderr(), "registry/models.json: {said}").unwrap();
 }
+
+// Under the key built in (D56): the decider's, made in their own terminal — its private key in no
+// repository and no session. The lists here are signed by a test's key, or are the list on `main`
+// with the signature the decider made of it, `registry/models.json.minisig`.
+
+/// The decider's key, as its `.pub` names it: `minisign public key 28AD0E835D7AF31E`.
+const DECIDERS_KEY_ID: &str = "28AD0E835D7AF31E";
+
+/// The signature the decider made of the list in the repository.
+fn deciders_signature() -> String {
+    std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/registry/models.json.minisig"))
+        .expect("registry/models.json.minisig, the decider's signature of the list")
+}
+
+#[test]
+fn the_key_built_in_is_the_deciders() {
+    let key = registry::PUBLIC_KEY.expect("a key built in");
+    let key = minisign::PublicKey::from_base64(key).unwrap();
+    // minisign shows a key's number as its eight bytes read little-endian.
+    let id: String = key.keynum().iter().rev().map(|byte| format!("{byte:02X}")).collect();
+    assert_eq!(id, DECIDERS_KEY_ID);
+}
+
+#[test]
+fn under_the_key_built_in_a_list_signed_by_another_key_changed_after_it_was_signed_or_unsigned_is_refused() {
+    let list = registry::SHIPPED.to_owned();
+    let refused = [
+        ("signed by another key", signed_by(&test_key(), list.clone())),
+        (
+            "changed after the decider signed it",
+            served_with(
+                200,
+                list.replacen("\"version\": 1", "\"version\":  1", 1),
+                "",
+                Some(deciders_signature()),
+            ),
+        ),
+        ("unsigned", served_with(200, list.clone(), "", None)),
+    ];
+    for (what, served) in refused {
+        let why = registry::fetch(&served.address, registry::PUBLIC_KEY).expect_err(what);
+        assert!(why.contains("signature") && !why.contains("waits"), "{what}: {why}");
+        assert_eq!(*served.asked.lock().unwrap(), ["/models.json", "/models.json.minisig"], "{what}");
+    }
+}
+
+#[test]
+fn under_the_key_built_in_the_list_the_decider_signed_is_taken() {
+    let served = served_with(200, registry::SHIPPED.to_owned(), "", Some(deciders_signature()));
+    let listed = registry::fetch(&served.address, registry::PUBLIC_KEY).unwrap();
+    assert_eq!(listed, registry::shipped());
+}
