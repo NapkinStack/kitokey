@@ -2008,7 +2008,12 @@ echo '{{"available":true,"installed":true,"supported":true}}'
             # The keyboard alone (WAI-ARIA APG, Disclosure): Tab from Settings' top to « Avancé », Enter
             # unfolds it, Tab reaches its switch; each stop's focus seen.
             browser.execute_script("document.querySelector('#settings input, #settings select, #settings button').focus()")
-            stop = "const e = document.activeElement; return [e.id || e.className || e.tagName, e.matches(':focus-visible')]"
+            # The focus seen, measured: its ring drawn — an outline or a shadow —, on the element or on the
+            # choice that holds it; `:focus-visible` alone is true under `outline: none` (WCAG 2.4.7).
+            stop = ("const ring = (n) => { if (!n) return false; const s = getComputedStyle(n);"
+                    " return (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || s.boxShadow !== 'none'; };"
+                    "const e = document.activeElement;"
+                    "return [e.id || e.className || e.tagName, e.matches(':focus-visible') && (ring(e) || ring(e.closest('.choice')))]")
             stops = []
             for _ in range(80):
                 ActionChains(browser).send_keys(Keys.TAB).perform()
@@ -4983,6 +4988,10 @@ def two_panes(now: dt.datetime) -> None:
                 check("Settings, 420 px, « Avancé » unfolded and the developer mode on: nothing past its card or the window (D95)", logs and over == [], over)
                 advanced_unfolded(browser).click()
                 wait_for(browser, lambda b: not b.find_elements(By.ID, "open-logs"), 5)
+                # « Modèles », the card the 0.2.5 audit saw spill at 420 px: seen, in both themes.
+                browser.execute_script("document.getElementById('model').scrollIntoView({block: 'start'})")
+                seen(browser, "d95-settings-420-models-light")
+                seen(browser, "d95-settings-420-models-dark")
             if width in (1920, 420):
                 seen(browser, f"d95-settings-{width}-light")
                 seen(browser, f"d95-settings-{width}-dark")
