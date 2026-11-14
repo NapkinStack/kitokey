@@ -4310,11 +4310,15 @@ async function draw(mine, again) {
   }
   let opened = null;
   let seen = makings;
+  // Numbered as readMakings' readings are: the snapshot is kept only if no later reading answered
+  // meanwhile — never the making drawn back over the stop that followed it (D92).
+  let asked = makingsAsked;
   // Settings too: their models' states are drawn with the page, not at the next reading (D37).
   if (name || settings) {
     // What is being made, read before the meeting: the counts its page keeps are never ahead of
     // what it shows, never behind what was made before it was read — drawn again only for what
     // was made since.
+    asked = ++makingsAsked;
     seen = await window.__TAURI__.core.invoke("makings").catch(() => makings);
   }
   if (name) {
@@ -4371,7 +4375,7 @@ async function draw(mine, again) {
   const kept = opened && page.dataset.name === name && page.dataset.at === "#/" && address !== "#/" && fresh === drawnMeeting;
   if (opened && !kept) {
     page.classList.toggle("arriving", page.childElementCount === 0);
-    makings = seen;
+    if (asked === makingsAsked) makings = seen;
     showMeeting(opened, words);
     drawnMeeting = fresh;
   }
@@ -4384,7 +4388,7 @@ async function draw(mine, again) {
       window.__TAURI__.core.invoke("minutes_shown"),
     ]);
     if (mine !== drawing) return;
-    makings = seen;
+    if (asked === makingsAsked) makings = seen;
     showSettings(shown, minutes, words);
   }
 }
