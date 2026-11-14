@@ -1214,10 +1214,10 @@ def service_named(now: dt.datetime) -> None:
 
 
 def models_guided(now: dt.datetime) -> None:
-    """BE. D95, criterion 2. The summary set up in « Modèles » as one guided path: here or a service; a
+    """BJ. D95, criterion 2. The summary set up in « Modèles » as one guided path: here or a service; a
     service named, its key tested at once against a stand-in made for the run — refused, said with
     its cause; taken, its models listed as people say them —; no address typed but under « Avancé »."""
-    print("BE. Settings: the summary set up in a few guided steps, a service's key tested at once (D95)")
+    print("BJ. Settings: the summary set up in a few guided steps, a service's key tested at once (D95)")
     good, false = "sk-stand-in-good", "sk-stand-in-false"
     asked = []
 
