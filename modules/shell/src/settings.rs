@@ -257,8 +257,10 @@ pub enum Refused {
     Unopened,
     /// A line that is not a setting as TOML writes one, or a setting whose value is not of its kind.
     Unparsed { line: usize, key: Option<&'static str> },
-    /// `sessions` or `model`: not a whole path.
-    NotWhole { key: &'static str, line: usize },
+    /// `sessions`: not a folder's whole path.
+    SessionsNotWhole { line: usize },
+    /// `model`: not a file's whole path.
+    ModelNotWhole { line: usize },
     /// `keep_audio`: neither "always" nor a number of days from 1 to 36,500.
     KeepAudio { line: usize },
 }
@@ -338,14 +340,14 @@ pub fn read(path: &Path) -> Result<Settings, Unread> {
         ),
     })?;
     // A path written as people write it: from their home, with a tilde — or from the root.
-    let whole = |key: &'static str, what: &str, written: toml::Spanned<PathBuf>| {
+    let whole = |key: &str, what: &str, refused: fn(usize) -> Refused, written: toml::Spanned<PathBuf>| {
         let at = line(written.span().start);
         let named = from_home(written.into_inner());
         if named.is_absolute() {
             Ok(named)
         } else {
             Err(unread(
-                Refused::NotWhole { key, line: at },
+                refused(at),
                 format!("{}, line {at}: {key} is {what} whole path, from the root or from ~", path.display()),
             ))
         }
@@ -391,10 +393,10 @@ pub fn read(path: &Path) -> Result<Settings, Unread> {
         };
     }
     if let Some(sessions) = written.sessions {
-        settings.sessions = whole("sessions", "the folder's", sessions)?;
+        settings.sessions = whole("sessions", "the folder's", |line| Refused::SessionsNotWhole { line }, sessions)?;
     }
     if let Some(model) = written.model {
-        settings.model = whole("model", "the file's", model)?;
+        settings.model = whole("model", "the file's", |line| Refused::ModelNotWhole { line }, model)?;
     }
     Ok(settings)
 }

@@ -1237,7 +1237,7 @@ const STILL_WRONG: &str = include_str!("words_still_wrong.txt");
 
 /// The sentences still without their comment, counted: 602 keys would be three review budgets.
 /// The number only goes down, as the list does.
-const WITHOUT_COMMENT: usize = 365;
+const WITHOUT_COMMENT: usize = 345;
 
 /// A sentence of `src/words.rs`, as the file arranges it.
 #[derive(Debug)]
@@ -2258,14 +2258,14 @@ fn a_settings_file_refused_says_which_setting_and_what_to_do_in_both_languages()
             "La ligne 4 n’est pas écrite comme un réglage. Corrigez-la, ou supprimez-la.",
         ),
         (
-            Refused::NotWhole { key: "sessions", line: 4 },
+            Refused::SessionsNotWhole { line: 4 },
             "Line 4: “sessions” gives a folder’s whole path, from / or from ~. Correct it.",
-            "Ligne 4\u{a0}: «\u{a0}sessions\u{a0}» donne le chemin complet d’un dossier, depuis / ou depuis ~. Corrigez-le.",
+            "Ligne 4\u{a0}: «\u{a0}sessions\u{a0}» donne le chemin entier d’un dossier, depuis / ou depuis ~. Corrigez-le.",
         ),
         (
-            Refused::NotWhole { key: "model", line: 4 },
+            Refused::ModelNotWhole { line: 4 },
             "Line 4: “model” gives a file’s whole path, from / or from ~. Correct it.",
-            "Ligne 4\u{a0}: «\u{a0}model\u{a0}» donne le chemin complet d’un fichier, depuis / ou depuis ~. Corrigez-le.",
+            "Ligne 4\u{a0}: «\u{a0}model\u{a0}» donne le chemin entier d’un fichier, depuis / ou depuis ~. Corrigez-le.",
         ),
         (
             Refused::KeepAudio { line: 4 },
@@ -2276,7 +2276,11 @@ fn a_settings_file_refused_says_which_setting_and_what_to_do_in_both_languages()
     // Each refusal `settings.rs` makes is said: one added fails to compile here until it is named.
     for (refused, ..) in &said {
         match refused {
-            Refused::Unopened | Refused::Unparsed { .. } | Refused::NotWhole { .. } | Refused::KeepAudio { .. } => {}
+            Refused::Unopened
+            | Refused::Unparsed { .. }
+            | Refused::SessionsNotWhole { .. }
+            | Refused::ModelNotWhole { .. }
+            | Refused::KeepAudio { .. } => {}
         }
     }
     let raw = "settings.toml, line 4: keep_audio is \"always\" or a number of days";
