@@ -221,7 +221,7 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 .fields > .fields, .fields > .says, .fields > .disclose-advanced { flex-basis: 100%; }
 .fields > .disclose-advanced { justify-content: flex-start; }
 .tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); }
-.path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; }
 .path:hover { border-color: var(--edge); color: var(--ink); }
 
 /* The sidebar's gesture and the list's rows (D11's first board). */
