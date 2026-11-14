@@ -304,64 +304,128 @@ pub fn menu(language: Language) -> Menu {
 pub struct Window {
     pub locale: &'static str,
     /// Bytes, kilobytes, megabytes, gigabytes.
+    /// Shows: the window, as units. When: after every size (o, ko, Mo, Go). At most: about 3
+    /// characters. Placeholders: none.
     pub units: [&'static str; 4],
     /// What a screen reader calls the window's sections.
+    /// Shows: the sidebar, as a name for a screen reader. When: screen reader: name of the
+    /// sidebar's icon navigation. At most: no limit. Placeholders: none.
     pub sections: &'static str,
+    /// Shows: the sidebar, as a name for a screen reader. When: screen reader: name of the sidebar.
+    /// At most: no limit. Placeholders: none.
     pub meetings: &'static str,
     /// How many meetings weigh the size beside it (board 4's foot).
+    /// Shows: the sidebar's foot, as a status. When: always, under the list: how many meetings
+    /// weigh the size beside it; plural. At most: about 24 characters. Placeholders: {} the number
+    /// of meetings.
     pub weight: &'static str,
     /// The same, for one meeting.
+    /// Shows: the sidebar's foot, as a status. When: same, exactly one meeting. At most: about 24
+    /// characters. Placeholders: {} the number of meetings, 1.
     pub weight_one: &'static str,
     /// A picture of the two weights, for whoever does not see it.
+    /// Shows: the sidebar's foot, as a name for a screen reader. When: screen reader: description
+    /// of the audio/text bar. At most: no limit. Placeholders: {} the audio's size, then the
+    /// texts'.
     pub weight_described: &'static str,
+    /// Shows: the sidebar, as a heading. When: group heading in the meeting list. At most: about 24
+    /// characters. Placeholders: none.
     pub this_week: &'static str,
+    /// Shows: the sidebar, as a heading. When: group heading in the meeting list. At most: about 24
+    /// characters. Placeholders: none.
     pub last_week: &'static str,
     /// Earlier in the current month: the month's name.
+    /// Shows: the sidebar, as a heading. When: group heading: earlier this month. At most: about 24
+    /// characters. Placeholders: {} month name.
     pub earlier_in: &'static str,
     /// Sessions whose start cannot be read as a day.
+    /// Shows: the sidebar, as a heading. When: group heading for meetings whose date cannot be
+    /// read. At most: about 24 characters. Placeholders: none.
     pub undated: &'static str,
+    /// Shows: the sidebar, as a list label. When: on a meeting's row when it has minutes. At most:
+    /// 18 characters. Placeholders: none.
     pub minutes: &'static str,
+    /// Shows: the sidebar, as a list label. When: on a meeting's row when it has a transcript.
+    /// At most: 18 characters. Placeholders: none.
     pub transcript: &'static str,
+    /// Shows: the sidebar, as a list label. When: on a meeting's row: audio and its size. At most:
+    /// 18 characters. Placeholders: {} the audio's size.
     pub audio: &'static str,
+    /// Shows: the sidebar, as a list label. When: on a meeting's row whose audio was deleted.
+    /// At most: 18 characters. Placeholders: none.
     pub audio_freed: &'static str,
     /// What a meeting's audio weighs, beside its length in its header (D89).
     pub audio_weighs: &'static str,
+    /// Shows: the sidebar, as a list label. When: on the row of the meeting being recorded.
+    /// At most: 18 characters. Placeholders: none.
     pub recording: &'static str,
+    /// Shows: the sidebar, as a list label. When: on the row of a recording that ended abnormally.
+    /// At most: 18 characters. Placeholders: none.
     pub interrupted: &'static str,
     /// No session in the folder: the folder.
+    /// Shows: the window with no meeting, as a heading. When: no meeting in the folder yet.
+    /// At most: no limit. Placeholders: {} folder.
     pub none: &'static str,
     /// The sidebar's search (D61): what its field says, and none of the meetings holding what is typed.
     /// No meeting yet: what to do.
+    /// Shows: the window with no meeting, as a help line. When: under the empty-state title: how to
+    /// start. At most: no limit. Placeholders: none.
     pub none_do: &'static str,
+    /// Shows: the window with no meeting, as an error. When: the meetings folder cannot be read.
+    /// At most: no limit. Placeholders: {} folder.
     pub list_unread: &'static str,
+    /// Shows: the window with no meeting, as a help line. When: under that error: what to do.
+    /// At most: no limit. Placeholders: none.
     pub list_unread_do: &'static str,
     pub again_refused: &'static str,
     pub hearing_models_refused: &'static str,
+    /// Shows: the sidebar, as an error. When: the folded/unfolded state could not be saved.
+    /// At most: no limit. Placeholders: {} failure sentence.
     pub fold_not_kept: &'static str,
     pub agreement_refused: &'static str,
     pub meeting_not_opened: &'static str,
+    /// Shows: the window, as an error. When: a page failed to render. At most: no limit.
+    /// Placeholders: none.
     pub page_not_shown: &'static str,
     pub context_not_read: &'static str,
+    /// Shows: the sidebar and the recording bar, as a button. When: record button label while the
+    /// recording starts. At most: about 24 characters. Placeholders: none.
     pub record_starting: &'static str,
+    /// Shows: the sidebar and the recording bar, as a button. When: record button label while the
+    /// recording stops. At most: about 24 characters. Placeholders: none.
     pub record_stopping: &'static str,
     pub redo_cancel: &'static str,
     pub saved: &'static str,
+    /// Shows: the recording bar, as a help line. When: the user wanted the meeting confidential
+    /// from the bar, but it is not. At most: no limit. Placeholders: none.
     pub small_not_confidential: &'static str,
     /// A recording refused, the trial over (PDR-0005, D83): why and what stays, in one sentence; the one gesture.
+    /// Shows: the sidebar, as an error. When: recording refused: the trial is over. At most: no
+    /// limit. Placeholders: none.
     pub trial_over: &'static str,
+    /// Shows: the sidebar, as a button. When: beside trial_over. At most: about 24 characters.
+    /// Placeholders: none.
     pub buy: &'static str,
     /// Settings on a trial licence (D83): the name of what they say is left of it (`trial_left`).
     pub trial: &'static str,
+    /// Shows: the sidebar, as a field's placeholder. When: search field over the meeting list.
+    /// At most: about 26 characters. Placeholders: none.
     pub find_meetings: &'static str,
     /// The sidebar folded and brought back (D61): each button's name; the shortcut is added beside.
+    /// Shows: the sidebar, as a name for a screen reader. When: icon button (tooltip + screen
+    /// reader) that folds the sidebar; shortcut appended. At most: no limit. Placeholders: none.
     pub fold: &'static str,
     pub unfold: &'static str,
+    /// Shows: the sidebar, as a status. When: search finds no meeting. At most: no limit.
+    /// Placeholders: none.
     pub none_found: &'static str,
     /// One meeting's page.
     pub back: &'static str,
     pub open_folder: &'static str,
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
     pub more_actions: &'static str,
+    /// Shows: the window, as a format. When: a setting's name before its value: "{}:". At most: no
+    /// limit. Placeholders: {} a setting's name.
     pub labelled: &'static str,
     pub minutes_title: &'static str,
     pub transcript_title: &'static str,
@@ -390,6 +454,8 @@ pub struct Window {
     pub unread: &'static str,
     pub no_match: &'static str,
     /// The settings' page.
+    /// Shows: the sidebar, as a name for a screen reader. When: icon link to Settings (tooltip) and
+    /// Settings page title. At most: no limit. Placeholders: none.
     pub settings: &'static str,
     pub after_title: &'static str,
     /// Each choice of what follows a recording: its name, then what it does.
@@ -513,93 +579,223 @@ pub struct Window {
     pub sessions_folder: [&'static str; 2],
     pub choose: &'static str,
     /// The recording bar, its icon in the sidebar's foot (D89), what it says (D90).
+    /// Shows: the sidebar, as a name for a screen reader. When: icon button (tooltip): open the
+    /// recording bar. At most: no limit. Placeholders: none.
     pub small: &'static str,
+    /// Shows: the recording bar and « Vérifier le son », as a label. When: meter name: the user's
+    /// mic. At most: about 20 characters. Placeholders: none.
     pub small_mic: &'static str,
+    /// Shows: the recording bar and « Vérifier le son », as a label. When: meter name: the
+    /// meeting's sound. At most: about 20 characters. Placeholders: none.
     pub small_meeting: &'static str,
+    /// Shows: the recording bar, as a help line. When: during recording: what happens at stop.
+    /// At most: no limit. Placeholders: none.
     pub small_note: &'static str,
     /// What the bar says of each side (D49, D90): silent two minutes, never as an error; a
     /// microphone that sends nothing, as the notifications say it; a side with no device.
+    /// Shows: the recording bar, as a status. When: mic silent for 2 min (not an error). At most:
+    /// about 60 characters. Placeholders: none.
     pub bar_silent_me: &'static str,
+    /// Shows: the recording bar, as a status. When: meeting sound silent for 2 min. At most: about
+    /// 60 characters. Placeholders: none.
     pub bar_silent_others: &'static str,
+    /// Shows: the recording bar, as an error. When: mic sends pure zeros. At most: no limit.
+    /// Placeholders: none.
     pub small_nothing: &'static str,
+    /// Shows: the recording bar, as a status. When: no mic device for now. At most: no limit.
+    /// Placeholders: none.
     pub small_waiting_me: &'static str,
+    /// Shows: the recording bar, as a status. When: no output device for now. At most: no limit.
+    /// Placeholders: none.
     pub small_waiting_others: &'static str,
     /// The reminder said where the user looks, the first seconds of a recording (D50).
+    /// Shows: the recording bar, as a help line. When: first seconds of recording: tell
+    /// participants. At most: no limit. Placeholders: none.
     pub small_announce: &'static str,
+    /// Shows: the recording bar, as a button. When: copies a ready sentence for the call's chat.
+    /// At most: about 24 characters. Placeholders: none.
     pub copy_announcement: &'static str,
+    /// Shows: the recording bar, as an error. When: copy failed. At most: about 16 characters.
+    /// Placeholders: none.
     pub announcement_not_copied: &'static str,
+    /// Shows: the recording bar, as a name for a screen reader. When: icon button (tooltip): open
+    /// the full window. At most: no limit. Placeholders: none.
     pub small_full: &'static str,
     /// The bar's options (D90): opened under its row, closed again.
+    /// Shows: the recording bar, as a name for a screen reader. When: icon button (tooltip): unfold
+    /// options. At most: no limit. Placeholders: none.
     pub bar_more: &'static str,
+    /// Shows: the recording bar, as a name for a screen reader. When: icon button (tooltip): fold
+    /// options. At most: no limit. Placeholders: none.
     pub bar_less: &'static str,
+    /// Shows: the recording bar, as a name for a screen reader. When: icon button (tooltip): hide
+    /// the bar. At most: no limit. Placeholders: none.
     pub bar_hide: &'static str,
+    /// Shows: the recording bar, as a label. When: microphone picker. At most: no limit.
+    /// Placeholders: {} mic name.
     pub small_microphone: &'static str,
+    /// Shows: the recording bar, as a name for a screen reader. When: screen reader: the mic
+    /// picker. At most: no limit. Placeholders: none.
     pub small_microphones: &'static str,
+    /// Shows: the recording bar, as a choice of a list. When: mic choice: automatic. At most: about
+    /// 8 characters. Placeholders: none.
     pub microphone_auto: &'static str,
+    /// Shows: the recording bar, as a help line. When: under "Auto". At most: no limit.
+    /// Placeholders: none.
     pub microphone_auto_says: &'static str,
+    /// Shows: the recording bar, as a help line. When: under the chosen mic, unplugged. At most: no
+    /// limit. Placeholders: none.
     pub microphone_absent: &'static str,
+    /// Shows: the recording bar, as an error. When: mic list unavailable. At most: no limit.
+    /// Placeholders: none.
     pub microphones_unread: &'static str,
+    /// Shows: the recording bar, as an error. When: mic choice not saved. At most: no limit.
+    /// Placeholders: none.
     pub microphone_not_kept: &'static str,
+    /// Shows: the recording bar, as a status. When: during recording: chosen mic gone. At most: no
+    /// limit. Placeholders: none.
     pub small_microphone_gone: &'static str,
     /// Recording, under the microphone (D90, board 6): the one recorded, a change for the next.
+    /// Shows: the recording bar, as a help line. When: during recording: mic in use. At most: no
+    /// limit. Placeholders: {} mic name.
     pub bar_microphone_recorded: &'static str,
+    /// Shows: the recording bar, as a help line. When: during recording: a change is for next time.
+    /// At most: no limit. Placeholders: none.
     pub bar_microphone_next: &'static str,
     /// The context typed before the start, in the row at rest (D91, board 5): its placeholder, its ✕,
     /// and under the row while one is kept, that it waits for the next recording.
+    /// Shows: the recording bar, as a field's placeholder. When: context field before a recording.
+    /// At most: about 28 characters. Placeholders: none.
     pub bar_context: &'static str,
+    /// Shows: the recording bar, as a name for a screen reader. When: icon button (tooltip): clear
+    /// context. At most: no limit. Placeholders: none.
     pub bar_context_clear: &'static str,
+    /// Shows: the recording bar, as a help line. When: context kept for next recording. At most: no
+    /// limit. Placeholders: none.
     pub bar_context_kept: &'static str,
     /// « Avancé » (D90, board 6; D91), closed by default, in the bar opened and in *Refaire…*: the
     /// meeting's own models, Settings' choice first, said as such — what it holds said on it.
+    /// Shows: the recording bar and Redo…, as a button. When: disclosure: per-meeting models.
+    /// At most: about 30 characters. Placeholders: none.
     pub bar_advanced: &'static str,
+    /// Shows: the recording bar and Redo…, as a label. When: per-meeting transcription model.
+    /// At most: about 30 characters. Placeholders: none.
     pub models_transcription: &'static str,
+    /// Shows: the recording bar and Redo…, as a label. When: per-meeting minutes model. At most:
+    /// about 30 characters. Placeholders: none.
     pub models_minutes: &'static str,
+    /// Shows: the recording bar and Redo…, as a choice of a list. When: first choice: Settings'
+    /// model. At most: about 60 characters. Placeholders: {} model.
     pub models_settings: &'static str,
+    /// Shows: the recording bar and Redo…, as a choice of a list. When: no model chosen in
+    /// Settings. At most: about 30 characters. Placeholders: none.
     pub models_none: &'static str,
+    /// Shows: the recording bar and Redo…, as a help line. When: per-meeting choice does not change
+    /// Settings. At most: no limit. Placeholders: none.
     pub models_own_note: &'static str,
+    /// Shows: the recording bar and Redo…, as an error. When: choice not saved. At most: no limit.
+    /// Placeholders: {} failure sentence.
     pub models_not_kept: &'static str,
     pub models_not_read: &'static str,
     /// A meeting's own model gone (D91): Settings' choice stands in, as Auto does for a microphone.
+    /// Shows: the recording bar and Redo…, as a status. When: per-meeting transcription model
+    /// missing. At most: no limit. Placeholders: none.
     pub models_gone_transcription: &'static str,
+    /// Shows: the recording bar and Redo…, as a status. When: per-meeting minutes model's provider
+    /// no longer configured. At most: no limit. Placeholders: none.
     pub models_gone_minutes: &'static str,
     /// A service the meeting chose, not used while it is said confidential (D60).
+    /// Shows: the recording bar and Redo…, as a status. When: online service ignored: meeting
+    /// confidential. At most: no limit. Placeholders: none.
     pub models_unused_confidential: &'static str,
     /// Under the bar's row at rest, « Avancé » closed: the models chosen for the next recording, named
     /// short (D91) — one, or more joined by « · ».
+    /// Shows: the recording bar, as a help line. When: at rest: models kept for next recording.
+    /// At most: no limit. Placeholders: {} the models kept, joined by « · ».
     pub bar_models_kept: &'static str,
+    /// Shows: the recording bar, as a help line. When: same, one model. At most: no limit.
+    /// Placeholders: {} the model kept.
     pub bar_model_kept: &'static str,
     /// « Vérifier le son » (D88, board 7): its title, and its row in Settings.
     pub check_sound: &'static str,
     pub check_sound_says: &'static str,
     /// A source capture could not open; none named yet.
+    /// Shows: « Vérifier le son », as a status. When: a source cannot be opened. At most: about 16
+    /// characters. Placeholders: none.
     pub check_unavailable: &'static str,
     /// The microphone listened to is a Bluetooth headset's: its call profile while the panel shows.
+    /// Shows: « Vérifier le son », as a help line. When: Bluetooth headset switches to call
+    /// profile. At most: no limit. Placeholders: none.
     pub check_bluetooth: &'static str,
     /// The test sound, and what was heard of it: on the meeting's side, or not, and what to do.
+    /// Shows: « Vérifier le son », as a button. When: plays a test sound. At most: about 24
+    /// characters. Placeholders: none.
     pub check_play: &'static str,
+    /// Shows: « Vérifier le son », as a status. When: test sound heard. At most: no limit.
+    /// Placeholders: none.
     pub check_heard: &'static str,
+    /// Shows: « Vérifier le son », as an error. When: test sound not heard. At most: no limit.
+    /// Placeholders: none.
     pub check_not_heard: &'static str,
     /// A call holds a microphone: no test sound, it would reach the call.
+    /// Shows: « Vérifier le son », as a help line. When: a call holds the mic: no test sound.
+    /// At most: no limit. Placeholders: none.
     pub check_call: &'static str,
+    /// Shows: « Vérifier le son », as a help line. When: mic stays open while panel shows. At most:
+    /// no limit. Placeholders: none.
     pub check_open_note: &'static str,
+    /// Shows: « Vérifier le son », as a name for a screen reader. When: icon button (tooltip):
+    /// close panel. At most: no limit. Placeholders: none.
     pub check_close: &'static str,
     /// It could not listen; or a recording runs.
+    /// Shows: « Vérifier le son », as an error. When: cannot listen. At most: no limit.
+    /// Placeholders: none.
     pub check_failed: &'static str,
+    /// Shows: « Vérifier le son », as a status. When: a recording runs. At most: no limit.
+    /// Placeholders: none.
     pub check_recording: &'static str,
     /// Freeing space (D11's third board).
+    /// Shows: the sidebar and « Faire de la place », as a name for a screen reader. When: icon link
+    /// (tooltip) and page title. At most: about 24 characters. Placeholders: none.
     pub free: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a heading. When: question. At most: no
+    /// limit. Placeholders: none.
     pub free_what: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a name, then its line. When: radio:
+    /// remove audio only. At most: no limit. Placeholders: none.
     pub free_audio: [&'static str; 2],
+    /// Shows: « Faire de la place », the sidebar's foot, as a name, then its line. When: radio:
+    /// remove whole meeting. At most: no limit. Placeholders: none.
     pub free_whole: [&'static str; 2],
+    /// Shows: « Faire de la place », the sidebar's foot, as a heading. When: list ordering label.
+    /// At most: about 30 characters. Placeholders: none.
     pub free_heaviest: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a button. When: tick meetings older
+    /// than 30 days. At most: about 36 characters. Placeholders: none.
     pub free_older: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a status. When: after a size; plural.
+    /// At most: no limit. Placeholders: {} count meetings.
     pub free_total: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a status. When: same, one meeting.
+    /// At most: no limit. Placeholders: none.
     pub free_one: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a help line. When: goes to trash,
+    /// restorable. At most: no limit. Placeholders: none.
     pub free_note: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a help line. When: consequence of
+    /// removing audio. At most: no limit. Placeholders: none.
     pub free_audio_note: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a button. When: confirm: audio to
+    /// trash. At most: about 36 characters. Placeholders: none.
     pub free_do_audio: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a button. When: confirm: meetings to
+    /// trash. At most: about 36 characters. Placeholders: none.
     pub free_do_whole: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a status. When: a meeting cannot be
+    /// freed now. At most: no limit. Placeholders: none.
     pub free_busy: &'static str,
+    /// Shows: « Faire de la place », the sidebar's foot, as a status. When: after freeing. At most:
+    /// no limit. Placeholders: none.
     pub free_done: &'static str,
     /// *Refaire…* on the minutes (D11's sixth board): the panel's title, question, note and gesture.
     pub redo: &'static str,
@@ -607,6 +803,8 @@ pub struct Window {
     pub redo_with: &'static str,
     pub redo_note: &'static str,
     pub redo_do: &'static str,
+    /// Shows: the recording bar and Redo…, as a choice of a list. When: appended to a local model's
+    /// name. At most: about 20 characters. Placeholders: none.
     pub on_computer: &'static str,
     pub redo_transcript_title: &'static str,
     pub redo_transcript_note: &'static str,
@@ -622,14 +820,26 @@ pub struct Window {
     pub agree_open: &'static str,
     pub minutes_not_made: &'static str,
     pub try_again: &'static str,
+    /// Shows: the sidebar, as a list label. When: row: minutes being written. At most: 18
+    /// characters. Placeholders: none.
     pub chip_making: &'static str,
+    /// Shows: the sidebar, as a list label. When: row: queued. At most: 18 characters.
+    /// Placeholders: none.
     pub chip_waiting: &'static str,
+    /// Shows: the sidebar, as a list label. When: row: consent needed. At most: 18 characters.
+    /// Placeholders: none.
     pub chip_awaiting: &'static str,
+    /// Shows: the sidebar, as a list label. When: row: transcript being made. At most: 18
+    /// characters. Placeholders: none.
     pub chip_transcribing: &'static str,
+    /// Shows: the sidebar, as a list label. When: row: minutes failed. At most: 18 characters.
+    /// Placeholders: none.
     pub chip_failed: &'static str,
     /// The same for the transcript: being made (by, for how long), not made ({} the reason).
     pub transcript_making: &'static str,
     pub transcript_not_made: &'static str,
+    /// Shows: the sidebar, as a list label. When: row: transcript failed. At most: 18 characters.
+    /// Placeholders: none.
     pub chip_transcript_failed: &'static str,
     /// Who writes the minutes chosen on the settings' page, not yet saved: who still does ({}).
     pub minutes_unsaved: &'static str,
@@ -640,6 +850,8 @@ pub struct Window {
     pub ran_online: &'static str,
     /// The header's button, at rest and while a recording runs.
     pub record_start: &'static str,
+    /// Shows: the sidebar, as a button. When: stop recording. At most: about 24 characters.
+    /// Placeholders: none.
     pub record_stop: &'static str,
     /// The agreement before a meeting first leaves for a host (D11's fifth board): what leaves,
     /// what stays, to whom; the user's word, once or for this service; on this computer instead.
@@ -672,6 +884,8 @@ pub struct Window {
     pub keep_days: &'static str,
     /// The settings file could not be read: why.
     /// A change could not be saved: why.
+    /// Shows: the window, as an error. When: a setting/change not saved. At most: no limit.
+    /// Placeholders: {} failure sentence (lower-case start).
     pub not_saved: &'static str,
     /// Who writes the minutes was saved, but the keyring did not keep the key: why.
     pub key_not_kept: &'static str,
@@ -781,6 +995,8 @@ pub struct Window {
     /// the switch not saved; the minutes waiting for Ollama holding no model, and the fetch of {}.
     pub confidential_name: &'static str,
     pub confidential_says: &'static str,
+    /// Shows: the sidebar, as a list label. When: row: confidential. At most: 18 characters.
+    /// Placeholders: none.
     pub confidential_chip: &'static str,
     pub confidential_left: &'static str,
     pub confidential_left_sound: &'static str,
