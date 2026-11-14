@@ -1741,3 +1741,257 @@ fn a_notice_of_minutes_failed_by_the_meetings_own_model_says_what_its_page_says(
         }
     }
 }
+
+// The voice guide (`docs/voice.md`, D94): a notification's title, read whole as it is sent.
+
+/// The titles over 50 characters today, put right with the notifications' sentences (D94): a list
+/// that only shrinks.
+const TITLES_TOO_LONG: [&str; 2] = [
+    "Le son de la réunion n’est plus enregistré pour l’instant",
+    "Les réglages de Wholeheard n’ont pas tous été repris",
+];
+
+/// The functions of `words.rs` that return a notification, each read below: one added there fails
+/// the title's test until it is named here — and read in `every_notice`, which the review checks.
+const NOTIFYING: [&str; 17] = [
+    "of",
+    "notice",
+    "trouble",
+    "made",
+    "minutes",
+    "transcript_kept_beside",
+    "told",
+    "sends_nothing",
+    "lost_beside",
+    "back",
+    "offer",
+    "audio_trashed",
+    "carried_over",
+    "carry_failed",
+    "model_needed",
+    "pulled",
+    "fetched",
+];
+
+/// Every notification of the shell in one language, each variant of what it is sent for read. Each
+/// enum is matched here without a wildcard: a variant added fails to compile until it is named in
+/// that match — which does not give it a value in the list; the review of the change does.
+fn every_notice(language: Language) -> Vec<Notice> {
+    use kitokey_shell::{summarising::Cause, transcription::Made};
+    use words::{Minutes, Sides, Trouble};
+    let named = || Some("Jabra Evolve2 65".to_string());
+    let causes = [
+        Cause::Unreachable,
+        Cause::TooSlow,
+        Cause::RefusedKey,
+        Cause::NoCredit,
+        Cause::UnknownModel,
+        Cause::TooMany,
+        Cause::Down,
+        Cause::NoTimes,
+        Cause::Redirected,
+        Cause::ProviderFailed,
+        Cause::CutShort,
+        Cause::NotMinutes,
+        Cause::TranscriptUnusable,
+        Cause::NoSpeech,
+        Cause::Settings,
+        Cause::Unwritable,
+    ];
+    for cause in causes {
+        match cause {
+            Cause::Unreachable
+            | Cause::TooSlow
+            | Cause::RefusedKey
+            | Cause::NoCredit
+            | Cause::UnknownModel
+            | Cause::TooMany
+            | Cause::Down
+            | Cause::NoTimes
+            | Cause::Redirected
+            | Cause::ProviderFailed
+            | Cause::CutShort
+            | Cause::NotMinutes
+            | Cause::TranscriptUnusable
+            | Cause::NoSpeech
+            | Cause::Settings
+            | Cause::Unwritable => {}
+        }
+    }
+    let mut notices = Vec::new();
+    for source in [Source::Me, Source::Others] {
+        for said in [
+            Said::Unavailable(source, "x".into()),
+            Said::Started(PathBuf::from("/s"), named(), named()),
+            Said::Silent(source),
+            Said::Nothing,
+            Said::Heard(source),
+            Said::Level(source, 0.5),
+            Said::Moved(source, named()),
+            Said::Moved(source, None),
+            Said::Lost(source),
+            Said::MicrophoneGone,
+            Said::MicrophoneBack,
+            Said::Stopped(PathBuf::from("/s"), 3725.0),
+            Said::Failed("x".into()),
+        ] {
+            match said {
+                Said::Unavailable(..)
+                | Said::Started(..)
+                | Said::Silent(_)
+                | Said::Nothing
+                | Said::Heard(_)
+                | Said::Level(..)
+                | Said::Moved(..)
+                | Said::Lost(_)
+                | Said::MicrophoneGone
+                | Said::MicrophoneBack
+                | Said::Stopped(..)
+                | Said::Failed(_) => {}
+            }
+            notices.extend(words::of(&said, true, language));
+            let mut sides = Sides::default();
+            sides.told(&Said::Started(PathBuf::from("/s"), named(), named()), false, language);
+            notices.extend(sides.told(&said, false, language));
+        }
+        notices.push(words::back(named().as_deref(), language));
+    }
+    for trouble in [
+        Trouble::NoRecorder("x".into()),
+        Trouble::Settings("x".into()),
+        Trouble::Shortcut("x".into()),
+        Trouble::NoModel("x".into()),
+        Trouble::NoTranscriber("x".into()),
+        Trouble::NoFolder("x".into()),
+        Trouble::NoSession,
+    ] {
+        match trouble {
+            Trouble::NoRecorder(_)
+            | Trouble::Settings(_)
+            | Trouble::Shortcut(_)
+            | Trouble::NoModel(_)
+            | Trouble::NoTranscriber(_)
+            | Trouble::NoFolder(_)
+            | Trouble::NoSession => {}
+        }
+        notices.push(words::trouble(&trouble, language));
+    }
+    for made in [Made::Written(PathBuf::from("/s/transcript.jsonl")), Made::Failed("x".into())] {
+        match made {
+            Made::Written(_) | Made::Failed(_) => {}
+        }
+        notices.push(words::made(&made, language));
+    }
+    let mut minutes = vec![
+        Minutes::Ready,
+        Minutes::ReadyKeptBeside("x".into()),
+        Minutes::Failed(None),
+        Minutes::RedoFailed(None),
+        Minutes::Waiting("x".into()),
+        Minutes::Unchosen,
+        Minutes::NoProvider("x".into()),
+        Minutes::NoTranscript,
+        Minutes::OllamaWaits { silent: false },
+        Minutes::OllamaWaits { silent: true },
+    ];
+    for cause in causes {
+        minutes.push(Minutes::Failed(Some(cause)));
+        minutes.push(Minutes::RedoFailed(Some(cause)));
+        for again in [false, true] {
+            minutes.push(Minutes::FailedOwn {
+                cause,
+                model: "qwen3:8b".into(),
+                again,
+            });
+        }
+    }
+    for said in minutes {
+        match said {
+            Minutes::Ready
+            | Minutes::ReadyKeptBeside(_)
+            | Minutes::Failed(_)
+            | Minutes::RedoFailed(_)
+            | Minutes::FailedOwn { .. }
+            | Minutes::Waiting(_)
+            | Minutes::Unchosen
+            | Minutes::NoProvider(_)
+            | Minutes::NoTranscript
+            | Minutes::OllamaWaits { .. } => {}
+        }
+        notices.push(words::minutes(&said, language));
+    }
+    for not_put_back in [false, true] {
+        notices.push(words::transcript_kept_beside(language, "x", not_put_back));
+    }
+    notices.push(words::offer("Microsoft Teams", language).0);
+    for outcome in [
+        Ok((1, 30)),
+        Ok((3, 30)),
+        Err(Refusal::NotAllowed),
+        Err(Refusal::NoSpace),
+        Err(Refusal::Other),
+    ] {
+        if let Err(refusal) = outcome {
+            match refusal {
+                Refusal::NotAllowed | Refusal::NoSpace | Refusal::Other => {}
+            }
+        }
+        notices.push(words::audio_trashed(language, &outcome));
+    }
+    notices.push(words::carried_over(language));
+    notices.push(words::carry_failed(language));
+    notices.push(words::model_needed(language, "1.6 GB", "huggingface.co"));
+    for outcome in [Ok(()), Err("x".to_string())] {
+        notices.push(words::pulled(&outcome, "qwen3:8b", language));
+        for chosen in [false, true] {
+            notices.push(words::fetched(&outcome, chosen, language));
+        }
+    }
+    notices
+}
+
+#[test]
+fn a_notification_s_title_holds_50_characters() {
+    let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/words.rs")).unwrap();
+    // Read over the whole file, not line by line: a signature may span several lines.
+    let notifying: Vec<_> = source
+        .match_indices("fn ")
+        .filter(|(at, _)| source[..*at].ends_with(|c: char| c.is_whitespace()))
+        .filter_map(|(at, _)| {
+            let rest = &source[at + 3..];
+            let name = &rest[..rest.find(|c: char| !(c.is_alphanumeric() || c == '_'))?];
+            // Its parameters, to the parenthesis that closes them; then what it returns, to its body.
+            let (mut depth, mut close) = (0, None);
+            for (index, c) in rest.char_indices().skip_while(|&(_, c)| c != '(') {
+                depth += match c {
+                    '(' => 1,
+                    ')' => -1,
+                    _ => 0,
+                };
+                if depth == 0 {
+                    close = Some(index);
+                    break;
+                }
+            }
+            let after = &rest[close? + 1..];
+            let returns = &after[..after.find(['{', ';'])?];
+            returns.split_once("->")?.1.contains("Notice").then_some(name)
+        })
+        .collect();
+    assert_eq!(
+        notifying, NOTIFYING,
+        "a function that sends a notification: read it in `every_notice`"
+    );
+    let mut wrong: Vec<_> = BOTH
+        .iter()
+        .flat_map(|&language| every_notice(language))
+        .map(|notice| notice.title)
+        .filter(|title| title.chars().count() > 50)
+        .collect();
+    wrong.sort();
+    wrong.dedup();
+    assert_eq!(
+        wrong, TITLES_TOO_LONG,
+        "a title over 50 characters, or one put right: take it from the list"
+    );
+}

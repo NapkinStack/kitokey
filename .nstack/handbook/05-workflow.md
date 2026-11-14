@@ -349,7 +349,12 @@ the change, and the stricter applies:
 joins an earlier one in the same cell, after a `;`, each clause starting with its commit:
 `651e249 — <what moved>; deb508f — <what moved>`. The engine's pull
 request check reads the sheet in CI: missing, unfilled, without evidence, verified before the
-head and not confirmed on it, failed. The approver decides on the sheet; where the project answers
+head and not confirmed on it, failed. Where checks are attested, each record also keeps the sheet's
+rows as it read them, and the check compares the description with them: an **explored** row whose
+Commit cell moved and whose evidence did not was never explored again, and fails — evidence names
+its run (a link to that screenshot, video or trace), so a new run brings a new one. A row a record
+held and the sheet no longer shows is said. A rebase or a squash drops the records of the commits
+it rewrites, and what they read with them. The approver decides on the sheet; where the project answers
 `approval: agent`, the approver of a `prototype` or `standard` module may be the verifier itself,
 an agent under another identity than the author's (`07-governance.md` §7).
 

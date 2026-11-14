@@ -36,7 +36,8 @@ change: `nstack claim D<n> --session <this session> --person <the person you wor
 forge handle, asked once, never git's user: agents sharing one identity would be one person.
 Held by someone else — another agent's session is someone else, even for your person — stop and
 say who holds it; never work around a hold, never force-push a
-branch `nstack/hold/…` (`.nstack/handbook/project.md`, *Who holds a deliverable*).
+branch `nstack/hold/…` (`.nstack/handbook/project.md`, *Who holds a deliverable*). An issue no
+cycle plans is held the same way, `nstack claim '#<n>'`, and unclaimed once its work is merged.
 
 **Words.** Facing a person, use the framework's words as `.nstack/handbook/glossary.md` defines
 them, and explain a term or a rule's code (`.nstack/handbook/RULES.md`) the first time you use it.
