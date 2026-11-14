@@ -3743,9 +3743,9 @@ def bar_window(now: dt.datetime) -> None:
 
 
 def recording_found(now: dt.datetime) -> None:
-    """BE. A recording left running by a Kitokey ended before this one, found at the start (#773): the bar
+    """BI. A recording left running by a Kitokey ended before this one, found at the start (#773): the bar
     shows it with ■ and its time from the session's own start, and its ■ stops it by a signal."""
-    print("BE. a recording left running by an ended Kitokey: the bar shows ■ and its time from its real start, and stops it (#773)")
+    print("BI. a recording left running by an ended Kitokey: the bar shows ■ and its time from its real start, and stops it (#773)")
     taping = WORK / "recording-found"
     taping.mkdir()
     folder = taping / "2026-11-13_09-00"
@@ -3788,6 +3788,90 @@ def recording_found(now: dt.datetime) -> None:
             check("the bar and the tray back at rest", back, tray_colour())
             check("nothing kept for the next start", wait_for(None, lambda b: not kept.exists(), 5))
     finally:
+        if recorder.poll() is None:
+            recorder.kill()
+        recorder.wait()
+
+
+def recording_found_not_forgotten(now: dt.datetime) -> None:
+    """BH. A recording found at the start, the settings' folder read-only, so that its `recording.json`
+    can be neither removed nor set aside (#818): stopped, the bar at rest, the removal refused logged once;
+    at the next start, nothing found again, the bar at rest, nothing more warned. Then a `recording.json`
+    that cannot be read: nothing found at that start nor the next, its warning once at each."""
+    print("BH. a found recording whose recording.json cannot be removed: stopped, at rest at that start and the next, its warning once (#818)")
+    logs = WORK / "state" / "kitokey" / "logs"
+    logged = lambda message: sum(f.read_text().count(f'"message":"{message}"') for f in logs.glob("shell.*.jsonl"))
+    counted = ("shell.recording_found", "shell.recording_gone", "shell.recording_not_forgotten", "shell.recording_unread")
+    since_start = lambda before: {name: logged(name) - before[name] for name in counted}
+    at_rest = lambda b: (b.find_element(By.ID, "small-record").is_displayed() and not b.find_element(By.ID, "small-stop").is_displayed()
+                         and tray_colour() == "blue")
+    taping = WORK / "recording-not-forgotten"
+    taping.mkdir()
+    folder = taping / "2026-11-14_09-00"
+    folder.mkdir()
+    started = dt.datetime.now().astimezone() - dt.timedelta(seconds=90)
+    stamp = started.isoformat(timespec="seconds")
+    (folder / "session.json").write_text(json.dumps({"contract": "session-audio/v3", "started": stamp, "tracks": {}}))
+    # The recorder left running, as BI plays it: stopped by a signal that writes `stopped`.
+    script = (
+        "trap '' PIPE\n"
+        "trap 'printf %s \"$2\" > \"$1/session.json\"; exit 0' TERM INT\n"
+        "while :; do sleep 0.1 & wait $!; done\n"
+    )
+    ended = json.dumps({"contract": "session-audio/v3", "started": stamp, "stopped": dt.datetime.now().astimezone().isoformat(timespec="seconds"), "tracks": {}})
+    recorder = subprocess.Popen(["sh", "-c", script, "sh", str(folder), ended], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    # The start-up entry decided already: the start writes nothing to the settings, which BH does not claim (D32).
+    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\nautostart = false\n', small=True)
+    settings = window.file.parent
+    kept = settings / "recording.json"
+    try:
+        since = int(Path(f"/proc/{recorder.pid}/stat").read_text().rsplit(")", 1)[1].split()[19])
+        text = json.dumps({"id": recorder.pid, "since": since, "folder": str(folder)})
+        kept.write_text(text)
+        settings.chmod(0o555)
+        before = {name: logged(name) for name in counted}
+        with window as browser:
+            shown = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+            check("the settings' folder read-only: the recording left running is found, ■ shown", shown)
+            stop_from_small(browser)
+            gone = wait_for(None, lambda b: recorder.poll() is not None, 10)
+            check("■ stops it", gone and recorder.returncode == 0, recorder.returncode)
+            check("the bar and the tray back at rest", wait_for(browser, at_rest, 10), tray_colour())
+            removed = wait_for(None, lambda b: since_start(before)["shell.recording_not_forgotten"] >= 1, 5)
+            check("recording.json cannot be removed: left as it was, its removal refused logged once",
+                  removed and kept.read_text() == text and since_start(before) == {"shell.recording_found": 1, "shell.recording_gone": 0,
+                                                                                    "shell.recording_not_forgotten": 1, "shell.recording_unread": 0},
+                  since_start(before))
+        before = {name: logged(name) for name in counted}
+        with window as browser:
+            # Found at the start, before the window opens: read once the shell said what it found.
+            read = wait_for(None, lambda b: since_start(before)["shell.recording_gone"] >= 1, 10)
+            check("the next start: the program kept is gone, nothing found, the bar and the tray at rest",
+                  read and wait_for(browser, at_rest, 5) and not browser.find_element(By.ID, "small-stop").is_displayed(), tray_colour())
+            time.sleep(1)
+            check("the next start: nothing more warned — its file still there, read as gone",
+                  since_start(before) == {"shell.recording_found": 0, "shell.recording_gone": 1, "shell.recording_not_forgotten": 0, "shell.recording_unread": 0}
+                  and kept.exists() and at_rest(browser), since_start(before))
+        # A file that cannot be read, in the same read-only folder: it cannot be set aside either.
+        settings.chmod(0o755)
+        kept.write_text("{}")
+        kept.chmod(0)
+        settings.chmod(0o555)
+        for start in ("its first start", "the next start"):
+            before = {name: logged(name) for name in counted}
+            with window as browser:
+                read = wait_for(None, lambda b: since_start(before)["shell.recording_unread"] >= 1, 10)
+                check(f"recording.json unreadable, {start}: nothing found, the bar and the tray at rest",
+                      read and wait_for(browser, at_rest, 5), tray_colour())
+                time.sleep(1)
+                check(f"recording.json unreadable, {start}: said once, left in place",
+                      since_start(before) == {"shell.recording_found": 0, "shell.recording_gone": 0, "shell.recording_not_forgotten": 0, "shell.recording_unread": 1}
+                      and kept.exists() and not list(settings.glob("recording.json.unreadable-*")), since_start(before))
+    finally:
+        settings.chmod(0o755)
+        if kept.exists():
+            kept.chmod(0o644)
         if recorder.poll() is None:
             recorder.kill()
         recorder.wait()
@@ -9134,6 +9218,7 @@ def main() -> int:
     bar_window(now)
     bar_opened(now)
     recording_found(now)
+    recording_found_not_forgotten(now)
     context_before_start(now)
     own_models(now)
     cancelled_at_once(now)
