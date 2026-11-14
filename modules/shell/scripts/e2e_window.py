@@ -4952,8 +4952,8 @@ def actions_rows(now: dt.datetime) -> None:
 
 
 def meeting_told_once(now: dt.datetime) -> None:
-    """AL. A meeting made after a stop is told once, naming it, and only where no window of Kitokey has the focus (D44, D92)."""
-    print("AL. the last step's end: none told while a window of Kitokey has the focus; else one notification, naming the meeting, its click opening it (D92)")
+    """BN. A meeting made after a stop is told once, naming it, and only where no window of Kitokey has the focus (D44, D92)."""
+    print("BN. the last step's end: none told while a window of Kitokey has the focus; else one notification, naming the meeting, its click opening it (D92)")
     meetings = WORK / "telling"
     meetings.mkdir()
     model = WORK / "telling-model.bin"
