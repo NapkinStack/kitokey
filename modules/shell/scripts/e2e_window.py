@@ -2245,6 +2245,8 @@ def cancelled_at_once(now: dt.datetime) -> None:
                                        stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
             try:
                 time.sleep(0.5)
+                # What the page reads before the making starts: the later answer of #823's race.
+                browser.execute_script("window.__TAURI__.core.invoke('makings').then((m) => { window.before = m; })")
                 start(browser, first)
                 running = wait_for(browser, lambda b: held.exists() and child.exists() and child.read_text().strip() != "", 15)
                 check(f"{what}: made again with the first model, held running", running)
@@ -2255,23 +2257,49 @@ def cancelled_at_once(now: dt.datetime) -> None:
                 check(f"{what}: « Annuler » on its page while it is made", offered)
                 if not offered:
                     continue
+                # Refused — its meeting gone meanwhile, the answer stood in for here —: said beside its
+                # line, and still said once the makings are read again; the making goes on (D92). The
+                # transcript's and the minutes' alike: one button, one note (#823).
+                browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                       " asked === 'making_cancelled' ? Promise.reject('the meeting is gone') : real.invoke(asked, ...rest) };"
+                                       " window.restore = () => { window.__TAURI__.core = real; };")
+                press(browser, "making-cancel")
+                refusal = lambda b: b.execute_script("const n = document.querySelector('.note.warn[data-refused]'); return n ? n.textContent : ''")
+                said_now = wait_for(browser, lambda b: "Kitokey n’a pas pu annuler" in refusal(b), 3)
+                # The makings read again meanwhile: by the gesture itself, then by the page's own reading.
+                time.sleep(1.5)
+                kept = refusal(browser)
+                role = browser.execute_script("return document.querySelector('.note.warn[data-refused]')?.getAttribute('role')")
+                check(f"{what}: « Annuler » refused: said beside its making in its own words, an alert, still said once the makings are read again, the making going on",
+                      said_now and kept.startswith("Kitokey n’a pas pu annuler") and "the meeting is gone" in kept and role == "alert" and not gone(pids[0])
+                      and browser.execute_script("const c = document.getElementById('making-cancel'); return !!c && !c.disabled"), kept)
+                browser.execute_script("window.restore()")
                 if step == "hearing":
-                    # Refused — its meeting gone meanwhile, the answer stood in for here —: said beside its
-                    # line, and still said once the makings are read again; the making goes on (D92).
-                    browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
-                                           " asked === 'making_cancelled' ? Promise.reject('the meeting is gone') : real.invoke(asked, ...rest) };"
-                                           " window.restore = () => { window.__TAURI__.core = real; };")
-                    press(browser, "making-cancel")
-                    refusal = lambda b: b.execute_script("const n = document.querySelector('.note.warn[data-refused]'); return n ? n.textContent : ''")
-                    said_now = wait_for(browser, lambda b: "Kitokey n’a pas pu annuler" in refusal(b), 3)
-                    # The makings read again meanwhile: by the gesture itself, then by the page's own reading.
-                    time.sleep(1.5)
-                    kept = refusal(browser)
-                    role = browser.execute_script("return document.querySelector('.note.warn[data-refused]')?.getAttribute('role')")
-                    check(f"{what}: « Annuler » refused: said beside its making in its own words, an alert, still said once the makings are read again, the making going on",
-                          said_now and kept.startswith("Kitokey n’a pas pu annuler") and "the meeting is gone" in kept and role == "alert" and not gone(pids[0])
-                          and browser.execute_script("const c = document.getElementById('making-cancel'); return !!c && !c.disabled"), kept)
+                    # Two readings of the makings answered out of order (#823), as #816 has the bar's asks: the
+                    # first answered a second late with the making still made, the second at once with the
+                    # page's state before it started. The later reading wins: the late one is dropped.
+                    browser.execute_script("""
+                        const real = window.__TAURI__.core; let n = 0; window.raced = null;
+                        window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {
+                          if (asked !== 'makings') return real.invoke(asked, ...rest);
+                          n += 1;
+                          if (n > 1) return Promise.resolve(window.before);
+                          return real.invoke('makings').then((made) => new Promise((done) => setTimeout(() => {
+                            done(made);
+                            // Read once the late answer has been taken or dropped: after its reading's own turn.
+                            setTimeout(() => { window.raced = [JSON.stringify(makings) === JSON.stringify(window.before),
+                              !!document.getElementById('making-cancel')?.getClientRects().length]; }, 0);
+                          }, 1000)));
+                        } };
+                        window.restore = () => { window.__TAURI__.core = real; };
+                        readMakings(); readMakings();""")
+                    raced = wait_for(browser, lambda b: b.execute_script("return window.raced"), 5)
+                    check(f"{what}: two readings answered out of order — the late one dropped, the page drawn with the later one (#823)",
+                          raced == [True, False], browser.execute_script("return window.raced"))
                     browser.execute_script("window.restore()")
+                    # The page's own next reading draws the making again, still made, its « Annuler » back.
+                    check(f"{what}: read again for real, the making is drawn as made again",
+                          wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 5))
                 pressed = time.monotonic()
                 press(browser, "making-cancel")
                 ended = wait_for(browser, lambda b: all(gone(pid) for pid in pids) and b.execute_script(idle), 2)
