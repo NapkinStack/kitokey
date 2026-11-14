@@ -81,9 +81,18 @@ fn recorded_as(folder: &Path, contract: &str, tracks: &str, clock: &str) {
     fs::write(folder.join("clock.jsonl"), clock).unwrap();
 }
 
+/// The transcript's lines, its `complete` line without when it was made: each run says its own.
 fn lines(folder: &Path) -> Vec<serde_json::Value> {
     let text = fs::read_to_string(folder.join("transcript.jsonl")).unwrap();
-    text.lines().map(|line| serde_json::from_str(line).unwrap()).collect()
+    text.lines()
+        .map(|line| {
+            let mut line: serde_json::Value = serde_json::from_str(line).unwrap();
+            if line["type"] == "complete" {
+                assert!(line.as_object_mut().unwrap().remove("made").is_some_and(|made| made.is_string()));
+            }
+            line
+        })
+        .collect()
 }
 
 const BOTH: &str = r#"{"local":{"device":"a microphone"},"remote":{"device":"a loudspeaker"}}"#;

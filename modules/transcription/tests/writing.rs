@@ -48,7 +48,9 @@ fn a_transcript_opens_on_what_made_it_and_holds_what_was_heard_with_its_times_an
     transcript
         .heard(Speaker::Me, &[said(3.4, 5.1, "Première semaine de juin.")], 30.0)
         .unwrap();
+    let before = chrono::Local::now().timestamp();
     transcript.complete(302.337).unwrap();
+    let after = chrono::Local::now().timestamp();
 
     let written = lines(folder.path());
     assert_eq!(
@@ -66,7 +68,17 @@ fn a_transcript_opens_on_what_made_it_and_holds_what_was_heard_with_its_times_an
         serde_json::json!({ "type": "covered", "speaker": "others", "until": 30.0 })
     );
     assert_eq!(written[3]["speaker"], "me");
-    assert_eq!(written[5], serde_json::json!({ "type": "complete", "duration": 302.34 }));
+    // The last line says when the transcript was made whole: this computer's time, its offset
+    // said, to the second — as `edited` and the minutes' `made` are written (transcript/v1, D93).
+    let made = written[5]["made"].as_str().expect("the complete line says when it was made");
+    let at = chrono::DateTime::parse_from_rfc3339(made).expect("RFC 3339");
+    assert!((before..=after).contains(&at.timestamp()), "{made} is not now");
+    let local = at.with_timezone(&chrono::Local);
+    assert_eq!(made, local.to_rfc3339_opts(chrono::SecondsFormat::Secs, false));
+    assert_eq!(
+        written[5],
+        serde_json::json!({ "type": "complete", "duration": 302.34, "made": made })
+    );
     assert_eq!(
         types(folder.path()),
         ["header", "segment", "covered", "segment", "covered", "complete"]

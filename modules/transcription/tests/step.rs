@@ -1,12 +1,15 @@
 //! The step every engine shares, tried with an engine played here: it "hears" a stretch of
 //! sound wherever the samples are not silence. No model, no voice of anyone.
 
+mod made;
+
 use std::{fs, io, path::Path};
 
 use kitokey_transcription::{
     Segment,
     step::{Engine, RATE, read, sound, transcribe},
 };
+use made::unmade;
 
 /// Hears each stretch of non-silent samples as one segment, and says how long it was. It
 /// can be told to fail at its n-th call, and it keeps what it was asked.
@@ -117,7 +120,7 @@ fn a_session_is_heard_span_by_span_and_a_sentence_across_two_spans_is_heard_whol
         serde_json::json!({ "type": "header", "contract": "transcript/v1", "engine": "played",
         "model": "a-model", "language": "fr", "context": "Quatre personnes." })
     );
-    assert_eq!(lines.last().unwrap(), &serde_json::json!({ "type": "complete", "duration": 70.0 }));
+    assert_eq!(unmade(text.lines().last().unwrap()), "{\"duration\":70.0,\"type\":\"complete\"}\n");
     // The third span of `others` holds no sound: the engine was not asked to find words in silence.
     assert_eq!(engine.calls, 5);
     // Every span was heard in the language asked, with the context the user attached, and no span is longer than asked.
@@ -155,7 +158,8 @@ fn a_step_that_stops_halfway_is_run_again_and_gives_the_same_transcript_as_one_n
         // Run again: it goes on from where it was, and asks nothing of what is covered.
         transcribe(folder.path(), &mut again, None, 30).unwrap();
         let written = fs::read_to_string(folder.path().join("transcript.jsonl")).unwrap();
-        assert_eq!(written, expected, "stopped at call {fails_at}");
+        // Byte for byte, but for when each run made it whole.
+        assert_eq!(unmade(&written), unmade(&expected), "stopped at call {fails_at}");
         assert!(
             again.calls + fails_at - 1 <= 6,
             "stopped at call {fails_at}: {} calls again",
@@ -243,7 +247,7 @@ fn a_recording_still_going_on_is_heard_up_to_here_and_again_when_there_is_more()
     transcribe(folder.path(), &mut Played::default(), None, 30).unwrap();
     let whole = fs::read_to_string(folder.path().join("transcript.jsonl")).unwrap();
     assert!(
-        whole.starts_with(&so_far) && whole.trim_end().ends_with(r#"{"duration":70.0,"type":"complete"}"#),
+        whole.starts_with(&so_far) && unmade(&whole).trim_end().ends_with(r#"{"duration":70.0,"type":"complete"}"#),
         "{whole}"
     );
     let written = segments(folder.path());
@@ -279,5 +283,8 @@ fn the_length_the_last_line_says_is_the_one_the_session_was_covered_to() {
     transcribe(folder.path(), &mut Played::default(), None, 1).unwrap();
     let text = fs::read_to_string(folder.path().join("transcript.jsonl")).unwrap();
     assert!(text.contains(r#"{"speaker":"me","type":"covered","until":1.01}"#), "{text}");
-    assert!(text.trim_end().ends_with(r#"{"duration":1.01,"type":"complete"}"#), "{text}");
+    assert!(
+        unmade(&text).trim_end().ends_with(r#"{"duration":1.01,"type":"complete"}"#),
+        "{text}"
+    );
 }
