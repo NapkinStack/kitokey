@@ -335,6 +335,10 @@ pub struct Window {
     pub none_do: &'static str,
     pub list_unread: &'static str,
     pub list_unread_do: &'static str,
+    /// The settings file cannot be read: said above every page but Settings (#770) — never read since
+    /// Kitokey started, then read before and its last settings held.
+    pub settings_banner: &'static str,
+    pub settings_banner_kept: &'static str,
     pub again_refused: &'static str,
     pub hearing_models_refused: &'static str,
     pub fold_not_kept: &'static str,
@@ -640,6 +644,15 @@ pub struct Window {
     /// A transcript waiting for the default Whisper model: offered in the menu, or coming.
     pub transcript_model_needed: &'static str,
     pub transcript_model_coming: &'static str,
+    /// The button that ends what is being made of a meeting, or takes it out of the line (D92).
+    pub making_cancel: &'static str,
+    /// « Annuler » refused — its meeting gone meanwhile (D92). Shows: a meeting's page, beside the
+    /// making's line, until the next gesture on it. When: the shell refused to end or take out the
+    /// making. At most: no limit. Placeholders: {} why it was refused.
+    pub making_cancel_failed: &'static str,
+    /// Said on its page once the user cancelled its transcript, or its minutes: what was there stays.
+    pub transcript_stopped: &'static str,
+    pub minutes_stopped: &'static str,
     pub ran_online: &'static str,
     /// The header's button, at rest and while a recording runs.
     pub record_start: &'static str,
@@ -818,6 +831,8 @@ pub fn window(language: Language) -> Window {
             none_do: "Start a recording: its button, its shortcut, or the tray’s icon.",
             list_unread: "The meetings in {} cannot be read.",
             list_unread_do: "Check that this folder’s disk is connected and that you may read it, then try again.",
+            settings_banner: "Settings cannot be read: your meetings are not shown.",
+            settings_banner_kept: "Settings cannot be read: the last ones read stay in use, and no change is saved until the file is fixed.",
             again_refused: "It could not start again: {}",
             hearing_models_refused: "This service’s models could not be read, you can type one: {}",
             fold_not_kept: "The sidebar will be back as it was at the next start: {}",
@@ -1070,6 +1085,10 @@ pub fn window(language: Language) -> Window {
             minutes_unsaved_none: "Not saved yet — no minutes are written until it is.",
             transcript_model_needed: "Waiting for the Whisper model.",
             transcript_model_coming: "Waiting for the Whisper model, being downloaded.",
+            making_cancel: "Cancel",
+            making_cancel_failed: "Kitokey could not cancel: {}",
+            transcript_stopped: "Transcription stopped. You can start it again, with another model if you like.",
+            minutes_stopped: "Minutes stopped. You can start them again, with another model if you like.",
             ran_online: "online",
             record_start: "Start a recording",
             record_stop: "Stop the recording",
@@ -1239,6 +1258,8 @@ pub fn window(language: Language) -> Window {
             none_do: "Démarrez un enregistrement\u{a0}: son bouton, son raccourci, ou l’icône de la barre système.",
             list_unread: "Les réunions de {} ne peuvent pas être lues.",
             list_unread_do: "Vérifiez que le disque de ce dossier est branché et que vous pouvez le lire, puis réessayez.",
+            settings_banner: "Les réglages ne peuvent pas être lus\u{a0}: vos réunions ne sont pas affichées.",
+            settings_banner_kept: "Les réglages ne peuvent pas être lus\u{a0}: les derniers lus restent en usage, et aucun changement n’est enregistré tant que le fichier n’est pas corrigé.",
             again_refused: "Impossible de recommencer\u{a0}: {}",
             hearing_models_refused: "Les modèles de ce service n’ont pas pu être lus, vous pouvez en saisir un\u{a0}: {}",
             fold_not_kept: "La barre latérale reviendra comme avant au prochain démarrage\u{a0}: {}",
@@ -1494,6 +1515,10 @@ pub fn window(language: Language) -> Window {
             minutes_unsaved_none: "Pas encore enregistré — aucun compte rendu n’est fait tant que ce n’est pas le cas.",
             transcript_model_needed: "En attente du modèle Whisper.",
             transcript_model_coming: "En attente du modèle Whisper, en cours de téléchargement.",
+            making_cancel: "Annuler",
+            making_cancel_failed: "Kitokey n’a pas pu annuler\u{a0}: {}",
+            transcript_stopped: "Transcription arrêtée. Vous pouvez la relancer, avec un autre modèle si besoin.",
+            minutes_stopped: "Compte rendu arrêté. Vous pouvez le relancer, avec un autre modèle si besoin.",
             ran_online: "en ligne",
             record_start: "Démarrer un enregistrement",
             record_stop: "Arrêter l’enregistrement",
