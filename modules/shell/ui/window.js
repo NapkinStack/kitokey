@@ -3418,7 +3418,7 @@ function showSmall(words) {
   let choicesMade = 0;
   let choicesKept = 0;
   const choosePick = async (one) => {
-    choicesMade += 1;
+    const mine = ++choicesMade;
     const before = known.chosen;
     known = { ...known, chosen: one };
     paintPick();
@@ -3426,9 +3426,12 @@ function showSmall(words) {
       await invoke("microphone_chosen", { name: one?.name ?? null, description: one?.description ?? null });
       smallSaid("microphone", null);
     } catch {
-      known = { ...known, chosen: before };
-      paintPick();
-      drawPicks();
+      // Put back only while it is the last choice made: a later one stands, refused or not yet (#839).
+      if (mine === choicesMade) {
+        known = { ...known, chosen: before };
+        paintPick();
+        drawPicks();
+      }
       smallSaid("microphone", words.microphone_not_kept);
     } finally {
       choicesKept += 1;
