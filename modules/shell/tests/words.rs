@@ -1741,3 +1741,84 @@ fn a_notice_of_minutes_failed_by_the_meetings_own_model_says_what_its_page_says(
         }
     }
 }
+
+/// A meeting's day and hour, as the window's `Intl` says them (CLDR's abbreviated months).
+fn at(day: &str, time: &str) -> chrono::NaiveDateTime {
+    chrono::NaiveDateTime::parse_from_str(&format!("{day} {time}"), "%Y-%m-%d %H:%M").unwrap()
+}
+
+#[test]
+fn a_day_and_an_hour_are_said_as_the_window_says_them() {
+    let french = [
+        "janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc.",
+    ];
+    let english = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    for (month, (fr, en)) in french.iter().zip(english).enumerate() {
+        let day = chrono::NaiveDate::from_ymd_opt(2026, month as u32 + 1, 18).unwrap();
+        assert_eq!(words::day(day, Language::French), format!("18 {fr}"));
+        assert_eq!(words::day(day, Language::English), format!("{en} 18"));
+    }
+    let first = chrono::NaiveDate::from_ymd_opt(2026, 11, 1).unwrap();
+    assert_eq!(
+        (words::day(first, Language::French), words::day(first, Language::English)),
+        ("1 nov.".into(), "Nov 1".into())
+    );
+    for (time, fr, en) in [
+        ("12:00", "12:00", "12:00 PM"),
+        ("09:42", "09:42", "09:42 AM"),
+        ("00:05", "00:05", "12:05 AM"),
+        ("17:31", "17:31", "05:31 PM"),
+    ] {
+        let when = at("2026-11-13", time);
+        assert_eq!(words::hour(when.time(), Language::French), fr);
+        assert_eq!(words::hour(when.time(), Language::English), en);
+    }
+}
+
+#[test]
+fn a_meeting_is_named_by_its_title_else_its_hour_that_day_else_its_day_and_hour() {
+    let started = Some(at("2026-10-18", "12:00"));
+    let (that_day, later) = (at("2026-10-18", "23:59").date(), at("2026-11-14", "01:00").date());
+    let named = |title, when, today, language| words::meeting(title, when, today, language);
+    assert_eq!(
+        named(Some("Point hebdo"), started, later, Language::French),
+        "«\u{a0}Point hebdo\u{a0}»"
+    );
+    assert_eq!(named(Some("Weekly sync"), started, later, Language::English), "“Weekly sync”");
+    assert_eq!(named(None, started, that_day, Language::French), "la réunion de 12:00");
+    assert_eq!(named(None, started, that_day, Language::English), "the 12:00 PM meeting");
+    assert_eq!(named(None, started, later, Language::French), "la réunion du 18 oct. à 12:00");
+    assert_eq!(named(None, started, later, Language::English), "the meeting of Oct 18 at 12:00 PM");
+    // A title of blanks is none; a meeting whose start cannot be read is the meeting.
+    assert_eq!(
+        named(Some(" \t"), started, later, Language::French),
+        "la réunion du 18 oct. à 12:00"
+    );
+    assert_eq!(named(None, None, later, Language::French), "la réunion");
+    assert_eq!(named(None, None, later, Language::English), "the meeting");
+}
+
+#[test]
+fn the_notification_that_ends_a_meeting_names_it_first_and_keeps_its_title() {
+    for language in BOTH {
+        let notice = words::minutes(&words::Minutes::Ready, language);
+        let meeting = words::meeting(None, Some(at("2026-10-18", "12:00")), at("2026-11-14", "01:00").date(), language);
+        let told = words::for_meeting(notice.clone(), &meeting, language);
+        assert_eq!(told.title, notice.title);
+        assert!(told.body.ends_with(&notice.body), "{told:?}");
+        assert!(told.body.contains(&meeting), "{told:?}");
+        assert!(told.title.chars().count() <= 50, "{told:?}");
+    }
+    let told = words::for_meeting(
+        words::minutes(&words::Minutes::Ready, Language::French),
+        "«\u{a0}Point hebdo\u{a0}»",
+        Language::French,
+    );
+    assert!(told.body.starts_with("Pour «\u{a0}Point hebdo\u{a0}». "), "{told:?}");
+    let told = words::for_meeting(
+        words::minutes(&words::Minutes::Ready, Language::English),
+        "the 12:00 PM meeting",
+        Language::English,
+    );
+    assert!(told.body.starts_with("For the 12:00 PM meeting. "), "{told:?}");
+}

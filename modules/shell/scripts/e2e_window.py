@@ -1802,6 +1802,18 @@ def meeting_language(now: dt.datetime) -> None:
     (heard / "language").unlink()
 
 
+# Another application, as the user's: a window of its own the desktop gives the focus to, as it
+# gives it any window shown (headless.sh's extension) — Kitokey's own window still seen beside it.
+ELSEWHERE = """
+import gi
+gi.require_version("Gtk", "4.0")
+from gi.repository import Gio, Gtk
+app = Gtk.Application(application_id="org.example.Elsewhere", flags=Gio.ApplicationFlags.NON_UNIQUE)
+app.connect("activate", lambda a: Gtk.ApplicationWindow(application=a, title="Elsewhere").present())
+app.run([])
+"""
+
+
 def app_language(now: dt.datetime) -> None:
     """AF. The language Kitokey speaks, chosen in Settings, the system's by default (D64)."""
     print("AF. the app's language chosen in Settings: spoken at once and after a restart, never the meetings' (D64)")
@@ -1827,12 +1839,23 @@ echo '{{"available":true,"installed":true,"supported":true}}'
     sections = lambda b: b.execute_script("return [document.getElementById('settings-link').getAttribute('aria-label'), document.documentElement.lang]")
     redo = lambda b: b.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", heard.name, str(model))
 
+    def away(b, made) -> None:
+        """A making's end awaited with another application in front: told only then (D92)."""
+        other = subprocess.Popen(["/usr/bin/python3", "-c", ELSEWHERE], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            wait_for(b, lambda b: not b.execute_script("return document.hasFocus()"), 10)
+            made()
+        finally:
+            other.terminate()
+            other.wait(timeout=10)
+            wait_for(b, lambda b: b.execute_script("return document.hasFocus()"), 5)
+
     def by_settings(b, ready: str) -> str:
         """The transcript made again by whoever the settings name to hear (D59): what it was told."""
         args.unlink(missing_ok=True)
         count = notified.read_text().count(ready)
-        b.execute_script("window.__TAURI__.core.invoke('context_redo', {name: arguments[0]})", heard.name)
-        wait_for(b, lambda b: told() != "" and notified.read_text().count(ready) > count, 15)
+        away(b, lambda: (b.execute_script("window.__TAURI__.core.invoke('context_redo', {name: arguments[0]})", heard.name),
+                         wait_for(b, lambda b: told() != "" and notified.read_text().count(ready) > count, 15)))
         return told()
 
     notified = WORK / "notified-language"
@@ -1851,8 +1874,7 @@ echo '{{"available":true,"installed":true,"supported":true}}'
                   [o.text for o in pick.options] == ["Langue du système", "Français", "English"]
                   and pick.first_selected_option.get_attribute("value") == "" and label == "Langue de Kitokey",
                   ([o.text for o in pick.options], label))
-            redo(browser)
-            wait_for(browser, lambda b: "Transcription prête" in notified.read_text(), 15)
+            away(browser, lambda: (redo(browser), wait_for(browser, lambda b: "Transcription prête" in notified.read_text(), 15)))
             before = by_settings(browser, "Transcription prête")
             spoke = len(asked.read_text())
             choose(browser, "app-language", "en")
@@ -4758,18 +4780,6 @@ def actions_rows(now: dt.datetime) -> None:
         browser.execute_script("document.querySelector('#meeting .minutes').scrollIntoView({block: 'start'})")
         time.sleep(0.3)
         shot(browser, "d46-actions-rows")
-
-
-# Another application, as the user's: a window of its own the desktop gives the focus to, as it
-# gives it any window shown (headless.sh's extension) — Kitokey's own window still seen beside it.
-ELSEWHERE = """
-import gi
-gi.require_version("Gtk", "4.0")
-from gi.repository import Gio, Gtk
-app = Gtk.Application(application_id="org.example.Elsewhere", flags=Gio.ApplicationFlags.NON_UNIQUE)
-app.connect("activate", lambda a: Gtk.ApplicationWindow(application=a, title="Elsewhere").present())
-app.run([])
-"""
 
 
 def meeting_told_once(now: dt.datetime) -> None:

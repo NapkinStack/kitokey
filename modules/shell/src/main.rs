@@ -3438,12 +3438,9 @@ fn write_minutes_from(
             summarising::Made::Written(_) => words::Minutes::Ready,
             summarising::Made::Failed(_, cause) => words::Minutes::failed_by(cause, again, own_model.as_deref(), shell.language()),
         };
-        // Ready, a click opens the meeting (D44); a failure is said as ever.
-        if written {
-            tell_opening(&app, &words::minutes(&said, shell.language()), folder.clone());
-        } else {
-            tell(&app, &words::minutes(&said, shell.language()));
-        }
+        // Ready, a click opens the meeting (D44); failed, it is said — once, naming the meeting,
+        // where no window of Kitokey has the focus (D92).
+        tell_made(&app, &words::minutes(&said, shell.language()), &folder, written);
     });
 }
 
@@ -3937,10 +3934,12 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         if cancel.cancelled() {
             return transcribe_next(&app);
         }
-        // Made again and ready, its click opens the meeting as after a stop (D44).
+        // Made again and ready, its click opens the meeting as after a stop (D44); the minutes
+        // made after it, theirs alone says it (D92).
         match &made {
-            Made::Written(_) => tell_opening(&app, &words::made(&made, shell.language()), folder.clone()),
-            Made::Failed(_) => tell(&app, &words::made(&made, shell.language())),
+            Made::Written(_) if minutes_after => {}
+            Made::Written(_) => tell_made(&app, &words::made(&made, shell.language()), &folder, true),
+            Made::Failed(_) => tell_made(&app, &words::made(&made, shell.language()), &folder, false),
         }
         if let Some((name, not_put_back)) = kept_beside {
             tell(&app, &words::transcript_kept_beside(shell.language(), &name, not_put_back));
@@ -4101,14 +4100,14 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
         match made {
             Made::Written(folder) => {
                 // The minutes follow, when the settings say so — as they are now; then their
-                // notification alone says the meeting is made (D44).
+                // notification alone says the meeting is made (D44, D92).
                 if shell.reread().is_ok_and(|settings| settings.after == settings::After::Minutes) {
                     make_minutes(&app, folder);
                 } else {
-                    tell_opening(&app, &notice, folder.clone());
+                    tell_made(&app, &notice, &folder, true);
                 }
             }
-            Made::Failed(_) => tell(&app, &notice),
+            Made::Failed(_) => tell_made(&app, &notice, &heard_folder, false),
         }
         transcribe_next(&app);
     });
@@ -4465,6 +4464,35 @@ fn window_seen(app: &AppHandle) -> bool {
         .iter()
         .filter_map(|label| app.get_webview_window(label))
         .any(|window| window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false))
+}
+
+/// Whether a window of Kitokey has the focus, as the toolkit says: the user is in Kitokey (D92).
+fn window_focused(app: &AppHandle) -> bool {
+    ["main", "small"]
+        .iter()
+        .filter_map(|label| app.get_webview_window(label))
+        .any(|window| window.is_focused().unwrap_or(false))
+}
+
+/// The notification that ends a meeting's making — its last step written or failed (D92): told
+/// once, naming the meeting, and only when no window of Kitokey has the focus, the page saying it
+/// there. `opening`: its click opens the meeting (D44).
+fn tell_made(app: &AppHandle, notice: &Notice, folder: &Path, opening: bool) {
+    if window_focused(app) {
+        tracing::info!("shell.made_not_told");
+        return;
+    }
+    let language = app.state::<Shell>().language();
+    let name = folder.file_name().unwrap_or_default().to_string_lossy();
+    let title = named::read(folder).or_else(|| minutes::title(folder));
+    let started = chrono::NaiveDateTime::parse_from_str(&name, "%Y-%m-%d_%H-%M").ok();
+    let meeting = words::meeting(title.as_deref(), started, chrono::Local::now().date_naive(), language);
+    let notice = words::for_meeting(notice.clone(), &meeting, language);
+    if opening {
+        tell_opening(app, &notice, folder.to_path_buf());
+    } else {
+        tell(app, &notice);
+    }
 }
 
 /// Quits Kitokey. A recording in progress is stopped first, as the user would stop it: its
