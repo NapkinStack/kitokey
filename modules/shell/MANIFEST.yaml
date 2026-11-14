@@ -308,6 +308,11 @@ evidence:
     - pattern: '"message":"shell\.microphones_unread"'
       level: warning
       scenario: AO
+    # The window's AO records with the settings' folder unwritable: the recording is not kept for a
+    # Kitokey started again to find (#773).
+    - pattern: '"message":"shell\.recording_not_kept"'
+      level: warning
+      scenario: AO
     # The window's AN starts a recording with no microphone to open, its side said waiting (D49).
     - pattern: '"message":"shell\.recording_unavailable"'
       level: warning
@@ -362,14 +367,14 @@ evidence:
     - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioI")'
       level: error
       scenario: I
-    # A reading refused on the way to a page: what is shown takes presses again.
-    - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioAS")'
+    # The window's BL: a reading refused on the way to a page: what is shown takes presses again.
+    - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioBL")'
       level: error
-      scenario: AS
+      scenario: BL
     # An address that does not decode: its drawing fails, said on the page.
     - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"URIError")'
       level: error
-      scenario: AS
+      scenario: BL
 
 docs:
   readme: README.md

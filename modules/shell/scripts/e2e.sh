@@ -11,6 +11,11 @@ cd "$(dirname "$0")/.."
 mkdir -p .evidence
 : > .evidence/e2e.txt
 say() { echo "$*" | tee -a .evidence/e2e.txt; }
+# A partial run's names (KITOKEY_E2E_ONLY, scripts/e2e_only.py), checked before anything is built or
+# started: a typo refused at once, named; a blank value a full run. Passed on as read, for the window
+# and the logs to read the same.
+if ! only=$(python3 -I scripts/e2e_only.py --asked scripts/e2e_window.py 2>&1); then say "$only"; exit 3; fi
+export KITOKEY_E2E_ONLY="$only"
 # The run's logs and screenshots, where NapkinStack reads them after it (nstack e2e shell).
 evidence=${NSTACK_EVIDENCE:-$PWD/.evidence/e2e}
 mkdir -p "$evidence"
@@ -120,9 +125,13 @@ click() {
 }
 published=""
 failed=0
+# A partial run (KITOKEY_E2E_ONLY, scripts/e2e_only.py): the window's scenarios it names alone — the
+# tray's not played, the logs' completeness not owed —, said first and last, and never passed.
+[ -z "$only" ] || say "partial run: $only — the tray's scenarios not played"
 check() { if "$@"; then say "  ok    $*"; else say "  FAIL  $*"; failed=1; fi; }
 is() { [ "$1" = "$2" ] || { say "        got: $1"; return 1; }; }
 
+if [ -z "$only" ]; then
 # The program that hears, played: it notes what it was given, fails, is slow or stuck when told.
 cat > "$work/kitokey-transcription" <<'PLAYED'
 #!/bin/sh
@@ -190,6 +199,7 @@ recorder=$(pgrep -P "$app" -f kitokey-capture || true)
 kill -KILL "$app"; sleep 1
 check test ! -e "$work/sessions/told"          # the recorder was not told to stop
 check kill -0 "$recorder"                       # and it records on
+kill "$recorder" 2>/dev/null || true            # gone before the next start finds it (S2)
 
 say "D. no recorder, or one that ends before it starts: said, and the menu still offers to start"
 start en_GB.UTF-8 "transcript = false" "$work/nowhere"
@@ -208,7 +218,7 @@ check is "$(grep -c 'nothing to record' "$work/notified")" 0
 click 6
 
 say "E. one gesture, pressed twice: one recording; a recorder that never ends: quit asked twice leaves"
-printf '#!/bin/sh\necho x >> "$2/starts"\necho "{\\"event\\":\\"started\\",\\"folder\\":\\"$2/s\\"}"\nwhile read line; do echo "$line" >> "$2/told"; done\nexec sleep 20\n' > "$work/stubborn"; chmod +x "$work/stubborn"
+printf '#!/bin/sh\necho $$ > "$2/stubborn"\necho x >> "$2/starts"\necho "{\\"event\\":\\"started\\",\\"folder\\":\\"$2/s\\"}"\nwhile read line; do echo "$line" >> "$2/told"; done\nexec sleep 20\n' > "$work/stubborn"; chmod +x "$work/stubborn"
 start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/stubborn"
 busctl --user call "$bus" "$menu" com.canonical.dbusmenu Event isvu 3 clicked s "" 0 >/dev/null
 click 3
@@ -220,6 +230,7 @@ check is "$(cat "$work/sessions/told")" "stop"
 check is "$(kill -0 "$app" 2>/dev/null && echo waiting || echo gone)" "waiting"
 click 6
 check is "$(kill -0 "$app" 2>/dev/null && echo waiting || echo gone)" "gone"
+kill "$(cat "$work/sessions/stubborn")" 2>/dev/null || true   # still going: gone before F's start finds it
 
 say "F. the transcript follows the stop; a failed one is made again from the menu; no model is said"
 # The logs' level chosen in the developer mode reaches the programs Kitokey starts (D29).
@@ -498,6 +509,74 @@ else
   pactl unload-module "$mic_module"; mic_module=""
 fi
 
+say "S2. Kitokey ended while recording, started again: the recording it left is found, shown from its start, and stopped (#773)"
+# The recorder played as the real one behaves when its shell is gone: the session's file written at the
+# start, its input closed and its output gone no order to stop, stopped by a signal (recording/v1).
+cat > "$work/orphaned" <<'PLAYED'
+#!/bin/sh
+trap '' PIPE
+echo "$1 $2" > "$2/given"; echo $$ > "$2/recorder"
+folder="$2/2026-11-13_09-00"; mkdir -p "$folder"
+since=$(date -d '-90 seconds' +%Y-%m-%dT%H:%M:%S%:z)
+printf '{"contract":"session-audio/v3","started":"%s","tracks":{}}\n' "$since" > "$folder/session.json"
+stop() {
+  printf '{"contract":"session-audio/v3","started":"%s","stopped":"%s","tracks":{}}\n' "$since" "$(date +%Y-%m-%dT%H:%M:%S%:z)" > "$folder/session.json"
+  echo "{\"event\":\"stopped\",\"folder\":\"$folder\",\"seconds\":90}"; exit 0
+}
+trap 'echo signal > "$2/told"; stop' TERM INT
+trap stop USR1
+echo "{\"event\":\"started\",\"folder\":\"$folder\"}"
+( while read line; do echo "$line" > "$2/told"; kill -USR1 $$; done ) &
+while :; do sleep 0.2 & wait $!; done
+PLAYED
+chmod +x "$work/orphaned"
+start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"" "$work/orphaned"
+click 3
+recorder=$(cat "$work/sessions/recorder")
+kill -TERM "$app"; wait "$app" 2>/dev/null || true; app=""
+check test ! -e "$work/sessions/told"          # the recorder was not told to stop
+check kill -0 "$recorder"                       # and it records on
+start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"" "$work/orphaned"; sleep 1
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"         # no second recording was started
+found=$(cat "$work"/state/kitokey/logs/shell.*.jsonl 2>/dev/null | grep '"message":"shell.recording_found"' | grep -o '"seconds":[0-9.]*' | tail -1 | cut -d: -f2 || true)
+check test "${found%.*}" -ge 90 2>/dev/null      # its length counted from the session's start
+# Started again while it shows the recording found: the running one keeps it, nothing started anew.
+again
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"
+click 3; sleep 1
+check is "$(cat "$work/sessions/told")" "signal"
+check is "$(kill -0 "$recorder" 2>/dev/null && echo recording || echo ended)" "ended"
+check grep -q '"stopped"' "$work/sessions/2026-11-13_09-00/session.json"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(tail -1 "$work/sessions/heard")" "$work/sessions/2026-11-13_09-00 --model $work/model.bin"
+check test ! -e "$work/config/kitokey/recording.json"   # nothing kept once it ended
+click 6
+rm -rf "$work/sessions/2026-11-13_09-00"
+# Killed outright (SIGKILL), as a crash leaves it: found all the same, and Quit stops it first (as B).
+start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"
+click 3
+recorder=$(cat "$work/sessions/recorder")
+kill -KILL "$app"; wait "$app" 2>/dev/null || true; app=""
+check kill -0 "$recorder"
+start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"; sleep 1
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"
+click 6
+check is "$(cat "$work/sessions/told")" "signal"
+check is "$(kill -0 "$recorder" 2>/dev/null && echo recording || echo ended) $(kill -0 "$app" 2>/dev/null && echo running || echo gone)" "ended gone"
+check grep -q '"stopped"' "$work/sessions/2026-11-13_09-00/session.json"
+check test ! -e "$work/config/kitokey/recording.json"
+# Started once more: nothing is left to find.
+start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"; sleep 1
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"
+click 6
+rm -rf "$work/sessions/2026-11-13_09-00" "$work/sessions/recorder"
+
+fi
+
 # The window (cycle 03): Kitokey started with --window by tauri-driver, its page read over
 # WebDriver (scripts/e2e_window.py). For a few seconds a window appears, twice.
 if ! command -v WebKitWebDriver >/dev/null; then
@@ -524,8 +603,10 @@ fi
 
 # Its log (ADR-0007): each recording and making under an id, never a path of the run's folder.
 shell_log=$(cat "$work"/state/kitokey/logs/shell.*.jsonl 2>/dev/null || true)
-check grep -q '"message":"shell.recording_started"' <<< "$shell_log"
-check grep -q '"message":"shell.minutes_written"' <<< "$shell_log"
+if [ -z "$only" ]; then
+  check grep -q '"message":"shell.recording_started"' <<< "$shell_log"
+  check grep -q '"message":"shell.minutes_written"' <<< "$shell_log"
+fi
 check test -z "$(grep -F "$work" <<< "$shell_log")"
 check test ! -s "$work/errors"
 # Every warning and error logged is one a scenario provokes, and each one named is logged: the
@@ -533,5 +614,10 @@ check test ! -s "$work/errors"
 logs_read() { uv run --quiet --with pyyaml==6.0.3 python scripts/e2e_logs.py "$work" "$evidence" MANIFEST.yaml | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"; }
 check logs_read
 [ -s "$work/errors" ] && sed 's/^/    /' "$work/errors" >> .evidence/e2e.txt
+if [ -n "$only" ]; then
+  # Never read as the module's e2e: its status is a failure either way, its last line says which.
+  [ "$failed" = 0 ] && say "e2e: partial run ($only): its checks passed — not the module's e2e" || say "e2e: partial run ($only): FAILED"
+  exit 3
+fi
 [ "$failed" = 0 ] && say "e2e: passed" || say "e2e: FAILED"
 exit "$failed"
