@@ -7730,7 +7730,10 @@ def main() -> int:
             and (WORK / "summary-key").read_text() == "none",
             browser.find_element(By.ID, "minutes-tested").text,
         )
-        # OpenRouter's own address, typed under « Avancé » here: no service of the run is asked (D95).
+        # OpenRouter's own address, typed under « Avancé » here: no service of the run is asked (D95) —
+        # every ask of a service's models counted, none made.
+        browser.execute_script("const real = window.__TAURI__.core; window.modelsAsked = 0; window.__TAURI__.core = { ...real,"
+                               " invoke: (asked, ...rest) => { if (asked === 'minutes_models') window.modelsAsked += 1; return real.invoke(asked, ...rest); } }")
         press(browser, "minutes-online")
         key = browser.find_element(By.ID, "minutes-key")
         check("a key is typed where it is not shown, and never filled in", key.get_attribute("type") == "password" and key.get_attribute("value") == "")
@@ -7749,6 +7752,8 @@ def main() -> int:
             online and 'minutes_provider = "https://openrouter.ai/api/v1"' in text and 'minutes_model = "anthropic/claude-sonnet"' in text,
             text,
         )
+        check("saved under « Avancé »: no key test, nothing asked of openrouter.ai", browser.execute_script("return window.modelsAsked") == 0,
+              browser.execute_script("return window.modelsAsked"))
         kept = browser.find_element(By.ID, "minutes-key")
         browser.execute_script("arguments[0].scrollIntoView({block: 'center'})", kept)
         shot(browser, "4-settings-online")
@@ -7802,6 +7807,8 @@ def main() -> int:
         WebDriverWait(browser, 5).until(staleness_of(before))
         said = wait_for(browser, lambda b: b.find_element(By.ID, "not-saved").is_displayed(), 5)
         check("an address that is none is said, and nothing changes", said and window.file.read_text() == text, browser.find_element(By.ID, "not-saved").text)
+        check("to its end, no service asked its models: no request for openrouter.ai left the run", browser.execute_script("return window.modelsAsked") == 0,
+              browser.execute_script("return window.modelsAsked"))
     broken = WORK / "broken"
     broken.mkdir()
     # No window named: a file that cannot be read opens the full one, where it is said (D35).
