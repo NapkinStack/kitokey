@@ -415,7 +415,10 @@ function cancelButton(said, id) {
   cancel.addEventListener("click", async () => {
     cancel.disabled = true;
     cancelledFrom = said.id;
-    await window.__TAURI__.core.invoke("making_cancelled", { name: said.dataset.name }).catch(() => {});
+    await window.__TAURI__.core.invoke("making_cancelled", { name: said.dataset.name }).catch((why) => {
+      said.textContent = fill(words.not_saved, why);
+      cancel.disabled = false;
+    });
     readMakings();
   });
   return cancel;
