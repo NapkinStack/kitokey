@@ -1751,8 +1751,8 @@ const TITLES_TOO_LONG: [&str; 2] = [
     "Les réglages de Wholeheard n’ont pas tous été repris",
 ];
 
-/// The functions that send a notification, each read below with every variant of what it is sent
-/// for: one added to `words.rs` is read there too, or this fails.
+/// The functions of `words.rs` that return a notification, each read below: one added there fails
+/// the title's test until it is named here — and read in `every_notice`, which the review checks.
 const NOTIFYING: [&str; 17] = [
     "of",
     "notice",
@@ -1773,8 +1773,9 @@ const NOTIFYING: [&str; 17] = [
     "fetched",
 ];
 
-/// Every notification of the shell in one language, each variant of what it is sent for read: a
-/// variant added to one of these enums fails to compile here until it is.
+/// Every notification of the shell in one language, each variant of what it is sent for read. Each
+/// enum is matched here without a wildcard: a variant added fails to compile until it is named in
+/// that match — which does not give it a value in the list; the review of the change does.
 fn every_notice(language: Language) -> Vec<Notice> {
     use kitokey_shell::{summarising::Cause, transcription::Made};
     use words::{Minutes, Sides, Trouble};
@@ -1952,11 +1953,29 @@ fn every_notice(language: Language) -> Vec<Notice> {
 #[test]
 fn a_notification_s_title_holds_50_characters() {
     let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/words.rs")).unwrap();
+    // Read over the whole file, not line by line: a signature may span several lines.
     let notifying: Vec<_> = source
-        .lines()
-        .filter_map(|line| {
-            let (head, returns) = line.split_once("fn ")?.1.split_once('(')?;
-            returns.split_once("->")?.1.contains("Notice").then_some(head)
+        .match_indices("fn ")
+        .filter(|(at, _)| source[..*at].ends_with(|c: char| c.is_whitespace()))
+        .filter_map(|(at, _)| {
+            let rest = &source[at + 3..];
+            let name = &rest[..rest.find(|c: char| !(c.is_alphanumeric() || c == '_'))?];
+            // Its parameters, to the parenthesis that closes them; then what it returns, to its body.
+            let (mut depth, mut close) = (0, None);
+            for (index, c) in rest.char_indices().skip_while(|&(_, c)| c != '(') {
+                depth += match c {
+                    '(' => 1,
+                    ')' => -1,
+                    _ => 0,
+                };
+                if depth == 0 {
+                    close = Some(index);
+                    break;
+                }
+            }
+            let after = &rest[close? + 1..];
+            let returns = &after[..after.find(['{', ';'])?];
+            returns.split_once("->")?.1.contains("Notice").then_some(name)
         })
         .collect();
     assert_eq!(

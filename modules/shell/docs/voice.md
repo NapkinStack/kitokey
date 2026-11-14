@@ -16,9 +16,9 @@ worried — a recording that stops, an error.
 | R2 | **The user's words, not the system's.** No jargon, no internal term (lexicon below). | "Others", not "Remote" / « Les autres », pas « À distance » | GNOME HIG; Google, *Tone* |
 | R3 | **Active voice, a clear subject.** Kitokey, or the thing, does the action. | "Kitokey could not open the folder." / « Kitokey n’a pas pu ouvrir le dossier. » | Mailchimp, *Voice and tone*; Google, *Voice* |
 | R4 | **Buttons and menu entries are verbs** that say what will happen. An ellipsis only when another step follows. | "Transcribe", "Choose…" / « Transcrire », « Choisir… » | GNOME HIG (ellipsis); Apple HIG; Material, *UX writing* |
-| R5 | **An error says what happened, then what to do**, never blaming the user, no technical detail — that stays behind *Developer* (`shown_detail`). | "The folder could not be opened. Open it from your file manager." / « Impossible d’ouvrir le dossier. Ouvrez-le depuis votre gestionnaire de fichiers. » | Google, *Writing helpful error messages* |
-| R6 | **One voice, a tone that adapts.** Calm, clear, reassuring. In an error or a worry, reassure first — what goes on, what is not lost —, then the gesture. No humour in an error. | "The meeting’s sound is still recorded." / « Le son de la réunion est toujours enregistré. » | Mailchimp |
-| R7 | **Privacy is said precisely**: what leaves, to whom, what stays. Never vague, never played down. A sentence of this kind is the decider's to settle. | "The text of “Weekly sync” is about to leave your computer" / « Le texte de « Point hebdo » va quitter votre ordinateur » | The product's promise: nothing crosses the network without an agreement |
+| R5 | **An error says what happened, then what to do**, never blaming the user, no technical detail — that stays behind *Developer* (`shown_detail`). | "Kitokey could not open the folder. Open it from your file manager." / « Impossible d’ouvrir le dossier. Ouvrez-le depuis votre gestionnaire de fichiers. » | Google, *Writing helpful error messages* |
+| R6 | **One voice, a tone that adapts.** Calm, clear, reassuring. In an error or a worry, reassure first — what goes on, what is not lost —, then the gesture. No humour in an error. | "The recording goes on; nothing is lost." / « L’enregistrement continue, rien n’est perdu. » | Mailchimp |
+| R7 | **Privacy is said precisely**: what leaves, to whom, what stays. Never vague, never played down. | "The text of “Weekly sync” is about to leave your computer" / « Le texte de « Point hebdo » va quitter votre ordinateur » | The product's promise: nothing crosses the network without an agreement |
 | R8 | **Sentence case everywhere in English** — titles, buttons, menus —, as Google, Material and Windows do; French never capitalises a title. | "Models to download" / « Modèles à télécharger » | Google style; GNOME HIG prefers title case, a deviation taken for one case on three systems |
 | R9 | **One thing, one name, everywhere.** A notification that cites a menu entry cites it word for word. | "Transcribe the last recording" in the menu and in the notification / « Transcrire le dernier enregistrement » dans les deux | GNOME HIG; Apple HIG |
 | R10 | **Accessibility.** An `aria-label` or a tooltip names the action, not the icon. A status reads on its own, without what surrounds it. | "Hide the sidebar" / « Masquer la barre latérale » | Mailchimp, *Writing for accessibility*; Apple HIG |
@@ -53,7 +53,7 @@ worried — a recording that stops, an error.
 | The AI's engine | model — in Settings and *Advanced* only | modèle | "ggml", quantisation, "engine" |
 | The secret | API key | clé d’API | "key" alone, "token" |
 | Where keys are kept | system keychain | trousseau du système | "keyring" (EN) |
-| What the computer plays | the meeting’s sound / others | le son de la réunion / les autres | "remote", "what the machine plays" |
+| What the computer plays | meeting audio / others | le son de la réunion / les autres | "remote", "what the machine plays" |
 | The user's microphone | your microphone | votre micro | "Here" |
 | The icon by the clock | the Kitokey icon | l’icône Kitokey | "tray", « barre système » |
 | A meeting's folder | the meeting’s folder | le dossier de la réunion | "session", "session's folder" |
@@ -65,7 +65,7 @@ worried — a recording that stops, an error.
 ## Templates
 
 - **An error**: *what did not work. What is still safe. The gesture.*
-  "The folder could not be opened. Open it from your file manager." /
+  "Kitokey could not open the folder. Open it from your file manager." /
   « Impossible d’ouvrir le dossier. Ouvrez-le depuis votre gestionnaire de fichiers. »
 - **An error completing a heading** (`failure`): it starts in lower case after the heading's
   « : » and stands as a clause of its own. "…: try again." / « … : réessayez. »
