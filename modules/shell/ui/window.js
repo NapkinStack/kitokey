@@ -426,13 +426,20 @@ function cancelButton(said, id) {
     cancelledFrom = said.id;
     // A refusal said before was the last gesture's: this one says its own.
     document.querySelector(`.note[data-refused="${said.id}"]`)?.remove();
-    await window.__TAURI__.core.invoke("making_cancelled", { name: said.dataset.name }).catch((why) => {
+    const ended = await window.__TAURI__.core.invoke("making_cancelled", { name: said.dataset.name }).then(() => true, (why) => {
       // Said beside the line, which is drawn again as the makings are read: kept until the next gesture.
       said.after(refusalNote(said.id, fill(words.making_cancel_failed, why)));
       cancelledFrom = null;
       cancel.disabled = false;
+      return false;
     });
-    readMakings();
+    // Asked: it ends within two seconds; read again until its line says it, not at the page's
+    // next reading, a second and a half later (D92).
+    for (let tries = 0; tries < (ended ? 15 : 1); tries++) {
+      if (tries > 0) await new Promise((wait) => setTimeout(wait, 200));
+      await readMakings();
+      if (!said.classList.contains("making") && !said.classList.contains("waiting")) break;
+    }
   });
   return cancel;
 }

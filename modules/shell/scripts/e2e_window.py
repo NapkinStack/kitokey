@@ -2217,8 +2217,11 @@ def cancelled_at_once(now: dt.datetime) -> None:
                 check(f"{what}: the version already whole kept, byte for byte, nothing left beside it",
                       wait_for(browser, lambda b: sha(file) == before and sorted(p.name for p in meeting.iterdir()) == listed, 3),
                       sorted(p.name for p in meeting.iterdir()))
-                stopped = browser.execute_script("const s = document.getElementById('making-stopped'); return s ? s.textContent : ''")
-                check(f"{what}: the page says what was stopped", "arrêté" in stopped.lower(), stopped)
+                stopped_said = lambda b: b.execute_script("const s = document.getElementById('making-stopped'); return s ? s.textContent : ''")
+                said_in_time = wait_for(browser, lambda b: "arrêté" in stopped_said(b).lower(), max(0.0, 2 - (time.monotonic() - pressed)))
+                said_after = time.monotonic() - pressed
+                check(f"{what}: the page says what was stopped, within two seconds of « Annuler » ({said_after:.2f} s)",
+                      said_in_time and said_after <= 2, stopped_said(browser))
                 check(f"{what}: a refusal said before is gone with the gesture that followed it",
                       not browser.execute_script("return document.querySelector('.note.warn[data-refused]')"))
                 time.sleep(2)
