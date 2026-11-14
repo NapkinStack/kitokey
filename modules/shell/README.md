@@ -26,6 +26,20 @@ it starts and never reads the code of · grey: files, the only thing it shares w
 **It holds no step** (ADR-0002): closed or crashed, a recording goes on, and every step still
 runs from a terminal.
 
+**A recording found again** (#773, Linux): while one runs, `recording.json` beside the settings keeps
+capture's process number, when the system started it (`/proc/<id>/stat`) and the session's folder,
+written whole once capture says `started`, removed once it has ended. A Kitokey started again after
+its shell was ended reads it: the same number and start — no other program can be that one — is the
+recording in progress, its tray and bar at ■, its length counted from `session.json`'s `started`,
+stopped by a termination signal (`recording/v1`), its transcript following as usual; a `stopped`
+already written is a recording ending. Its levels, devices and silences went with the output of the
+shell that read them: none are shown. A program gone, another under its number or a file that does
+not read finds nothing, and the file is removed; one that cannot be read — a file, or a folder in
+its place — is set aside as `recording.json.unreadable-<seconds>`, never deleted. The session left is
+listed as it is. Not found: a
+recording whose shell was ended before capture said `started`, and on macOS and Windows, which have
+no `/proc`.
+
 **Today**: an icon in the tray whose menu starts and stops a recording, the same from a
 global shortcut — Super+Alt+M under a Linux desktop — and a notification for what matters:
 the reminder to announce the recording, with the microphone recorded named in it — one
