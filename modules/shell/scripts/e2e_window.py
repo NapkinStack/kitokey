@@ -3721,9 +3721,9 @@ def bar_window(now: dt.datetime) -> None:
 
 
 def recording_found(now: dt.datetime) -> None:
-    """BE. A recording left running by a Kitokey ended before this one, found at the start (#773): the bar
+    """BI. A recording left running by a Kitokey ended before this one, found at the start (#773): the bar
     shows it with ■ and its time from the session's own start, and its ■ stops it by a signal."""
-    print("BE. a recording left running by an ended Kitokey: the bar shows ■ and its time from its real start, and stops it (#773)")
+    print("BI. a recording left running by an ended Kitokey: the bar shows ■ and its time from its real start, and stops it (#773)")
     taping = WORK / "recording-found"
     taping.mkdir()
     folder = taping / "2026-11-13_09-00"
@@ -3790,7 +3790,7 @@ def recording_found_not_forgotten(now: dt.datetime) -> None:
     started = dt.datetime.now().astimezone() - dt.timedelta(seconds=90)
     stamp = started.isoformat(timespec="seconds")
     (folder / "session.json").write_text(json.dumps({"contract": "session-audio/v3", "started": stamp, "tracks": {}}))
-    # The recorder left running, as BE plays it: stopped by a signal that writes `stopped`.
+    # The recorder left running, as BI plays it: stopped by a signal that writes `stopped`.
     script = (
         "trap '' PIPE\n"
         "trap 'printf %s \"$2\" > \"$1/session.json\"; exit 0' TERM INT\n"
