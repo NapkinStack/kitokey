@@ -2517,6 +2517,12 @@ def models_advanced(now: dt.datetime) -> None:
             check("Settings unchanged by any of it", window.file.read_text() == before, window.file.read_text())
             # Stopped by ■: nothing kept for the next, nothing said kept — as the shell has it.
             wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+            # Stopped with « Avancé » open on that meeting's models: drawn again for the next recording,
+            # closed, Settings' first — never left open on the meeting that ended (#766, P5).
+            rest = wait_for(browser, lambda b: b.execute_script(shown, "small")["heard"] == "Réglages : Whisper adv settings", 3)
+            got = browser.execute_script(shown, "small")
+            check("stopped by ■ with « Avancé » open: drawn again for the next recording, closed, Settings' first",
+                  rest and got["expanded"] == "false" and got["written"] == "Réglages : Qwen3 14b", got)
             none_kept = lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
             quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
             check("stopped by ■: no models kept for the next, and none said kept", quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
@@ -2539,8 +2545,22 @@ def models_advanced(now: dt.datetime) -> None:
                 tray_click("Démarrer")
                 wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
                 time.sleep(0.6)
+                # « Avancé » opened on this meeting's models, then stopped from the tray: the bar's own
+                # stop is not the only one that draws it again for the next (#766, P5).
+                wait_for(browser, lambda b: b.execute_script(shown, "small")["expanded"] == "false", 5)
+                time.sleep(0.5)
+                if browser.execute_script("return document.getElementById('small-options').hidden"):
+                    browser.execute_script("document.getElementById('small-more').click()")
+                browser.execute_script("document.getElementById('small-advanced').click()")
+                ours = wait_for(browser, lambda b: b.execute_script(shown, "small")["written"] == "Mistral 7b — sur cet ordinateur"
+                                and b.execute_script(shown, "small")["expanded"] == "true", 5)
+                check("recording from the tray: « Avancé » open on this meeting's models", ours, browser.execute_script(shown, "small"))
                 tray_click("Arrêter l’enregistrement")
                 wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+                rest = wait_for(browser, lambda b: b.execute_script(shown, "small")["written"] == "Réglages\u00a0: Qwen3 14b", 3)
+                got = browser.execute_script(shown, "small")
+                check("stopped from the tray with « Avancé » open: drawn again for the next recording, closed, Settings' first",
+                      rest and got["expanded"] == "false" and got["heard"] == "Réglages\u00a0: Whisper adv settings", got)
                 quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
                 check("started and stopped from the tray's icon: no models kept for the next, and none said kept",
                       quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
@@ -2553,6 +2573,9 @@ def models_advanced(now: dt.datetime) -> None:
                 check("started again after a recording took them: no models kept, none said, nothing on disk",
                       none_kept(browser) == {} and browser.execute_script(line) is None and not next_models.exists(),
                       [none_kept(browser), browser.execute_script(line), next_models.exists()])
+                got = browser.execute_script(shown, "small")
+                check("started again: « Avancé » closed, Settings' first in both lists",
+                      got["expanded"] == "false" and got["heard"] == "Réglages\u00a0: Whisper adv settings" and got["written"] == "Réglages\u00a0: Qwen3 14b", got)
                 wait_for(None, lambda b: (meeting / "transcript.jsonl").exists(), 15)
                 wait_for(browser, lambda b: b.execute_script(idle), 15)
             finally:
@@ -3592,6 +3615,57 @@ def bar_window(now: dt.datetime) -> None:
         browser.execute_script("window.__TAURI__.core.invoke('full_window', {page: '#/settings'})")
         check("hidden, then closed for the full window on a page: « Afficher la barre » leaves the menu",
               wait_for(None, lambda b: "Afficher la barre" not in tray_labels(), 5), tray_labels())
+
+
+def recording_found(now: dt.datetime) -> None:
+    """BE. A recording left running by a Kitokey ended before this one, found at the start (#773): the bar
+    shows it with ■ and its time from the session's own start, and its ■ stops it by a signal."""
+    print("BE. a recording left running by an ended Kitokey: the bar shows ■ and its time from its real start, and stops it (#773)")
+    taping = WORK / "recording-found"
+    taping.mkdir()
+    folder = taping / "2026-11-13_09-00"
+    folder.mkdir()
+    started = dt.datetime.now().astimezone() - dt.timedelta(seconds=90)
+    stamp = started.isoformat(timespec="seconds")
+    (folder / "session.json").write_text(json.dumps({"contract": "session-audio/v3", "started": stamp, "tracks": {}}))
+    # The recorder as the real one is once its shell is gone: no input, no one reading it, stopped by a signal
+    # that writes `stopped` (recording/v1, session-audio).
+    script = (
+        "trap '' PIPE\n"
+        "trap 'echo signal > \"$1/told\"; printf %s \"$2\" > \"$1/session.json\"; exit 0' TERM INT\n"
+        "while :; do sleep 0.1 & wait $!; done\n"
+    )
+    ended = json.dumps({"contract": "session-audio/v3", "started": stamp, "stopped": dt.datetime.now().astimezone().isoformat(timespec="seconds"), "tracks": {}})
+    recorder = subprocess.Popen(["sh", "-c", script, "sh", str(folder), ended], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    try:
+        since = int(Path(f"/proc/{recorder.pid}/stat").read_text().rsplit(")", 1)[1].split()[19])
+        window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True)
+        kept = window.file.parent / "recording.json"
+        kept.write_text(json.dumps({"id": recorder.pid, "since": since, "folder": str(folder)}))
+        begun = time.monotonic()
+        with window as browser:
+            shown = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+            check("found at the start: the bar shows ■, ● gone, the tray's icon red",
+                  shown and not browser.find_element(By.ID, "small-record").is_displayed() and tray_colour() == "red", tray_colour())
+            clock = browser.find_element(By.CSS_SELECTOR, "#small .time").text
+            parts = clock.split(":")
+            seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2]) if len(parts) == 3 and all(p.isdigit() for p in parts) else -1
+            upper = 90 + (time.monotonic() - begun) + 2
+            check("its time counted from the session's start, not from Kitokey's", 90 <= seconds <= upper, (clock, upper))
+            check("the recorder is not told anything by being found", recorder.poll() is None and not (folder / "told").exists())
+            stop_from_small(browser)
+            gone = wait_for(None, lambda b: recorder.poll() is not None, 10)
+            check("■ in the bar stops it by a termination signal, as the line stop would", gone and recorder.returncode == 0
+                  and (folder / "told").read_text().strip() == "signal", recorder.returncode)
+            check("its session says stopped", "stopped" in json.loads((folder / "session.json").read_text()))
+            back = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and tray_colour() == "blue", 10)
+            check("the bar and the tray back at rest", back, tray_colour())
+            check("nothing kept for the next start", wait_for(None, lambda b: not kept.exists(), 5))
+    finally:
+        if recorder.poll() is None:
+            recorder.kill()
+        recorder.wait()
 
 
 def bar_opened(now: dt.datetime) -> None:
@@ -8782,6 +8856,7 @@ def main() -> int:
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
+    recording_found(now)
     context_before_start(now)
     own_models(now)
     models_advanced(now)

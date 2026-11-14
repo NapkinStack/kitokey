@@ -308,6 +308,11 @@ evidence:
     - pattern: '"message":"shell\.microphones_unread"'
       level: warning
       scenario: AO
+    # The window's AO records with the settings' folder unwritable: the recording is not kept for a
+    # Kitokey started again to find (#773).
+    - pattern: '"message":"shell\.recording_not_kept"'
+      level: warning
+      scenario: AO
     # The window's AN starts a recording with no microphone to open, its side said waiting (D49).
     - pattern: '"message":"shell\.recording_unavailable"'
       level: warning
