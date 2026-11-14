@@ -197,6 +197,36 @@ TEST_CAUSES = [
     ("provider.down", "Le fournisseur répond qu’il est en panne\u00a0: réessayez plus tard. Sur cet ordinateur, ce modèle est peut-être trop gros pour la mémoire\u00a0: choisissez-en un plus petit."),
     ("provider.unreachable", "Le fournisseur n’a pas pu être joint\u00a0: vérifiez qu’il tourne, ou le réseau, puis réessayez."),
 ]
+# Settings in at most three groups (D95): each group's heading, in order — the trial's line is no group; and the group the
+# transcription model's state is said in — no card of its own any more (#782).
+SETTINGS_GROUPS = """return [[...document.querySelectorAll('#settings > section:has(> h2)')].map(s => s.querySelector('h2')?.textContent ?? ''),
+  document.getElementById('model-state')?.closest('#settings > section')?.querySelector('h2')?.textContent ?? null,
+  document.getElementById('developer')?.closest('#settings > section')?.querySelector('h2')?.textContent ?? null,
+  document.getElementById('developer')?.getClientRects().length ?? null,
+  [...document.querySelectorAll('#settings .name')].filter(n => n.textContent === arguments[0])
+    .map(n => [n.closest('#settings > section')?.querySelector('h2')?.textContent ?? null, n.closest('.card') === n.closest('#settings > section')])]"""
+# Whatever of Settings goes past its card or the window: each element's box measured, and a box
+# whose text spills past it — not the page's scroll alone, which saw nothing at 420 px (#782).
+SETTINGS_OVERFLOW = """const out = [], width = document.documentElement.clientWidth;
+for (const card of document.querySelectorAll('#settings > *')) {
+  if (!card.getClientRects().length) continue;
+  const c = card.getBoundingClientRect();
+  if (c.left < -0.5 || c.right > width + 0.5) out.push(`card ${card.id || card.className}: ${Math.round(c.left)}–${Math.round(c.right)} of ${width}`);
+  for (const e of card.querySelectorAll('*')) {
+    if (e.tagName === 'OPTION' || !e.getClientRects().length) continue;
+    const r = e.getBoundingClientRect();
+    // A box that holds more than its width — spilling, hidden or scrolled —, but a field, which scrolls its own text.
+    const spills = !['INPUT', 'SELECT', 'TEXTAREA'].includes(e.tagName) && e.clientWidth > 0 && e.scrollWidth > e.clientWidth + 1;
+    if (r.width > 0 && (r.left < c.left - 0.5 || r.right > c.right + 0.5) || spills)
+      out.push(`${e.id || e.className || e.tagName}: ${Math.round(r.left)}–${Math.round(r.right)} in ${Math.round(c.left)}–${Math.round(c.right)}${spills ? ', spills' : ''}`);
+  }
+}
+return out.slice(0, 12)"""
+# Settings' column and the room its parent gives it, inside its padding and scroll bar.
+SETTINGS_CENTRED = """const s = document.getElementById('settings').getBoundingClientRect(), p = s && document.getElementById('settings').parentElement;
+const r = p.getBoundingClientRect(), cs = getComputedStyle(p);
+const left = r.left + p.clientLeft + parseFloat(cs.paddingLeft), right = r.left + p.clientLeft + p.clientWidth - parseFloat(cs.paddingRight);
+return [s.left, s.right, left, right]"""
 MONTHS_FR = "janvier février mars avril mai juin juillet août septembre octobre novembre décembre".split()
 # The page's ground, as `ui/window.css` sets it in each theme.
 GROUND = {"light": "rgb(242, 244, 247)", "dark": "rgb(21, 23, 28)"}
@@ -276,6 +306,13 @@ def tester_click(browser, element_id: str, case: str) -> None:
         if wait_for(browser, lambda b: b.execute_script(CLICKS_COUNTED, element_id) > before, 1):
             return
     check(f"Tester never started for {case}", False, f"#{element_id} clicked twice, no click taken")
+
+
+def advanced_unfolded(browser):
+    """Settings' « Avancé », folded at the bottom of « Général » (D95), unfolded; its developer switch."""
+    if browser.find_element(By.ID, "general-advanced").get_attribute("aria-expanded") != "true":
+        press(browser, "general-advanced")
+    return browser.find_element(By.ID, "developer")
 
 
 def context_opened(browser):
@@ -1161,6 +1198,7 @@ def service_named(now: dt.datetime) -> None:
         code.write_text(TEST_CAUSES[-1][0])
         try:
             before = browser.find_element(By.ID, "transcription-said")
+            advanced_unfolded(browser)
             press(browser, "developer")
             WebDriverWait(browser, 5).until(staleness_of(before))
             free(browser, "transcription-test", "a service in developer mode")
@@ -1839,6 +1877,29 @@ echo '{{"available":true,"installed":true,"supported":true}}'
                   [o.text for o in pick.options] == ["Langue du système", "Français", "English"]
                   and pick.first_selected_option.get_attribute("value") == "" and label == "Langue de Kitokey",
                   ([o.text for o in pick.options], label))
+            grouped = browser.execute_script(SETTINGS_GROUPS, "Modèle de transcription")
+            check("Settings in three groups, in order; the model's state said once, a line of « Modèles », no card of its own (#782);"
+                  " « Avancé » folded in « Général » (D95)",
+                  grouped == [["Après un enregistrement", "Modèles", "Général"], "Modèles", "Général", 0, [["Modèles", True]]], grouped)
+            # The keyboard alone (WAI-ARIA APG, Disclosure): Tab from Settings' top to « Avancé », Enter
+            # unfolds it, Tab reaches its switch; each stop's focus seen.
+            browser.execute_script("document.querySelector('#settings input, #settings select, #settings button').focus()")
+            stop = "const e = document.activeElement; return [e.id || e.className || e.tagName, e.matches(':focus-visible')]"
+            stops = []
+            for _ in range(80):
+                ActionChains(browser).send_keys(Keys.TAB).perform()
+                stops.append(browser.execute_script(stop))
+                if stops[-1][0] == "general-advanced":
+                    break
+            ActionChains(browser).send_keys(Keys.ENTER).perform()
+            opened = browser.find_element(By.ID, "general-advanced").get_attribute("aria-expanded")
+            ActionChains(browser).send_keys(Keys.TAB).perform()
+            stops.append(browser.execute_script(stop))
+            print(f"        Settings' stops: {[name for name, _ in stops]}")
+            check("by the keyboard alone: Tab reaches « Avancé », Enter unfolds it, Tab reaches its switch; the focus seen at each stop (D95)",
+                  stops[-2][0] == "general-advanced" and opened == "true" and stops[-1][0] == "developer" and all(seen_ for _, seen_ in stops),
+                  (opened, [s_ for s_ in stops if not s_[1]] or stops[-3:]))
+            press(browser, "general-advanced")
             redo(browser)
             wait_for(browser, lambda b: "Transcription prête" in notified.read_text(), 15)
             before = by_settings(browser, "Transcription prête")
@@ -1853,6 +1914,9 @@ echo '{{"available":true,"installed":true,"supported":true}}'
                   saved and spoken and label == "Language of Kitokey"
                   and browser.execute_script("return document.activeElement.id") == "app-language",
                   (window.file.read_text(), sections(browser), label))
+            grouped = browser.execute_script(SETTINGS_GROUPS, "Transcription model")
+            check("in English too: three groups, in order (D95)",
+                  grouped == [["After a recording", "Models", "General"], "Models", "General", 0, [["Models", True]]], grouped)
             check("the tray's menu speaks it at once, with no restart", wait_for(browser, lambda b: tray_labels() == english, 5), tray_labels())
             mark = len(notified.read_text())
             after = by_settings(browser, "Transcript ready")
@@ -4854,6 +4918,31 @@ def two_panes(now: dt.datetime) -> None:
         browser.find_element(By.CSS_SELECTOR, "#pane .back").click()
         again = wait_for(browser, lambda b: b.find_element(By.ID, "sidebar").is_displayed() and not b.find_element(By.ID, "pane").is_displayed(), 10)
         check("the way back is the list again", again)
+        # Settings from 1920 to 420 px (D95): centred at a maximum width; nothing past its card or the window.
+        browser.execute_script("location.hash = '#/settings'")
+        for width in (1920, 840, 600, 420):
+            browser.set_window_size(width, 900)
+            drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "app-language") and b.find_element(By.ID, "app-language").is_displayed(), 10)
+            over = browser.execute_script(SETTINGS_OVERFLOW)
+            check(f"Settings, {width} px wide: nothing past its card or the window, each box measured (D95, #782)", drawn and over == [], over)
+            if width == 420:
+                # « Avancé » unfolded, the developer mode on: the logs' level and folder measured too.
+                advanced_unfolded(browser).click()
+                logs = wait_for(browser, lambda b: b.find_elements(By.ID, "open-logs") and b.find_element(By.ID, "open-logs").is_displayed(), 5)
+                over = browser.execute_script(SETTINGS_OVERFLOW)
+                check("Settings, 420 px, « Avancé » unfolded and the developer mode on: nothing past its card or the window (D95)", logs and over == [], over)
+                advanced_unfolded(browser).click()
+                wait_for(browser, lambda b: not b.find_elements(By.ID, "open-logs"), 5)
+            if width in (1920, 420):
+                seen(browser, f"d95-settings-{width}-light")
+                seen(browser, f"d95-settings-{width}-dark")
+            if width == 1920:
+                left, right, room_left, room_right = browser.execute_script(SETTINGS_CENTRED)
+                check("Settings at 1920 px: one column centred in the room it has, not stuck to its left (D95, #782)",
+                      abs((left + right) / 2 - (room_left + room_right) / 2) <= 1 and right - left < room_right - room_left - 100,
+                      (left, right, room_left, room_right))
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "sidebar").is_displayed(), 10)
         browser.set_window_size(1100, 800)
         find = browser.find_element(By.ID, "find")
         find.send_keys("zzz")
@@ -7377,7 +7466,10 @@ def main() -> int:
         # The user changes the file by hand while Kitokey runs: the next save keeps it.
         window.file.write_text(window.file.read_text().replace("keep_audio = 30", "keep_audio = 90 # by hand"))
         changed(lambda: browser.find_element(By.ID, "reminder").click())
-        changed(lambda: browser.find_element(By.ID, "developer").click())
+        changed(lambda: advanced_unfolded(browser).click())
+        # Drawn again by the switch: « Avancé » still unfolded — read, never pressed (D95).
+        unfolded = read(browser, lambda b: b.find_element(By.ID, "general-advanced").get_attribute("aria-expanded"))
+        check("the developer mode turned on: Settings drawn again, « Avancé » still unfolded (D95)", unfolded == "true", unfolded)
         # When an application takes the microphone (D30, board 4): offer to record by default;
         # nothing chosen here, then the offer again, each written.
         offer_on = read(browser, lambda b: Select(b.find_element(By.ID, "offer")).first_selected_option.get_attribute("value")) == "offer"
@@ -7422,7 +7514,7 @@ def main() -> int:
         check("the logs' level chosen is in the file", 'log = "debug"' in window.file.read_text(), window.file.read_text())
         changed(lambda: Select(browser.find_element(By.ID, "log-level")).select_by_value("info"))
         check("the usual level chosen again is in the file", 'log = "info"' in window.file.read_text(), window.file.read_text())
-        changed(lambda: browser.find_element(By.ID, "developer").click())
+        changed(lambda: advanced_unfolded(browser).click())
         check("the developer mode turned off again is said so in the file, and hides its rows",
               "developer = false" in window.file.read_text() and not browser.find_elements(By.ID, "log-level"), window.file.read_text())
         failed = browser.find_element(By.ID, "not-saved").is_displayed()
@@ -7510,7 +7602,7 @@ def main() -> int:
         window.file.write_text(held)
         browser.execute_script("window.dispatchEvent(new Event('focus'))")
         wait_for(browser, lambda b: not b.find_element(By.ID, "reminder").get_attribute("disabled"), 5)
-        changed(lambda: browser.find_element(By.ID, "developer").click())
+        changed(lambda: advanced_unfolded(browser).click())
         check("developer mode on again, to read a failure", "developer = true" in window.file.read_text(), window.file.read_text())
         held = window.file.read_text()
         lines = [line for line in held.splitlines() if not line.startswith("keep_audio")] + ["keep_audio = 0"]
@@ -7633,13 +7725,13 @@ def main() -> int:
                 # A second test in flight once the sentence is read: the next case waits for it (#799).
                 tester_click(browser, "minutes-test", f"the minutes, {cause} again")
             # In developer mode, the sentence and the program's last line, its name off.
-            changed(lambda: browser.find_element(By.ID, "developer").click())
+            changed(lambda: advanced_unfolded(browser).click())
             free(browser, "minutes-test", "the minutes in developer mode")
             tester_click(browser, "minutes-test", "the minutes in developer mode")
             raw = wait_for(browser, lambda b: "raw words of the provider" in b.find_element(By.ID, "minutes-tested").get_attribute("textContent"), 10)
             told = browser.find_element(By.ID, "minutes-tested").get_attribute("textContent")
             check("Tester in developer mode: the cause, then the raw line alone", raw and told.startswith(TEST_CAUSES[-1][1]) and "kitokey-summary:" not in told and "earlier line" not in told, told)
-            changed(lambda: browser.find_element(By.ID, "developer").click())
+            changed(lambda: advanced_unfolded(browser).click())
             text = window.file.read_text()
         finally:
             code.unlink(missing_ok=True)
@@ -7953,6 +8045,7 @@ def main() -> int:
               (state(browser), heard.read_text()[-400:]))
         # The developer mode shows what the program said, under the sentence; never in a notice (D29).
         to_settings()
+        advanced_unfolded(browser)
         press(browser, "developer")
         wait_for(browser, lambda b: "developer = true" in window.file.read_text(), 5)
         browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
@@ -7968,6 +8061,7 @@ def main() -> int:
         check("and each track's level, after the logs: one line a track, numbers only",
               lines.count('"type":"levels"') == 2 and lines.rstrip().endswith("}") and '"track":"remote"' in lines.splitlines()[-1], lines[-400:])
         to_settings()
+        advanced_unfolded(browser)
         press(browser, "developer")
         wait_for(browser, lambda b: "developer = false" in window.file.read_text(), 5)
         settled = window.file.read_text()

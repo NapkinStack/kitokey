@@ -471,8 +471,10 @@ pub struct Window {
     /// turned back on; by a policy.
     pub autostart_held: [&'static str; 2],
     pub keep_audio: [&'static str; 2],
-    /// The settings' last card, and its one switch: what a program said of a failure, shown on
-    /// the page under the sentence (D29).
+    /// The settings' last group: Kitokey itself, as GNOME's preferences name it (D95).
+    pub general_title: &'static str,
+    /// Folded at the bottom of « Général », and its one switch: what a program said of a failure,
+    /// shown on the page under the sentence (D29).
     pub advanced_title: &'static str,
     pub developer: [&'static str; 2],
     /// Under a making not made, in developer mode: what its program said ({}).
@@ -928,6 +930,7 @@ pub fn window(language: Language) -> Window {
                 "Turned off in Windows: turn it back on in Settings › Apps › Startup.",
                 "Set by your organisation: it cannot be changed here.",
             ],
+            general_title: "General",
             advanced_title: "Advanced",
             developer: [
                 "Developer mode",
@@ -1351,6 +1354,7 @@ pub fn window(language: Language) -> Window {
                 "Désactivé dans Windows\u{a0}: réactivez-le dans Paramètres › Applications › Démarrage.",
                 "Défini par votre organisation\u{a0}: il ne peut pas être changé ici.",
             ],
+            general_title: "Général",
             advanced_title: "Avancé",
             developer: [
                 "Mode développeur",
