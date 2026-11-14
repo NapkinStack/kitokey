@@ -3477,13 +3477,17 @@ function showSmall(words) {
     if (toggle && modelsKept.hidden) toggle.removeAttribute("aria-describedby");
     else if (toggle) toggle.setAttribute("aria-describedby", modelsKept.id);
   };
+  // Each ask numbered: an answer come after a later ask's is neither drawn nor said — the later one
+  // is (#815). Ollama answering late, an older answer, come last, closed « Avancé » under the user.
+  let advancedAsked = 0;
   const advancedOf = async (opened) => {
     const name = meeting.name;
+    const asked = ++advancedAsked;
     const offered = await invoke("models_offered", { name }).catch((why) => {
-      smallSaid("models", fill(words.models_not_read, why));
+      if (asked === advancedAsked) smallSaid("models", fill(words.models_not_read, why));
       return null;
     });
-    if (offered === null) return;
+    if (offered === null || asked !== advancedAsked) return;
     smallSaid("models", null);
     // Asked for another meeting than the bar's now — a start or a stop meanwhile —: the later ask draws.
     if (meeting.name !== name) return;
