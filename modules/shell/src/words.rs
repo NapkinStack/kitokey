@@ -472,6 +472,7 @@ pub struct Window {
     pub autostart_held: [&'static str; 2],
     pub keep_audio: [&'static str; 2],
     /// The settings' last group: Kitokey itself, as GNOME's preferences name it (D95).
+    /// Shows: Settings, as a heading. When: always. At most: no limit. Placeholders: none.
     pub general_title: &'static str,
     /// Folded at the bottom of « Général », and its one switch: what a program said of a failure,
     /// shown on the page under the sentence (D29).
