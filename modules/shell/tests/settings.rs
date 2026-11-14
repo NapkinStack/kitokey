@@ -11,7 +11,7 @@ fn written(text: &str) -> Result<Settings, String> {
     let folder = tempfile::tempdir().unwrap();
     let path = folder.path().join("settings.toml");
     fs::write(&path, text).unwrap();
-    read(&path).map_err(|said| said.replace(&path.display().to_string(), "<file>"))
+    read(&path).map_err(|unread| unread.detail.replace(&path.display().to_string(), "<file>"))
 }
 
 #[test]
@@ -74,7 +74,66 @@ fn a_file_that_is_not_settings_is_said_in_one_sentence_and_not_used() {
     }
     // A file that is there and cannot be read is said too, not taken for no file.
     let folder = tempfile::tempdir().unwrap();
-    assert!(read(folder.path()).unwrap_err().contains("cannot be read"));
+    assert!(read(folder.path()).unwrap_err().detail.contains("cannot be read"));
+}
+
+/// What the user is told of a file refused (#783) is which setting, on which line: the sentence
+/// above stays for the log and developer mode. A key is named only when it is one of Kitokey's —
+/// never what the user typed in its place.
+#[test]
+fn a_file_refused_names_the_setting_and_its_line() {
+    use kitokey_shell::settings::Refused;
+    let refused = |text: &str| {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("settings.toml");
+        fs::write(&path, text).unwrap();
+        read(&path).unwrap_err().refused
+    };
+    for (text, expected) in [
+        ("keep_audio = 0\n", Refused::KeepAudio { line: 1 }),
+        ("reminder = false\nkeep_audio = \"never\"\n", Refused::KeepAudio { line: 2 }),
+        ("reminder = false\nsessions = \"Kitokey\"\n", Refused::SessionsNotWhole { line: 2 }),
+        ("model = \"ggml.bin\"\n", Refused::ModelNotWhole { line: 1 }),
+        (
+            "# mine\ndeveloper = \"yes\"\n",
+            Refused::Unparsed {
+                line: 2,
+                key: Some("developer"),
+            },
+        ),
+        (
+            "after = \"sometimes\"\n",
+            Refused::Unparsed {
+                line: 1,
+                key: Some("after"),
+            },
+        ),
+        (
+            "  bar_at = [1]\n",
+            Refused::Unparsed {
+                line: 1,
+                key: Some("bar_at"),
+            },
+        ),
+        (
+            "reminder = false\nreminder = true\n",
+            Refused::Unparsed {
+                line: 2,
+                key: Some("reminder"),
+            },
+        ),
+        ("this is not TOML\n", Refused::Unparsed { line: 1, key: None }),
+        ("reminder = true\n= 3\n", Refused::Unparsed { line: 2, key: None }),
+        (
+            "# é\r\nreminder = true\r\n\r\n[sessions]\r\nx = 1\r\n",
+            Refused::Unparsed { line: 4, key: None },
+        ),
+        ("my secret = 3\n", Refused::Unparsed { line: 1, key: None }),
+    ] {
+        assert_eq!(refused(text), expected, "{text:?}");
+    }
+    let folder = tempfile::tempdir().unwrap();
+    assert_eq!(read(folder.path()).unwrap_err().refused, Refused::Unopened);
 }
 
 #[test]
@@ -617,7 +676,7 @@ fn a_failure_of_the_settings_file_names_it_without_its_path_even_through_a_link(
     let folder = tempfile::tempdir().unwrap();
     let file = folder.path().join("settings.toml");
     fs::write(&file, "keep_audio = 0\n").unwrap();
-    let said = read(&file).unwrap_err();
+    let said = read(&file).unwrap_err().detail;
     assert_eq!(
         unnamed(&said, &file),
         "settings.toml, line 1: keep_audio is \"always\" or a number of days"
