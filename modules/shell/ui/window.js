@@ -2019,6 +2019,8 @@ function choice(name, value, [label, says], checked, disabled) {
 // Who writes the minutes: picked from what Ollama holds, an online service, or the user's own
 // address; a key goes to the system's keyring, and the page never receives one back.
 let testing = false;
+// Settings' « Avancé » unfolded: kept while Settings are drawn again, as a choice there redraws them.
+let generalAdvanced = false;
 
 function minutesRow(minutes, words, locked) {
   const box = element("div", "step");
@@ -2264,15 +2266,17 @@ function showSettings(shown, minutes, words) {
   }
 
   const after = element("section", "card group");
-  after.setAttribute("role", "radiogroup");
   const afterTitle = element("h2", "", words.after_title);
   afterTitle.id = "after-title";
-  after.setAttribute("aria-labelledby", "after-title");
-  after.append(afterTitle);
+  // The radios alone in the group named by the heading: the folder and the sound kept follow them.
+  const made = element("div", "choices");
+  made.setAttribute("role", "radiogroup");
+  made.setAttribute("aria-labelledby", "after-title");
+  after.append(afterTitle, made);
   for (const [value, said] of [["nothing", words.after_nothing], ["transcript", words.after_transcript], ["minutes", words.after_minutes]]) {
     const one = choice("after", value, said, shown.after === value, locked);
     one.querySelector("input").addEventListener("change", () => save({ after: value }));
-    after.append(one);
+    made.append(one);
   }
   parts.push(after);
 
@@ -2288,7 +2292,6 @@ function showSettings(shown, minutes, words) {
   redoButton.disabled = locked;
   redoButton.addEventListener("click", () => (location.hash = "#/welcome/again"));
   redo.append(redoSaid, redoButton);
-  models.append(redo);
   const step = element("div", "step");
   const row = element("div", "row");
   const label = element("label", "name", words.transcription);
@@ -2574,7 +2577,21 @@ function showSettings(shown, minutes, words) {
   spokenPick.value = shown.meeting_language ?? "";
   spokenPick.addEventListener("change", () => save({ meeting_language: spokenPick.value }));
   spokenRow.append(spokenLabel, spokenPick);
-  step.append(row, speech, service, here, spokenRow);
+  // The transcription model's state, under its choice: there and ready; else said, and offered, by
+  // paintModel — a line of this step, no card of its own (D95, #782).
+  const chosen = shown.models.find((model) => model.path === shown.model);
+  const state = element("div", "row state");
+  const stateSaid = element("div", "said");
+  stateSaid.append(
+    element("span", "name", words.model_state),
+    element("span", "says", chosen ? fill(words.model_here, size(chosen.bytes, words)) : ""),
+  );
+  state.append(stateSaid);
+  if (chosen) state.append(readySaid(words.model_ready));
+  else state.dataset.missing = "true";
+  state.id = "model-state";
+  paintModel(state);
+  step.append(row, state, speech, service, here, spokenRow);
   // The short list of models to download, each said by what it is good for (D37).
   const offered = element("ul", "offered");
   offered.id = "offered";
@@ -2623,6 +2640,7 @@ function showSettings(shown, minutes, words) {
   parts.push(models);
 
   const more = element("section", "card group");
+  more.append(element("h2", "", words.general_title));
   const remind = element("label", "row");
   const box = element("input");
   box.type = "checkbox";
@@ -2805,27 +2823,27 @@ function showSettings(shown, minutes, words) {
   checkButton.addEventListener("click", () => checkSound(words, checkButton));
   check.append(checkSaid, checkButton);
   // Outside Windows' package, no startup task: nothing offered (D84).
-  more.append(speaks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, where, keep);
-  parts.push(more);
+  more.append(speaks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
+  // What becomes of a recording: where it goes and how long its sound stays, after what is made.
+  after.append(where, keep);
 
-  // The transcription model's state: there and ready; else said, and offered, by paintModel.
-  const chosen = shown.models.find((model) => model.path === shown.model);
-  const state = element("section", "card group state");
-  const stateSaid = element("div", "said");
-  stateSaid.append(
-    element("span", "name", words.model_state),
-    element("span", "says", chosen ? fill(words.model_here, size(chosen.bytes, words)) : ""),
-  );
-  state.append(stateSaid);
-  if (chosen) state.append(readySaid(words.model_ready));
-  else state.dataset.missing = "true";
-  state.id = "model-state";
-  paintModel(state);
-  parts.push(state);
-
-  // Last, for whoever looks into a failure: the developer mode (D29).
-  const advanced = element("section", "card group");
-  advanced.append(element("h2", "", words.advanced_title));
+  // Last, for whoever looks into a failure: the developer mode (D29), folded at the bottom of
+  // « Général » (D95) — a disclosure (ARIA APG), as the redo panel's « Avancé ».
+  const toggle = element("button", "disclose-advanced");
+  toggle.type = "button";
+  toggle.id = "general-advanced";
+  toggle.setAttribute("aria-controls", "general-advanced-panel");
+  toggle.append(icon("chevron-right"), element("span", "", words.advanced_title));
+  const advanced = element("div", "general-advanced");
+  advanced.id = "general-advanced-panel";
+  const unfold = (now) => {
+    generalAdvanced = now;
+    toggle.setAttribute("aria-expanded", String(now));
+    toggle.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
+    advanced.hidden = !now;
+  };
+  toggle.addEventListener("click", () => unfold(!generalAdvanced));
+  unfold(generalAdvanced);
   const developer = element("label", "row");
   const developerBox = element("input");
   developerBox.type = "checkbox";
@@ -2870,7 +2888,8 @@ function showSettings(shown, minutes, words) {
     logs.append(logsSaid, openLogs);
     advanced.append(level, logs);
   }
-  parts.push(advanced);
+  more.append(toggle, advanced);
+  parts.push(more);
   page.replaceChildren(...parts);
   if (focusLanguage) {
     focusLanguage = false;
