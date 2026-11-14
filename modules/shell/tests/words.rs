@@ -1283,8 +1283,12 @@ fn context(comment: &str) -> bool {
 /// Every sentence of `src/words.rs`: each string literal of a function, its escapes read as the
 /// compiler reads them, with the comment that covers it.
 fn sentences() -> Vec<Sentence> {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/words.rs");
-    let source: Vec<char> = std::fs::read_to_string(path).unwrap().chars().collect();
+    sentences_in(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/words.rs")).unwrap())
+}
+
+/// The sentences of a source written as `words.rs` is.
+fn sentences_in(source: &str) -> Vec<Sentence> {
+    let source: Vec<char> = source.chars().collect();
     let mut found = Vec::new();
     let mut fields = std::collections::HashMap::new();
     let (mut function, mut structure, mut keyword, mut word_before) = (String::new(), String::new(), String::new(), String::new());
@@ -1411,6 +1415,8 @@ fn sentences() -> Vec<Sentence> {
             });
             place += 1;
         }
+        // Only the literal right after a word of the code is the code's: the next one is read.
+        word_before.clear();
     }
     found
 }
@@ -1489,6 +1495,27 @@ fn still_wrong(rule: &str, found: Vec<String>) {
     assert_eq!(
         found, listed,
         "`{rule}`: a key listed once more or once less than it breaks the rule"
+    );
+}
+
+/// Only the literal right after `expect`, `eq_ignore_ascii_case` or `target_os` is the code's: a
+/// sentence after it is still read (the verifier's probes on #812).
+#[test]
+fn a_literal_of_the_code_leaves_the_sentence_after_it_read() {
+    let read = |source: &str| sentences_in(source).into_iter().map(|sentence| sentence.text).collect::<Vec<_>>();
+    assert_eq!(
+        read("fn opened() -> &'static str {\n    if cfg!(target_os = \"linux\") { \"Can't open it on Linux\" } else { \"Open it\" }\n}\n"),
+        ["Can't open it on Linux", "Open it"]
+    );
+    assert_eq!(
+        read(
+            "fn said(code: &str) -> &'static str {\n    if code.eq_ignore_ascii_case(\"fr\") { \"Le fournisseur\" } else { \"The provider\" }\n}\n"
+        ),
+        ["Le fournisseur", "The provider"]
+    );
+    assert_eq!(
+        read("fn told(x: Option<u8>) -> &'static str {\n    x.expect(\"always there\");\n    \"A sentence\"\n}\n"),
+        ["A sentence"]
     );
 }
 
