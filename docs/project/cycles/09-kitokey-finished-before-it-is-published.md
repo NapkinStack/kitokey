@@ -1,6 +1,6 @@
 ---
 goal: "Before Kitokey is published, a meeting weighs half what it does, its two sources are tried before a recording, and recording is a minimal bar in Kitokey's own look"
-status: accepted          # proposed | accepted | closed | stopped — the decider accepts
+status: closed            # proposed | accepted | closed | stopped — the decider accepts
 accepted_on: 2026-11-07   # « …enchaine », the plan before publishing; started at cycle 08's closure
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
 start: 2026-11-07         # cycle 08's closure
@@ -9,7 +9,7 @@ deliverables:
   - id: D87
     title: "A meeting's tracks are compressed without loss once its recording stops: it weighs less, and nothing of what was recorded is lost"
     module: capture
-    state: ready
+    state: accepted
     acceptance:
       - "Given a recording stopped, when capture ends, then — under `session-audio/v3`, the third version `v2`'s page already names for it — each track is kept as FLAC in the meeting's folder in place of its WAV — the same rate, channels and bit depth —, its samples decoded equal, one by one, to the WAV's, which is removed only once that is checked; `recording/v1`'s page says which event tells that the tracks are final, and no step reads a track before it — a making started on `stopped` reads the WAV whole or the FLAC whole, never one being removed; held by capture's e2e, the second form's notes decoded and compared"
       - "Given capture killed (`SIGKILL`) at chosen points while it compresses — before the FLAC is whole, after, before and after the WAV is removed —, when the meeting is read again, then it is read whole — from its WAV until the FLAC is checked, from its FLAC after; no meeting is ever left with neither a whole WAV nor a whole FLAC"
@@ -18,7 +18,7 @@ deliverables:
   - id: D88
     title: "Before a recording, the user tries their microphone and the meeting's sound, and sees that Kitokey hears both"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given capture asked to listen without recording, when it runs, then it says, as `recording/v1` says while recording, each source's `device` and its `level` about ten times a second, writes nothing anywhere, and stops on « stop » or a TERM signal within one second; held by capture's e2e on devices made for the run — a note played into each, its level seen, no file written — in a pull request of capture's own, before the shell's"
       - "Given « Vérifier le son » / \"Check the sound\" opened from the bar or from Settings, when it shows, then it shows, for « Votre micro » and « Le son de la réunion », the device's name and a meter that moves as sound comes; the microphone is opened only while it shows — an active stream, the departure from ADR-0015 this deliverable writes in that record first: a Bluetooth headset then switches to its call profile while the panel shows, which the panel says in one sentence, and WirePlumber restores it once closed; during a recording ADR-0015 holds unchanged —, and no stream of Kitokey's is left open within one second of closing it — held by the window's e2e, read in `pw-dump`; with it closed and no recording, Kitokey holds no stream"
@@ -27,7 +27,7 @@ deliverables:
   - id: D89
     title: "Kitokey has a look of its own: a mark, one set of icons, compact controls, one accent"
     module: shell
-    state: ready
+    state: deferred   # closed early, 2026-11-13: merged (#712, #720 to #741), its criteria not all held; its holder's `nstack deliver`, or the next framing
     acceptance:
       - "Given a new folder of drawings under `docs/project/drawings/` drawn before anything is built — with D90's boards, in one round —, when the decider reads it, then it shows in both themes Kitokey's mark, the tray's icon at rest and while recording, the full window's header and a meeting's page with the icons and sizes below; what the decider accepts there becomes this deliverable's bar, its date in the cycle"
       - "Given the window, the bar and Settings, when the shell's tests run, then every icon is one of Lucide's, inline, 16 or 20 CSS px; each screen has one labelled primary action, every secondary action is an icon button with a tooltip and an accessible name in French and in English; controls are 32 CSS px high, 28 in the bar, on a 4 px grid; red is used for recording alone; the contrast of each pair of colours the theme uses is checked by a test in both themes"
@@ -36,7 +36,7 @@ deliverables:
   - id: D90
     title: "Recording is a minimal bar: the essentials, and the rest one gesture away"
     module: shell
-    state: ready
+    state: deferred   # closed early, 2026-11-13: merged (#712, #740, #743, #744, #752, #768), criterion 3 on Windows and macOS unproven; its holder's `nstack deliver`, or the next framing
     acceptance:
       - "Given D89's round of drawings, when the decider reads it, then it holds the bar at rest, recording, and opened — its size and content are the boards', the last meeting no longer in it; what the decider accepts there becomes this deliverable's bar"
       - "Given the bar while recording, when it shows, then it holds the time recorded in tabular figures, a thin meter for each side with its health — a side silent for two minutes said in words, never as an error —, « Arrêter », and a way to the full window; opened, it shows the context, the microphone, « Confidentiel », « Vérifier le son » (D88) and « Avancé » (D91) — keyboard alone, both themes, French and English, nothing overflowing"
@@ -45,7 +45,7 @@ deliverables:
   - id: D91
     title: "A meeting's context and its models are chosen before it is recorded, the settings' choice by default"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given the bar at rest, when the user types a context and then starts a recording, then that context is the new meeting's `context.txt`, under D59's rules — 400 characters, written whole once the meeting's `session.json` is there; another meeting being made does not close the field; given no recording started, then it is kept for the next one until the user clears it, and said as such"
       - "Given « Avancé » / \"Advanced\", closed by default, in the opened bar and in *Refaire…*, when the user opens it, then it offers the transcription's model — the models installed and the service when one is set — and the minutes' model, each set to Settings' choice; a choice made there is that meeting's alone, kept with the meeting as a contract allows — a version first when none does —, used when it is made and made again, and Settings are unchanged"
@@ -53,7 +53,7 @@ deliverables:
   - id: D52
     title: "Spike — can a transcript followed live, on the machine alone, keep up during a call and be worth reading?"
     module: null
-    state: ready
+    state: deferred   # closed early, 2026-11-13: spike not started; cut first
     acceptance:
       - "Given a measuring program of the bench — a session's two tracks heard as they would arrive, in spans of 5 s and of 10 s, by `ggml-small-q8_0` (the list's \"faster\" model), and by Kyutai's `stt-1b-en_fr` streaming model as it hears, continuously — one that does not run on this machine's processor recorded as such, a result —, when it runs on the decider's Fedora while capture records a stand-in call on devices made for the run, then the transcription's log issue records, for each: the time to hear a span against its length, the processor and memory it took, the delay from a word said to the word shown, and capture's tracks against a recording of the same call without it — gaps of zeros, blocks lost"
       - "Given SUMM-RE's passages of the bench (`bench.real`), when they are heard that way and scored, then the record gives the share of words missed or misheard by the preview, side by side with the transcript of record's — the recommended model, whole — on the same passages"
@@ -61,7 +61,7 @@ deliverables:
   - id: D84
     title: "On Windows, Wholeheard starts with the session from its package, and Settings say what Windows does"
     module: shell
-    state: ready
+    state: deferred   # closed early, 2026-11-13: #790 merged, #788 and #791 open, criterion 1 a person's (#795)
     acceptance:
       - "Given the package installed and Wholeheard started once, when the user signs in again, then Wholeheard starts in the notification area alone, no window (D17), and Windows' own Startup settings list it under its name; held by the colleague on #482, a runner cannot sign in again"
       - "Given Settings' start-with-the-session switch on Windows, when it shows and is changed, then it shows Windows' state of Wholeheard's startup task and changes it there; a task turned off by the user in Windows is shown off and never turned back on by Wholeheard — Settings say where to turn it back on —, one turned off by a policy is shown off and one turned on by a policy shown on, the switch disabled in both, said in one sentence"
@@ -70,14 +70,14 @@ deliverables:
   - id: D85
     title: "Spike — does Whisper large-v3 trained for French hear a meeting better than today's model?"
     module: transcription
-    state: ready
+    state: deferred   # closed early, 2026-11-13: spike not started
     acceptance:
       - "Given `bofenghuang/whisper-large-v3-french` as whisper.cpp reads it (`ggml-model-q5_0.bin`, MIT) and today's recommended `ggml-large-v3-turbo-q8_0.bin`, in a spike outside the shipped program, the spike's input diffed first against what the step really reads — and D76's own input diffed the same way, its 98.3 % measured again if they differ —, when each hears the module's bench, the trial meeting and the decider's call kept in `temp/real-calls` — nothing of which leaves the machine or is published —, then the module's log issue records for each: word errors where a reference exists, inventions on a silent track, duplicated words, time against the recording's length, peak memory and the model's size"
       - "Given that record, when it is read against D76's threshold — at least two points fewer word errors on the trial meeting *(framer's, no source)*, no more than one point worse on the bench, fewer inventions on silence, faster than the call lasted on this machine's CPU —, then the framer proposes an ADR to offer it in the models list (ADR-0010); below it, what was missing is recorded. A refuted result is a delivered one"
   - id: D54
     title: "On Windows, Wholeheard installs from one MSIX package the Microsoft Store can take, and removing it keeps the meetings"
     module: install
-    state: ready
+    state: deferred   # closed early, 2026-11-13: a person's trial, key or reading left; its gesture in cycle 10's What needs a person
     acceptance:
       - "Given the Windows workflow on main, when it runs, then it leaves beside the zip Wholeheard-<version>-x64.msix, made with the Windows SDK's MakeAppx from an AppxManifest.xml that names Wholeheard, its version in four parts the last 0, its logos, the identity the decider reserved in Partner Center — or a placeholder the run says is one —, `runFullTrust` and the microphone, and the shell started with `--window`; the four programs inside it"
       - "Given that package signed for the run with a certificate made for it, when GitHub's Windows runner installs it (`Add-AppxPackage`), then Wholeheard's process starts from it with its window; when a later version is installed over it, then a meeting folder placed under Documents\\Wholeheard and the settings are still there; and when it is removed (`Remove-AppxPackage`), then the meeting folder is still there"
@@ -86,14 +86,14 @@ deliverables:
   - id: D57
     title: "The Store's listing and Wholeheard's privacy policy are written, in French and in English"
     module: null
-    state: ready
+    state: deferred   # closed early, 2026-11-13: a person's trial, key or reading left; its gesture in cycle 10's What needs a person
     acceptance:
       - "Given the repository, when `docs/privacy.md` is read on GitHub, then it says in French and in English what Wholeheard records, where it keeps it, what leaves the machine only when the user chose a service and to which host, that nothing is sent otherwise, and how to remove it all — its URL the one Partner Center is given"
       - "Given `docs/store/listing.md`, when it is read, then it holds the Store's description, its short features and the screenshots it needs, in French and in English, said as PDR-0001's promise — the decider reads it and says it claims nothing the product does not do"
   - id: D53
     title: "On Windows, Wholeheard opens from one zip the forge made — and does a call recorded there hold both sides?"
     module: install
-    state: ready
+    state: deferred   # closed early, 2026-11-13: a person's trial, key or reading left; its gesture in cycle 10's What needs a person
     acceptance:
       - "Given a run of the Windows workflow on main, or one started by hand, when it ends, then each program's tests pass on GitHub's Windows runner, and it leaves one artifact, Wholeheard-<version>-windows-x64.zip, holding wholeheard.exe and the three programs side by side, kept 7 days as the Mac's"
       - "Given that zip on the colleague's Windows 11, when they unpack it and open wholeheard.exe — past SmartScreen's warning on an unsigned program —, then Wholeheard's icon is in the notification area and its window opens from it, with nothing installed before it and no terminal"
@@ -101,7 +101,7 @@ deliverables:
   - id: D86
     title: "Wholeheard becomes Kitokey, and nothing of the user's is lost on the way"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given Wholeheard installed and used — settings, meetings, the Whisper model, keys in the keyring —, when the user installs Kitokey's package over it (`dnf install` of the .rpm, `apt install` of the .deb), then it replaces Wholeheard's, and Kitokey starts with the same settings, the same meetings where they were, the model not fetched again and the keys kept; a carrying over cut halfway resumes at the next start and never loses a meeting"
       - "Given the repository, when it is searched for Wholeheard, then the product, its programs, its packages, its application id, its folders and its variables are named Kitokey; Wholeheard and Summit are named only where history is told and in the code that carries over what the user held under them"
@@ -110,7 +110,7 @@ deliverables:
   - id: D78
     title: "On Fedora, Wholeheard installs from Copr with dnf, and each new version comes with the system's updates"
     module: install
-    state: ready
+    state: accepted
     acceptance:
       - "Given a release tag on main, when the forge's workflow runs, then it makes a source package from that tag that builds the four programs from source, the crates inside it, and Copr builds it for each Fedora release Copr still supports, its internet access left off; a build that fails fails the workflow and names the release that failed"
       - "Given the package's header, when it is read, then its licence is the repository's, GPL-3.0, and its summary and description are those of today's package"
@@ -119,7 +119,7 @@ deliverables:
   - id: D66
     title: "A recording holds the microphone the call holds, and never touches a Bluetooth headset's profile"
     module: capture
-    state: ready
+    state: deferred   # closed early, 2026-11-13: a person's trial, key or reading left; its gesture in cycle 10's What needs a person
     acceptance:
       - "Given a call holding a microphone other than the default input, when a recording runs, then `me` records that one — its name in `session.json` and the `device` event — and, when the call changes it, follows it, the track going on; held on virtual devices by capture's e2e, a stand-in call on a source of its own"
       - "Given a source carrying `bluez5.loopback=true`, when capture records it, then its stream says its version's passive value (ADR-0015, as corrected by #574, merged after this amendment), the source never runs from it alone and no profile switch comes from it, within one known window: a default input turning into a headset during a recording stays on an active stream until a reading of the graph closes it, within a few seconds, and for as long as the graph does not read; in that window WirePlumber's decision to switch came 4 times in 10 measured, on a stand-in with no card; held by capture's e2e on a stand-in source, read in `pw-dump` — WirePlumber's decision testable on a stand-in carrying `device.id` —, and `others` is unchanged. Given no call holding a microphone, then capture records the meeting's sound and says in one sentence that the microphone waits when the default input is such a source; records the default input, as today, when it is not"
@@ -129,7 +129,7 @@ deliverables:
   - id: D56
     title: "The list of models read again is refused unless the decider's key signed it"
     module: shell
-    state: ready
+    state: deferred   # closed early, 2026-11-13: a person's trial, key or reading left; its gesture in cycle 10's What needs a person
     acceptance:
       - "Given `registry/models.json` and its signature `models.json.minisig` on main, made with minisign by the decider's key — the public key built into the shell, the private one never in a repository —, when the list is read again on the user's gesture, then it is offered only when its signature verifies; a list unsigned, signed by another key, or changed after it was signed is refused, and the shipped list stays, said in one sentence (ADR-0010, *Rejected alternatives*)"
       - "Given a pull request that changes the list, when its checks run, then a list whose signature does not verify against the built-in key is refused; until the decider's key is given, no list is read again, and Settings and the check say it waits on that key — the colleagues' builds lose today's reading again, said in the cycle's closure"
@@ -138,7 +138,7 @@ deliverables:
   - id: D41
     title: "On Linux, a call heard on an output other than the system's default is recorded there"
     module: capture
-    state: ready
+    state: deferred   # closed early, 2026-11-13: a person's trial, key or reading left; its gesture in cycle 10's What needs a person
     acceptance:
       - "Given a call — an application other than capture holding a microphone — whose sound plays on an output other than the system's default, when it is recorded, then the remote track holds what the call plays, and capture says `device` with that output's name"
       - "Given the call's sound moved to another output while recording, or back to the default, when it moves, then the remote track follows it within two seconds and the move is kept in `session.json` with when"
@@ -148,10 +148,12 @@ deliverables:
   - id: D27
     title: "Wholeheard installs on Ubuntu from one package, its programs built on the system they ship to"
     module: install
-    state: ready
+    state: deferred   # closed early, 2026-11-13: a person's trial, key or reading left; its gesture in cycle 10's What needs a person
     acceptance:
       - "Given Ubuntu 24.04, when a user installs Wholeheard from one package file (`sudo apt install ./kitokey_<version>_amd64.deb`), then Wholeheard is in the applications menu and starts in the tray with nothing built and no variable set, and removing it leaves the user's meetings and settings"
       - "Given a release for a system — Fedora or Ubuntu —, when the programs are built, then they are built in a container of that system, so that no package depends on the machine that made it"
+outcome: shipped
+ended_on: 2026-11-13
 ---
 
 # Cycle 09 — Kitokey finished before it is published
@@ -349,3 +351,49 @@ below is unchanged, and the end date does not move for them.
 
 ## Closure
 
+
+**Closed on 2026-11-13, early, shipped, on the decider's word that day:** « on enchaine des que possible ».
+[Cycle 10](10-kitokey-ready-when-you-come-back.md), accepted the same day, starts at this closure. One
+accepted cycle at a time, so this one closes first, a week before its end. D78, D86, D87, D88 and D91 are
+accepted from their records by `nstack deliver --write-states`. As cycle 10 says, the twelve others are
+deferred to this cycle's *Later*, never moved there. Their gestures for a person are carried into cycle 10's
+*What needs a person*. 5 of 17 accepted.
+
+**D88, the decider's answer** (criterion 4), in the working session on 2026-11-13: « ma dernier reunion été
+vraie et faite avec les airpods, le son et le micro sont bon » and « oui, les deux jauges bougeaient ».
+
+**Merged, not delivered.** The criteria are read at `main` 958404b. Each one waits for its holder's
+`nstack deliver`, or for the next framing.
+
+| Deliverable | Criterion | Holds? | Pull requests |
+|---|---|---|---|
+| D89 the look | 1 the drawings read | Yes, the mark and the name accepted in rounds 6 and 7 | #712, #720 to #726 |
+| | 2 Lucide, sizes, one accent, contrast in both themes | Yes, by the look's tests (`tests/look.rs`) | #730, #731, #732, #733, #737 |
+| | 3 icons from one SVG, the tray's two states | Yes. The README's line on GNOME's microphone indicator is not found | #727, #729 |
+| | 4 screenshots in both themes at 1920 and 420 px | Made; not checked in a sheet beside the boards | #738 |
+| D90 the bar | 1 the drawings read | Yes | #712, #720 to #726 |
+| | 2 recording and opened | Merged; read from the pull requests, not run again here | #740, #743, #752, #765, #768 |
+| | 3 above the other windows on Windows and macOS; on GNOME an ordinary window | Not proven on Windows or macOS | #744 |
+| | 4 hidden, never back by itself; the shortcut stops | Yes | #744 |
+| D84 the startup task | 1 started at sign-in, listed by Windows | No: a person on Windows 11 (#795) | — |
+| | 2 Settings show and change the task's state | Yes in unit tests; on Windows, a person's | #790 |
+| | 3 the zip offers no switch, no `autostart` file; Linux unchanged | Yes in unit tests | #790 |
+| | 4 each state mapped; `trial.ps1` records it | First half yes; second half open | #790; #788 and #791 open |
+
+**Deferred with a reason, one line each:**
+
+- D41, D66 (trial), PDR-0005, D57, D53, D54 and D84 on Windows, D56, D27: a person's trial, key or reading.
+  Each gesture is unchanged, in cycle 10's *What needs a person*.
+- D89 and D90: the decider's acceptance of the drawings is done. What is left is the table above.
+- D52 and D85: agents' spikes, not started; D52 is cut first, as the cut order says.
+
+**Out-of-cycle pull requests** #786, #787, #788, #791, #792, #793, #794, #796, #798 and #800 are unaffected:
+none carries a deliverable of this cycle's, and each goes on as it is.
+
+**The goal.** Partly reached: a meeting is kept as FLAC (D87), both sources are tried before a recording (D88),
+and the context and models are chosen before it (D91). The look and the bar (D89, D90) are merged, but not
+every criterion is proven.
+
+**Success criteria**: none moved.
+
+**Documents brought current:** none by this closure. Cycle 10's front matter: `accepted`, starting today.

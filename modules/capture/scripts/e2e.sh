@@ -30,8 +30,21 @@ if [ -z "${KITOKEY_E2E_SEALED:-}" ]; then
   done
   "${sealed[@]}" -- true 2>> .evidence/e2e.txt ||
     { say "e2e: NOT RUN — this system refuses the run a namespace of its own (bwrap)"; exit 77; }
+  # The run's folders, made out here and removed out here too: a TERM that ends this script ends
+  # the sealed one by SIGKILL (--die-with-parent), before its own cleaning can run (#796, S4).
+  work=$(mktemp -d)
+  graph=$(mktemp -d /tmp/wh-XXXXXX)
+  cleaned() {
+    # Once more after the sealed processes' last writes: they end with the seal, killed.
+    rm -rf "$work" "$graph" "$work.real" "$work.trial"; sleep 0.2; rm -rf "$work" "$graph" "$work.real" "$work.trial"
+  }
+  trap cleaned EXIT
+  trap 'exit 143' TERM
+  trap 'exit 130' INT
+  trap 'exit 129' HUP
   status=0
-  "${sealed[@]}" --setenv KITOKEY_E2E_SEALED 1 -- bash "$(realpath "$0")" "$@" || status=$?
+  "${sealed[@]}" --setenv KITOKEY_E2E_SEALED 1 --setenv KITOKEY_E2E_WORK "$work" --setenv KITOKEY_E2E_GRAPH "$graph" \
+    -- bash "$(realpath "$0")" "$@" || status=$?
   say "The desktop's defaults, before and after the run: $desktop_before"
   if [ "$(desktop_defaults)" = "$desktop_before" ]; then
     say "  ok    the desktop's defaults the same"
@@ -61,13 +74,13 @@ if [ "$(cut -d. -f1 /proc/loadavg)" -ge "$quiet" ]; then
   say "e2e: NOT RUN — the machine is busy (load $(cut -d' ' -f1 /proc/loadavg), $(nproc) processors): a clock cannot be measured on it"; exit 77
 fi
 bin=$(realpath "${CARGO_TARGET_DIR:-$PWD/target}/release/kitokey-capture")   # where cargo built it
-work=$(mktemp -d)
+work=${KITOKEY_E2E_WORK:-$(mktemp -d)}   # made by the part outside the seal, which removes it
 # Its logs in the run's evidence, this run's alone, never the user's (ADR-0007).
 export KITOKEY_LOG_DIR="$evidence/logs"
 rm -rf "$KITOKEY_LOG_DIR"
 
 # The run's own graph, as private_graph.sh's. A socket's path is short: never under a long folder.
-graph=$(mktemp -d /tmp/wh-XXXXXX)
+graph=${KITOKEY_E2E_GRAPH:-$(mktemp -d /tmp/wh-XXXXXX)}
 export XDG_RUNTIME_DIR=$graph/rt PIPEWIRE_RUNTIME_DIR=$graph/rt XDG_CONFIG_HOME=$graph/cfg XDG_STATE_HOME=$graph/state
 export XDG_CACHE_HOME=$graph/cache XDG_DATA_HOME=$graph/data DBUS_SESSION_BUS_ADDRESS=disabled:
 unset PIPEWIRE_REMOTE PULSE_SERVER DISPLAY WAYLAND_DISPLAY
