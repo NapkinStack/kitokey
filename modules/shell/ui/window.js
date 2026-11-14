@@ -2534,9 +2534,16 @@ function showSettings(shown, minutes, words) {
   const [addressWrap, address] = guidedField("transcription-provider", words.service_address, "url", own ? shown.transcription_provider : "", locked);
   const [modelWrap, serviceModel] = guidedField("transcription-model", words.service_model, "text", own ? shown.transcription_model : "", locked);
   const [ownAgreeWrap, ownAgreeBox, ownAgreeHost] = agreement("transcription-own-agreed");
-  ownAgreeHost(hostOf(address.value));
+  // Its address left empty: the service chosen above, with a model it does not list — a new release,
+  // an id of its own — named by hand; the field shows that address as it stands in.
+  const ownAddress = () => address.value.trim() || hearing().address;
+  const standsIn = () => {
+    address.placeholder = hearing().address;
+    ownAgreeHost(hostOf(ownAddress()));
+  };
+  standsIn();
   address.addEventListener("input", () => {
-    ownAgreeHost(hostOf(address.value));
+    ownAgreeHost(hostOf(ownAddress()));
     ownAgreeBox.checked = false;
   });
   const ownSave = guidedButton("transcription-own-save", words.service_save, false, locked);
@@ -2571,7 +2578,7 @@ function showSettings(shown, minutes, words) {
     serviceSaid.textContent = saved;
   };
   saveService.addEventListener("click", () => saveHearing(hearing().address, serviceModels.value, serviceKey.value, agreeBox, null, serviceModels));
-  ownSave.addEventListener("click", () => saveHearing(address.value, serviceModel.value, serviceKey.value, ownAgreeBox, address, serviceModel));
+  ownSave.addEventListener("click", () => saveHearing(ownAddress(), serviceModel.value, serviceKey.value, ownAgreeBox, address, serviceModel));
   const testService = element("button", "open", words.service_test);
   testService.type = "button";
   testService.id = "transcription-test";
@@ -2614,6 +2621,7 @@ function showSettings(shown, minutes, words) {
     serviceSaid.textContent = "";
     testService.disabled = locked;
     shownSaved();
+    standsIn();
   });
   const service = element("div", "fields");
   service.id = "transcription-away";
