@@ -74,7 +74,7 @@ a family, a number a rule; a retired rule's number is never reused.
 | `C7` | A discovery decided with no decider, date or challenger — or a charter with no go before it | `.nstack/handbook/project.md` |
 | `C8` | A document left as its form once its moment has come: the front page's sentence at a go, the whole front page at an accepted charter, the module map once a module holds code | `06-decisions.md` §10 |
 | `C9` | *(warning)* An accepted charter changed by a pull request that carries no decision record | `06-decisions.md` §4 |
-| `C10` | *(warning)* An accepted decision record due at a closure — its criterion names the cycle, or a date its end reached — with no reading line | `06-decisions.md` §6 |
+| `C10` | *(warning)* An accepted decision record due at a closure — its criterion names the cycle, or a date in bold, `**YYYY-MM-DD**`, its end reached — with no reading line; a criterion with neither, holding a plain date its end reached, is told to bold its due date | `06-decisions.md` §6 |
 
 ## H — hygiene
 
@@ -107,7 +107,7 @@ in git; elsewhere a record is shown, and the forge's CI judges.
 
 | Code | Refuses | Why |
 |---|---|---|
-| `A1` | In a project whose checks are attested, a head commit with no record | `07-governance.md` §7 |
+| `A1` | In a project whose checks are attested, a head commit with no record — read from the remote's notes, in CI too | `07-governance.md` §7 |
 | `A2` | A record of the head that misses a check the CI runs, or holds a failed one | `07-governance.md` §7 |
 
 ## K — the cycle a change belongs to
