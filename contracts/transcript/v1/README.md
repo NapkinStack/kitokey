@@ -38,7 +38,7 @@ may rewrite a segment's `text` (below). Every line has a `type`.
 | `header` | First line, once | `contract`: `transcript/v1` · `engine` and `model`: what transcribed · `language`: the language asked for, or `null` when detected · `context`: the text the engine received, or `null` |
 | `segment` | Each stretch of speech | `speaker`: `me` or `others` · `track`: the track it was heard on, `local` for `me`, `remote` for `others` · `voice`: which voice within the track, `null` until voices are told apart · `start` and `end`: seconds from the session's `started`, to the hundredth · `text`: what was said, one line · `edited`, optional: when a person corrected `text`, RFC 3339 with its offset |
 | `covered` | After each span is done | `speaker` · `until`: seconds; every segment of that speaker that starts before `until` is in the file |
-| `complete` | Last line, once | `duration`: seconds of audio transcribed |
+| `complete` | Last line, once | `duration`: seconds of audio transcribed · `made`, optional: when the transcript was made whole, RFC 3339 with its offset — absent in a transcript made before it was written |
 
 - **Order.** Lines come in the order they were made, not the order of the meeting: a reader
   that wants the meeting sorts the segments by `start`.
@@ -105,6 +105,12 @@ Valid, and not finished:
 {"type": "segment", "speaker": "others", "start": 0.0, "end": 3.2, "text": "Du coup j'ai besoin que l'on confirme la date."}
 {"type": "segment", "speaker": "me", "track": "local", "voice": null, "start": 3.4, "end": 5.1, "text": "Première semaine de juin, je pense."}
 {"type": "covered", "speaker": "others", "until": 30.0}
+```
+
+Valid, and complete — its last line:
+
+```json
+{"type": "complete", "duration": 1912.4, "made": "2026-11-13T09:42:10+01:00"}
 ```
 
 To refuse: a file whose first line is not a `header` of `transcript/v1`; a `segment` whose
