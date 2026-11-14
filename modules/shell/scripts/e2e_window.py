@@ -3799,7 +3799,8 @@ def recording_found_not_forgotten(now: dt.datetime) -> None:
     ended = json.dumps({"contract": "session-audio/v3", "started": stamp, "stopped": dt.datetime.now().astimezone().isoformat(timespec="seconds"), "tracks": {}})
     recorder = subprocess.Popen(["sh", "-c", script, "sh", str(folder), ended], stdin=subprocess.DEVNULL,
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True)
+    # The start-up entry decided already: the start writes nothing to the settings, which BH does not claim (D32).
+    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\nautostart = false\n', small=True)
     settings = window.file.parent
     kept = settings / "recording.json"
     try:
