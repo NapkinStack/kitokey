@@ -1212,6 +1212,119 @@ def service_named(now: dt.datetime) -> None:
     server.shutdown()
 
 
+def models_guided(now: dt.datetime) -> None:
+    """D95, criterion 2. The summary set up in « Modèles » as one guided path: here or a service; a
+    service named, its key tested at once against a stand-in made for the run — refused, said with
+    its cause; taken, its models listed as people say them —; no address typed but under « Avancé »."""
+    print("D95. Settings: the summary set up in a few guided steps, a service's key tested at once (D95)")
+    good, false = "sk-stand-in-good", "sk-stand-in-false"
+    asked = []
+
+    # The named services' stand-in (OpenRouter's routes): its key route, then its models — the false
+    # key refused on both, as the services do (401).
+    class Service(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            key = (self.headers.get("authorization") or "").removeprefix("Bearer ")
+            asked.append([self.path, key])
+            if key != good:
+                status, body = 401, {"error": {"message": "Invalid credentials, HTTP 401 from the stand-in", "code": 401}}
+            elif self.path.endswith("/key"):
+                status, body = 200, {"data": {"label": "stand-in"}}
+            elif self.path.endswith("/models"):
+                status, body = 200, {"data": [{"id": "anthropic/claude-sonnet-4-5"}, {"id": "openai/gpt-4o-mini"}, {"id": "mistralai/mistral-7b-instruct:free"}]}
+            else:
+                status, body = 404, {}
+            raw = json.dumps(body).encode()
+            self.send_response(status)
+            self.send_header("content-length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_):
+            pass
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            raw = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:latest"}]}).encode()
+            self.send_response(200)
+            self.send_header("content-length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_):
+            pass
+
+    servers = [http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler) for handler in (Service, Tags)]
+    for server in servers:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    stand = f"http://127.0.0.1:{servers[0].server_address[1]}/api/v1"
+    guided = WORK / "guided"
+    guided.mkdir()
+    window = Window(guided, "fr_FR.UTF-8", ollama=f"http://127.0.0.1:{servers[1].server_address[1]}")
+    window.env.update(KITOKEY_ONLINE=stand)
+    said = "return document.getElementById('minutes-key-said')?.textContent || ''"
+    options = "return [...document.querySelectorAll(`#${arguments[0]} option`)].filter(o => !o.disabled).map(o => o.textContent)"
+    # What a field of the common case shows: no address, nothing a machine reads (E5).
+    addresses = "return [...document.querySelectorAll('#settings input[type=url]')].filter(i => i.getClientRects().length > 0).map(i => i.id)"
+    with window as browser:
+        browser.find_element(By.ID, "settings-link").click()
+        wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-where"), 5)
+        group = browser.execute_script("const g = document.getElementById('minutes-where'); return [g.getAttribute('role'), [...g.querySelectorAll('input[type=radio]')].map(r => r.id)]")
+        check("the summary, first step: on this computer or a service, one choice (D95)",
+              group == ["radiogroup", ["minutes-here", "minutes-online"]], group)
+        press(browser, "minutes-here")
+        here = wait_for(browser, lambda b: b.execute_script(options, "minutes") == ["Mistral", "Qwen3 14b"], 5)
+        check("on this computer: Ollama's models, each said as people say it — no tag, no « : »",
+              here, browser.execute_script(options, "minutes"))
+        press(browser, "minutes-online")
+        named = wait_for(browser, lambda b: b.execute_script(options, "minutes-service") == ["OpenRouter", "OpenAI", "Mistral"], 5)
+        check("a service: OpenRouter, OpenAI, Mistral, by name", named, browser.execute_script(options, "minutes-service"))
+        check("a service, the common case: no address asked, « Avancé » folded (E5)",
+              browser.execute_script(addresses) == [] and browser.find_element(By.ID, "minutes-advanced").get_attribute("aria-expanded") == "false",
+              browser.execute_script(addresses))
+        check("a service, before its key: no model offered", not browser.find_element(By.ID, "minutes-models").is_displayed())
+        # A false key: refused at once, its cause said in a sentence, nothing of the service's own words (E4).
+        choose(browser, "minutes-service", "0")
+        browser.find_element(By.ID, "minutes-key").send_keys(false)
+        press(browser, "minutes-key-test")
+        refused = wait_for(browser, lambda b: b.execute_script(said) == TEST_CAUSES[0][1], 10)
+        told = browser.execute_script(said)
+        check("a false key: refused at once, said with its cause — no HTTP, no raw word of the service's (E4)",
+              refused and "401" not in told and "HTTP" not in told and "Invalid" not in told and not browser.find_element(By.ID, "minutes-models").is_displayed(), told)
+        check("the false key asked of OpenRouter's key route, its models not asked", ["/api/v1/key", false] in asked and ["/api/v1/models", false] not in asked, asked)
+        # The good one: taken, the service's models listed as people say them.
+        key = browser.find_element(By.ID, "minutes-key")
+        key.clear()
+        key.send_keys(good)
+        press(browser, "minutes-key-test")
+        listed = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
+        offered = browser.execute_script(options, "minutes-models")
+        check("the good key: the models listed, each as people say it (E4)",
+              listed and offered == ["Claude Sonnet 4.5", "GPT 4o Mini", "Mistral 7b Instruct Free"], [offered, browser.execute_script(said)])
+        check("no raw identifier in the list: no « : », no « / » (E4)", offered != [] and not any(":" in o or "/" in o for o in offered), offered)
+        choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
+        press(browser, "minutes-save")
+        saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
+        text = window.file.read_text()
+        check("saved: the service's address and the model chosen, never the key", saved and f'minutes_provider = "{stand}"' in text and "sk-stand-in" not in text, text)
+        logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and "sk-stand-in" in f.read_text(errors="ignore")]
+        check("the key never logged", logged == [], logged)
+        # Drawn again: the service and its model said as chosen, no address shown.
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
+        browser.execute_script("location.hash = '#/settings'")
+        again = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-online").is_selected() and b.find_element(By.ID, "minutes-service").get_attribute("value") == "0", 5)
+        check("drawn again: a service chosen, OpenRouter, no address shown", again and browser.execute_script(addresses) == [], browser.execute_script(addresses))
+        # The user's own address, under « Avancé » alone (E5).
+        press(browser, "minutes-advanced")
+        unfolded = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-address").is_displayed(), 3)
+        check("« Avancé » unfolded: an address of one's own, and a model named by hand", unfolded and browser.find_element(By.ID, "minutes-model").is_displayed())
+        shot_themed(browser, "d95-models-service-light", "light")
+        shot_themed(browser, "d95-models-service-dark", "dark")
+    for server in servers:
+        server.shutdown()
+
+
 def ollama_pulled(now: dt.datetime) -> None:
     """V. The minutes' recommended model fetched by Ollama, on the user's click (D37)."""
     print("V. Settings: qwen3:8b fetched by Ollama on the user's click; without Ollama, said where to get it (D37)")
@@ -8593,6 +8706,7 @@ def main() -> int:
     list_refreshed(now)
     speech_offered(now)
     service_named(now)
+    models_guided(now)
     ollama_pulled(now)
     first_run(now)
     context_written(now)
