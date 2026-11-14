@@ -307,7 +307,32 @@ pub fn settle(current: &Path, previous: &Path, written: bool, dispose: impl FnOn
 /// will do first —, leaving nothing: a folder that refuses is said before any recorder starts.
 pub fn writable(folder: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(folder)?;
+    std::fs::remove_file(probe(folder)?)
+}
+
+/// A file written in `folder` for `writable`: its path.
+fn probe(folder: &Path) -> std::io::Result<PathBuf> {
     let probe = folder.join(format!(".kitokey-writable-{}", std::process::id()));
     std::fs::write(&probe, b"")?;
-    std::fs::remove_file(&probe)
+    Ok(probe)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// On Windows a removed file's name can stay taken a while, its deletion pending — « Access is
+    /// denied » to whoever makes it again (#705, #760): the next probe never depends on the last
+    /// one's going. Its name kept taken here by a folder, which refuses a file as Windows does.
+    #[test]
+    fn a_second_probe_does_not_wait_on_the_first_ones_deletion() {
+        let folder = tempfile::tempdir().unwrap();
+        let first = probe(folder.path()).unwrap();
+        fs::remove_file(&first).unwrap();
+        fs::create_dir(&first).unwrap();
+        let second = probe(folder.path()).unwrap();
+        assert_ne!(first, second);
+        fs::remove_file(second).unwrap();
+        assert!(writable(folder.path()).is_ok());
+    }
 }
