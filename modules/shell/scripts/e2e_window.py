@@ -1292,6 +1292,12 @@ def models_guided(now: dt.datetime) -> None:
         check("a false key: refused at once, said with its cause — no HTTP, no raw word of the service's (E4)",
               refused and "401" not in told and "HTTP" not in told and "Invalid" not in told and not browser.find_element(By.ID, "minutes-models").is_displayed(), told)
         check("the false key asked of OpenRouter's key route, its models not asked", ["/api/v1/key", false] in asked and ["/api/v1/models", false] not in asked, asked)
+        # Drawn again with no gesture — a model come, the window crossing 840 px —: the refusal stays (ux.md).
+        drawn_again = "window.__old = document.getElementById('minutes-key-said'); refresh()"
+        anew = "return !window.__old.isConnected && document.getElementById('minutes-key-said') !== null"
+        browser.execute_script(drawn_again)
+        wait_for(browser, lambda b: b.execute_script(anew), 5)
+        check("drawn again by itself: the refusal still said, until the key is tried again", browser.execute_script(said) == TEST_CAUSES[0][1], browser.execute_script(said))
         # The good one: taken, the service's models listed as people say them.
         key = browser.find_element(By.ID, "minutes-key")
         key.clear()
@@ -1302,6 +1308,10 @@ def models_guided(now: dt.datetime) -> None:
         check("the good key: the models listed, each as people say it (E4)",
               listed and offered == ["Claude Sonnet 4.5", "GPT 4o Mini", "Mistral 7b Instruct Free"], [offered, browser.execute_script(said)])
         check("no raw identifier in the list: no « : », no « / » (E4)", offered != [] and not any(":" in o or "/" in o for o in offered), offered)
+        browser.execute_script(drawn_again)
+        wait_for(browser, lambda b: b.execute_script(anew), 5)
+        check("drawn again by itself: the models listed with the key still offered",
+              browser.find_element(By.ID, "minutes-models").is_displayed() and browser.execute_script(options, "minutes-models") == offered, browser.execute_script(options, "minutes-models"))
         choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
         press(browser, "minutes-online-save")
         saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)

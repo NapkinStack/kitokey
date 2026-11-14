@@ -2023,6 +2023,12 @@ let testing = false;
 let generalAdvanced = false;
 // The summary's « Avancé » unfolded: kept while Settings are drawn again (D95).
 let minutesAdvanced = false;
+// Each service's last answer to « Vérifier la clé », by its place in the list: what it refused, or
+// the models it listed — kept while Settings are drawn again by a model come or the window's
+// width, until the user acts (ux.md: an error stays until corrected). Another address forgets it.
+let minutesAnswers = new Map();
+// Where, and which service, chosen and not yet saved: kept the same way.
+let minutesChosen = {};
 
 function minutesRow(minutes, words, locked) {
   const box = element("div", "step");
@@ -2036,8 +2042,9 @@ function minutesRow(minutes, words, locked) {
   way.id = "minutes-where";
   way.setAttribute("role", "radiogroup");
   way.setAttribute("aria-labelledby", "minutes-title");
-  const hereChoice = choice("minutes-where", "here", [words.welcome_on_this_computer, ""], savedHere, locked);
-  const awayChoice = choice("minutes-where", "online", [words.where_service, ""], !!minutes.provider && !savedHere, locked);
+  const way_ = minutesChosen.way ?? (savedHere ? "here" : minutes.provider ? "online" : null);
+  const hereChoice = choice("minutes-where", "here", [words.welcome_on_this_computer, ""], way_ === "here", locked);
+  const awayChoice = choice("minutes-where", "online", [words.where_service, ""], way_ === "online", locked);
   hereChoice.querySelector("input").id = "minutes-here";
   awayChoice.querySelector("input").id = "minutes-online";
   way.append(hereChoice, awayChoice);
@@ -2106,7 +2113,7 @@ function minutesRow(minutes, words, locked) {
   // A service: named, its key tested at once — its models asked with it —, then one of them (D95).
   const [serviceWrap, servicePick] = listed("minutes-service", words.service_name);
   minutes.online.forEach((service, index) => option(servicePick, String(index), service.name));
-  servicePick.value = String(Math.max(online, 0));
+  servicePick.value = minutesChosen.service ?? String(Math.max(online, 0));
   const [keyWrap, key] = field("minutes-key", words.key, "password", "");
   key.autocomplete = "off";
   const keyTest = button("minutes-key-test", words.key_test, false);
@@ -2116,17 +2123,27 @@ function minutesRow(minutes, words, locked) {
   const [modelsWrap, modelsPick] = listed("minutes-models", words.model_name);
   const onlineSave = button("minutes-online-save", words.save, true);
   const service = () => minutes.online[Number(servicePick.value)];
-  // The model saved with this service, said; the others come with its key.
-  const shownSaved = () => {
+  // The models listed with its key, the one saved chosen.
+  const shownListed = (models) => {
     modelsPick.replaceChildren();
+    for (const id of models) option(modelsPick, id, modelSaid(id));
+    if (models.includes(minutes.model)) modelsPick.value = minutes.model;
+    modelsWrap.hidden = onlineSave.hidden = models.length === 0;
+  };
+  // This service's last answer, said again; else the model saved with it — the others come with its key.
+  const shownSaved = () => {
     const saved = online >= 0 && Number(servicePick.value) === online && minutes.model;
+    key.placeholder = saved && minutes.key_kept ? words.key_kept : "";
+    const answer = minutesAnswers.get(servicePick.value);
+    keySaid.textContent = answer?.said ?? "";
+    if (answer?.models) return shownListed(answer.models);
+    modelsPick.replaceChildren();
     if (saved) option(modelsPick, minutes.model, modelSaid(minutes.model));
     modelsWrap.hidden = onlineSave.hidden = !saved;
-    key.placeholder = saved && minutes.key_kept ? words.key_kept : "";
   };
   shownSaved();
   servicePick.addEventListener("change", () => {
-    keySaid.textContent = "";
+    minutesChosen.service = servicePick.value;
     shownSaved();
   });
   keyTest.addEventListener("click", async () => {
@@ -2140,16 +2157,14 @@ function minutesRow(minutes, words, locked) {
     } catch (why) {
       said = why;
     }
+    minutesAnswers.set(asked, { said, models });
+    // Said on the page as it is now: drawn again meanwhile, or another service chosen, it says its own.
+    const now = document.getElementById("minutes-service");
+    if (now !== servicePick) return now?.dispatchEvent(new Event("change"));
     keyTest.disabled = locked;
-    // Another service chosen meanwhile: its own answer comes with its own test.
     if (servicePick.value !== asked) return;
-    keySaid.textContent = said;
-    if (models === null) return shownSaved();
-    modelsPick.replaceChildren();
-    for (const id of models) option(modelsPick, id, modelSaid(id));
-    if (models.includes(minutes.model)) modelsPick.value = minutes.model;
-    modelsWrap.hidden = onlineSave.hidden = models.length === 0;
-    modelsPick.focus();
+    shownSaved();
+    if (models !== null) modelsPick.focus();
   });
   onlineSave.addEventListener("click", () => save(service().address, modelsPick.value, key.value || null));
   // « Avancé »: an address of one's own, OpenAI's way of asking, its model named by hand.
@@ -2201,7 +2216,12 @@ function minutesRow(minutes, words, locked) {
       where.replaceChildren(words.where_online, element("code", "tag", host));
     }
   };
-  for (const radio of [hereChoice, awayChoice]) radio.querySelector("input").addEventListener("change", draw);
+  for (const radio of [hereChoice, awayChoice]) {
+    radio.querySelector("input").addEventListener("change", () => {
+      minutesChosen.way = radio.querySelector("input").value;
+      draw();
+    });
+  }
   draw();
   fields.append(here, away);
   box.append(title, way, where);
@@ -4514,6 +4534,8 @@ window.addEventListener("hashchange", () => {
   document.getElementById("pane-said").hidden = true;
   notShown(false);
   serviceAnswer = null;
+  minutesAnswers = new Map();
+  minutesChosen = {};
   if (nameRefused) paneSays(nameRefused);
   nameRefused = null;
   // Another address: the assistant, shown again, is drawn anew — even if the drawing that left it was cut short.
