@@ -7448,8 +7448,11 @@ def main() -> int:
         held = window.file.read_text()
         lines = [line for line in held.splitlines() if not line.startswith("keep_audio")] + ["keep_audio = 0"]
         broken = "\n".join(lines) + "\n"
-        refused = "Le réglage n’a pas été enregistré\u00a0: le fichier des réglages ne peut pas être lu\u00a0: corrigez-le, puis réessayez.".replace("\xa0", " ")  # WebDriver's `.text` reads U+00A0 as a space
-        locked_said = "Le fichier des réglages ne peut pas être lu\u00a0: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé.".replace("\xa0", " ")  # WebDriver's `.text` reads U+00A0 as a space
+        # Which setting, on which line, and what to do (#783) — never settings.rs's own sentence.
+        # WebDriver's `.text` reads U+00A0 as a space.
+        which = lambda line: f"Ligne {line} : « keep_audio » vaut « always » ou un nombre de jours, de 1 à 36\u202f500. Corrigez-le."  # noqa: E731
+        refused = f"Le réglage n’a pas été enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
+        locked_said = f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which(len(lines))}"
         unreadable = lambda: browser.find_element(By.ID, "settings-unreadable").text  # noqa: E731
         window.file.write_text(broken)
         changed(lambda: browser.find_element(By.ID, "reminder").click())
@@ -7465,6 +7468,9 @@ def main() -> int:
         lines = [line for line in held.splitlines() if not line.startswith("keep_audio")] + ["keep_audio = 0"]
         window.file.write_text("\n".join(lines) + "\n")
         raw = f'settings.toml, line {len(lines)}: keep_audio is "always" or a number of days'
+        # The file's line has moved with developer mode written: the sentences name the new one.
+        refused = f"Le réglage n’a pas été enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
+        locked_said = f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which(len(lines))}"
         changed(lambda: browser.find_element(By.ID, "reminder").click())
         said = not_saved()
         check("developer mode on, the raw text is under the sentence of the command that failed, without its path", said == f"{refused}\n{raw}", said)
@@ -7624,7 +7630,8 @@ def main() -> int:
         wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#settings .warn"))
         warned = browser.find_element(By.CSS_SELECTOR, "#settings .warn").text
         locked = browser.execute_script("return [...document.querySelectorAll('#settings input, #settings select')].every(e => e.disabled)")
-        check("a settings file that cannot be read is said so, and nothing can be changed", warned == "Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé." and locked, warned)
+        which = "Ligne 3 : « keep_audio » vaut « always » ou un nombre de jours, de 1 à 36\u202f500. Corrigez-le."  # U+00A0 read as a space
+        check("a settings file that cannot be read is said so, which setting and what to do, and nothing can be changed", warned == f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which}" and locked, warned)
         check("it is left as it was", window.file.read_text() == f'sessions = "{broken}"\nwelcomed = true\nkeep_audio = 0\n')
         # The shell itself refuses, not only the page.
         refused = browser.execute_async_script(

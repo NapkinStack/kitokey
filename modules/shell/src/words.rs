@@ -4,6 +4,7 @@
 use crate::{
     recording::{Said, Source},
     registry::Good,
+    settings::Refused,
     summarising::Cause,
     transcription::Made,
     trial::Left,
@@ -2094,8 +2095,8 @@ pub fn window(language: Language) -> Window {
 pub enum Trouble {
     /// The program that records could not be started: what the system said of it.
     NoRecorder(String),
-    /// The settings file was not read: the sentence that says which file, and what in it.
-    Settings(String),
+    /// The settings file was not read: which setting, on which line (#783).
+    Settings(Refused),
     /// The desktop did not bind the global shortcut: what it said of it.
     Shortcut(String),
     /// The model a transcript is heard with is not on the machine: where it was looked for.
@@ -2137,8 +2138,10 @@ pub enum Failure {
     FolderNotWhole,
     FolderUnmade,
     Autostart,
-    SettingsUnread,
-    SettingsLocked,
+    /// The settings file refused, which setting and where (#783): under the command it stopped,
+    /// and, `SettingsLocked`, alone on Settings.
+    SettingsUnread(Refused),
+    SettingsLocked(Refused),
     SettingsUnwritten,
     FolderNotOpened,
     KeyboardSettings,
@@ -2193,11 +2196,25 @@ pub fn failure(failure: Failure, language: Language) -> String {
         (Failure::Autostart, French) => {
             "le démarrage à l’ouverture de session n’a pas pu être changé\u{a0}: vérifiez que votre dossier personnel peut être écrit."
         }
-        (Failure::SettingsUnread, English) => "the settings file cannot be read: correct it, then try again.",
-        (Failure::SettingsUnread, French) => "le fichier des réglages ne peut pas être lu\u{a0}: corrigez-le, puis réessayez.",
-        (Failure::SettingsLocked, English) => "The settings file cannot be read: Kitokey does not write over it until it is corrected.",
-        (Failure::SettingsLocked, French) => {
-            "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé."
+        // Shows: under a command the window refused, after « not saved: », then the refusal.
+        // When: the settings file cannot be read as settings. At most: no limit. Placeholders: {} the refusal.
+        (Failure::SettingsUnread(why), English) => return format!("the settings file cannot be read. {}", refused(&why, language)),
+        (Failure::SettingsUnread(why), French) => {
+            return format!("le fichier des réglages ne peut pas être lu. {}", refused(&why, language));
+        }
+        // Shows: alone on Settings, then the refusal. When: the settings file cannot be read.
+        // At most: no limit. Placeholders: {} the refusal.
+        (Failure::SettingsLocked(why), English) => {
+            return format!(
+                "The settings file cannot be read: Kitokey does not write over it until it is corrected. {}",
+                refused(&why, language)
+            );
+        }
+        (Failure::SettingsLocked(why), French) => {
+            return format!(
+                "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {}",
+                refused(&why, language)
+            );
         }
         (Failure::SettingsUnwritten, English) => "the settings file could not be written: check that the disk has room, then try again.",
         (Failure::SettingsUnwritten, French) => {
@@ -2476,6 +2493,49 @@ pub fn cause(cause: Cause, language: Language) -> &'static str {
     }
 }
 
+/// What the user is told of a settings file refused (#783): which setting, on which line, and the
+/// gesture — never `settings.rs`'s own sentence, which stays for the log and developer mode.
+// Shows: after the sentence of a notification or a page that says the file was not read.
+// When: `settings::read` refuses the file. At most: no limit. Placeholders: {line} the line, {key}
+// the setting's name as the file writes it — one of Kitokey's own, never what the user typed.
+pub fn refused(refused: &Refused, language: Language) -> String {
+    use Language::{English, French};
+    match (*refused, language) {
+        (Refused::Unopened, English) => "Kitokey cannot open its settings file: check that you may read it.".into(),
+        (Refused::Unopened, French) => "Kitokey ne peut pas ouvrir son fichier de réglages\u{a0}: vérifiez que vous pouvez le lire.".into(),
+        (Refused::Unparsed { line, key: Some(key) }, English) => {
+            format!("Line {line}: Kitokey does not understand the value of “{key}”. Correct it, or remove the line.")
+        }
+        (Refused::Unparsed { line, key: Some(key) }, French) => {
+            format!("Ligne {line}\u{a0}: Kitokey ne comprend pas la valeur de «\u{a0}{key}\u{a0}». Corrigez-la, ou supprimez la ligne.")
+        }
+        (Refused::Unparsed { line, key: None }, English) => {
+            format!("Line {line} is not written as a setting. Correct it, or remove it.")
+        }
+        (Refused::Unparsed { line, key: None }, French) => {
+            format!("La ligne {line} n’est pas écrite comme un réglage. Corrigez-la, ou supprimez-la.")
+        }
+        (Refused::NotWhole { key: "model", line }, English) => {
+            format!("Line {line}: “model” gives a file’s whole path, from / or from ~. Correct it.")
+        }
+        (Refused::NotWhole { key: "model", line }, French) => {
+            format!("Ligne {line}\u{a0}: «\u{a0}model\u{a0}» donne le chemin complet d’un fichier, depuis / ou depuis ~. Corrigez-le.")
+        }
+        (Refused::NotWhole { key, line }, English) => {
+            format!("Line {line}: “{key}” gives a folder’s whole path, from / or from ~. Correct it.")
+        }
+        (Refused::NotWhole { key, line }, French) => {
+            format!("Ligne {line}\u{a0}: «\u{a0}{key}\u{a0}» donne le chemin complet d’un dossier, depuis / ou depuis ~. Corrigez-le.")
+        }
+        (Refused::KeepAudio { line }, English) => {
+            format!("Line {line}: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it.")
+        }
+        (Refused::KeepAudio { line }, French) => format!(
+            "Ligne {line}\u{a0}: «\u{a0}keep_audio\u{a0}» vaut «\u{a0}always\u{a0}» ou un nombre de jours, de 1 à 36\u{202f}500. Corrigez-le."
+        ),
+    }
+}
+
 /// What the user is told of a trouble: what it is, and what still works. Where the user has
 /// something to put right — the settings file's line, the place the model goes —, it says where;
 /// never what a program or the system said (D29).
@@ -2491,18 +2551,23 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
             "Kitokey ne peut pas enregistrer",
             "Son programme d’enregistrement n’a pas pu démarrer. Réinstaller Kitokey le remet en place.",
         ),
+        // Shows: a notification at a start, its body then the refusal. When: the settings file cannot
+        // be read. At most: no limit. Placeholders: {} the refusal.
         (Trouble::Settings(why), English) => {
             return said(
                 "Your settings were not read",
-                format!("Kitokey runs with its defaults until the file is corrected: {}.", detail(why)),
+                format!(
+                    "Kitokey runs with its defaults until the file is corrected. {}",
+                    refused(why, language)
+                ),
             );
         }
         (Trouble::Settings(why), French) => {
             return said(
                 "Vos réglages n’ont pas été lus",
                 format!(
-                    "Kitokey fonctionne avec ses réglages par défaut tant que le fichier n’est pas corrigé\u{a0}: {}.",
-                    detail(why)
+                    "Kitokey fonctionne avec ses réglages par défaut tant que le fichier n’est pas corrigé. {}",
+                    refused(why, language)
                 ),
             );
         }
