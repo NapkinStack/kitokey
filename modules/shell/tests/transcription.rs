@@ -341,9 +341,16 @@ sleep 60"#,
     let pressed = std::time::Instant::now();
     transcription.cancel();
     let ended = said.recv_timeout(Duration::from_secs(2)).expect("not ended within two seconds");
+    let answered = pressed.elapsed();
     assert!(matches!(ended, Made::Failed(_)), "{ended:?}");
-    assert!(gone(&child), "its child, deaf to TERM, still runs");
-    assert!(pressed.elapsed() <= Duration::from_secs(2));
+    assert!(answered <= Duration::from_secs(2), "{answered:?}");
+    // The KILL sent, the child is gone once the kernel has delivered it and the process is reaped:
+    // a moment after the answer on a loaded machine (#845). Waited for as a state, within half a second.
+    let killed = std::time::Instant::now();
+    while !gone(&child) && killed.elapsed() < Duration::from_millis(500) {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(gone(&child), "its child, deaf to TERM, still runs half a second after the answer");
 }
 
 #[test]
