@@ -99,13 +99,17 @@ fn answered(agent: &ureq::Agent, address: &str, limit: usize) -> Result<String, 
     Ok(text)
 }
 
+/// minisign's legacy form — the list signed whole, not its hash — is refused: `minisign -S` writes
+/// the pre-hashed form, and `minisign-verify` takes the other only when it is asked to (D56).
+const LEGACY_ALLOWED: bool = false;
+
 /// Whether `signature` is `key`'s over the bytes of `list`. minisign's pre-hashed signature only,
 /// what `minisign -S` writes: the legacy form is refused.
 pub fn verify(list: &str, signature: &str, key: &str) -> Result<(), String> {
     let key = minisign_verify::PublicKey::from_base64(key).map_err(|error| format!("the key built in does not read ({error})"))?;
     let signature =
         minisign_verify::Signature::decode(signature).map_err(|error| format!("the list's signature does not read ({error})"))?;
-    key.verify(list.as_bytes(), &signature, false)
+    key.verify(list.as_bytes(), &signature, LEGACY_ALLOWED)
         .map_err(|error| format!("the list's signature does not verify ({error})"))
 }
 

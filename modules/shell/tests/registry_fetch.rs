@@ -273,3 +273,22 @@ fn under_the_key_built_in_the_list_the_decider_signed_is_taken() {
     let listed = registry::fetch(&served.address, registry::PUBLIC_KEY).unwrap();
     assert_eq!(listed, registry::shipped());
 }
+
+/// A key made for this test, outside it (openssl's Ed25519, the boxes as minisign writes them):
+/// `minisign` the crate writes the pre-hashed form only. Its private key was not kept.
+const FIXED_KEY: &str = "RWQBI0VniavN7wWzl40CApIQMFl5I82eP9r51HLn0+S12rpml2YUEJMN";
+/// What that key signed, both ways.
+const FIXED_LIST: &str = "A list signed by a key made for this test.\n";
+/// Its signature in minisign's pre-hashed form, `ED`: what `minisign -S` writes.
+const PREHASHED: &str = "untrusted comment: signature from minisign secret key\nRUQBI0VniavN7wrzXTMs5fdRG6KVz+5THLiu+a8cBCxN3Z4DuDpIiu2Cuw6V6r3uIeRW5H2FQ8B7Md7iETvI1lBzIvFSaYz98gs=\ntrusted comment: timestamp:1794666686\tfile:models.json\thashed\njSaui6oed+w24Xpc7qoBDxGb4ESZQFH+G1ZlPTqlNFx0oGA4rwdySDORy0ZpX4bGnpIEqTcPo1qHunqdHT7GAg==\n";
+/// The same bytes signed in the legacy form, `Ed`: the list itself, not its hash.
+const LEGACY: &str = "untrusted comment: signature from minisign secret key\nRWQBI0VniavN77JORcfb0/qk/S+eZJButt7IBOw0QkA5tgFZ6PaeIDWMDMQx9jpkVazHbKuJl/LBc6SjE2HJrM8V5/wcGoAWZgo=\ntrusted comment: timestamp:1794666686\tfile:models.json\thashed\ns6BDg+gP07KNfUzg51q7MJUZRhiw6Jt2I5D/UARqlcYKY/Z/aty8y7kYp9vXkt8Ezy0bjBGe/WWugAD6UjjkBA==\n";
+
+#[test]
+fn a_list_signed_in_minisigns_legacy_form_is_refused() {
+    // The same key and bytes, pre-hashed: verified — the refusal below is the form's alone.
+    assert_eq!(registry::verify(FIXED_LIST, PREHASHED, FIXED_KEY), Ok(()));
+    let why = registry::verify(FIXED_LIST, LEGACY, FIXED_KEY).unwrap_err();
+    assert!(why.contains("signature"), "{why}");
+    assert!(registry::in_the_repository(FIXED_LIST, Some(LEGACY), Some(FIXED_KEY)).is_err());
+}
