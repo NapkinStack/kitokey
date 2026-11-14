@@ -1014,18 +1014,21 @@ def service_named(now: dt.datetime) -> None:
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
         wait_for(browser, lambda b: b.find_elements(By.ID, "model"))
-        check("the service's fields are hidden until it is chosen", not browser.find_element(By.ID, "transcription-service").is_displayed())
-        Select(browser.find_element(By.ID, "model")).select_by_value("service")
-        shown = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-service").is_displayed(), 5)
-        check("chosen, its address, its model and its key are asked", shown and browser.find_elements(By.ID, "transcription-key"))
-        # An address that is none, or a name that only starts as this computer's: said, nothing saved.
+        check("the service's fields are hidden until it is chosen", not browser.find_element(By.ID, "transcription-away").is_displayed())
+        press(browser, "transcription-online")
+        shown = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-away").is_displayed(), 5)
+        check("chosen, a service named and its key are asked", shown and browser.find_element(By.ID, "transcription-key").is_displayed())
+        # An address of one's own, under « Avancé » (D95): one that is none, or a name that only
+        # starts as this computer's: said, nothing saved.
+        press(browser, "transcription-advanced")
+        wait_for(browser, lambda b: b.find_element(By.ID, "transcription-provider").is_displayed(), 3)
         browser.find_element(By.ID, "transcription-provider").send_keys("hears.example/v1")
-        browser.find_element(By.ID, "transcription-save").click()
+        browser.find_element(By.ID, "transcription-own-save").click()
         bad = wait_for(browser, lambda b: "l’adresse commence par https://" in b.execute_script(said), 5)
         browser.find_element(By.ID, "transcription-provider").clear()
         browser.find_element(By.ID, "transcription-provider").send_keys("https://localhost.hears.example/v1")
         browser.find_element(By.ID, "transcription-model").send_keys("whisper-1")
-        browser.find_element(By.ID, "transcription-save").click()
+        browser.find_element(By.ID, "transcription-own-save").click()
         elsewhere = wait_for(browser, lambda b: "acceptez d’abord" in b.execute_script(said), 5)
         check("an address that is none, or a host that only starts as this computer's, is said and not saved",
               bad and elsewhere and "transcription_provider" not in window.file.read_text(), browser.execute_script(said))
@@ -1034,14 +1037,14 @@ def service_named(now: dt.datetime) -> None:
         # A host elsewhere, not agreed to: nothing saved, the agreement asked.
         browser.find_element(By.ID, "transcription-provider").send_keys("https://hears.example/v1")
         browser.find_element(By.ID, "transcription-model").send_keys("whisper-1")
-        agreement = browser.find_element(By.ID, "transcription-agreed").find_element(By.XPATH, "..").text
-        browser.find_element(By.ID, "transcription-save").click()
+        agreement = browser.find_element(By.ID, "transcription-own-agreed").find_element(By.XPATH, "..").text
+        browser.find_element(By.ID, "transcription-own-save").click()
         refused = wait_for(browser, lambda b: "acceptez d’abord" in b.execute_script(said), 5)
         check("a host elsewhere is not saved before the user agreed, the host named in the agreement",
               refused and "hears.example" in agreement and "transcription_provider" not in window.file.read_text(), (agreement, browser.execute_script(said)))
         # Agreed: saved, and who hears is that service.
-        browser.find_element(By.ID, "transcription-agreed").click()
-        browser.find_element(By.ID, "transcription-save").click()
+        browser.find_element(By.ID, "transcription-own-agreed").click()
+        browser.find_element(By.ID, "transcription-own-save").click()
         saved = wait_for(browser, lambda b: 'engine = "service"' in window.file.read_text(), 5)
         check("agreed, the service is saved as who hears, its host kept as agreed",
               saved and 'transcription_agreed = "hears.example"' in window.file.read_text() and "whisper-1" in window.file.read_text(), window.file.read_text())
@@ -1069,21 +1072,21 @@ def service_named(now: dt.datetime) -> None:
         # Enregistrer while Tester asks: the sentence said, then the answer; the button given back.
         browser.execute_script("window.answer = null; window.__TAURI__.core = window.held; document.getElementById('transcription-test').click()")
         wait_for(browser, lambda b: b.execute_script("return window.answer !== null"), 5)
-        browser.execute_script("document.getElementById('transcription-save').click()")
+        browser.execute_script("document.getElementById('transcription-own-save').click()")
         saved_said = wait_for(browser, lambda b: "hears.example" in b.execute_script(said), 5)
         check("Enregistrer while Tester asks: said, Tester still disabled", saved_said and browser.execute_script(testing), browser.execute_script(said))
         browser.execute_script("window.answer()")
         check("then Tester's answer is said, and it can be asked again", wait_for(browser, lambda b: b.execute_script(said).startswith(hears) and not b.execute_script(testing), 10), browser.execute_script(said))
         browser.execute_script("window.restore()")
         # Enregistrer's own sentence: it outlives a redraw too.
-        browser.execute_script("document.getElementById('transcription-save').click()")
+        browser.execute_script("document.getElementById('transcription-own-save').click()")
         wait_for(browser, lambda b: "hears.example" in b.execute_script(said), 5)
         kept_said = browser.execute_script(said)
         browser.execute_script("window.__old = document.getElementById('transcription-said'); refresh()")
         wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && document.getElementById('transcription-said') !== null"), 5)
         check("Enregistrer's sentence: it stays when drawn anew", browser.execute_script(said) == kept_said, browser.execute_script(said))
         # Another address saved while Tester asks about the first: its answer is not said of the second.
-        address_to = "const a = document.getElementById('transcription-provider'); a.value = arguments[0]; a.dispatchEvent(new Event('input')); document.getElementById('transcription-agreed').click(); document.getElementById('transcription-save').click()"
+        address_to = "const a = document.getElementById('transcription-provider'); a.value = arguments[0]; a.dispatchEvent(new Event('input')); document.getElementById('transcription-own-agreed').click(); document.getElementById('transcription-own-save').click()"
         browser.execute_script("window.answer = null; window.__TAURI__.core = window.held; document.getElementById('transcription-test').click()")
         wait_for(browser, lambda b: b.execute_script("return window.answer !== null"), 5)
         browser.execute_script(address_to, "https://other.example/v1")
@@ -1096,7 +1099,7 @@ def service_named(now: dt.datetime) -> None:
         browser.execute_script(address_to, "https://hears.example/v1")
         wait_for(browser, lambda b: 'transcription_agreed = "hears.example"' in window.file.read_text(), 5)
         # Another model saved while Tester asks about the first: the same.
-        model_to = "const m = document.getElementById('transcription-model'); m.value = arguments[0]; m.dispatchEvent(new Event('input')); document.getElementById('transcription-save').click()"
+        model_to = "const m = document.getElementById('transcription-model'); m.value = arguments[0]; m.dispatchEvent(new Event('input')); document.getElementById('transcription-own-save').click()"
         browser.execute_script("window.answer = null; window.__TAURI__.core = window.held; document.getElementById('transcription-test').click()")
         wait_for(browser, lambda b: b.execute_script("return window.answer !== null"), 5)
         browser.execute_script(model_to, "whisper-2")
@@ -1124,18 +1127,18 @@ def service_named(now: dt.datetime) -> None:
         check("another address and back: the last answer is gone", browser.execute_script(said) == "", browser.execute_script(said))
         # Offered by name, as the minutes' services are (D63).
         offered = lambda b, id_: b.execute_script("return [...document.querySelectorAll(arguments[0])].map(o => [o.value, o.textContent])", f"#{id_} option")
-        names = [said_ for value, said_ in offered(browser, "model") if value.startswith("service:")]
+        names = [said_ for _, said_ in offered(browser, "transcription-service")]
         check("the services that hear are offered by name, as the minutes' are: OpenRouter, OpenAI", names == ["OpenRouter", "OpenAI"], names)
         # Another choice: what was said of the last goes at once, on the same page.
         browser.execute_script("document.getElementById('transcription-test').click()")
         wait_for(browser, lambda b: b.execute_script(said).startswith(hears), 10)
-        Select(browser.find_element(By.ID, "model")).select_by_value("service:0")
+        choose(browser, "transcription-service", "1")
         check("another service chosen: the last answer goes at once", browser.execute_script(said) == "", browser.execute_script(said))
-        Select(browser.find_element(By.ID, "model")).select_by_value("service")
+        choose(browser, "transcription-service", "0")
         # Another service chosen while Tester asks: its button at once, the old answer never said, even drawn anew.
         browser.execute_script("window.answer = null; window.answered = 0; window.__TAURI__.core = window.held; document.getElementById('transcription-test').click()")
         wait_for(browser, lambda b: b.execute_script("return window.answer !== null"), 5)
-        Select(browser.find_element(By.ID, "model")).select_by_value("service:0")
+        choose(browser, "transcription-service", "1")
         check("another service chosen while Tester asks: its button given back at once", not browser.execute_script(testing))
         browser.execute_script("window.answer()")
         wait_for(browser, lambda b: b.execute_script("return window.answered") >= 1, 10)
@@ -1144,17 +1147,16 @@ def service_named(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && document.getElementById('transcription-said') !== null"), 5)
         check("drawn anew after: nor then", browser.execute_script(said) == "", browser.execute_script(said))
         listed.clear()
-        Select(browser.find_element(By.ID, "model")).select_by_value("service:0")
-        models = wait_for(browser, lambda b: [s for _, s in offered(b, "transcription-models")] == ["openai/whisper-large-v3-turbo", "vendor/scribe", "Un autre modèle…"], 5)
-        check("OpenRouter chosen: its transcription models listed from it, its address filled and not asked",
-              models and listed == ["/api/v1/models?output_modalities=transcription"] and not browser.find_element(By.ID, "transcription-provider").is_displayed()
-              and not browser.find_element(By.ID, "transcription-model").is_displayed(), (offered(browser, "transcription-models"), listed))
-        Select(browser.find_element(By.ID, "transcription-models")).select_by_value("")
-        typed = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-model").is_displayed()
-                         and b.execute_script("return document.activeElement.id") == "transcription-model", 3)
-        check("« Un autre modèle… »: a model typed by hand", typed)
-        Select(browser.find_element(By.ID, "transcription-models")).select_by_value("vendor/scribe")
+        choose(browser, "transcription-service", "0")
+        press(browser, "transcription-advanced")
+        wait_for(browser, lambda b: not b.find_element(By.ID, "transcription-provider").is_displayed(), 3)
         browser.find_element(By.ID, "transcription-key").send_keys("sk-stand-in-not-a-key")
+        press(browser, "transcription-key-test")
+        models = wait_for(browser, lambda b: [s for _, s in offered(b, "transcription-models")] == ["Whisper Large V3 Turbo", "Scribe"], 5)
+        check("OpenRouter chosen, its key taken: its transcription models listed from it, by name, its address filled and not asked",
+              models and listed == ["/api/v1/key", "/api/v1/models?output_modalities=transcription"] and not browser.find_element(By.ID, "transcription-provider").is_displayed(),
+              (offered(browser, "transcription-models"), listed))
+        Select(browser.find_element(By.ID, "transcription-models")).select_by_value("vendor/scribe")
         if not browser.find_element(By.ID, "transcription-agreed").is_selected():
             browser.find_element(By.ID, "transcription-agreed").click()
         press(browser, "transcription-save")
@@ -1188,13 +1190,14 @@ def service_named(now: dt.datetime) -> None:
         browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
         browser.execute_script("location.hash = '#/settings'")
-        kept = wait_for(browser, lambda b: b.find_elements(By.ID, "model") and b.find_element(By.ID, "model").get_attribute("value") == "service:0"
+        kept = wait_for(browser, lambda b: b.find_elements(By.ID, "transcription-online") and b.find_element(By.ID, "transcription-online").is_selected()
+                        and b.find_element(By.ID, "transcription-service").get_attribute("value") == "0"
                         and b.find_element(By.ID, "transcription-models").get_attribute("value") == "vendor/scribe", 5)
         check("drawn again: OpenRouter chosen, its model in its list", kept)
-        Select(browser.find_element(By.ID, "model")).select_by_value("service:1")
-        named = wait_for(browser, lambda b: [s for _, s in offered(b, "transcription-models")] == ["whisper-1", "Un autre modèle…"], 5)
-        check("OpenAI chosen: the model it publishes with segments, named in the repository — not its own list",
-              named and len(listed) == 2, (offered(browser, "transcription-models"), listed))
+        # OpenAI's key is tested at its own address, never a stand-in's: its models are held by providers' tests.
+        choose(browser, "transcription-service", "1")
+        check("OpenAI chosen: no model offered before its key, nothing asked of it",
+              not browser.find_element(By.ID, "transcription-models").is_displayed() and len(listed) == 2, listed)
         # In developer mode, the sentence and the program's last line, its name off.
         code.write_text(TEST_CAUSES[-1][0])
         try:
@@ -6444,16 +6447,16 @@ def nothing_silent(now: dt.datetime) -> None:
         browser.execute_script("window.restore()")
         press(browser, "unfold")
         check("kept at last: the sentence goes", wait_for(browser, lambda b: not shown(b, "pane-said"), 5))
-        browser.execute_script(refuse, "hearing_models")
+        browser.execute_script(refuse, "transcription_models")
         browser.execute_script("location.hash = '#/settings'")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "model"), 10)
-        # Settings drawn before, drawn anew: the list taken once that drawing is done.
+        wait_for(browser, lambda b: b.find_elements(By.ID, "transcription-online"), 10)
+        # Settings drawn before, drawn anew: the key tested once that drawing is done.
         time.sleep(1)
-        Select(browser.find_element(By.ID, "model")).select_by_value("service:0")
-        refused = wait_for(browser, lambda b: shown(b, "transcription-models-refused"), 5)
-        check("a service's models refused: said, and the model can still be typed",
-              refused and text(browser, "transcription-models-refused") == "Les modèles de ce service n’ont pas pu être lus, vous pouvez en saisir un\u00a0: REFUS"
-              and shown(browser, "transcription-model"), text(browser, "transcription-models-refused"))
+        press(browser, "transcription-online")
+        press(browser, "transcription-key-test")
+        refused = wait_for(browser, lambda b: text(b, "transcription-key-said") == "REFUS", 5)
+        check("a hearing service's key test refused: said where it is asked, no model listed (D95)",
+              refused and not shown(browser, "transcription-models"), text(browser, "transcription-key-said"))
         browser.execute_script("window.restore()")
         browser.execute_script("location.hash = '#/'")
         # The folder refused, then given back: said, and read again on the click.

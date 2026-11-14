@@ -347,7 +347,7 @@ fn main() {
             speech_shown,
             transcription_saved,
             transcription_tested,
-            hearing_models,
+            transcription_models,
             speech_installed,
             ollama_pull_offered,
             header,
@@ -2661,23 +2661,30 @@ async fn transcription_saved(
     Ok(not_kept)
 }
 
-/// The transcription models a service that hears offers (D63): listed by the service where it
-/// lists them, else those it publishes. Nothing of a meeting is sent; no key is needed to list.
+/// A hearing service's models, asked with the key the user typed — or the one kept for its host
+/// under the transcription's account —: the key tested at once (D95), as the summary's is. Only the
+/// ids come back; nothing is kept, the key never logged. Refused, the cause in the Tester's sentence.
 #[tauri::command]
-async fn hearing_models(shell: State<'_, Shell>, index: usize) -> Result<Vec<String>, Told> {
+async fn transcription_models(shell: State<'_, Shell>, index: usize, key: Option<String>) -> Result<Vec<String>, Told> {
     let service = providers::hearing()
         .into_iter()
         .nth(index)
         .ok_or_else(|| shell.told(Failure::Unexpected, "no such service"))?;
-    let published = || service.models.iter().map(|model| model.to_string()).collect();
-    if !service.listed {
-        return Ok(published());
-    }
-    let address = service.address.clone();
-    let listed = tauri::async_runtime::spawn_blocking(move || providers::hearing_listed(&address))
-        .await
-        .map_err(|error| shell.told(Failure::Unexpected, error))?;
-    Ok(listed.unwrap_or_else(published))
+    let host = providers::host(&service.address).unwrap_or_default();
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&transcription::key_account(&host)).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::hearing_models(&service, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
 }
 
 /// *Tester* for who hears: `kitokey-transcription --test` sends a sound of its own to the service
