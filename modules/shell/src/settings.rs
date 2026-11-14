@@ -249,31 +249,104 @@ struct Written {
     microphone_description: Option<String>,
 }
 
+/// What in a settings file Kitokey refuses, as the user is told it (#783): which setting, on which
+/// line. A key is one of the file's own (`KEYS`), never what the user typed in its place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refused {
+    /// The file is there and cannot be opened: its permissions, a folder in its place.
+    Unopened,
+    /// A line that is not a setting as TOML writes one, or a setting whose value is not of its kind.
+    Unparsed { line: usize, key: Option<&'static str> },
+    /// `sessions` or `model`: not a whole path.
+    NotWhole { key: &'static str, line: usize },
+    /// `keep_audio`: neither "always" nor a number of days from 1 to 36,500.
+    KeepAudio { line: usize },
+}
+
+/// A settings file refused: what the user is told, and the sentence the log and developer mode
+/// hold — which names the file by its whole path until `unnamed` is given it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unread {
+    pub refused: Refused,
+    pub detail: String,
+}
+
+impl std::fmt::Display for Unread {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.detail)
+    }
+}
+
+/// The keys a settings file may hold: those a refusal names.
+const KEYS: [&str; 25] = [
+    "reminder",
+    "sessions",
+    "transcript",
+    "after",
+    "model",
+    "engine",
+    "transcription_provider",
+    "transcription_model",
+    "transcription_agreed",
+    "minutes_provider",
+    "minutes_model",
+    "meeting_language",
+    "minutes_agreed",
+    "keep_audio",
+    "developer",
+    "offer",
+    "autostart",
+    "window",
+    "log",
+    "welcomed",
+    "folded",
+    "bar_at",
+    "language",
+    "microphone",
+    "microphone_description",
+];
+
 /// Reads the settings. No file is no choice made: the defaults. A file that cannot be read as
 /// settings is said in one sentence — which file, which line, and what in it — and nothing of
 /// it is used.
-pub fn read(path: &Path) -> Result<Settings, String> {
+pub fn read(path: &Path) -> Result<Settings, Unread> {
+    let unread = |refused, detail| Unread { refused, detail };
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Settings::default()),
-        Err(error) => return Err(format!("{} cannot be read ({error})", path.display())),
+        Err(error) => return Err(unread(Refused::Unopened, format!("{} cannot be read ({error})", path.display()))),
     };
     // The line a place of the file is on: one more than the line ends before it.
     let line = |at: usize| text[..at.min(text.len())].matches('\n').count() + 1;
+    // The key a line sets, when it is one of the file's own.
+    let key = |at: usize| {
+        let start = text[..at.min(text.len())].rfind('\n').map_or(0, |end| end + 1);
+        let (named, _) = text[start..].split_once('=')?;
+        KEYS.into_iter().find(|key| *key == named.trim())
+    };
     let written: Written = toml::from_str(&text).map_err(|error| match error.span() {
-        Some(span) => format!("{}, line {}: {}", path.display(), line(span.start), error.message()),
-        None => format!("{}: {}", path.display(), error.message()),
+        Some(span) => unread(
+            Refused::Unparsed {
+                line: line(span.start),
+                key: key(span.start),
+            },
+            format!("{}, line {}: {}", path.display(), line(span.start), error.message()),
+        ),
+        None => unread(
+            Refused::Unparsed { line: 1, key: None },
+            format!("{}: {}", path.display(), error.message()),
+        ),
     })?;
     // A path written as people write it: from their home, with a tilde — or from the root.
-    let whole = |key: &str, what: &str, written: toml::Spanned<PathBuf>| {
+    let whole = |key: &'static str, what: &str, written: toml::Spanned<PathBuf>| {
         let at = line(written.span().start);
         let named = from_home(written.into_inner());
         if named.is_absolute() {
             Ok(named)
         } else {
-            Err(format!(
-                "{}, line {at}: {key} is {what} whole path, from the root or from ~",
-                path.display()
+            Err(unread(
+                Refused::NotWhole { key, line: at },
+                format!("{}, line {at}: {key} is {what} whole path, from the root or from ~", path.display()),
             ))
         }
     };
@@ -310,9 +383,9 @@ pub fn read(path: &Path) -> Result<Settings, String> {
             toml::Value::String(always) if always == "always" => KeepAudio::Always,
             toml::Value::Integer(days) if (1..=36_500).contains(days) => KeepAudio::Days(*days as u32),
             _ => {
-                return Err(format!(
-                    "{}, line {at}: keep_audio is \"always\" or a number of days",
-                    path.display()
+                return Err(unread(
+                    Refused::KeepAudio { line: at },
+                    format!("{}, line {at}: keep_audio is \"always\" or a number of days", path.display()),
                 ));
             }
         };
@@ -345,7 +418,7 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     let refused = |why: String| io::Error::new(io::ErrorKind::InvalidData, why);
     // Through a link, the file it points to.
     let path = &fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    let before = read(path).map_err(refused)?;
+    let before = read(path).map_err(|why| refused(why.detail))?;
     let mut document = match fs::read_to_string(path) {
         Ok(text) => text.parse::<DocumentMut>().map_err(|error| refused(error.to_string()))?,
         Err(error) if error.kind() == io::ErrorKind::NotFound => DocumentMut::new(),

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use kitokey_shell::{
     recording::{Said, Source},
+    settings::Refused,
     words::{self, Failure, Language, Notice, Refusal},
 };
 
@@ -308,7 +309,10 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
     for language in BOTH {
         for trouble in [
             Trouble::NoRecorder(String::new()),
-            Trouble::Settings("settings.toml, line 3: invalid boolean".into()),
+            Trouble::Settings(Refused::Unparsed {
+                line: 3,
+                key: Some("reminder"),
+            }),
             Trouble::Shortcut(String::new()),
             Trouble::NoModel("<data>/kitokey/models/ggml.bin".into()),
             Trouble::NoTranscriber(String::new()),
@@ -319,8 +323,12 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
                 "{title} — {body}"
             );
         }
-        let settings = words::trouble(&Trouble::Settings("settings.toml, line 3: invalid boolean".into()), language).body;
-        assert!(settings.contains("settings.toml, line 3: invalid boolean"), "{settings}");
+        let unparsed = Refused::Unparsed {
+            line: 3,
+            key: Some("reminder"),
+        };
+        let settings = words::trouble(&Trouble::Settings(unparsed), language).body;
+        assert!(settings.ends_with(&words::refused(&unparsed, language)), "{settings}");
         let model = words::trouble(&Trouble::NoModel("<data>/kitokey/models/ggml.bin".into()), language).body;
         assert!(model.contains("<data>/kitokey/models/ggml.bin"), "{model}");
     }
@@ -328,10 +336,8 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
     let body = |trouble, language| words::trouble(&trouble, language).body;
     assert!(body(Trouble::NoRecorder(String::new()), Language::English).ends_with("Installing Kitokey again puts it back."));
     assert!(body(Trouble::NoRecorder(String::new()), Language::French).ends_with("Réinstaller Kitokey le remet en place."));
-    assert!(body(Trouble::Settings(String::new()), Language::English).contains("runs with its defaults"));
+    assert!(body(Trouble::Settings(Refused::Unopened), Language::English).contains("runs with its defaults"));
     assert!(body(Trouble::Shortcut(String::new()), Language::French).contains("permet toujours de démarrer"));
-    // What the settings file holds wrong comes out on one line.
-    assert!(body(Trouble::Settings("line one\n\tline two".into()), Language::English).contains("line one line two"));
 }
 
 #[test]
@@ -1533,18 +1539,25 @@ fn the_settings_files_path_stays_out_of_what_a_command_keeps_of_a_failure() {
 #[test]
 fn a_settings_file_that_cannot_be_read_is_said_whole_its_raw_text_under_it_only_in_developer_mode() {
     let raw = "settings.toml, line 1: keep_audio is \"always\" or a number of days";
-    let page = |language, developer| serde_json::to_value(words::told(Failure::SettingsLocked, raw, language, developer)).unwrap();
+    let locked = Failure::SettingsLocked(Refused::KeepAudio { line: 1 });
+    let page = |language, developer| serde_json::to_value(words::told(locked, raw, language, developer)).unwrap();
     assert_eq!(
         page(Language::French, false),
-        "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé."
+        "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. \
+         Ligne 1\u{a0}: «\u{a0}keep_audio\u{a0}» vaut «\u{a0}always\u{a0}» ou un nombre de jours, de 1 à 36\u{202f}500. Corrigez-le."
     );
     assert_eq!(
         page(Language::English, false),
-        "The settings file cannot be read: Kitokey does not write over it until it is corrected."
+        "The settings file cannot be read: Kitokey does not write over it until it is corrected. \
+         Line 1: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it."
     );
     assert_eq!(
         page(Language::English, true),
-        format!("The settings file cannot be read: Kitokey does not write over it until it is corrected.\n{raw}").as_str()
+        format!(
+            "The settings file cannot be read: Kitokey does not write over it until it is corrected. \
+             Line 1: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it.\n{raw}"
+        )
+        .as_str()
     );
 }
 
@@ -1737,6 +1750,77 @@ fn a_notice_of_minutes_failed_by_the_meetings_own_model_says_what_its_page_says(
                 let notice = words::minutes(&Minutes::failed_by(Some(cause), again, by, language), language);
                 let before = words::minutes(&Minutes::failed(Some(cause), again), language);
                 assert_eq!((notice.title, notice.body), (before.title, before.body));
+            }
+        }
+    }
+}
+
+/// A settings file refused is said in the user's language: which setting, on which line, and what
+/// to do — never `settings.rs`'s own sentence, which stays for the log and behind « Développeur »
+/// (#783, D94). The window says it under each command it refuses, and the notification at a start.
+#[test]
+fn a_settings_file_refused_says_which_setting_and_what_to_do_in_both_languages() {
+    use words::Trouble;
+    let said = [
+        (
+            Refused::Unopened,
+            "Kitokey cannot open its settings file: check that you may read it.",
+            "Kitokey ne peut pas ouvrir son fichier de réglages\u{a0}: vérifiez que vous pouvez le lire.",
+        ),
+        (
+            Refused::Unparsed {
+                line: 4,
+                key: Some("after"),
+            },
+            "Line 4: Kitokey does not understand the value of “after”. Correct it, or remove the line.",
+            "Ligne 4\u{a0}: Kitokey ne comprend pas la valeur de «\u{a0}after\u{a0}». Corrigez-la, ou supprimez la ligne.",
+        ),
+        (
+            Refused::Unparsed { line: 4, key: None },
+            "Line 4 is not written as a setting. Correct it, or remove it.",
+            "La ligne 4 n’est pas écrite comme un réglage. Corrigez-la, ou supprimez-la.",
+        ),
+        (
+            Refused::NotWhole { key: "sessions", line: 4 },
+            "Line 4: “sessions” gives a folder’s whole path, from / or from ~. Correct it.",
+            "Ligne 4\u{a0}: «\u{a0}sessions\u{a0}» donne le chemin complet d’un dossier, depuis / ou depuis ~. Corrigez-le.",
+        ),
+        (
+            Refused::NotWhole { key: "model", line: 4 },
+            "Line 4: “model” gives a file’s whole path, from / or from ~. Correct it.",
+            "Ligne 4\u{a0}: «\u{a0}model\u{a0}» donne le chemin complet d’un fichier, depuis / ou depuis ~. Corrigez-le.",
+        ),
+        (
+            Refused::KeepAudio { line: 4 },
+            "Line 4: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it.",
+            "Ligne 4\u{a0}: «\u{a0}keep_audio\u{a0}» vaut «\u{a0}always\u{a0}» ou un nombre de jours, de 1 à 36\u{202f}500. Corrigez-le.",
+        ),
+    ];
+    // Each refusal `settings.rs` makes is said: one added fails to compile here until it is named.
+    for (refused, ..) in &said {
+        match refused {
+            Refused::Unopened | Refused::Unparsed { .. } | Refused::NotWhole { .. } | Refused::KeepAudio { .. } => {}
+        }
+    }
+    let raw = "settings.toml, line 4: keep_audio is \"always\" or a number of days";
+    for (refused, english, french) in said {
+        for (language, sentence) in [(Language::English, english), (Language::French, french)] {
+            assert_eq!(words::refused(&refused, language), sentence);
+            // The notification at a start: what still works, then the setting and the gesture.
+            let Notice { title, body } = words::trouble(&Trouble::Settings(refused), language);
+            assert!(title.chars().count() <= 50 && body.ends_with(sentence), "{title} — {body}");
+            assert!(
+                body.starts_with(["Kitokey runs with its defaults", "Kitokey fonctionne avec ses réglages par défaut"][language as usize]),
+                "{body}"
+            );
+            // Under a command the window refused: its sentence, the refusal after it, the raw text
+            // only in developer mode.
+            for failure in [Failure::SettingsUnread(refused), Failure::SettingsLocked(refused)] {
+                let shown = |developer| serde_json::to_value(words::told(failure, raw, language, developer)).unwrap();
+                let shown = (shown(false), shown(true));
+                assert!(shown.0.as_str().unwrap().ends_with(sentence), "{shown:?}");
+                assert!(!shown.0.as_str().unwrap().contains(raw), "{shown:?}");
+                assert_eq!(shown.1.as_str().unwrap(), format!("{}\n{raw}", shown.0.as_str().unwrap()));
             }
         }
     }
