@@ -496,7 +496,7 @@ def main(what, folder, *args):
     elif what == "stopped-source":
         # The remote source was stopped for several seconds: the capture wrote zeros and said which.
         points, silences, _ = clocks["remote"]
-        remote, rate = tracks["remote"], tracks["remote"]["rate"]
+        _, rate = tracks["remote"], tracks["remote"]["rate"]
         assert silences, "remote stopped for seconds, and the clock says no silence of ours"
         zeros = sum(to - start for start, to in silences)
         assert zeros >= 2 * rate, f"{zeros / rate:.1f} s of zeros said for a stop of several seconds"
