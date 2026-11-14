@@ -58,6 +58,8 @@ type MinutesFailed = (String, Option<summarising::Cause>, Option<String>);
 struct Shell {
     /// What the user chose: read at start, changed from the window.
     settings: Mutex<Settings>,
+    /// The settings file was read once at least: what is held is the user's, not the defaults (#770).
+    settings_read: Mutex<bool>,
     /// Held while a change is read onto the file and written: two saves never interleave, the
     /// later undoing the earlier.
     saving: Mutex<()>,
@@ -207,6 +209,7 @@ impl Shell {
         );
         if let Ok(settings) = &read {
             *self.settings.lock().unwrap() = settings.clone();
+            *self.settings_read.lock().unwrap() = true;
         }
         read
     }
@@ -490,6 +493,7 @@ fn main() {
                 .build(app)?;
             app.manage(Shell {
                 settings: Mutex::new(read.clone().unwrap_or_default()),
+                settings_read: Mutex::new(read.is_ok()),
                 saving: Mutex::new(()),
                 keyring: Mutex::new(None),
                 system,
@@ -889,6 +893,12 @@ struct Listing {
     folded: bool,
     /// The meetings' folder is there and cannot be read (D67): `sessions` is empty for that reason.
     unreadable: bool,
+    /// The settings file cannot be read (#770): never read since Kitokey started, the folder listed is
+    /// the default one, not the user's; read before, the last settings read are held and listed.
+    settings_unread: bool,
+    /// With `settings_unread`: the last settings read are held — the user's meetings are listed, and no
+    /// change is saved until the file is fixed.
+    settings_kept: bool,
     /// The last start refused, the trial over (D83).
     refused: bool,
 }
@@ -904,6 +914,12 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
     let asked = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let shell = app.state::<Shell>();
+        // Read anew: fixed meanwhile, the user's folder is listed again (#770). Not during a save:
+        // the file read just before its rename would put the settings it replaced back in memory.
+        let settings_unread = {
+            let _saving = shell.saving.lock().unwrap();
+            shell.reread().is_err()
+        };
         let recorded = shell.recorded.lock().unwrap().clone();
         let sessions = sessions::list(&shell.settings().sessions, recorded.as_deref());
         let mut kept = shell.shapes.lock().unwrap();
@@ -946,6 +962,8 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
                 sessions::unreadable(&folder, folder == settings::Settings::default().sessions)
             },
             refused: *shell.refused.lock().unwrap(),
+            settings_unread,
+            settings_kept: settings_unread && *shell.settings_read.lock().unwrap(),
         }
     })
     .await
