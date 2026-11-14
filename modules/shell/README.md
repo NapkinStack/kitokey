@@ -26,6 +26,20 @@ it starts and never reads the code of · grey: files, the only thing it shares w
 **It holds no step** (ADR-0002): closed or crashed, a recording goes on, and every step still
 runs from a terminal.
 
+**A recording found again** (#773, Linux): while one runs, `recording.json` beside the settings keeps
+capture's process number, when the system started it (`/proc/<id>/stat`) and the session's folder,
+written whole once capture says `started`, removed once it has ended. A Kitokey started again after
+its shell was ended reads it: the same number and start — no other program can be that one — is the
+recording in progress, its tray and bar at ■, its length counted from `session.json`'s `started`,
+stopped by a termination signal (`recording/v1`), its transcript following as usual; a `stopped`
+already written is a recording ending. Its levels, devices and silences went with the output of the
+shell that read them: none are shown. A program gone, another under its number or a file that does
+not read finds nothing, and the file is removed; one that cannot be read — a file, or a folder in
+its place — is set aside as `recording.json.unreadable-<seconds>`, never deleted. The session left is
+listed as it is. Not found: a
+recording whose shell was ended before capture said `started`, and on macOS and Windows, which have
+no `/proc`.
+
 **Today**: an icon in the tray whose menu starts and stops a recording, the same from a
 global shortcut — Super+Alt+M under a Linux desktop — and a notification for what matters:
 the reminder to announce the recording, with the microphone recorded named in it — one
@@ -46,6 +60,14 @@ alone, no window; `TryExec`, so a removed package starts nothing. The entry is t
 Settings' *Lancer Kitokey à l'ouverture de session* writes or removes it, and reads it as the
 desktop's tools leave it (`Hidden`, `X-GNOME-Autostart-enabled`). `autostart` in the settings
 file says Kitokey wrote it once: turned off, it is never written again by itself.
+
+**On Windows** (D84), the package declares a startup task, `KitokeyStartupTask` (`install`'s
+manifest), that Windows turns on at the first start; nothing is written under
+`AppData\Roaming\autostart`. The same switch reads and changes the task through `StartupTask`
+(`src/autostart.rs`): turned off by the user in Windows' Startup settings, or set by a policy, it is
+shown as Windows holds it, disabled, with the sentence saying why. The zip has no task: the switch
+is not offered. Each start says the task's state in the log, `shell.startup_task`, for the Windows
+trial to record.
 
 **What the user held under an earlier name** — Wholeheard until D86, Summit until D28 — is carried
 over at the start, before anything is read (`src/migrate.rs`, `keys`, `autostart`), the latest name

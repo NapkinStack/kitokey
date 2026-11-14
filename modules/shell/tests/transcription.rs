@@ -312,3 +312,67 @@ fn the_meetings_language_is_told_to_each_engine_speechanalyzer_only_in_the_two_i
         assert!(args().ends_with(wanted), "{hearer:?} {spoken:?}: {}", args());
     }
 }
+
+/// Whether a process has ended: none by that number, or one ended and not yet waited for.
+fn gone(pid: &str) -> bool {
+    fs::read_to_string(format!("/proc/{}/stat", pid.trim())).map_or(true, |stat| {
+        stat.rsplit_once(')').and_then(|(_, rest)| rest.split_whitespace().next()) == Some("Z")
+    })
+}
+
+#[test]
+fn cancelled_it_ends_within_two_seconds_with_what_it_started_even_deaf_to_term() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    let (transcription, said) = made(
+        folder.path(),
+        r#"echo '{"type":"header"}' > "$1/transcript.jsonl"
+( trap '' TERM; exec sleep 60 ) & echo $! > "$1/child"
+sleep 60"#,
+    );
+    let child = folder.path().join("session/child");
+    for _ in 0..50 {
+        if fs::read_to_string(&child).is_ok_and(|pid| !pid.trim().is_empty()) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let child = fs::read_to_string(&child).expect("the program never started its child");
+    let pressed = std::time::Instant::now();
+    transcription.cancel();
+    let ended = said.recv_timeout(Duration::from_secs(2)).expect("not ended within two seconds");
+    assert!(matches!(ended, Made::Failed(_)), "{ended:?}");
+    assert!(gone(&child), "its child, deaf to TERM, still runs");
+    assert!(pressed.elapsed() <= Duration::from_secs(2));
+}
+
+#[test]
+fn cancelled_its_group_is_told_term_first_and_given_the_grace_to_end_by_it() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    // A child of the program, in its group, that ends on TERM saying so: TERM sent to the leader
+    // alone, or KILL at once, and it never says it.
+    let (transcription, said) = made(
+        folder.path(),
+        r#"( trap 'echo TERM > "$1/told"; exit 0' TERM; echo $$ > "$1/child"; sleep 60 & wait ) &
+sleep 60"#,
+    );
+    let child = folder.path().join("session/child");
+    for _ in 0..50 {
+        if fs::read_to_string(&child).is_ok_and(|pid| !pid.trim().is_empty()) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(child.exists(), "the program never started its child");
+    transcription.cancel();
+    said.recv_timeout(Duration::from_secs(2)).expect("not ended within two seconds");
+    assert_eq!(
+        fs::read_to_string(folder.path().join("session/told"))
+            .ok()
+            .as_deref()
+            .map(str::trim),
+        Some("TERM"),
+        "its child was not told TERM within the grace"
+    );
+}
