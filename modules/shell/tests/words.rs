@@ -1231,7 +1231,7 @@ const STILL_WRONG: &str = include_str!("words_still_wrong.txt");
 
 /// The sentences still without their comment, counted: 602 keys would be three review budgets.
 /// The number only goes down, as the list does.
-const WITHOUT_COMMENT: usize = 491;
+const WITHOUT_COMMENT: usize = 365;
 
 /// A sentence of `src/words.rs`, as the file arranges it.
 #[derive(Debug)]

@@ -355,6 +355,8 @@ pub struct Window {
     /// At most: 18 characters. Placeholders: none.
     pub audio_freed: &'static str,
     /// What a meeting's audio weighs, beside its length in its header (D89).
+    /// Shows: a meeting's page, as a status. When: header of a meeting, beside its duration: audio
+    /// size. At most: about 16 characters. Placeholders: {} the audio's size.
     pub audio_weighs: &'static str,
     /// Shows: the sidebar, as a list label. When: on the row of the meeting being recorded.
     /// At most: 18 characters. Placeholders: none.
@@ -377,16 +379,24 @@ pub struct Window {
     /// Shows: the window with no meeting, as a help line. When: under that error: what to do.
     /// At most: no limit. Placeholders: none.
     pub list_unread_do: &'static str,
+    /// Shows: a meeting's page, as an error. When: "Try again" on a failed step was refused.
+    /// At most: no limit. Placeholders: {} failure sentence.
     pub again_refused: &'static str,
     pub hearing_models_refused: &'static str,
     /// Shows: the sidebar, as an error. When: the folded/unfolded state could not be saved.
     /// At most: no limit. Placeholders: {} failure sentence.
     pub fold_not_kept: &'static str,
+    /// Shows: the agreement before a meeting leaves, as an error. When: sending to the online
+    /// service was refused. At most: no limit. Placeholders: {} failure sentence.
     pub agreement_refused: &'static str,
+    /// Shows: a meeting's page, as an error. When: a meeting's page could not open. At most: no
+    /// limit. Placeholders: {} failure sentence.
     pub meeting_not_opened: &'static str,
     /// Shows: the window, as an error. When: a page failed to render. At most: no limit.
     /// Placeholders: none.
     pub page_not_shown: &'static str,
+    /// Shows: a meeting's page, as an error. When: the meeting context could not be re-read.
+    /// At most: no limit. Placeholders: {} failure sentence.
     pub context_not_read: &'static str,
     /// Shows: the sidebar and the recording bar, as a button. When: record button label while the
     /// recording starts. At most: about 24 characters. Placeholders: none.
@@ -394,6 +404,8 @@ pub struct Window {
     /// Shows: the sidebar and the recording bar, as a button. When: record button label while the
     /// recording stops. At most: about 24 characters. Placeholders: none.
     pub record_stopping: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a button. When: closes the Redo panel. At most:
+    /// about 16 characters. Placeholders: none.
     pub redo_cancel: &'static str,
     pub saved: &'static str,
     /// Shows: the recording bar, as a help line. When: the user wanted the meeting confidential
@@ -415,43 +427,89 @@ pub struct Window {
     /// Shows: the sidebar, as a name for a screen reader. When: icon button (tooltip + screen
     /// reader) that folds the sidebar; shortcut appended. At most: no limit. Placeholders: none.
     pub fold: &'static str,
+    /// Shows: any page of the window, as a name for a screen reader. When: icon button (tooltip +
+    /// screen reader) that brings the sidebar back. At most: no limit. Placeholders: none.
     pub unfold: &'static str,
     /// Shows: the sidebar, as a status. When: search finds no meeting. At most: no limit.
     /// Placeholders: none.
     pub none_found: &'static str,
     /// One meeting's page.
+    /// Shows: any page of the window, as a link. When: back link to the meeting list. At most:
+    /// about 16 characters. Placeholders: none.
     pub back: &'static str,
+    /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip): open
+    /// the meeting's folder in the file manager. At most: no limit. Placeholders: none.
     pub open_folder: &'static str,
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
+    /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) of the
+    /// menu of rarer actions. At most: no limit. Placeholders: none.
     pub more_actions: &'static str,
     /// Shows: the window, as a format. When: a setting's name before its value: "{}:". At most: no
     /// limit. Placeholders: {} a setting's name.
     pub labelled: &'static str,
+    /// Shows: a meeting's page, as a heading. When: heading of the minutes card. At most: about 20
+    /// characters. Placeholders: none.
     pub minutes_title: &'static str,
+    /// Shows: a meeting's page, as a name for a screen reader. When: name of the transcript card.
+    /// At most: about 20 characters. Placeholders: none.
     pub transcript_title: &'static str,
+    /// Shows: a meeting's page, as a field's placeholder. When: search field over the transcript.
+    /// At most: about 30 characters. Placeholders: none.
     pub search: &'static str,
     /// The minutes' maker: the model, the provider, when.
+    /// Shows: a meeting's page, as a status. When: under minutes: the model that wrote them.
+    /// At most: no limit. Placeholders: {} model name.
     pub written_by: &'static str,
     /// Its provider, when known, said after the model.
+    /// Shows: a meeting's page, as a status. When: appended after written_by: the provider.
+    /// At most: no limit. Placeholders: {} provider.
     pub written_via: &'static str,
     /// Between a day and its hour: "mar. 13 oct. à 12:21", "Tue, Oct 13 at 12:21 PM".
+    /// Shows: a meeting's page, as a format. When: between a day and its hour. At most: no limit.
+    /// Placeholders: none.
     pub at: &'static str,
     /// The transcript's maker: the model, on this computer.
+    /// Shows: a meeting's page, as a status. When: under the transcript: the model that made it.
+    /// At most: no limit. Placeholders: {} model.
     pub heard_by: &'static str,
+    /// Shows: a meeting's page, as a label. When: speaker side in the transcript: the user's
+    /// microphone. At most: about 12 characters. Placeholders: none.
     pub here: &'static str,
+    /// Shows: a meeting's page, as a label. When: speaker side in the transcript: the other
+    /// participants. At most: about 12 characters. Placeholders: none.
     pub remote: &'static str,
     /// A voice told within a track: its label.
+    /// Shows: a meeting's page, as a label. When: a voice told apart within a side. At most: about
+    /// 12 characters. Placeholders: {} number.
     pub voice: &'static str,
+    /// Shows: a meeting's page, as a label. When: legend of the speaking-time drawing. At most: no
+    /// limit. Placeholders: none.
     pub here_described: &'static str,
+    /// Shows: a meeting's page, as a label. When: legend of the speaking-time drawing. At most: no
+    /// limit. Placeholders: none.
     pub remote_described: &'static str,
     /// Who spoke over the meeting, for whoever does not see the drawing.
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the speaking-
+    /// time drawing. At most: no limit. Placeholders: none.
     pub who_spoke: &'static str,
+    /// Shows: a meeting's page, as a status. When: transcript card, none yet. At most: no limit.
+    /// Placeholders: none.
     pub no_transcript: &'static str,
+    /// Shows: a meeting's page, as a status. When: minutes card, none yet. At most: no limit.
+    /// Placeholders: none.
     pub no_minutes: &'static str,
+    /// Shows: a meeting's page, as a help line. When: transcript still being written: what is shown
+    /// is partial. At most: no limit. Placeholders: none.
     pub being_made: &'static str,
+    /// Shows: a meeting's page, as an error. When: a file of a newer/older format cannot be read.
+    /// At most: no limit. Placeholders: none.
     pub unreadable: &'static str,
     /// Lines of a transcript that are not the contract's, left out: how many.
+    /// Shows: a meeting's page, as a help line. When: some lines of the transcript file are
+    /// skipped; plural. At most: no limit. Placeholders: {} count.
     pub unread: &'static str,
+    /// Shows: a meeting's page, as a status. When: search in the transcript finds nothing. At most:
+    /// no limit. Placeholders: none.
     pub no_match: &'static str,
     /// The settings' page.
     /// Shows: the sidebar, as a name for a screen reader. When: icon link to Settings (tooltip) and
@@ -474,6 +532,8 @@ pub struct Window {
     /// One the user named, not on this computer: theirs, nothing offered (D36).
     pub model_named_missing: &'static str,
     pub model_coming: &'static str,
+    /// Shows: a meeting's page, as a button. When: download the transcription model. At most: about
+    /// 40 characters. Placeholders: {} host.
     pub model_offer: &'static str,
     /// The short list of models to download (D37): its heading, the gesture, how far, and the
     /// model chosen that is not here yet, in the choice.
@@ -542,27 +602,51 @@ pub struct Window {
     pub advanced_title: &'static str,
     pub developer: [&'static str; 2],
     /// Under a making not made, in developer mode: what its program said ({}).
+    /// Shows: a meeting's page, as a status. When: developer mode: raw program message under a
+    /// failure. At most: no limit. Placeholders: {} raw text.
     pub program_said: &'static str,
     /// A meeting's minutes, their three sections as the page names them (D11's second board),
     /// whatever titles the model wrote: `minutes/v1` holds them in this order.
+    /// Shows: a meeting's page, as a heading. When: the three section titles of minutes. At most:
+    /// about 20 characters. Placeholders: none.
     pub minutes_sections: [&'static str; 3],
     /// The actions' three cells, named for assistive technology alone (D46), and what a meeting
     /// left unsettled, as the summary writes it.
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: column names of
+    /// the actions table. At most: about 12 characters. Placeholders: none.
     pub actions_cells: [&'static str; 3],
+    /// Shows: a meeting's page, as a status. When: written by the summary model when an action has
+    /// no owner/date; MATCHED by code. At most: no limit. Placeholders: none.
     pub unsettled: &'static str,
     /// A model of this computer that holds the minutes' form, as Settings offer it ({}).
     pub model_recommended: &'static str,
     /// A meeting's player (D26): its button, both ways, and why a meeting has none.
+    /// Shows: a meeting's page, as a button. When: player button at rest. At most: about 12
+    /// characters. Placeholders: none.
     pub play: &'static str,
+    /// Shows: a meeting's page, as a button. When: player button while playing. At most: about 12
+    /// characters. Placeholders: none.
     pub pause: &'static str,
+    /// Shows: a meeting's page, as a help line. When: audio deleted: no player. At most: no limit.
+    /// Placeholders: none.
     pub no_player: &'static str,
     /// Its audio is there, and no track of it is one this version plays.
+    /// Shows: a meeting's page, as a help line. When: audio present but no playable track. At most:
+    /// no limit. Placeholders: none.
     pub not_playable: &'static str,
     /// A line of the minutes' time, as a screen reader says it (D75): what a click on it does.
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: a time in the
+    /// minutes, click plays from there. At most: no limit. Placeholders: {} time.
     pub time_listen: &'static str,
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: a time in the
+    /// minutes, click shows the transcript passage. At most: no limit. Placeholders: {} time.
     pub time_passage: &'static str,
     /// A track the window could not play; and the drawing as the playback's slider, named.
+    /// Shows: a meeting's page, as an error. When: playback failed. At most: no limit.
+    /// Placeholders: none.
     pub not_played: &'static str,
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the playback
+    /// slider. At most: no limit. Placeholders: none.
     pub playback: &'static str,
     /// In developer mode: the logs' level, the logs' folder, a meeting's diagnostic copied.
     pub log_level: [&'static str; 2],
@@ -571,9 +655,17 @@ pub struct Window {
     pub logs: [&'static str; 2],
     pub open_logs: &'static str,
     pub logs_not_opened: &'static str,
+    /// Shows: a meeting's page, as a menu entry. When: developer: menu item copies a diagnostic.
+    /// At most: about 30 characters. Placeholders: none.
     pub copy_diagnostic: &'static str,
+    /// Shows: a meeting's page, as a status. When: after copying. At most: about 24 characters.
+    /// Placeholders: none.
     pub diagnostic_copied: &'static str,
+    /// Shows: a meeting's page, as a status. When: nothing to copy. At most: no limit.
+    /// Placeholders: none.
     pub diagnostic_empty: &'static str,
+    /// Shows: a meeting's page, as an error. When: copy failed. At most: about 24 characters.
+    /// Placeholders: none.
     pub diagnostic_not_copied: &'static str,
     /// The folder the sessions go to, and the button that opens the system's dialog for it.
     pub sessions_folder: [&'static str; 2],
@@ -696,6 +788,8 @@ pub struct Window {
     /// Shows: the recording bar and Redo…, as an error. When: choice not saved. At most: no limit.
     /// Placeholders: {} failure sentence.
     pub models_not_kept: &'static str,
+    /// Shows: a meeting's page, as an error. When: per-meeting models unreadable. At most: no
+    /// limit. Placeholders: {} failure sentence.
     pub models_not_read: &'static str,
     /// A meeting's own model gone (D91): Settings' choice stands in, as Auto does for a microphone.
     /// Shows: the recording bar and Redo…, as a status. When: per-meeting transcription model
@@ -798,27 +892,57 @@ pub struct Window {
     /// no limit. Placeholders: none.
     pub free_done: &'static str,
     /// *Refaire…* on the minutes (D11's sixth board): the panel's title, question, note and gesture.
+    /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) opening
+    /// the Redo panel. At most: no limit. Placeholders: none.
     pub redo: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a heading. When: redo the minutes. At most: no
+    /// limit. Placeholders: none.
     pub redo_title: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a help line. When: uses this meeting's models.
+    /// At most: no limit. Placeholders: none.
     pub redo_with: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a help line. When: current minutes go to trash
+    /// once new ones are ready. At most: no limit. Placeholders: none.
     pub redo_note: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a button. When: confirm redo. At most: about 16
+    /// characters. Placeholders: none.
     pub redo_do: &'static str,
     /// Shows: the recording bar and Redo…, as a choice of a list. When: appended to a local model's
     /// name. At most: about 20 characters. Placeholders: none.
     pub on_computer: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a heading. When: redo the transcript. At most:
+    /// no limit. Placeholders: none.
     pub redo_transcript_title: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
+    /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
     /// What a meeting lacks, offered on its page; what is said once asked; where a step ran.
+    /// Shows: a meeting's page, as a button. When: meeting lacks minutes. At most: about 30
+    /// characters. Placeholders: none.
     pub make_minutes: &'static str,
+    /// Shows: a meeting's page, as a button. When: meeting lacks a transcript. At most: about 30
+    /// characters. Placeholders: none.
     pub make_transcript: &'static str,
     /// What is made in the background, said on the pages (D25): the minutes being written (by,
     /// for how long), waiting their turn ({} before), waiting for the user's agreement to send them
     /// ({} the host) with the way to give it, not written ({} the reason); on a list's row.
+    /// Shows: a meeting's page, as a status. When: minutes being written (followed by model and
+    /// elapsed time). At most: no limit. Placeholders: none.
     pub minutes_making: &'static str,
+    /// Shows: a meeting's page, as a status. When: queued. At most: no limit. Placeholders: {}
+    /// number before it.
     pub minutes_waiting: &'static str,
+    /// Shows: a meeting's page, as a status. When: waiting for consent. At most: no limit.
+    /// Placeholders: {} host.
     pub minutes_awaiting: &'static str,
+    /// Shows: a meeting's page, as a link. When: opens the consent page. At most: about 24
+    /// characters. Placeholders: none.
     pub agree_open: &'static str,
+    /// Shows: a meeting's page, as an error. When: minutes failed (cause follows). At most: no
+    /// limit. Placeholders: none.
     pub minutes_not_made: &'static str,
+    /// Shows: a meeting's page, as a button. When: retry a failed step. At most: about 16
+    /// characters. Placeholders: none.
     pub try_again: &'static str,
     /// Shows: the sidebar, as a list label. When: row: minutes being written. At most: 18
     /// characters. Placeholders: none.
@@ -836,7 +960,11 @@ pub struct Window {
     /// Placeholders: none.
     pub chip_failed: &'static str,
     /// The same for the transcript: being made (by, for how long), not made ({} the reason).
+    /// Shows: a meeting's page, as a status. When: transcript being made. At most: no limit.
+    /// Placeholders: none.
     pub transcript_making: &'static str,
+    /// Shows: a meeting's page, as an error. When: transcript failed. At most: no limit.
+    /// Placeholders: none.
     pub transcript_not_made: &'static str,
     /// Shows: the sidebar, as a list label. When: row: transcript failed. At most: 18 characters.
     /// Placeholders: none.
@@ -855,18 +983,45 @@ pub struct Window {
     pub record_stop: &'static str,
     /// The agreement before a meeting first leaves for a host (D11's fifth board): what leaves,
     /// what stays, to whom; the user's word, once or for this service; on this computer instead.
+    /// Shows: the agreement before a meeting leaves, as a label. When: small heading above the
+    /// title. At most: no limit. Placeholders: none.
     pub agree_eyebrow: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a heading. When: always. At most: no limit.
+    /// Placeholders: {} meeting name.
     pub agree_title: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a help line. When: under the title.
+    /// At most: no limit. Placeholders: none.
     pub agree_lead: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a name, then its line. When: what leaves:
+    /// the transcript; {} minutes, {} words. At most: no limit. Placeholders: {} filled by the
+    /// window.
     pub agree_leaves: [&'static str; 2],
+    /// Shows: the agreement before a meeting leaves, as a name, then its line. When: what leaves:
+    /// the context; {} words. At most: no limit. Placeholders: {} the context's number of words.
     pub agree_context: [&'static str; 2],
+    /// Shows: the agreement before a meeting leaves, as a name, then its line. When: what stays:
+    /// the audio. At most: no limit. Placeholders: none.
     pub agree_stays: [&'static str; 2],
+    /// Shows: the agreement before a meeting leaves, as a label. When: recipient row. At most:
+    /// about 16 characters. Placeholders: none.
     pub agree_to: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a label. When: model row. At most: about 16
+    /// characters. Placeholders: none.
     pub agree_model: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a label. When: checkbox: don't ask again
+    /// for this service. At most: no limit. Placeholders: none.
     pub agree_remember: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a button. When: primary: send. At most:
+    /// about 30 characters. Placeholders: none.
     pub agree_send: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a button. When: refuse. At most: about 20
+    /// characters. Placeholders: none.
     pub agree_not: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a link. When: alternative: write locally.
+    /// At most: no limit. Placeholders: none.
     pub agree_local: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a button. When: confirm local writing.
+    /// At most: about 30 characters. Placeholders: none.
     pub agree_local_write: &'static str,
     /// The global shortcut: its keys as granted, none granted, where it changes, the button there.
     pub shortcut: [&'static str; 2],
@@ -932,6 +1087,8 @@ pub struct Window {
     pub welcome_ollama_by: &'static str,
     pub welcome_reminder_on: &'static str,
     pub welcome_reminder_off: &'static str,
+    /// Shows: the first run's assistant and a meeting's page, as an error. When: Ollama not
+    /// answering: minutes wait. At most: no limit. Placeholders: none.
     pub welcome_ollama_silent: &'static str,
     /// Ollama answers without the model ({} the model).
     pub welcome_ollama_lacks: &'static str,
@@ -946,63 +1103,141 @@ pub struct Window {
     /// label, its example and why it helps; its count ({} the most, {} what is left — one, then
     /// more); another script than Latin or Cyrillic; why it is closed; what changed, the
     /// transcript alone or with the minutes, and the gesture that makes them again.
+    /// Shows: a meeting's page, as a button. When: context empty: add one. At most: about 24
+    /// characters. Placeholders: none.
     pub context_add: &'static str,
     pub context_edit: &'static str,
     pub context_open: &'static str,
+    /// Shows: a meeting's page, as a label. When: context row name, followed by ':'. At most: about
+    /// 16 characters. Placeholders: none.
     pub context_title: &'static str,
+    /// Shows: a meeting's page, as a label. When: context field label. At most: no limit.
+    /// Placeholders: none.
     pub context_label: &'static str,
+    /// Shows: a meeting's page, as a field's placeholder. When: context field example. At most: no
+    /// limit. Placeholders: none.
     pub context_example: &'static str,
+    /// Shows: a meeting's page, as a help line. When: why context helps. At most: no limit.
+    /// Placeholders: none.
     pub context_why: &'static str,
+    /// Shows: a meeting's page, as a status. When: count. At most: no limit. Placeholders: {} max
+    /// characters.
     pub context_most: &'static str,
+    /// Shows: a meeting's page, as a status. When: count left; [one, many]. At most: no limit.
+    /// Placeholders: {} number.
     pub context_left: [&'static str; 2],
+    /// Shows: a meeting's page, as a help line. When: non-Latin script warning. At most: no limit.
+    /// Placeholders: none.
     pub context_script: &'static str,
+    /// Shows: a meeting's page, as a status. When: context locked during processing. At most: no
+    /// limit. Placeholders: none.
     pub context_making: &'static str,
+    /// Shows: a meeting's page, as a status. When: context locked: transcript unfinished. At most:
+    /// no limit. Placeholders: none.
     pub context_unfinished: &'static str,
+    /// Shows: a meeting's page, as a help line. When: transcript (or + minutes) made with another
+    /// context; [transcript only, both]. At most: no limit. Placeholders: none.
     pub context_changed: [&'static str; 2],
+    /// Shows: a meeting's page, as a button. When: redo with new context. At most: about 30
+    /// characters. Placeholders: none.
     pub context_redo: &'static str,
     /// The language a meeting is spoken in (D65).
+    /// Shows: a meeting's page, as a label. When: row: spoken language. At most: about 20
+    /// characters. Placeholders: none.
     pub language_label: &'static str,
+    /// Shows: a meeting's page, as a choice of a list. When: "As in Settings", followed by — value.
+    /// At most: about 30 characters. Placeholders: none.
     pub language_default: &'static str,
     pub language_detected: &'static str,
     pub meetings_language: &'static str,
+    /// Shows: a meeting's page, as an error. When: always. At most: no limit. Placeholders: {}
+    /// failure sentence.
     pub language_not_saved: &'static str,
+    /// Shows: a meeting's page, as a menu entry. When: rarer actions: rename. At most: about 30
+    /// characters. Placeholders: none.
     pub rename_meeting: &'static str,
+    /// Shows: a meeting's page, as a field's placeholder. When: name field. At most: about 30
+    /// characters. Placeholders: none.
     pub name_meeting: &'static str,
+    /// Shows: a meeting's page, as an error. When: always. At most: no limit. Placeholders: {}
+    /// failure sentence.
     pub name_not_saved: &'static str,
+    /// Shows: a meeting's page, as a choice of a list. When: appended "detected". At most: about 12
+    /// characters. Placeholders: none.
     pub language_detected_short: &'static str,
     /// SpeechAnalyzer's language when the settings name none: the system's, never the app's (D64).
     pub language_as_system: &'static str,
     /// A meeting's own language SpeechAnalyzer does not hear: the one it hears in, said (D65).
+    /// Shows: a meeting's page, on a Mac, as a choice of a list. When: {} language — SpeechAnalyzer
+    /// hears {}. At most: no limit. Placeholders: {} the language chosen, then the one heard.
     pub language_heard_as: &'static str,
     /// The language Kitokey speaks (D64): its row in Settings, and the system's, its default.
     pub app_language: [&'static str; 2],
     pub app_language_system: &'static str,
     /// A transcript's line corrected by whoever listens (D62).
+    /// Shows: a meeting's page, as a name for a screen reader. When: pencil on a transcript line.
+    /// At most: no limit. Placeholders: {} time.
     pub correct_line: &'static str,
+    /// Shows: a meeting's page, as a list label. When: line edited by the user. At most: 18
+    /// characters. Placeholders: none.
     pub corrected: &'static str,
+    /// Shows: a meeting's page, as an error. When: empty correction. At most: no limit.
+    /// Placeholders: none.
     pub correction_empty: &'static str,
+    /// Shows: a meeting's page, as an error. When: always. At most: no limit. Placeholders: {}
+    /// failure sentence.
     pub correction_failed: &'static str,
+    /// Shows: a meeting's page, as a help line. When: minutes older than transcript corrections.
+    /// At most: no limit. Placeholders: none.
     pub corrected_since: &'static str,
+    /// Shows: a meeting's page, as a button. When: redo minutes with corrections. At most: about 36
+    /// characters. Placeholders: none.
     pub redo_corrections: &'static str,
     /// The minutes copied in one click, said in place (D45).
+    /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip): copy
+    /// minutes. At most: no limit. Placeholders: none.
     pub copy_minutes: &'static str,
+    /// Shows: a meeting's page, as a status. When: after copy. At most: about 12 characters.
+    /// Placeholders: none.
     pub minutes_copied: &'static str,
+    /// Shows: a meeting's page, as an error. When: copy failed. At most: no limit. Placeholders:
+    /// none.
     pub minutes_not_copied: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a help line. When: warning: corrections lost.
+    /// At most: no limit. Placeholders: none.
     pub redo_loses_corrections: &'static str,
+    /// Shows: a meeting's page, as an error. When: context not saved. At most: no limit.
+    /// Placeholders: none.
     pub context_not_saved: &'static str,
     /// A meeting said confidential (D60): the switch's name and its words; the list's word beside
     /// the lock; what had left before ({} what, then each: the sound, the transcript, {} a host);
     /// the switch not saved; the minutes waiting for Ollama holding no model, and the fetch of {}.
+    /// Shows: a meeting's page and the recording bar, as a label. When: switch name. At most: about
+    /// 24 characters. Placeholders: none.
     pub confidential_name: &'static str,
+    /// Shows: a meeting's page and the recording bar, as a help line. When: switch line. At most:
+    /// no limit. Placeholders: none.
     pub confidential_says: &'static str,
     /// Shows: the sidebar, as a list label. When: row: confidential. At most: 18 characters.
     /// Placeholders: none.
     pub confidential_chip: &'static str,
+    /// Shows: a meeting's page, as a help line. When: data already sent before marking
+    /// confidential. At most: no limit. Placeholders: {} list.
     pub confidential_left: &'static str,
+    /// Shows: a meeting's page, as a status. When: list item. At most: no limit. Placeholders: {}
+    /// host.
     pub confidential_left_sound: &'static str,
+    /// Shows: a meeting's page, as a status. When: list item. At most: no limit. Placeholders: {}
+    /// host.
     pub confidential_left_transcript: &'static str,
+    /// Shows: a meeting's page, as an error. When: switch not saved. At most: no limit.
+    /// Placeholders: none.
     pub confidential_not_saved: &'static str,
+    /// Shows: a meeting's page, as an error. When: confidential + Ollama has no model. At most: no
+    /// limit. Placeholders: none.
     pub confidential_ollama_empty: &'static str,
+    /// Shows: a meeting's page, as a button. When: always. At most: about 30 characters.
+    /// Placeholders: {} model.
     pub confidential_fetch: &'static str,
 }
 
