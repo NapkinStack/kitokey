@@ -30,7 +30,7 @@ from pathlib import Path
 
 from selenium import webdriver
 from selenium.common.exceptions import (
-    ElementNotInteractableException, NoSuchWindowException, StaleElementReferenceException, TimeoutException, WebDriverException,
+    ElementNotInteractableException, NoSuchElementException, NoSuchWindowException, StaleElementReferenceException, TimeoutException, WebDriverException,
 )
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
@@ -384,11 +384,12 @@ def read(browser, reads):
 def wait_for(browser, holds, seconds: float = 10) -> bool:
     until = time.monotonic() + seconds
     while time.monotonic() < until:
-        # The page drawn again between finding an element and reading it: not yet, look again.
+        # The page drawn again between finding an element and reading it, or not yet drawn: not yet,
+        # look again — as Selenium's WebDriverWait ignores NoSuchElementException.
         try:
             if holds(browser):
                 return True
-        except StaleElementReferenceException:
+        except (NoSuchElementException, StaleElementReferenceException):
             pass
         time.sleep(0.1)
     return False
