@@ -1229,9 +1229,9 @@ fn every_french_sentence_has_its_spaces_before_the_tall_signs() {
 /// list only shrinks, and a sentence put right never covers another written wrong.
 const STILL_WRONG: &str = include_str!("words_still_wrong.txt");
 
-/// The sentences still without their comment, counted: 604 keys would be three review budgets.
+/// The sentences still without their comment, counted: 602 keys would be three review budgets.
 /// The number only goes down, as the list does.
-const WITHOUT_COMMENT: usize = 604;
+const WITHOUT_COMMENT: usize = 602;
 
 /// A sentence of `src/words.rs`, as the file arranges it.
 #[derive(Debug)]
@@ -1395,7 +1395,8 @@ fn sentences() -> Vec<Sentence> {
         let shown = matches!(function.as_str(), "window" | "menu");
         let said = keyword == "fn"
             && !NOT_SAID.contains(&function.as_str())
-            && word_before != "expect"
+            // An `expect`'s words, a locale compared, a target named: for the code, no sentence.
+            && !matches!(word_before.as_str(), "expect" | "eq_ignore_ascii_case" | "target_os")
             && !(shown && field == "locale")
             && strip_placeholders(&text).chars().any(char::is_alphabetic);
         if said {
