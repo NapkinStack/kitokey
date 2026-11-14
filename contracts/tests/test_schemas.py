@@ -222,6 +222,7 @@ EXAMPLES = {
             {"type": "complete", "duration": 1.0, "made": None},
             {"type": "complete", "duration": 1.0, "made": 1763023330},
             {"type": "complete", "duration": 1.0, "made": "2026-11-13T09:42:10+01:00\n"},
+            {"type": "complete", "duration": 1.0, "made": "2026-11-13T09:42:10+01:00\r"},
             {
                 "type": "header",
                 "contract": "transcript/v2",
