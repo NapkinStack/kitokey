@@ -88,7 +88,7 @@ that says it. It gives four things, in this order, each after its word, two line
 pub chip_making: &'static str,
 ```
 
-`At most:` is a number of characters, or `no limit` for a sentence that wraps. `Placeholders:` names
+`At most:` is a number of characters where a limit is held — a notification's title, 50; a list's label, 18 —; `about N characters` for the review's estimates, guidance as Android's and Xcode's string comments give translators, not a gate; or `no limit` for a sentence that wraps. `Placeholders:` names
 each placeholder and what fills it — `{} the folder's path` —, or `none`. In a function, a comment
 covers the sentences after it, up to the next such comment or the end of the function: one above
 the English arm covers the French one too.
