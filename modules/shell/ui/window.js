@@ -235,6 +235,10 @@ function leftSaid(words, left) {
   return each.length === 0 ? "" : fill(words.confidential_left, each.join(" · "));
 }
 
+// A meeting's language its page could not save: said on every drawing of that page until the next
+// choice, saved or refused, and gone once the page is left — as Settings' refusal (#655, #841).
+let languageRefused = null;
+
 // The language a meeting is spoken in (D65): the settings' own, or one of its own — its next
 // transcript heard in it. Written at once; refused, said, the choice put back.
 function languageRow(session, language, languages, words, settled, apple, system) {
@@ -261,15 +265,18 @@ function languageRow(session, language, languages, words, settled, apple, system
   const said = element("p", "says");
   said.id = "language-said";
   said.setAttribute("role", "status");
+  said.textContent = languageRefused?.name === nameOf(session) ? languageRefused.said : "";
   let kept = pick.value;
   pick.addEventListener("change", async () => {
     try {
       await window.__TAURI__.core.invoke("language_set", { name: nameOf(session), language: pick.value || null });
       kept = pick.value;
+      languageRefused = null;
       said.textContent = "";
     } catch (why) {
       pick.value = kept;
-      said.textContent = fill(words.language_not_saved, why);
+      languageRefused = { name: nameOf(session), said: fill(words.language_not_saved, why) };
+      said.textContent = languageRefused.said;
     }
   });
   // Its value and a chevron, as board 4 draws the list: the system's own box not drawn.
@@ -4283,6 +4290,8 @@ async function draw(mine, again) {
   document.body.dataset.at = listed ? "list" : "page";
   const beside = listed && !narrow.matches && listing.sessions.length > 0;
   const name = wanted ? decodeURIComponent(wanted[1]) : beside ? nameOf(listing.sessions[0]) : null;
+  // A refused language is said until its meeting's own page is left (#841).
+  if (languageRefused && !(wanted && decodeURIComponent(wanted[1]) === languageRefused.name)) languageRefused = null;
   // Another page, or another meeting: what was played stops — and the list alone under 840 px.
   if (player && player.name !== name) {
     player.stop();
