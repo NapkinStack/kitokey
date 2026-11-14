@@ -4923,11 +4923,20 @@ def meeting_renamed(now: dt.datetime) -> None:
         check("being recorded, Libérer de l'espace names it, its date beside", bool(busy) and busy[0][0] == "En direct" and "·" in busy[0][1], busy)
         browser.execute_script(f"location.hash = '#/meeting/{recording.name}'")
         wait_for(browser, lambda b: head(b) == "En direct", 10)
-        # A press within half a second is the same press.
-        time.sleep(0.6)
+        # Pressed once it is the stop gesture, as the shell says it: recording, nothing stopping, no
+        # press of the window's still answered — not after a fixed delay (#763). On a miss, the
+        # button's state, the shell's and the folder's are said.
+        state = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('header').then((h) =>"
+                 " done({recording: h.recording, stopping: h.stopping, asked: recordAsked,"
+                 " button: document.getElementById('record').className}))")
+        gesture = lambda b: (lambda s: s["recording"] and not s["stopping"] and s["asked"] is None and "live" in s["button"])(b.execute_async_script(state))
+        ready = wait_for(browser, gesture, 10)
+        before = browser.execute_async_script(state)
         browser.find_element(By.ID, "record").click()
         stopped = wait_for(browser, lambda b: "stopped" in (recording / "session.json").read_text() and not live(b), 10)
-        check("stopped: the name stays", stopped and (recording / "title.txt").read_text() == "En direct\n" and head(browser) == "En direct", head(browser))
+        check("stopped: the name stays", ready and stopped and (recording / "title.txt").read_text() == "En direct\n" and head(browser) == "En direct",
+              {"name": head(browser), "before the press": before, "after": browser.execute_async_script(state),
+               "session.json": (recording / "session.json").read_text()})
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
         check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
