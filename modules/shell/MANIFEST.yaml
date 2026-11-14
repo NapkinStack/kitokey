@@ -358,11 +358,11 @@ evidence:
     - pattern: '"message":"shell\.command_failed"'
       level: warning
       scenario: AB
-    # The window's run starts once on a settings file broken by hand: settings.rs's sentence goes to
+    # The window's K starts once on a settings file broken by hand: settings.rs's sentence goes to
     # the log, the user is told which setting and what to do (#783).
     - pattern: '"message":"shell\.settings_unread"'
       level: warning
-      scenario: window
+      scenario: K
     # A failure of the page's own, thrown then rejected; any other kind of the page's is not provoked.
     - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioI")'
       level: error
