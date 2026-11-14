@@ -6802,6 +6802,18 @@ def gestures_answer(now: dt.datetime) -> None:
         browser.execute_script("document.getElementById('reminder').click()")
         refused = wait_for(browser, lambda b: b.find_element(By.ID, "not-saved").is_displayed(), 5)
         check("a write refused: said, no Enregistré", refused and not here(browser), browser.find_element(By.ID, "not-saved").text)
+        # The page drawn again, by whatever draws it (#655): the refusal still said; Settings left and
+        # opened again, it is no longer.
+        drawn = browser.execute_async_script("const done = arguments[0]; refresh().then(() => done(true), () => done(false))")
+        refusal = lambda b: b.find_element(By.ID, "not-saved")
+        check("drawn again after it, the refusal is still said (#655)",
+              drawn and refusal(browser).is_displayed() and "REFUS" in refusal(browser).text, (drawn, refusal(browser).text))
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: not b.find_elements(By.ID, "not-saved") or not refusal(b).is_displayed(), 5)
+        browser.execute_script("location.hash = '#/settings'")
+        back = wait_for(browser, lambda b: b.find_elements(By.ID, "reminder") and b.find_element(By.ID, "reminder").is_displayed(), 5)
+        check("Settings left and opened again: the refusal is no longer said (#655)",
+              back and not refusal(browser).is_displayed(), refusal(browser).text if back else "Settings not drawn again")
         browser.execute_script("window.restore()")
         # A radio with no id, far down at the smallest size: said under it, in view.
         time.sleep(0.5)
