@@ -2205,6 +2205,7 @@ function minutesRow(minutes, words, locked) {
   servicePick.addEventListener("change", () => {
     guided.minutes.chosen.service = servicePick.value;
     shownSaved();
+    address.placeholder = service().address;
   });
   guidedKeyTested("minutes", words, locked, { servicePick, key, keyTest, keySaid, modelsPick },
     (index, typed) => window.__TAURI__.core.invoke("minutes_models", { provider: minutes.online[Number(index)].address, key: typed }), shownSaved);
@@ -2213,7 +2214,10 @@ function minutesRow(minutes, words, locked) {
   const [addressWrap, address] = field("minutes-address", words.address, "url", own ? minutes.provider : "");
   const [modelWrap, model] = field("minutes-model", words.model_name, "text", own ? minutes.model : "");
   const ownSave = button("minutes-own-save", words.save, false);
-  ownSave.addEventListener("click", () => save(address.value, model.value, key.value || null));
+  // Its address left empty: the service chosen above, with a model it does not list — a new release,
+  // an id of its own — named by hand.
+  address.placeholder = service().address;
+  ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, key.value || null));
   const [toggle, advanced] = guidedAdvanced("minutes", words, own, [addressWrap, modelWrap, ownSave]);
   const away = element("div", "fields");
   away.append(serviceWrap, keyWrap, keyTest, keySaid, modelsWrap, onlineSave, toggle, advanced);
