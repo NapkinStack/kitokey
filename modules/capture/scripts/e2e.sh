@@ -88,8 +88,16 @@ pipewire-pulse > "$graph/pipewire-pulse.log" 2>&1 & pulse=$!
 for _ in $(seq 20); do pactl info > /dev/null 2>&1 && break; sleep 0.25; done
 restore() {
   status=$?
+  # Cleaning is never cut short: `timeout` signals the script, then its whole group, a second TERM.
+  trap '' TERM INT HUP
   pkill -P $$ 2>/dev/null || true
+  # The graph's daemons by their PIDs, killed outright if they have not ended within two seconds.
   kill "$pulse" "$manager" "$daemon" 2>/dev/null || true
+  for _ in $(seq 20); do
+    alive=0; for p in "$pulse" "$manager" "$daemon"; do kill -0 "$p" 2>/dev/null && alive=1; done
+    [ "$alive" = 0 ] && break; sleep 0.1
+  done
+  kill -KILL "$pulse" "$manager" "$daemon" 2>/dev/null || true
   wait "$pulse" "$manager" "$daemon" 2>/dev/null || true
   rm -rf "$work" "$graph"
   if [ -e "$work.real" ]; then
@@ -106,6 +114,8 @@ restore() {
 }
 trap restore EXIT
 trap 'exit 77' TERM
+trap 'exit 130' INT
+trap 'exit 129' HUP
 
 # The guard, the whole run long, failing closed: the graph read (an answer late or empty stops the
 # run), no device in it, no source or sink but the run's own `kitokey_e2e_*`, and no process of the
@@ -332,6 +342,7 @@ for run in part flac again; do
   eval "recorder_$run=$!"
 done
 sleep 65
+signallers=()
 for run in part flac again; do
   folder=$(ls -d "$work/kept-$run"/*/ | head -1)
   pid=$(eval echo "\$recorder_$run")
@@ -340,12 +351,14 @@ for run in part flac again; do
     flac) python3 scripts/e2e_measure_v2.py signal-at "$folder" "$pid" SIGKILL local.flac & ;;
     again) python3 scripts/e2e_measure_v2.py signal-at "$folder" "$pid" SIGTERM local.flac.part & ;;
   esac
+  signallers+=("$!")
 done
 sleep 0.5
 kill -INT "$recorder_part" "$recorder_flac" "$recorder_again"
 wait "$recorder_part" "$recorder_flac" 2>/dev/null || true
 again_as=0; wait "$recorder_again" || again_as=$?
-wait
+# Its signallers alone: the graph's daemons are children of this script too, and never end.
+wait "${signallers[@]}" 2>/dev/null || true
 kill "$mic_player" "$others_player" 2>/dev/null || true
 for run in part flac again; do
   folder=$(ls -d "$work/kept-$run"/*/ | head -1)
