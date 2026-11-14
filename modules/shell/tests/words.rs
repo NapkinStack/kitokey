@@ -1550,7 +1550,9 @@ fn every_sentence_carries_its_comment() {
 fn a_sentence_has_the_same_placeholders_in_both_languages_and_its_comment_names_them() {
     use std::collections::BTreeMap;
     let mut groups: BTreeMap<String, [Vec<String>; 2]> = BTreeMap::new();
-    let mut named: BTreeMap<String, String> = BTreeMap::new();
+    // What one comment covers — a whole field, each place of an array, or the arms after it — and
+    // the placeholders it says, against those its sentences hold.
+    let mut covered: BTreeMap<String, (std::collections::BTreeSet<String>, String)> = BTreeMap::new();
     for sentence in sentences() {
         let Some(french) = sentence.french else { continue };
         let group = match (&sentence.field, &sentence.comment) {
@@ -1558,9 +1560,15 @@ fn a_sentence_has_the_same_placeholders_in_both_languages_and_its_comment_names_
             (None, Some((number, _))) => format!("{} comment {number}", sentence.function),
             (None, None) => sentence.function.clone(),
         };
-        groups.entry(group.clone()).or_default()[french as usize].extend(placeholders(&sentence.text));
-        if let Some((_, comment)) = &sentence.comment {
-            named.insert(group, comment[comment.find("Placeholders:").unwrap()..].to_string());
+        groups.entry(group).or_default()[french as usize].extend(placeholders(&sentence.text));
+        if let Some((number, comment)) = &sentence.comment {
+            let key = match &sentence.field {
+                Some((field, _)) => format!("{}.{field}", sentence.function),
+                None => format!("{} comment {number}", sentence.function),
+            };
+            let entry = covered.entry(key).or_default();
+            entry.0.extend(placeholders(&sentence.text));
+            entry.1 = comment[comment.find("Placeholders:").unwrap()..].to_string();
         }
     }
     let mut wrong = Vec::new();
@@ -1570,12 +1578,11 @@ fn a_sentence_has_the_same_placeholders_in_both_languages_and_its_comment_names_
         if english != french {
             wrong.push(format!("{group}: in both languages"));
         }
-        if let Some(named) = named.get(&group) {
-            let said: std::collections::BTreeSet<_> = english.iter().chain(&french).cloned().collect();
-            let listed: std::collections::BTreeSet<_> = placeholders(named).into_iter().collect();
-            if said != listed {
-                wrong.push(format!("{group}: in its comment"));
-            }
+    }
+    for (key, (said, named)) in covered {
+        let listed: std::collections::BTreeSet<_> = placeholders(&named).into_iter().collect();
+        if said != listed {
+            wrong.push(format!("{key}: in its comment"));
         }
     }
     still_wrong("placeholders", wrong);
