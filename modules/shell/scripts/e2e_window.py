@@ -7109,6 +7109,21 @@ def trial_left(now: dt.datetime) -> None:
 
 def main() -> int:
     now = dt.datetime.now().astimezone()
+    # A partial run (pytest's -k, scripts/e2e_only.py): the scenarios KITOKEY_E2E_ONLY names, alone,
+    # said first — never read as a full run: e2e.sh says it again, and never passes it.
+    if os.environ.get("KITOKEY_E2E_ONLY", "").strip():
+        import e2e_only
+
+        try:
+            played = e2e_only.chosen(Path(__file__).read_text(), os.environ["KITOKEY_E2E_ONLY"])
+        except SystemExit as refused:
+            # On the output the evidence keeps, as every line of the run.
+            print(refused)
+            return 1
+        print(f"partial run: {', '.join(played)}")
+        for name in played:
+            globals()[name](now)
+        return 1 if FAILED else 0
     sessions = WORK / "sessions"
     # Sessions this week, last week, earlier this month when there is room for one, two months
     # ago; one whose start is written with an offset of hours alone; one whose start is no instant.

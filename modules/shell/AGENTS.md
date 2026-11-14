@@ -46,4 +46,4 @@ Puts Kitokey's four steps in the user's hands: a tray, a global shortcut, notifi
 
 ## Non-standard commands
 
-- None yet.
+- `KITOKEY_E2E_ONLY=<scenario>[,…] bash scripts/headless.sh`: the window's e2e scenarios named, by their function in `scripts/e2e_window.py`, played alone (`scripts/e2e_only.py`, as pytest's `-k`); the tray's and `main()`'s own are not. A red check is replayed so before a pull request is blamed for it. Such a run says « partial run » first and last, and never exits 0: it is never the module's e2e.

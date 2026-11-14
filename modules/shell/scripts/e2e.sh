@@ -120,9 +120,14 @@ click() {
 }
 published=""
 failed=0
+# A partial run (KITOKEY_E2E_ONLY, scripts/e2e_only.py): the window's scenarios it names alone — the
+# tray's not played, the logs' completeness not owed —, said first and last, and never passed.
+only=${KITOKEY_E2E_ONLY:-}
+[ -z "$only" ] || say "partial run: $only — the tray's scenarios not played"
 check() { if "$@"; then say "  ok    $*"; else say "  FAIL  $*"; failed=1; fi; }
 is() { [ "$1" = "$2" ] || { say "        got: $1"; return 1; }; }
 
+if [ -z "$only" ]; then
 # The program that hears, played: it notes what it was given, fails, is slow or stuck when told.
 cat > "$work/kitokey-transcription" <<'PLAYED'
 #!/bin/sh
@@ -566,6 +571,8 @@ check test ! -e "$work/sessions/given"
 click 6
 rm -rf "$work/sessions/2026-11-13_09-00" "$work/sessions/recorder"
 
+fi
+
 # The window (cycle 03): Kitokey started with --window by tauri-driver, its page read over
 # WebDriver (scripts/e2e_window.py). For a few seconds a window appears, twice.
 if ! command -v WebKitWebDriver >/dev/null; then
@@ -592,8 +599,10 @@ fi
 
 # Its log (ADR-0007): each recording and making under an id, never a path of the run's folder.
 shell_log=$(cat "$work"/state/kitokey/logs/shell.*.jsonl 2>/dev/null || true)
-check grep -q '"message":"shell.recording_started"' <<< "$shell_log"
-check grep -q '"message":"shell.minutes_written"' <<< "$shell_log"
+if [ -z "$only" ]; then
+  check grep -q '"message":"shell.recording_started"' <<< "$shell_log"
+  check grep -q '"message":"shell.minutes_written"' <<< "$shell_log"
+fi
 check test -z "$(grep -F "$work" <<< "$shell_log")"
 check test ! -s "$work/errors"
 # Every warning and error logged is one a scenario provokes, and each one named is logged: the
@@ -601,5 +610,10 @@ check test ! -s "$work/errors"
 logs_read() { uv run --quiet --with pyyaml==6.0.3 python scripts/e2e_logs.py "$work" "$evidence" MANIFEST.yaml | tee -a .evidence/e2e.txt; return "${PIPESTATUS[0]}"; }
 check logs_read
 [ -s "$work/errors" ] && sed 's/^/    /' "$work/errors" >> .evidence/e2e.txt
+if [ -n "$only" ]; then
+  # Never read as the module's e2e: its status is a failure either way, its last line says which.
+  [ "$failed" = 0 ] && say "e2e: partial run ($only): its checks passed — not the module's e2e" || say "e2e: partial run ($only): FAILED"
+  exit 3
+fi
 [ "$failed" = 0 ] && say "e2e: passed" || say "e2e: FAILED"
 exit "$failed"
