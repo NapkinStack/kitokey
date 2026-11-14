@@ -1194,6 +1194,25 @@ def service_named(now: dt.datetime) -> None:
                         and b.find_element(By.ID, "transcription-service").get_attribute("value") == "0"
                         and b.find_element(By.ID, "transcription-models").get_attribute("value") == "vendor/scribe", 5)
         check("drawn again: OpenRouter chosen, its model in its list", kept)
+        # A model the service does not list — a new release, an id of its own —: typed by hand under
+        # « Avancé », the address left empty, saved with the service chosen above, and read again.
+        press(browser, "transcription-advanced")
+        wait_for(browser, lambda b: b.find_element(By.ID, "transcription-model").is_displayed(), 3)
+        check("« Avancé », its address left empty: the service chosen above shown standing in",
+              browser.find_element(By.ID, "transcription-provider").get_attribute("placeholder") == stand,
+              browser.find_element(By.ID, "transcription-provider").get_attribute("placeholder"))
+        browser.find_element(By.ID, "transcription-model").send_keys("vendor/new-scribe")
+        press(browser, "transcription-own-save")
+        typed = wait_for(browser, lambda b: 'transcription_model = "vendor/new-scribe"' in window.file.read_text(), 5)
+        text = window.file.read_text()
+        check("a model typed by hand for the service chosen: saved with its address", typed and f'transcription_provider = "{stand}"' in text, text)
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
+        browser.execute_script("location.hash = '#/settings'")
+        reread = wait_for(browser, lambda b: b.find_elements(By.ID, "transcription-online") and b.find_element(By.ID, "transcription-online").is_selected()
+                          and b.find_element(By.ID, "transcription-service").get_attribute("value") == "0"
+                          and [s for _, s in offered(b, "transcription-models")] == ["New Scribe"], 5)
+        check("read again: that service, the model typed said as people say it", reread, offered(browser, "transcription-models"))
         # OpenAI's key is tested at its own address, never a stand-in's: its models are held by providers' tests.
         choose(browser, "transcription-service", "1")
         check("OpenAI chosen: no model offered before its key, nothing asked of it",
