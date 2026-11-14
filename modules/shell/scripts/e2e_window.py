@@ -2191,6 +2191,22 @@ def cancelled_at_once(now: dt.datetime) -> None:
                 check(f"{what}: « Annuler » on its page while it is made", offered)
                 if not offered:
                     continue
+                if step == "hearing":
+                    # Refused — its meeting gone meanwhile, the answer stood in for here —: said beside its
+                    # line, and still said once the makings are read again; the making goes on (D92).
+                    browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                           " asked === 'making_cancelled' ? Promise.reject('the meeting is gone') : real.invoke(asked, ...rest) };"
+                                           " window.restore = () => { window.__TAURI__.core = real; };")
+                    press(browser, "making-cancel")
+                    refusal = lambda b: b.execute_script("const n = document.querySelector('.note.warn[data-refused]'); return n ? n.textContent : ''")
+                    said_now = wait_for(browser, lambda b: "Kitokey n’a pas pu annuler" in refusal(b), 3)
+                    # The makings read again meanwhile: by the gesture itself, then by the page's own reading.
+                    time.sleep(1.5)
+                    kept = refusal(browser)
+                    check(f"{what}: « Annuler » refused: said beside its making in its own words, still said once the makings are read again, the making going on",
+                          said_now and kept.startswith("Kitokey n’a pas pu annuler") and "the meeting is gone" in kept and not gone(pids[0])
+                          and browser.execute_script("const c = document.getElementById('making-cancel'); return !!c && !c.disabled"), kept)
+                    browser.execute_script("window.restore()")
                 pressed = time.monotonic()
                 press(browser, "making-cancel")
                 ended = wait_for(browser, lambda b: all(gone(pid) for pid in pids) and b.execute_script(idle), 2)
@@ -2202,6 +2218,8 @@ def cancelled_at_once(now: dt.datetime) -> None:
                       sorted(p.name for p in meeting.iterdir()))
                 stopped = browser.execute_script("const s = document.getElementById('making-stopped'); return s ? s.textContent : ''")
                 check(f"{what}: the page says what was stopped", "arrêté" in stopped.lower(), stopped)
+                check(f"{what}: a refusal said before is gone with the gesture that followed it",
+                      not browser.execute_script("return document.querySelector('.note.warn[data-refused]')"))
                 time.sleep(2)
                 check(f"{what}: no notification for a cancel", "member=Notify" not in notified.read_text(), notified.read_text()[-300:])
             finally:
