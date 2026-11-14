@@ -2219,9 +2219,9 @@ def cancelled_at_once(now: dt.datetime) -> None:
                       sorted(p.name for p in meeting.iterdir()))
                 stopped_said = lambda b: b.execute_script("const s = document.getElementById('making-stopped'); return s ? s.textContent : ''")
                 said_in_time = wait_for(browser, lambda b: "arrêté" in stopped_said(b).lower(), max(0.0, 2 - (time.monotonic() - pressed)))
-                said_after = time.monotonic() - pressed
-                check(f"{what}: the page says what was stopped, within two seconds of « Annuler » ({said_after:.2f} s)",
-                      said_in_time and said_after <= 2, stopped_said(browser))
+                stopped_in = time.monotonic() - pressed
+                check(f"{what}: the page says what was stopped, within two seconds of « Annuler » ({stopped_in:.2f} s)",
+                      said_in_time and stopped_in <= 2, stopped_said(browser))
                 # And it stays said: no reading answered late draws the making again over it, « Annuler » back.
                 flicker = []
                 for _ in range(20):
