@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::LazyLock;
 
 use oxc_allocator::Allocator;
-use oxc_ast::ast::{StringLiteral, TemplateElement};
-use oxc_ast_visit::Visit;
+use oxc_ast::ast::{AssignmentExpression, AssignmentTarget, CallExpression, Expression, StringLiteral, TemplateElement};
+use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
 use oxc_span::SourceType;
 
@@ -30,6 +30,66 @@ impl<'a> Visit<'a> for Texts {
 
     fn visit_template_element(&mut self, element: &TemplateElement<'a>) {
         self.0.push(element.value.raw.as_str().to_string());
+    }
+}
+
+/// What the page sets as a style's value: `x.style.borderColor = …`, `x.style.cssText = …`,
+/// `x.style.setProperty(name, …)` — its texts, where a word is a value and not a class (#739).
+#[derive(Default)]
+struct StyleValues(Vec<String>);
+
+/// A text written in the code as it is: a string, or a template's parts joined.
+fn written(expression: &Expression) -> Option<String> {
+    match expression {
+        Expression::StringLiteral(literal) => Some(literal.value.as_str().unwrap_or_default().to_string()),
+        Expression::TemplateLiteral(template) => Some(
+            template
+                .quasis
+                .iter()
+                .map(|part| part.value.raw.as_str())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        _ => None,
+    }
+}
+
+/// Whether an expression is some element's `.style`.
+fn a_style(expression: &Expression) -> bool {
+    matches!(expression, Expression::StaticMemberExpression(member) if member.property.name == "style")
+}
+
+impl<'a> Visit<'a> for StyleValues {
+    fn visit_assignment_expression(&mut self, assigned: &AssignmentExpression<'a>) {
+        if let AssignmentTarget::StaticMemberExpression(member) = &assigned.left
+            && a_style(&member.object)
+            && let Some(text) = written(&assigned.right)
+        {
+            // A property set alone gives its value; `cssText` gives its declarations.
+            self.0.push(if member.property.name == "cssText" {
+                text
+            } else {
+                format!("{}: {text}", member.property.name)
+            });
+        }
+        walk::walk_assignment_expression(self, assigned);
+    }
+
+    fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
+        if let Expression::StaticMemberExpression(member) = &call.callee
+            && member.property.name == "setProperty"
+            && a_style(&member.object)
+            && let Some(text) = call.arguments.get(1).and_then(|value| value.as_expression()).and_then(written)
+        {
+            let name = call
+                .arguments
+                .first()
+                .and_then(|name| name.as_expression())
+                .and_then(written)
+                .unwrap_or_default();
+            self.0.push(format!("{name}: {text}"));
+        }
+        walk::walk_call_expression(self, call);
     }
 }
 
@@ -395,11 +455,56 @@ const COLOUR_FUNCTIONS: [&str; 10] = [
     "rgb(", "rgba(", "hsl(", "hsla(", "hwb(", "lab(", "lch(", "oklab(", "oklch(", "color(",
 ];
 
-/// Whether a text names one of the system's colours as a word of its own.
-fn names_a_system_colour(text: &str) -> bool {
-    text.to_lowercase()
+/// CSS Color 4's deprecated system colours (§6.2), which browsers still draw: a value as the others.
+/// Some are words a rule says otherwise (`background`, `menu`): read in a value alone.
+const DEPRECATED_SYSTEM_COLOURS: [&str; 23] = [
+    "activeborder",
+    "activecaption",
+    "appworkspace",
+    "background",
+    "buttonhighlight",
+    "buttonshadow",
+    "captiontext",
+    "inactiveborder",
+    "inactivecaption",
+    "inactivecaptiontext",
+    "infobackground",
+    "infotext",
+    "menu",
+    "menutext",
+    "scrollbar",
+    "threeddarkshadow",
+    "threedface",
+    "threedhighlight",
+    "threedlightshadow",
+    "threedshadow",
+    "window",
+    "windowframe",
+    "windowtext",
+];
+
+/// The properties whose value names other properties, never a colour: `transition: background 0.2s`.
+const NAMING_PROPERTIES: [&str; 3] = ["transition", "transition-property", "will-change"];
+
+/// Whether a value names one of the system's colours, current or deprecated, as a word of its own.
+fn names_a_system_colour(value: &str) -> bool {
+    value
+        .to_lowercase()
         .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
-        .any(|word| SYSTEM_COLOURS.contains(&word))
+        .any(|word| SYSTEM_COLOURS.contains(&word) || DEPRECATED_SYSTEM_COLOURS.contains(&word))
+}
+
+/// Whether a rule's declarations — or a text the page sets, `border-color: Highlight` or `Highlight`
+/// alone — give a system colour as a value: never in a property's name, nor where a value names
+/// properties (#739).
+fn sets_a_system_colour(declarations: &str) -> bool {
+    declarations.split(';').any(|one| match one.split_once(':') {
+        Some((key, value)) => !NAMING_PROPERTIES.contains(&key.trim().to_lowercase().as_str()) && names_a_system_colour(value),
+        None => {
+            let word = one.trim().to_lowercase();
+            SYSTEM_COLOURS.contains(&word.as_str()) || DEPRECATED_SYSTEM_COLOURS.contains(&word.as_str())
+        }
+    })
 }
 
 /// Whether a text writes a colour by one of CSS Color 4's functions: `color(` alone, never `color-mix(`.
@@ -430,7 +535,7 @@ fn red_outside_a_recording(style: &str) -> Vec<String> {
         .filter(|(_, body)| {
             let body = body.to_lowercase();
             let literal = names_a_colour(&body)
-                || names_a_system_colour(&body)
+                || sets_a_system_colour(&body)
                 || body.split(|c: char| !(c.is_ascii_alphanumeric() || c == '#')).any(|word| {
                     word.starts_with('#') && [4, 5, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit())
                 });
@@ -466,6 +571,12 @@ fn colours_in_page(page: &str) -> Vec<String> {
                 .any(|word| word.starts_with('#') && [4, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit()));
             hex || names_a_colour(&lower) || lower.contains("--red") || writes_a_colour(&lower)
         })
+        .chain({
+            // A system colour, where the page sets a style's value (#739).
+            let mut styles = StyleValues::default();
+            styles.visit_program(&parsed.program);
+            styles.0.into_iter().filter(|set| sets_a_system_colour(set))
+        })
         .collect()
 }
 
@@ -491,6 +602,9 @@ fn red_says_a_recording_and_nothing_else() {
         "var(--red)",
         // The system's colours and every function of CSS Color 4 (#739).
         "AccentColor",
+        "ButtonHighlight",
+        "Window",
+        "Background",
         "oklch(0.55 0.2 27)",
         "lab(45 60 40)",
         "color(srgb 0.76 0.21 0.18)",
@@ -516,6 +630,10 @@ fn red_says_a_recording_and_nothing_else() {
         "row.style.setProperty(\"background\", `indianred`);",
         "row.style.setProperty(\"color\", \"var(--red)\");",
         "row.style.borderColor = `oklch(0.55 0.2 27)`;",
+        // The system's colours set by the page, current or deprecated (#739).
+        "row.style.borderColor = \"Highlight\";",
+        "row.style.cssText = \"border-color: ButtonHighlight\";",
+        "row.style.setProperty(\"background\", \"Window\");",
     ] {
         assert_eq!(colours_in_page(&format!("{PAGE}\n{set}")).len(), 1, "{set}");
     }
