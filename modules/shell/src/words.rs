@@ -639,6 +639,10 @@ pub struct Window {
     pub transcript_model_coming: &'static str,
     /// The button that ends what is being made of a meeting, or takes it out of the line (D92).
     pub making_cancel: &'static str,
+    /// « Annuler » refused — its meeting gone meanwhile (D92). Shows: a meeting's page, beside the
+    /// making's line, until the next gesture on it. When: the shell refused to end or take out the
+    /// making. At most: no limit. Placeholders: {} why it was refused.
+    pub making_cancel_failed: &'static str,
     /// Said on its page once the user cancelled its transcript, or its minutes: what was there stays.
     pub transcript_stopped: &'static str,
     pub minutes_stopped: &'static str,
@@ -1072,6 +1076,7 @@ pub fn window(language: Language) -> Window {
             transcript_model_needed: "Waiting for the Whisper model.",
             transcript_model_coming: "Waiting for the Whisper model, being downloaded.",
             making_cancel: "Cancel",
+            making_cancel_failed: "Kitokey could not cancel: {}",
             transcript_stopped: "Transcription stopped. You can start it again, with another model if you like.",
             minutes_stopped: "Minutes stopped. You can start them again, with another model if you like.",
             ran_online: "online",
@@ -1498,6 +1503,7 @@ pub fn window(language: Language) -> Window {
             transcript_model_needed: "En attente du modèle Whisper.",
             transcript_model_coming: "En attente du modèle Whisper, en cours de téléchargement.",
             making_cancel: "Annuler",
+            making_cancel_failed: "Kitokey n’a pas pu annuler\u{a0}: {}",
             transcript_stopped: "Transcription arrêtée. Vous pouvez la relancer, avec un autre modèle si besoin.",
             minutes_stopped: "Compte rendu arrêté. Vous pouvez le relancer, avec un autre modèle si besoin.",
             ran_online: "en ligne",

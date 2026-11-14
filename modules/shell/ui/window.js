@@ -407,6 +407,14 @@ function transcriptState(name) {
 // The card whose « Annuler » was pressed: once it says stopped, the focus goes to what makes it again.
 let cancelledFrom = null;
 
+// A refused « Annuler », said for the line `of` (D92).
+function refusalNote(of, text) {
+  const note = element("p", "note warn", text);
+  note.dataset.refused = of;
+  note.setAttribute("role", "status");
+  return note;
+}
+
 // « Annuler » (D92): what is made of the meeting ends within two seconds, or leaves the line.
 function cancelButton(said, id) {
   const cancel = element("button", "open", words.making_cancel);
@@ -415,8 +423,12 @@ function cancelButton(said, id) {
   cancel.addEventListener("click", async () => {
     cancel.disabled = true;
     cancelledFrom = said.id;
+    // A refusal said before was the last gesture's: this one says its own.
+    document.querySelector(`.note[data-refused="${said.id}"]`)?.remove();
     await window.__TAURI__.core.invoke("making_cancelled", { name: said.dataset.name }).catch((why) => {
-      said.textContent = fill(words.not_saved, why);
+      // Said beside the line, which is drawn again as the makings are read: kept until the next gesture.
+      said.after(refusalNote(said.id, fill(words.making_cancel_failed, why)));
+      cancelledFrom = null;
       cancel.disabled = false;
     });
     readMakings();
