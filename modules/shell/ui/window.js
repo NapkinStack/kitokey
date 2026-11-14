@@ -2358,10 +2358,9 @@ function showSettings(shown, minutes, words) {
   }
   const failed = element("p", "card note warn");
   failed.id = "not-saved";
-  // What the last save could not do, said on the page drawn after it — once.
+  // What the last save could not do, said on every drawing of the page until the next save (#655).
   failed.textContent = notSaved ?? "";
   failed.hidden = notSaved === null;
-  notSaved = null;
   parts.push(failed);
   // What is left of the trial, on a trial licence alone (D83): said first, nothing to change.
   if (shown.trial !== null) {
@@ -4325,6 +4324,8 @@ async function draw(mine, again) {
     player = null;
   }
   const settings = location.hash === "#/settings";
+  // What the last save could not do is said until the next save, or until Settings is left (#655).
+  if (!settings) notSaved = null;
   // The first run's assistant, alone in the window: no header, no other page (D58).
   const welcoming = /^#\/welcome(\/again)?$/.test(location.hash);
   document.getElementById("frame").hidden = welcoming;
