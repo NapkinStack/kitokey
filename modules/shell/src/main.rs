@@ -3198,7 +3198,9 @@ fn write_minutes_from(
     let asked_again = chosen.clone();
     drop(writing);
     shell.minutes_tried.lock().unwrap().insert(folder.clone(), chosen.clone());
-    // Not started: said on the meeting's page as well as in a notification (D25).
+    // Not started: said on the meeting's page as well as in a notification (D25) — the one that
+    // ends a meeting made after a stop, then, its transcript's own not told: its meeting named (D92).
+    let told = |notice: Notice| tell(app, &of_meeting(app, &notice, &folder));
     let refused = |why: String| {
         shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
         shell.minutes_failed.lock().unwrap().insert(folder.clone(), (why, None, None));
@@ -3207,7 +3209,7 @@ fn write_minutes_from(
         Ok(settings) => settings,
         Err(why) => {
             refused(why.clone());
-            return tell(app, &words::trouble(&Trouble::Settings(why), shell.language()));
+            return told(words::trouble(&Trouble::Settings(why), shell.language()));
         }
     };
     let named = settings.minutes_provider.clone().zip(settings.minutes_model.clone());
@@ -3236,7 +3238,7 @@ fn write_minutes_from(
                 let said = words::Minutes::OllamaWaits {
                     silent: wait == Wait::Silent,
                 };
-                return tell(app, &words::minutes(&said, shell.language()));
+                return told(words::minutes(&said, shell.language()));
             }
         }
     } else {
@@ -3249,19 +3251,19 @@ fn write_minutes_from(
             if from_line {
                 return;
             }
-            tell(app, &words::minutes(&words::Minutes::Unchosen, shell.language()));
+            told(words::minutes(&words::Minutes::Unchosen, shell.language()));
             return open_window_at(app, "#/settings");
         }
     };
     if !matches!(meeting::transcript(&folder), meeting::Read::Present(transcript) if transcript.complete) {
         refused("this meeting has no whole transcript".into());
-        return tell(app, &words::minutes(&words::Minutes::NoTranscript, shell.language()));
+        return told(words::minutes(&words::Minutes::NoTranscript, shell.language()));
     }
     let Some(host) = providers::host(&provider) else {
         let why = format!("{provider} is no provider's address");
         tracing::warn!(detail = %why, "shell.minutes_refused");
         refused(why);
-        return tell(app, &words::minutes(&words::Minutes::NoProvider(provider), shell.language()));
+        return told(words::minutes(&words::Minutes::NoProvider(provider), shell.language()));
     };
     if agreed_now != Some(host.as_str()) && !providers::local(&provider) && settings.minutes_agreed.as_deref() != Some(host.as_str()) {
         let mut awaiting = shell.awaiting.lock().unwrap();
@@ -3278,7 +3280,7 @@ fn write_minutes_from(
         if from_line {
             return;
         }
-        tell(app, &words::minutes(&words::Minutes::Waiting(host), shell.language()));
+        told(words::minutes(&words::Minutes::Waiting(host), shell.language()));
         let name = folder
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
@@ -4474,6 +4476,16 @@ fn window_focused(app: &AppHandle) -> bool {
         .any(|window| window.is_focused().unwrap_or(false))
 }
 
+/// A notice about a meeting, its meeting named first: its title, else when it was recorded (D92).
+fn of_meeting(app: &AppHandle, notice: &Notice, folder: &Path) -> Notice {
+    let language = app.state::<Shell>().language();
+    let name = folder.file_name().unwrap_or_default().to_string_lossy();
+    let title = named::read(folder).or_else(|| minutes::title(folder));
+    let started = chrono::NaiveDateTime::parse_from_str(&name, "%Y-%m-%d_%H-%M").ok();
+    let meeting = words::meeting(title.as_deref(), started, chrono::Local::now().date_naive(), language);
+    words::for_meeting(notice.clone(), &meeting, language)
+}
+
 /// The notification that ends a meeting's making — its last step written or failed (D92): told
 /// once, naming the meeting, and only when no window of Kitokey has the focus, the page saying it
 /// there. `opening`: its click opens the meeting (D44).
@@ -4482,12 +4494,7 @@ fn tell_made(app: &AppHandle, notice: &Notice, folder: &Path, opening: bool) {
         tracing::info!("shell.made_not_told");
         return;
     }
-    let language = app.state::<Shell>().language();
-    let name = folder.file_name().unwrap_or_default().to_string_lossy();
-    let title = named::read(folder).or_else(|| minutes::title(folder));
-    let started = chrono::NaiveDateTime::parse_from_str(&name, "%Y-%m-%d_%H-%M").ok();
-    let meeting = words::meeting(title.as_deref(), started, chrono::Local::now().date_naive(), language);
-    let notice = words::for_meeting(notice.clone(), &meeting, language);
+    let notice = of_meeting(app, notice, folder);
     if opening {
         tell_opening(app, &notice, folder.to_path_buf());
     } else {

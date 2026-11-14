@@ -4806,7 +4806,8 @@ def meeting_told_once(now: dt.datetime) -> None:
     other = None
     try:
         time.sleep(0.5)
-        with Window(meetings, "fr_FR.UTF-8", settings) as browser:
+        window = Window(meetings, "fr_FR.UTF-8", settings)
+        with window as browser:
             # The window has the focus: made after a stop, transcript then minutes, nothing told.
             check("the window has the focus, as the desktop gives it", wait_for(browser, focused, 5))
             browser.find_element(By.ID, "record").click()
@@ -4854,6 +4855,21 @@ def meeting_told_once(now: dt.datetime) -> None:
             check("its minutes failed: one notification, the failure's, naming the meeting — the transcript not told on its own",
                   failed and told(mark).count("member=Notify") == 1 and "Transcription prête" not in told(mark)
                   and "Compte rendu prêt" not in told(mark) and names(told(mark)), told(mark)[-600:])
+
+            # Its minutes not started — nobody named to write them: the transcript's end is the last
+            # step's, one notification still, D25's, naming the meeting (D25, D92).
+            (WORK / "fail-minutes").unlink(missing_ok=True)
+            window.file.write_text(f'after = "minutes"\nreminder = false\nmodel = "{model}"\n')
+            other.terminate(); other.wait(timeout=10)
+            other = subprocess.Popen(["/usr/bin/python3", "-c", ELSEWHERE], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            wait_for(browser, lambda b: not focused(b), 10)
+            mark = len(notified.read_text())
+            browser.execute_script("window.__TAURI__.core.invoke('context_redo', {name: arguments[0]})", meeting.name)
+            unchosen = wait_for(browser, lambda b: told(mark).count("member=Notify") >= 1 and idle(b), 20)
+            time.sleep(2)
+            check("its minutes not started: one notification, what to do for them, naming the meeting — the transcript not told on its own",
+                  unchosen and told(mark).count("member=Notify") == 1 and "Transcription prête" not in told(mark)
+                  and names(told(mark)), told(mark)[-600:])
     finally:
         (WORK / "fail-minutes").unlink(missing_ok=True)
         if other is not None:
