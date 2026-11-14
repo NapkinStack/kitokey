@@ -2145,6 +2145,7 @@ function minutesRow(minutes, words, locked) {
   servicePick.addEventListener("change", () => {
     minutesChosen.service = servicePick.value;
     shownSaved();
+    address.placeholder = service().address;
   });
   keyTest.addEventListener("click", async () => {
     keyTest.disabled = true;
@@ -2178,7 +2179,10 @@ function minutesRow(minutes, words, locked) {
   const [addressWrap, address] = field("minutes-address", words.address, "url", own ? minutes.provider : "");
   const [modelWrap, model] = field("minutes-model", words.model_name, "text", own ? minutes.model : "");
   const ownSave = button("minutes-own-save", words.save, false);
-  ownSave.addEventListener("click", () => save(address.value, model.value, key.value || null));
+  // Its address left empty: the service chosen above, with a model it does not list — a new release,
+  // an id of its own — named by hand.
+  address.placeholder = service().address;
+  ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, key.value || null));
   advanced.append(addressWrap, modelWrap, ownSave);
   const unfold = (now) => {
     minutesAdvanced = now;
