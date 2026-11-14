@@ -50,14 +50,19 @@ Bluetooth headset may switch to its call profile while it listens, and the syste
 (ADR-0015's amendment of 2026-11-07); `me`'s first `device` says `headset: true` then, `false` for any
 other microphone — absent where the graph does not read (D88). It is never part of a recording.
 
-**`nstack e2e capture`** runs the scenarios without a call and without a voice: for about
-three minutes the system's default output and input are two silent devices of its own, a note
+**`nstack e2e capture`** runs the scenarios without a call and without a voice, sealed off the
+computer's sound: in a bubblewrap (`bwrap`) whose `/dev` holds no sound card and which reaches
+neither the desktop's PipeWire nor the system bus, on a PipeWire of its own that sees no
+hardware — the computer's microphones, speakers and headsets, a pair of AirPods connecting
+during the run included, cannot be opened, and the desktop's defaults are never moved: its
+default output and input are two silent devices of its own, a note
 is played into each, and the program records them in both forms — stopped as a user stops it,
 read while it writes, left silent, killed, and with the same sound in both sources to see that
 the tracks keep one clock. The second form's notes rest away from zero and carry two unequal
 channels in 24 bits, so that a track centred, mixed or cut shows; and one source stops and
-comes back. It runs nothing where there is no sound server, or while an application holds a
-microphone; what it saw is in `.evidence/e2e.txt`, its logs in `$NSTACK_EVIDENCE/logs`
+comes back. It runs nothing where PipeWire or `bwrap` is missing or where the system refuses
+it a namespace, and stops at once, NOT RUN, if a device not its own shows in its graph, a sound
+card is held, or the graph does not answer; what it saw is in `.evidence/e2e.txt`, its logs in `$NSTACK_EVIDENCE/logs`
 (`.evidence/e2e/logs` when run alone), where nstack reads them after the run: a warning or an
 error the manifest's `evidence.provoked` does not declare is said. A real call, a real microphone and a
 headset stay a person's to try. Scenario P listens, stopped by `stop`, by a TERM signal and by its input closed, and with a named
