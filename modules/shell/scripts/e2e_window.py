@@ -1789,15 +1789,26 @@ def meeting_language(now: dt.datetime) -> None:
         removed = wait_for(browser, lambda b: not (heard / "language").exists(), 5)
         # Flaky once in five full runs, never alone (#735): a miss says what the page, the folder and
         # the shell's log said, so that its cause is read, not guessed.
-        said_then = lambda: {
-            "page": browser.execute_script("const p = document.getElementById('meeting-language'), s = document.getElementById('language-said');"
-                                           " return [p && p.value, s && s.textContent]"),
-            "language": (heard / "language").read_text() if (heard / "language").exists() else None,
-            "makings": browser.execute_async_script("const done = arguments[arguments.length - 1];"
-                                                    " window.__TAURI__.core.invoke('makings').then(done, (why) => done(String(why)))"),
-            "log": [line for log in sorted((WORK / "state" / "kitokey" / "logs").glob("*.jsonl")) for line in log.read_text().splitlines()
-                    if any(word in line for word in ("language_set", "\"WARN\"", "\"ERROR\"", "panicked"))][-8:],
-        }
+        def said_then() -> dict:
+            # Each part read on its own: one that raises — the file gone between two looks, a log cut
+            # inside a character, a page that does not answer — says why, and never stops the run.
+            def part(read):
+                try:
+                    return read()
+                except Exception as why:  # noqa: BLE001 — a diagnostic never raises
+                    return repr(why)
+            return {
+                "page": part(lambda: browser.execute_script(
+                    "const p = document.getElementById('meeting-language'), s = document.getElementById('language-said');"
+                    " return [p && p.value, s && s.textContent]")),
+                "language": part(lambda: (heard / "language").read_text()),
+                "makings": part(lambda: browser.execute_async_script(
+                    "const done = arguments[arguments.length - 1];"
+                    " window.__TAURI__.core.invoke('makings').then(done, (why) => done(String(why)))")),
+                "log": part(lambda: [line for log in sorted((WORK / "state" / "kitokey" / "logs").glob("*.jsonl"))
+                                     for line in log.read_text(errors="replace").splitlines()
+                                     if any(word in line for word in ("language_set", "\"WARN\"", "\"ERROR\"", "panicked"))][-8:]),
+            }
         check("« Celle des Réglages »: the file removed", removed, None if removed else said_then())
         args.unlink(missing_ok=True)
         browser.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", heard.name, str(model))
