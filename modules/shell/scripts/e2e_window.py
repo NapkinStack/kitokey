@@ -1838,14 +1838,21 @@ def meeting_language(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         check("the page left and come back to: the refusal no longer said", sentence(browser) == "", sentence(browser))
+        # Saved: another language than the one refused — the same one chosen again after its refusal
+        # put the list back is not a change the page is sure to hear (6cc1b8e's red, #842).
         browser.execute_script(refusing)
-        choose(browser, "meeting-language", "fr")
+        choose(browser, "meeting-language", "de")
         wait_for(browser, lambda b: "refused 1" in sentence(b), 5)
         browser.execute_script("window.restore()")
         choose(browser, "meeting-language", "fr")
         saved = wait_for(browser, lambda b: (heard / "language").exists() and (heard / "language").read_text() == "fr\n", 5)
         drawn_again()
-        check("refused, then a choice saved: no refusal said, after a redraw too", saved and sentence(browser) == "", sentence(browser))
+        try:
+            language = (heard / "language").read_text(errors="replace")
+        except OSError as why:
+            language = repr(why)
+        check("refused, then a choice saved: no refusal said, after a redraw too", saved and sentence(browser) == "",
+              {"saved": saved, "language": language, "list": value(), "said": sentence(browser)})
         choose(browser, "meeting-language", "")
         wait_for(browser, lambda b: not (heard / "language").exists(), 5)
     # SpeechAnalyzer hears (a program in its place, as X has it): it detects none, and hears French
