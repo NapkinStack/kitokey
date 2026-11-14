@@ -113,7 +113,8 @@ restore() {
   exit "$status"
 }
 trap restore EXIT
-trap 'exit 77' TERM
+# A TERM is a stop, never a skip: the guard's own says NOT RUN through "$work.real", read in restore.
+trap 'exit 143' TERM
 trap 'exit 130' INT
 trap 'exit 129' HUP
 
