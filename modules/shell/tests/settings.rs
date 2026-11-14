@@ -92,11 +92,8 @@ fn a_file_refused_names_the_setting_and_its_line() {
     for (text, expected) in [
         ("keep_audio = 0\n", Refused::KeepAudio { line: 1 }),
         ("reminder = false\nkeep_audio = \"never\"\n", Refused::KeepAudio { line: 2 }),
-        (
-            "reminder = false\nsessions = \"Kitokey\"\n",
-            Refused::NotWhole { key: "sessions", line: 2 },
-        ),
-        ("model = \"ggml.bin\"\n", Refused::NotWhole { key: "model", line: 1 }),
+        ("reminder = false\nsessions = \"Kitokey\"\n", Refused::SessionsNotWhole { line: 2 }),
+        ("model = \"ggml.bin\"\n", Refused::ModelNotWhole { line: 1 }),
         (
             "# mine\ndeveloper = \"yes\"\n",
             Refused::Unparsed {

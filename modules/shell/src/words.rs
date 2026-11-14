@@ -1765,6 +1765,9 @@ pub fn failure(failure: Failure, language: Language) -> String {
                 refused(&why, language)
             );
         }
+        // Shows: under a command the window refused, after « not saved: », or alone where the page
+        // shows it (the folder, the keyboard settings). When: the command named by its arm fails.
+        // At most: no limit. Placeholders: none.
         (Failure::SettingsUnwritten, English) => "the settings file could not be written: check that the disk has room, then try again.",
         (Failure::SettingsUnwritten, French) => {
             "le fichier des réglages n’a pas pu être écrit\u{a0}: vérifiez qu’il reste de la place, puis réessayez."
@@ -2044,11 +2047,11 @@ pub fn cause(cause: Cause, language: Language) -> &'static str {
 
 /// What the user is told of a settings file refused (#783): which setting, on which line, and the
 /// gesture — never `settings.rs`'s own sentence, which stays for the log and developer mode.
-// Shows: after the sentence of a notification or a page that says the file was not read.
-// When: `settings::read` refuses the file. At most: no limit. Placeholders: {line} the line, {key}
-// the setting's name as the file writes it — one of Kitokey's own, never what the user typed.
 pub fn refused(refused: &Refused, language: Language) -> String {
     use Language::{English, French};
+    // Shows: after the sentence of a notification or a page that says the file was not read.
+    // When: `settings::read` refuses the file. At most: no limit. Placeholders: {line} the line,
+    // {key} the setting's name as the file writes it — one of Kitokey's own, never what the user typed.
     match (*refused, language) {
         (Refused::Unopened, English) => "Kitokey cannot open its settings file: check that you may read it.".into(),
         (Refused::Unopened, French) => "Kitokey ne peut pas ouvrir son fichier de réglages\u{a0}: vérifiez que vous pouvez le lire.".into(),
@@ -2064,17 +2067,17 @@ pub fn refused(refused: &Refused, language: Language) -> String {
         (Refused::Unparsed { line, key: None }, French) => {
             format!("La ligne {line} n’est pas écrite comme un réglage. Corrigez-la, ou supprimez-la.")
         }
-        (Refused::NotWhole { key: "model", line }, English) => {
+        (Refused::SessionsNotWhole { line }, English) => {
+            format!("Line {line}: “sessions” gives a folder’s whole path, from / or from ~. Correct it.")
+        }
+        (Refused::SessionsNotWhole { line }, French) => {
+            format!("Ligne {line}\u{a0}: «\u{a0}sessions\u{a0}» donne le chemin entier d’un dossier, depuis / ou depuis ~. Corrigez-le.")
+        }
+        (Refused::ModelNotWhole { line }, English) => {
             format!("Line {line}: “model” gives a file’s whole path, from / or from ~. Correct it.")
         }
-        (Refused::NotWhole { key: "model", line }, French) => {
-            format!("Ligne {line}\u{a0}: «\u{a0}model\u{a0}» donne le chemin complet d’un fichier, depuis / ou depuis ~. Corrigez-le.")
-        }
-        (Refused::NotWhole { key, line }, English) => {
-            format!("Line {line}: “{key}” gives a folder’s whole path, from / or from ~. Correct it.")
-        }
-        (Refused::NotWhole { key, line }, French) => {
-            format!("Ligne {line}\u{a0}: «\u{a0}{key}\u{a0}» donne le chemin complet d’un dossier, depuis / ou depuis ~. Corrigez-le.")
+        (Refused::ModelNotWhole { line }, French) => {
+            format!("Ligne {line}\u{a0}: «\u{a0}model\u{a0}» donne le chemin entier d’un fichier, depuis / ou depuis ~. Corrigez-le.")
         }
         (Refused::KeepAudio { line }, English) => {
             format!("Line {line}: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it.")
@@ -2120,6 +2123,10 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
                 ),
             );
         }
+        // Shows: a notification, its title then its body. When: the shortcut is not bound, the model or
+        // the program that hears is missing, the meetings' folder cannot be written, or no recording is
+        // there to transcribe. At most: the title, 50 characters; the body, no limit. Placeholders:
+        // {at} where the model is looked for, or the folder.
         (Trouble::Shortcut(_), English) => (
             "The keyboard shortcut is not set",
             "The menu of Kitokey’s icon still starts and stops a recording.",
