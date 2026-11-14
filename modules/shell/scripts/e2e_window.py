@@ -1792,7 +1792,7 @@ def meeting_language(now: dt.datetime) -> None:
             "return window.__TAURI__.core.invoke('language_set', {name: arguments[0], language: arguments[1]}).then(() => 'kept', (why) => String(why))", heard.name, text)
             for text in ("Deutsch", "zz")]
         check("a text that is not a code of ISO 639-1 is refused, nothing written", "kept" not in refused and not (heard / "language").exists(), refused)
-        browser.execute_script(f"location.hash = '#/'")
+        browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
@@ -2313,7 +2313,7 @@ def models_advanced(now: dt.datetime) -> None:
                   told == {"size": "12px", "context": "12px", "described": "small-models-kept"}, told)
             # Kitokey quit and started again: the models chosen at rest are still the next recording's, and said.
             window.__exit__()
-            browser = window.__enter__()
+            browser = window.__enter__()  # noqa: PLW2901 — Kitokey quit and started again: its window reopened on purpose
             wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
             again = wait_for(browser, lambda b: b.execute_script(line) == keptSaid, 5)
             chosen_again = browser.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
@@ -2422,7 +2422,7 @@ def models_advanced(now: dt.datetime) -> None:
                 # Quit and started again after a recording took them: nothing comes back.
                 wait_for(browser, lambda b: b.execute_script(idle), 15)
                 window.__exit__()
-                browser = window.__enter__()
+                browser = window.__enter__()  # noqa: PLW2901 — Kitokey quit and started again: its window reopened on purpose
                 wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
                 time.sleep(1)
                 check("started again after a recording took them: no models kept, none said, nothing on disk",
@@ -5190,7 +5190,7 @@ def transcript_corrected(now: dt.datetime) -> None:
         warned = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-loses-corrections"), 5)
         check("Refaire… of a corrected transcript says, before it starts, that its corrections will not be kept",
               warned and "ne seront pas gardées" in browser.find_element(By.ID, "redo-loses-corrections").text)
-        browser.execute_script(f"location.hash = '#/'")
+        browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "redo-corrections"), 10)
@@ -6520,7 +6520,6 @@ def gestures_answer(now: dt.datetime) -> None:
         "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
     slow = ("const real = window.__TAURI__.core; window.__asked = 0; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'record'"
             " ? (window.__asked++, new Promise((done) => setTimeout(done, 2000)).then(() => real.invoke(asked, ...rest))) : real.invoke(asked, ...rest) };")
-    shown = lambda b, id_: b.find_element(By.ID, id_).is_displayed()
     said = lambda b: b.find_element(By.ID, "record-said").get_attribute("textContent")
     running = lambda b: b.execute_async_script("const d = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('recording_now').then((n) => d(n.recording))")
     with Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n') as browser:
@@ -7618,7 +7617,7 @@ def main() -> int:
         # never says « Aucune réunion ». The file fixed, the banner goes and the meeting is listed.
         session(elsewhere / "kept", now - dt.timedelta(hours=1), 10, {"transcript.jsonl": 100})
         window.__exit__()
-        browser = window.__enter__()
+        browser = window.__enter__()  # noqa: PLW2901 — Kitokey quit and started again: its window reopened on purpose
         banner = ("const b = document.getElementById('settings-banner');"
                   "return b && b.getClientRects().length > 0 ? [document.getElementById('settings-banner-said').textContent,"
                   " document.getElementById('settings-banner-link').textContent, document.getElementById('settings-banner-link').getAttribute('href')] : null")
@@ -7706,7 +7705,7 @@ def main() -> int:
         # No settings file at all — a first start —: nothing unreadable, no banner.
         window.file.unlink()
         window.__exit__()
-        browser = window.__enter__()
+        browser = window.__enter__()  # noqa: PLW2901 — Kitokey quit and started again: its window reopened on purpose
         first = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('listed').then(l => l.settings_unread)") is False, 10)
         time.sleep(0.5)
         check("no settings file, a first start: not said unreadable, no banner", first and browser.execute_script(region) == ["status", True, 0],
