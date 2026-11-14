@@ -1332,6 +1332,22 @@ def models_guided(now: dt.datetime) -> None:
         check("« Avancé » unfolded: an address of one's own, and a model named by hand", unfolded and browser.find_element(By.ID, "minutes-model").is_displayed())
         shot_themed(browser, "d95-models-service-light", "light")
         shot_themed(browser, "d95-models-service-dark", "dark")
+        # A model the service does not list — a new release, an id of its own —: typed by hand under
+        # « Avancé », the address left empty, saved with the service chosen above, and read again.
+        check("« Avancé », its address left empty: the service chosen above shown standing in",
+              browser.find_element(By.ID, "minutes-address").get_attribute("placeholder") == stand, browser.find_element(By.ID, "minutes-address").get_attribute("placeholder"))
+        browser.find_element(By.ID, "minutes-model").send_keys("vendor/new-model")
+        press(browser, "minutes-own-save")
+        typed = wait_for(browser, lambda b: 'minutes_model = "vendor/new-model"' in window.file.read_text(), 5)
+        text = window.file.read_text()
+        check("a model typed by hand for the service chosen: saved with its address", typed and f'minutes_provider = "{stand}"' in text, text)
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
+        browser.execute_script("location.hash = '#/settings'")
+        reread = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-online").is_selected()
+                          and b.find_element(By.ID, "minutes-service").get_attribute("value") == "0"
+                          and b.execute_script(options, "minutes-models") == ["New Model"], 5)
+        check("read again: that service, the model typed said as people say it", reread, browser.execute_script(options, "minutes-models"))
     for server in servers:
         server.shutdown()
 
