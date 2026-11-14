@@ -3249,9 +3249,10 @@ fn write_minutes_from(
     let asked_again = chosen.clone();
     drop(writing);
     shell.minutes_tried.lock().unwrap().insert(folder.clone(), chosen.clone());
-    // Not started: said on the meeting's page as well as in a notification (D25) — the one that
-    // ends a meeting made after a stop, then, its transcript's own not told: its meeting named (D92).
-    let told = |notice: Notice| tell(app, &of_meeting(app, &notice, &folder));
+    // Not started: said on the meeting's page, and in a notification (D25) — the one that ends a
+    // meeting made after a stop, then, its transcript's own not told: its meeting named, and only
+    // where no window of Kitokey has the focus (D92).
+    let told = |notice: Notice| tell_made(app, &notice, &folder, false);
     let refused = |why: String| {
         shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
         shell.minutes_failed.lock().unwrap().insert(folder.clone(), (why, None, None));
@@ -4108,8 +4109,9 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
                 .transcripts_failed
                 .lock()
                 .unwrap()
-                .insert(folder, format!("{} is no model on this computer", model.display()));
-            tell(app, &words::trouble(&trouble, shell.language()));
+                .insert(folder.clone(), format!("{} is no model on this computer", model.display()));
+            // The meeting's last step, failed: told as its end is (D92).
+            tell_made(app, &words::trouble(&trouble, shell.language()), &folder, false);
         }
         return;
     }
@@ -4125,9 +4127,9 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
     let (transcription, made) = match started {
         Ok(started) => started,
         Err(error) => {
-            shell.transcripts_failed.lock().unwrap().insert(folder, error.to_string());
-            tell(app, &words::trouble(&Trouble::NoTranscriber(error.to_string()), shell.language()));
-            return;
+            shell.transcripts_failed.lock().unwrap().insert(folder.clone(), error.to_string());
+            let notice = words::trouble(&Trouble::NoTranscriber(error.to_string()), shell.language());
+            return tell_made(app, &notice, &folder, false);
         }
     };
     // Held by its token: cancelled meanwhile, it is stopped at once (D92).
@@ -4553,9 +4555,9 @@ fn of_meeting(app: &AppHandle, notice: &Notice, folder: &Path) -> Notice {
     words::for_meeting(notice.clone(), &meeting, language)
 }
 
-/// The notification that ends a meeting's making — its last step written or failed (D92): told
-/// once, naming the meeting, and only when no window of Kitokey has the focus, the page saying it
-/// there. `opening`: its click opens the meeting (D44).
+/// The notification that ends a meeting's making — its last step written or failed, or the next
+/// one unable to start (D25) —: told naming the meeting, and only when no window of Kitokey has the
+/// focus, the window saying it there (D92). `opening`: its click opens the meeting (D44).
 fn tell_made(app: &AppHandle, notice: &Notice, folder: &Path, opening: bool) {
     if window_focused(app) {
         tracing::info!("shell.made_not_told");
