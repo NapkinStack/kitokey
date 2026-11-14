@@ -4,6 +4,13 @@
 //! at its first start, and never again: once turned off, it stays off.
 //!
 //! [XDG Autostart]: https://specifications.freedesktop.org/autostart-spec/latest/
+//!
+//! On Windows, the package declares a startup task Windows turns on at its first start (D84):
+//! [`StartupTask`] is read and changed, Windows' Startup settings are the setting, and nothing is
+//! written under `AppData\Roaming\autostart`, which Windows never reads. Outside a package — the
+//! zip —, there is no task, and Settings offer nothing.
+//!
+//! [`StartupTask`]: https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.startuptask
 
 use std::{
     fs, io,
@@ -29,8 +36,12 @@ const ENTRY: &str = "[Desktop Entry]\n\
     Icon=com.napkinstack.Kitokey\n\
     Terminal=false\n";
 
-/// Where the entry is on this system: the user's configuration's `autostart` folder.
+/// Where the entry is on this system: the user's configuration's `autostart` folder; none on
+/// Windows, whose session starts the package's task instead.
 pub fn file() -> Option<PathBuf> {
+    if cfg!(windows) {
+        return None;
+    }
     dirs::config_dir().map(|folder| folder.join("autostart").join(NAME))
 }
 
@@ -120,4 +131,135 @@ pub fn at_start(entry: &Path, settings_file: &Path) -> AtStart {
     let carried = carry_over(&entry.with_file_name(NAME_BEFORE), entry);
     let written = first(entry, settings_file);
     AtStart { carried, written }
+}
+
+/// The startup task's `TaskId`, as the package's manifest declares it (`install`, D84).
+pub const TASK_ID: &str = "KitokeyStartupTask";
+
+/// Windows' state of the package's startup task, as `StartupTaskState` names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Task {
+    Disabled,
+    DisabledByUser,
+    Enabled,
+    DisabledByPolicy,
+    EnabledByPolicy,
+}
+
+/// Who holds the switch when Kitokey cannot move it: the user, in Windows' Startup settings — never
+/// turned back on by Kitokey —, or a policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Held {
+    User,
+    Policy,
+}
+
+/// What Settings show of a task: on or off, and who holds it when Kitokey cannot change it.
+pub fn shown(task: Task) -> (bool, Option<Held>) {
+    match task {
+        Task::Enabled => (true, None),
+        Task::Disabled => (false, None),
+        Task::DisabledByUser => (false, Some(Held::User)),
+        Task::DisabledByPolicy => (false, Some(Held::Policy)),
+        Task::EnabledByPolicy => (true, Some(Held::Policy)),
+    }
+}
+
+/// The package's startup task as Windows holds it now; none outside a package, or off Windows.
+pub fn task() -> Result<Option<Task>, String> {
+    #[cfg(windows)]
+    return windows_task::read();
+    #[cfg(not(windows))]
+    Ok(None)
+}
+
+/// Asks Windows to turn the task on — which it refuses, saying nothing, when the user or a policy
+/// turned it off — or turns it off.
+pub fn turn(on: bool) -> Result<(), String> {
+    #[cfg(windows)]
+    return windows_task::turn(on);
+    #[cfg(not(windows))]
+    {
+        let _ = on;
+        Err("this system names no folder for the session's start".to_string())
+    }
+}
+
+/// The startup task, through `Windows.ApplicationModel.StartupTask` (Windows 10, version 1607 and later).
+#[cfg(windows)]
+mod windows_task {
+    use std::{sync::mpsc, thread, time::Duration};
+
+    use windows::{
+        ApplicationModel::{Package, StartupTask, StartupTaskState},
+        core::{HRESULT, HSTRING},
+    };
+
+    use super::{TASK_ID, Task};
+
+    /// `APPMODEL_ERROR_NO_PACKAGE`: the process has no package's identity.
+    const NO_PACKAGE: HRESULT = HRESULT::from_win32(15_700);
+
+    /// How long Windows is waited for, on a thread of its own — never the window's.
+    const WAIT: Duration = Duration::from_secs(5);
+
+    fn waited<T: Send + 'static>(ask: impl FnOnce() -> windows::core::Result<T> + Send + 'static) -> Result<T, String> {
+        let (sent, received) = mpsc::channel();
+        thread::spawn(move || {
+            let _ = sent.send(ask());
+        });
+        received
+            .recv_timeout(WAIT)
+            .map_err(|_| format!("Windows did not answer within {} s", WAIT.as_secs()))?
+            .map_err(|error| error.to_string())
+    }
+
+    /// The package's task; none when Windows did not start Kitokey from a package.
+    fn startup_task() -> windows::core::Result<Option<StartupTask>> {
+        match Package::Current() {
+            Ok(_) => StartupTask::GetAsync(&HSTRING::from(TASK_ID))?.join().map(Some),
+            Err(error) if error.code() == NO_PACKAGE => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+
+    fn named(state: StartupTaskState) -> Result<Task, String> {
+        Ok(match state {
+            StartupTaskState::Disabled => Task::Disabled,
+            StartupTaskState::DisabledByUser => Task::DisabledByUser,
+            StartupTaskState::Enabled => Task::Enabled,
+            StartupTaskState::DisabledByPolicy => Task::DisabledByPolicy,
+            StartupTaskState::EnabledByPolicy => Task::EnabledByPolicy,
+            other => {
+                return Err(format!(
+                    "Windows names a state of the startup task Kitokey does not know: {}",
+                    other.0
+                ));
+            }
+        })
+    }
+
+    pub fn read() -> Result<Option<Task>, String> {
+        waited(|| startup_task()?.map(|task| task.State()).transpose())?
+            .map(named)
+            .transpose()
+    }
+
+    pub fn turn(on: bool) -> Result<(), String> {
+        let turned = waited(move || {
+            let Some(task) = startup_task()? else {
+                return Ok(false);
+            };
+            if on {
+                task.RequestEnableAsync()?.join()?;
+            } else {
+                task.Disable()?;
+            }
+            Ok(true)
+        })?;
+        turned
+            .then_some(())
+            .ok_or_else(|| "Kitokey was not started from its package".to_string())
+    }
 }

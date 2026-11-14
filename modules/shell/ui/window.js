@@ -385,6 +385,8 @@ function minutesState(name) {
     return { kind: "ollama", silent: makings.ollama_waiting[name] === "silent", busy: makings.model_fetching !== null };
   }
   if (makings.failed[name] !== undefined) return { kind: "failed", why: makings.failed[name], said: makings.failed_said[name] };
+  // Cancelled by the user (D92): said, until it is made again.
+  if (makings.stopped[name] === "minutes") return { kind: "stopped" };
   return null;
 }
 
@@ -398,7 +400,48 @@ function transcriptState(name) {
   }
   if (waiting >= 0) return { kind: "waiting", before: waiting + 1 };
   if (makings.transcripts_failed[name] !== undefined) return { kind: "failed", why: makings.transcripts_failed[name] };
+  if (makings.stopped[name] === "transcript") return { kind: "stopped" };
   return null;
+}
+
+// The card whose « Annuler » was pressed: once it says stopped, the focus goes to what makes it again.
+let cancelledFrom = null;
+
+// A refused « Annuler », said for the line `of` (D92): an alert, which a screen reader says as it
+// is inserted — a status says its changes, not its arrival (WAI-ARIA, the APG's alert pattern).
+function refusalNote(of, text) {
+  const note = element("p", "note warn", text);
+  note.dataset.refused = of;
+  note.setAttribute("role", "alert");
+  return note;
+}
+
+// « Annuler » (D92): what is made of the meeting ends within two seconds, or leaves the line.
+function cancelButton(said, id) {
+  const cancel = element("button", "open", words.making_cancel);
+  cancel.type = "button";
+  if (id) cancel.id = id;
+  cancel.addEventListener("click", async () => {
+    cancel.disabled = true;
+    cancelledFrom = said.id;
+    // A refusal said before was the last gesture's: this one says its own.
+    document.querySelector(`.note[data-refused="${said.id}"]`)?.remove();
+    const ended = await window.__TAURI__.core.invoke("making_cancelled", { name: said.dataset.name }).then(() => true, (why) => {
+      // Said beside the line, which is drawn again as the makings are read: kept until the next gesture.
+      said.after(refusalNote(said.id, fill(words.making_cancel_failed, why)));
+      cancelledFrom = null;
+      cancel.disabled = false;
+      return false;
+    });
+    // Asked: it ends within two seconds; read again until its line says it, not at the page's
+    // next reading, a second and a half later (D92).
+    for (let tries = 0; tries < (ended ? 15 : 1); tries++) {
+      if (tries > 0) await new Promise((wait) => setTimeout(wait, 200));
+      await readMakings();
+      if (!said.classList.contains("making") && !said.classList.contains("waiting")) break;
+    }
+  });
+  return cancel;
 }
 
 // One card's state, said where its content is: what makes it and for how long, its place in
@@ -406,9 +449,9 @@ function transcriptState(name) {
 function paintState(said, shown, of) {
   said.hidden = shown === null;
   said.className = `making-state ${shown?.kind ?? ""}`;
-  // Being made, waiting, or failed with Try again: not offered a second time.
+  // Being made, waiting, or failed with Try again: not offered a second time. Stopped, it is.
   const offered = document.getElementById(of.offer);
-  if (offered) offered.hidden = shown !== null;
+  if (offered) offered.hidden = shown !== null && shown.kind !== "stopped";
   // Drawn again only when it says something else — a link or a button under the pointer or the
   // keyboard's focus stays the same one —; while it is made, only its time moves.
   const { seconds, ...same } = shown ?? {};
@@ -423,9 +466,15 @@ function paintState(said, shown, of) {
   said.dataset.key = key;
   if (shown === null) return said.replaceChildren();
   if (shown.kind === "making") {
-    said.replaceChildren(element("span", "what", of.making), element("span", "by", `${by} · ${minutes}`), element("span", "making-bar"));
+    said.replaceChildren(element("span", "what", of.making), element("span", "by", `${by} · ${minutes}`), element("span", "making-bar"), cancelButton(said, "making-cancel"));
   } else if (shown.kind === "waiting") {
-    said.replaceChildren(element("span", "what", fill(words.minutes_waiting, shown.before)));
+    said.replaceChildren(element("span", "what", fill(words.minutes_waiting, shown.before)), cancelButton(said));
+  } else if (shown.kind === "stopped") {
+    const stopped = element("span", "what", of.stopped);
+    stopped.id = "making-stopped";
+    said.replaceChildren(stopped);
+    if (cancelledFrom === said.id && offered && !offered.hidden) offered.focus();
+    cancelledFrom = null;
   } else if (shown.kind === "model") {
     if (shown.coming) said.replaceChildren(element("span", "what", words.transcript_model_coming));
     else said.replaceChildren(element("span", "what", words.transcript_model_needed), modelFetch(shown.busy));
@@ -541,9 +590,10 @@ function paintMakings() {
   paintModel();
   paintOffered();
   for (const chip_ of document.querySelectorAll(".chip.making")) {
-    // The minutes' state first; else the transcript's, which comes before them.
-    const minutes = minutesState(chip_.dataset.name);
-    const transcript = transcriptState(chip_.dataset.name);
+    // The minutes' state first; else the transcript's, which comes before them. Stopped: no chip.
+    const chipped = (state) => (state?.kind === "stopped" ? null : state);
+    const minutes = chipped(minutesState(chip_.dataset.name));
+    const transcript = chipped(transcriptState(chip_.dataset.name));
     const state = minutes ?? transcript;
     chip_.hidden = state === null;
     if (state === null) continue;
@@ -556,7 +606,7 @@ function paintMakings() {
   const minutes = document.getElementById("minutes-state");
   if (minutes) {
     paintState(minutes, minutesState(minutes.dataset.name), {
-      offer: "make-minutes", again: "minutes-again", ask: "minutes_again", making: words.minutes_making, not_made: words.minutes_not_made,
+      offer: "make-minutes", again: "minutes-again", ask: "minutes_again", making: words.minutes_making, not_made: words.minutes_not_made, stopped: words.minutes_stopped,
     });
   }
   // No line corrected while the transcript is made or waits to be (D62): its pencils hidden.
@@ -564,12 +614,12 @@ function paintMakings() {
     if (pencil.parentElement.querySelector(".correcting")) continue;
     const kind = transcriptState(pencil.dataset.name)?.kind;
     // Nor while its minutes are written: they read the transcript before (#528's verification).
-    pencil.hidden = (kind !== undefined && kind !== "failed") || minutesState(pencil.dataset.name)?.kind === "making";
+    pencil.hidden = (kind !== undefined && kind !== "failed" && kind !== "stopped") || minutesState(pencil.dataset.name)?.kind === "making";
   }
   const transcript = document.getElementById("transcript-state");
   if (transcript) {
     paintState(transcript, transcriptState(transcript.dataset.name), {
-      offer: "make-transcript", again: "transcript-again", ask: "transcript_again", making: words.transcript_making, not_made: words.transcript_not_made,
+      offer: "make-transcript", again: "transcript-again", ask: "transcript_again", making: words.transcript_making, not_made: words.transcript_not_made, stopped: words.transcript_stopped,
     });
   }
   paintContext();
@@ -615,8 +665,15 @@ function savedSaid(saved) {
   savedFor = setTimeout(() => savedSentence.remove(), 1500);
 }
 
+// Each reading of the makings numbered: an answer a later reading has overtaken is dropped — the
+// latest wins, never a making said still made over the stop that followed it (D92).
+let makingsAsked = 0;
+
 async function readMakings() {
-  makings = await window.__TAURI__.core.invoke("makings").catch(() => null);
+  const asked = ++makingsAsked;
+  const read = await window.__TAURI__.core.invoke("makings").catch(() => null);
+  if (asked !== makingsAsked) return;
+  makings = read;
   // Only the meeting shown: its page hidden, the last one opened is no longer in front.
   const opened = document.getElementById("meeting").hidden ? null : document.getElementById("minutes-state")?.dataset.name;
   // The minutes or the transcript of the meeting shown written since its page was drawn, however
@@ -2019,6 +2076,8 @@ function choice(name, value, [label, says], checked, disabled) {
 // Who writes the minutes: picked from what Ollama holds, an online service, or the user's own
 // address; a key goes to the system's keyring, and the page never receives one back.
 let testing = false;
+// Settings' « Avancé » unfolded: kept while Settings are drawn again, as a choice there redraws them.
+let generalAdvanced = false;
 
 function minutesRow(minutes, words, locked) {
   const box = element("div", "step");
@@ -2264,15 +2323,17 @@ function showSettings(shown, minutes, words) {
   }
 
   const after = element("section", "card group");
-  after.setAttribute("role", "radiogroup");
   const afterTitle = element("h2", "", words.after_title);
   afterTitle.id = "after-title";
-  after.setAttribute("aria-labelledby", "after-title");
-  after.append(afterTitle);
+  // The radios alone in the group named by the heading: the folder and the sound kept follow them.
+  const made = element("div", "choices");
+  made.setAttribute("role", "radiogroup");
+  made.setAttribute("aria-labelledby", "after-title");
+  after.append(afterTitle, made);
   for (const [value, said] of [["nothing", words.after_nothing], ["transcript", words.after_transcript], ["minutes", words.after_minutes]]) {
     const one = choice("after", value, said, shown.after === value, locked);
     one.querySelector("input").addEventListener("change", () => save({ after: value }));
-    after.append(one);
+    made.append(one);
   }
   parts.push(after);
 
@@ -2288,7 +2349,6 @@ function showSettings(shown, minutes, words) {
   redoButton.disabled = locked;
   redoButton.addEventListener("click", () => (location.hash = "#/welcome/again"));
   redo.append(redoSaid, redoButton);
-  models.append(redo);
   const step = element("div", "step");
   const row = element("div", "row");
   const label = element("label", "name", words.transcription);
@@ -2574,7 +2634,21 @@ function showSettings(shown, minutes, words) {
   spokenPick.value = shown.meeting_language ?? "";
   spokenPick.addEventListener("change", () => save({ meeting_language: spokenPick.value }));
   spokenRow.append(spokenLabel, spokenPick);
-  step.append(row, speech, service, here, spokenRow);
+  // The transcription model's state, under its choice: there and ready; else said, and offered, by
+  // paintModel — a line of this step, no card of its own (D95, #782).
+  const chosen = shown.models.find((model) => model.path === shown.model);
+  const state = element("div", "row state");
+  const stateSaid = element("div", "said");
+  stateSaid.append(
+    element("span", "name", words.model_state),
+    element("span", "says", chosen ? fill(words.model_here, size(chosen.bytes, words)) : ""),
+  );
+  state.append(stateSaid);
+  if (chosen) state.append(readySaid(words.model_ready));
+  else state.dataset.missing = "true";
+  state.id = "model-state";
+  paintModel(state);
+  step.append(row, state, speech, service, here, spokenRow);
   // The short list of models to download, each said by what it is good for (D37).
   const offered = element("ul", "offered");
   offered.id = "offered";
@@ -2623,6 +2697,7 @@ function showSettings(shown, minutes, words) {
   parts.push(models);
 
   const more = element("section", "card group");
+  more.append(element("h2", "", words.general_title));
   const remind = element("label", "row");
   const box = element("input");
   box.type = "checkbox";
@@ -2658,10 +2733,12 @@ function showSettings(shown, minutes, words) {
   startBox.id = "autostart";
   startBox.setAttribute("role", "switch");
   startBox.checked = shown.autostart;
-  startBox.disabled = locked;
+  // On Windows, held by the user or a policy (D84): shown as Windows holds it, never moved here.
+  const held = { user: words.autostart_held[0], policy: words.autostart_held[1] }[shown.autostart_held];
+  startBox.disabled = locked || held !== undefined;
   startBox.addEventListener("change", () => save({ autostart: startBox.checked }));
   const startSaid = element("span", "said");
-  startSaid.append(element("span", "name", words.autostart[0]), element("span", "says", words.autostart[1]));
+  startSaid.append(element("span", "name", words.autostart[0]), element("span", "says", held ?? words.autostart[1]));
   start.append(startSaid, startBox);
   const keep = element("div", "row");
   const keepSaid = element("label", "said");
@@ -2802,27 +2879,28 @@ function showSettings(shown, minutes, words) {
   checkButton.append(icon("audio-lines"), element("span", "", words.check_sound));
   checkButton.addEventListener("click", () => checkSound(words, checkButton));
   check.append(checkSaid, checkButton);
-  more.append(speaks, remind, check, offer, start, keys, where, keep);
-  parts.push(more);
+  // Outside Windows' package, no startup task: nothing offered (D84).
+  more.append(speaks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
+  // What becomes of a recording: where it goes and how long its sound stays, after what is made.
+  after.append(where, keep);
 
-  // The transcription model's state: there and ready; else said, and offered, by paintModel.
-  const chosen = shown.models.find((model) => model.path === shown.model);
-  const state = element("section", "card group state");
-  const stateSaid = element("div", "said");
-  stateSaid.append(
-    element("span", "name", words.model_state),
-    element("span", "says", chosen ? fill(words.model_here, size(chosen.bytes, words)) : ""),
-  );
-  state.append(stateSaid);
-  if (chosen) state.append(readySaid(words.model_ready));
-  else state.dataset.missing = "true";
-  state.id = "model-state";
-  paintModel(state);
-  parts.push(state);
-
-  // Last, for whoever looks into a failure: the developer mode (D29).
-  const advanced = element("section", "card group");
-  advanced.append(element("h2", "", words.advanced_title));
+  // Last, for whoever looks into a failure: the developer mode (D29), folded at the bottom of
+  // « Général » (D95) — a disclosure (ARIA APG), as the redo panel's « Avancé ».
+  const toggle = element("button", "disclose-advanced");
+  toggle.type = "button";
+  toggle.id = "general-advanced";
+  toggle.setAttribute("aria-controls", "general-advanced-panel");
+  toggle.append(icon("chevron-right"), element("span", "", words.advanced_title));
+  const advanced = element("div", "general-advanced");
+  advanced.id = "general-advanced-panel";
+  const unfold = (now) => {
+    generalAdvanced = now;
+    toggle.setAttribute("aria-expanded", String(now));
+    toggle.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
+    advanced.hidden = !now;
+  };
+  toggle.addEventListener("click", () => unfold(!generalAdvanced));
+  unfold(generalAdvanced);
   const developer = element("label", "row");
   const developerBox = element("input");
   developerBox.type = "checkbox";
@@ -2867,7 +2945,8 @@ function showSettings(shown, minutes, words) {
     logs.append(logsSaid, openLogs);
     advanced.append(level, logs);
   }
-  parts.push(advanced);
+  more.append(toggle, advanced);
+  parts.push(more);
   page.replaceChildren(...parts);
   if (focusLanguage) {
     focusLanguage = false;
@@ -4250,11 +4329,15 @@ async function draw(mine, again) {
   }
   let opened = null;
   let seen = makings;
+  // Numbered as readMakings' readings are: the snapshot is kept only if no later reading answered
+  // meanwhile — never the making drawn back over the stop that followed it (D92).
+  let asked = makingsAsked;
   // Settings too: their models' states are drawn with the page, not at the next reading (D37).
   if (name || settings) {
     // What is being made, read before the meeting: the counts its page keeps are never ahead of
     // what it shows, never behind what was made before it was read — drawn again only for what
     // was made since.
+    asked = ++makingsAsked;
     seen = await window.__TAURI__.core.invoke("makings").catch(() => makings);
   }
   if (name) {
@@ -4277,7 +4360,27 @@ async function draw(mine, again) {
   if (mine !== drawing) return;
   if (pageNotShown) document.getElementById("pane-said").hidden = true;
   notShown(false);
-  document.getElementById("empty").hidden = !listed || listing.sessions.length > 0;
+  // The settings unreadable, the folder listed is not the user's: said, never « no meeting » (#770).
+  document.getElementById("empty").hidden = !listed || listing.sessions.length > 0 || listing.settings_unread;
+  // Put in its live region when it comes, taken out when it goes — never drawn again meanwhile, which
+  // a screen reader would say again at each listing.
+  // Its sentence what is true: the defaults listed, or the last settings read held (#770).
+  const live = document.getElementById("settings-banner-live");
+  // Hidden on Réglages, never emptied: a live region says a change of its words, not of its
+  // visibility (WAI-ARIA) — back on the list, the same banner, not said again.
+  live.hidden = settings;
+  const sentence = !listing.settings_unread ? null : listing.settings_kept ? words.settings_banner_kept : words.settings_banner;
+  if (sentence !== (document.getElementById("settings-banner-said")?.textContent ?? null)) {
+    const banner = element("div", "banner");
+    banner.id = "settings-banner";
+    const said = element("p", "", sentence);
+    said.id = "settings-banner-said";
+    const link = element("a", "link", words.settings);
+    link.id = "settings-banner-link";
+    link.href = "#/settings";
+    banner.append(said, link);
+    live.replaceChildren(...(sentence ? [banner] : []));
+  }
   // No meeting yet: under 840 px, the sidebar and what to do, one under the other.
   document.body.classList.toggle("no-meeting", listing.sessions.length === 0);
   document.getElementById("agree").hidden = agreement === null;
@@ -4311,7 +4414,7 @@ async function draw(mine, again) {
   const kept = opened && page.dataset.name === name && page.dataset.at === "#/" && address !== "#/" && fresh === drawnMeeting;
   if (opened && !kept) {
     page.classList.toggle("arriving", page.childElementCount === 0);
-    makings = seen;
+    if (asked === makingsAsked) makings = seen;
     showMeeting(opened, words);
     drawnMeeting = fresh;
   }
@@ -4324,7 +4427,7 @@ async function draw(mine, again) {
       window.__TAURI__.core.invoke("minutes_shown"),
     ]);
     if (mine !== drawing) return;
-    makings = seen;
+    if (asked === makingsAsked) makings = seen;
     showSettings(shown, minutes, words);
   }
 }
