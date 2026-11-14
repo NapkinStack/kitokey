@@ -2293,9 +2293,11 @@ def cancelled_at_once(now: dt.datetime) -> None:
                         } };
                         window.restore = () => { window.__TAURI__.core = real; };
                         readMakings(); readMakings();""")
-                    raced = wait_for(browser, lambda b: b.execute_script("return window.raced"), 5)
+                    # wait_for says whether it came, not what came: what came is read after it.
+                    came = wait_for(browser, lambda b: b.execute_script("return window.raced"), 5)
+                    raced = browser.execute_script("return window.raced")
                     check(f"{what}: two readings answered out of order — the late one dropped, the page drawn with the later one (#823)",
-                          raced == [True, False], browser.execute_script("return window.raced"))
+                          came and raced == [True, False], raced)
                     browser.execute_script("window.restore()")
                     # The page's own next reading draws the making again, still made, its « Annuler » back.
                     check(f"{what}: read again for real, the making is drawn as made again",
