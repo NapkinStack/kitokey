@@ -1834,7 +1834,8 @@ const TITLES_TOO_LONG: [&str; 2] = [
 
 /// The functions of `words.rs` that return a notification, each read below: one added there fails
 /// the title's test until it is named here — and read in `every_notice`, which the review checks.
-const NOTIFYING: [&str; 17] = [
+const NOTIFYING: [&str; 18] = [
+    "for_meeting",
     "of",
     "notice",
     "trouble",
@@ -2028,6 +2029,12 @@ fn every_notice(language: Language) -> Vec<Notice> {
             notices.push(words::fetched(&outcome, chosen, language));
         }
     }
+    // Each one sent again with its meeting named first (D92): its title kept.
+    let named: Vec<_> = notices
+        .iter()
+        .map(|notice| words::for_meeting(notice.clone(), "x", language))
+        .collect();
+    notices.extend(named);
     notices
 }
 
