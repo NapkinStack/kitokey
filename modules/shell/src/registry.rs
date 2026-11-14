@@ -13,10 +13,10 @@ pub const SHIPPED: &str = include_str!("../registry/models.json");
 /// Where the list is read again from, on the user's gesture: the file on `main`.
 pub const ADDRESS: &str = "https://raw.githubusercontent.com/NapkinStack/wholeheard/main/modules/shell/registry/models.json";
 
-/// The decider's public key, as `minisign -G` writes it on the second line of its `.pub` file.
-/// None until they give it (cycle 05, *Dependency with a date*): no list is read again, Settings
-/// say so, and so does the check of the list in the repository.
-pub const PUBLIC_KEY: Option<&str> = None;
+/// The decider's public key, as `minisign -G` writes it on the second line of its `.pub` file:
+/// `minisign public key 28AD0E835D7AF31E`, made in their own terminal (D56). Its private key is in
+/// no repository and no session: a list is signed by the decider alone (`AGENTS.md`).
+pub const PUBLIC_KEY: Option<&str> = Some("RWQe83pdgw6tKGbfv/lHOXQkpVU+KJcfXp3KiOmb2JIVn9Lz0ojPkotS");
 
 /// What no list is read again without, said to the logs and to whoever reads the check.
 const WAITS: &str = "the list is not read again: it waits on the decider's key";
