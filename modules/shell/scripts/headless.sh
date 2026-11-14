@@ -22,6 +22,12 @@ if [ "${1:-}" != --inside ]; then
     mkdir -p "$here/../.evidence"
     echo "e2e: NOT RUN — no GNOME to run it in here, missing:$missing" | tee "$here/../.evidence/e2e.txt"; exit 77
   fi
+  # A partial run's names checked before the session is made (scripts/e2e_only.py): a typo refused
+  # at once, named, as e2e.sh would refuse it minutes later.
+  if ! asked=$(python3 -I "$here/e2e_only.py" --asked "$here/e2e_window.py" 2>&1); then
+    mkdir -p "$here/../.evidence"
+    echo "$asked" | tee "$here/../.evidence/e2e.txt"; exit 3
+  fi
   root=${XDG_CACHE_HOME:-$HOME/.cache}/kitokey-headless/run-$$
   mkdir -p "$root/run" "$root/user/.config" "$root/user/.local/share" "$root/user/.local/state" "$root/user/.cache" "$root/tmp"
   chmod 700 "$root/run"

@@ -11,6 +11,11 @@ cd "$(dirname "$0")/.."
 mkdir -p .evidence
 : > .evidence/e2e.txt
 say() { echo "$*" | tee -a .evidence/e2e.txt; }
+# A partial run's names (KITOKEY_E2E_ONLY, scripts/e2e_only.py), checked before anything is built or
+# started: a typo refused at once, named; a blank value a full run. Passed on as read, for the window
+# and the logs to read the same.
+if ! only=$(python3 -I scripts/e2e_only.py --asked scripts/e2e_window.py 2>&1); then say "$only"; exit 3; fi
+export KITOKEY_E2E_ONLY="$only"
 # The run's logs and screenshots, where NapkinStack reads them after it (nstack e2e shell).
 evidence=${NSTACK_EVIDENCE:-$PWD/.evidence/e2e}
 mkdir -p "$evidence"
@@ -122,7 +127,6 @@ published=""
 failed=0
 # A partial run (KITOKEY_E2E_ONLY, scripts/e2e_only.py): the window's scenarios it names alone — the
 # tray's not played, the logs' completeness not owed —, said first and last, and never passed.
-only=${KITOKEY_E2E_ONLY:-}
 [ -z "$only" ] || say "partial run: $only — the tray's scenarios not played"
 check() { if "$@"; then say "  ok    $*"; else say "  FAIL  $*"; failed=1; fi; }
 is() { [ "$1" = "$2" ] || { say "        got: $1"; return 1; }; }
