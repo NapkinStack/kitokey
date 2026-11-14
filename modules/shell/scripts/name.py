@@ -42,7 +42,7 @@ def kerning(font: TTFont, left: str, right: str) -> int:
     for index in sorted(indices):
         lookup = gpos.LookupList.Lookup[index]
         for sub in lookup.SubTable:
-            sub = sub.ExtSubTable if lookup.LookupType == 9 else sub
+            sub = sub.ExtSubTable if lookup.LookupType == 9 else sub  # noqa: PLW2901 — an extension's subtable read as the one it wraps, on purpose
             if sub.LookupType != 2 or left not in sub.Coverage.glyphs:
                 continue
             if sub.Format == 1:
