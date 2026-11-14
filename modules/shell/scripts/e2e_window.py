@@ -1336,6 +1336,132 @@ def models_guided(now: dt.datetime) -> None:
         server.shutdown()
 
 
+def transcription_guided(now: dt.datetime) -> None:
+    """BG. D95, criterion 2. The transcription set up in « Modèles » as the summary is (BE): here or a
+    service; a service named, its key tested at once against a stand-in made for the run — refused,
+    said with its cause; taken, its transcription models listed as people say them —; its host
+    agreed to before anything is saved (D43); no address typed but under « Avancé »."""
+    print("BG. Settings: the transcription set up in a few guided steps, a service's key tested at once (D95)")
+    good, false = "sk-stand-in-good", "sk-stand-in-false"
+    asked = []
+
+    # OpenRouter's stand-in: its key route, then its transcription models — the false key refused (401).
+    class Service(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            key = (self.headers.get("authorization") or "").removeprefix("Bearer ")
+            asked.append([self.path, key])
+            if self.path.endswith("/key") and key != good:
+                status, body = 401, {"error": {"message": "Invalid credentials, HTTP 401 from the stand-in", "code": 401}}
+            elif self.path.endswith("/key"):
+                status, body = 200, {"data": {"label": "stand-in"}}
+            elif self.path.endswith("/models?output_modalities=transcription"):
+                status, body = 200, {"data": [{"id": "openai/whisper-large-v3-turbo"}, {"id": "openai/whisper-large-v3"}]}
+            else:
+                status, body = 404, {}
+            raw = json.dumps(body).encode()
+            self.send_response(status)
+            self.send_header("content-length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Service)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    stand = f"http://127.0.0.1:{server.server_address[1]}/api/v1"
+    guided = WORK / "guided-hearing"
+    guided.mkdir()
+    window = Window(guided, "fr_FR.UTF-8")
+    window.env.update(KITOKEY_HEARING=stand)
+    said = "return document.getElementById('transcription-key-said')?.textContent || ''"
+    saved_said = "return document.getElementById('transcription-said')?.textContent || ''"
+    options = "return [...document.querySelectorAll(`#${arguments[0]} option`)].filter(o => !o.disabled).map(o => o.textContent)"
+    addresses = "return [...document.querySelectorAll('#settings input[type=url]')].filter(i => i.getClientRects().length > 0).map(i => i.id)"
+    try:
+        with window as browser:
+            browser.find_element(By.ID, "settings-link").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "transcription-where"), 5)
+            group = browser.execute_script("const g = document.getElementById('transcription-where'); return [g.getAttribute('role'), [...g.querySelectorAll('input[type=radio]')].map(r => r.id)]")
+            check("the transcription, first step: on this computer or a service, one choice (D95)",
+                  group == ["radiogroup", ["transcription-here", "transcription-online"]], group)
+            press(browser, "transcription-here")
+            here = wait_for(browser, lambda b: b.find_element(By.ID, "model").is_displayed(), 5)
+            local = browser.execute_script(options, "model")
+            check("on this computer: the models said by name — no file, no path, no service among them",
+                  here and local != [] and not any("/" in o or ".bin" in o or "ggml" in o or o in ("OpenRouter", "OpenAI") for o in local), local)
+            press(browser, "transcription-online")
+            named = wait_for(browser, lambda b: b.execute_script(options, "transcription-service") == ["OpenRouter", "OpenAI"], 5)
+            check("a service: OpenRouter, OpenAI, by name", named, browser.execute_script(options, "transcription-service"))
+            check("a service, the common case: no address asked, « Avancé » folded (E5)",
+                  browser.execute_script(addresses) == [] and browser.find_element(By.ID, "transcription-advanced").get_attribute("aria-expanded") == "false",
+                  browser.execute_script(addresses))
+            check("a service, before its key: no model offered", not browser.find_element(By.ID, "transcription-models").is_displayed())
+            # A false key: refused at once, its cause said in a sentence, nothing of the service's own words (E4).
+            choose(browser, "transcription-service", "0")
+            browser.find_element(By.ID, "transcription-key").send_keys(false)
+            press(browser, "transcription-key-test")
+            refused = wait_for(browser, lambda b: b.execute_script(said) == TEST_CAUSES[0][1], 10)
+            told = browser.execute_script(said)
+            check("a false key: refused at once, said with its cause — no HTTP, no raw word of the service's (E4)",
+                  refused and "401" not in told and "HTTP" not in told and "Invalid" not in told and not browser.find_element(By.ID, "transcription-models").is_displayed(), told)
+            check("the false key asked of OpenRouter's key route, its models not asked",
+                  ["/api/v1/key", false] in asked and not any("models" in path for path, _ in asked), asked)
+            drawn_again = "window.__old = document.getElementById('transcription-key-said'); refresh()"
+            anew = "return !window.__old.isConnected && document.getElementById('transcription-key-said') !== null"
+            browser.execute_script(drawn_again)
+            wait_for(browser, lambda b: b.execute_script(anew), 5)
+            check("drawn again by itself: the refusal still said, until the key is tried again", browser.execute_script(said) == TEST_CAUSES[0][1], browser.execute_script(said))
+            # The good one: taken, the service's transcription models listed as people say them.
+            key = browser.find_element(By.ID, "transcription-key")
+            key.clear()
+            key.send_keys(good)
+            press(browser, "transcription-key-test")
+            listed = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
+            offered = browser.execute_script(options, "transcription-models")
+            check("the good key: its transcription models listed, each as people say it (E4)",
+                  listed and offered == ["Whisper Large V3 Turbo", "Whisper Large V3"], [offered, browser.execute_script(said)])
+            check("no raw identifier in the list: no « : », no « / » (E4)", offered != [] and not any(":" in o or "/" in o for o in offered), offered)
+            browser.execute_script(drawn_again)
+            wait_for(browser, lambda b: b.execute_script(anew), 5)
+            check("drawn again by itself: the models listed with the key still offered",
+                  browser.find_element(By.ID, "transcription-models").is_displayed() and browser.execute_script(options, "transcription-models") == offered,
+                  browser.execute_script(options, "transcription-models"))
+            # Its host agreed to first (D43): not agreed, nothing saved, the agreement asked, the host named.
+            choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
+            host = stand.split("/")[2]
+            agreement = browser.find_element(By.ID, "transcription-agreed").find_element(By.XPATH, "..").text
+            press(browser, "transcription-save")
+            asked_first = wait_for(browser, lambda b: "acceptez d’abord" in b.execute_script(saved_said), 5)
+            check("a service's host not agreed to: nothing saved, the agreement asked, its host named (D43)",
+                  asked_first and host in agreement and "transcription_provider" not in window.file.read_text(), [agreement, browser.execute_script(saved_said)])
+            press(browser, "transcription-agreed")
+            press(browser, "transcription-save")
+            saved = wait_for(browser, lambda b: 'transcription_model = "openai/whisper-large-v3-turbo"' in window.file.read_text(), 5)
+            text = window.file.read_text()
+            check("agreed and saved: who hears is the service, its address, the model chosen, its host agreed, never the key",
+                  saved and 'engine = "service"' in text and f'transcription_provider = "{stand}"' in text and f'transcription_agreed = "{host}"' in text
+                  and "sk-stand-in" not in text, text)
+            logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and "sk-stand-in" in f.read_text(errors="ignore")]
+            check("the key never logged", logged == [], logged)
+            # Drawn again: the service and its model said as chosen, no address shown.
+            browser.execute_script("location.hash = '#/'")
+            wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
+            browser.execute_script("location.hash = '#/settings'")
+            again = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-online").is_selected()
+                             and b.find_element(By.ID, "transcription-service").get_attribute("value") == "0", 5)
+            check("drawn again: a service chosen, OpenRouter, no address shown", again and browser.execute_script(addresses) == [], browser.execute_script(addresses))
+            # The user's own address, under « Avancé » alone (E5).
+            press(browser, "transcription-advanced")
+            unfolded = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-provider").is_displayed(), 3)
+            check("« Avancé » unfolded: an address of one's own, and a model named by hand", unfolded and browser.find_element(By.ID, "transcription-model").is_displayed())
+            browser.execute_script("document.getElementById('transcription-where').scrollIntoView({block: 'start'})")
+            shot_themed(browser, "d95-transcription-service-light", "light")
+            shot_themed(browser, "d95-transcription-service-dark", "dark")
+    finally:
+        server.shutdown()
+
+
 def ollama_pulled(now: dt.datetime) -> None:
     """V. The minutes' recommended model fetched by Ollama, on the user's click (D37)."""
     print("V. Settings: qwen3:8b fetched by Ollama on the user's click; without Ollama, said where to get it (D37)")
@@ -8740,6 +8866,7 @@ def main() -> int:
     speech_offered(now)
     service_named(now)
     models_guided(now)
+    transcription_guided(now)
     ollama_pulled(now)
     first_run(now)
     context_written(now)
