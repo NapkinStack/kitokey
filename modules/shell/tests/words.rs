@@ -1223,16 +1223,15 @@ fn every_french_sentence_has_its_spaces_before_the_tall_signs() {
 
 // The voice guide (`docs/voice.md`, D94): what every sentence holds, read from `src/words.rs`.
 
-/// What the rewrite (D94, one pull request an area) still has to put right: how many sentences
-/// each rule of the guide finds wrong today. A number only goes down: a sentence put right lowers
-/// it in the same pull request, and a new sentence that breaks a rule raises it, which fails.
-const STILL_WRONG: [(&str, usize); 5] = [
-    ("without their comment", 604),
-    ("with other placeholders in French and in English, or than their comment names", 1),
-    ("with a straight apostrophe", 12),
-    ("longer than their limit", 5),
-    ("with a word the lexicon refuses", 95),
-];
+/// What the rewrite (D94, one pull request an area) still has to put right, sentence by sentence:
+/// `tests/words_still_wrong.txt`, one `rule key` a line, sorted. A sentence that breaks a rule and
+/// is not listed fails; one listed that no longer breaks it fails too, until it is removed — the
+/// list only shrinks, and a sentence put right never covers another written wrong.
+const STILL_WRONG: &str = include_str!("words_still_wrong.txt");
+
+/// The sentences still without their comment, counted: 604 keys would be three review budgets.
+/// The number only goes down, as the list does.
+const WITHOUT_COMMENT: usize = 604;
 
 /// A sentence of `src/words.rs`, as the file arranges it.
 #[derive(Debug)]
@@ -1454,19 +1453,41 @@ fn limit(comment: &str) -> Option<usize> {
     after.trim_start().split(|c: char| !c.is_ascii_digit()).next()?.parse().ok()
 }
 
-/// What `rule` finds today, against what `STILL_WRONG` says is left of it.
-fn still_wrong(rule: usize, found: Vec<String>) {
-    let (what, left) = STILL_WRONG[rule];
+/// What `rule` finds today, against what `STILL_WRONG` lists of it, key by key.
+fn still_wrong(rule: &str, found: Vec<String>) {
+    let lines: Vec<_> = STILL_WRONG.lines().filter(|line| !line.is_empty()).collect();
+    assert!(lines.is_sorted(), "tests/words_still_wrong.txt: keep it sorted");
+    let mut listed: Vec<_> = lines
+        .iter()
+        .filter_map(|line| line.strip_prefix(&format!("{rule} ")))
+        .map(str::to_string)
+        .collect();
+    let mut found = found;
+    listed.sort();
+    found.sort();
+    let new: Vec<_> = found
+        .iter()
+        .filter(|key| !listed.contains(key))
+        .map(|key| format!("{rule} {key}"))
+        .collect();
+    let gone: Vec<_> = listed
+        .iter()
+        .filter(|key| !found.contains(key))
+        .map(|key| format!("{rule} {key}"))
+        .collect();
     assert!(
-        found.len() == left,
-        "{} sentences {what}, STILL_WRONG says {left}: {}\n{}",
-        found.len(),
-        if found.len() < left {
-            "lower it"
-        } else {
-            "a sentence was written that breaks the guide"
-        },
-        found.join("\n")
+        new.is_empty(),
+        "written against the guide (`{rule}`), put it right:\n{}",
+        new.join("\n")
+    );
+    assert!(
+        gone.is_empty(),
+        "put right (`{rule}`): remove it from the list:\n{}",
+        gone.join("\n")
+    );
+    assert_eq!(
+        found, listed,
+        "`{rule}`: a key listed once more or once less than it breaks the rule"
     );
 }
 
@@ -1505,12 +1526,22 @@ fn the_sentences_are_read_as_the_file_arranges_them() {
 /// one for both its languages, so counted on its English.
 #[test]
 fn every_sentence_carries_its_comment() {
-    let without = sentences()
+    let without: Vec<_> = sentences()
         .into_iter()
         .filter(|sentence| sentence.french != Some(true) && sentence.comment.is_none())
         .map(|s| s.name())
         .collect();
-    still_wrong(0, without);
+    assert!(
+        without.len() == WITHOUT_COMMENT,
+        "{} sentences without their comment, WITHOUT_COMMENT says {WITHOUT_COMMENT}: {}\n{}",
+        without.len(),
+        if without.len() < WITHOUT_COMMENT {
+            "lower it"
+        } else {
+            "a sentence was written without its comment"
+        },
+        without.join("\n")
+    );
 }
 
 /// The same placeholders in French and in English — a field's, or those one comment covers —, and
@@ -1537,17 +1568,17 @@ fn a_sentence_has_the_same_placeholders_in_both_languages_and_its_comment_names_
         english.sort();
         french.sort();
         if english != french {
-            wrong.push(format!("{group}: {english:?} in English, {french:?} in French"));
+            wrong.push(format!("{group}: in both languages"));
         }
         if let Some(named) = named.get(&group) {
             let said: std::collections::BTreeSet<_> = english.iter().chain(&french).cloned().collect();
             let listed: std::collections::BTreeSet<_> = placeholders(named).into_iter().collect();
             if said != listed {
-                wrong.push(format!("{group}: says {said:?}, its comment names {listed:?}"));
+                wrong.push(format!("{group}: in its comment"));
             }
         }
     }
-    still_wrong(1, wrong);
+    still_wrong("placeholders", wrong);
 }
 
 #[test]
@@ -1557,7 +1588,7 @@ fn no_sentence_has_a_straight_apostrophe() {
         .filter(|sentence| sentence.text.contains('\''))
         .map(|s| s.name())
         .collect();
-    still_wrong(2, wrong);
+    still_wrong("apostrophe", wrong);
 }
 
 /// A list's label at most 18 characters, whatever its comment says, and every sentence at most what
@@ -1591,10 +1622,10 @@ fn a_sentence_fits_its_limit_and_a_list_label_holds_18_characters() {
             at_most => at_most,
         };
         if at_most.is_some_and(|at_most| measured(&sentence.text) > at_most) {
-            wrong.push(format!("{} {} > {}", sentence.name(), measured(&sentence.text), at_most.unwrap()));
+            wrong.push(sentence.name());
         }
     }
-    still_wrong(3, wrong);
+    still_wrong("limit", wrong);
 }
 
 /// The lexicon's refused words that a test can tell apart: « fournisseur », « segment », « tu »;
@@ -1624,7 +1655,7 @@ fn no_sentence_says_a_word_the_lexicon_refuses() {
             wrong.push(format!("{} « {} »", sentence.name(), words[at]));
         }
     }
-    still_wrong(4, wrong);
+    still_wrong("lexicon", wrong);
 }
 
 #[test]
