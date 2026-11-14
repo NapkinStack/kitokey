@@ -110,4 +110,4 @@ limit window.chip_failed[0] "Minutes not written"
 limit window.chip_transcript_failed[0] "Transcript not written"
 limit window.chip_transcript_failed[0] "Transcription non faite"
 limit window.recording[0] "Enregistrement en cours"
-placeholders of: in both languages
+placeholders of comment 7: in both languages
