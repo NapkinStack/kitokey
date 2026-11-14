@@ -1221,6 +1221,483 @@ fn every_french_sentence_has_its_spaces_before_the_tall_signs() {
     );
 }
 
+// The voice guide (`docs/voice.md`, D94): what every sentence holds, read from `src/words.rs`.
+
+/// What the rewrite (D94, one pull request an area) still has to put right, sentence by sentence:
+/// `tests/words_still_wrong.txt`, one `rule key` a line, sorted. A sentence that breaks a rule and
+/// is not listed fails; one listed that no longer breaks it fails too, until it is removed — the
+/// list only shrinks, and a sentence put right never covers another written wrong.
+const STILL_WRONG: &str = include_str!("words_still_wrong.txt");
+
+/// The sentences still without their comment, counted: 602 keys would be three review budgets.
+/// The number only goes down, as the list does.
+const WITHOUT_COMMENT: usize = 602;
+
+/// A sentence of `src/words.rs`, as the file arranges it.
+#[derive(Debug)]
+struct Sentence {
+    /// The function that says it.
+    function: String,
+    /// In `window` and `menu`, the field it fills and its place there: an array holds several.
+    field: Option<(String, usize)>,
+    /// Said in French, in English, or before either is named.
+    french: Option<bool>,
+    text: String,
+    /// The comment that covers it, when it gives the guide's four words: its field's, or the last
+    /// one above it in its function. Numbered, so that what one comment covers is read together.
+    comment: Option<(usize, String)>,
+}
+
+impl Sentence {
+    fn name(&self) -> String {
+        match &self.field {
+            Some((field, place)) => format!("{}.{field}[{place}] {:?}", self.function, self.text),
+            None => format!("{} {:?}", self.function, self.text),
+        }
+    }
+}
+
+/// Functions whose literals are no sentence: a language's code, a model's name made fit to show,
+/// what a program said made fit to show.
+const NOT_SAID: [&str; 9] = [
+    "named",
+    "code",
+    "detail",
+    "quantised",
+    "dated",
+    "without_tail",
+    "js_space",
+    "model_said",
+    "shown_detail",
+];
+
+/// A comment that gives the guide's four words, in their order.
+fn context(comment: &str) -> bool {
+    let at: Vec<_> = ["Shows:", "When:", "At most:", "Placeholders:"]
+        .iter()
+        .map(|word| comment.find(word))
+        .collect();
+    at.iter().all(Option::is_some) && at.windows(2).all(|pair| pair[0] < pair[1])
+}
+
+/// Every sentence of `src/words.rs`: each string literal of a function, its escapes read as the
+/// compiler reads them, with the comment that covers it.
+fn sentences() -> Vec<Sentence> {
+    sentences_in(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/words.rs")).unwrap())
+}
+
+/// The sentences of a source written as `words.rs` is.
+fn sentences_in(source: &str) -> Vec<Sentence> {
+    let source: Vec<char> = source.chars().collect();
+    let mut found = Vec::new();
+    let mut fields = std::collections::HashMap::new();
+    let (mut function, mut structure, mut keyword, mut word_before) = (String::new(), String::new(), String::new(), String::new());
+    let mut french = None;
+    let (mut block, mut doc) = (String::new(), None::<String>);
+    let (mut comment, mut comments) = (None::<(usize, String)>, 0);
+    let (mut field, mut place) = (String::new(), 0);
+    let mut at = 0;
+    while at < source.len() {
+        let c = source[at];
+        if c == '/' && source.get(at + 1) == Some(&'/') {
+            let end = source[at..].iter().position(|&d| d == '\n').map_or(source.len(), |n| at + n);
+            block.extend(&source[at..end]);
+            block.push('\n');
+            at = end;
+            continue;
+        }
+        if c.is_whitespace() {
+            at += 1;
+            continue;
+        }
+        // A token: the comment above it ends here.
+        if !block.is_empty() {
+            let closed = std::mem::take(&mut block);
+            if keyword == "fn" && context(&closed) {
+                comments += 1;
+                comment = Some((comments, closed.clone()));
+            }
+            doc = Some(closed);
+        }
+        if c.is_alphanumeric() || c == '_' {
+            let start = at;
+            while at < source.len() && (source[at].is_alphanumeric() || source[at] == '_') {
+                at += 1;
+            }
+            let word: String = source[start..at].iter().collect();
+            match word_before.as_str() {
+                "fn" => {
+                    (function, keyword, french, comment) = (word.clone(), "fn".into(), None, None);
+                }
+                "struct" => (structure, keyword) = (word.clone(), "struct".into()),
+                _ => {}
+            }
+            match word.as_str() {
+                "French" => french = Some(true),
+                "English" => french = Some(false),
+                _ => {}
+            }
+            let next = source[at..]
+                .iter()
+                .position(|d| !d.is_whitespace())
+                .map_or(source.len(), |n| at + n);
+            let named = source.get(next) == Some(&':') && source.get(next + 1) != Some(&':');
+            if named
+                && keyword == "struct"
+                && word_before == "pub"
+                && let Some(doc) = doc.take()
+            {
+                fields.insert((structure.clone(), word.clone()), doc);
+            }
+            if named && keyword == "fn" {
+                (field, place) = (word.clone(), 0);
+            }
+            if word != "pub" {
+                doc = None;
+            }
+            word_before = word;
+            continue;
+        }
+        doc = None;
+        if c == '\'' {
+            // A character, escaped or not, or a lifetime.
+            at = match (source.get(at + 1), source.get(at + 2)) {
+                (Some('\\'), _) => at + 3 + source[at + 3..].iter().position(|&d| d == '\'').unwrap() + 1,
+                (_, Some('\'')) => at + 3,
+                _ => at + 1,
+            };
+            continue;
+        }
+        if c != '"' {
+            at += 1;
+            continue;
+        }
+        let mut text = String::new();
+        at += 1;
+        while at < source.len() {
+            let d = source[at];
+            at += 1;
+            match d {
+                '\\' => {
+                    let escaped = source[at];
+                    at += 1;
+                    match escaped {
+                        'u' => {
+                            let close = at + source[at..].iter().position(|&e| e == '}').unwrap();
+                            let code: String = source[at + 1..close].iter().collect();
+                            text.push(char::from_u32(u32::from_str_radix(&code, 16).unwrap()).unwrap());
+                            at = close + 1;
+                        }
+                        'n' => text.push('\n'),
+                        other => text.push(other),
+                    }
+                }
+                '"' => break,
+                other => text.push(other),
+            }
+        }
+        let shown = matches!(function.as_str(), "window" | "menu");
+        let said = keyword == "fn"
+            && !NOT_SAID.contains(&function.as_str())
+            // An `expect`'s words, a locale compared, a target named: for the code, no sentence.
+            && !matches!(word_before.as_str(), "expect" | "eq_ignore_ascii_case" | "target_os")
+            && !(shown && field == "locale")
+            && strip_placeholders(&text).chars().any(char::is_alphabetic);
+        if said {
+            let owner = if function == "window" { "Window" } else { "Menu" };
+            let own = fields.get(&(owner.to_string(), field.clone())).filter(|doc| context(doc));
+            found.push(Sentence {
+                function: function.clone(),
+                field: shown.then(|| (field.clone(), place)),
+                french,
+                text,
+                comment: if shown { own.map(|doc| (0, doc.clone())) } else { comment.clone() },
+            });
+            place += 1;
+        }
+        // Only the literal right after a word of the code is the code's: the next one is read.
+        word_before.clear();
+    }
+    found
+}
+
+/// The placeholders of a sentence, `{}` or `{name}`, a format's options left out: `{minutes:02}`
+/// is `{minutes}`. `{{` is no placeholder.
+fn placeholders(text: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let mut rest = text;
+    while let Some(open) = rest.find('{') {
+        let after = &rest[open + 1..];
+        if let Some(escaped) = after.strip_prefix('{') {
+            rest = escaped;
+            continue;
+        }
+        let Some(close) = after.find('}') else { break };
+        let name = after[..close].split(':').next().unwrap();
+        if name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            found.push(format!("{{{name}}}"));
+        }
+        rest = &after[close + 1..];
+    }
+    found
+}
+
+fn strip_placeholders(text: &str) -> String {
+    placeholders(text)
+        .iter()
+        .fold(text.to_string(), |text, placeholder| text.replacen(placeholder.as_str(), "", 1))
+}
+
+/// A sentence's length as the guide counts it: each placeholder as 6 characters, the size or the
+/// time that usually fills it.
+fn measured(text: &str) -> usize {
+    strip_placeholders(text).chars().count() + 6 * placeholders(text).len()
+}
+
+/// The limit a comment gives, in characters: none when it says `no limit`.
+fn limit(comment: &str) -> Option<usize> {
+    let after = &comment[comment.find("At most:")? + "At most:".len()..];
+    after.trim_start().split(|c: char| !c.is_ascii_digit()).next()?.parse().ok()
+}
+
+/// What `rule` finds today, against what `STILL_WRONG` lists of it, key by key.
+fn still_wrong(rule: &str, found: Vec<String>) {
+    let lines: Vec<_> = STILL_WRONG.lines().filter(|line| !line.is_empty()).collect();
+    assert!(lines.is_sorted(), "tests/words_still_wrong.txt: keep it sorted");
+    let mut listed: Vec<_> = lines
+        .iter()
+        .filter_map(|line| line.strip_prefix(&format!("{rule} ")))
+        .map(str::to_string)
+        .collect();
+    let mut found = found;
+    listed.sort();
+    found.sort();
+    let new: Vec<_> = found
+        .iter()
+        .filter(|key| !listed.contains(key))
+        .map(|key| format!("{rule} {key}"))
+        .collect();
+    let gone: Vec<_> = listed
+        .iter()
+        .filter(|key| !found.contains(key))
+        .map(|key| format!("{rule} {key}"))
+        .collect();
+    assert!(
+        new.is_empty(),
+        "written against the guide (`{rule}`), put it right:\n{}",
+        new.join("\n")
+    );
+    assert!(
+        gone.is_empty(),
+        "put right (`{rule}`): remove it from the list:\n{}",
+        gone.join("\n")
+    );
+    assert_eq!(
+        found, listed,
+        "`{rule}`: a key listed once more or once less than it breaks the rule"
+    );
+}
+
+/// Only the literal right after `expect`, `eq_ignore_ascii_case` or `target_os` is the code's: a
+/// sentence after it is still read (the verifier's probes on #812).
+#[test]
+fn a_literal_of_the_code_leaves_the_sentence_after_it_read() {
+    let read = |source: &str| sentences_in(source).into_iter().map(|sentence| sentence.text).collect::<Vec<_>>();
+    assert_eq!(
+        read("fn opened() -> &'static str {\n    if cfg!(target_os = \"linux\") { \"Can't open it on Linux\" } else { \"Open it\" }\n}\n"),
+        ["Can't open it on Linux", "Open it"]
+    );
+    assert_eq!(
+        read(
+            "fn said(code: &str) -> &'static str {\n    if code.eq_ignore_ascii_case(\"fr\") { \"Le fournisseur\" } else { \"The provider\" }\n}\n"
+        ),
+        ["Le fournisseur", "The provider"]
+    );
+    assert_eq!(
+        read("fn told(x: Option<u8>) -> &'static str {\n    x.expect(\"always there\");\n    \"A sentence\"\n}\n"),
+        ["A sentence"]
+    );
+}
+
+#[test]
+fn the_sentences_are_read_as_the_file_arranges_them() {
+    let sentences = sentences();
+    let (french, english): (Vec<_>, Vec<_>) = sentences.iter().partition(|sentence| sentence.french == Some(true));
+    assert!(french.len() > 300 && english.len() > 300, "{} {}", french.len(), english.len());
+    fn strings(value: &serde_json::Value, found: &mut Vec<String>) {
+        match value {
+            serde_json::Value::String(text) => found.push(text.clone()),
+            serde_json::Value::Array(values) => values.iter().for_each(|value| strings(value, found)),
+            serde_json::Value::Object(fields) => fields.values().for_each(|value| strings(value, found)),
+            _ => {}
+        }
+    }
+    let shown = |language: Language| {
+        let mut texts = Vec::new();
+        strings(&serde_json::to_value(words::window(language)).unwrap(), &mut texts);
+        texts.retain(|text| text != words::window(language).locale && strip_placeholders(text).chars().any(char::is_alphabetic));
+        texts.sort();
+        texts
+    };
+    for (language, french) in [(Language::English, false), (Language::French, true)] {
+        let mut read: Vec<_> = sentences
+            .iter()
+            .filter(|sentence| sentence.function == "window" && sentence.french == Some(french))
+            .map(|sentence| sentence.text.clone())
+            .collect();
+        read.sort();
+        assert_eq!(read, shown(language), "{language:?}: the window's sentences, each read once");
+    }
+}
+
+/// Each sentence carries a comment that says where it shows, when, its limit and its placeholders:
+/// one for both its languages, so counted on its English.
+#[test]
+fn every_sentence_carries_its_comment() {
+    let without: Vec<_> = sentences()
+        .into_iter()
+        .filter(|sentence| sentence.french != Some(true) && sentence.comment.is_none())
+        .map(|s| s.name())
+        .collect();
+    assert!(
+        without.len() == WITHOUT_COMMENT,
+        "{} sentences without their comment, WITHOUT_COMMENT says {WITHOUT_COMMENT}: {}\n{}",
+        without.len(),
+        if without.len() < WITHOUT_COMMENT {
+            "lower it"
+        } else {
+            "a sentence was written without its comment"
+        },
+        without.join("\n")
+    );
+}
+
+/// The same placeholders in French and in English — a field's, or those one comment covers —, and
+/// those its comment names.
+#[test]
+fn a_sentence_has_the_same_placeholders_in_both_languages_and_its_comment_names_them() {
+    use std::collections::BTreeMap;
+    let mut groups: BTreeMap<String, [Vec<String>; 2]> = BTreeMap::new();
+    // What one comment covers — a whole field, each place of an array, or the arms after it — and
+    // the placeholders it says, against those its sentences hold.
+    let mut covered: BTreeMap<String, (std::collections::BTreeSet<String>, String)> = BTreeMap::new();
+    for sentence in sentences() {
+        let Some(french) = sentence.french else { continue };
+        let group = match (&sentence.field, &sentence.comment) {
+            (Some((field, place)), _) => format!("{}.{field}[{place}]", sentence.function),
+            (None, Some((number, _))) => format!("{} comment {number}", sentence.function),
+            (None, None) => sentence.function.clone(),
+        };
+        groups.entry(group).or_default()[french as usize].extend(placeholders(&sentence.text));
+        if let Some((number, comment)) = &sentence.comment {
+            let key = match &sentence.field {
+                Some((field, _)) => format!("{}.{field}", sentence.function),
+                None => format!("{} comment {number}", sentence.function),
+            };
+            let entry = covered.entry(key).or_default();
+            entry.0.extend(placeholders(&sentence.text));
+            entry.1 = comment[comment.find("Placeholders:").unwrap()..].to_string();
+        }
+    }
+    let mut wrong = Vec::new();
+    for (group, [mut english, mut french]) in groups {
+        english.sort();
+        french.sort();
+        if english != french {
+            wrong.push(format!("{group}: in both languages"));
+        }
+    }
+    for (key, (said, named)) in covered {
+        let listed: std::collections::BTreeSet<_> = placeholders(&named).into_iter().collect();
+        if said != listed {
+            wrong.push(format!("{key}: in its comment"));
+        }
+    }
+    still_wrong("placeholders", wrong);
+}
+
+#[test]
+fn no_sentence_has_a_straight_apostrophe() {
+    let wrong = sentences()
+        .into_iter()
+        .filter(|sentence| sentence.text.contains('\''))
+        .map(|s| s.name())
+        .collect();
+    still_wrong("apostrophe", wrong);
+}
+
+/// A list's label at most 18 characters, whatever its comment says, and every sentence at most what
+/// its comment says. A notification's title is read whole below.
+#[test]
+fn a_sentence_fits_its_limit_and_a_list_label_holds_18_characters() {
+    let script = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/ui/window.js")).unwrap();
+    // A list's labels: what the window puts in a chip, by name or by the `chip_` they all begin with.
+    let mut labels = std::collections::BTreeSet::new();
+    for (opening, _) in script.match_indices("words.") {
+        let name: String = script[opening + 6..]
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect();
+        if name.starts_with("chip_") || script[..opening].ends_with("chip(") {
+            labels.insert(name);
+        }
+    }
+    assert!(labels.contains("chip_making") && labels.contains("recording"), "{labels:?}");
+    let mut wrong = Vec::new();
+    for sentence in sentences() {
+        let comment = sentence.comment.as_ref().map(|(_, comment)| comment.as_str()).unwrap_or_default();
+        let label = sentence
+            .field
+            .as_ref()
+            .is_some_and(|(field, _)| sentence.function == "window" && labels.contains(field))
+            || comment.contains("list label");
+        let at_most = match limit(comment) {
+            Some(at_most) if label => Some(at_most.min(18)),
+            None if label => Some(18),
+            at_most => at_most,
+        };
+        if at_most.is_some_and(|at_most| measured(&sentence.text) > at_most) {
+            wrong.push(sentence.name());
+        }
+    }
+    still_wrong("limit", wrong);
+}
+
+/// The lexicon's refused words that a test can tell apart: « fournisseur », « segment », « tu »;
+/// "provider", "keyring", and "minutes" — the summary's, not a length's: after a number or a
+/// placeholder, it is a length.
+#[test]
+fn no_sentence_says_a_word_the_lexicon_refuses() {
+    let mut wrong = Vec::new();
+    for sentence in sentences() {
+        const FRENCH: [&str; 5] = ["fournisseur", "fournisseurs", "segment", "segments", "tu"];
+        const ENGLISH: [&str; 4] = ["provider", "providers", "keyring", "minutes"];
+        // A sentence the reader cannot place in either language — a helper such as `french_days` —
+        // is held to both lexicons.
+        let both = [FRENCH.as_slice(), ENGLISH.as_slice()].concat();
+        let refused: &[&str] = match sentence.french {
+            Some(true) => &FRENCH,
+            Some(false) => &ENGLISH,
+            None => &both,
+        };
+        let words: Vec<String> = sentence
+            .text
+            .split(|c: char| !(c.is_alphanumeric() || c == '{' || c == '}' || c == '_'))
+            .filter(|word| !word.is_empty())
+            .map(str::to_lowercase)
+            .collect();
+        let length = |at: usize| at > 0 && (words[at - 1].starts_with('{') || words[at - 1].chars().all(|c| c.is_ascii_digit()));
+        if let Some(at) = words
+            .iter()
+            .enumerate()
+            .position(|(at, word)| refused.contains(&word.as_str()) && !(word == "minutes" && length(at)))
+        {
+            wrong.push(format!("{} « {} »", sentence.name(), words[at]));
+        }
+    }
+    still_wrong("lexicon", wrong);
+}
+
 #[test]
 fn a_list_waiting_on_its_key_says_so_and_what_stays_offered() {
     let (english, french) = (words::window(Language::English), words::window(Language::French));
