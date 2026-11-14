@@ -5611,9 +5611,9 @@ def corrections_gated(now: dt.datetime) -> None:
 
 
 def press_on_the_page_left(now: dt.datetime) -> None:
-    """AS. Another page asked for: the page left is gone at once, nothing of it to press; a drawing
+    """BL. Another page asked for: the page left is gone at once, nothing of it to press; a drawing
     that fails is said, with a way out and a way to try again; what is agreed to names its meeting."""
-    print("AS. the page left goes at once: nothing to press, nothing sent; a failed drawing has a way out; the agreement names its meeting")
+    print("BL. the page left goes at once: nothing to press, nothing sent; a failed drawing has a way out; the agreement names its meeting")
     meetings = WORK / "pressed"
     minutes = ("---\ncontract: minutes/v2\nmade: 2026-10-28T10:00:00+01:00\nprovider: writes.example\nmodel: m\ncontext: null\n{}---\n\n"
                "## 1.\n\nLe budget.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
@@ -5631,7 +5631,7 @@ def press_on_the_page_left(now: dt.datetime) -> None:
     # `opened` answers 800 ms late; `listed` refused by `refusing` calls from now, each `after` ms late.
     late = ("const real = window.__TAURI__.core; window.refusing = arguments[0] ?? 0; const after = arguments[1] ?? 0; window.__TAURI__.core = { ...real, invoke: async (asked, ...rest) => {"
             " if (asked === 'opened') await new Promise((r) => setTimeout(r, 800));"
-            " if (asked === 'listed' && window.refusing > 0) { window.refusing -= 1; await new Promise((r) => setTimeout(r, after)); window.threw = true; throw Object.assign(new Error('REFUS'), { name: 'ScenarioAS' }); }"
+            " if (asked === 'listed' && window.refusing > 0) { window.refusing -= 1; await new Promise((r) => setTimeout(r, after)); window.threw = true; throw Object.assign(new Error('REFUS'), { name: 'ScenarioBL' }); }"
             " return real.invoke(asked, ...rest); } }; window.restore = () => { window.__TAURI__.core = real; };")
     page_of = "return document.getElementById('meeting').hidden ? null : document.getElementById('minutes-state')?.dataset.name ?? null"
     said = "const p = document.getElementById('pane-said'); return p.hidden ? '' : p.textContent"
@@ -5723,14 +5723,14 @@ def press_on_the_page_left(now: dt.datetime) -> None:
         # A throw in the drawing: nothing of the page left, said; tried again, drawn; logged.
         at_page(browser, left)
         browser.execute_script("window.logged = []; const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => { if (asked === 'page_failed') window.logged.push(rest[0]); return real.invoke(asked, ...rest); } }; window.restore = () => { window.__TAURI__.core = real; };"
-                               "window.__drawn = showMeeting; showMeeting = () => { throw Object.assign(new Error('REFUS'), { name: 'ScenarioAS' }); };")
+                               "window.__drawn = showMeeting; showMeeting = () => { throw Object.assign(new Error('REFUS'), { name: 'ScenarioBL' }); };")
         browser.execute_script("player = { name: arguments[0], stop() { window.stopped = true; } }", asked.name)
         browser.execute_script(f"location.hash = '#/meeting/{asked.name}'")
         told = wait_for(browser, lambda b: b.execute_script(said) == not_shown, 5)
         check("a throw in the drawing: said, nothing of the page left, what played stopped",
               told and browser.execute_script("return document.getElementById('meeting').querySelector('button, a, input, textarea, select') === null && window.stopped === true"), browser.execute_script("return [window.stopped, document.getElementById('meeting').textContent.slice(0, 80)]"))
         logged = browser.execute_script("return window.logged")
-        check("a throw in the drawing: logged, with its kind", bool(logged) and logged[0]["kind"] == "ScenarioAS", logged)
+        check("a throw in the drawing: logged, with its kind", bool(logged) and logged[0]["kind"] == "ScenarioBL", logged)
         browser.execute_script("showMeeting = window.__drawn; window.restore()")
         again = browser.find_element(By.ID, "pane-again")
         check("tried again: offered, its words", again.is_displayed() and again.text == "Réessayer", again.text)
