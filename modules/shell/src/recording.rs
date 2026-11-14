@@ -3,6 +3,7 @@
 //! and a recording goes on if the shell does not.
 
 use std::{
+    fs,
     io::{self, BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
     process::{Child, ChildStdin, Command, Stdio},
@@ -297,8 +298,15 @@ pub fn microphones(program: &Path) -> io::Result<Vec<Listed>> {
 /// A recording in progress: the program, and what it says. Dropped, it stops nothing: the
 /// program records on, and is stopped by a signal.
 pub struct Recording {
-    program: Child,
-    input: ChildStdin,
+    held: Held,
+}
+
+/// How the shell holds the program that records.
+enum Held {
+    /// Started here: its input and output are this shell's.
+    Started { program: Child, input: ChildStdin },
+    /// Found running, started by a Kitokey ended since: only a signal reaches it (#773).
+    Found(Kept),
 }
 
 impl Recording {
@@ -357,28 +365,203 @@ impl Recording {
             error!(detail = %crate::log::without(&why, Some(&sessions)), "shell.recording_failed");
             let _ = tell.send(Said::Failed(why));
         });
-        Ok((Self { program, input }, said))
+        Ok((
+            Self {
+                held: Held::Started { program, input },
+            },
+            said,
+        ))
     }
 
-    /// Tells the program to stop: it writes its files whole, says `stopped`, and ends.
+    /// Tells the program to stop: it writes its files whole, says `stopped`, and ends. One found
+    /// running is told by a termination signal, which `recording/v1` makes the same order — once
+    /// its number is still that program's.
     pub fn stop(&mut self) -> io::Result<()> {
-        self.input.write_all(b"stop\n")?;
-        self.input.flush()
+        match &mut self.held {
+            Held::Started { input, .. } => {
+                input.write_all(b"stop\n")?;
+                input.flush()
+            }
+            Held::Found(kept) if !kept.running() => Err(io::ErrorKind::NotFound.into()),
+            #[cfg(unix)]
+            Held::Found(kept) => {
+                let id = libc::pid_t::try_from(kept.id).map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?;
+                // SAFETY: a signal sent to a number checked to be the program kept, nothing else.
+                match unsafe { libc::kill(id, libc::SIGTERM) } {
+                    0 => Ok(()),
+                    _ => Err(io::Error::last_os_error()),
+                }
+            }
+            #[cfg(not(unix))]
+            Held::Found(_) => Err(io::ErrorKind::Unsupported.into()),
+        }
     }
 
     /// The program's number for the system: what stops a recording whose shell is gone.
     pub fn id(&self) -> u32 {
-        self.program.id()
+        match &self.held {
+            Held::Started { program, .. } => program.id(),
+            Held::Found(kept) => kept.id,
+        }
     }
 
     /// Waits for the program to end, so that nothing of it is left in the system's table of
-    /// programs: for whoever heard its output close.
-    pub fn wait(mut self) {
-        let _ = self.program.wait();
+    /// programs: for whoever heard its output close. One found running is not this shell's to wait for.
+    pub fn wait(self) {
+        if let Held::Started { mut program, .. } = self.held {
+            let _ = program.wait();
+        }
     }
 
     /// Whether the program has ended.
     pub fn ended(&mut self) -> bool {
-        !matches!(self.program.try_wait(), Ok(None))
+        match &mut self.held {
+            Held::Started { program, .. } => !matches!(program.try_wait(), Ok(None)),
+            Held::Found(kept) => !kept.running(),
+        }
     }
+}
+
+/// What the shell keeps of the recording it runs, beside its settings, so that a Kitokey started
+/// again after its shell was ended finds the recording left running (#773): the program's number,
+/// when the system started it — with the number, no other program can be it —, and its session.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Kept {
+    pub id: u32,
+    pub since: u64,
+    pub folder: PathBuf,
+}
+
+impl Kept {
+    /// What is kept of a program running now, recording this session: none where the system does
+    /// not say when a program started — all but Linux —, or once the program is gone.
+    pub fn of(id: u32, folder: &Path) -> Option<Self> {
+        Some(Self {
+            id,
+            since: since(id)?,
+            folder: folder.to_path_buf(),
+        })
+    }
+
+    fn running(&self) -> bool {
+        since(self.id) == Some(self.since)
+    }
+}
+
+/// Keeps it whole: a file beside, renamed over it.
+pub fn keep(file: &Path, kept: &Kept) -> io::Result<()> {
+    let part = file.with_extension("part");
+    fs::write(&part, serde_json::to_vec(kept)?)?;
+    fs::rename(&part, file)
+}
+
+/// Keeps nothing: the recording ended. Nothing kept already is no failure.
+pub fn forget(file: &Path) -> io::Result<()> {
+    match fs::remove_file(file) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        other => other,
+    }
+}
+
+/// When the system started this program, in its ticks since it booted (`/proc/<id>/stat`, the 22nd
+/// field): none when it is gone, or ended and not yet waited for, or where there is no `/proc`.
+pub fn since(id: u32) -> Option<u64> {
+    let stat = fs::read_to_string(format!("/proc/{id}/stat")).ok()?;
+    // After the program's name, in parentheses that may hold anything: its state, then the fields.
+    let mut fields = stat.get(stat.rfind(')')? + 1..)?.split_whitespace();
+    if matches!(fields.next()?, "Z" | "X" | "x") {
+        return None;
+    }
+    fields.nth(18)?.parse().ok()
+}
+
+/// A recording found running, left by a Kitokey ended before this one (#773).
+pub struct Found {
+    pub recording: Recording,
+    /// What it says from now: only its end, `Stopped` or `Failed` — its output went with the shell
+    /// that read it.
+    pub said: Receiver<Said>,
+    pub folder: PathBuf,
+    /// Its `session.json` says `stopped` already: it was told to stop, and is ending.
+    pub stopping: bool,
+    /// How long it has recorded, from its session's start.
+    pub seconds: f64,
+}
+
+/// How often a recording found is looked at, to know it ended: no output says it.
+const LOOKED_AT_EVERY: Duration = Duration::from_millis(200);
+
+/// The recording a Kitokey ended before this one left running, as `file` keeps it — or none:
+/// nothing kept, a file that cannot be read or does not read, a program gone or another under its
+/// number. What finds nothing is removed — what cannot be read, a file or a folder in its place, is set
+/// aside as `<file>.unreadable-<now>`, never deleted: nothing is left to find.
+/// `now`: seconds since 1970.
+pub fn find(file: &Path, now: i64) -> Option<Found> {
+    let text = match fs::read(file) {
+        Ok(text) => text,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return None,
+        // Not readable — no permission, or a folder in its place —: set aside, never deleted (it may
+        // not be the shell's), so that the next `keep` works.
+        Err(error) => {
+            let aside = file.with_file_name(format!(
+                "{}.unreadable-{now}",
+                file.file_name().unwrap_or_default().to_string_lossy()
+            ));
+            let name = aside.file_name().unwrap_or_default().to_string_lossy().to_string();
+            match fs::rename(file, &aside) {
+                Ok(()) => warn!(kind = ?error.kind(), aside = %name, "shell.recording_unread"),
+                Err(moved) => warn!(kind = ?error.kind(), not_set_aside = ?moved.kind(), "shell.recording_unread"),
+            }
+            return None;
+        }
+    };
+    let kept = match serde_json::from_slice::<Kept>(&text) {
+        Ok(kept) if kept.running() => kept,
+        Ok(_) => {
+            info!("shell.recording_gone");
+            let _ = forget(file);
+            return None;
+        }
+        Err(_) => {
+            warn!("shell.recording_unread");
+            let _ = forget(file);
+            return None;
+        }
+    };
+    let (started, stopped) = times(&kept.folder);
+    let seconds = started.map_or(0.0, |started| now.saturating_sub(started).max(0) as f64);
+    let (tell, said) = mpsc::channel();
+    let watched = kept.clone();
+    thread::spawn(move || {
+        while watched.running() {
+            thread::sleep(LOOKED_AT_EVERY);
+        }
+        // Ended: stopped, its files whole, when its session says so (`session-audio`); else not.
+        let _ = tell.send(match times(&watched.folder) {
+            (Some(started), Some(stopped)) => {
+                info!("shell.recording_stopped");
+                Said::Stopped(watched.folder.clone(), stopped.saturating_sub(started).max(0) as f64)
+            }
+            _ => {
+                error!("shell.recording_failed");
+                Said::Failed(String::new())
+            }
+        });
+    });
+    Some(Found {
+        folder: kept.folder.clone(),
+        recording: Recording { held: Held::Found(kept) },
+        said,
+        stopping: stopped.is_some(),
+        seconds,
+    })
+}
+
+/// When a session started and stopped, as its `session.json` says, in seconds since 1970.
+fn times(folder: &Path) -> (Option<i64>, Option<i64>) {
+    let session: Option<Value> = fs::read(folder.join("session.json"))
+        .ok()
+        .and_then(|text| serde_json::from_slice(&text).ok());
+    let at = |field: &str| session.as_ref()?.get(field)?.as_str().and_then(crate::sessions::instant);
+    (at("started"), at("stopped"))
 }

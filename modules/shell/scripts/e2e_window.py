@@ -3408,6 +3408,57 @@ def bar_window(now: dt.datetime) -> None:
               wait_for(None, lambda b: "Afficher la barre" not in tray_labels(), 5), tray_labels())
 
 
+def recording_found(now: dt.datetime) -> None:
+    """BE. A recording left running by a Kitokey ended before this one, found at the start (#773): the bar
+    shows it with ■ and its time from the session's own start, and its ■ stops it by a signal."""
+    print("BE. a recording left running by an ended Kitokey: the bar shows ■ and its time from its real start, and stops it (#773)")
+    taping = WORK / "recording-found"
+    taping.mkdir()
+    folder = taping / "2026-11-13_09-00"
+    folder.mkdir()
+    started = dt.datetime.now().astimezone() - dt.timedelta(seconds=90)
+    stamp = started.isoformat(timespec="seconds")
+    (folder / "session.json").write_text(json.dumps({"contract": "session-audio/v3", "started": stamp, "tracks": {}}))
+    # The recorder as the real one is once its shell is gone: no input, no one reading it, stopped by a signal
+    # that writes `stopped` (recording/v1, session-audio).
+    script = (
+        "trap '' PIPE\n"
+        "trap 'echo signal > \"$1/told\"; printf %s \"$2\" > \"$1/session.json\"; exit 0' TERM INT\n"
+        "while :; do sleep 0.1 & wait $!; done\n"
+    )
+    ended = json.dumps({"contract": "session-audio/v3", "started": stamp, "stopped": dt.datetime.now().astimezone().isoformat(timespec="seconds"), "tracks": {}})
+    recorder = subprocess.Popen(["sh", "-c", script, "sh", str(folder), ended], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    try:
+        since = int(Path(f"/proc/{recorder.pid}/stat").read_text().rsplit(")", 1)[1].split()[19])
+        window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True)
+        kept = window.file.parent / "recording.json"
+        kept.write_text(json.dumps({"id": recorder.pid, "since": since, "folder": str(folder)}))
+        begun = time.monotonic()
+        with window as browser:
+            shown = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+            check("found at the start: the bar shows ■, ● gone, the tray's icon red",
+                  shown and not browser.find_element(By.ID, "small-record").is_displayed() and tray_colour() == "red", tray_colour())
+            clock = browser.find_element(By.CSS_SELECTOR, "#small .time").text
+            parts = clock.split(":")
+            seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2]) if len(parts) == 3 and all(p.isdigit() for p in parts) else -1
+            upper = 90 + (time.monotonic() - begun) + 2
+            check("its time counted from the session's start, not from Kitokey's", 90 <= seconds <= upper, (clock, upper))
+            check("the recorder is not told anything by being found", recorder.poll() is None and not (folder / "told").exists())
+            stop_from_small(browser)
+            gone = wait_for(None, lambda b: recorder.poll() is not None, 10)
+            check("■ in the bar stops it by a termination signal, as the line stop would", gone and recorder.returncode == 0
+                  and (folder / "told").read_text().strip() == "signal", recorder.returncode)
+            check("its session says stopped", "stopped" in json.loads((folder / "session.json").read_text()))
+            back = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and tray_colour() == "blue", 10)
+            check("the bar and the tray back at rest", back, tray_colour())
+            check("nothing kept for the next start", wait_for(None, lambda b: not kept.exists(), 5))
+    finally:
+        if recorder.poll() is None:
+            recorder.kill()
+        recorder.wait()
+
+
 def bar_opened(now: dt.datetime) -> None:
     """BA. The bar opened (D90, board 6): at rest, the microphone, « Vérifier le son » — D88's panel in
     the bar — and « Avancé » closed; recording, the context, the microphone recorded, « Confidentielle »
@@ -8548,6 +8599,7 @@ def main() -> int:
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
+    recording_found(now)
     context_before_start(now)
     own_models(now)
     models_advanced(now)
