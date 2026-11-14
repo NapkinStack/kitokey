@@ -37,7 +37,7 @@ use kitokey_shell::{
     minutes::{self, Minutes},
     model::{self, Published},
     named, player,
-    providers::{self, Online},
+    providers::{self, OnlineOffered},
     recording::{self, Recording, Said, Source},
     registry,
     sessions::{self, Listed},
@@ -393,6 +393,7 @@ fn main() {
             settings_saved,
             minutes_shown,
             minutes_saved,
+            minutes_models,
             minutes_tested,
             agreement_shown,
             agreed,
@@ -2551,7 +2552,7 @@ struct MinutesShown {
     ollama_address: String,
     /// The local model recommended for the minutes, said so when Ollama holds it (#261).
     recommended: &'static str,
-    online: [Online; 3],
+    online: Vec<OnlineOffered>,
     provider: Option<String>,
     model: Option<String>,
     key_kept: bool,
@@ -2582,7 +2583,7 @@ async fn minutes_shown(shell: State<'_, Shell>) -> Result<MinutesShown, Told> {
         ollama: models.unwrap_or_default(),
         ollama_address: providers::ollama_address(&ollama()),
         recommended: providers::RECOMMENDED,
-        online: providers::ONLINE,
+        online: providers::online(),
         provider: settings.minutes_provider,
         model: settings.minutes_model,
         key_kept: kept,
@@ -2635,6 +2636,31 @@ async fn minutes_saved(
     };
     look_again(&app);
     Ok(not_kept)
+}
+
+/// A service's models for the summary, asked with the key the user typed — or the one kept for its
+/// host —: the key tested at once (D95). Only the ids come back; nothing is kept, the key never
+/// logged. Refused, the cause in the Tester's own sentence.
+#[tauri::command]
+async fn minutes_models(shell: State<'_, Shell>, provider: String, key: Option<String>) -> Result<Vec<String>, Told> {
+    let host = providers::host(provider.trim()).ok_or_else(|| shell.told(Failure::BadAddress, "no provider's address"))?;
+    let key_checked = providers::online()
+        .iter()
+        .any(|service| service.address == provider.trim() && service.key_checked);
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&host).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::service_models(provider.trim(), key_checked, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
 }
 
 /// Who hears, when a service does (D43): its address and model saved, the user's agreement to its

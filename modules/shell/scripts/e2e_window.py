@@ -30,7 +30,7 @@ from pathlib import Path
 
 from selenium import webdriver
 from selenium.common.exceptions import (
-    ElementNotInteractableException, NoSuchWindowException, StaleElementReferenceException, TimeoutException, WebDriverException,
+    ElementNotInteractableException, NoSuchElementException, NoSuchWindowException, StaleElementReferenceException, TimeoutException, WebDriverException,
 )
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
@@ -384,11 +384,12 @@ def read(browser, reads):
 def wait_for(browser, holds, seconds: float = 10) -> bool:
     until = time.monotonic() + seconds
     while time.monotonic() < until:
-        # The page drawn again between finding an element and reading it: not yet, look again.
+        # The page drawn again between finding an element and reading it, or not yet drawn: not yet,
+        # look again — as Selenium's WebDriverWait ignores NoSuchElementException.
         try:
             if holds(browser):
                 return True
-        except StaleElementReferenceException:
+        except (NoSuchElementException, StaleElementReferenceException):
             pass
         time.sleep(0.1)
     return False
@@ -1212,6 +1213,145 @@ def service_named(now: dt.datetime) -> None:
     server.shutdown()
 
 
+def models_guided(now: dt.datetime) -> None:
+    """BE. D95, criterion 2. The summary set up in « Modèles » as one guided path: here or a service; a
+    service named, its key tested at once against a stand-in made for the run — refused, said with
+    its cause; taken, its models listed as people say them —; no address typed but under « Avancé »."""
+    print("BE. Settings: the summary set up in a few guided steps, a service's key tested at once (D95)")
+    good, false = "sk-stand-in-good", "sk-stand-in-false"
+    asked = []
+
+    # The named services' stand-in (OpenRouter's routes): its key route, then its models — the false
+    # key refused on both, as the services do (401).
+    class Service(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            key = (self.headers.get("authorization") or "").removeprefix("Bearer ")
+            asked.append([self.path, key])
+            if key != good:
+                status, body = 401, {"error": {"message": "Invalid credentials, HTTP 401 from the stand-in", "code": 401}}
+            elif self.path.endswith("/key"):
+                status, body = 200, {"data": {"label": "stand-in"}}
+            elif self.path.endswith("/models"):
+                status, body = 200, {"data": [{"id": "anthropic/claude-sonnet-4-5"}, {"id": "openai/gpt-4o-mini"}, {"id": "mistralai/mistral-7b-instruct:free"}]}
+            else:
+                status, body = 404, {}
+            raw = json.dumps(body).encode()
+            self.send_response(status)
+            self.send_header("content-length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_):
+            pass
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            raw = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:latest"}]}).encode()
+            self.send_response(200)
+            self.send_header("content-length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_):
+            pass
+
+    servers = [http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler) for handler in (Service, Tags)]
+    for server in servers:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    stand = f"http://127.0.0.1:{servers[0].server_address[1]}/api/v1"
+    guided = WORK / "guided"
+    guided.mkdir()
+    window = Window(guided, "fr_FR.UTF-8", ollama=f"http://127.0.0.1:{servers[1].server_address[1]}")
+    window.env.update(KITOKEY_ONLINE=stand)
+    said = "return document.getElementById('minutes-key-said')?.textContent || ''"
+    options = "return [...document.querySelectorAll(`#${arguments[0]} option`)].filter(o => !o.disabled).map(o => o.textContent)"
+    # What a field of the common case shows: no address, nothing a machine reads (E5).
+    addresses = "return [...document.querySelectorAll('#settings input[type=url]')].filter(i => i.getClientRects().length > 0).map(i => i.id)"
+    with window as browser:
+        browser.find_element(By.ID, "settings-link").click()
+        wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-where"), 5)
+        group = browser.execute_script("const g = document.getElementById('minutes-where'); return [g.getAttribute('role'), [...g.querySelectorAll('input[type=radio]')].map(r => r.id)]")
+        check("the summary, first step: on this computer or a service, one choice (D95)",
+              group == ["radiogroup", ["minutes-here", "minutes-online"]], group)
+        press(browser, "minutes-here")
+        here = wait_for(browser, lambda b: b.execute_script(options, "minutes") == ["Mistral", "Qwen3 14b"], 5)
+        check("on this computer: Ollama's models, each said as people say it — no tag, no « : »",
+              here, browser.execute_script(options, "minutes"))
+        press(browser, "minutes-online")
+        named = wait_for(browser, lambda b: b.execute_script(options, "minutes-service") == ["OpenRouter", "OpenAI", "Mistral"], 5)
+        check("a service: OpenRouter, OpenAI, Mistral, by name", named, browser.execute_script(options, "minutes-service"))
+        check("a service, the common case: no address asked, « Avancé » folded (E5)",
+              browser.execute_script(addresses) == [] and browser.find_element(By.ID, "minutes-advanced").get_attribute("aria-expanded") == "false",
+              browser.execute_script(addresses))
+        check("a service, before its key: no model offered", not browser.find_element(By.ID, "minutes-models").is_displayed())
+        # A false key: refused at once, its cause said in a sentence, nothing of the service's own words (E4).
+        choose(browser, "minutes-service", "0")
+        browser.find_element(By.ID, "minutes-key").send_keys(false)
+        press(browser, "minutes-key-test")
+        refused = wait_for(browser, lambda b: b.execute_script(said) == TEST_CAUSES[0][1], 10)
+        told = browser.execute_script(said)
+        check("a false key: refused at once, said with its cause — no HTTP, no raw word of the service's (E4)",
+              refused and "401" not in told and "HTTP" not in told and "Invalid" not in told and not browser.find_element(By.ID, "minutes-models").is_displayed(), told)
+        check("the false key asked of OpenRouter's key route, its models not asked", ["/api/v1/key", false] in asked and ["/api/v1/models", false] not in asked, asked)
+        # Drawn again with no gesture — a model come, the window crossing 840 px —: the refusal stays (ux.md).
+        drawn_again = "window.__old = document.getElementById('minutes-key-said'); refresh()"
+        anew = "return !window.__old.isConnected && document.getElementById('minutes-key-said') !== null"
+        browser.execute_script(drawn_again)
+        wait_for(browser, lambda b: b.execute_script(anew), 5)
+        check("drawn again by itself: the refusal still said, until the key is tried again", browser.execute_script(said) == TEST_CAUSES[0][1], browser.execute_script(said))
+        # The good one: taken, the service's models listed as people say them.
+        key = browser.find_element(By.ID, "minutes-key")
+        key.clear()
+        key.send_keys(good)
+        press(browser, "minutes-key-test")
+        listed = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
+        offered = browser.execute_script(options, "minutes-models")
+        check("the good key: the models listed, each as people say it (E4)",
+              listed and offered == ["Claude Sonnet 4.5", "GPT 4o Mini", "Mistral 7b Instruct Free"], [offered, browser.execute_script(said)])
+        check("no raw identifier in the list: no « : », no « / » (E4)", offered != [] and not any(":" in o or "/" in o for o in offered), offered)
+        browser.execute_script(drawn_again)
+        wait_for(browser, lambda b: b.execute_script(anew), 5)
+        check("drawn again by itself: the models listed with the key still offered",
+              browser.find_element(By.ID, "minutes-models").is_displayed() and browser.execute_script(options, "minutes-models") == offered, browser.execute_script(options, "minutes-models"))
+        choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
+        press(browser, "minutes-online-save")
+        saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
+        text = window.file.read_text()
+        check("saved: the service's address and the model chosen, never the key", saved and f'minutes_provider = "{stand}"' in text and "sk-stand-in" not in text, text)
+        logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and "sk-stand-in" in f.read_text(errors="ignore")]
+        check("the key never logged", logged == [], logged)
+        # Drawn again: the service and its model said as chosen, no address shown.
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
+        browser.execute_script("location.hash = '#/settings'")
+        again = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-online").is_selected() and b.find_element(By.ID, "minutes-service").get_attribute("value") == "0", 5)
+        check("drawn again: a service chosen, OpenRouter, no address shown", again and browser.execute_script(addresses) == [], browser.execute_script(addresses))
+        # The user's own address, under « Avancé » alone (E5).
+        press(browser, "minutes-advanced")
+        unfolded = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-address").is_displayed(), 3)
+        check("« Avancé » unfolded: an address of one's own, and a model named by hand", unfolded and browser.find_element(By.ID, "minutes-model").is_displayed())
+        shot_themed(browser, "d95-models-service-light", "light")
+        shot_themed(browser, "d95-models-service-dark", "dark")
+        # A model the service does not list — a new release, an id of its own —: typed by hand under
+        # « Avancé », the address left empty, saved with the service chosen above, and read again.
+        check("« Avancé », its address left empty: the service chosen above shown standing in",
+              browser.find_element(By.ID, "minutes-address").get_attribute("placeholder") == stand, browser.find_element(By.ID, "minutes-address").get_attribute("placeholder"))
+        browser.find_element(By.ID, "minutes-model").send_keys("vendor/new-model")
+        press(browser, "minutes-own-save")
+        typed = wait_for(browser, lambda b: 'minutes_model = "vendor/new-model"' in window.file.read_text(), 5)
+        text = window.file.read_text()
+        check("a model typed by hand for the service chosen: saved with its address", typed and f'minutes_provider = "{stand}"' in text, text)
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
+        browser.execute_script("location.hash = '#/settings'")
+        reread = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-online").is_selected()
+                          and b.find_element(By.ID, "minutes-service").get_attribute("value") == "0"
+                          and b.execute_script(options, "minutes-models") == ["New Model"], 5)
+        check("read again: that service, the model typed said as people say it", reread, browser.execute_script(options, "minutes-models"))
+    for server in servers:
+        server.shutdown()
+
+
 def ollama_pulled(now: dt.datetime) -> None:
     """V. The minutes' recommended model fetched by Ollama, on the user's click (D37)."""
     print("V. Settings: qwen3:8b fetched by Ollama on the user's click; without Ollama, said where to get it (D37)")
@@ -1308,8 +1448,8 @@ def ollama_pulled(now: dt.datetime) -> None:
             browser.execute_script(pull)
             here = wait_for(browser, lambda b: "Sur cet ordinateur" in b.execute_script(row), 20)
             check("whole: on this computer, Ollama asked for qwen3:8b", here and pulls[-1].get("model") == "qwen3:8b", (browser.execute_script(row), pulls))
-            first = browser.execute_script("return document.querySelector('#minutes optgroup option')?.textContent || ''")
-            check("it is offered first among the minutes' models", "qwen3:8b" in first, first)
+            first = browser.execute_script("return document.querySelector('#minutes option')?.textContent || ''")
+            check("it is offered first among the minutes' models, said as people say it", first.startswith("Qwen3 8b"), first)
             check("its notice says it is ready for the minutes", wait_for(browser, lambda b: "comptes rendus" in notified.read_text(), 5), notified.read_text()[-300:])
     finally:
         monitor.terminate()
@@ -1451,8 +1591,8 @@ def first_run(now: dt.datetime) -> None:
         seen(browser, "d58-3-summary-connected-light")
         press(browser, "welcome-go")
         opened = wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed()
-                          and b.execute_script("return document.activeElement.id") == "minutes", 10)
-        check("Choisir mon service opens Settings at the minutes, nothing saved for them yet",
+                          and b.execute_script("return document.activeElement.id") == "minutes-service", 10)
+        check("Choisir mon service opens Settings at the minutes' services, nothing saved for them yet",
               opened and "minutes_provider" not in window.file.read_text(), (browser.execute_script("return document.activeElement.id"), window.file.read_text()))
         # Refaire le réglage: Annuler changes nothing; confirmed, it is saved.
         before = window.file.read_text()
@@ -1498,7 +1638,7 @@ def first_run(now: dt.datetime) -> None:
         staged = window.file.read_text()
         press(browser, "welcome-go")
         opened = wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed()
-                          and b.execute_script("return document.activeElement.id") == "minutes", 10)
+                          and b.execute_script("return document.activeElement.id") == "minutes-service", 10)
         check("Refaire, confirmed connected: Settings at the minutes, nothing changed by itself",
               opened and window.file.read_text() == staged, window.file.read_text())
         press(browser, "settings-link")
@@ -1884,7 +2024,12 @@ echo '{{"available":true,"installed":true,"supported":true}}'
             # The keyboard alone (WAI-ARIA APG, Disclosure): Tab from Settings' top to « Avancé », Enter
             # unfolds it, Tab reaches its switch; each stop's focus seen.
             browser.execute_script("document.querySelector('#settings input, #settings select, #settings button').focus()")
-            stop = "const e = document.activeElement; return [e.id || e.className || e.tagName, e.matches(':focus-visible')]"
+            # The focus seen, measured: its ring drawn — an outline or a shadow —, on the element or on the
+            # choice that holds it; `:focus-visible` alone is true under `outline: none` (WCAG 2.4.7).
+            stop = ("const ring = (n) => { if (!n) return false; const s = getComputedStyle(n);"
+                    " return (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || s.boxShadow !== 'none'; };"
+                    "const e = document.activeElement;"
+                    "return [e.id || e.className || e.tagName, e.matches(':focus-visible') && (ring(e) || ring(e.closest('.choice')))]")
             stops = []
             for _ in range(80):
                 ActionChains(browser).send_keys(Keys.TAB).perform()
@@ -4933,6 +5078,10 @@ def two_panes(now: dt.datetime) -> None:
                 check("Settings, 420 px, « Avancé » unfolded and the developer mode on: nothing past its card or the window (D95)", logs and over == [], over)
                 advanced_unfolded(browser).click()
                 wait_for(browser, lambda b: not b.find_elements(By.ID, "open-logs"), 5)
+                # « Modèles », the card the 0.2.5 audit saw spill at 420 px: seen, in both themes.
+                browser.execute_script("document.getElementById('model').scrollIntoView({block: 'start'})")
+                seen(browser, "d95-settings-420-models-light")
+                seen(browser, "d95-settings-420-models-dark")
             if width in (1920, 420):
                 seen(browser, f"d95-settings-{width}-light")
                 seen(browser, f"d95-settings-{width}-dark")
@@ -6589,14 +6738,15 @@ def gestures_answer(now: dt.datetime) -> None:
             "const r = document.getElementById('saved-said').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && document.getElementById('saved-said').previousElementSibling.querySelector('input[name=after]') !== null"))
         wait_for(browser, lambda b: not here(b), 3)
         # A button in no row: said beside it, the page not sent to its top.
-        browser.execute_script("const p = document.getElementById('minutes'); p.scrollIntoView({block: 'center'}); p.value = 'custom'; p.dispatchEvent(new Event('change', {bubbles: true}))")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-address"), 5)
+        browser.execute_script("const p = document.getElementById('minutes-online'); p.scrollIntoView({block: 'center'}); p.click();"
+                               " const a = document.getElementById('minutes-advanced'); if (a.getAttribute('aria-expanded') !== 'true') a.click()")
+        wait_for(browser, lambda b: b.find_element(By.ID, "minutes-address").is_displayed(), 5)
         browser.find_element(By.ID, "minutes-address").send_keys("http://127.0.0.1:9/v1")
         browser.find_element(By.ID, "minutes-model").send_keys("mistral")
-        browser.execute_script("document.getElementById('minutes-save').click()")
+        browser.execute_script("document.getElementById('minutes-own-save').click()")
         wait_for(browser, here, 5)
         check("the minutes' Enregistrer: said beside its button, in view", here(browser) and browser.execute_script(
-            "const s = document.getElementById('saved-said'), r = s.getBoundingClientRect(); return s.previousElementSibling?.id === 'minutes-save' && r.top >= 0 && r.top + r.height / 2 <= innerHeight"),
+            "const s = document.getElementById('saved-said'), r = s.getBoundingClientRect(); return s.previousElementSibling?.id === 'minutes-own-save' && r.top >= 0 && r.top + r.height / 2 <= innerHeight"),
               browser.execute_script("const s = document.getElementById('saved-said'); return [s?.previousElementSibling?.id, s?.getBoundingClientRect().top]"))
         browser.set_window_size(1100, 800)
         browser.execute_script("location.hash = '#/'")
@@ -7580,7 +7730,7 @@ def main() -> int:
         browser.execute_script("location.hash = '#/'")
         browser.execute_script("location.hash = '#/settings'")
         silent = wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-silent"), 5)
-        said = read(browser, lambda b: " ".join(p.text for p in b.find_elements(By.CSS_SELECTOR, "#minutes-where, #minutes-silent, #minutes-lacking")))
+        said = read(browser, lambda b: " ".join(p.text for p in b.find_elements(By.CSS_SELECTOR, "#minutes-status, #minutes-silent, #minutes-lacking")))
         check("this computer's Ollama not answering: said so, here, never a model said missing",
               silent and "Sur cet ordinateur" in said and "ne répond pas" in said and not browser.find_elements(By.ID, "minutes-lacking"), said)
         window.file.write_text(kept)
@@ -7733,16 +7883,17 @@ def main() -> int:
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
         wait_for(browser, lambda b: b.find_elements(By.ID, "minutes"))
-        offered = browser.execute_script("return [...document.querySelectorAll('#minutes option')].map(o => o.textContent)")
+        press(browser, "minutes-here")
+        offered = browser.execute_script("return [[...document.querySelectorAll('#minutes option')].map(o => o.textContent), [...document.querySelectorAll('#minutes-service option')].map(o => o.textContent)]")
         check(
-            "who can write the minutes: Ollama's models, the online services, one's own",
-            offered == ["Pas encore choisi", "mistral:7b", "qwen3:14b", "OpenRouter", "OpenAI", "Mistral", "Personnalisé…"],
+            "who can write the minutes: Ollama's models as people say them, the online services by name",
+            offered == [["Mistral 7b", "Qwen3 14b"], ["OpenRouter", "OpenAI", "Mistral"]],
             offered,
         )
         # Going through the list never saves: what is chosen is saved on the word (D25).
         before = browser.find_element(By.ID, "minutes")
-        Select(before).select_by_visible_text("qwen3:14b")
-        Select(before).select_by_visible_text("mistral:7b")
+        Select(before).select_by_visible_text("Qwen3 14b")
+        Select(before).select_by_visible_text("Mistral 7b")
         time.sleep(1)
         unsaid = browser.find_element(By.ID, "minutes-unsaved")
         shot(browser, "8-minutes-unsaved")
@@ -7766,7 +7917,7 @@ def main() -> int:
         browser.execute_script("location.hash = '#/'")
         browser.execute_script("location.hash = '#/settings'")
         lacking = wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-lacking"), 5)
-        said = " ".join(p.text for p in browser.find_elements(By.CSS_SELECTOR, "#minutes-where, #minutes-lacking"))
+        said = " ".join(p.text for p in browser.find_elements(By.CSS_SELECTOR, "#minutes-status, #minutes-lacking"))
         check(
             "this computer's Ollama with a model it lacks: said here, nothing leaves, the model named",
             lacking and "Sur cet ordinateur" in said and "En ligne" not in said and "absent:latest" in said,
@@ -7788,13 +7939,19 @@ def main() -> int:
             and (WORK / "summary-key").read_text() == "none",
             browser.find_element(By.ID, "minutes-tested").text,
         )
-        Select(browser.find_element(By.ID, "minutes")).select_by_visible_text("OpenRouter")
+        # OpenRouter's own address, typed under « Avancé » here: no service of the run is asked (D95) —
+        # every ask of a service's models counted, none made.
+        browser.execute_script("const real = window.__TAURI__.core; window.modelsAsked = 0; window.__TAURI__.core = { ...real,"
+                               " invoke: (asked, ...rest) => { if (asked === 'minutes_models') window.modelsAsked += 1; return real.invoke(asked, ...rest); } }")
+        press(browser, "minutes-online")
         key = browser.find_element(By.ID, "minutes-key")
         check("a key is typed where it is not shown, and never filled in", key.get_attribute("type") == "password" and key.get_attribute("value") == "")
+        press(browser, "minutes-advanced")
+        browser.find_element(By.ID, "minutes-address").send_keys("https://openrouter.ai/api/v1")
         browser.find_element(By.ID, "minutes-model").send_keys("anthropic/claude-sonnet")
         key.send_keys("sk-scenario")
         before = browser.find_element(By.ID, "minutes")
-        browser.find_element(By.ID, "minutes-save").click()
+        browser.find_element(By.ID, "minutes-own-save").click()
         # Saved, the page is drawn again: what follows acts on the new one.
         WebDriverWait(browser, 5).until(staleness_of(before))
         online = wait_for(browser, lambda b: "openrouter.ai" in window.file.read_text(), 5)
@@ -7804,6 +7961,8 @@ def main() -> int:
             online and 'minutes_provider = "https://openrouter.ai/api/v1"' in text and 'minutes_model = "anthropic/claude-sonnet"' in text,
             text,
         )
+        check("saved under « Avancé »: no key test, nothing asked of openrouter.ai", browser.execute_script("return window.modelsAsked") == 0,
+              browser.execute_script("return window.modelsAsked"))
         kept = browser.find_element(By.ID, "minutes-key")
         browser.execute_script("arguments[0].scrollIntoView({block: 'center'})", kept)
         shot(browser, "4-settings-online")
@@ -7847,15 +8006,18 @@ def main() -> int:
             and "sk-scenario" not in (WORK / "summary-args").read_text(),
             said,
         )
-        Select(browser.find_element(By.ID, "minutes")).select_by_visible_text("Personnalisé…")
+        if browser.find_element(By.ID, "minutes-advanced").get_attribute("aria-expanded") != "true":
+            press(browser, "minutes-advanced")
         browser.find_element(By.ID, "minutes-address").send_keys("not an address")
         browser.find_element(By.ID, "minutes-model").send_keys("m")
         before = browser.find_element(By.ID, "minutes")
-        browser.find_element(By.ID, "minutes-save").click()
+        browser.find_element(By.ID, "minutes-own-save").click()
         # Refused, the page is drawn again too, the refusal said on the new one.
         WebDriverWait(browser, 5).until(staleness_of(before))
         said = wait_for(browser, lambda b: b.find_element(By.ID, "not-saved").is_displayed(), 5)
         check("an address that is none is said, and nothing changes", said and window.file.read_text() == text, browser.find_element(By.ID, "not-saved").text)
+        check("to its end, no service asked its models: no request for openrouter.ai left the run", browser.execute_script("return window.modelsAsked") == 0,
+              browser.execute_script("return window.modelsAsked"))
     broken = WORK / "broken"
     broken.mkdir()
     # No window named: a file that cannot be read opens the full one, where it is said (D35).
@@ -8766,6 +8928,7 @@ def main() -> int:
     list_refreshed(now)
     speech_offered(now)
     service_named(now)
+    models_guided(now)
     ollama_pulled(now)
     first_run(now)
     context_written(now)

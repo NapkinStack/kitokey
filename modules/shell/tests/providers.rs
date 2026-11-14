@@ -231,3 +231,121 @@ fn the_transcription_models_a_service_lists_are_offered_by_name_and_none_when_it
     assert_eq!(hearing_listed(&answering("not json", 1)), None);
     assert_eq!(hearing_listed(&answering(r#"{"data":[]}"#, 1)), None);
 }
+
+/// A service that answers each path with its status and body, and keeps what it was asked:
+/// the path and the `authorization` header, as many times as asked (D95).
+fn serving(routes: &'static [(&'static str, u16, &'static str)], times: usize) -> (String, std::sync::mpsc::Receiver<(String, String)>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = format!("http://{}/api/v1", listener.local_addr().unwrap());
+    let (sent, asked) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        for stream in listener.incoming().take(times) {
+            let mut stream = stream.unwrap();
+            let mut request = [0u8; 4096];
+            let read = stream.read(&mut request).unwrap_or(0);
+            let request = String::from_utf8_lossy(&request[..read]).to_string();
+            let path = request.split_whitespace().nth(1).unwrap_or_default().to_string();
+            let authorization = request
+                .lines()
+                .find_map(|line| {
+                    line.to_ascii_lowercase()
+                        .starts_with("authorization:")
+                        .then(|| line[14..].trim().to_string())
+                })
+                .unwrap_or_default();
+            let _ = sent.send((path.clone(), authorization));
+            let (status, body) = routes
+                .iter()
+                .find(|(route, _, _)| path == *route)
+                .map_or((404, "{}"), |(_, status, body)| (*status, *body));
+            let reply = format!(
+                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = stream.write_all(reply.as_bytes());
+        }
+    });
+    (address, asked)
+}
+
+#[test]
+fn a_service_s_models_are_listed_with_the_key_and_a_refusal_of_it_is_the_refused_key() {
+    use kitokey_shell::{providers::service_models, summarising::Cause};
+    // OpenAI's form and Mistral's example, a bare list: the ids alone, none the step would refuse.
+    let (listing, asked) = serving(
+        &[(
+            "/api/v1/models",
+            200,
+            r#"{"object":"list","data":[{"id":"gpt-4o-mini","owned_by":"x"},{"id":""},{"name":"no id"}]}"#,
+        )],
+        1,
+    );
+    assert_eq!(service_models(&listing, false, Some("sk-good")).unwrap(), ["gpt-4o-mini"]);
+    assert_eq!(asked.recv().unwrap(), ("/api/v1/models".to_string(), "Bearer sk-good".to_string()));
+    let (bare, _) = serving(
+        &[("/api/v1/models", 200, r#"[{"id":"mistral-small-latest"},{"id":"a\u0000b"}]"#)],
+        1,
+    );
+    assert_eq!(service_models(&bare, false, Some("k")).unwrap(), ["mistral-small-latest"]);
+    // The key refused, 401 or 403: the refused key, whatever the service says with it.
+    for status in [401, 403] {
+        let routes: &'static [(&str, u16, &str)] = if status == 401 {
+            &[("/api/v1/models", 401, r#"{"error":"Incorrect API key provided: sk-f***"}"#)]
+        } else {
+            &[("/api/v1/models", 403, "{}")]
+        };
+        let (refusing, _) = serving(routes, 1);
+        assert_eq!(service_models(&refusing, false, Some("sk-false")), Err(Cause::RefusedKey));
+    }
+    // Each other refusal its own cause; none read as a list.
+    for (status, cause) in [
+        (402, Cause::NoCredit),
+        (429, Cause::TooMany),
+        (503, Cause::Down),
+        (404, Cause::ProviderFailed),
+    ] {
+        let routes: &'static [(&str, u16, &str)] = match status {
+            402 => &[("/api/v1/models", 402, "{}")],
+            429 => &[("/api/v1/models", 429, "{}")],
+            503 => &[("/api/v1/models", 503, "{}")],
+            _ => &[],
+        };
+        let (failing, _) = serving(routes, 1);
+        assert_eq!(service_models(&failing, false, Some("k")), Err(cause), "HTTP {status}");
+    }
+    let (not_a_list, _) = serving(&[("/api/v1/models", 200, "not json")], 1);
+    assert_eq!(service_models(&not_a_list, false, Some("k")), Err(Cause::ProviderFailed));
+    let closed = TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap();
+    assert_eq!(
+        service_models(&format!("http://{closed}/v1"), false, Some("k")),
+        Err(Cause::Unreachable)
+    );
+}
+
+#[test]
+fn a_service_that_lists_its_models_to_anyone_has_its_key_asked_first() {
+    use kitokey_shell::{providers::service_models, summarising::Cause};
+    // OpenRouter lists its models to anyone: its own route says whether the key is one (`GET /key`).
+    assert_eq!(ONLINE.map(|service| service.key_checked), [true, false, false]);
+    let (refusing, asked) = serving(
+        &[("/api/v1/key", 401, "{}"), ("/api/v1/models", 200, r#"{"data":[{"id":"a/b"}]}"#)],
+        2,
+    );
+    assert_eq!(service_models(&refusing, true, Some("sk-false")), Err(Cause::RefusedKey));
+    assert_eq!(asked.recv().unwrap(), ("/api/v1/key".to_string(), "Bearer sk-false".to_string()));
+    // Refused there, its models are not asked.
+    assert!(asked.recv_timeout(std::time::Duration::from_millis(300)).is_err());
+    let (good, asked) = serving(
+        &[
+            ("/api/v1/key", 200, r#"{"data":{"label":"x"}}"#),
+            ("/api/v1/models", 200, r#"{"data":[{"id":"anthropic/claude-sonnet-4-5"}]}"#),
+        ],
+        2,
+    );
+    assert_eq!(
+        service_models(&good, true, Some("sk-good")).unwrap(),
+        ["anthropic/claude-sonnet-4-5"]
+    );
+    assert_eq!(asked.recv().unwrap().0, "/api/v1/key");
+    assert_eq!(asked.recv().unwrap(), ("/api/v1/models".to_string(), "Bearer sk-good".to_string()));
+}

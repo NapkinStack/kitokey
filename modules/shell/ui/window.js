@@ -2021,45 +2021,36 @@ function choice(name, value, [label, says], checked, disabled) {
 let testing = false;
 // Settings' « Avancé » unfolded: kept while Settings are drawn again, as a choice there redraws them.
 let generalAdvanced = false;
+// The summary's « Avancé » unfolded: kept while Settings are drawn again (D95).
+let minutesAdvanced = false;
+// Each service's last answer to « Vérifier la clé », by its place in the list: what it refused, or
+// the models it listed — kept while Settings are drawn again by a model come or the window's
+// width, until the user acts (ux.md: an error stays until corrected). Another address forgets it.
+let minutesAnswers = new Map();
+// Where, and which service, chosen and not yet saved: kept the same way.
+let minutesChosen = {};
 
 function minutesRow(minutes, words, locked) {
   const box = element("div", "step");
-  const row = element("div", "row");
-  const label = element("label", "name", words.minutes_step);
-  label.htmlFor = "minutes";
-  const pick = element("select");
-  pick.id = "minutes";
-  pick.disabled = locked;
-  const add = (parent, value, text) => {
-    const option = element("option", "", text);
-    option.value = value;
-    parent.append(option);
-  };
+  const title = element("span", "name", words.minutes_step);
+  title.id = "minutes-title";
   const online = minutes.online.findIndex((service) => service.address === minutes.provider);
-  let current = "none";
-  if (minutes.provider === minutes.ollama_address && minutes.ollama.includes(minutes.model)) current = `ollama:${minutes.model}`;
-  else if (online >= 0) current = `online:${online}`;
-  else if (minutes.provider) current = "custom";
-  if (current === "none") add(pick, "none", words.not_chosen);
-  if (minutes.ollama.length > 0) {
-    const group = element("optgroup");
-    group.label = words.ollama_group;
-    // The one that holds the minutes' form, said so (#261): first, as the shell lists it.
-    for (const name of minutes.ollama) add(group, `ollama:${name}`, name === minutes.recommended ? fill(words.model_recommended, name) : name);
-    pick.append(group);
-  }
-  const groupOnline = element("optgroup");
-  groupOnline.label = words.online_group;
-  minutes.online.forEach((service, index) => add(groupOnline, `online:${index}`, service.name));
-  const groupOther = element("optgroup");
-  groupOther.label = words.other_group;
-  add(groupOther, "custom", words.custom);
-  pick.append(groupOnline, groupOther);
-  pick.value = current;
-  row.append(label, pick);
-  const fields = element("div", "fields");
+  const savedHere = !!minutes.provider && minutes.provider === minutes.ollama_address;
+  const own = !!minutes.provider && !savedHere && online < 0;
+  // First (D95): on this computer, or a service — one choice; an address of one's own under « Avancé ».
+  const way = element("div", "choices");
+  way.id = "minutes-where";
+  way.setAttribute("role", "radiogroup");
+  way.setAttribute("aria-labelledby", "minutes-title");
+  const way_ = minutesChosen.way ?? (savedHere ? "here" : minutes.provider ? "online" : null);
+  const hereChoice = choice("minutes-where", "here", [words.welcome_on_this_computer, ""], way_ === "here", locked);
+  const awayChoice = choice("minutes-where", "online", [words.where_service, ""], way_ === "online", locked);
+  hereChoice.querySelector("input").id = "minutes-here";
+  awayChoice.querySelector("input").id = "minutes-online";
+  way.append(hereChoice, awayChoice);
   const where = element("p", "status");
-  where.id = "minutes-where";
+  where.id = "minutes-status";
+  const fields = element("div", "fields");
   const field = (id, text, type, value) => {
     const wrap = element("label", "field");
     wrap.htmlFor = id;
@@ -2071,6 +2062,27 @@ function minutesRow(minutes, words, locked) {
     input.disabled = locked;
     wrap.append(element("span", "name", text), input);
     return [wrap, input];
+  };
+  const listed = (id, text) => {
+    const wrap = element("label", "field");
+    wrap.htmlFor = id;
+    const pick = element("select");
+    pick.id = id;
+    pick.disabled = locked;
+    wrap.append(element("span", "name", text), pick);
+    return [wrap, pick];
+  };
+  const option = (pick, value, text) => {
+    const one = element("option", "", text);
+    one.value = value;
+    pick.append(one);
+  };
+  const button = (id, text, primary) => {
+    const one = element("button", primary ? "primary" : "open", text);
+    one.type = "button";
+    one.id = id;
+    one.disabled = locked;
+    return one;
   };
   // Saved or not, the page is drawn again from what the shell holds; a failure stays said.
   const save = async (provider, model, key) => {
@@ -2085,76 +2097,147 @@ function minutesRow(minutes, words, locked) {
     await refresh();
     savedSaid(failed === null);
   };
-  // Chosen, not yet saved: who writes them meanwhile is said — going through the list, with the
+  // Chosen, not yet saved: who writes them meanwhile is said — going through a list, with the
   // keyboard's arrows too, never changes who does (D25).
   const unsaved = element("p", "says");
   unsaved.id = "minutes-unsaved";
-  const inUse = minutes.provider && minutes.model ? modelSaid(minutes.model) : words.not_chosen;
+  unsaved.textContent = minutes.provider && minutes.model ? fill(words.minutes_unsaved, modelSaid(minutes.model)) : words.minutes_unsaved_none;
+  unsaved.hidden = true;
+  // On this computer: Ollama's models, each said as people say it.
+  const [hereWrap, herePick] = listed("minutes", words.model_name);
+  for (const name of minutes.ollama) option(herePick, name, name === minutes.recommended ? fill(words.model_recommended, modelSaid(name)) : modelSaid(name));
+  if (savedHere && minutes.ollama.includes(minutes.model)) herePick.value = minutes.model;
+  const hereSave = button("minutes-save", words.save, false);
+  hereSave.addEventListener("click", () => save(minutes.ollama_address, herePick.value, null));
+  herePick.addEventListener("change", () => (unsaved.hidden = savedHere && herePick.value === minutes.model));
+  // A service: named, its key tested at once — its models asked with it —, then one of them (D95).
+  const [serviceWrap, servicePick] = listed("minutes-service", words.service_name);
+  minutes.online.forEach((service, index) => option(servicePick, String(index), service.name));
+  servicePick.value = minutesChosen.service ?? String(Math.max(online, 0));
+  const [keyWrap, key] = field("minutes-key", words.key, "password", "");
+  key.autocomplete = "off";
+  const keyTest = button("minutes-key-test", words.key_test, false);
+  const keySaid = element("p", "says");
+  keySaid.id = "minutes-key-said";
+  keySaid.setAttribute("role", "status");
+  const [modelsWrap, modelsPick] = listed("minutes-models", words.model_name);
+  const onlineSave = button("minutes-online-save", words.save, true);
+  const service = () => minutes.online[Number(servicePick.value)];
+  // The models listed with its key, the one saved chosen.
+  const shownListed = (models) => {
+    modelsPick.replaceChildren();
+    for (const id of models) option(modelsPick, id, modelSaid(id));
+    if (models.includes(minutes.model)) modelsPick.value = minutes.model;
+    modelsWrap.hidden = onlineSave.hidden = models.length === 0;
+  };
+  // This service's last answer, said again; else the model saved with it — the others come with its key.
+  const shownSaved = () => {
+    const saved = online >= 0 && Number(servicePick.value) === online && minutes.model;
+    key.placeholder = saved && minutes.key_kept ? words.key_kept : "";
+    const answer = minutesAnswers.get(servicePick.value);
+    keySaid.textContent = answer?.said ?? "";
+    if (answer?.models) return shownListed(answer.models);
+    modelsPick.replaceChildren();
+    if (saved) option(modelsPick, minutes.model, modelSaid(minutes.model));
+    modelsWrap.hidden = onlineSave.hidden = !saved;
+  };
+  shownSaved();
+  servicePick.addEventListener("change", () => {
+    minutesChosen.service = servicePick.value;
+    shownSaved();
+    address.placeholder = service().address;
+  });
+  keyTest.addEventListener("click", async () => {
+    keyTest.disabled = true;
+    keySaid.textContent = words.testing;
+    const asked = servicePick.value;
+    let models = null;
+    let said = "";
+    try {
+      models = await window.__TAURI__.core.invoke("minutes_models", { provider: service().address, key: key.value || null });
+    } catch (why) {
+      said = why;
+    }
+    minutesAnswers.set(asked, { said, models });
+    // Said on the page as it is now: drawn again meanwhile, or another service chosen, it says its own.
+    const now = document.getElementById("minutes-service");
+    if (now !== servicePick) return now?.dispatchEvent(new Event("change"));
+    keyTest.disabled = locked;
+    if (servicePick.value !== asked) return;
+    shownSaved();
+    if (models !== null) modelsPick.focus();
+  });
+  onlineSave.addEventListener("click", () => save(service().address, modelsPick.value, key.value || null));
+  // « Avancé »: an address of one's own, OpenAI's way of asking, its model named by hand.
+  const toggle = element("button", "disclose-advanced");
+  toggle.type = "button";
+  toggle.id = "minutes-advanced";
+  toggle.setAttribute("aria-controls", "minutes-advanced-panel");
+  toggle.append(icon("chevron-right"), element("span", "", words.advanced_title));
+  const advanced = element("div", "fields");
+  advanced.id = "minutes-advanced-panel";
+  const [addressWrap, address] = field("minutes-address", words.address, "url", own ? minutes.provider : "");
+  const [modelWrap, model] = field("minutes-model", words.model_name, "text", own ? minutes.model : "");
+  const ownSave = button("minutes-own-save", words.save, false);
+  // Its address left empty: the service chosen above, with a model it does not list — a new release,
+  // an id of its own — named by hand.
+  address.placeholder = service().address;
+  ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, key.value || null));
+  advanced.append(addressWrap, modelWrap, ownSave);
+  const unfold = (now) => {
+    minutesAdvanced = now;
+    toggle.setAttribute("aria-expanded", String(now));
+    toggle.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
+    advanced.hidden = !now;
+  };
+  toggle.addEventListener("click", () => unfold(!minutesAdvanced));
+  unfold(minutesAdvanced || own);
+  const away = element("div", "fields");
+  away.append(serviceWrap, keyWrap, keyTest, keySaid, modelsWrap, onlineSave, toggle, advanced);
+  const here = element("div", "fields");
+  // No model in Ollama, or no Ollama: said so, nothing to save.
+  if (minutes.ollama.length > 0) here.append(hereWrap, hereSave);
+  // Said once: Ollama saved here says it already, below the choice.
+  else if (!savedHere) here.append(element("p", "says", words.ollama_silent));
   const draw = () => {
-    fields.replaceChildren();
-    const value = pick.value;
-    unsaved.hidden = value === current;
-    unsaved.textContent = minutes.provider && minutes.model ? fill(words.minutes_unsaved, inUse) : words.minutes_unsaved_none;
-    if (value.startsWith("ollama:")) {
+    const isHere = hereChoice.querySelector("input").checked;
+    const isAway = awayChoice.querySelector("input").checked;
+    here.hidden = !isHere;
+    away.hidden = !isAway;
+    unsaved.hidden = !(isHere && minutes.ollama.length > 0 && !(savedHere && herePick.value === minutes.model));
+    // Where the text goes, as saved: here, nothing leaves; else the service's host.
+    where.textContent = "";
+    where.className = "status";
+    if (savedHere || (own && minutes.provider_local)) {
       where.className = "status here";
       where.textContent = words.on_this_computer;
-      const button = element("button", "open", words.save);
-      button.type = "button";
-      button.id = "minutes-save";
-      button.disabled = locked || value === current;
-      button.addEventListener("click", () => save(minutes.ollama_address, value.slice("ollama:".length), null));
-      fields.append(button);
-      return;
+    } else if (minutes.provider) {
+      let host = minutes.provider;
+      try {
+        host = new URL(minutes.provider).host;
+      } catch {}
+      where.className = "status online";
+      where.replaceChildren(words.where_online, element("code", "tag", host));
     }
-    if (value === "none") {
-      where.textContent = "";
-      return;
-    }
-    let shown = minutes.provider ?? "";
-    try {
-      const address = new URL(value === "custom" ? minutes.provider : minutes.online[Number(value.split(":")[1])].address);
-      shown = `${address.host}${address.pathname}`;
-    } catch {}
-    // The address saved is this machine — Ollama with a model it does not list, or another server
-    // here —: said as it is, nothing leaves; and a model Ollama does not have, named.
-    const here = value === "custom" && value === current && minutes.provider_local;
-    where.className = here ? "status here" : "status online";
-    where.replaceChildren(here ? words.on_this_computer : words.where_online, element("code", "tag", shown));
-    // Ollama answered without that model: named. Not answering, or with no model at all: said so —
-    // never "the model is missing" on a list that could not be read.
-    if (here && minutes.provider === minutes.ollama_address && minutes.model) {
-      const answered = minutes.ollama.length > 0;
-      if (!answered || !minutes.ollama.includes(minutes.model)) {
-        const said = element("p", "says warn", answered ? fill(words.ollama_lacks, minutes.model) : words.ollama_silent);
-        said.id = answered ? "minutes-lacking" : "minutes-silent";
-        fields.append(said);
-      }
-    }
-    const custom = value === "custom";
-    const [addressWrap, address] = field("minutes-address", words.address, "url", custom && current === "custom" ? minutes.provider : "");
-    const [modelWrap, model] = field("minutes-model", words.model_name, "text", current === value ? minutes.model : "");
-    const [keyWrap, key] = field("minutes-key", words.key, "password", "");
-    key.autocomplete = "off";
-    if (minutes.key_kept && current === value) key.placeholder = words.key_kept;
-    const button = element("button", "open", words.save);
-    button.type = "button";
-    button.id = "minutes-save";
-    button.disabled = locked;
-    button.addEventListener("click", () => {
-      const provider = custom ? address.value : minutes.online[Number(value.split(":")[1])].address;
-      save(provider, model.value, key.value || null);
-    });
-    if (custom) fields.append(addressWrap);
-    fields.append(modelWrap, keyWrap, button);
   };
-  // Tester sits on the key's row, as the board has it, or on its own row when there is none.
-  let place = () => {};
-  pick.addEventListener("change", () => {
-    draw();
-    place();
-  });
+  for (const radio of [hereChoice, awayChoice]) {
+    radio.querySelector("input").addEventListener("change", () => {
+      minutesChosen.way = radio.querySelector("input").value;
+      draw();
+    });
+  }
   draw();
-  box.append(row, where, fields, unsaved);
+  fields.append(here, away);
+  box.append(title, way, where);
+  // This computer's Ollama saved: a model it does not have named; not answering, or with no model
+  // at all, said so — never "the model is missing" on a list that could not be read.
+  if (savedHere && minutes.model && !minutes.ollama.includes(minutes.model)) {
+    const answered = minutes.ollama.length > 0;
+    const said = element("p", "says warn", answered ? fill(words.ollama_lacks, minutes.model) : words.ollama_silent);
+    said.id = answered ? "minutes-lacking" : "minutes-silent";
+    box.append(said);
+  }
+  box.append(fields, unsaved);
   // Tester: the choice saved, asked whether it answers — one sentence of Kitokey's, said first.
   // One test at a time, the page drawn again meanwhile or not.
   if (minutes.provider && minutes.model) {
@@ -2190,10 +2273,8 @@ function minutesRow(minutes, words, locked) {
       const again = document.getElementById("minutes-test");
       if (again) again.disabled = again.dataset.locked === "true";
     });
-    test.append(tested);
+    test.append(button, tested);
     box.append(test);
-    place = () => (fields.childElementCount > 0 ? fields.append(button) : test.prepend(button));
-    place();
   }
   return box;
 }
@@ -2898,7 +2979,8 @@ function showSettings(shown, minutes, words) {
   // From the assistant's « Choisir mon service »: the minutes' choice, in view and focused.
   if (focusMinutes) {
     focusMinutes = false;
-    const minutesPick = document.getElementById("minutes");
+    document.getElementById("minutes-online")?.click();
+    const minutesPick = document.getElementById("minutes-service");
     minutesPick?.scrollIntoView({ block: "center" });
     minutesPick?.focus();
   }
@@ -4476,6 +4558,8 @@ window.addEventListener("hashchange", () => {
   document.getElementById("pane-said").hidden = true;
   notShown(false);
   serviceAnswer = null;
+  minutesAnswers = new Map();
+  minutesChosen = {};
   if (nameRefused) paneSays(nameRefused);
   nameRefused = null;
   // Another address: the assistant, shown again, is drawn anew — even if the drawing that left it was cut short.
