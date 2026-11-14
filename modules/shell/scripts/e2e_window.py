@@ -5088,6 +5088,10 @@ def two_panes(now: dt.datetime) -> None:
                 browser.execute_script("document.getElementById('model').closest('section.card').scrollIntoView({block: 'start'})")
                 seen(browser, "d95-settings-420-models-light")
                 seen(browser, "d95-settings-420-models-dark")
+                # Taller than the window at 420 px: its lower part too, so that the two shots show it whole.
+                browser.execute_script("document.getElementById('model').closest('section.card').scrollIntoView({block: 'end'})")
+                seen(browser, "d95-settings-420-models-end-light")
+                seen(browser, "d95-settings-420-models-end-dark")
             if width == 1920:
                 left, right, room_left, room_right = browser.execute_script(SETTINGS_CENTRED)
                 check("Settings at 1920 px: one column centred in the room it has, not stuck to its left (D95, #782)",
