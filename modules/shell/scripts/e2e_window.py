@@ -3771,6 +3771,61 @@ def recording_found(now: dt.datetime) -> None:
         recorder.wait()
 
 
+def microphone_latest_answer(now: dt.datetime) -> None:
+    """BK. The bar's microphone (#750): the list asked after a choice, before the shell has kept it, answers
+    with the microphone as it was; that answer never brings it back. The choice's save is held in the
+    page, the list opened again meanwhile — as the window's at-rest redraw can ask it, under a full run's load."""
+    print("BK. the bar's microphone: a list read after a choice not yet kept never brings the microphone before back (#750)")
+    captured = WORK / "microphones"
+    left = captured.read_text() if captured.exists() else None
+    captured.write_text("".join(json.dumps({"event": "microphone", "name": name, "description": said}) + "\n"
+                                              for name, said in [("alsa_laptop", "Digital Microphone"), ("bluez_input.AA_BB", "USB Headset")]))
+    (WORK / "microphones-slow").unlink(missing_ok=True)
+    taping = WORK / "microphone-latest"
+    taping.mkdir()
+    name = "const b = document.getElementById('small-microphone'); return b ? b.textContent : ''"
+    panel = "const p = document.getElementById('small-microphones'); return !!p && !p.hidden"
+    # The choice's save held until released; each list read counted once answered.
+    hold = ("const real = window.__TAURI__.core; let release; const held = new Promise((r) => { release = r; });"
+            " window.releaseSave = release; window.listsAnswered = 0;"
+            " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'microphone_chosen' ? held.then(() => real.invoke(asked, ...rest))"
+            " : asked === 'microphones_listed' ? real.invoke(asked, ...rest).finally(() => { window.listsAnswered += 1; }) : real.invoke(asked, ...rest) };"
+            " window.restoreCore = () => { window.__TAURI__.core = real; };")
+    answered = lambda b: b.execute_script("return window.listsAnswered")
+    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nmicrophone = "alsa_laptop"\nmicrophone_description = "Digital Microphone"\n', small=True)
+    with window as browser:
+        wait_for(browser, lambda b: b.find_element(By.ID, "small-more").is_displayed(), 8)
+        if browser.find_element(By.ID, "small-more").get_attribute("aria-expanded") != "true":
+            press(browser, "small-more")
+        shown = wait_for(browser, lambda b: "Digital Microphone" in b.execute_script(name), 8)
+        check("the bar's options: the microphone kept is named", shown, browser.execute_script(name))
+        browser.execute_script(hold)
+        press(browser, "small-microphone")
+        listed = wait_for(browser, lambda b: b.execute_script(panel) and answered(b) >= 1 and len(b.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")) == 3, 5)
+        browser.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")[0].click()
+        closed = wait_for(browser, lambda b: not b.execute_script(panel), 3)
+        check("Auto clicked, its save held: the list closes, the name says Auto at once",
+              listed and closed and "Auto" in browser.execute_script(name), browser.execute_script(name))
+        # Asked after the choice, before the shell has it: the shell answers with the microphone before.
+        before = answered(browser)
+        press(browser, "small-microphone")
+        read = wait_for(browser, lambda b: answered(b) > before, 5)
+        time.sleep(0.3)
+        check("the list read after the choice, its save still held: the name still says Auto (#750)",
+              read and "Auto" in browser.execute_script(name), browser.execute_script(name))
+        browser.execute_script("window.releaseSave()")
+        kept = wait_for(None, lambda b: 'microphone = "alsa_laptop"' not in window.file.read_text(), 5)
+        time.sleep(0.3)
+        check("the save let through: Auto kept in the settings, and still named (#750)",
+              kept and "Auto" in browser.execute_script(name), (window.file.read_text(), browser.execute_script(name)))
+        browser.execute_script("window.restoreCore()")
+    # What capture lists is left as the scenarios before had it.
+    if left is None:
+        captured.unlink()
+    else:
+        captured.write_text(left)
+
+
 def bar_opened(now: dt.datetime) -> None:
     """BA. The bar opened (D90, board 6): at rest, the microphone, « Vérifier le son » — D88's panel in
     the bar — and « Avancé » closed; recording, the context, the microphone recorded, « Confidentielle »
@@ -5556,9 +5611,9 @@ def corrections_gated(now: dt.datetime) -> None:
 
 
 def press_on_the_page_left(now: dt.datetime) -> None:
-    """AS. Another page asked for: the page left is gone at once, nothing of it to press; a drawing
+    """BL. Another page asked for: the page left is gone at once, nothing of it to press; a drawing
     that fails is said, with a way out and a way to try again; what is agreed to names its meeting."""
-    print("AS. the page left goes at once: nothing to press, nothing sent; a failed drawing has a way out; the agreement names its meeting")
+    print("BL. the page left goes at once: nothing to press, nothing sent; a failed drawing has a way out; the agreement names its meeting")
     meetings = WORK / "pressed"
     minutes = ("---\ncontract: minutes/v2\nmade: 2026-10-28T10:00:00+01:00\nprovider: writes.example\nmodel: m\ncontext: null\n{}---\n\n"
                "## 1.\n\nLe budget.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
@@ -5576,7 +5631,7 @@ def press_on_the_page_left(now: dt.datetime) -> None:
     # `opened` answers 800 ms late; `listed` refused by `refusing` calls from now, each `after` ms late.
     late = ("const real = window.__TAURI__.core; window.refusing = arguments[0] ?? 0; const after = arguments[1] ?? 0; window.__TAURI__.core = { ...real, invoke: async (asked, ...rest) => {"
             " if (asked === 'opened') await new Promise((r) => setTimeout(r, 800));"
-            " if (asked === 'listed' && window.refusing > 0) { window.refusing -= 1; await new Promise((r) => setTimeout(r, after)); window.threw = true; throw Object.assign(new Error('REFUS'), { name: 'ScenarioAS' }); }"
+            " if (asked === 'listed' && window.refusing > 0) { window.refusing -= 1; await new Promise((r) => setTimeout(r, after)); window.threw = true; throw Object.assign(new Error('REFUS'), { name: 'ScenarioBL' }); }"
             " return real.invoke(asked, ...rest); } }; window.restore = () => { window.__TAURI__.core = real; };")
     page_of = "return document.getElementById('meeting').hidden ? null : document.getElementById('minutes-state')?.dataset.name ?? null"
     said = "const p = document.getElementById('pane-said'); return p.hidden ? '' : p.textContent"
@@ -5668,14 +5723,14 @@ def press_on_the_page_left(now: dt.datetime) -> None:
         # A throw in the drawing: nothing of the page left, said; tried again, drawn; logged.
         at_page(browser, left)
         browser.execute_script("window.logged = []; const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => { if (asked === 'page_failed') window.logged.push(rest[0]); return real.invoke(asked, ...rest); } }; window.restore = () => { window.__TAURI__.core = real; };"
-                               "window.__drawn = showMeeting; showMeeting = () => { throw Object.assign(new Error('REFUS'), { name: 'ScenarioAS' }); };")
+                               "window.__drawn = showMeeting; showMeeting = () => { throw Object.assign(new Error('REFUS'), { name: 'ScenarioBL' }); };")
         browser.execute_script("player = { name: arguments[0], stop() { window.stopped = true; } }", asked.name)
         browser.execute_script(f"location.hash = '#/meeting/{asked.name}'")
         told = wait_for(browser, lambda b: b.execute_script(said) == not_shown, 5)
         check("a throw in the drawing: said, nothing of the page left, what played stopped",
               told and browser.execute_script("return document.getElementById('meeting').querySelector('button, a, input, textarea, select') === null && window.stopped === true"), browser.execute_script("return [window.stopped, document.getElementById('meeting').textContent.slice(0, 80)]"))
         logged = browser.execute_script("return window.logged")
-        check("a throw in the drawing: logged, with its kind", bool(logged) and logged[0]["kind"] == "ScenarioAS", logged)
+        check("a throw in the drawing: logged, with its kind", bool(logged) and logged[0]["kind"] == "ScenarioBL", logged)
         browser.execute_script("showMeeting = window.__drawn; window.restore()")
         again = browser.find_element(By.ID, "pane-again")
         check("tried again: offered, its words", again.is_displayed() and again.text == "Réessayer", again.text)
@@ -9052,6 +9107,7 @@ def main() -> int:
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
+    microphone_latest_answer(now)
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
