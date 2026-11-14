@@ -2203,8 +2203,9 @@ def cancelled_at_once(now: dt.datetime) -> None:
                     # The makings read again meanwhile: by the gesture itself, then by the page's own reading.
                     time.sleep(1.5)
                     kept = refusal(browser)
-                    check(f"{what}: « Annuler » refused: said beside its making in its own words, still said once the makings are read again, the making going on",
-                          said_now and kept.startswith("Kitokey n’a pas pu annuler") and "the meeting is gone" in kept and not gone(pids[0])
+                    role = browser.execute_script("return document.querySelector('.note.warn[data-refused]')?.getAttribute('role')")
+                    check(f"{what}: « Annuler » refused: said beside its making in its own words, an alert, still said once the makings are read again, the making going on",
+                          said_now and kept.startswith("Kitokey n’a pas pu annuler") and "the meeting is gone" in kept and role == "alert" and not gone(pids[0])
                           and browser.execute_script("const c = document.getElementById('making-cancel'); return !!c && !c.disabled"), kept)
                     browser.execute_script("window.restore()")
                 pressed = time.monotonic()

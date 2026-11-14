@@ -407,11 +407,12 @@ function transcriptState(name) {
 // The card whose « Annuler » was pressed: once it says stopped, the focus goes to what makes it again.
 let cancelledFrom = null;
 
-// A refused « Annuler », said for the line `of` (D92).
+// A refused « Annuler », said for the line `of` (D92): an alert, which a screen reader says as it
+// is inserted — a status says its changes, not its arrival (WAI-ARIA, the APG's alert pattern).
 function refusalNote(of, text) {
   const note = element("p", "note warn", text);
   note.dataset.refused = of;
-  note.setAttribute("role", "status");
+  note.setAttribute("role", "alert");
   return note;
 }
 
