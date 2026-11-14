@@ -3776,9 +3776,9 @@ def microphone_latest_answer(now: dt.datetime) -> None:
     with the microphone as it was; that answer never brings it back. The choice's save is held in the
     page, the list opened again meanwhile — as the window's at-rest redraw can ask it, under a full run's load."""
     print("BK. the bar's microphone: a list read after a choice not yet kept never brings the microphone before back (#750)")
-    listed = WORK / "microphones"
-    left = listed.read_text() if listed.exists() else None
-    listed.write_text("".join(json.dumps({"event": "microphone", "name": name, "description": said}) + "\n"
+    captured = WORK / "microphones"
+    left = captured.read_text() if captured.exists() else None
+    captured.write_text("".join(json.dumps({"event": "microphone", "name": name, "description": said}) + "\n"
                                               for name, said in [("alsa_laptop", "Digital Microphone"), ("bluez_input.AA_BB", "USB Headset")]))
     (WORK / "microphones-slow").unlink(missing_ok=True)
     taping = WORK / "microphone-latest"
@@ -3821,9 +3821,9 @@ def microphone_latest_answer(now: dt.datetime) -> None:
         browser.execute_script("window.restoreCore()")
     # What capture lists is left as the scenarios before had it.
     if left is None:
-        listed.unlink()
+        captured.unlink()
     else:
-        listed.write_text(left)
+        captured.write_text(left)
 
 
 def bar_opened(now: dt.datetime) -> None:
