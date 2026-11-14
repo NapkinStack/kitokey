@@ -234,6 +234,57 @@ impl Transcription {
             let _ = child.kill();
         }
     }
+
+    /// Stops the program on the user's word, « Annuler » (D92): within two seconds, without
+    /// waiting here. What it had written is the shell's to settle once it is said ended.
+    pub fn cancel(&self) {
+        (self.stopper())();
+    }
+
+    /// The same, to be held by the making's token (`crate::cancel::Cancel::hold`).
+    pub fn stopper(&self) -> impl FnOnce() + Send + 'static {
+        let program = Arc::clone(&self.program);
+        move || {
+            thread::spawn(move || cancel(&program));
+        }
+    }
+}
+
+/// How long a program told to stop is given before it is killed, with what it started: the two
+/// seconds « Annuler » promises hold it, the shell's waiting a tenth of a second at a time (D92).
+const GRACE: Duration = Duration::from_secs(1);
+
+/// Stops a program that leads a group of its own, and whatever it started: TERM to the group, a
+/// second's grace, then KILL to what is left of it. The group is taken while its leader runs, its
+/// number its own then; within the grace, no other process can have been given it.
+#[cfg(unix)]
+pub(crate) fn cancel(program: &Mutex<Child>) {
+    let running = |child: &mut Child| matches!(child.try_wait(), Ok(None));
+    let Some(group) = program
+        .lock()
+        .ok()
+        .and_then(|mut child| running(&mut child).then(|| i32::try_from(child.id()).ok()).flatten())
+    else {
+        return;
+    };
+    // SAFETY: signals sent to the group this program leads, which it was started in.
+    unsafe { libc::kill(-group, libc::SIGTERM) };
+    let until = std::time::Instant::now() + GRACE;
+    // SAFETY: signal 0 sends nothing: it asks whether the group still holds a process.
+    while std::time::Instant::now() < until && unsafe { libc::kill(-group, 0) } == 0 {
+        thread::sleep(Duration::from_millis(50));
+    }
+    // SAFETY: as above; none left, it reaches no one.
+    unsafe { libc::kill(-group, libc::SIGKILL) };
+}
+
+/// Elsewhere, the program alone: no step starts one of its own there — the one program a step
+/// starts, SpeechAnalyzer's helper, is macOS's alone.
+#[cfg(not(unix))]
+pub(crate) fn cancel(program: &Mutex<Child>) {
+    if let Ok(mut child) = program.lock() {
+        let _ = child.kill();
+    }
 }
 
 /// A file's or a folder's own name, never its path: the path says whose meetings and where.

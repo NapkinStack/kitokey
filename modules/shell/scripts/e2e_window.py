@@ -59,6 +59,11 @@ if [ "$1" != --test ]; then
   provider=local
   case "$3" in http://127.0.0.1*|http://localhost*) ;; *) provider=$(python3 -c "$HOST" "$3"); [ -n "$STANDIN" ] && python3 -c "$SEND" "$STANDIN/write";; esac
   [ -e "$here/slow-minutes" ] && sleep 3
+  # Held, as a model answering slowly (D92): its number and its child's — deaf to TERM — noted, then waits.
+  if [ -e "$here/hold-minutes" ]; then
+    echo '{"event": "sending", "host": "h", "model": "m", "characters": 1}'
+    echo $$ > "$here/held-minutes"; ( trap '' TERM; exec sleep 60 ) & echo $! > "$here/held-minutes-child"; sleep 60; exit 0
+  fi
   [ -e "$here/fail-minutes" ] && { echo '{"event": "failed", "code": "answer.not_minutes"}'; echo "kitokey-summary: the provider's answer is not minutes" >&2; exit 1; }
   [ -e "$here/fail-plainly" ] && { echo "kitokey-summary: a failure no code names" >&2; exit 1; }
   context=$(python3 -c "$CONTEXT" "$1")
@@ -97,6 +102,13 @@ if [ "$2" = --provider ]; then
   [ -n "$STANDIN" ] && python3 -c "$SEND" "$STANDIN/hear"
 fi
 [ -e "$(dirname "$0")/slow-hearing" ] && sleep 3
+# Held, as a long meeting heard (D92): a transcript begun, its number and its child's — deaf to TERM — noted, then waits.
+if [ -e "$(dirname "$0")/hold-hearing" ]; then
+  printf '{"type":"header","contract":"transcript/v1","engine":"%s","model":"%s","language":null,"context":null}\n' "$engine" "$model" > "$1/transcript.jsonl"
+  # Told to stop, it finishes all the same when the scenario says so: a transcript written after « Annuler ».
+  [ -e "$(dirname "$0")/hold-hearing-finish" ] && trap 'printf '"'"'{"type":"complete","duration":1.0}\n'"'"' >> "$1/transcript.jsonl"; exit 0' TERM
+  echo $$ > "$(dirname "$0")/held-hearing"; ( trap '' TERM; exec sleep 60 ) & echo $! > "$(dirname "$0")/held-hearing-child"; sleep 60; exit 0
+fi
 context=$(python3 -c "$CONTEXT" "$1")
 printf '{"type":"header","contract":"transcript/v1","engine":"%s","model":"%s","language":null,"context":%s}\\n{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Refait avec %s."}\\n{"type":"complete","duration":1.0}\\n' "$engine" "$model" "$context" "$model" > "$1/transcript.jsonl"
 """
@@ -2110,6 +2122,183 @@ def own_models(now: dt.datetime) -> None:
         browser.execute_script("return window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: {}})", meeting.name)
         removed = wait_for(browser, lambda b: not (meeting / "models.json").exists(), 5)
         check("none chosen: models.json removed", removed)
+
+
+def gone(pid: int) -> bool:
+    """A process ended: none by that number, or one ended and not yet waited for."""
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] == "Z"
+    except (FileNotFoundError, ProcessLookupError, IndexError):
+        return True
+
+
+def cancelled_at_once(now: dt.datetime) -> None:
+    """BE. « Annuler » on a making the page started (D92, criterion 4, the decider's word of
+    2026-11-13): ended within two seconds — its program and what it started, one deaf to TERM —,
+    the version already whole shown as it was, byte for byte, nothing said by a notification;
+    then another model chosen and started at once, the version shown saying it made it."""
+    print("BE. Annuler: a making ended within 2 s, child and all; the whole version kept byte for byte; no notification; another model at once (D92)")
+    meetings = WORK / "cancelled"
+    meeting = meetings / "2026-11-13_17-31"
+    session(meeting, now - dt.timedelta(hours=1), 1, {"local.wav": 1000})
+    whole = ('{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"ggml-tiny-first","language":null,"context":null}\n'
+             '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"La version entière."}\n'
+             '{"type":"complete","duration":1.0}\n')
+    (meeting / "transcript.jsonl").write_text(whole)
+    (meeting / "minutes.md").write_text("---\ncontract: minutes/v2\nmade: 2026-11-13T17:40:00+01:00\nprovider: local\nmodel: writer-first\n"
+                                        "context: null\n---\n\n## A\n\nLa version entière.\n\n## B\n\n## C\n")
+    data = WORK / "data-cancelled"
+    folder = data / "kitokey" / "models"
+    folder.mkdir(parents=True)
+    a, b = folder / "ggml-tiny-a.bin", folder / "ggml-tiny-b.bin"
+    for model in (a, b):
+        model.write_bytes(b"\0" * 16)
+    local = "http://localhost:11434/v1"
+    # The minutes follow a transcript (`after`): none must follow one written after « Annuler ».
+    window = Window(meetings, "fr_FR.UTF-8", f'reminder = false\nafter = "minutes"\nmodel = "{a}"\nminutes_provider = "{local}"\nminutes_model = "writer-a"\n')
+    window.env.update(XDG_DATA_HOME=str(data))
+    sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+    idle = "return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)"
+    makers = lambda b: " | ".join(b.execute_script("return [...document.querySelectorAll('.maker')].map(m => m.textContent)")).lower()
+    steps = (
+        ("the transcript", meeting / "transcript.jsonl", "hearing",
+         lambda b, model: b.execute_script("return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", meeting.name, str(model)),
+         (a, b), "tiny b"),
+        ("the minutes", meeting / "minutes.md", "minutes",
+         lambda b, model: b.execute_script("return window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: arguments[1], model: arguments[2]})", meeting.name, local, model),
+         ("writer-a", "writer-b"), "writer b"),
+    )
+    with window as browser:
+        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        for what, file, step, start, (first, second), said_after in steps:
+            before, listed = sha(file), sorted(p.name for p in meeting.iterdir())
+            held, child = WORK / f"held-{step}", WORK / f"held-{step}-child"
+            held.unlink(missing_ok=True)
+            child.unlink(missing_ok=True)
+            (WORK / f"hold-{step}").touch()
+            notified = WORK / f"notified-cancelled-{step}"
+            monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                       stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+            try:
+                time.sleep(0.5)
+                start(browser, first)
+                running = wait_for(browser, lambda b: held.exists() and child.exists() and child.read_text().strip() != "", 15)
+                check(f"{what}: made again with the first model, held running", running)
+                if not running:
+                    continue
+                pids = int(held.read_text()), int(child.read_text())
+                offered = wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 10)
+                check(f"{what}: « Annuler » on its page while it is made", offered)
+                if not offered:
+                    continue
+                if step == "hearing":
+                    # Refused — its meeting gone meanwhile, the answer stood in for here —: said beside its
+                    # line, and still said once the makings are read again; the making goes on (D92).
+                    browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                           " asked === 'making_cancelled' ? Promise.reject('the meeting is gone') : real.invoke(asked, ...rest) };"
+                                           " window.restore = () => { window.__TAURI__.core = real; };")
+                    press(browser, "making-cancel")
+                    refusal = lambda b: b.execute_script("const n = document.querySelector('.note.warn[data-refused]'); return n ? n.textContent : ''")
+                    said_now = wait_for(browser, lambda b: "Kitokey n’a pas pu annuler" in refusal(b), 3)
+                    # The makings read again meanwhile: by the gesture itself, then by the page's own reading.
+                    time.sleep(1.5)
+                    kept = refusal(browser)
+                    role = browser.execute_script("return document.querySelector('.note.warn[data-refused]')?.getAttribute('role')")
+                    check(f"{what}: « Annuler » refused: said beside its making in its own words, an alert, still said once the makings are read again, the making going on",
+                          said_now and kept.startswith("Kitokey n’a pas pu annuler") and "the meeting is gone" in kept and role == "alert" and not gone(pids[0])
+                          and browser.execute_script("const c = document.getElementById('making-cancel'); return !!c && !c.disabled"), kept)
+                    browser.execute_script("window.restore()")
+                pressed = time.monotonic()
+                press(browser, "making-cancel")
+                ended = wait_for(browser, lambda b: all(gone(pid) for pid in pids) and b.execute_script(idle), 2)
+                took = time.monotonic() - pressed
+                check(f"{what}: ended within two seconds, its program and the child deaf to TERM ({took:.2f} s)",
+                      ended and took <= 2, [(pid, gone(pid)) for pid in pids])
+                check(f"{what}: the version already whole kept, byte for byte, nothing left beside it",
+                      wait_for(browser, lambda b: sha(file) == before and sorted(p.name for p in meeting.iterdir()) == listed, 3),
+                      sorted(p.name for p in meeting.iterdir()))
+                stopped_said = lambda b: b.execute_script("const s = document.getElementById('making-stopped'); return s ? s.textContent : ''")
+                said_in_time = wait_for(browser, lambda b: "arrêté" in stopped_said(b).lower(), max(0.0, 2 - (time.monotonic() - pressed)))
+                stopped_in = time.monotonic() - pressed
+                check(f"{what}: the page says what was stopped, within two seconds of « Annuler » ({stopped_in:.2f} s)",
+                      said_in_time and stopped_in <= 2, stopped_said(browser))
+                # And it stays said: no reading answered late draws the making again over it, « Annuler » back.
+                flicker = []
+                for _ in range(20):
+                    seen = browser.execute_script("const s = document.getElementById('making-stopped'); const c = document.getElementById('making-cancel');"
+                                                  " return [s ? s.textContent : '', !!c && c.getClientRects().length > 0]")
+                    if "arrêté" not in seen[0].lower() or seen[1]:
+                        flicker.append(seen)
+                    time.sleep(0.1)
+                check(f"{what}: said stopped for the two seconds after, never drawn again as made", said_in_time and not flicker, flicker[:3])
+                check(f"{what}: a refusal said before is gone with the gesture that followed it",
+                      not browser.execute_script("return document.querySelector('.note.warn[data-refused]')"))
+                time.sleep(2)
+                check(f"{what}: no notification for a cancel", "member=Notify" not in notified.read_text(), notified.read_text()[-300:])
+            finally:
+                monitor.terminate()
+                (WORK / f"hold-{step}").unlink(missing_ok=True)
+            start(browser, second)
+            made = wait_for(browser, lambda b: sha(file) != before and b.execute_script(idle), 15)
+            check(f"{what}: another model started at once, without restarting Kitokey — the version shown says it made it",
+                  made and wait_for(browser, lambda b: said_after in makers(b), 10), makers(browser))
+        # A first transcript, none whole before it: cancelled, nothing of it is left to be taken up by
+        # another model's making — the page offers to make it, and the next model makes it whole.
+        fresh = meetings / "2026-11-13_18-02"
+        session(fresh, now - dt.timedelta(minutes=30), 1, {"local.wav": 1000})
+        held = WORK / "held-hearing"
+        held.unlink(missing_ok=True)
+        (WORK / "hold-hearing").touch()
+        try:
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", fresh.name)
+            running = wait_for(browser, lambda b: held.exists(), 15)
+            browser.execute_script(f"location.hash = '#/meeting/{fresh.name}'")
+            offered = running and wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 10)
+            check("a first transcript: « Annuler » on its page while it is made", offered)
+            if offered:
+                press(browser, "making-cancel")
+                ended = wait_for(browser, lambda b: b.execute_script(idle), 2)
+                check("a first transcript cancelled: ended within two seconds, nothing of it left in the meeting's folder",
+                      ended and sorted(p.name for p in fresh.iterdir()) == ["local.wav", "session.json"], sorted(p.name for p in fresh.iterdir()))
+        finally:
+            (WORK / "hold-hearing").unlink(missing_ok=True)
+        browser.execute_script("return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", fresh.name, str(b))
+        made = wait_for(browser, lambda b: (fresh / "transcript.jsonl").exists() and b.execute_script(idle), 15)
+        check("then another model makes it whole at once", made and '"model":"ggml-tiny-b"' in (fresh / "transcript.jsonl").read_text())
+        # Written all the same after « Annuler » (the decider's decision, 2026-11-13): kept, being
+        # whole, shown as written — never said stopped —, and nothing follows it: no notification,
+        # no minutes made with the model the user was changing, though the settings chain them.
+        finished = meetings / "2026-11-13_18-30"
+        session(finished, now - dt.timedelta(minutes=20), 1, {"local.wav": 1000})
+        held.unlink(missing_ok=True)
+        (WORK / "summary-args").unlink(missing_ok=True)
+        (WORK / "hold-hearing").touch()
+        (WORK / "hold-hearing-finish").touch()
+        notified = WORK / "notified-cancelled-finished"
+        monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                   stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+        try:
+            time.sleep(0.5)
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", finished.name)
+            running = wait_for(browser, lambda b: held.exists(), 15)
+            browser.execute_script(f"location.hash = '#/meeting/{finished.name}'")
+            offered = running and wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 10)
+            check("finishing all the same: « Annuler » on its page", offered)
+            if offered:
+                press(browser, "making-cancel")
+                ended = wait_for(browser, lambda b: b.execute_script(idle), 3)
+                whole = (finished / "transcript.jsonl").read_text() if (finished / "transcript.jsonl").exists() else ""
+                check("written all the same after « Annuler »: kept whole", ended and '"type":"complete"' in whole, whole)
+                time.sleep(3)
+                stopped = browser.execute_script("const s = document.getElementById('making-stopped'); return s ? s.textContent : ''")
+                check("written all the same: not said stopped on its page", stopped == "", stopped)
+                check("written all the same: no minutes made after it, though the settings chain them",
+                      not (WORK / "summary-args").exists() and not (finished / "minutes.md").exists())
+                check("written all the same: no notification", "member=Notify" not in notified.read_text(), notified.read_text()[-300:])
+        finally:
+            monitor.terminate()
+            (WORK / "hold-hearing").unlink(missing_ok=True)
+            (WORK / "hold-hearing-finish").unlink(missing_ok=True)
 
 
 LONG = "hf.co/unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF:UD-Q4_K_XL-very-long-name"
@@ -8550,6 +8739,7 @@ def main() -> int:
     bar_opened(now)
     context_before_start(now)
     own_models(now)
+    cancelled_at_once(now)
     models_advanced(now)
     meeting_named(now)
     word_after_a_gap(now)
