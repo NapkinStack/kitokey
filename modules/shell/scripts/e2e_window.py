@@ -1811,6 +1811,26 @@ def meeting_language(now: dt.datetime) -> None:
         # By script, in one step: the page may be drawn again between finding the list and reading it.
         said = browser.execute_script("const p = document.getElementById('meeting-language'); return p.options[p.selectedIndex].text")
         check("the settings detecting it, the page says « détectée »", said == "Celle des Réglages — détectée", said)
+        # Refused on its page (the shell's refusal stood in for): said, and still said once the page is
+        # drawn again; then gone once the page is left (#841, the rule of #655's fix).
+        browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                               " asked === 'language_set' ? Promise.reject('not a code of ISO 639-1') : real.invoke(asked, ...rest) };"
+                               " window.restore = () => { window.__TAURI__.core = real; };")
+        sentence = lambda b: b.execute_script("const s = document.getElementById('language-said'); return s ? s.textContent : ''")
+        choose(browser, "meeting-language", "fr")
+        refused_now = wait_for(browser, lambda b: "not a code of ISO 639-1" in sentence(b), 5)
+        browser.execute_async_script("const done = arguments[arguments.length - 1]; refresh().then(done)")
+        time.sleep(0.5)
+        kept = sentence(browser)
+        check("a language refused on its page: said, still said once the page is drawn again, the list back",
+              refused_now and "not a code of ISO 639-1" in kept and not (heard / "language").exists()
+              and browser.execute_script("return document.getElementById('meeting-language').value") == "", kept)
+        browser.execute_script("window.restore()")
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
+        browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
+        check("the page left and come back to: the refusal no longer said", sentence(browser) == "", sentence(browser))
     # SpeechAnalyzer hears (a program in its place, as X has it): it detects none, and hears French
     # and English alone — the system's when nothing names another (D64).
     program = WORK / "speaking-speech"
