@@ -337,7 +337,11 @@ pub struct Window {
     pub list_unread_do: &'static str,
     /// The settings file cannot be read: said above every page but Settings (#770) — never read since
     /// Kitokey started, then read before and its last settings held.
+    /// Shows: a banner above every page but Settings. When: the settings file cannot be read and was
+    /// never read since Kitokey started. At most: no limit. Placeholders: none.
     pub settings_banner: &'static str,
+    /// Shows: a banner above every page but Settings. When: the settings file cannot be read, read
+    /// before, its last settings held. At most: no limit. Placeholders: none.
     pub settings_banner_kept: &'static str,
     pub again_refused: &'static str,
     pub hearing_models_refused: &'static str,
@@ -645,13 +649,19 @@ pub struct Window {
     pub transcript_model_needed: &'static str,
     pub transcript_model_coming: &'static str,
     /// The button that ends what is being made of a meeting, or takes it out of the line (D92).
+    /// Shows: a button on a meeting's page, beside what is being made. When: its transcript or minutes
+    /// are being made, or waiting in line. At most: no limit. Placeholders: none.
     pub making_cancel: &'static str,
     /// « Annuler » refused — its meeting gone meanwhile (D92). Shows: a meeting's page, beside the
     /// making's line, until the next gesture on it. When: the shell refused to end or take out the
     /// making. At most: no limit. Placeholders: {} why it was refused.
     pub making_cancel_failed: &'static str,
     /// Said on its page once the user cancelled its transcript, or its minutes: what was there stays.
+    /// Shows: a meeting's page, where its transcript is. When: the user cancelled its transcript.
+    /// At most: no limit. Placeholders: none.
     pub transcript_stopped: &'static str,
+    /// Shows: a meeting's page, where its minutes are. When: the user cancelled its minutes.
+    /// At most: no limit. Placeholders: none.
     pub minutes_stopped: &'static str,
     pub ran_online: &'static str,
     /// The header's button, at rest and while a recording runs.
