@@ -3,6 +3,7 @@
 //! and the files beside it; nothing here writes, moves or opens a file for writing.
 
 use std::io::ErrorKind;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -310,11 +311,24 @@ pub fn writable(folder: &Path) -> std::io::Result<()> {
     std::fs::remove_file(probe(folder)?)
 }
 
-/// A file written in `folder` for `writable`: its path.
+/// The count of the next probe's name, one for the process (`probe`).
+static PROBES: AtomicU64 = AtomicU64::new(0);
+
+/// A file made new in `folder` for `writable`: its path. Its name is never given twice in a
+/// process, as the trial's beside the day (#759): on Windows, a name just removed can stay taken a
+/// while, its deletion pending, and making it again answers « Access is denied » (#705, #760).
 fn probe(folder: &Path) -> std::io::Result<PathBuf> {
-    let probe = folder.join(format!(".kitokey-writable-{}", std::process::id()));
-    std::fs::write(&probe, b"")?;
-    Ok(probe)
+    for _ in 0..1000 {
+        let count = PROBES.fetch_add(1, Ordering::Relaxed);
+        let probe = folder.join(format!(".kitokey-writable-{}-{count}", std::process::id()));
+        match fs::OpenOptions::new().write(true).create_new(true).open(&probe) {
+            Ok(_) => return Ok(probe),
+            // One an earlier Kitokey left under the same number: passed over.
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(std::io::Error::other("no name free for a probe of the folder"))
 }
 
 #[cfg(test)]
