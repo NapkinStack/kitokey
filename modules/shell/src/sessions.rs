@@ -349,4 +349,19 @@ mod tests {
         fs::remove_file(second).unwrap();
         assert!(writable(folder.path()).is_ok());
     }
+
+    /// A probe an earlier Kitokey left under this process's number is passed over, never an error.
+    #[test]
+    fn a_probe_left_in_the_folder_is_passed_over() {
+        let folder = tempfile::tempdir().unwrap();
+        let next = PROBES.load(Ordering::Relaxed);
+        let left: Vec<_> = (next..next + 50)
+            .map(|count| folder.path().join(format!(".kitokey-writable-{}-{count}", std::process::id())))
+            .collect();
+        for path in &left {
+            fs::write(path, "").unwrap();
+        }
+        let made = probe(folder.path()).unwrap();
+        assert!(!left.contains(&made), "{made:?}");
+    }
 }
