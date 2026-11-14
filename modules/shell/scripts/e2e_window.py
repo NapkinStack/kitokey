@@ -3771,6 +3771,61 @@ def recording_found(now: dt.datetime) -> None:
         recorder.wait()
 
 
+def microphone_latest_answer(now: dt.datetime) -> None:
+    """BK. The bar's microphone (#750): the list asked after a choice, before the shell has kept it, answers
+    with the microphone as it was; that answer never brings it back. The choice's save is held in the
+    page, the list opened again meanwhile — as the window's at-rest redraw can ask it, under a full run's load."""
+    print("BK. the bar's microphone: a list read after a choice not yet kept never brings the microphone before back (#750)")
+    listed = WORK / "microphones"
+    left = listed.read_text() if listed.exists() else None
+    listed.write_text("".join(json.dumps({"event": "microphone", "name": name, "description": said}) + "\n"
+                                              for name, said in [("alsa_laptop", "Digital Microphone"), ("bluez_input.AA_BB", "USB Headset")]))
+    (WORK / "microphones-slow").unlink(missing_ok=True)
+    taping = WORK / "microphone-latest"
+    taping.mkdir()
+    name = "const b = document.getElementById('small-microphone'); return b ? b.textContent : ''"
+    panel = "const p = document.getElementById('small-microphones'); return !!p && !p.hidden"
+    # The choice's save held until released; each list read counted once answered.
+    hold = ("const real = window.__TAURI__.core; let release; const held = new Promise((r) => { release = r; });"
+            " window.releaseSave = release; window.listsAnswered = 0;"
+            " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'microphone_chosen' ? held.then(() => real.invoke(asked, ...rest))"
+            " : asked === 'microphones_listed' ? real.invoke(asked, ...rest).finally(() => { window.listsAnswered += 1; }) : real.invoke(asked, ...rest) };"
+            " window.restoreCore = () => { window.__TAURI__.core = real; };")
+    answered = lambda b: b.execute_script("return window.listsAnswered")
+    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nmicrophone = "alsa_laptop"\nmicrophone_description = "Digital Microphone"\n', small=True)
+    with window as browser:
+        wait_for(browser, lambda b: b.find_element(By.ID, "small-more").is_displayed(), 8)
+        if browser.find_element(By.ID, "small-more").get_attribute("aria-expanded") != "true":
+            press(browser, "small-more")
+        shown = wait_for(browser, lambda b: "Digital Microphone" in b.execute_script(name), 8)
+        check("the bar's options: the microphone kept is named", shown, browser.execute_script(name))
+        browser.execute_script(hold)
+        press(browser, "small-microphone")
+        listed = wait_for(browser, lambda b: b.execute_script(panel) and answered(b) >= 1 and len(b.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")) == 3, 5)
+        browser.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")[0].click()
+        closed = wait_for(browser, lambda b: not b.execute_script(panel), 3)
+        check("Auto clicked, its save held: the list closes, the name says Auto at once",
+              listed and closed and "Auto" in browser.execute_script(name), browser.execute_script(name))
+        # Asked after the choice, before the shell has it: the shell answers with the microphone before.
+        before = answered(browser)
+        press(browser, "small-microphone")
+        read = wait_for(browser, lambda b: answered(b) > before, 5)
+        time.sleep(0.3)
+        check("the list read after the choice, its save still held: the name still says Auto (#750)",
+              read and "Auto" in browser.execute_script(name), browser.execute_script(name))
+        browser.execute_script("window.releaseSave()")
+        kept = wait_for(None, lambda b: 'microphone = "alsa_laptop"' not in window.file.read_text(), 5)
+        time.sleep(0.3)
+        check("the save let through: Auto kept in the settings, and still named (#750)",
+              kept and "Auto" in browser.execute_script(name), (window.file.read_text(), browser.execute_script(name)))
+        browser.execute_script("window.restoreCore()")
+    # What capture lists is left as the scenarios before had it.
+    if left is None:
+        listed.unlink()
+    else:
+        listed.write_text(left)
+
+
 def bar_opened(now: dt.datetime) -> None:
     """BA. The bar opened (D90, board 6): at rest, the microphone, « Vérifier le son » — D88's panel in
     the bar — and « Avancé » closed; recording, the context, the microphone recorded, « Confidentielle »
@@ -9052,6 +9107,7 @@ def main() -> int:
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
+    microphone_latest_answer(now)
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
