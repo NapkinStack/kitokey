@@ -3853,7 +3853,8 @@ def microphone_rollback(now: dt.datetime) -> None:
     bar back. A then B chosen, both saves held in the page; A's refused, then B's let through: the bar names B
     throughout, the refusal is said while B waits, and B kept takes it away. First, one choice refused alone
     goes back to the microphone read from the shell at the start; then two choices both refused:
-    the bar goes back to what the shell last kept, never to a choice it refused."""
+    the bar goes back to what the shell last kept, never to a choice it refused; last, the first of two
+    quick choices kept and the second refused: back to the first."""
     print("BM. the bar's microphone: an earlier choice refused while a later one stands never puts the bar back (#839)")
     captured = WORK / "microphones"
     left = captured.read_text() if captured.exists() else None
@@ -3924,6 +3925,18 @@ def microphone_rollback(now: dt.datetime) -> None:
         check("both refused: the bar names Auto, the microphone the shell kept, never the headset; the refusal said (#839)",
               "Auto" in browser.execute_script(name) and refused in browser.execute_script(said) and 'microphone = ' not in window.file.read_text(),
               (browser.execute_script(name), browser.execute_script(said), window.file.read_text()))
+        # Two quick choices, the first kept, the second refused: the headset held, Digital chosen while it
+        # waits — the list read on opening not taken —, the headset let through, Digital refused. The bar
+        # goes back to the headset, the shell's last kept, not to what the list read before them.
+        chosen = choose(browser, 2) and choose(browser, 1) and wait_for(browser, lambda b: saves(b) == 7, 3)
+        browser.execute_script("window.saves[5].go()")
+        kept = wait_for(None, lambda b: 'microphone = "bluez_input.AA_BB"' in window.file.read_text(), 5)
+        browser.execute_script("window.saves[6].refuse()")
+        told = wait_for(browser, lambda b: refused in b.execute_script(said), 3)
+        time.sleep(0.3)
+        check("the headset kept, then Digital refused: the bar names the headset, the shell's last kept (#839)",
+              chosen and kept and told and "USB Headset" in browser.execute_script(name),
+              (chosen, kept, browser.execute_script(name), browser.execute_script(said), window.file.read_text()))
         browser.execute_script("window.restoreCore()")
     # What capture lists is left as the scenarios before had it.
     if left is None:
