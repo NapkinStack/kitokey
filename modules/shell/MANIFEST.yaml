@@ -345,6 +345,10 @@ evidence:
     - pattern: '"message":"shell\.minutes_refused"'
       level: warning
       scenario: M
+    # The window's BE: a false key refused when the summary's service is asked its models (D95).
+    - pattern: '"message":"shell\.models_refused"'
+      level: warning
+      scenario: BE
     # Tester, a service that refuses the key.
     - pattern: '"message":"shell\.test_failed"'
       level: error
