@@ -63,6 +63,16 @@ repos:
       - id: actionlint
         args: [-shellcheck=, -pyflakes=]
 
+  # The e2e scripts, run only by the coordinator's e2e: an undefined name or a loop variable
+  # overwritten is seen at commit, not after a run (72470a8). F and PLW2901 only, the shell's
+  # scripts for now; capture's join once #814 merges. The version contracts and platform lock.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 44b5042edab9382aba712eed4f9c7bab7a3d6a3e  # frozen: v0.17.0
+    hooks:
+      - id: ruff-check
+        args: [--isolated, --select, "F,PLW2901"]
+        files: ^modules/shell/scripts/.*\.py$
+
   # At commit time: only scans the staged changes.
   - repo: https://github.com/gitleaks/gitleaks
     rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e  # frozen: v8.30.1
