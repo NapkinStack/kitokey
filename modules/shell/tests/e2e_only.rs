@@ -2,6 +2,8 @@
 //! function's name, and `scripts/e2e_only.py` says which a run of `scripts/e2e_window.py` plays —
 //! those alone, in the order `main()` calls them; without it, every one `main()` calls. A red check
 //! is replayed alone before a pull request is blamed for it (the coordinator, 2026-11-14).
+//! Unix only, as the module's other tests that drive its scripts: the e2e runs under GNOME.
+#![cfg(unix)]
 
 use std::{fs, process::Command};
 
