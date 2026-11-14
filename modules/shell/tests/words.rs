@@ -1635,10 +1635,15 @@ fn a_sentence_fits_its_limit_and_a_list_label_holds_18_characters() {
 fn no_sentence_says_a_word_the_lexicon_refuses() {
     let mut wrong = Vec::new();
     for sentence in sentences() {
+        const FRENCH: [&str; 5] = ["fournisseur", "fournisseurs", "segment", "segments", "tu"];
+        const ENGLISH: [&str; 4] = ["provider", "providers", "keyring", "minutes"];
+        // A sentence the reader cannot place in either language — a helper such as `french_days` —
+        // is held to both lexicons.
+        let both = [FRENCH.as_slice(), ENGLISH.as_slice()].concat();
         let refused: &[&str] = match sentence.french {
-            Some(true) => &["fournisseur", "fournisseurs", "segment", "segments", "tu"],
-            Some(false) => &["provider", "providers", "keyring", "minutes"],
-            None => continue,
+            Some(true) => &FRENCH,
+            Some(false) => &ENGLISH,
+            None => &both,
         };
         let words: Vec<String> = sentence
             .text
