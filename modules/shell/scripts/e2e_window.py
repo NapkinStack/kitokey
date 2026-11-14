@@ -4760,9 +4760,21 @@ def actions_rows(now: dt.datetime) -> None:
         shot(browser, "d46-actions-rows")
 
 
+# Another application, as the user's: a window of its own the desktop gives the focus to, as it
+# gives it any window shown (headless.sh's extension) — Kitokey's own window still seen beside it.
+ELSEWHERE = """
+import gi
+gi.require_version("Gtk", "4.0")
+from gi.repository import Gio, Gtk
+app = Gtk.Application(application_id="org.example.Elsewhere", flags=Gio.ApplicationFlags.NON_UNIQUE)
+app.connect("activate", lambda a: Gtk.ApplicationWindow(application=a, title="Elsewhere").present())
+app.run([])
+"""
+
+
 def meeting_told_once(now: dt.datetime) -> None:
-    """AL. A meeting's notifications are fewer, and a click on one opens the meeting (D44)."""
-    print("AL. a window seen: no stop told, the transcript not told before its minutes; their notification's click opens the meeting (D44)")
+    """AL. A meeting made after a stop is told once, naming it, and only where no window of Kitokey has the focus (D44, D92)."""
+    print("AL. the last step's end: none told while a window of Kitokey has the focus; else one notification, naming the meeting, its click opening it (D92)")
     meetings = WORK / "telling"
     meetings.mkdir()
     model = WORK / "telling-model.bin"
@@ -4775,20 +4787,41 @@ def meeting_told_once(now: dt.datetime) -> None:
                 for rule, out in (("interface='org.freedesktop.Notifications',member='Notify'", notified),
                                   ("type='method_return',sender='org.freedesktop.Notifications'", answered))]
     live = lambda b: "live" in (b.find_element(By.ID, "record").get_attribute("class") or "")
+    focused = lambda b: b.execute_script("return document.hasFocus()")
+    idle = lambda b: b.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null"
+                                      " && m.transcripts_waiting.length === 0 && m.minutes === null && m.minutes_waiting.length === 0)")
+    told = lambda mark: notified.read_text()[mark:]
+    # The meeting as the notification names it: no title of its own, so its day and hour.
+    names = lambda text: "18 oct." in text and "12:00" in text
+    other = None
     try:
         time.sleep(0.5)
         with Window(meetings, "fr_FR.UTF-8", settings) as browser:
+            # The window has the focus: made after a stop, transcript then minutes, nothing told.
+            check("the window has the focus, as the desktop gives it", wait_for(browser, focused, 5))
             browser.find_element(By.ID, "record").click()
             wait_for(browser, lambda b: (meeting / "session.json").exists() and live(b), 10)
             # The button says it at the click now (D68); a press within half a second is the same press.
             time.sleep(0.6)
             browser.find_element(By.ID, "record").click()
-            made = wait_for(browser, lambda b: "Compte rendu prêt" in notified.read_text(), 20)
-            told = notified.read_text()
-            check("a window seen: the stop is not told, nor the transcript before its minutes — their notification alone",
-                  made and "Enregistrement arrêté" not in told and "Transcription prête" not in told, told[-600:])
-            check("its words say the click opens it", "Cliquez pour l’ouvrir." in told, told[-400:])
-            # Away from the meeting, then the notification clicked as the desktop clicks it.
+            made = wait_for(browser, lambda b: (meeting / "minutes.md").exists() and idle(b), 20)
+            time.sleep(2)
+            check("a window of Kitokey has the focus: the stop, the transcript and its minutes made, nothing told",
+                  made and focused(browser) and told(0).count("member=Notify") == 0, told(0)[-600:])
+
+            # Another application has the focus, Kitokey's window seen beside it: made again — the
+            # transcript, then its minutes —, one notification, the minutes', naming the meeting.
+            other = subprocess.Popen(["/usr/bin/python3", "-c", ELSEWHERE], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            check("another application has the focus, Kitokey's window still seen",
+                  wait_for(browser, lambda b: not focused(b), 10) and browser.find_element(By.ID, "meeting").is_displayed())
+            mark = len(notified.read_text())
+            browser.execute_script("window.__TAURI__.core.invoke('context_redo', {name: arguments[0]})", meeting.name)
+            ready = wait_for(browser, lambda b: "Compte rendu prêt" in told(mark) and idle(b), 20)
+            time.sleep(2)
+            check("the focus elsewhere: one notification, the minutes', naming the meeting — the transcript not told on its own",
+                  ready and told(mark).count("member=Notify") == 1 and "Transcription prête" not in told(mark)
+                  and names(told(mark)) and "Cliquez pour l’ouvrir." in told(mark), told(mark)[-600:])
+            # Clicked as the desktop clicks it: the full window opens on that meeting's page.
             browser.execute_script("location.hash = '#/settings'")
             wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 5)
             number = re.findall(r"^ +uint32 (\d+)", answered.read_text(), re.M)[-1]
@@ -4798,21 +4831,24 @@ def meeting_told_once(now: dt.datetime) -> None:
                               and b.find_element(By.ID, "meeting").is_displayed(), 10)
             check("clicked: the full window opens on that meeting's page, never the file manager", opened,
                   browser.execute_script("return location.hash"))
-            # Its transcript made again (Refaire…): ready, its click opens the meeting too.
-            (meeting / "local.wav").write_bytes(b"\0" * 1000)
+
+            # Failed, its last step: one notification still — the failure's, naming the meeting.
+            other.terminate(); other.wait(timeout=10)
+            other = subprocess.Popen(["/usr/bin/python3", "-c", ELSEWHERE], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            wait_for(browser, lambda b: not focused(b), 10)
+            (WORK / "fail-minutes").touch()
             mark = len(notified.read_text())
-            browser.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})",
-                                   meeting.name, str(model))
-            again = wait_for(browser, lambda b: "Transcription prête" in notified.read_text()[mark:], 15)
-            browser.execute_script("location.hash = '#/settings'")
-            wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 5)
-            number = re.findall(r"^ +uint32 (\d+)", answered.read_text(), re.M)[-1]
-            subprocess.run(["gdbus", "emit", "--session", "--object-path", "/org/freedesktop/Notifications", "--signal",
-                            "org.freedesktop.Notifications.ActionInvoked", f"uint32 {number}", "'default'"], capture_output=True)
-            reopened = wait_for(browser, lambda b: b.execute_script("return location.hash") == f"#/meeting/{meeting.name}", 10)
-            check("a transcript made again says the click opens it, and the click does",
-                  again and "Cliquez pour l’ouvrir." in notified.read_text()[mark:] and reopened, browser.execute_script("return location.hash"))
+            browser.execute_script("window.__TAURI__.core.invoke('context_redo', {name: arguments[0]})", meeting.name)
+            failed = wait_for(browser, lambda b: told(mark).count("member=Notify") >= 1 and idle(b), 20)
+            time.sleep(2)
+            check("its minutes failed: one notification, the failure's, naming the meeting — the transcript not told on its own",
+                  failed and told(mark).count("member=Notify") == 1 and "Transcription prête" not in told(mark)
+                  and "Compte rendu prêt" not in told(mark) and names(told(mark)), told(mark)[-600:])
     finally:
+        (WORK / "fail-minutes").unlink(missing_ok=True)
+        if other is not None:
+            other.terminate()
+            other.wait(timeout=10)
         for monitor in monitors:
             monitor.terminate()
             monitor.wait(timeout=10)
