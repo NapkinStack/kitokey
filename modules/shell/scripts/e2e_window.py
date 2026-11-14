@@ -4801,6 +4801,10 @@ def meeting_told_once(now: dt.datetime) -> None:
     idle = lambda b: b.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null"
                                       " && m.transcripts_waiting.length === 0 && m.minutes === null && m.minutes_waiting.length === 0)")
     told = lambda mark: notified.read_text()[mark:]
+    # What each Notify seen was, for a check that fails: its sender, whether the desktop relayed it
+    # (`x-shell-sender`), its title and body — a count alone does not say which.
+    seen = lambda mark: [(m.split(' ', 1)[0], 'x-shell-sender' in m, re.findall(r'^   string "(.*)"$', m, re.M)[2:4])
+                         for m in told(mark).split('sender=')[1:] if 'member=Notify' in m.split('\n', 1)[0]]
     # The meeting as the notification names it: no title of its own, so its day and hour.
     names = lambda text: "18 oct." in text and "12:00" in text
     other = None
@@ -4818,7 +4822,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             made = wait_for(browser, lambda b: (meeting / "minutes.md").exists() and idle(b), 20)
             time.sleep(2)
             check("a window of Kitokey has the focus: the stop, the transcript and its minutes made, nothing told",
-                  made and focused(browser) and told(0).count("member=Notify") == 0, told(0)[-600:])
+                  made and focused(browser) and told(0).count("member=Notify") == 0, seen(0))
 
             # Another application has the focus, Kitokey's window seen beside it: made again — the
             # transcript, then its minutes —, one notification, the minutes', naming the meeting.
@@ -4831,7 +4835,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             time.sleep(2)
             check("the focus elsewhere: one notification, the minutes', naming the meeting — the transcript not told on its own",
                   ready and told(mark).count("member=Notify") == 1 and "Transcription prête" not in told(mark)
-                  and names(told(mark)) and "Cliquez pour l’ouvrir." in told(mark), told(mark)[-600:])
+                  and names(told(mark)) and "Cliquez pour l’ouvrir." in told(mark), seen(mark))
             # Clicked as the desktop clicks it: the full window opens on that meeting's page.
             browser.execute_script("location.hash = '#/settings'")
             wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 5)
@@ -4854,7 +4858,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             time.sleep(2)
             check("its minutes failed: one notification, the failure's, naming the meeting — the transcript not told on its own",
                   failed and told(mark).count("member=Notify") == 1 and "Transcription prête" not in told(mark)
-                  and "Compte rendu prêt" not in told(mark) and names(told(mark)), told(mark)[-600:])
+                  and "Compte rendu prêt" not in told(mark) and names(told(mark)), seen(mark))
 
             # Its minutes not started — nobody named to write them: the transcript's end is the last
             # step's, one notification still, D25's, naming the meeting (D25, D92).
@@ -4869,7 +4873,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             time.sleep(2)
             check("its minutes not started: one notification, what to do for them, naming the meeting — the transcript not told on its own",
                   unchosen and told(mark).count("member=Notify") == 1 and "Transcription prête" not in told(mark)
-                  and names(told(mark)), told(mark)[-600:])
+                  and names(told(mark)), seen(mark))
     finally:
         (WORK / "fail-minutes").unlink(missing_ok=True)
         if other is not None:
