@@ -5070,6 +5070,11 @@ def two_panes(now: dt.datetime) -> None:
             drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "app-language") and b.find_element(By.ID, "app-language").is_displayed(), 10)
             over = browser.execute_script(SETTINGS_OVERFLOW)
             check(f"Settings, {width} px wide: nothing past its card or the window, each box measured (D95, #782)", drawn and over == [], over)
+            # The top of Settings, before anything below is scrolled to.
+            if width in (1920, 420):
+                browser.execute_script("window.scrollTo(0, 0)")
+                seen(browser, f"d95-settings-{width}-light")
+                seen(browser, f"d95-settings-{width}-dark")
             if width == 420:
                 # « Avancé » unfolded, the developer mode on: the logs' level and folder measured too.
                 advanced_unfolded(browser).click()
@@ -5079,12 +5084,10 @@ def two_panes(now: dt.datetime) -> None:
                 advanced_unfolded(browser).click()
                 wait_for(browser, lambda b: not b.find_elements(By.ID, "open-logs"), 5)
                 # « Modèles », the card the 0.2.5 audit saw spill at 420 px: seen, in both themes.
-                browser.execute_script("document.getElementById('model').scrollIntoView({block: 'start'})")
+                # The card whole, its title first: scrolled to the card, not to its select.
+                browser.execute_script("document.getElementById('model').closest('section.card').scrollIntoView({block: 'start'})")
                 seen(browser, "d95-settings-420-models-light")
                 seen(browser, "d95-settings-420-models-dark")
-            if width in (1920, 420):
-                seen(browser, f"d95-settings-{width}-light")
-                seen(browser, f"d95-settings-{width}-dark")
             if width == 1920:
                 left, right, room_left, room_right = browser.execute_script(SETTINGS_CENTRED)
                 check("Settings at 1920 px: one column centred in the room it has, not stuck to its left (D95, #782)",
