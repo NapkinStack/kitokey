@@ -146,7 +146,15 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .minutes .body table.actions .long { min-width: 14ch; white-space: normal; overflow-wrap: break-word; }
 .minutes .body table.actions .unsettled { color: var(--soft); font-weight: 400; }
 /* The settings (D11's fourth board): cards, each titled inside; a step per model, on a raised ground. */
-#settings { max-width: 720px; }
+/* Settings: one column centred at a maximum width, as GNOME's adaptive preferences (D95); nothing
+   wider than its card — a choice narrows to it, and what holds an unbreakable string breaks
+   anywhere: a folder's path, a model's id, a host; never a label's words (#782). */
+#settings { max-width: 720px; width: 100%; margin-inline: auto; }
+#settings .path, #settings code, #offered .name { overflow-wrap: anywhere; }
+#settings select { max-width: 100%; min-width: 0; }
+#settings .picks { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.general-advanced { display: flex; flex-direction: column; gap: 12px; }
+#settings .choices { display: flex; flex-direction: column; gap: 10px; }
 #settings .group { margin: 0; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--line); }
 #settings .group h2 { font-size: 17px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--ink); margin: 0; }
 .step { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--raised); }
@@ -156,7 +164,7 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .status.here::before { background: var(--ok); }
 .status:empty { display: none; }
 .status.online::before { background: var(--accent); }
-#settings .group > .row + .row { border-top: 1px solid var(--line); padding-top: 14px; }
+#settings .group > .row + .row, .general-advanced > .row + .row { border-top: 1px solid var(--line); padding-top: 14px; }
 .picks { display: flex; gap: 8px; align-items: center; }
 .picks input { width: 96px; min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
 #settings .state { flex-direction: row; align-items: center; justify-content: space-between; }
@@ -173,6 +181,9 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
 select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--ink); font: inherit; }
 .warn { padding: 12px 16px; color: var(--ink); }
+/* The settings unreadable (#770): a strip above the page, its sentence and the way to Settings, as GNOME's banner. */
+.banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; margin: 16px 24px 0; padding: 12px 16px; border-radius: 12px; background: var(--raised); color: var(--ink); }
+.banner p { margin: 0; }
 /* In developer mode, a command's raw failure on the line under its sentence (D47). */
 .warn, #language-said, #context-said, #correction-said, #minutes-tested, #transcription-said, #free-said, #welcome-said { white-space: pre-line; }
 .fields { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
@@ -209,8 +220,11 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 /* The meetings by week (D11's first board): each week's title, then its meetings, a breath between weeks. */
 #groups { display: flex; flex-direction: column; gap: 24px; }
 .fields:empty { display: none; }
+/* The summary's guided steps (D95): a step's sentence, its « Avancé » and its fields each on a line. */
+.fields > .fields, .fields > .says, .fields > .disclose-advanced { flex-basis: 100%; }
+.fields > .disclose-advanced { justify-content: flex-start; }
 .tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); }
-.path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; }
 .path:hover { border-color: var(--edge); color: var(--ink); }
 
 /* The sidebar's gesture and the list's rows (D11's first board). */
@@ -424,6 +438,7 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 /* « Confidentielle »'s switch (board 4): the same checkbox, its role switch, drawn as a track and
    its knob — off at the start, the knob soft; on, the track in the accent, the knob at the end. */
 .setting input[type="checkbox"] { appearance: none; -webkit-appearance: none; flex: none; width: 32px; height: 20px; margin: 0; border: 1px solid var(--edge); border-radius: 10px; background: radial-gradient(circle closest-side, var(--soft) 82%, transparent 90%) no-repeat 2px 50% / 14px 14px, var(--raised); cursor: pointer; transition: background-position 120ms ease; }
+.setting input[type="checkbox"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .setting input[type="checkbox"]:checked { border-color: var(--accent); background: radial-gradient(circle closest-side, var(--surface) 82%, transparent 90%) no-repeat calc(100% - 2px) 50% / 14px 14px, var(--accent); }
 /* Read by a screen reader, not drawn. */
 .unseen { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -537,10 +552,10 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
   body.no-meeting[data-at="list"] .pane { display: block; }
   /* A sentence of the pane said at the list's address: it alone above the list, the pane's other
      children — what to do with no meeting — staying under the header. */
-  body[data-at="list"]:has(#pane-said:not([hidden])) .frame { flex-direction: column; align-items: stretch; }
-  body[data-at="list"]:has(#pane-said:not([hidden])) .pane { display: contents; }
-  body[data-at="list"]:has(#pane-said:not([hidden])) #pane-said, body[data-at="list"]:has(#pane-said:not([hidden])) #pane-again { order: -1; }
-  body[data-at="list"]:has(#pane-said:not([hidden])) .pane > .back { display: none; }
+  body[data-at="list"]:has(#pane-said:not([hidden]), #settings-banner) .frame { flex-direction: column; align-items: stretch; }
+  body[data-at="list"]:has(#pane-said:not([hidden]), #settings-banner) .pane { display: contents; }
+  body[data-at="list"]:has(#pane-said:not([hidden])) #pane-said, body[data-at="list"]:has(#pane-said:not([hidden])) #pane-again, body[data-at="list"] #settings-banner-live { order: -1; }
+  body[data-at="list"]:has(#pane-said:not([hidden]), #settings-banner) .pane > .back { display: none; }
   .pane > .back { display: inline-block; margin: 8px 0 0 16px; }
   .pane > main { padding: 12px 16px 40px; }
   .meeting-head { margin: 0 -16px; padding: 8px 16px; }

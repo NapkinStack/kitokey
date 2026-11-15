@@ -24,6 +24,7 @@ use tauri::{
 };
 use tauri_plugin_notification::NotificationExt;
 // A call starting is seen only on Linux, by PipeWire (D30).
+use kitokey_shell::cancel::Cancel;
 #[cfg(target_os = "linux")]
 use kitokey_shell::microphone;
 use kitokey_shell::{
@@ -37,7 +38,7 @@ use kitokey_shell::{
     minutes::{self, Minutes},
     model::{self, Published},
     named, player,
-    providers::{self, Online},
+    providers::{self, OnlineOffered},
     recording::{self, Recording, Said, Source},
     registry,
     sessions::{self, Listed},
@@ -58,6 +59,8 @@ type MinutesFailed = (String, Option<summarising::Cause>, Option<String>);
 struct Shell {
     /// What the user chose: read at start, changed from the window.
     settings: Mutex<Settings>,
+    /// The settings file was read once at least: what is held is the user's, not the defaults (#770).
+    settings_read: Mutex<bool>,
     /// Held while a change is read onto the file and written: two saves never interleave, the
     /// later undoing the earlier.
     saving: Mutex<()>,
@@ -141,7 +144,7 @@ struct Shell {
     minutes_tried: Mutex<HashMap<PathBuf, Option<(String, String)>>>,
     /// The sessions whose transcripts wait for the one being made, or for the model — in
     /// the order they were asked, each once; made again as a *Refaire…* asked (D25, D59).
-    waiting: Mutex<VecDeque<(PathBuf, Option<Again>)>>,
+    waiting: Mutex<VecDeque<(PathBuf, Option<Again>, Cancel)>>,
     /// The model making the transcript, and since when: said on the meeting's page (D25).
     hearing_by: Mutex<Option<(String, Instant)>>,
     /// Why a meeting's last transcript was not made, until one is begun (D25).
@@ -167,6 +170,17 @@ struct Shell {
     /// made again here, their end is no failure to tell (D60).
     heard_here: Mutex<std::collections::HashSet<PathBuf>>,
     written_here: Mutex<std::collections::HashSet<PathBuf>>,
+    /// The token of the transcript being made, set and taken under `transcription`'s lock, and
+    /// of the minutes being written, under `writing_minutes`' (« Annuler », D92).
+    transcript_token: Mutex<Option<Cancel>>,
+    minutes_token: Mutex<Option<Cancel>>,
+    /// The making taken from each line and not yet begun, with its token: « Annuler » meanwhile
+    /// cancels it, and its start then begins nothing (D92).
+    promoted_transcript: Mutex<Option<(PathBuf, Cancel)>>,
+    promoted_minutes: Mutex<Option<(PathBuf, Cancel)>>,
+    /// What was last cancelled of a meeting — its transcript or its minutes —, said on its page
+    /// until a making of it starts again.
+    stopped: Mutex<HashMap<PathBuf, &'static str>>,
     /// What had left before a meeting was said confidential, and to which host: said on its page
     /// while it stays so, until Kitokey quits (D60).
     left: Mutex<HashMap<PathBuf, Vec<Left>>>,
@@ -207,6 +221,7 @@ impl Shell {
         );
         if let Ok(settings) = &read {
             *self.settings.lock().unwrap() = settings.clone();
+            *self.settings_read.lock().unwrap() = true;
         }
         read
     }
@@ -347,7 +362,7 @@ fn main() {
             speech_shown,
             transcription_saved,
             transcription_tested,
-            hearing_models,
+            transcription_models,
             speech_installed,
             ollama_pull_offered,
             header,
@@ -365,6 +380,7 @@ fn main() {
             busy_meetings,
             freed,
             minutes_redo,
+            making_cancelled,
             context_shown,
             context_saved,
             context_redo,
@@ -390,6 +406,7 @@ fn main() {
             settings_saved,
             minutes_shown,
             minutes_saved,
+            minutes_models,
             minutes_tested,
             agreement_shown,
             agreed,
@@ -467,7 +484,7 @@ fn main() {
                             return;
                         }
                         match transcription::latest(&shell.settings().sessions) {
-                            Some(last) => transcribe(app, last),
+                            Some(last) => transcribe(app, last, Cancel::default()),
                             None => tell(app, &words::trouble(&Trouble::NoSession, shell.language())),
                         }
                     }
@@ -489,6 +506,7 @@ fn main() {
                 .build(app)?;
             app.manage(Shell {
                 settings: Mutex::new(read.clone().unwrap_or_default()),
+                settings_read: Mutex::new(read.is_ok()),
                 saving: Mutex::new(()),
                 keyring: Mutex::new(None),
                 system,
@@ -536,6 +554,11 @@ fn main() {
                 minutes_host: Mutex::new(None),
                 heard_here: Mutex::default(),
                 written_here: Mutex::default(),
+                transcript_token: Mutex::default(),
+                minutes_token: Mutex::default(),
+                promoted_transcript: Mutex::default(),
+                promoted_minutes: Mutex::default(),
+                stopped: Mutex::default(),
                 left: Mutex::default(),
                 ollama_waiting: Mutex::default(),
                 fetching: Mutex::new(false),
@@ -564,6 +587,8 @@ fn main() {
             if let Err(why) = read {
                 tell(app.handle(), &words::trouble(&Trouble::Settings(why), language));
             }
+            // A recording a Kitokey ended before this one left running: shown, and stopped from here (#773).
+            found(app.handle());
             shortcut(app.handle());
             offers(app.handle());
             // The audio kept longer than the settings say goes to the trash, now and every hour.
@@ -886,6 +911,12 @@ struct Listing {
     folded: bool,
     /// The meetings' folder is there and cannot be read (D67): `sessions` is empty for that reason.
     unreadable: bool,
+    /// The settings file cannot be read (#770): never read since Kitokey started, the folder listed is
+    /// the default one, not the user's; read before, the last settings read are held and listed.
+    settings_unread: bool,
+    /// With `settings_unread`: the last settings read are held — the user's meetings are listed, and no
+    /// change is saved until the file is fixed.
+    settings_kept: bool,
     /// The last start refused, the trial over (D83).
     refused: bool,
 }
@@ -901,6 +932,12 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
     let asked = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let shell = app.state::<Shell>();
+        // Read anew: fixed meanwhile, the user's folder is listed again (#770). Not during a save:
+        // the file read just before its rename would put the settings it replaced back in memory.
+        let settings_unread = {
+            let _saving = shell.saving.lock().unwrap();
+            shell.reread().is_err()
+        };
         let recorded = shell.recorded.lock().unwrap().clone();
         let sessions = sessions::list(&shell.settings().sessions, recorded.as_deref());
         let mut kept = shell.shapes.lock().unwrap();
@@ -943,6 +980,8 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
                 sessions::unreadable(&folder, folder == settings::Settings::default().sessions)
             },
             refused: *shell.refused.lock().unwrap(),
+            settings_unread,
+            settings_kept: settings_unread && *shell.settings_read.lock().unwrap(),
         }
     })
     .await
@@ -1074,6 +1113,73 @@ fn minutes_redo(
     Ok(())
 }
 
+/// « Annuler » on a meeting's page (D92, the decider's word of 2026-11-13): what is being made of
+/// it — its transcript, its minutes — ends within two seconds, and what waits its turn leaves the
+/// line. The version already whole stays; the user may at once start another making.
+#[tauri::command]
+fn making_cancelled(shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    // Each making of it cancelled by its own token: waiting in a line — taken out —, taken from one
+    // and not yet begun, or being made, read under its kind's lock. Its start and its end read the
+    // same token: whichever comes first, the other sees it.
+    let taken = |slot: &Mutex<Option<(PathBuf, Cancel)>>| {
+        if let Some((taken, token)) = slot.lock().unwrap().as_ref()
+            && *taken == folder
+        {
+            token.cancel();
+        }
+    };
+    {
+        let mut waiting = shell.waiting.lock().unwrap();
+        waiting.retain(|(queued, _, token)| {
+            let ours = *queued == folder;
+            if ours {
+                token.cancel();
+            }
+            !ours
+        });
+        taken(&shell.promoted_transcript);
+    }
+    {
+        let mut waiting = shell.minutes_waiting.lock().unwrap();
+        waiting.retain(|queued| {
+            let ours = queued.folder == folder;
+            if ours {
+                queued.cancel.cancel();
+            }
+            !ours
+        });
+        taken(&shell.promoted_minutes);
+    }
+    {
+        let _running = shell.transcription.lock().unwrap();
+        if shell.hearing.lock().unwrap().as_deref() == Some(folder.as_path())
+            && let Some(token) = shell.transcript_token.lock().unwrap().as_ref()
+        {
+            token.cancel();
+        }
+    }
+    {
+        let writing = shell.writing_minutes.lock().unwrap();
+        if writing.as_deref() == Some(folder.as_path())
+            && let Some(token) = shell.minutes_token.lock().unwrap().as_ref()
+        {
+            token.cancel();
+        }
+    }
+    tracing::info!(session = %name, "shell.making_cancelled");
+    Ok(())
+}
+
+/// The slot of a making taken from a line freed once its start has been tried — begun, or not —,
+/// unless it already holds the next one taken.
+fn free(slot: &Mutex<Option<(PathBuf, Cancel)>>, token: &Cancel) {
+    let mut slot = slot.lock().unwrap();
+    if slot.as_ref().is_some_and(|(_, taken)| taken.same(token)) {
+        *slot = None;
+    }
+}
+
 /// A line of a meeting's transcript corrected on the user's word (D62, ADR-0014): once complete,
 /// never while it is made or waits to be made again. The making's lock held while it is written:
 /// one writer at a time.
@@ -1082,7 +1188,7 @@ fn transcript_corrected(shell: State<'_, Shell>, name: String, track: String, st
     let folder = session_folder(&shell, &name)?;
     let running = shell.transcription.lock().unwrap();
     let hearing = shell.hearing.lock().unwrap().as_deref() == Some(folder.as_path());
-    let waits = shell.waiting.lock().unwrap().iter().any(|(queued, _)| *queued == folder);
+    let waits = shell.waiting.lock().unwrap().iter().any(|(queued, ..)| *queued == folder);
     if (running.is_some() && hearing) || waits {
         return Err(shell.told(Failure::Busy, format!("the transcript of {name} is being made")));
     }
@@ -1107,7 +1213,7 @@ fn transcript_corrected(shell: State<'_, Shell>, name: String, track: String, st
 #[tauri::command]
 fn transcript_redo(app: AppHandle, shell: State<'_, Shell>, name: String, model: PathBuf) -> Result<(), Told> {
     let folder = session_folder(&shell, &name)?;
-    retranscribe(&app, folder, Again::Model(model)).map_err(|(failure, detail)| shell.told(failure, detail))
+    retranscribe(&app, folder, Again::Model(model), Cancel::default()).map_err(|(failure, detail)| shell.told(failure, detail))
 }
 
 /// *Refaire…* on a transcript (D91): made again by whoever the meeting's own models name — chosen
@@ -1115,7 +1221,7 @@ fn transcript_redo(app: AppHandle, shell: State<'_, Shell>, name: String, model:
 #[tauri::command]
 fn transcript_redo_own(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
     let folder = session_folder(&shell, &name)?;
-    retranscribe(&app, folder, Again::Own).map_err(|(failure, detail)| shell.told(failure, detail))
+    retranscribe(&app, folder, Again::Own, Cancel::default()).map_err(|(failure, detail)| shell.told(failure, detail))
 }
 
 /// *Try again*, on a meeting whose transcript was not made: as it was last asked — made again
@@ -1126,8 +1232,8 @@ fn transcript_again(app: AppHandle, shell: State<'_, Shell>, name: String) -> Re
     // Read, and the lock let go, before it is asked again: retranscribe takes it too.
     let tried = shell.transcripts_tried.lock().unwrap().get(&folder).cloned().flatten();
     match tried {
-        Some(again) => retranscribe_or_say(&app, folder, again),
-        None => transcribe(&app, folder),
+        Some(again) => retranscribe_or_say(&app, folder, again, Cancel::default()),
+        None => transcribe(&app, folder, Cancel::default()),
     }
     Ok(())
 }
@@ -1139,7 +1245,7 @@ fn transcript_asked(app: AppHandle, shell: State<'_, Shell>, name: String) -> Re
     if shell.recording.lock().unwrap().is_some() && shell.recorded.lock().unwrap().as_deref() == Some(folder.as_path()) {
         return Err(shell.told(Failure::Busy, format!("{name} is being recorded")));
     }
-    transcribe(&app, folder);
+    transcribe(&app, folder, Cancel::default());
     Ok(())
 }
 
@@ -1783,8 +1889,8 @@ fn confidential_set(app: AppHandle, shell: State<'_, Shell>, name: String, on: b
         confidential::add(&mut left, What::Sound, &host);
         shell.heard_here.lock().unwrap().insert(folder.clone());
         let mut waiting = shell.waiting.lock().unwrap();
-        waiting.retain(|(queued, _)| *queued != folder);
-        waiting.push_front((folder.clone(), Some(Again::Settings)));
+        waiting.retain(|(queued, ..)| *queued != folder);
+        waiting.push_front((folder.clone(), Some(Again::Settings), Cancel::default()));
         drop(waiting);
         tracing::info!(host = %host, "shell.confidential_ended");
         transcription.end();
@@ -1821,7 +1927,7 @@ fn confidential_set(app: AppHandle, shell: State<'_, Shell>, name: String, on: b
         shell.asked_again.lock().unwrap().remove(&folder);
     }
     if !writing && !queued && (awaiting || by_service) {
-        write_minutes_from(&app, folder.clone(), None, None, true);
+        write_minutes_from(&app, folder.clone(), None, None, true, Cancel::default());
     }
     Ok(confidential_of(&shell, &folder))
 }
@@ -1887,6 +1993,37 @@ fn next_file() -> Option<PathBuf> {
     settings::file().map(|file| file.with_file_name("next-context.txt"))
 }
 
+/// Where the recording running is kept, beside the settings, while it runs (#773).
+fn recording_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("recording.json"))
+}
+
+/// A recording a Kitokey ended before this one left running (#773) — its shell killed, the
+/// computer's session closed under it —: shown as the recording in progress, counted from its
+/// session's start, and stopped by the same gestures; its transcript follows its stop as usual.
+/// Its levels, devices and silences went with the output of the shell that read them: none said.
+fn found(app: &AppHandle) {
+    let Some(found) = recording_file().and_then(|file| recording::find(&file, seconds_now())) else {
+        return;
+    };
+    let shell = app.state::<Shell>();
+    tracing::info!(
+        session = %found.folder.file_name().unwrap_or_default().to_string_lossy(),
+        seconds = found.seconds,
+        stopping = found.stopping,
+        "shell.recording_found"
+    );
+    *shell.recording.lock().unwrap() = Some(found.recording);
+    *shell.stopping.lock().unwrap() = found.stopping;
+    *shell.recorded.lock().unwrap() = Some(found.folder);
+    let since = Instant::now().checked_sub(Duration::from_secs_f64(found.seconds));
+    *shell.meter.lock().unwrap() = (Some(since.unwrap_or_else(Instant::now)), [0.0, 0.0]);
+    show(app, if found.stopping { Shown::Stopping } else { Shown::Recording });
+    small_recording(app, true);
+    let (app, said) = (app.clone(), found.said);
+    std::thread::spawn(move || listen(&app, &said, None, true));
+}
+
 /// Where the models chosen at rest for the next recording are, beside it: kept the same way (D91).
 fn next_models_file() -> Option<PathBuf> {
     settings::file().map(|file| file.with_file_name("next-models.json"))
@@ -1921,7 +2058,7 @@ fn context_redo(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result
         return Err(shell.told(closed.failure(), format!("{name} cannot be made again now: {closed:?}")));
     }
     // One that cannot begin — no model, the program missing — says why on its page.
-    retranscribe_or_say(&app, folder, Again::Settings);
+    retranscribe_or_say(&app, folder, Again::Settings, Cancel::default());
     Ok(())
 }
 
@@ -2500,7 +2637,7 @@ struct MinutesShown {
     ollama_address: String,
     /// The local model recommended for the minutes, said so when Ollama holds it (#261).
     recommended: &'static str,
-    online: [Online; 3],
+    online: Vec<OnlineOffered>,
     provider: Option<String>,
     model: Option<String>,
     key_kept: bool,
@@ -2531,7 +2668,7 @@ async fn minutes_shown(shell: State<'_, Shell>) -> Result<MinutesShown, Told> {
         ollama: models.unwrap_or_default(),
         ollama_address: providers::ollama_address(&ollama()),
         recommended: providers::RECOMMENDED,
-        online: providers::ONLINE,
+        online: providers::online(),
         provider: settings.minutes_provider,
         model: settings.minutes_model,
         key_kept: kept,
@@ -2586,6 +2723,31 @@ async fn minutes_saved(
     Ok(not_kept)
 }
 
+/// A service's models for the summary, asked with the key the user typed — or the one kept for its
+/// host —: the key tested at once (D95). Only the ids come back; nothing is kept, the key never
+/// logged. Refused, the cause in the Tester's own sentence.
+#[tauri::command]
+async fn minutes_models(shell: State<'_, Shell>, provider: String, key: Option<String>) -> Result<Vec<String>, Told> {
+    let host = providers::host(provider.trim()).ok_or_else(|| shell.told(Failure::BadAddress, "no provider's address"))?;
+    let key_checked = providers::online()
+        .iter()
+        .any(|service| service.address == provider.trim() && service.key_checked);
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&host).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::service_models(provider.trim(), key_checked, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
+}
+
 /// Who hears, when a service does (D43): its address and model saved, the user's agreement to its
 /// host with them, its key kept in the keyring under the transcription's own account. A host on
 /// this computer needs no agreement. Nothing is sent here.
@@ -2635,23 +2797,30 @@ async fn transcription_saved(
     Ok(not_kept)
 }
 
-/// The transcription models a service that hears offers (D63): listed by the service where it
-/// lists them, else those it publishes. Nothing of a meeting is sent; no key is needed to list.
+/// A hearing service's models, asked with the key the user typed — or the one kept for its host
+/// under the transcription's account —: the key tested at once (D95), as the summary's is. Only the
+/// ids come back; nothing is kept, the key never logged. Refused, the cause in the Tester's sentence.
 #[tauri::command]
-async fn hearing_models(shell: State<'_, Shell>, index: usize) -> Result<Vec<String>, Told> {
+async fn transcription_models(shell: State<'_, Shell>, index: usize, key: Option<String>) -> Result<Vec<String>, Told> {
     let service = providers::hearing()
         .into_iter()
         .nth(index)
         .ok_or_else(|| shell.told(Failure::Unexpected, "no such service"))?;
-    let published = || service.models.iter().map(|model| model.to_string()).collect();
-    if !service.listed {
-        return Ok(published());
-    }
-    let address = service.address.clone();
-    let listed = tauri::async_runtime::spawn_blocking(move || providers::hearing_listed(&address))
-        .await
-        .map_err(|error| shell.told(Failure::Unexpected, error))?;
-    Ok(listed.unwrap_or_else(published))
+    let host = providers::host(&service.address).unwrap_or_default();
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&transcription::key_account(&host)).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::hearing_models(&service, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
 }
 
 /// *Tester* for who hears: `kitokey-transcription --test` sends a sound of its own to the service
@@ -2781,6 +2950,8 @@ struct Queued {
     folder: PathBuf,
     agreed: Option<String>,
     chosen: Option<(String, String)>,
+    /// Its own token, from the line to its end (D92).
+    cancel: Cancel,
 }
 
 /// A making of minutes is over: its meeting free, its failure kept for its page, and the next
@@ -2812,16 +2983,30 @@ fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<
 fn minutes_next(app: &AppHandle) {
     let shell = app.state::<Shell>();
     minuting(app, false);
-    *shell.writing_minutes.lock().unwrap() = None;
+    {
+        // Freed with its token, under the one lock: « Annuler » after this finds none.
+        let mut writing = shell.writing_minutes.lock().unwrap();
+        writing.take();
+        shell.minutes_token.lock().unwrap().take();
+    }
     if *shell.leaving.lock().unwrap() {
         return;
     }
     loop {
-        let Some(next) = shell.minutes_waiting.lock().unwrap().pop_front() else {
+        // Taken from the line under its lock, and said taken: « Annuler » meanwhile withdraws it.
+        let next = {
+            let mut waiting = shell.minutes_waiting.lock().unwrap();
+            let next = waiting.pop_front();
+            *shell.promoted_minutes.lock().unwrap() = next.as_ref().map(|next| (next.folder.clone(), next.cancel.clone()));
+            next
+        };
+        let Some(next) = next else {
             return;
         };
         // Started, or set aside (an agreement to give, a reason it cannot): the next one then.
-        write_minutes_from(app, next.folder, next.agreed.as_deref(), next.chosen, true);
+        let token = next.cancel.clone();
+        write_minutes_from(app, next.folder, next.agreed.as_deref(), next.chosen, true, next.cancel);
+        free(&shell.promoted_minutes, &token);
         if shell.writing_minutes.lock().unwrap().is_some() {
             return;
         }
@@ -2839,10 +3024,21 @@ fn minutes_ended_here(app: &AppHandle, folder: &Path) {
         folder: folder.to_path_buf(),
         agreed: None,
         chosen: None,
+        cancel: Cancel::default(),
     });
     drop(waiting);
     shell.minutes_by.lock().unwrap().take();
     shell.minutes_host.lock().unwrap().take();
+    minutes_next(app);
+}
+
+/// Minutes the user cancelled (D92): said stopped on their page, the ones there kept, nothing
+/// told; the next ones asked meanwhile started.
+fn minutes_cancelled(app: &AppHandle, folder: &Path) {
+    let shell = app.state::<Shell>();
+    shell.minutes_by.lock().unwrap().take();
+    shell.minutes_host.lock().unwrap().take();
+    shell.stopped.lock().unwrap().insert(folder.to_path_buf(), "minutes");
     minutes_next(app);
 }
 
@@ -2875,6 +3071,8 @@ struct Makings {
     /// Confidential meetings whose minutes wait for Ollama, and why (D60); the model it would fetch.
     ollama_waiting: HashMap<String, Wait>,
     ollama_recommended: &'static str,
+    /// What the user last cancelled of a meeting, by its name: `transcript` or `minutes` (D92).
+    stopped: HashMap<String, &'static str>,
 }
 
 #[derive(serde::Serialize)]
@@ -2929,8 +3127,8 @@ fn makings(shell: State<'_, Shell>) -> Makings {
     let settings = shell.settings();
     let (transcripts_waiting, model_needed) = {
         let waiting = shell.waiting.lock().unwrap();
-        let names = waiting.iter().map(|(folder, _)| named(folder)).collect();
-        let needed = default_model_missing(&settings) || waiting.iter().any(|(folder, _)| default_model_missing_for(&settings, folder));
+        let names = waiting.iter().map(|(folder, ..)| named(folder)).collect();
+        let needed = default_model_missing(&settings) || waiting.iter().any(|(folder, ..)| default_model_missing_for(&settings, folder));
         (names, needed)
     };
     Makings {
@@ -3003,6 +3201,13 @@ fn makings(shell: State<'_, Shell>) -> Makings {
             .map(|(folder, wait)| (named(folder), *wait))
             .collect(),
         ollama_recommended: providers::RECOMMENDED,
+        stopped: shell
+            .stopped
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(folder, what)| (named(folder), *what))
+            .collect(),
     }
 }
 
@@ -3029,19 +3234,26 @@ fn look_again(app: &AppHandle) {
             .remove(&folder)
             .filter(|asked| asked.named == named)
             .map(|asked| asked.choice);
-        write_minutes_from(app, folder, None, chosen, true);
+        write_minutes_from(app, folder, None, chosen, true, Cancel::default());
     }
 }
 
 /// The same, `agreed_now` naming the host the user just agreed to send this meeting to, once:
 /// the gate is passed only if that is still the host the settings name as it is read here.
 fn write_minutes(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>, chosen: Option<(String, String)>) {
-    write_minutes_from(app, folder, agreed_now, chosen, false);
+    write_minutes_from(app, folder, agreed_now, chosen, false, Cancel::default());
 }
 
 /// `from_line`: taken from the line, where nobody asked just now — an agreement it needs is set
 /// aside and said on its page, never a window opened over what the user is doing.
-fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>, chosen: Option<(String, String)>, from_line: bool) {
+fn write_minutes_from(
+    app: &AppHandle,
+    folder: PathBuf,
+    agreed_now: Option<&str>,
+    chosen: Option<(String, String)>,
+    from_line: bool,
+    cancel: Cancel,
+) {
     let shell = app.state::<Shell>();
     let writing = shell.writing_minutes.lock().unwrap();
     if let Some(being) = writing.as_ref() {
@@ -3061,6 +3273,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
                 folder,
                 agreed: agreed_now.map(str::to_string),
                 chosen,
+                cancel,
             });
         }
         return;
@@ -3160,9 +3373,15 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
     if writing.is_some() {
         // Another started meanwhile, between the reading and now: this one waits its turn.
         drop(writing);
-        return write_minutes_from(app, folder, agreed_now, again.then_some((provider, model)), from_line);
+        return write_minutes_from(app, folder, agreed_now, again.then_some((provider, model)), from_line, cancel);
     }
+    // Cancelled before it began: nothing begins (D92).
+    if cancel.cancelled() {
+        return;
+    }
+    // Begun, its token with it under the lock « Annuler » reads it under.
     *writing = Some(folder.clone());
+    *shell.minutes_token.lock().unwrap() = Some(cancel.clone());
     drop(writing);
     // Started: out of the line, its agreement given, its last failure gone.
     shell.minutes_waiting.lock().unwrap().retain(|queued| queued.folder != folder);
@@ -3175,6 +3394,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
         .then(|| model.clone());
     *shell.minutes_host.lock().unwrap() = (!providers::local(&provider)).then(|| host.clone());
     shell.minutes_failed.lock().unwrap().remove(&folder);
+    shell.stopped.lock().unwrap().remove(&folder);
     minuting(app, true);
     let app = app.clone();
     // The keyring may ask the user first: never on the window's and the tray's thread.
@@ -3201,6 +3421,9 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
             || !providers::local(&provider) && (confidential::marked(&folder) || shell.written_here.lock().unwrap().contains(&folder));
         let started = if here() {
             Err(std::io::Error::other("the meeting was said confidential"))
+        } else if cancel.cancelled() {
+            // Cancelled while the keyring was asked: never started (D92).
+            Err(std::io::Error::other("cancelled"))
         } else {
             Summarising::start(
                 &program("kitokey-summary", "KITOKEY_SUMMARY"),
@@ -3216,8 +3439,16 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
                 if here() {
                     making.end();
                 }
+                // Held by its token: cancelled meanwhile, it is stopped at once (D92).
+                cancel.hold(making.stopper());
                 *shell.minuting.lock().unwrap() = Some(making);
                 events
+            }
+            Err(_) if cancel.cancelled() => {
+                if let Some(previous) = &previous {
+                    let _ = std::fs::remove_file(previous);
+                }
+                return minutes_cancelled(&app, &folder);
             }
             Err(_) if here() => {
                 if let Some(previous) = &previous {
@@ -3241,7 +3472,9 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
             })
             .unwrap_or(summarising::Made::Failed(String::new(), None));
         shell.minuting.lock().unwrap().take();
-        let ended_here = matches!(made, summarising::Made::Failed(..)) && here();
+        // Cancelled by the user (D92), and not written meanwhile: no failure, nothing told.
+        let cancelled = cancel.cancelled() && matches!(made, summarising::Made::Failed(..));
+        let ended_here = matches!(made, summarising::Made::Failed(..)) && !cancelled && here();
         // Replaced, the earlier minutes go to the trash — refused, they stay beside, and it is said.
         let mut kept_beside = None;
         if let Some(previous) = previous {
@@ -3255,6 +3488,9 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
                 }
             }
         }
+        if cancelled {
+            return minutes_cancelled(&app, &folder);
+        }
         if ended_here {
             return minutes_ended_here(&app, &folder);
         }
@@ -3264,6 +3500,7 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
                 folder: folder.clone(),
                 agreed: None,
                 chosen: None,
+                cancel: Cancel::default(),
             });
         }
         minutes_ended(
@@ -3275,7 +3512,8 @@ fn write_minutes_from(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>
             },
             own_model.as_deref(),
         );
-        if *shell.leaving.lock().unwrap() {
+        // Written all the same after « Annuler »: kept, being whole, and nothing told (D92).
+        if *shell.leaving.lock().unwrap() || cancel.cancelled() {
             return;
         }
         let written = matches!(made, summarising::Made::Written(_));
@@ -3433,16 +3671,17 @@ fn start_recording(app: &AppHandle, owner: licence::Owner) {
             let app = app.clone();
             // On a trial licence, the meeting is counted as made here (PDR-0005).
             let trial = (licence == Ok(Licence::Trial)).then_some(sessions);
-            std::thread::spawn(move || listen(&app, &said, trial.as_deref()));
+            std::thread::spawn(move || listen(&app, &said, trial.as_deref(), false));
         }
         Err(error) => tell(app, &words::trouble(&Trouble::NoRecorder(error.to_string()), shell.language())),
     }
 }
 
 /// Tells the user what a recording says, until it has ended; then the tray is at rest again.
-fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
+/// `found`: a recording found running (#773), started already, which says nothing but its end.
+fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>, found: bool) {
     let shell = app.state::<Shell>();
-    let mut started = false;
+    let mut started = found;
     let mut stopped = None;
     // What the devices are: what is said of one gone, or back, depends on the other.
     let mut sides = words::Sides::default();
@@ -3484,6 +3723,18 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
                 Err(error) => tracing::error!(kind = ?error.kind(), "shell.models_not_taken"),
             }
             drop(next);
+            // Kept beside the settings while it runs: a Kitokey started again finds it (#773).
+            let kept = shell
+                .recording
+                .lock()
+                .unwrap()
+                .as_ref()
+                .and_then(|running| recording::Kept::of(running.id(), folder));
+            if let (Some(file), Some(kept)) = (recording_file(), kept)
+                && let Err(error) = recording::keep(&file, &kept)
+            {
+                tracing::warn!(kind = ?error.kind(), "shell.recording_not_kept");
+            }
             *shell.recorded.lock().unwrap() = Some(folder.clone());
             *shell.meter.lock().unwrap() = (Some(Instant::now()), [0.0, 0.0]);
             small_recording(app, true);
@@ -3514,6 +3765,9 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
             tell(app, &notice);
         }
     }
+    if let Some(Err(error)) = recording_file().map(|file| recording::forget(&file)) {
+        tracing::warn!(kind = ?error.kind(), "shell.recording_not_forgotten");
+    }
     shell.recorded.lock().unwrap().take();
     *shell.meter.lock().unwrap() = (None, [0.0, 0.0]);
     *shell.devices.lock().unwrap() = recording::Devices::default();
@@ -3534,18 +3788,18 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>) {
     }
     // Quitting, the stop's transcript is not begun: it is made from the menu next time.
     if let Some(folder) = stopped.filter(|_| !*shell.leaving.lock().unwrap()) {
-        transcribe(app, folder);
+        transcribe(app, folder, Cancel::default());
     }
 }
 
 /// Puts a session in line for its transcript, once — made again as a *Refaire…* asked, the
 /// newer ask kept when it is asked again.
-fn wait(shell: &Shell, folder: PathBuf, again: Option<Again>) {
+fn wait(shell: &Shell, folder: PathBuf, again: Option<Again>, cancel: Cancel) {
     let mut waiting = shell.waiting.lock().unwrap();
-    match waiting.iter_mut().find(|(queued, _)| *queued == folder) {
-        Some((_, chosen)) if again.is_some() => *chosen = again,
+    match waiting.iter_mut().find(|(queued, ..)| *queued == folder) {
+        Some((_, chosen, _)) if again.is_some() => *chosen = again,
         Some(_) => {}
-        None => waiting.push_back((folder, again)),
+        None => waiting.push_back((folder, again, cancel)),
     }
 }
 
@@ -3559,18 +3813,35 @@ fn hearing(shell: &Shell, folder: &Path, hearer: &Hearer) {
         _ => None,
     };
     shell.transcripts_failed.lock().unwrap().remove(folder);
+    shell.stopped.lock().unwrap().remove(folder);
 }
 
-/// A transcript ended: counted when written, its reason kept when not — said on its page. Whether
-/// it was ended because its meeting was said confidential, to be made again here: no failure then.
-fn heard(shell: &Shell, folder: &Path, made: &Made) -> bool {
+/// How a transcript's making ended, for what follows it.
+#[derive(PartialEq)]
+enum Heard {
+    /// Written, or failed: told, and what follows it made.
+    Ended,
+    /// Ended because its meeting was said confidential, to be made again here: no failure (D60).
+    Here,
+    /// Cancelled by the user (D92): no failure, nothing told, nothing made after it.
+    Cancelled,
+}
+
+/// A transcript ended: counted when written, its reason kept when not — said on its page —, or
+/// said stopped when its own token was cancelled.
+fn heard(shell: &Shell, folder: &Path, made: &Made, cancelled: bool) -> Heard {
     shell.hearing.lock().unwrap().take();
     shell.hearing_by.lock().unwrap().take();
     shell.hearing_host.lock().unwrap().take();
     let here = shell.heard_here.lock().unwrap().remove(folder);
+    // Written all the same, as it was cancelled: written it is — never a whole one thrown away.
+    let cancelled = cancelled && !matches!(made, Made::Written(_));
+    if cancelled {
+        shell.stopped.lock().unwrap().insert(folder.to_path_buf(), "transcript");
+    }
     match made {
         Made::Written(_) => *shell.transcripts_made.lock().unwrap().entry(folder.to_path_buf()).or_default() += 1,
-        Made::Failed(_) if here => {}
+        Made::Failed(_) if here || cancelled => {}
         Made::Failed(why) => {
             let why = if why.trim().is_empty() {
                 "kitokey-transcription stopped without saying why"
@@ -3584,7 +3855,11 @@ fn heard(shell: &Shell, folder: &Path, made: &Made) -> bool {
                 .insert(folder.to_path_buf(), why.to_string());
         }
     }
-    here
+    match (cancelled, here) {
+        (true, _) => Heard::Cancelled,
+        (false, true) => Heard::Here,
+        (false, false) => Heard::Ended,
+    }
 }
 
 /// The next transcript in line, once one ends: made, or made again with the model a Refaire…
@@ -3601,16 +3876,22 @@ fn transcribe_next(app: &AppHandle) {
         let settings = shell.settings();
         let next = {
             let mut waiting = shell.waiting.lock().unwrap();
-            let at = waiting.iter().position(|(folder, again)| {
+            let at = waiting.iter().position(|(folder, again, _)| {
                 matches!(again, Some(Again::Model(_))) || !default_model_missing_for(&own(&settings, folder), folder)
             });
-            at.and_then(|at| waiting.remove(at))
+            let next = at.and_then(|at| waiting.remove(at));
+            // Said taken, with its token: « Annuler » meanwhile cancels it (D92).
+            *shell.promoted_transcript.lock().unwrap() = next.as_ref().map(|(folder, _, token)| (folder.clone(), token.clone()));
+            next
         };
-        match next {
-            None => return,
-            Some((folder, None)) => transcribe(app, folder),
-            Some((folder, Some(again))) => retranscribe_or_say(app, folder, again),
+        let Some((folder, again, token)) = next else {
+            return;
+        };
+        match again {
+            None => transcribe(app, folder, token.clone()),
+            Some(again) => retranscribe_or_say(app, folder, again, token.clone()),
         }
+        free(&shell.promoted_transcript, &token);
         if shell.transcription.lock().unwrap().is_some() {
             return;
         }
@@ -3618,8 +3899,8 @@ fn transcribe_next(app: &AppHandle) {
 }
 
 /// Made again as a Refaire… asked; one that cannot begin says why on its page.
-fn retranscribe_or_say(app: &AppHandle, folder: PathBuf, again: Again) {
-    if let Err((_, why)) = retranscribe(app, folder.clone(), again) {
+fn retranscribe_or_say(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) {
+    if let Err((_, why)) = retranscribe(app, folder.clone(), again, cancel) {
         app.state::<Shell>().transcripts_failed.lock().unwrap().insert(folder, why);
     }
 }
@@ -3629,13 +3910,17 @@ fn retranscribe_or_say(app: &AppHandle, folder: PathBuf, again: Again) {
 /// transcript there stays in place until the new one is whole — set aside for the run, since the
 /// program goes on from a transcript it finds —, then goes to the system's trash; a run that
 /// fails, or that Kitokey ends as it quits, puts it back.
-fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (Failure, String)> {
+fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) -> Result<(), (Failure, String)> {
     let shell = app.state::<Shell>();
     let mut running = shell.transcription.lock().unwrap();
+    // Cancelled before it began: nothing begins (D92).
+    if cancel.cancelled() {
+        return Ok(());
+    }
     if running.is_some() {
         // One at a time: it waits its turn, said on its page — the one being made too.
         drop(running);
-        wait(&shell, folder, Some(again));
+        wait(&shell, folder, Some(again), cancel);
         return Ok(());
     }
     shell.transcripts_tried.lock().unwrap().insert(folder.clone(), Some(again.clone()));
@@ -3657,7 +3942,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
         // model is offered, as for a first transcript.
         if matches!(again, Again::Settings | Again::Own) && *model == Settings::default().model {
             drop(running);
-            wait(&shell, folder, Some(again));
+            wait(&shell, folder, Some(again), cancel);
             if !*shell.fetching.lock().unwrap() {
                 offer(app);
             }
@@ -3697,7 +3982,10 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
             return Err((Failure::ProgramNotStarted, error.to_string()));
         }
     };
+    // Held by its token: cancelled meanwhile, it is stopped at once (D92).
+    cancel.hold(transcription.stopper());
     *running = Some(transcription);
+    *shell.transcript_token.lock().unwrap() = Some(cancel.clone());
     // Who puts the earlier transcript back, or trashes it: this run's end, or Kitokey quitting —
     // whichever comes first takes it, the other finds nothing.
     *shell.redoing.lock().unwrap() = previous.clone().map(|previous| (current.clone(), previous));
@@ -3711,13 +3999,20 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
         // Ended and said so at once: none begun in between loses what it says of itself.
         let mut running = shell.transcription.lock().unwrap();
         running.take();
-        let here = heard(&shell, &folder, &made);
+        shell.transcript_token.lock().unwrap().take();
+        let here = heard(&shell, &folder, &made, cancel.cancelled());
         drop(running);
         transcribing(&app, false);
         // Replaced, the earlier transcript goes to the trash — refused, it stays beside, and it is
         // said; not replaced, it is put back — failing that, it is said where it is.
         let mut kept_beside = None;
-        if let Some((current, previous)) = shell.redoing.lock().unwrap().take() {
+        let redoing = shell.redoing.lock().unwrap().take();
+        // Cancelled with none whole before it: what it began is no version, nor taken up by the
+        // next model's making (D92).
+        if here == Heard::Cancelled && redoing.is_none() {
+            let _ = std::fs::remove_file(folder.join("transcript.jsonl"));
+        }
+        if let Some((current, previous)) = redoing {
             let name = previous.file_name().map(|name| name.to_string_lossy().into_owned());
             let written = matches!(made, Made::Written(_));
             if let Some(not_put_back) = sessions::settle(&current, &previous, written, |previous| {
@@ -3729,8 +4024,17 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again) -> Result<(), (F
         if *shell.leaving.lock().unwrap() {
             return;
         }
-        // Ended for its meeting said confidential: made again here, first in line.
-        if here {
+        // Ended for its meeting said confidential: made again here, first in line. Cancelled:
+        // nothing told — the earlier one not put back excepted —, nothing made after it.
+        if here != Heard::Ended {
+            if let (Heard::Cancelled, Some((name, not_put_back))) = (&here, kept_beside) {
+                tell(&app, &words::transcript_kept_beside(shell.language(), &name, not_put_back));
+            }
+            return transcribe_next(&app);
+        }
+        // Written all the same after « Annuler »: kept, being whole, but nothing follows it — no
+        // notification, no minutes made with a model the user was changing (D92).
+        if cancel.cancelled() {
             return transcribe_next(&app);
         }
         // Made again and ready, its click opens the meeting as after a stop (D44).
@@ -3805,11 +4109,15 @@ fn hearer_now(shell: &Shell, settings: &Settings, folder: &Path) -> (Hearer, Opt
 /// Makes the transcript of a session — after the one being made, if there is one. What is
 /// missing — the model, the program — is said in one sentence, and on its page; the recording is
 /// never touched. Whether it began.
-fn transcribe(app: &AppHandle, folder: PathBuf) {
+fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
     let shell = app.state::<Shell>();
     let mut running = shell.transcription.lock().unwrap();
+    // Cancelled before it began: nothing begins (D92).
+    if cancel.cancelled() {
+        return;
+    }
     if running.is_some() {
-        wait(&shell, folder, None);
+        wait(&shell, folder, None, cancel);
         return;
     }
     shell.transcripts_tried.lock().unwrap().insert(folder.clone(), None);
@@ -3820,7 +4128,7 @@ fn transcribe(app: &AppHandle, folder: PathBuf) {
     if matches!(hearer, Hearer::Model(_)) && !model.is_file() {
         // The default model is offered, its size and host shown; one the user named is theirs.
         if *model == Settings::default().model {
-            wait(&shell, folder, None);
+            wait(&shell, folder, None, cancel);
             // Already coming: the session waits for it, and nothing is offered twice.
             if !*shell.fetching.lock().unwrap() {
                 offer(app);
@@ -3854,7 +4162,10 @@ fn transcribe(app: &AppHandle, folder: PathBuf) {
             return;
         }
     };
+    // Held by its token: cancelled meanwhile, it is stopped at once (D92).
+    cancel.hold(transcription.stopper());
     *running = Some(transcription);
+    *shell.transcript_token.lock().unwrap() = Some(cancel.clone());
     hearing(&shell, &folder, &hearer);
     transcribing(app, true);
     let heard_folder = folder;
@@ -3864,15 +4175,26 @@ fn transcribe(app: &AppHandle, folder: PathBuf) {
         let shell = app.state::<Shell>();
         let mut running = shell.transcription.lock().unwrap();
         running.take();
-        let here = heard(&shell, &heard_folder, &made);
+        shell.transcript_token.lock().unwrap().take();
+        let here = heard(&shell, &heard_folder, &made, cancel.cancelled());
         drop(running);
         transcribing(&app, false);
+        // Cancelled: what it began is no version, nor taken up by the next model's making (D92).
+        if here == Heard::Cancelled {
+            let _ = std::fs::remove_file(heard_folder.join("transcript.jsonl"));
+        }
         // Ended by Kitokey as it quits: nothing to tell, it goes on next time.
         if *shell.leaving.lock().unwrap() {
             return;
         }
-        // Ended for its meeting said confidential: made again here, first in line.
-        if here {
+        // Ended for its meeting said confidential: made again here, first in line; cancelled,
+        // nothing told, nothing made after it.
+        if here != Heard::Ended {
+            return transcribe_next(&app);
+        }
+        // Written all the same after « Annuler »: kept, being whole, but nothing follows it — no
+        // notification, no minutes made with a model the user was changing (D92).
+        if cancel.cancelled() {
             return transcribe_next(&app);
         }
         let notice = words::made(&made, shell.language());
@@ -4052,7 +4374,7 @@ fn pull(app: &AppHandle) {
         if outcome.is_ok() {
             let waited: Vec<PathBuf> = shell.ollama_waiting.lock().unwrap().keys().cloned().collect();
             for folder in waited {
-                write_minutes_from(&app, folder, None, None, true);
+                write_minutes_from(&app, folder, None, None, true, Cancel::default());
             }
         }
     });

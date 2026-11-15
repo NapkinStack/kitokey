@@ -22,6 +22,12 @@ if [ "${1:-}" != --inside ]; then
     mkdir -p "$here/../.evidence"
     echo "e2e: NOT RUN — no GNOME to run it in here, missing:$missing" | tee "$here/../.evidence/e2e.txt"; exit 77
   fi
+  # A partial run's names checked before the session is made (scripts/e2e_only.py): a typo refused
+  # at once, named, as e2e.sh would refuse it minutes later.
+  if ! asked=$(python3 -I "$here/e2e_only.py" --asked "$here/e2e_window.py" 2>&1); then
+    mkdir -p "$here/../.evidence"
+    echo "$asked" | tee "$here/../.evidence/e2e.txt"; exit 3
+  fi
   root=${XDG_CACHE_HOME:-$HOME/.cache}/kitokey-headless/run-$$
   mkdir -p "$root/run" "$root/user/.config" "$root/user/.local/share" "$root/user/.local/state" "$root/user/.cache" "$root/tmp"
   chmod 700 "$root/run"
@@ -37,8 +43,9 @@ if [ "${1:-}" != --inside ]; then
     rm -rf "$root"
   }
   trap ended EXIT
-  # Of the user's environment, their tools and caches and NapkinStack's; nothing of their desktop.
-  mapfile -t kept < <(env | grep -E '^(NSTACK_[A-Z_]*|CARGO_TARGET_DIR|KITOKEY_SCREENSHOTS)=' || true)
+  # Of the user's environment, their tools and caches and NapkinStack's, and the scenarios a partial
+  # run plays (KITOKEY_E2E_ONLY, scripts/e2e_only.py); nothing of their desktop.
+  mapfile -t kept < <(env | grep -E '^(NSTACK_[A-Z_]*|CARGO_TARGET_DIR|KITOKEY_SCREENSHOTS|KITOKEY_E2E_ONLY)=' || true)
   setsid env -i PATH="$PATH" USER="$USER" LOGNAME="$USER" LANG="${LANG:-C.UTF-8}" "${kept[@]}" \
     CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
     UV_CACHE_DIR="${UV_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/uv}" \
