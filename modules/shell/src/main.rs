@@ -2740,16 +2740,46 @@ struct ServiceOffered {
     models: Vec<String>,
 }
 
-/// What Refaire offers beyond Settings' own (D96): each online service whose key is kept, with
-/// every model it lists — one that does not answer is left out. A meeting said confidential is
-/// offered none (D60). Read off the window's thread: the keyring may ask the user first.
+/// The services Refaire offers beyond Settings' own (D96): those that write the summary, those
+/// that transcribe.
+#[derive(serde::Serialize, Default)]
+struct ServicesOffered {
+    minutes: Vec<ServiceOffered>,
+    transcription: Vec<ServiceOffered>,
+}
+
+/// What Refaire offers beyond Settings' own (D96): each online service whose key is kept — the
+/// summary's under its host, the transcription's under its own account —, with every model it
+/// lists; one that does not answer is left out. A meeting said confidential is offered none
+/// (D60). Read off the window's thread: the keyring may ask the user first.
 #[tauri::command]
-async fn services_offered(shell: State<'_, Shell>, name: String) -> Result<Vec<ServiceOffered>, Told> {
+async fn services_offered(shell: State<'_, Shell>, name: String) -> Result<ServicesOffered, Told> {
     let folder = session_folder(&shell, &name)?;
     if confidential::marked(&folder) {
-        return Ok(Vec::new());
+        return Ok(ServicesOffered::default());
     }
     tauri::async_runtime::spawn_blocking(|| {
+        let mut hearing: Vec<ServiceOffered> = Vec::new();
+        for service in providers::hearing() {
+            if hearing.iter().any(|known| known.address == service.address) {
+                continue;
+            }
+            let Some(host) = providers::host(&service.address) else {
+                continue;
+            };
+            let Some(key) = keys::key(&transcription::key_account(&host)).ok().flatten() else {
+                continue;
+            };
+            match providers::hearing_models(&service, Some(&key)) {
+                Ok(models) if !models.is_empty() => hearing.push(ServiceOffered {
+                    name: service.name,
+                    address: service.address.clone(),
+                    models,
+                }),
+                Ok(_) => {}
+                Err(cause) => tracing::warn!(cause = ?cause, "shell.services_unread"),
+            }
+        }
         let mut offered: Vec<ServiceOffered> = Vec::new();
         for service in providers::online() {
             // One address once: a stand-in may answer for every service.
@@ -2772,7 +2802,10 @@ async fn services_offered(shell: State<'_, Shell>, name: String) -> Result<Vec<S
                 Err(cause) => tracing::warn!(cause = ?cause, "shell.services_unread"),
             }
         }
-        offered
+        ServicesOffered {
+            minutes: offered,
+            transcription: hearing,
+        }
     })
     .await
     .map_err(|error| shell.told(Failure::Unexpected, error))

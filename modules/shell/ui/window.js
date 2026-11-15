@@ -1252,22 +1252,27 @@ function modelsAdvanced(words, prefix, offered, chosen) {
   box.append(toggle, panel);
   // Each service set up with its key (D96): every model it lists, grouped under its name, as people
   // say them — never Settings' own again, nor one already offered.
-  const services = (offeredServices) => {
-    const known = new Set([...writePick.options].map((option) => option.value));
+  const grouped = (pick, offeredServices, valueOf, saidOf, settings) => {
+    const known = new Set([...pick.options].map((option) => option.value));
     for (const service of offeredServices) {
       const group = element("optgroup");
       group.label = service.name;
       for (const model of service.models) {
-        const value = JSON.stringify({ provider: service.address, model });
-        if (known.has(value) || value === settingsWriting) continue;
-        const option = element("option", "", writerSaid(service.address, model));
+        const value = valueOf(service.address, model);
+        if (known.has(value) || value === settings) continue;
+        const option = element("option", "", saidOf(service.address, model));
         option.value = value;
         group.append(option);
         known.add(value);
       }
-      if (group.childElementCount > 0) writePick.append(group);
+      if (group.childElementCount > 0) pick.append(group);
     }
-    paintWhole(writePick);
+    paintWhole(pick);
+  };
+  const services = (offeredServices) => {
+    grouped(writePick, offeredServices.minutes, (provider, model) => JSON.stringify({ provider, model }), writerSaid, settingsWriting);
+    grouped(hearPick, offeredServices.transcription, (provider, model) => JSON.stringify({ engine: "service", provider, model }),
+      (provider, model) => `${modelSaid(model)}${fill(words.written_via, via(provider))}`, settingsHearing);
   };
   return { box, toggle, panel, models, unfold, services };
 }
