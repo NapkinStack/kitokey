@@ -935,7 +935,10 @@ def list_refreshed(now: dt.datetime) -> None:
     window.env.update(KITOKEY_REGISTRY=f"http://{at}/models.json")
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
-        button = wait_for(browser, lambda b: b.find_elements(By.ID, "offered-refresh"), 10)
+        # « Modèles à télécharger » folded at first (#782): unfolded, as the user does, to reach its button.
+        wait_for(browser, lambda b: b.find_elements(By.ID, "offered-toggle"), 10)
+        press(browser, "offered-toggle")
+        button = wait_for(browser, lambda b: b.find_elements(By.ID, "offered-refresh") and b.find_element(By.ID, "offered-refresh").is_displayed(), 10)
         check("the key built in: a button offers to read the list again, its host shown, nothing said of a key awaited",
               button and at in browser.find_element(By.ID, "offered-refresh").text and "attend la clé" not in browser.execute_script(said)
               and asked == [], (browser.execute_script(said), asked))

@@ -2778,8 +2778,8 @@ function showSettings(shown, minutes, words) {
   pulled.append(pulledSaid, element("span", "state"));
   offered.append(pulled);
   // The list read again from where it is kept, only on this click, its host shown (D40): read,
-  // the page is drawn with it; refused, the list above stays, and it is said. Until the key that
-  // signs it is built in, no click is offered, and that is said (D56).
+  // the page is drawn with it; refused, the list above stays, and it is said — signed by the
+  // decider's key alone, built in since D56.
   const refreshed = element("p", "says");
   refreshed.id = "offered-refreshed";
   refreshed.setAttribute("role", "status");
@@ -2794,7 +2794,6 @@ function showSettings(shown, minutes, words) {
     refresh_.disabled = false;
     refreshed.textContent = words.offered_refresh_failed;
   });
-  if (shown.registry_waits) refreshed.textContent = words.offered_refresh_waits;
   // Folded at first (#782): a disclosure (ARIA APG), as « Avancé », left as the user leaves it when
   // the page is drawn again — a download running in it goes on either way.
   const offeredToggle = element("button", "disclose-advanced");
@@ -2802,7 +2801,7 @@ function showSettings(shown, minutes, words) {
   offeredToggle.id = "offered-toggle";
   offeredToggle.setAttribute("aria-controls", "offered");
   offeredToggle.append(icon("chevron-right"), element("span", "", words.offered_title));
-  const offeredPanel = [offered, ...(shown.registry_waits ? [] : [refresh_]), refreshed];
+  const offeredPanel = [offered, refresh_, refreshed];
   const unfoldOffered = (now) => {
     offeredOpen = now;
     offeredToggle.setAttribute("aria-expanded", String(now));

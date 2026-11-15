@@ -1231,7 +1231,7 @@ const STILL_WRONG: &str = include_str!("words_still_wrong.txt");
 
 /// The sentences still without their comment, counted: 602 keys would be three review budgets.
 /// The number only goes down, as the list does.
-const WITHOUT_COMMENT: usize = 597;
+const WITHOUT_COMMENT: usize = 596;
 
 /// A sentence of `src/words.rs`, as the file arranges it.
 #[derive(Debug)]
@@ -1697,13 +1697,6 @@ fn no_sentence_says_a_word_the_lexicon_refuses() {
         }
     }
     still_wrong("lexicon", wrong);
-}
-
-#[test]
-fn a_list_waiting_on_its_key_says_so_and_what_stays_offered() {
-    let (english, french) = (words::window(Language::English), words::window(Language::French));
-    assert!(english.offered_refresh_waits.contains("waits on the key") && english.offered_refresh_waits.contains("still offered"));
-    assert!(french.offered_refresh_waits.contains("attend la clé") && french.offered_refresh_waits.contains("restent proposés"));
 }
 
 #[test]

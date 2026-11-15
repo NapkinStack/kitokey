@@ -2337,7 +2337,6 @@ struct SettingsShown {
     /// host it is read again from on the user's gesture (D40).
     offered: Vec<Offered>,
     registry_host: String,
-    registry_waits: bool,
     /// The services that hear, offered by name (D63).
     hearing: Vec<providers::Hearing>,
     /// The language meetings are spoken in, none: detected; and those offered first (D65).
@@ -2423,7 +2422,6 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
         transcription_agreed: settings.transcription_agreed.clone(),
         models,
         registry_host: registry::host(&registry_address()).to_owned(),
-        registry_waits: registry::PUBLIC_KEY.is_none(),
         hearing: providers::hearing(),
         meeting_language: settings.meeting_language.clone(),
         languages: spoken::OFFERED.to_vec(),
