@@ -1,6 +1,7 @@
 //! What the engine heard, kept apart from the tracks and made again the same. Sound made here,
 //! no voice of anyone.
 
+mod made;
 mod sound;
 
 use std::{fs, io, path::Path};
@@ -9,6 +10,7 @@ use kitokey_transcription::{
     Segment,
     step::{DERIVED, Engine, MADE, RATE, transcribe},
 };
+use made::unmade;
 use sound::{energy, room, speaking};
 
 /// An engine that writes how loud each span it hears is, and keeps what it was given.
@@ -127,7 +129,7 @@ fn what_the_engine_heard_is_kept_apart_says_what_made_it_and_is_made_again_the_s
             .iter()
             .map(|name| fs::read(derived.join(name)).unwrap())
             .collect();
-        let transcript = fs::read(folder.path().join("transcript.jsonl")).unwrap();
+        let transcript = fs::read_to_string(folder.path().join("transcript.jsonl")).unwrap();
         fs::remove_dir_all(&derived).unwrap();
         transcribe(folder.path(), &mut Loudness::default(), Some("fr"), 300).unwrap();
         let again: Vec<Vec<u8>> = ["local.wav", "remote.wav", MADE]
@@ -138,7 +140,11 @@ fn what_the_engine_heard_is_kept_apart_says_what_made_it_and_is_made_again_the_s
         fs::remove_file(folder.path().join("transcript.jsonl")).unwrap();
         fs::remove_dir_all(&derived).unwrap();
         transcribe(folder.path(), &mut Loudness::default(), Some("fr"), 300).unwrap();
-        assert_eq!(fs::read(folder.path().join("transcript.jsonl")).unwrap(), transcript);
+        // The same to the byte, but for when each run made it whole.
+        assert_eq!(
+            unmade(&fs::read_to_string(folder.path().join("transcript.jsonl")).unwrap()),
+            unmade(&transcript)
+        );
         assert_eq!(
             [
                 fs::read(folder.path().join("me.wav")).unwrap(),
