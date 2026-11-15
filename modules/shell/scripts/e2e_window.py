@@ -5824,6 +5824,8 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
                 status, body = 401, {"error": {"message": "Invalid credentials", "code": 401}}
             elif self.path.endswith("/key"):
                 status, body = 200, {"data": {"label": "stand-in"}}
+            elif self.path.endswith("/models?output_modalities=transcription"):
+                status, body = 200, {"data": [{"id": "openai/whisper-large-v3-turbo"}, {"id": "openai/whisper-large-v3"}]}
             elif self.path.endswith("/models"):
                 status, body = 200, {"data": [{"id": "anthropic/claude-sonnet-4-5"}, {"id": "openai/gpt-4o-mini"}, {"id": "mistralai/mistral-7b-instruct:free"}]}
             else:
@@ -5861,7 +5863,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
         (meetings / name / "minutes.md").write_text("---\ncontract: minutes/v1\nmodel: m\ncontext: null\n---\n\n## A\n\n## B\n\n## C\n")
     (meetings / "2026-10-18_14-00" / "confidential").touch()
     window = Window(meetings, "fr_FR.UTF-8", ollama=f"http://127.0.0.1:{servers[1].server_address[1]}")
-    window.env.update(KITOKEY_ONLINE=stand)
+    window.env.update(KITOKEY_ONLINE=stand, KITOKEY_HEARING=stand)
     options = "return [...document.querySelectorAll(`#${arguments[0]} option`)].filter(o => !o.disabled).map(o => o.textContent)"
     # Each group of a list: its label, and the entries under it.
     grouped = ("const s = document.getElementById(arguments[0]); return s ? [...s.querySelectorAll('optgroup')]"
@@ -5881,6 +5883,17 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "minutes-online-save")
             saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
             check("a service set up in Settings, its key kept, a model saved", saved, window.file.read_text())
+            # A service that transcribes, set up as BG guides it: its key kept under the transcription's account.
+            press(browser, "transcription-online")
+            wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
+            choose(browser, "transcription-service", "0")
+            browser.find_element(By.ID, "transcription-key").send_keys(good)
+            press(browser, "transcription-key-test")
+            wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
+            choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
+            press(browser, "transcription-save")
+            heard = wait_for(browser, lambda b: 'transcription_model = "openai/whisper-large-v3-turbo"' in window.file.read_text(), 5)
+            check("a service that transcribes set up, its key kept, a model saved", heard, window.file.read_text())
             # A meeting's redo panel: the service's models, grouped under its name, beside this computer's.
             browser.execute_script("location.hash = '#/meeting/2026-10-18_12-00'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
@@ -5894,6 +5907,19 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
                   bool(service) and all(any(entry.startswith(name) for entry in service[0]) for name in ("GPT 4o Mini", "Mistral 7b Instruct Free"))
                   and any("sur cet ordinateur" in o for o in offered), (groups, offered))
             check("no raw identifier offered: no « / », no « : » in a model's name", not any("/" in o or ":free" in o for o in offered), offered)
+            # The transcript's redo panel: the service's transcription models, grouped under its name.
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script("location.hash = '#/meeting/2026-10-18_12-00'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 10)
+            press(browser, "redo-transcript")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
+            hearing = redo_offered(browser, "redo-transcript-panel", "transcription")
+            wait_for(browser, lambda b: b.execute_script(grouped, "redo-transcript-panel-transcription-model"), 10)
+            groups = browser.execute_script(grouped, "redo-transcript-panel-transcription-model")
+            service = [models for label, models in (groups or []) if label == "OpenRouter"]
+            check("Refaire the transcript offers the service's transcription models, grouped under its name, as people say them (D96)",
+                  bool(service) and any(entry.startswith("Whisper Large V3") for entry in service[0])
+                  and not any("/" in entry for entry in service[0]), (groups, hearing))
             # Confidential: this computer's models alone.
             browser.execute_script("location.hash = '#/meeting/2026-10-18_14-00'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
@@ -5909,7 +5935,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
                 " window.__TAURI__.core.invoke('services_offered', {name: arguments[0]}).then(done, (why) => done(String(why)))",
                 "2026-10-18_14-00")
             check("a meeting said confidential: no service's models offered — none asked of the service, no group, none of its models (D91, D96)",
-                  answered == [] and not groups and not any(o.startswith(("GPT 4o Mini", "Mistral 7b Instruct Free")) for o in local),
+                  answered == {"minutes": [], "transcription": []} and not groups and not any(o.startswith(("GPT 4o Mini", "Mistral 7b Instruct Free")) for o in local),
                   (answered, groups, local))
     finally:
         for server in servers:
