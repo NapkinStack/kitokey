@@ -5902,8 +5902,15 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             local = redo_offered(browser, "redo-panel", "minutes")
             time.sleep(2)
             groups = browser.execute_script(grouped, "redo-panel-minutes-model")
-            check("a meeting said confidential: Refaire offers the models on this computer alone, no service (D91)",
-                  not groups and not any("Claude" in o or "GPT" in o for o in local), (groups, local))
+            # The service's own answer for it: none. Settings' entry stays — the stand-in is on 127.0.0.1,
+            # which D91 rightly counts as this computer; what D96 adds is held here.
+            answered = browser.execute_async_script(
+                "const done = arguments[arguments.length - 1];"
+                " window.__TAURI__.core.invoke('services_offered', {name: arguments[0]}).then(done, (why) => done(String(why)))",
+                "2026-10-18_14-00")
+            check("a meeting said confidential: no service's models offered — none asked of the service, no group, none of its models (D91, D96)",
+                  answered == [] and not groups and not any(o.startswith(("GPT 4o Mini", "Mistral 7b Instruct Free")) for o in local),
+                  (answered, groups, local))
     finally:
         for server in servers:
             server.shutdown()
