@@ -451,6 +451,9 @@ pub struct Window {
     pub service_test: &'static str,
     pub service_tested: &'static str,
     pub service_saved: &'static str,
+    /// Shows: Settings, « Transcription », under the service's form, once saved. When: the address saved is
+    /// this computer's, where nothing leaves it (#775). At most: one line. Placeholders: none.
+    pub service_saved_here: &'static str,
     pub service_agree_first: &'static str,
     pub service_address_bad: &'static str,
     pub service_model_named: &'static str,
@@ -923,6 +926,7 @@ pub fn window(language: Language) -> Window {
             service_test: "Test",
             service_tested: "It hears, with each segment’s times: a sound of Kitokey’s own was transcribed.",
             service_saved: "Saved: {} hears your next meetings.",
+            service_saved_here: "Saved: this computer hears your next meetings.",
             service_agree_first: "Nothing is saved: agree first that your meetings’ sound is sent to {}.",
             service_address_bad: "Nothing is saved: the address starts with https:// or http://, then the service’s host — for example https://api.groq.com/openai/v1.",
             service_model_named: "Nothing is saved: name the model the service hears with — for example whisper-large-v3.",
@@ -1348,6 +1352,7 @@ pub fn window(language: Language) -> Window {
             service_test: "Tester",
             service_tested: "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit.",
             service_saved: "Enregistré\u{a0}: {} transcrira vos prochaines réunions.",
+            service_saved_here: "Enregistré\u{a0}: cet ordinateur transcrira vos prochaines réunions.",
             service_agree_first: "Rien n’est enregistré\u{a0}: acceptez d’abord que le son de vos réunions soit envoyé à {}.",
             service_address_bad: "Rien n’est enregistré\u{a0}: l’adresse commence par https:// ou http://, puis l’hôte du service — par exemple https://api.groq.com/openai/v1.",
             service_model_named: "Rien n’est enregistré\u{a0}: nommez le modèle avec lequel le service entend — par exemple whisper-large-v3.",
