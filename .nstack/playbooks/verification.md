@@ -25,8 +25,9 @@ The session that wrote the change cannot verify it: start another session, with 
 context, or hand the sheet to a human. Sign the sheet with your session's identifier —
 `Verifier: session <id>` — or, as a person, `Verifier: @<handle>`. CI compares it with the
 change's authors and refuses a match; each person named must have written the sheet into the
-description or reviewed the pull request, under their own account — either starts the check
-again; a comment counts too, read at the next run.
+description or reviewed or commented on the pull request, under their own account. Writing the
+sheet starts the check again; a review or a comment is read at the next run, which any edit of the
+description starts.
 
 ### Your own ground
 
@@ -34,7 +35,11 @@ You verify on someone's machine, beside work that goes on. Leave it as you found
 
 - **A copy of your own**: a working tree checked out at the head, and build outputs of your
   own. A tree another session edits, or outputs another branch built, give results that are
-  not this change's.
+  not this change's. Where a sandbox keeps `.git` read-only, a worktree cannot be added: a
+  `git clone --shared <your clone> <scratch>` checked out at the head is that copy, `<scratch>`
+  and build outputs both under your own cache (`$XDG_CACHE_HOME`, which `nstack agent run <name> --
+  claude` sets — for Cargo, `CARGO_TARGET_DIR` there), never the system's temporary folder, which a quota shares with
+  everyone on the machine. Both are deleted when you leave.
 - **The machine's shared state** — a default device, a setting, a service, data others read —
   is touched only as the scenario needs, and is put back after each run, also on failure.
   What another program holds — a user's own running copy of the product, their files — is
@@ -94,7 +99,7 @@ mutant. A mutant can make the code loop forever, so it is never run unbounded:
 - **By hand**, one mutant per run, each run under a time limit — `timeout 120 <the module's test
   command>`; a timeout counts as killed: the mutant changed what the code does.
 - **The source restored on every exit**, not only at the end — `trap 'git checkout -- <file>'
-  EXIT`, or mutate in a throwaway worktree.
+  EXIT`, or mutate in a throwaway copy of your own (above).
 - **Report the counts** — killed, survived, timed out — and each survivor with its line: a
   survivor is a test that does not pin what it claims.
 
