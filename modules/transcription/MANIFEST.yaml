@@ -103,6 +103,12 @@ dependencies:
     exit_strategy: >
       One function, `opened` in src/flac.rs, held by tests/tracks.rs and tests/as_delivered.rs on FLACs
       libFLAC wrote; claxon, or libFLAC's own decoder, passes them in its place (ADR-0016).
+  - name: chrono
+    purpose: When the transcript was made whole, its `complete` line's `made`, in this computer's time
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      One call in `complete`, src/lib.rs, held by tests/writing.rs; the same crate and call as
+      capture's, summary's and the shell's.
   - name: tracing
     purpose: The steps and failures the program logs, as events of a run (ADR-0007)
     adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md

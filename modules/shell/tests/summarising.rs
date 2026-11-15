@@ -212,3 +212,43 @@ fn a_test_is_read_from_its_last_lines() {
         "a-program stopped without saying why (exit status: 3)"
     );
 }
+
+#[test]
+fn cancelled_minutes_end_within_two_seconds_with_what_they_started_the_minutes_there_kept() {
+    let _held = ONE_AT_A_TIME.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let folder = session();
+    let minutes = folder.path().join("session/minutes.md");
+    fs::write(&minutes, "the minutes before").unwrap();
+    let path = folder.path().join("kitokey-summary");
+    fs::write(
+        &path,
+        "#!/bin/sh\necho '{\"event\": \"sending\", \"host\": \"h\", \"model\": \"m\", \"characters\": 1}'\n( trap '' TERM; exec sleep 60 ) & echo $! > \"$1/child\"\nsleep 60\n",
+    )
+    .unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    let (making, events) = Summarising::start(&path, &folder.path().join("session"), "http://localhost:11434/v1", "m", None).unwrap();
+    let child = folder.path().join("session/child");
+    for _ in 0..50 {
+        if fs::read_to_string(&child).is_ok_and(|pid| !pid.trim().is_empty()) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let child = fs::read_to_string(&child).expect("the program never started its child");
+    let until = std::time::Instant::now() + Duration::from_secs(2);
+    making.cancel();
+    let ended = loop {
+        match events.recv_timeout(until.saturating_duration_since(std::time::Instant::now())) {
+            Ok(Event::Ended(made)) => break made,
+            Ok(_) => {}
+            Err(_) => panic!("not ended within two seconds"),
+        }
+    };
+    assert!(matches!(ended, Made::Failed(..)), "{ended:?}");
+    let stat = fs::read_to_string(format!("/proc/{}/stat", child.trim())).unwrap_or_default();
+    assert!(
+        stat.is_empty() || stat.rsplit_once(')').is_some_and(|(_, rest)| rest.trim_start().starts_with('Z')),
+        "its child still runs"
+    );
+    assert_eq!(fs::read_to_string(&minutes).unwrap(), "the minutes before");
+}
