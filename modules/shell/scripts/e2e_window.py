@@ -5809,6 +5809,105 @@ def redo_choice_starts_nothing(now: dt.datetime) -> None:
     finally:
         tags.shutdown()
 
+def redo_offers_the_services_models(now: dt.datetime) -> None:
+    """BQ. D96, criterion 1. A service set up in Settings with its key: the redo panel of a meeting's summary
+    offers the models that service lists, said as people say them and grouped under the service's name,
+    beside those on this computer — not Settings' one alone; a meeting said confidential is offered the
+    models on this computer alone (D91)."""
+    print("BQ. Refaire: a service set up with its key offers every model it lists, grouped under its name (D96)")
+    good = "sk-stand-in-good"
+
+    class Service(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            key = (self.headers.get("authorization") or "").removeprefix("Bearer ")
+            if key != good:
+                status, body = 401, {"error": {"message": "Invalid credentials", "code": 401}}
+            elif self.path.endswith("/key"):
+                status, body = 200, {"data": {"label": "stand-in"}}
+            elif self.path.endswith("/models"):
+                status, body = 200, {"data": [{"id": "anthropic/claude-sonnet-4-5"}, {"id": "openai/gpt-4o-mini"}, {"id": "mistralai/mistral-7b-instruct:free"}]}
+            else:
+                status, body = 404, {}
+            raw = json.dumps(body).encode()
+            self.send_response(status)
+            self.send_header("content-length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_):
+            pass
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            raw = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            self.send_response(200)
+            self.send_header("content-length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_):
+            pass
+
+    servers = [http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler) for handler in (Service, Tags)]
+    for server in servers:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    stand = f"http://127.0.0.1:{servers[0].server_address[1]}/api/v1"
+    meetings = WORK / "redo-services"
+    made = '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n' \
+           '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n'
+    for name in ("2026-10-18_12-00", "2026-10-18_14-00"):
+        session(meetings / name, now - dt.timedelta(hours=2), 3, {"local.wav": 1000})
+        (meetings / name / "transcript.jsonl").write_text(made)
+        (meetings / name / "minutes.md").write_text("---\ncontract: minutes/v1\nmodel: m\ncontext: null\n---\n\n## A\n\n## B\n\n## C\n")
+    (meetings / "2026-10-18_14-00" / "confidential").touch()
+    window = Window(meetings, "fr_FR.UTF-8", ollama=f"http://127.0.0.1:{servers[1].server_address[1]}")
+    window.env.update(KITOKEY_ONLINE=stand)
+    options = "return [...document.querySelectorAll(`#${arguments[0]} option`)].filter(o => !o.disabled).map(o => o.textContent)"
+    # Each group of a list: its label, and the entries under it.
+    grouped = ("const s = document.getElementById(arguments[0]); return s ? [...s.querySelectorAll('optgroup')]"
+               ".map(g => [g.label, [...g.querySelectorAll('option')].map(o => o.textContent)]) : null")
+    try:
+        with window as browser:
+            # The service set up as Settings guide it (BJ): a service, its key tested and kept, a model saved.
+            browser.find_element(By.ID, "settings-link").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-where"), 5)
+            press(browser, "minutes-online")
+            wait_for(browser, lambda b: b.execute_script(options, "minutes-service"), 5)
+            choose(browser, "minutes-service", "0")
+            browser.find_element(By.ID, "minutes-key").send_keys(good)
+            press(browser, "minutes-key-test")
+            wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
+            choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
+            press(browser, "minutes-online-save")
+            saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
+            check("a service set up in Settings, its key kept, a model saved", saved, window.file.read_text())
+            # A meeting's redo panel: the service's models, grouped under its name, beside this computer's.
+            browser.execute_script("location.hash = '#/meeting/2026-10-18_12-00'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+            press(browser, "redo-minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+            offered = redo_offered(browser, "redo-panel", "minutes")
+            groups = wait_for(browser, lambda b: b.execute_script(grouped, "redo-panel-minutes-model"), 10)
+            groups = browser.execute_script(grouped, "redo-panel-minutes-model")
+            service = [models for label, models in (groups or []) if label == "OpenRouter"]
+            check("Refaire offers the service's models, grouped under its name, each as people say it, beside this computer's (D96)",
+                  bool(service) and all(any(entry.startswith(name) for entry in service[0]) for name in ("GPT 4o Mini", "Mistral 7b Instruct Free"))
+                  and any("sur cet ordinateur" in o for o in offered), (groups, offered))
+            check("no raw identifier offered: no « / », no « : » in a model's name", not any("/" in o or ":free" in o for o in offered), offered)
+            # Confidential: this computer's models alone.
+            browser.execute_script("location.hash = '#/meeting/2026-10-18_14-00'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+            press(browser, "redo-minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+            local = redo_offered(browser, "redo-panel", "minutes")
+            time.sleep(2)
+            groups = browser.execute_script(grouped, "redo-panel-minutes-model")
+            check("a meeting said confidential: Refaire offers the models on this computer alone, no service (D91)",
+                  not groups and not any("Claude" in o or "GPT" in o for o in local), (groups, local))
+    finally:
+        for server in servers:
+            server.shutdown()
+
 def two_panes(now: dt.datetime) -> None:
     """AD. The window in two panes: the meetings in a sidebar, the one chosen beside them (D61)."""
     print("AD. the window in two panes: the sidebar, the meeting chosen beside it, as wide as the window (D61)")
@@ -9883,6 +9982,7 @@ def main() -> int:
     microphone_latest_answer(now)
     microphone_rollback(now)
     redo_choice_starts_nothing(now)
+    redo_offers_the_services_models(now)
     settings_folded(now)
     sound_checked(now)
     bar_window(now)
