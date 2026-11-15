@@ -190,6 +190,7 @@ recorder=$(pgrep -P "$app" -f kitokey-capture || true)
 kill -KILL "$app"; sleep 1
 check test ! -e "$work/sessions/told"          # the recorder was not told to stop
 check kill -0 "$recorder"                       # and it records on
+kill "$recorder" 2>/dev/null || true            # gone before the next start finds it (S2)
 
 say "D. no recorder, or one that ends before it starts: said, and the menu still offers to start"
 start en_GB.UTF-8 "transcript = false" "$work/nowhere"
@@ -208,7 +209,7 @@ check is "$(grep -c 'nothing to record' "$work/notified")" 0
 click 6
 
 say "E. one gesture, pressed twice: one recording; a recorder that never ends: quit asked twice leaves"
-printf '#!/bin/sh\necho x >> "$2/starts"\necho "{\\"event\\":\\"started\\",\\"folder\\":\\"$2/s\\"}"\nwhile read line; do echo "$line" >> "$2/told"; done\nexec sleep 20\n' > "$work/stubborn"; chmod +x "$work/stubborn"
+printf '#!/bin/sh\necho $$ > "$2/stubborn"\necho x >> "$2/starts"\necho "{\\"event\\":\\"started\\",\\"folder\\":\\"$2/s\\"}"\nwhile read line; do echo "$line" >> "$2/told"; done\nexec sleep 20\n' > "$work/stubborn"; chmod +x "$work/stubborn"
 start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/stubborn"
 busctl --user call "$bus" "$menu" com.canonical.dbusmenu Event isvu 3 clicked s "" 0 >/dev/null
 click 3
@@ -220,6 +221,7 @@ check is "$(cat "$work/sessions/told")" "stop"
 check is "$(kill -0 "$app" 2>/dev/null && echo waiting || echo gone)" "waiting"
 click 6
 check is "$(kill -0 "$app" 2>/dev/null && echo waiting || echo gone)" "gone"
+kill "$(cat "$work/sessions/stubborn")" 2>/dev/null || true   # still going: gone before F's start finds it
 
 say "F. the transcript follows the stop; a failed one is made again from the menu; no model is said"
 # The logs' level chosen in the developer mode reaches the programs Kitokey starts (D29).
@@ -497,6 +499,72 @@ else
   pactl set-default-source "$old_source"; old_source=""
   pactl unload-module "$mic_module"; mic_module=""
 fi
+
+say "S2. Kitokey ended while recording, started again: the recording it left is found, shown from its start, and stopped (#773)"
+# The recorder played as the real one behaves when its shell is gone: the session's file written at the
+# start, its input closed and its output gone no order to stop, stopped by a signal (recording/v1).
+cat > "$work/orphaned" <<'PLAYED'
+#!/bin/sh
+trap '' PIPE
+echo "$1 $2" > "$2/given"; echo $$ > "$2/recorder"
+folder="$2/2026-11-13_09-00"; mkdir -p "$folder"
+since=$(date -d '-90 seconds' +%Y-%m-%dT%H:%M:%S%:z)
+printf '{"contract":"session-audio/v3","started":"%s","tracks":{}}\n' "$since" > "$folder/session.json"
+stop() {
+  printf '{"contract":"session-audio/v3","started":"%s","stopped":"%s","tracks":{}}\n' "$since" "$(date +%Y-%m-%dT%H:%M:%S%:z)" > "$folder/session.json"
+  echo "{\"event\":\"stopped\",\"folder\":\"$folder\",\"seconds\":90}"; exit 0
+}
+trap 'echo signal > "$2/told"; stop' TERM INT
+trap stop USR1
+echo "{\"event\":\"started\",\"folder\":\"$folder\"}"
+( while read line; do echo "$line" > "$2/told"; kill -USR1 $$; done ) &
+while :; do sleep 0.2 & wait $!; done
+PLAYED
+chmod +x "$work/orphaned"
+start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"" "$work/orphaned"
+click 3
+recorder=$(cat "$work/sessions/recorder")
+kill -TERM "$app"; wait "$app" 2>/dev/null || true; app=""
+check test ! -e "$work/sessions/told"          # the recorder was not told to stop
+check kill -0 "$recorder"                       # and it records on
+start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"" "$work/orphaned"; sleep 1
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"         # no second recording was started
+found=$(cat "$work"/state/kitokey/logs/shell.*.jsonl 2>/dev/null | grep '"message":"shell.recording_found"' | grep -o '"seconds":[0-9.]*' | tail -1 | cut -d: -f2 || true)
+check test "${found%.*}" -ge 90 2>/dev/null      # its length counted from the session's start
+# Started again while it shows the recording found: the running one keeps it, nothing started anew.
+again
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"
+click 3; sleep 1
+check is "$(cat "$work/sessions/told")" "signal"
+check is "$(kill -0 "$recorder" 2>/dev/null && echo recording || echo ended)" "ended"
+check grep -q '"stopped"' "$work/sessions/2026-11-13_09-00/session.json"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(tail -1 "$work/sessions/heard")" "$work/sessions/2026-11-13_09-00 --model $work/model.bin"
+check test ! -e "$work/config/kitokey/recording.json"   # nothing kept once it ended
+click 6
+rm -rf "$work/sessions/2026-11-13_09-00"
+# Killed outright (SIGKILL), as a crash leaves it: found all the same, and Quit stops it first (as B).
+start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"
+click 3
+recorder=$(cat "$work/sessions/recorder")
+kill -KILL "$app"; wait "$app" 2>/dev/null || true; app=""
+check kill -0 "$recorder"
+start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"; sleep 1
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"
+click 6
+check is "$(cat "$work/sessions/told")" "signal"
+check is "$(kill -0 "$recorder" 2>/dev/null && echo recording || echo ended) $(kill -0 "$app" 2>/dev/null && echo running || echo gone)" "ended gone"
+check grep -q '"stopped"' "$work/sessions/2026-11-13_09-00/session.json"
+check test ! -e "$work/config/kitokey/recording.json"
+# Started once more: nothing is left to find.
+start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"; sleep 1
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check test ! -e "$work/sessions/given"
+click 6
+rm -rf "$work/sessions/2026-11-13_09-00" "$work/sessions/recorder"
 
 # The window (cycle 03): Kitokey started with --window by tauri-driver, its page read over
 # WebDriver (scripts/e2e_window.py). For a few seconds a window appears, twice.

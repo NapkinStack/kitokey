@@ -308,6 +308,11 @@ evidence:
     - pattern: '"message":"shell\.microphones_unread"'
       level: warning
       scenario: AO
+    # The window's AO records with the settings' folder unwritable: the recording is not kept for a
+    # Kitokey started again to find (#773).
+    - pattern: '"message":"shell\.recording_not_kept"'
+      level: warning
+      scenario: AO
     # The window's AN starts a recording with no microphone to open, its side said waiting (D49).
     - pattern: '"message":"shell\.recording_unavailable"'
       level: warning
@@ -345,10 +350,10 @@ evidence:
     - pattern: '"message":"shell\.minutes_refused"'
       level: warning
       scenario: M
-    # The window's BE: a false key refused when the summary's service is asked its models (D95).
+    # The window's BJ: a false key refused when the summary's service is asked its models (D95).
     - pattern: '"message":"shell\.models_refused"'
       level: warning
-      scenario: BE
+      scenario: BJ
     # Tester, a service that refuses the key.
     - pattern: '"message":"shell\.test_failed"'
       level: error

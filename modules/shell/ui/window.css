@@ -181,6 +181,9 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
 select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--ink); font: inherit; }
 .warn { padding: 12px 16px; color: var(--ink); }
+/* The settings unreadable (#770): a strip above the page, its sentence and the way to Settings, as GNOME's banner. */
+.banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; margin: 16px 24px 0; padding: 12px 16px; border-radius: 12px; background: var(--raised); color: var(--ink); }
+.banner p { margin: 0; }
 /* In developer mode, a command's raw failure on the line under its sentence (D47). */
 .warn, #language-said, #context-said, #correction-said, #minutes-tested, #transcription-said, #free-said, #welcome-said { white-space: pre-line; }
 .fields { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
@@ -549,10 +552,10 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
   body.no-meeting[data-at="list"] .pane { display: block; }
   /* A sentence of the pane said at the list's address: it alone above the list, the pane's other
      children — what to do with no meeting — staying under the header. */
-  body[data-at="list"]:has(#pane-said:not([hidden])) .frame { flex-direction: column; align-items: stretch; }
-  body[data-at="list"]:has(#pane-said:not([hidden])) .pane { display: contents; }
-  body[data-at="list"]:has(#pane-said:not([hidden])) #pane-said, body[data-at="list"]:has(#pane-said:not([hidden])) #pane-again { order: -1; }
-  body[data-at="list"]:has(#pane-said:not([hidden])) .pane > .back { display: none; }
+  body[data-at="list"]:has(#pane-said:not([hidden]), #settings-banner) .frame { flex-direction: column; align-items: stretch; }
+  body[data-at="list"]:has(#pane-said:not([hidden]), #settings-banner) .pane { display: contents; }
+  body[data-at="list"]:has(#pane-said:not([hidden])) #pane-said, body[data-at="list"]:has(#pane-said:not([hidden])) #pane-again, body[data-at="list"] #settings-banner-live { order: -1; }
+  body[data-at="list"]:has(#pane-said:not([hidden]), #settings-banner) .pane > .back { display: none; }
   .pane > .back { display: inline-block; margin: 8px 0 0 16px; }
   .pane > main { padding: 12px 16px 40px; }
   .meeting-head { margin: 0 -16px; padding: 8px 16px; }

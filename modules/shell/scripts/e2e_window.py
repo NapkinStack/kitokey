@@ -1236,10 +1236,10 @@ def service_named(now: dt.datetime) -> None:
 
 
 def models_guided(now: dt.datetime) -> None:
-    """BE. D95, criterion 2. The summary set up in « Modèles » as one guided path: here or a service; a
+    """BJ. D95, criterion 2. The summary set up in « Modèles » as one guided path: here or a service; a
     service named, its key tested at once against a stand-in made for the run — refused, said with
     its cause; taken, its models listed as people say them —; no address typed but under « Avancé »."""
-    print("BE. Settings: the summary set up in a few guided steps, a service's key tested at once (D95)")
+    print("BJ. Settings: the summary set up in a few guided steps, a service's key tested at once (D95)")
     good, false = "sk-stand-in-good", "sk-stand-in-false"
     asked = []
 
@@ -2665,6 +2665,12 @@ def models_advanced(now: dt.datetime) -> None:
             check("Settings unchanged by any of it", window.file.read_text() == before, window.file.read_text())
             # Stopped by ■: nothing kept for the next, nothing said kept — as the shell has it.
             wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+            # Stopped with « Avancé » open on that meeting's models: drawn again for the next recording,
+            # closed, Settings' first — never left open on the meeting that ended (#766, P5).
+            rest = wait_for(browser, lambda b: b.execute_script(shown, "small")["heard"] == "Réglages : Whisper adv settings", 3)
+            got = browser.execute_script(shown, "small")
+            check("stopped by ■ with « Avancé » open: drawn again for the next recording, closed, Settings' first",
+                  rest and got["expanded"] == "false" and got["written"] == "Réglages : Qwen3 14b", got)
             none_kept = lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
             quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
             check("stopped by ■: no models kept for the next, and none said kept", quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
@@ -2687,8 +2693,22 @@ def models_advanced(now: dt.datetime) -> None:
                 tray_click("Démarrer")
                 wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
                 time.sleep(0.6)
+                # « Avancé » opened on this meeting's models, then stopped from the tray: the bar's own
+                # stop is not the only one that draws it again for the next (#766, P5).
+                wait_for(browser, lambda b: b.execute_script(shown, "small")["expanded"] == "false", 5)
+                time.sleep(0.5)
+                if browser.execute_script("return document.getElementById('small-options').hidden"):
+                    browser.execute_script("document.getElementById('small-more').click()")
+                browser.execute_script("document.getElementById('small-advanced').click()")
+                ours = wait_for(browser, lambda b: b.execute_script(shown, "small")["written"] == "Mistral 7b — sur cet ordinateur"
+                                and b.execute_script(shown, "small")["expanded"] == "true", 5)
+                check("recording from the tray: « Avancé » open on this meeting's models", ours, browser.execute_script(shown, "small"))
                 tray_click("Arrêter l’enregistrement")
                 wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+                rest = wait_for(browser, lambda b: b.execute_script(shown, "small")["written"] == "Réglages\u00a0: Qwen3 14b", 3)
+                got = browser.execute_script(shown, "small")
+                check("stopped from the tray with « Avancé » open: drawn again for the next recording, closed, Settings' first",
+                      rest and got["expanded"] == "false" and got["heard"] == "Réglages\u00a0: Whisper adv settings", got)
                 quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
                 check("started and stopped from the tray's icon: no models kept for the next, and none said kept",
                       quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
@@ -2701,6 +2721,9 @@ def models_advanced(now: dt.datetime) -> None:
                 check("started again after a recording took them: no models kept, none said, nothing on disk",
                       none_kept(browser) == {} and browser.execute_script(line) is None and not next_models.exists(),
                       [none_kept(browser), browser.execute_script(line), next_models.exists()])
+                got = browser.execute_script(shown, "small")
+                check("started again: « Avancé » closed, Settings' first in both lists",
+                      got["expanded"] == "false" and got["heard"] == "Réglages\u00a0: Whisper adv settings" and got["written"] == "Réglages\u00a0: Qwen3 14b", got)
                 wait_for(None, lambda b: (meeting / "transcript.jsonl").exists(), 15)
                 wait_for(browser, lambda b: b.execute_script(idle), 15)
             finally:
@@ -3740,6 +3763,57 @@ def bar_window(now: dt.datetime) -> None:
         browser.execute_script("window.__TAURI__.core.invoke('full_window', {page: '#/settings'})")
         check("hidden, then closed for the full window on a page: « Afficher la barre » leaves the menu",
               wait_for(None, lambda b: "Afficher la barre" not in tray_labels(), 5), tray_labels())
+
+
+def recording_found(now: dt.datetime) -> None:
+    """BE. A recording left running by a Kitokey ended before this one, found at the start (#773): the bar
+    shows it with ■ and its time from the session's own start, and its ■ stops it by a signal."""
+    print("BE. a recording left running by an ended Kitokey: the bar shows ■ and its time from its real start, and stops it (#773)")
+    taping = WORK / "recording-found"
+    taping.mkdir()
+    folder = taping / "2026-11-13_09-00"
+    folder.mkdir()
+    started = dt.datetime.now().astimezone() - dt.timedelta(seconds=90)
+    stamp = started.isoformat(timespec="seconds")
+    (folder / "session.json").write_text(json.dumps({"contract": "session-audio/v3", "started": stamp, "tracks": {}}))
+    # The recorder as the real one is once its shell is gone: no input, no one reading it, stopped by a signal
+    # that writes `stopped` (recording/v1, session-audio).
+    script = (
+        "trap '' PIPE\n"
+        "trap 'echo signal > \"$1/told\"; printf %s \"$2\" > \"$1/session.json\"; exit 0' TERM INT\n"
+        "while :; do sleep 0.1 & wait $!; done\n"
+    )
+    ended = json.dumps({"contract": "session-audio/v3", "started": stamp, "stopped": dt.datetime.now().astimezone().isoformat(timespec="seconds"), "tracks": {}})
+    recorder = subprocess.Popen(["sh", "-c", script, "sh", str(folder), ended], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    try:
+        since = int(Path(f"/proc/{recorder.pid}/stat").read_text().rsplit(")", 1)[1].split()[19])
+        window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True)
+        kept = window.file.parent / "recording.json"
+        kept.write_text(json.dumps({"id": recorder.pid, "since": since, "folder": str(folder)}))
+        begun = time.monotonic()
+        with window as browser:
+            shown = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+            check("found at the start: the bar shows ■, ● gone, the tray's icon red",
+                  shown and not browser.find_element(By.ID, "small-record").is_displayed() and tray_colour() == "red", tray_colour())
+            clock = browser.find_element(By.CSS_SELECTOR, "#small .time").text
+            parts = clock.split(":")
+            seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2]) if len(parts) == 3 and all(p.isdigit() for p in parts) else -1
+            upper = 90 + (time.monotonic() - begun) + 2
+            check("its time counted from the session's start, not from Kitokey's", 90 <= seconds <= upper, (clock, upper))
+            check("the recorder is not told anything by being found", recorder.poll() is None and not (folder / "told").exists())
+            stop_from_small(browser)
+            gone = wait_for(None, lambda b: recorder.poll() is not None, 10)
+            check("■ in the bar stops it by a termination signal, as the line stop would", gone and recorder.returncode == 0
+                  and (folder / "told").read_text().strip() == "signal", recorder.returncode)
+            check("its session says stopped", "stopped" in json.loads((folder / "session.json").read_text()))
+            back = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed() and tray_colour() == "blue", 10)
+            check("the bar and the tray back at rest", back, tray_colour())
+            check("nothing kept for the next start", wait_for(None, lambda b: not kept.exists(), 5))
+    finally:
+        if recorder.poll() is None:
+            recorder.kill()
+        recorder.wait()
 
 
 def bar_opened(now: dt.datetime) -> None:
@@ -5144,6 +5218,11 @@ def two_panes(now: dt.datetime) -> None:
             drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "app-language") and b.find_element(By.ID, "app-language").is_displayed(), 10)
             over = browser.execute_script(SETTINGS_OVERFLOW)
             check(f"Settings, {width} px wide: nothing past its card or the window, each box measured (D95, #782)", drawn and over == [], over)
+            # The top of Settings, before anything below is scrolled to.
+            if width in (1920, 420):
+                browser.execute_script("window.scrollTo(0, 0)")
+                seen(browser, f"d95-settings-{width}-light")
+                seen(browser, f"d95-settings-{width}-dark")
             if width == 420:
                 # « Avancé » unfolded, the developer mode on: the logs' level and folder measured too.
                 advanced_unfolded(browser).click()
@@ -5153,12 +5232,14 @@ def two_panes(now: dt.datetime) -> None:
                 advanced_unfolded(browser).click()
                 wait_for(browser, lambda b: not b.find_elements(By.ID, "open-logs"), 5)
                 # « Modèles », the card the 0.2.5 audit saw spill at 420 px: seen, in both themes.
-                browser.execute_script("document.getElementById('model').scrollIntoView({block: 'start'})")
+                # The card whole, its title first: scrolled to the card, not to its select.
+                browser.execute_script("document.getElementById('model').closest('section.card').scrollIntoView({block: 'start'})")
                 seen(browser, "d95-settings-420-models-light")
                 seen(browser, "d95-settings-420-models-dark")
-            if width in (1920, 420):
-                seen(browser, f"d95-settings-{width}-light")
-                seen(browser, f"d95-settings-{width}-dark")
+                # Taller than the window at 420 px: its lower part too, so that the two shots show it whole.
+                browser.execute_script("document.getElementById('model').closest('section.card').scrollIntoView({block: 'end'})")
+                seen(browser, "d95-settings-420-models-end-light")
+                seen(browser, "d95-settings-420-models-end-dark")
             if width == 1920:
                 left, right, room_left, room_right = browser.execute_script(SETTINGS_CENTRED)
                 check("Settings at 1920 px: one column centred in the room it has, not stuck to its left (D95, #782)",
@@ -7464,6 +7545,7 @@ def main() -> int:
         browser.find_element(By.ID, "find").send_keys(Keys.TAB)
         focused = browser.execute_script("return document.activeElement.className")
         check("then the first meeting", "session" in focused, focused)
+        check("settings readable, meetings listed: no banner (#770)", browser.execute_script("return document.getElementById('settings-banner-live').childElementCount") == 0)
         browser.execute_script("[...document.querySelectorAll('#groups .session')].at(-1).focus()")
         browser.switch_to.active_element.send_keys(Keys.TAB)
         focused = browser.execute_script("return document.activeElement.id")
@@ -7848,6 +7930,104 @@ def main() -> int:
         said = not_saved()
         check("developer mode on, the raw text is under the sentence of the command that failed, without its path", said == f"{refused}\n{raw}", said)
         check("developer mode on, the raw text is under the settings file's sentence too", unreadable() == f"{locked_said}\n{raw}", unreadable())
+        # Started with that file unreadable (#770): the folder it names is not known, so its meetings
+        # are not listed — a banner says so on every page but Réglages, and leads there; the list
+        # never says « Aucune réunion ». The file fixed, the banner goes and the meeting is listed.
+        session(elsewhere / "kept", now - dt.timedelta(hours=1), 10, {"transcript.jsonl": 100})
+        window.__exit__()
+        browser = window.__enter__()
+        banner = ("const b = document.getElementById('settings-banner');"
+                  "return b && b.getClientRects().length > 0 ? [document.getElementById('settings-banner-said').textContent,"
+                  " document.getElementById('settings-banner-link').textContent, document.getElementById('settings-banner-link').getAttribute('href')] : null")
+        empty_said = "const e = document.getElementById('empty'); return e.getClientRects().length > 0 ? e.textContent : null"
+        shown = wait_for(browser, lambda b: b.execute_script(banner) is not None, 10)
+        check("started with the settings unreadable: a banner says the meetings are not shown, and leads to Réglages",
+              shown and browser.execute_script(banner)
+              == ["Les réglages ne peuvent pas être lus : vos réunions ne sont pas affichées.", "Réglages", "#/settings"],
+              browser.execute_script(banner))
+        check("started with the settings unreadable: the list never says no meeting", browser.execute_script(empty_said) is None,
+              browser.execute_script(empty_said))
+        browser.execute_script("window.bannerBefore = document.getElementById('settings-banner')")
+        said_before = browser.execute_script(banner)
+        browser.find_element(By.ID, "settings-banner-link").click()
+        there = wait_for(browser, lambda b: b.find_elements(By.ID, "settings-unreadable") and b.find_element(By.ID, "settings-unreadable").is_displayed(), 5)
+        check("the banner's link opens Réglages, which says why; the banner is not shown twice there",
+              there and browser.execute_script(banner) is None, browser.execute_script(banner))
+        browser.execute_script("location.hash = '#/'")
+        kept_shown = wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
+        check("back on the list: the banner still there", kept_shown, browser.execute_script(banner))
+        same = browser.execute_script("const b = document.getElementById('settings-banner');"
+                                      " return b === window.bannerBefore && b.parentElement.id === 'settings-banner-live'")
+        check("back from Réglages: the same node, the same words — not put in anew, so not said again (T10)",
+              same and browser.execute_script(banner) == said_before, [same, browser.execute_script(banner), said_before])
+        window.file.write_text(held)
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        gone = wait_for(browser, lambda b: b.execute_script(banner) is None and "kept" in b.execute_script(
+            "return [...document.querySelectorAll('#groups a')].map(a => a.getAttribute('href')).join(' ')"), 5)
+        check("the file fixed: the banner gone, the meeting listed", gone,
+              [browser.execute_script(banner), browser.execute_script("return document.getElementById('groups').textContent")])
+        # Broken while the window is open: the banner comes into a live region already there, empty —
+        # what a screen reader announces (ARIA APG, MDN « ARIA live regions »); a region filled before
+        # it is shown is not. Listed again, the same banner: never put in anew, never said again.
+        region = ("const l = document.getElementById('settings-banner-live');"
+                  "return l && [l.getAttribute('role'), getComputedStyle(l).display !== 'none', l.childElementCount]")
+        check("the file read: the banner's live region there, rendered, empty", browser.execute_script(region) == ["status", True, 0],
+              browser.execute_script(region))
+        # On a meeting's page when it breaks: the banner there too.
+        browser.execute_script("location.hash = '#/meeting/kept'")
+        wait_for(browser, lambda b: not b.find_element(By.ID, "meeting").get_attribute("hidden"), 5)
+        window.file.write_text(held + 'keep_audio = "x"\n')
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        came = wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
+        inside = browser.execute_script("const b = document.getElementById('settings-banner'); window.firstBanner = b;"
+                                        " return b && b.parentElement.id === 'settings-banner-live'")
+        check("broken while a meeting's page is open: the banner comes, inside its live region", came and inside,
+              [browser.execute_script(banner), inside, browser.execute_script("return location.hash")])
+        # Read before, the last settings read are held: the meetings stay listed, and the banner says so —
+        # never « not shown » then (#770, ines).
+        listed_still = browser.execute_script("return [...document.querySelectorAll('#groups a')].some(a => (a.getAttribute('href') || '').endsWith('/kept'))")
+        kept_said = ("Les réglages ne peuvent pas être lus\u00a0: les derniers lus restent en usage, et aucun changement n’est enregistré"
+                     " tant que le fichier n’est pas corrigé.")
+        check("broken while the window is open: the meetings still listed, the banner says the last settings read stay in use",
+              listed_still and (browser.execute_script(banner) or [None])[0] == kept_said, [listed_still, browser.execute_script(banner)])
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: b.execute_script(banner) is not None, 5)
+        # Under 840 px, at the list: above the list, inside the window, nothing cut (`#pane-said`'s rule).
+        browser.set_window_size(420, 760)
+        time.sleep(0.4)
+        narrow = browser.execute_script("const b = document.getElementById('settings-banner').getBoundingClientRect();"
+                                        " const l = document.getElementById('list').getBoundingClientRect();"
+                                        " const k = document.getElementById('settings-banner-link').getBoundingClientRect();"
+                                        " return {above: b.bottom <= l.top + 0.5, inside: b.left >= -0.5 && b.right <= innerWidth + 0.5, link: k.right <= b.right + 0.5 && k.width > 0}")
+        shot_themed(browser, "settings-banner-420-light", "light")
+        shot_themed(browser, "settings-banner-420-dark", "dark")
+        check("under 840 px: the banner above the list, inside the window, its link whole", narrow == {"above": True, "inside": True, "link": True}, narrow)
+        browser.set_window_size(1100, 800)
+        time.sleep(0.4)
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        time.sleep(1)
+        same = browser.execute_script("return document.getElementById('settings-banner') === window.firstBanner")
+        check("listed again, still unreadable: the same banner, not put in anew", same, same)
+        # A file it may not read — another path than a file that does not parse (`settings::read`).
+        window.file.write_text(held)
+        window.file.chmod(0)
+        try:
+            browser.execute_script("window.dispatchEvent(new Event('focus'))")
+            check("a settings file it may not read: the same banner, still there",
+                  wait_for(browser, lambda b: b.execute_script("return document.getElementById('settings-banner') === window.firstBanner"), 5))
+        finally:
+            window.file.chmod(0o644)
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        check("fixed again: the banner goes, its live region left empty",
+              wait_for(browser, lambda b: b.execute_script(region) == ["status", True, 0], 5), browser.execute_script(region))
+        # No settings file at all — a first start —: nothing unreadable, no banner.
+        window.file.unlink()
+        window.__exit__()
+        browser = window.__enter__()
+        first = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('listed').then(l => l.settings_unread)") is False, 10)
+        time.sleep(0.5)
+        check("no settings file, a first start: not said unreadable, no banner", first and browser.execute_script(region) == ["status", True, 0],
+              browser.execute_script(region))
     # Who writes the minutes: an Ollama made here, an online service, an address of the user's. A
     # key goes to the scenario's own keyring, which lives as long as the program.
     class Tags(http.server.BaseHTTPRequestHandler):
@@ -8943,6 +9123,7 @@ def main() -> int:
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
+    recording_found(now)
     context_before_start(now)
     own_models(now)
     models_advanced(now)
