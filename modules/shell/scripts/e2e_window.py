@@ -5715,8 +5715,14 @@ def redo_choice_starts_nothing(now: dt.datetime) -> None:
     decider saw a choice close the panel, 2026-11-15)."""
     print("BO. a model chosen in a redo panel, on the page or in the bar, starts nothing and the panel stays open (D96)")
 
+    # Answered late once `late` is set: a real Ollama answers a reading after the choice later than
+    # the stand-in's at once (the coordinator's (c), 2026-11-15).
+    late = threading.Event()
+
     class Tags(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
+            if late.is_set():
+                time.sleep(3)
             body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
             try:
                 self.send_response(200)
@@ -5781,6 +5787,25 @@ def redo_choice_starts_nothing(now: dt.datetime) -> None:
             check("in the bar: a model chosen in « Avancé » starts nothing, and the panel stays open, the choice shown (D96)",
                   bool(picked) and state == {"expanded": "true", "hidden": False, "value": picked} and browser.execute_script(idle) and untouched(),
                   (picked, state))
+            opened = ("const t = document.getElementById('small-advanced'); const p = document.getElementById('small-advanced-panel');"
+                      " return t?.getAttribute('aria-expanded') === 'true' && p?.hidden === false")
+            # (c) Another choice, Ollama answering the readings after it three seconds late.
+            late.set()
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_index(0)
+            time.sleep(6)
+            late.clear()
+            check("in the bar: a choice whose readings Ollama answers late leaves the panel open (D96)",
+                  browser.execute_script(opened) and browser.execute_script(idle) and untouched(), browser.execute_script(opened))
+            # (d) A making that ends while the panel is open: what is read after it never closes it.
+            (WORK / "slow-minutes").touch()
+            browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: arguments[1], model: 'mistral:7b'})",
+                                   meeting.name, f"{base}/v1")
+            began = wait_for(browser, lambda b: not b.execute_script(idle), 5)
+            (WORK / "slow-minutes").unlink()
+            ended = wait_for(browser, lambda b: b.execute_script(idle), 15)
+            time.sleep(2)
+            check("in the bar: a making that ends while « Avancé » is open leaves it open (D96)",
+                  began and ended and browser.execute_script(opened), browser.execute_script(opened))
     finally:
         tags.shutdown()
 
