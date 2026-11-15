@@ -419,7 +419,6 @@ pub struct Window {
     /// before, its last settings held. At most: no limit. Placeholders: none.
     pub settings_banner_kept: &'static str,
     pub again_refused: &'static str,
-    pub hearing_models_refused: &'static str,
     pub fold_not_kept: &'static str,
     pub agreement_refused: &'static str,
     pub meeting_not_opened: &'static str,
@@ -516,12 +515,9 @@ pub struct Window {
     pub speech_fetch: &'static str,
     pub speech_fetching: &'static str,
     pub speech_failed: &'static str,
-    /// A service that hears (D43): the choice's group, its fields, the agreement before anything is
-    /// sent to its host, the gestures, and what they say.
-    pub service_group: &'static str,
+    /// A service that hears (D43): its fields, the agreement before anything is sent to its host,
+    /// the gestures, and what they say.
     pub service_option: &'static str,
-    /// A model the service's list does not hold, typed (D63).
-    pub service_other_model: &'static str,
     pub service_address: &'static str,
     pub service_model: &'static str,
     pub service_key: &'static str,
@@ -920,7 +916,6 @@ pub fn window(language: Language) -> Window {
             settings_banner: "Settings cannot be read: your meetings are not shown.",
             settings_banner_kept: "Settings cannot be read: the last ones read stay in use, and no change is saved until the file is fixed.",
             again_refused: "It could not start again: {}",
-            hearing_models_refused: "This service’s models could not be read, you can type one: {}",
             fold_not_kept: "The sidebar will be back as it was at the next start: {}",
             agreement_refused: "This meeting cannot be sent: {}",
             meeting_not_opened: "This meeting could not be opened: {}",
@@ -994,9 +989,7 @@ pub fn window(language: Language) -> Window {
             speech_fetch: "Download Apple's model (macOS fetches it from Apple)",
             speech_fetching: "macOS is downloading Apple's model…",
             speech_failed: "Apple's model was not downloaded. Try again later; Whisper still hears.",
-            service_group: "A service",
             service_option: "A service I name",
-            service_other_model: "Another model…",
             service_address: "Its address",
             service_model: "Its model",
             service_key: "Its key, if it asks for one",
@@ -1345,7 +1338,6 @@ pub fn window(language: Language) -> Window {
             settings_banner: "Les réglages ne peuvent pas être lus\u{a0}: vos réunions ne sont pas affichées.",
             settings_banner_kept: "Les réglages ne peuvent pas être lus\u{a0}: les derniers lus restent en usage, et aucun changement n’est enregistré tant que le fichier n’est pas corrigé.",
             again_refused: "Impossible de recommencer\u{a0}: {}",
-            hearing_models_refused: "Les modèles de ce service n’ont pas pu être lus, vous pouvez en saisir un\u{a0}: {}",
             fold_not_kept: "La barre latérale reviendra comme avant au prochain démarrage\u{a0}: {}",
             agreement_refused: "Cette réunion ne peut pas être envoyée\u{a0}: {}",
             meeting_not_opened: "Cette réunion n’a pas pu être ouverte\u{a0}: {}",
@@ -1422,9 +1414,7 @@ pub fn window(language: Language) -> Window {
             speech_fetch: "Télécharger le modèle d’Apple (macOS le télécharge depuis Apple)",
             speech_fetching: "macOS télécharge le modèle d’Apple…",
             speech_failed: "Le modèle d’Apple n’a pas été téléchargé. Réessayez plus tard\u{202f}; Whisper reste disponible.",
-            service_group: "Un service",
             service_option: "Un service que je choisis",
-            service_other_model: "Un autre modèle…",
             service_address: "Son adresse",
             service_model: "Son modèle",
             service_key: "Sa clé, s’il en demande une",
