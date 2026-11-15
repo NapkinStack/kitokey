@@ -4414,10 +4414,10 @@ def settings_folded(now: dt.datetime) -> None:
 
 
 def appearance_chosen(now: dt.datetime) -> None:
-    """BO. D98: Settings' « Général » offers the appearance — « Système », « Clair », « Sombre » —; chosen,
+    """BP. D98: Settings' « Général » offers the appearance — « Système », « Clair », « Sombre » —; chosen,
     the window takes it at once, the other one than the system says; kept across starts, the bar
     taking it too; « Système » by default, following the system as before."""
-    print("BO. Settings: the appearance System, Light or Dark, taken at once, kept across starts, the bar too (D98)")
+    print("BP. Settings: the appearance System, Light or Dark, taken at once, kept across starts, the bar too (D98)")
     taping = WORK / "appearance"
     taping.mkdir()
     ground = "return getComputedStyle(document.documentElement).getPropertyValue('--ground').trim().toUpperCase()"
