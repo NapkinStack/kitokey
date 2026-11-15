@@ -919,6 +919,9 @@ def list_refreshed(now: dt.datetime) -> None:
             body = serving["signature"] if self.path.endswith(".minisig") else serving["list"]
             self.send_response(404 if body is None else 200)
             self.send_header("Content-Length", str(len(body or b"")))
+            # HTTP/1.0 closes each connection: said, so that the shell's client never sends the
+            # signature's request on the list's, closed under it (« Peer disconnected », #866).
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(body or b"")
 
