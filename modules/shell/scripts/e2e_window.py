@@ -2041,10 +2041,12 @@ def first_run(now: dt.datetime) -> None:
             browser.execute_script(f"location.hash = '#/meeting/{first.name}'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "make-minutes"), 10)
             press(browser, "make-minutes")
-            told = wait_for(browser, lambda b: "Aucun modèle choisi pour les comptes rendus" in notified.read_text(), 10)
-            opened = wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 5)
-            check("connected, no service chosen after: the first meeting's minutes say none is, and open Settings",
-                  told and opened and not (first / "minutes.md").exists() and "minutes_provider" not in window.file.read_text(),
+            # Asked from its page in front: Settings opened say it, never a notification (D25, D92).
+            opened = wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 10)
+            time.sleep(1)
+            told = "Aucun modèle choisi pour les comptes rendus" in notified.read_text()
+            check("connected, no service chosen after: the first meeting's minutes open Settings, nothing notified from its page in front (D92)",
+                  not told and opened and not (first / "minutes.md").exists() and "minutes_provider" not in window.file.read_text(),
                   (notified.read_text()[-300:], window.file.read_text()))
     finally:
         monitor.terminate()
@@ -5619,6 +5621,8 @@ def meeting_told_once(now: dt.datetime) -> None:
     # (`x-shell-sender`), its title and body — a count alone does not say which.
     seen = lambda mark: [(m.split(' ', 1)[0], 'x-shell-sender' in m, re.findall(r'^   string "(.*)"$', m, re.M)[2:4])
                          for m in told(mark).split('sender=')[1:] if 'member=Notify' in m.split('\n', 1)[0]]
+    # Those Kitokey sent: the desktop may relay one (`x-shell-sender`), the same notification again.
+    sent = lambda mark: [notice for notice in seen(mark) if not notice[1]]
     # The meeting as the notification names it: no title of its own, so its day and hour.
     names = lambda text: "18 oct." in text and "12:00" in text
     other = None
@@ -5653,7 +5657,7 @@ def meeting_told_once(now: dt.datetime) -> None:
         """The making's end awaited, then two seconds more for a notification that would follow it."""
         ended = wait_for(browser, lambda b: until(told(mark)) and idle(b), 20)
         time.sleep(2)
-        return ended and told(mark).count("member=Notify") == 1
+        return ended and len(sent(mark)) == 1
 
     unchosen = f'after = "minutes"\nreminder = false\nmodel = "{model}"\n'
     try:
@@ -5669,7 +5673,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             made = wait_for(browser, lambda b: (meeting / "minutes.md").exists() and idle(b), 20)
             time.sleep(2)
             check("a window of Kitokey has the focus: the stop, the transcript and its minutes made, nothing told",
-                  made and focused(browser) and told(0).count("member=Notify") == 0, seen(0))
+                  made and focused(browser) and not sent(0), seen(0))
 
             # 2. Another application has the focus: a stop, its transcript then its minutes — one
             # notification, the minutes', naming the meeting.
@@ -5757,7 +5761,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             shown = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/settings" and idle(b), 20)
             time.sleep(2)
             check("its minutes not started, a window of Kitokey focused: nothing told, the window opened on Settings",
-                  recorded and shown and focused(browser) and told(mark).count("member=Notify") == 0, seen(mark))
+                  recorded and shown and focused(browser) and not sent(mark), seen(mark))
     finally:
         HEARING.chmod(0o755)
         (WORK / "fail-minutes").unlink(missing_ok=True)
@@ -9181,14 +9185,16 @@ def main() -> int:
         wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"))
         redo_pick(browser, "redo-panel", "minutes", 1)
         browser.find_element(By.ID, "redo-do").click()
-        told = wait_for(browser, lambda b: "pas été refait" in heard.read_text(), 10)
-        check("minutes made again that fail: the ones there stay, and the notice says a redo", told and (asked / "minutes.md").read_text() == before, heard.read_text()[-400:])
-        failed = wait_for(browser, lambda b: "n’a pas été fait" in state(b) and b.find_elements(By.ID, "minutes-again"), 5)
+        # Made from its page, Kitokey's window in front: its end told there, never by a notification (D92).
+        failed = wait_for(browser, lambda b: "n’a pas été fait" in state(b) and b.find_elements(By.ID, "minutes-again"), 10)
+        time.sleep(1)
+        check("minutes made again that fail, from their page in front: the ones there stay, nothing notified (D92)",
+              failed and (asked / "minutes.md").read_text() == before and "member=Notify" not in heard.read_text(), heard.read_text()[-400:])
         check("the failure said on the meeting's page too, in plain words, with a way to try again — never what the program said",
               failed and "not minutes" not in state(browser) and "not minutes" not in heard.read_text(), (state(browser), heard.read_text()[-400:]))
         # Its cause named by the program, its gesture said, on the page and in the notice (D29).
-        check("the cause the program named is said with its gesture, on the page and in the notice",
-              "écrit de compte rendu" in state(browser) and "écrit de compte rendu" in heard.read_text(),
+        check("the cause the program named is said with its gesture, on the page",
+              "écrit de compte rendu" in state(browser),
               (state(browser), heard.read_text()[-400:]))
         # The developer mode shows what the program said, under the sentence; never in a notice (D29).
         to_settings()
@@ -9230,11 +9236,14 @@ def main() -> int:
         wait_for(browser, lambda b: b.find_elements(By.ID, "agree-send"))
         press(browser, "agree-send")
         # Only what is said after this gesture: a notice may show its title more than once.
-        told = wait_for(browser, lambda b: "pas été refait" in heard.read_text()[since:], 10)
+        # Its page in front: the failure said there (below), never by a notification (D92).
+        ended = wait_for(browser, lambda b: "member=Notify" in heard.read_text()[since:] or b.find_elements(By.ID, "minutes-again"), 10)
+        time.sleep(1)
         said = heard.read_text()[since:]
         monitor.terminate()
         (WORK / "fail-plainly").unlink()
-        check("asked through the agreement, still a redo: its failure said as one", told and "pas été fait" not in said and (asked / "minutes.md").read_text() == before, said[-400:])
+        check("asked through the agreement, still a redo, its page in front: the ones there stay, nothing notified (D92)",
+              ended and "member=Notify" not in said and (asked / "minutes.md").read_text() == before, said[-400:])
         browser.execute_script("location.hash = '#/'")
         browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
         plain = wait_for(browser, lambda b: "n’a pas été fait" in state(b), 5)
