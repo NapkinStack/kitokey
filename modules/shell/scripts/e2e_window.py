@@ -6679,6 +6679,9 @@ def confidential_kept(now: dt.datetime) -> None:
              'transcription_agreed = "hears.example"\nminutes_provider = "https://writes.example/v1"\nminutes_model = "gpt-4.1-mini"\n')
     agreed = named + 'minutes_agreed = "writes.example"\n'
     fits = lambda b: b.execute_script("const e = document.scrollingElement; return [e.scrollHeight, e.clientHeight];")
+    # The bar's window grows to its content after a row is added, asynchronously: waited for as a state,
+    # never a fixed pause, which a loaded machine outruns (#850).
+    whole = lambda b: fits(b)[0] <= fits(b)[1]
     front = lambda folder, key: next((line.split(": ", 1)[1] for line in (folder / "minutes.md").read_text().splitlines()
                                       if line.startswith(f"{key}: ")), None) if (folder / "minutes.md").exists() else None
     engine = lambda folder: json.loads((folder / "transcript.jsonl").read_text().splitlines()[0]).get("engine") \
@@ -6726,8 +6729,8 @@ def confidential_kept(now: dt.datetime) -> None:
         marked = wait_for(browser, lambda b: (meeting / "confidential").exists(), 3)
         check("turned on by the keyboard, the meeting's file confidential is written, empty, nothing beside it",
               marked and (meeting / "confidential").read_bytes() == b"" and names(meeting) == ["confidential", "session.json"], names(meeting))
-        time.sleep(0.3)
-        check("on, with its context, the bar holds whole — 440 wide, as tall as it shows", fits(browser)[0] <= fits(browser)[1]
+        held = wait_for(browser, whole, 5)
+        check("on, with its context, the bar holds whole — 440 wide, as tall as it shows", held
               and browser.execute_script("return innerWidth") == 440, (fits(browser), browser.execute_script("return [innerWidth, innerHeight]")))
         seen(browser, "d60-2-small-on-light")
         stop_from_small(browser)
@@ -6848,9 +6851,11 @@ def confidential_kept(now: dt.datetime) -> None:
         press(browser, "small-confidential")
         marked = wait_for(browser, lambda b: (english / "2026-10-18_12-00" / "confidential").exists(), 3)
         row = browser.find_element(By.CSS_SELECTOR, "#small .confidential").text
-        time.sleep(0.3)
+        held = wait_for(browser, whole, 5)
+        # Which part failed said with it (#850): the mark written, the row's words, the window's height.
         check("in English, « Confidential meeting — nothing leaves this computer », on, the window whole",
-              marked and "Confidential meeting" in row and "Nothing leaves this computer" in row and fits(browser)[0] <= fits(browser)[1], row)
+              marked and "Confidential meeting" in row and "Nothing leaves this computer" in row and held,
+              {"marked": marked, "row": row, "fits": fits(browser)})
         seen(browser, "d60-2-small-on-dark")
         stop_from_small(browser)
         wait_for(browser, lambda b: front(english / "2026-10-18_12-00", "provider") == "local", 20)
