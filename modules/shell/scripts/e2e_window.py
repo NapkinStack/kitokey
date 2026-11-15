@@ -5620,6 +5620,13 @@ def meeting_told_once(now: dt.datetime) -> None:
 def two_panes(now: dt.datetime) -> None:
     """AD. The window in two panes: the meetings in a sidebar, the one chosen beside them (D61)."""
     print("AD. the window in two panes: the sidebar, the meeting chosen beside it, as wide as the window (D61)")
+    # Its Settings with two models on this computer, as K leaves them in a whole run: played in a shard
+    # of its own, Settings would draw the guided step in their place (#862).
+    models = WORK / "data" / "kitokey" / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    for name in ("ggml-large-v3-turbo-q8_0.bin", "ggml-small.bin"):
+        if not (models / name).exists():
+            (models / name).write_bytes(b"x" * 1000)
     meetings = WORK / "panes"
     names = [f"2026-10-{day:02d}_10-00" for day in range(10, 24)]
     for index, name in enumerate(names):
