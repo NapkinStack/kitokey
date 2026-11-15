@@ -102,7 +102,17 @@ fn a_transcript_ended_by_kitokey_ends_with_what_it_started_and_is_not_written() 
     assert!(alive(&child));
     transcription.end();
     assert_eq!(end(&said), Made::Failed(String::new()));
-    assert!(!alive(&child), "what the program started is left running");
+    // Its group killed, the child is gone once the KILL is delivered and it is reaped — by the
+    // system, its parent gone: a moment after the answer on a loaded machine, a zombie meanwhile,
+    // which `kill -0` still finds (#845). Waited for as a state, within half a second.
+    let killed = std::time::Instant::now();
+    while !gone(&child) && killed.elapsed() < Duration::from_millis(500) {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        gone(&child),
+        "what the program started is left running half a second after the answer"
+    );
     assert!(!folder.path().join("session/transcript.jsonl").exists());
 }
 
