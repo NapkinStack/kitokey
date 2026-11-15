@@ -1250,6 +1250,20 @@ def service_named(now: dt.datetime) -> None:
         # « Avancé », the address left empty, saved with the service chosen above, and read again.
         press(browser, "transcription-advanced")
         wait_for(browser, lambda b: b.find_element(By.ID, "transcription-model").is_displayed(), 3)
+        # One save per setting (#860), as macOS's and GNOME's settings have it: « Avancé » unfolded shows one
+        # « Enregistrer » and one agreement at most, and that one saves what the page shows — the address
+        # left empty, the model typed or else the one chosen in the list.
+        shown_of = ("return arguments[0].filter((id) => { const e = document.getElementById(id); return !!e && e.getClientRects().length > 0; })")
+        saves, agreements = ["transcription-save", "transcription-own-save"], ["transcription-agreed", "transcription-own-agreed"]
+        one = browser.execute_script(shown_of, saves)
+        check("« Avancé » unfolded: one « Enregistrer » shown, one agreement at most (#860)",
+              len(one) == 1 and len(browser.execute_script(shown_of, agreements)) <= 1, [one, browser.execute_script(shown_of, agreements)])
+        if one:
+            press(browser, one[0])
+        kept = wait_for(browser, lambda b: "cet ordinateur transcrira" in b.execute_script(said), 5)
+        check("nothing typed under « Avancé »: that « Enregistrer » saves the service chosen above, the model chosen in its list (#860)",
+              kept and 'transcription_model = "vendor/scribe"' in window.file.read_text() and f'transcription_provider = "{stand}"' in window.file.read_text(),
+              (browser.execute_script(said), window.file.read_text()))
         check("« Avancé », its address left empty: the service chosen above shown standing in",
               browser.find_element(By.ID, "transcription-provider").get_attribute("placeholder") == stand,
               browser.find_element(By.ID, "transcription-provider").get_attribute("placeholder"))
@@ -1564,6 +1578,8 @@ def transcription_guided(now: dt.datetime) -> None:
             own.send_keys("https://hears.example/v1")
             away_asked = wait_for(browser, lambda b: b.execute_script(own_agreement), 3)
             check("one's own address: no agreement for this computer, one for a host elsewhere (#859)", here_none and away_asked, [here_none, away_asked])
+            both = browser.execute_script("return ['transcription-agreed', 'transcription-own-agreed'].filter((id) => { const e = document.getElementById(id); return !!e && e.getClientRects().length > 0; })")
+            check("a host elsewhere typed under « Avancé »: one agreement shown, its own (#860)", both == ["transcription-own-agreed"], both)
             own.clear()
             browser.execute_script("document.getElementById('transcription-where').scrollIntoView({block: 'start'})")
             shot_themed(browser, "d95-transcription-service-light", "light")
