@@ -6731,8 +6731,11 @@ def confidential_kept(now: dt.datetime) -> None:
         marked = wait_for(browser, lambda b: (english / "2026-10-18_12-00" / "confidential").exists(), 3)
         row = browser.find_element(By.CSS_SELECTOR, "#small .confidential").text
         time.sleep(0.3)
+        whole = fits(browser)
+        # Which part failed said with it (#850): the mark written, the row's words, the window's width.
         check("in English, « Confidential meeting — nothing leaves this computer », on, the window whole",
-              marked and "Confidential meeting" in row and "Nothing leaves this computer" in row and fits(browser)[0] <= fits(browser)[1], row)
+              marked and "Confidential meeting" in row and "Nothing leaves this computer" in row and whole[0] <= whole[1],
+              {"marked": marked, "row": row, "fits": whole})
         seen(browser, "d60-2-small-on-dark")
         stop_from_small(browser)
         wait_for(browser, lambda b: front(english / "2026-10-18_12-00", "provider") == "local", 20)
