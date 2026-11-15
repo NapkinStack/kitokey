@@ -904,19 +904,23 @@ def models_listed(now: dt.datetime) -> None:
 
 
 def list_refreshed(now: dt.datetime) -> None:
-    """W. The list of models is read again only signed by the decider's key: until it is built in, none is (D40, D56)."""
-    print("W. Settings: no list of models read again until the decider's key is built in, and it is said (D40, D56)")
-    # When registry::PUBLIC_KEY is set, this scenario changes: the button is back, its host shown,
-    # and an unsigned list served here is refused. The signed path is the shell's tests'
-    # (tests/registry_fetch.rs), with a key of their own: no window can hold a key a test made.
-    asked = []
+    """W. The list of models is read again only signed by the decider's key, built in (D40, D56)."""
+    print("W. Settings: a list of models read again is taken only signed by the decider's key; refused, it is said (D40, D56)")
+    # Served here: the list on main, with the decider's signature of it (registry/models.json.minisig),
+    # none, or the list changed after it was signed. A key a test made is the shell's tests' only
+    # (tests/registry_fetch.rs): no window holds one.
+    registry = Path(__file__).parent.parent / "registry"
+    shipped, signature = (registry / "models.json").read_bytes(), (registry / "models.json.minisig").read_bytes()
+    asked, serving = [], {"list": shipped, "signature": signature}
 
     class List(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             asked.append(self.path)
-            self.send_response(404)
-            self.send_header("Content-Length", "0")
+            body = serving["signature"] if self.path.endswith(".minisig") else serving["list"]
+            self.send_response(404 if body is None else 200)
+            self.send_header("Content-Length", str(len(body or b"")))
             self.end_headers()
+            self.wfile.write(body or b"")
 
         def log_message(self, *_):
             pass
@@ -931,20 +935,34 @@ def list_refreshed(now: dt.datetime) -> None:
     window.env.update(KITOKEY_REGISTRY=f"http://{at}/models.json")
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
-        waits = wait_for(browser, lambda b: "attend la clé qui la signe" in b.execute_script(said), 10)
-        check("Settings say the list waits on the key that signs it, and the models stay offered",
-              waits and "restent proposés" in browser.execute_script(said)
-              and browser.find_elements(By.CSS_SELECTOR, '[data-offered="ggml-small-q8_0.bin"]'),
-              browser.execute_script(said))
-        check("no button offers to read it again", not browser.find_elements(By.ID, "offered-refresh"))
-        # Asked all the same, it is refused, and logged so, with nothing asked of anyone.
-        browser.execute_script("window.__TAURI__.core.invoke('registry_refresh').then(() => { window.listRead = 'read'; }, () => { window.listRead = 'refused'; })")
-        answered = wait_for(browser, lambda b: b.execute_script("return window.listRead || ''"), 10)
-        check("asked all the same, it is refused, and nothing crosses the network",
-              answered and browser.execute_script("return window.listRead") == "refused" and asked == [],
-              (browser.execute_script("return window.listRead"), asked))
-    server.shutdown()
+        button = wait_for(browser, lambda b: b.find_elements(By.ID, "offered-refresh"), 10)
+        check("the key built in: a button offers to read the list again, its host shown, nothing said of a key awaited",
+              button and at in browser.find_element(By.ID, "offered-refresh").text and "attend la clé" not in browser.execute_script(said)
+              and asked == [], (browser.execute_script(said), asked))
 
+        def read_again(what: str, list_: bytes, signature: bytes | None) -> str:
+            """The list served as `what` says, the button pressed: what the page says after it."""
+            serving.update(list=list_, signature=signature)
+            asked.clear()
+            browser.find_element(By.ID, "offered-refresh").click()
+            wait_for(browser, lambda b: b.execute_script(said) or len(asked) == 2 and b.find_elements(By.ID, "offered-refresh")
+                     and b.find_element(By.ID, "offered-refresh").is_enabled(), 10)
+            time.sleep(0.5)
+            return browser.execute_script(said)
+
+        for what, list_, signature_ in [("unsigned", shipped, None),
+                                        ("changed after the decider signed it", shipped.replace(b'"version": 1', b'"version":  1', 1), signature),
+                                        ("its signature none", shipped, b"<html>")]:
+            refusal = read_again(what, list_, signature_)
+            check(f"a list {what}: refused, said, the models shipped still offered",
+                  "n’a pas pu être mise à jour" in refusal and "restent proposés" in refusal
+                  and asked == ["/models.json", "/models.json.minisig"]
+                  and browser.find_elements(By.CSS_SELECTOR, '[data-offered="ggml-small-q8_0.bin"]'), (refusal, asked))
+        taken = read_again("the decider's", shipped, signature)
+        check("the list the decider signed: taken, nothing said against it, its models offered",
+              "n’a pas pu" not in taken and asked == ["/models.json", "/models.json.minisig"]
+              and browser.find_elements(By.CSS_SELECTOR, '[data-offered="ggml-small-q8_0.bin"]'), (taken, asked))
+    server.shutdown()
 
 def speech_offered(now: dt.datetime) -> None:
     """X. On a Mac, Apple's SpeechAnalyzer is offered among who hears, its model fetched on the click (D42)."""
@@ -8603,8 +8621,11 @@ def main() -> int:
         held = window.file.read_text()
         lines = [line for line in held.splitlines() if not line.startswith("keep_audio")] + ["keep_audio = 0"]
         broken = "\n".join(lines) + "\n"
-        refused = "Le réglage n’a pas été enregistré\u00a0: le fichier des réglages ne peut pas être lu\u00a0: corrigez-le, puis réessayez.".replace("\xa0", " ")  # WebDriver's `.text` reads U+00A0 as a space
-        locked_said = "Le fichier des réglages ne peut pas être lu\u00a0: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé.".replace("\xa0", " ")  # WebDriver's `.text` reads U+00A0 as a space
+        # Which setting, on which line, and what to do (#783) — never settings.rs's own sentence.
+        # WebDriver's `.text` reads U+00A0 as a space.
+        which = lambda line: f"Ligne {line} : « keep_audio » vaut « always » ou un nombre de jours, de 1 à 36\u202f500. Corrigez-le."  # noqa: E731
+        refused = f"Le réglage n’a pas été enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
+        locked_said = f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which(len(lines))}"
         unreadable = lambda: browser.find_element(By.ID, "settings-unreadable").text  # noqa: E731
         window.file.write_text(broken)
         changed(lambda: browser.find_element(By.ID, "reminder").click())
@@ -8620,6 +8641,9 @@ def main() -> int:
         lines = [line for line in held.splitlines() if not line.startswith("keep_audio")] + ["keep_audio = 0"]
         window.file.write_text("\n".join(lines) + "\n")
         raw = f'settings.toml, line {len(lines)}: keep_audio is "always" or a number of days'
+        # The file's line has moved with developer mode written: the sentences name the new one.
+        refused = f"Le réglage n’a pas été enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
+        locked_said = f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which(len(lines))}"
         changed(lambda: browser.find_element(By.ID, "reminder").click())
         said = not_saved()
         check("developer mode on, the raw text is under the sentence of the command that failed, without its path", said == f"{refused}\n{raw}", said)
@@ -8889,7 +8913,8 @@ def main() -> int:
         wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#settings .warn"))
         warned = browser.find_element(By.CSS_SELECTOR, "#settings .warn").text
         locked = browser.execute_script("return [...document.querySelectorAll('#settings input, #settings select')].every(e => e.disabled)")
-        check("a settings file that cannot be read is said so, and nothing can be changed", warned == "Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé." and locked, warned)
+        which = "Ligne 3 : « keep_audio » vaut « always » ou un nombre de jours, de 1 à 36\u202f500. Corrigez-le."  # U+00A0 read as a space
+        check("a settings file that cannot be read is said so, which setting and what to do, and nothing can be changed", warned == f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which}" and locked, warned)
         check("it is left as it was", window.file.read_text() == f'sessions = "{broken}"\nwelcomed = true\nkeep_audio = 0\n')
         # The shell itself refuses, not only the page.
         refused = browser.execute_async_script(
