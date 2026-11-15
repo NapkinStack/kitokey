@@ -3499,18 +3499,24 @@ function showSmall(words) {
   // not yet kept, answers with the choice as it was then — never taken (#750).
   let choicesMade = 0;
   let choicesKept = 0;
+  // The choice the shell last kept, as an optimistic update keeps it: a refusal goes back to it (#839).
+  let confirmed = null;
   const choosePick = async (one) => {
-    choicesMade += 1;
-    const before = known.chosen;
+    const mine = ++choicesMade;
     known = { ...known, chosen: one };
     paintPick();
     try {
       await invoke("microphone_chosen", { name: one?.name ?? null, description: one?.description ?? null });
+      confirmed = one;
       smallSaid("microphone", null);
     } catch {
-      known = { ...known, chosen: before };
-      paintPick();
-      drawPicks();
+      // Put back only while it is the last choice made — a later one stands, refused or not yet —, and
+      // to what the shell kept, never to a choice it was still to answer (#839).
+      if (mine === choicesMade) {
+        known = { ...known, chosen: confirmed };
+        paintPick();
+        drawPicks();
+      }
       smallSaid("microphone", words.microphone_not_kept);
     } finally {
       choicesKept += 1;
@@ -3531,7 +3537,9 @@ function showSmall(words) {
     const same = JSON.stringify(read.list) === JSON.stringify(known.list) && read.unread === known.unread;
     // The list and whether it read are taken; the choice, only if none was made since it was asked,
     // nor was waiting for the shell when it was.
-    known = { ...read, chosen: asked === choicesMade && settled ? read.chosen : known.chosen };
+    const taken = asked === choicesMade && settled;
+    if (taken) confirmed = read.chosen;
+    known = { ...read, chosen: taken ? read.chosen : known.chosen };
     microphone.hidden = known.list.length === 0 && !known.unread && known.chosen === null;
     paintPick();
     if (!picks.hidden && !same) {
