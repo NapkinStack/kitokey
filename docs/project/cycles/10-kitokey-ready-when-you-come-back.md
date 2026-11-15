@@ -42,6 +42,33 @@ deliverables:
       - "Given Settings, when they show, then they hold at most three groups, as GNOME's preferences do — « Après un enregistrement », « Modèles », « Général » —, their content centred at a maximum width; the card that repeats the transcription model's state is gone (#782); held by the e2e, which reads the groups and their order, in French and in English"
       - "Given the « Modèles » group, when the user sets up the transcription or the summary, then it is one guided path: on this computer (Whisper, Ollama) or a named service (OpenRouter, OpenAI, Mistral); for a service, its key, tested at once, a refusal said in plain words with its cause; then the model chosen from a readable list, each said as `modelSaid` says it; no raw identifier is shown and no address is typed in the common case — a service of the user's own address folded under « Avancé »; held by the e2e setting up a service with a false key, then a good one, against a stand-in server made for the run"
       - "Given the window under 840 CSS px down to 420, when Settings show, then nothing overflows its card or the window — measured on each element's box, not the page's scroll alone, the overflow the audit saw at 420 px, which no check sees today (#782) —; given the e2e, then its screenshots of Settings in both themes at 1920 and 420 CSS px are in the sheet beside the audit's of 0.2.5"
+  - id: D96
+    title: "Redo offers every model of a service set up, and choosing one starts nothing"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given a service set up in Settings with its key — OpenRouter, OpenAI or Mistral —, when the redo panel of a meeting's summary shows, then its list offers the models that service lists, said as people say them and grouped under the service's name, beside the models on this computer — not Settings' one alone; the same for the transcript with a service that transcribes; a meeting said confidential is offered the models on this computer alone, as in D91; held by the e2e on a stand-in service that lists models"
+      - "Given the redo panel, on a meeting's page or in the bar, when the user chooses a model in its list, then nothing starts and the panel stays open, the choice shown; the one button that starts names the making and the model — « Refaire le compte rendu avec Claude Sonnet 4.5 »; Escape or « Annuler » leaves everything as it was; held by the e2e in both places — the decider saw a choice close the panel on 2026-11-15, on the test build of `main` and, he believes, on 0.2.5"
+  - id: D97
+    title: "A transcript and a summary say how long they took and, when the service says it, what they cost"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given a transcript or a summary made, when its page shows, then its line says how long the making took beside who made it and when — « Écrit par Claude Sonnet 4.5, via openrouter.ai · ven. 13 nov. à 14:53 · en 3 s » / « … · in 3 s » —, the time from the making's start to its last line written, kept with the version it made: an optional field, added to the contract's page and schema in the contract's own pull request, then written by its producer in its own, before the shell reads it; a version without it shows the rest of the line; held by the contracts' tests on both sides and the e2e"
+      - "Given a service that reports what a making cost — OpenRouter's `usage.cost`, as D51 reads it for the summary —, when the line shows, then it adds the cost, rounded and written in the user's language — « · env. 0,2 ct $ » / « · about $0.002 » —; given a service that does not report it, or this computer, then no cost is said, never one Kitokey estimates; held by tests of the format and the e2e"
+  - id: D98
+    title: "Settings offer the appearance: System, Light or Dark"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given Settings' « Général », when the user chooses the appearance — « Système », « Clair », « Sombre » —, then every window of Kitokey, the full one and the bar, takes it at once, kept across starts; « Système » by default, following the system's light or dark as today; held by the e2e: each choice, then a restart, the screenshots light or dark as chosen while the system says the other"
+  - id: D99
+    title: "The bar offers the meeting's language"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given the bar's options, when they show — at rest for the next meeting, while recording for the meeting in progress —, then they offer the meeting's language, the same list and the same refusal said as on the meeting's page (D89), « Celle des Réglages » first; the language chosen at rest is the next meeting's; held by the e2e, in French and in English, by keyboard alone"
+
 ---
 
 # Cycle 10 — Kitokey ready when you come back
@@ -201,6 +228,27 @@ contract's and the producer's own pull requests · blue: the decider's gesture.
   none on UX; `framing.md` §2 asks one only of a deliverable whose product is a drawing). D11's board 4,
   built since, is no longer the bar: the product and its screenshots are (`framing.md` §2); the sheet sets
   the new ones beside the audit's.
+
+### D96 to D99, added on the decider's word
+
+The decider, 2026-11-15, in his session with the coordinator, after using the test build of `main`:
+« 1 => GO », on the proposal to add these four to this cycle, its end unchanged. They answer his remarks of
+that day: redo with any model (« comment je peux refaire la dernière réunion avec Sonnet ») and a choice
+that closes the panel; the duration and the cost on the line that says who made it; the theme; the language
+in the bar. His remark on the keys of a paid service needed no deliverable: the key is in the system's
+keyring, handed to the program alone, never written, logged or sent to the window (`keys.rs`,
+`summarising.rs`, ADR-0013).
+
+- **D96** — prior art: ChatGPT's « Try again » opens a choice of model and keeps the previous answer; a model
+  switched starts nothing until confirmed (the forum's own bug report). The service's list is the one D95's
+  guided step already reads; nothing new is asked of a service.
+- **D97** — the cost is D51's, extended to the transcript where the service reports it; OpenRouter returns
+  it in every answer (its usage accounting). The duration is measured by the program that makes the version,
+  not the shell, so that it holds whoever started it.
+- **D98** — prior art: Notion's « Use system setting / Light / Dark », Slack's « System default ». The two
+  palettes exist; only the choice is new.
+- **D99** — the page's language row (D89), offered in the bar's options; no new language.
+- Cut first, in this order, when the breaker nears: D99, then D97's cost, said at the closure.
 
 ## What needs a person
 
