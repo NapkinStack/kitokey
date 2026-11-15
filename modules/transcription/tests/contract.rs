@@ -71,6 +71,10 @@ fn every_line_the_step_writes_is_one_the_contracts_schema_allows_in_the_order_it
         assert_eq!((types[0], types.iter().filter(|kind| **kind == "header").count()), ("header", 1));
         assert_eq!(types.iter().filter(|kind| **kind == "complete").count(), usize::from(complete));
         assert_eq!(*types.last().unwrap() == "complete", complete);
+        // The step says when it made the transcript whole: the field is optional to readers, never to it.
+        for line in lines.iter().filter(|line| line["type"] == "complete") {
+            assert!(line["made"].is_string(), "transcript {number}: {line} says not when it was made");
+        }
         assert_eq!(types.iter().filter(|kind| **kind == "segment").count(), 3);
         // Each segment says its track, and keeps the place of the voice, empty in this version.
         for segment in lines.iter().filter(|line| line["type"] == "segment") {
