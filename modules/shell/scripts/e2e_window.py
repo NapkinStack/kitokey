@@ -1169,8 +1169,10 @@ def service_named(now: dt.datetime) -> None:
               models and listed == ["/api/v1/key", "/api/v1/models?output_modalities=transcription"] and not browser.find_element(By.ID, "transcription-provider").is_displayed(),
               (offered(browser, "transcription-models"), listed))
         Select(browser.find_element(By.ID, "transcription-models")).select_by_value("vendor/scribe")
-        if not browser.find_element(By.ID, "transcription-agreed").is_selected():
-            browser.find_element(By.ID, "transcription-agreed").click()
+        # The stand-in is on this computer: no agreement asked, and it saves without one (#859); a host
+        # elsewhere is agreed to above, under « Avancé ».
+        asked = browser.execute_script("const a = document.getElementById('transcription-agreed'); return !!a && a.getClientRects().length > 0")
+        check("OpenRouter's stand-in on this computer: no agreement asked to send the sound (#859)", not asked, asked)
         press(browser, "transcription-save")
         saved = wait_for(browser, lambda b: f'transcription_provider = "{stand}"' in window.file.read_text(), 5)
         text = window.file.read_text()
