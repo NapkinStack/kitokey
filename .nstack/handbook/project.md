@@ -173,11 +173,21 @@ nstack claim D30 --person @alice --session <session>   # held; its first work br
 nstack plan                                             # who holds what, since when; what is stale
 nstack unclaim D30                                      # given back: by its holder's session, the decider, anyone once stale; a record: who made it, the decider
 nstack claim D30 --take-over --person @alice            # a hold nobody worked on for hold_days, or your own person's other session
+nstack claim '#14' --person @alice --session <session>  # an issue no cycle plans — a bug, a flaky test: held the same way, work on issue-14-…
 ```
+
+An issue is held as a deliverable is, in a framed project or not: the forge's assignee says who
+works on it and refuses nobody, the hold does. `nstack plan` lists the issues held. Quote `'#14'`
+— `#` starts a shell comment — or write `14`. Its work merged, its holder gives it back
+(`nstack unclaim '#14'`): an issue's hold does not end with a cycle.
 
 Two agents one person runs are two holders: a session renews only a hold it is on. Another
 session of that person is refused like anyone else, and takes the hold with `--take-over` when
-the person says so, stale or not; a person with no `--session` renews their own.
+the person says so, stale or not; a person with no `--session` renews their own. A renewed
+hold with no work branch left gets its first one again, unless the deliverable is merged.
+
+An empty branch its claim started for another title of the same id — an earlier cycle's `D30` —
+is never this deliverable's work: the claim makes its own beside it.
 
 When a deliverable's work went on other branches, the empty branch its claim started stays:
 `nstack plan` names it once the default branch records the deliverable's delivery — its

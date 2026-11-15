@@ -4,6 +4,7 @@ and error of Kitokey's logs found in the run's folder must be one the manifest's
 never seen fails it too, its scenario no longer provoking it. The logs are kept in the run's
 evidence, where NapkinStack reads them again ($NSTACK_EVIDENCE)."""
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -38,10 +39,12 @@ for number, log in enumerate(sorted(work.glob("**/logs/*.jsonl"))):
         if not hit:
             unknown.setdefault(entry.get("message", line), line)
 unseen = [item for item in declared if item["pattern"] not in seen]
+# A partial run (KITOKEY_E2E_ONLY) plays some scenarios: what the others provoke is not owed.
+partial = bool(os.environ.get("KITOKEY_E2E_ONLY", "").strip())
 print(f"    {lines} log lines kept in {kept}; {len(unknown)} warning or error message(s) not provoked, "
       f"{len(unseen)} declared and never logged")
 for line in unknown.values():
     print(f"    not provoked by any scenario: {line}")
 for item in unseen:
-    print(f"    declared and never logged: {item['pattern']} ({item['level']}, scenario {item['scenario']})")
-sys.exit(1 if unknown or unseen else 0)
+    print(f"    declared and never logged{' (not owed: partial run)' if partial else ''}: {item['pattern']} ({item['level']}, scenario {item['scenario']})")
+sys.exit(1 if unknown or (unseen and not partial) else 0)
