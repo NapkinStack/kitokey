@@ -7965,11 +7965,14 @@ def timed(scenario):
 
 def main() -> int:
     now = dt.datetime.now().astimezone()
-    # Each scenario main() plays, timed (#862).
+    began = time.monotonic()
+    # Each scenario main() plays, timed (#862). In the shard that plays main()'s own scenarios alone
+    # (KITOKEY_E2E_PART=main, scripts/e2e_sharded.sh), the others are the other shards'.
     import e2e_only
 
+    inline = os.environ.get("KITOKEY_E2E_PART", "") == "main"
     for name in e2e_only.scenarios(Path(__file__).read_text()):
-        globals()[name] = timed(globals()[name])
+        globals()[name] = (lambda now: None) if inline else timed(globals()[name])
     # A partial run (pytest's -k, scripts/e2e_only.py): the scenarios KITOKEY_E2E_ONLY names, alone,
     # said first — never read as a full run: e2e.sh says it again, and never passes it.
     if os.environ.get("KITOKEY_E2E_ONLY", "").strip():
@@ -9648,6 +9651,8 @@ def main() -> int:
               there and "supprimé pour faire de la place" not in browser.execute_script(no_player), browser.execute_script(no_player))
     # None remembered before the run, as on a desktop where Kitokey never played: none of the user's to keep.
     check("the volume the system remembers for the user's Kitokey is left as it was", kept is None or same_volume(remembered(), kept), [remembered(), kept])
+    # main()'s own scenarios, H to R, timed as one (#862).
+    print(f"    (main: {time.monotonic() - began:.1f} s)")
     model_offered(now)
     models_listed(now)
     list_refreshed(now)
