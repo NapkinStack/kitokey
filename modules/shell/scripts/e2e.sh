@@ -111,11 +111,20 @@ start() { # the language, the settings file's text, the recorder
   say "    (started: its tray item found in $((SECONDS - started_at)) s, $tries look(s))"
   bus=${item%@*}; menu=${item#*@}/Menu
 }
+# This session's Kitokeys alone: a run cut in shards plays the same binary side by side, each session
+# its own XDG_RUNTIME_DIR (#862).
+ours() {
+  local pid count=0
+  for pid in $(pgrep -f "^$bin" || true); do
+    grep -qzx "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-}" "/proc/$pid/environ" 2>/dev/null && count=$((count + 1))
+  done
+  echo "$count"
+}
 again() { # a second start, the first one's settings: it hands over to the running one and leaves
   LANGUAGE= LC_ALL=fr_FR.UTF-8 LANG=fr_FR.UTF-8 XDG_CONFIG_HOME="$work/config" XDG_DATA_HOME="$work/data" XDG_STATE_HOME="$work/state" \
     KITOKEY_KEYRING=memory timeout 10 "$bin" "$@" 2>> "$work/errors" && left=0 || left=$?
   check is "$left" 0
-  check is "$(pgrep -c -f "^$bin" || true)" 1
+  check is "$(ours)" 1
 }
 greyed() { busctl --user call "$bus" "$menu" com.canonical.dbusmenu GetLayout iias 0 -- -1 0 | grep -o '"enabled" b false' | wc -l; }
 labels() { # busctl writes what is not ASCII as escapes: printf reads them back

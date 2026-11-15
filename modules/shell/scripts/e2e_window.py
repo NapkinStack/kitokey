@@ -427,11 +427,14 @@ def session(folder: Path, started: dt.datetime, minutes: float | None, files: di
 
 
 def instances() -> list[int]:
-    """The processes of the Kitokey under test."""
+    """The processes of the Kitokey under test, in this session alone: a run cut in shards plays the
+    same binary in sessions side by side, each its own XDG_RUNTIME_DIR, and never ends another's (#862)."""
+    session = f"XDG_RUNTIME_DIR={os.environ.get('XDG_RUNTIME_DIR', '')}".encode()
     found = []
     for process in Path("/proc").iterdir():
         try:
-            if process.name.isdigit() and os.readlink(process / "exe") == str(BINARY.resolve()):
+            if (process.name.isdigit() and os.readlink(process / "exe") == str(BINARY.resolve())
+                    and session in (process / "environ").read_bytes().split(b"\0")):
                 found.append(int(process.name))
         except OSError:
             pass
