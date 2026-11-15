@@ -4413,6 +4413,48 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def appearance_chosen(now: dt.datetime) -> None:
+    """BO. D98: Settings' « Général » offers the appearance — « Système », « Clair », « Sombre » —; chosen,
+    the window takes it at once, the other one than the system says; kept across starts, the bar
+    taking it too; « Système » by default, following the system as before."""
+    print("BO. Settings: the appearance System, Light or Dark, taken at once, kept across starts, the bar too (D98)")
+    taping = WORK / "appearance"
+    taping.mkdir()
+    ground = "return getComputedStyle(document.documentElement).getPropertyValue('--ground').trim().toUpperCase()"
+    grounds = {"light": "#F2F4F7", "dark": "#15171C"}
+    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n')
+    with window as browser:
+        browser.execute_script("location.hash = '#/settings'")
+        offered = wait_for(browser, lambda b: b.find_elements(By.ID, "appearance"), 10)
+        system = "dark" if browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches") else "light"
+        other = "light" if system == "dark" else "dark"
+        pick = browser.find_elements(By.ID, "appearance")
+        choices = [(o.get_attribute("value"), o.text) for o in Select(pick[0]).options] if pick else []
+        check("« Général » offers the appearance, « Système » chosen by default (D98)",
+              offered and choices == [("system", "Système"), ("light", "Clair"), ("dark", "Sombre")]
+              and Select(pick[0]).first_selected_option.get_attribute("value") == "system"
+              and browser.execute_script(ground) == grounds[system], (choices, browser.execute_script(ground)))
+        if pick:
+            Select(pick[0]).select_by_value(other)
+        taken = wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
+        check(f"« {'Clair' if other == 'light' else 'Sombre'} » chosen while the system says the other: the window takes it at once, kept (D98)",
+              taken and f'appearance = "{other}"' in window.file.read_text(), (browser.execute_script(ground), window.file.read_text()))
+        shot(browser, f"d98-settings-{other}")
+        if pick:
+            Select(browser.find_element(By.ID, "appearance")).select_by_value("system")
+        back = wait_for(browser, lambda b: b.execute_script(ground) == grounds[system], 3)
+        check("« Système » chosen again: the system's appearance followed, as before (D98)", back, browser.execute_script(ground))
+        if pick:
+            Select(browser.find_element(By.ID, "appearance")).select_by_value(other)
+        wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
+    # Started again, the bar alone: it takes the appearance kept.
+    window.file.write_text(window.file.read_text().replace('window = "full"\n', ""))
+    with window as browser:
+        bar = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.execute_script(ground) == grounds[other], 10)
+        check("started again: the bar takes the appearance kept, not the system's (D98)", bar, browser.execute_script(ground))
+        shot(browser, f"d98-bar-{other}")
+
+
 def bar_opened(now: dt.datetime) -> None:
     """BA. The bar opened (D90, board 6): at rest, the microphone, « Vérifier le son » — D88's panel in
     the bar — and « Avancé » closed; recording, the context, the microphone recorded, « Confidentielle »
@@ -9783,6 +9825,7 @@ def main() -> int:
     microphone_latest_answer(now)
     microphone_rollback(now)
     settings_folded(now)
+    appearance_chosen(now)
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
