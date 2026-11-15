@@ -1250,7 +1250,26 @@ function modelsAdvanced(words, prefix, offered, chosen) {
   // What a choice here changes, said before the lists.
   panel.append(element("p", "says", words.models_own_note), hearRow, writeRow, said);
   box.append(toggle, panel);
-  return { box, toggle, panel, models, unfold };
+  // Each service set up with its key (D96): every model it lists, grouped under its name, as people
+  // say them — never Settings' own again, nor one already offered.
+  const services = (offeredServices) => {
+    const known = new Set([...writePick.options].map((option) => option.value));
+    for (const service of offeredServices) {
+      const group = element("optgroup");
+      group.label = service.name;
+      for (const model of service.models) {
+        const value = JSON.stringify({ provider: service.address, model });
+        if (known.has(value) || value === settingsWriting) continue;
+        const option = element("option", "", writerSaid(service.address, model));
+        option.value = value;
+        group.append(option);
+        known.add(value);
+      }
+      if (group.childElementCount > 0) writePick.append(group);
+    }
+    paintWhole(writePick);
+  };
+  return { box, toggle, panel, models, unfold, services };
 }
 
 // A panel of *Refaire…* closes on *Annuler* or Escape: nothing changed, the focus back on *Refaire…* (D68).
@@ -1284,6 +1303,10 @@ function redoWith(offered, session, words, button, id, title, notes, again) {
   panel.id = id;
   panel.append(element("h3", "", title), element("p", "says", words.redo_with));
   const advanced = modelsAdvanced(words, id, offered, async () => {});
+  // The services set up, read as the panel opens: their models join the list when they answer (D96).
+  if (!offered.confidential) {
+    window.__TAURI__.core.invoke("services_offered", { name: nameOf(session) }).then(advanced.services, () => {});
+  }
   const go = element("button", "primary", words.redo_do);
   go.type = "button";
   go.id = id.replace(/-panel$/, "-do");

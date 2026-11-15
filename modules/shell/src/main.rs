@@ -412,6 +412,7 @@ fn main() {
             minutes_shown,
             minutes_saved,
             minutes_models,
+            services_offered,
             minutes_tested,
             agreement_shown,
             agreed,
@@ -2728,6 +2729,53 @@ async fn minutes_saved(
     };
     look_again(&app);
     Ok(not_kept)
+}
+
+/// A service set up for the summary, with every model it lists (D96).
+#[derive(serde::Serialize)]
+struct ServiceOffered {
+    /// As Settings name it: OpenRouter, OpenAI, Mistral.
+    name: &'static str,
+    address: String,
+    models: Vec<String>,
+}
+
+/// What Refaire offers beyond Settings' own (D96): each online service whose key is kept, with
+/// every model it lists — one that does not answer is left out. A meeting said confidential is
+/// offered none (D60). Read off the window's thread: the keyring may ask the user first.
+#[tauri::command]
+async fn services_offered(shell: State<'_, Shell>, name: String) -> Result<Vec<ServiceOffered>, Told> {
+    let folder = session_folder(&shell, &name)?;
+    if confidential::marked(&folder) {
+        return Ok(Vec::new());
+    }
+    tauri::async_runtime::spawn_blocking(|| {
+        let mut offered: Vec<ServiceOffered> = Vec::new();
+        for service in providers::online() {
+            // One address once: a stand-in may answer for every service.
+            if offered.iter().any(|known| known.address == service.address) {
+                continue;
+            }
+            let Some(host) = providers::host(&service.address) else {
+                continue;
+            };
+            let Some(key) = keys::key(&host).ok().flatten() else {
+                continue;
+            };
+            match providers::service_models(&service.address, false, Some(&key)) {
+                Ok(models) if !models.is_empty() => offered.push(ServiceOffered {
+                    name: service.name,
+                    address: service.address,
+                    models,
+                }),
+                Ok(_) => {}
+                Err(cause) => tracing::warn!(cause = ?cause, "shell.services_unread"),
+            }
+        }
+        offered
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))
 }
 
 /// A service's models for the summary, asked with the key the user typed — or the one kept for its
