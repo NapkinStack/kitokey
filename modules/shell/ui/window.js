@@ -4371,6 +4371,10 @@ async function draw(mine, again) {
     }
     return;
   }
+  // What the last save could not do is said until the next save, or until Settings is left (#655):
+  // dropped as soon as another page is asked, before anything is awaited — a drawing the next one
+  // overtakes stops at its first answer, and would leave it to be said again.
+  if (location.hash !== "#/settings") notSaved = null;
   const listing = await window.__TAURI__.core.invoke("listed");
   if (mine !== drawing) return;
   words = listing.words;
@@ -4387,8 +4391,6 @@ async function draw(mine, again) {
     player = null;
   }
   const settings = location.hash === "#/settings";
-  // What the last save could not do is said until the next save, or until Settings is left (#655).
-  if (!settings) notSaved = null;
   // The first run's assistant, alone in the window: no header, no other page (D58).
   const welcoming = /^#\/welcome(\/again)?$/.test(location.hash);
   document.getElementById("frame").hidden = welcoming;
