@@ -7952,13 +7952,27 @@ def trial_left(now: dt.datetime) -> None:
         check("in English, outside the Store: nothing said of a trial", said is None, said)
 
 
+def timed(scenario):
+    """A scenario, its time said after it, done or failed: where a run's minutes go (#862)."""
+    def played(*args, **kwargs):
+        began = time.monotonic()
+        try:
+            return scenario(*args, **kwargs)
+        finally:
+            print(f"    ({scenario.__name__}: {time.monotonic() - began:.1f} s)")
+    return played
+
+
 def main() -> int:
     now = dt.datetime.now().astimezone()
+    # Each scenario main() plays, timed (#862).
+    import e2e_only
+
+    for name in e2e_only.scenarios(Path(__file__).read_text()):
+        globals()[name] = timed(globals()[name])
     # A partial run (pytest's -k, scripts/e2e_only.py): the scenarios KITOKEY_E2E_ONLY names, alone,
     # said first — never read as a full run: e2e.sh says it again, and never passes it.
     if os.environ.get("KITOKEY_E2E_ONLY", "").strip():
-        import e2e_only
-
         try:
             played = e2e_only.chosen(Path(__file__).read_text(), os.environ["KITOKEY_E2E_ONLY"])
         except SystemExit as refused:
