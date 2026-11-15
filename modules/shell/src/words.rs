@@ -337,10 +337,13 @@ pub struct Window {
     pub list_unread_do: &'static str,
     /// The settings file cannot be read: said above every page but Settings (#770) — never read since
     /// Kitokey started, then read before and its last settings held.
+    /// Shows: a banner above every page but Settings. When: the settings file cannot be read and was
+    /// never read since Kitokey started. At most: no limit. Placeholders: none.
     pub settings_banner: &'static str,
+    /// Shows: a banner above every page but Settings. When: the settings file cannot be read, read
+    /// before, its last settings held. At most: no limit. Placeholders: none.
     pub settings_banner_kept: &'static str,
     pub again_refused: &'static str,
-    pub hearing_models_refused: &'static str,
     pub fold_not_kept: &'static str,
     pub agreement_refused: &'static str,
     pub meeting_not_opened: &'static str,
@@ -437,12 +440,9 @@ pub struct Window {
     pub speech_fetch: &'static str,
     pub speech_fetching: &'static str,
     pub speech_failed: &'static str,
-    /// A service that hears (D43): the choice's group, its fields, the agreement before anything is
-    /// sent to its host, the gestures, and what they say.
-    pub service_group: &'static str,
+    /// A service that hears (D43): its fields, the agreement before anything is sent to its host,
+    /// the gestures, and what they say.
     pub service_option: &'static str,
-    /// A model the service's list does not hold, typed (D63).
-    pub service_other_model: &'static str,
     pub service_address: &'static str,
     pub service_model: &'static str,
     pub service_key: &'static str,
@@ -476,6 +476,7 @@ pub struct Window {
     pub autostart_held: [&'static str; 2],
     pub keep_audio: [&'static str; 2],
     /// The settings' last group: Kitokey itself, as GNOME's preferences name it (D95).
+    /// Shows: Settings, as a heading. When: always. At most: no limit. Placeholders: none.
     pub general_title: &'static str,
     /// Folded at the bottom of « Général », and its one switch: what a program said of a failure,
     /// shown on the page under the sentence (D29).
@@ -644,13 +645,19 @@ pub struct Window {
     pub transcript_model_needed: &'static str,
     pub transcript_model_coming: &'static str,
     /// The button that ends what is being made of a meeting, or takes it out of the line (D92).
+    /// Shows: a button on a meeting's page, beside what is being made. When: its transcript or minutes
+    /// are being made, or waiting in line. At most: no limit. Placeholders: none.
     pub making_cancel: &'static str,
     /// « Annuler » refused — its meeting gone meanwhile (D92). Shows: a meeting's page, beside the
     /// making's line, until the next gesture on it. When: the shell refused to end or take out the
     /// making. At most: no limit. Placeholders: {} why it was refused.
     pub making_cancel_failed: &'static str,
     /// Said on its page once the user cancelled its transcript, or its minutes: what was there stays.
+    /// Shows: a meeting's page, where its transcript is. When: the user cancelled its transcript.
+    /// At most: no limit. Placeholders: none.
     pub transcript_stopped: &'static str,
+    /// Shows: a meeting's page, where its minutes are. When: the user cancelled its minutes.
+    /// At most: no limit. Placeholders: none.
     pub minutes_stopped: &'static str,
     pub ran_online: &'static str,
     /// The header's button, at rest and while a recording runs.
@@ -691,21 +698,22 @@ pub struct Window {
     /// Who writes the minutes was saved, but the keyring did not keep the key: why.
     pub key_not_kept: &'static str,
     pub minutes_step: &'static str,
-    pub ollama_group: &'static str,
-    pub online_group: &'static str,
-    pub other_group: &'static str,
-    pub custom: &'static str,
     pub address: &'static str,
     pub model_name: &'static str,
     pub key: &'static str,
     pub key_kept: &'static str,
+    /// Settings, « Modèles », the summary's first step (D95): the choice beside « Sur cet ordinateur ».
+    pub where_service: &'static str,
+    /// The label of the list of the services offered by name (D95).
+    pub service_name: &'static str,
+    /// The button that asks the service its models with the key typed: the key tested at once (D95).
+    pub key_test: &'static str,
     pub save: &'static str,
     pub where_online: &'static str,
     /// The model saved, which this computer's Ollama does not have ({} the model).
     pub ollama_lacks: &'static str,
     /// This computer's Ollama, saved, not answering — or answering with no model.
     pub ollama_silent: &'static str,
-    pub not_chosen: &'static str,
     /// The first run's assistant (D58): its question, who writes the minutes, the setting said
     /// plainly, and its way back from Settings. Each answer is its name and its line.
     pub welcome_title: &'static str,
@@ -833,7 +841,6 @@ pub fn window(language: Language) -> Window {
             settings_banner: "Settings cannot be read: your meetings are not shown.",
             settings_banner_kept: "Settings cannot be read: the last ones read stay in use, and no change is saved until the file is fixed.",
             again_refused: "It could not start again: {}",
-            hearing_models_refused: "This service’s models could not be read, you can type one: {}",
             fold_not_kept: "The sidebar will be back as it was at the next start: {}",
             agreement_refused: "This meeting cannot be sent: {}",
             meeting_not_opened: "This meeting could not be opened: {}",
@@ -907,9 +914,7 @@ pub fn window(language: Language) -> Window {
             speech_fetch: "Download Apple's model (macOS fetches it from Apple)",
             speech_fetching: "macOS is downloading Apple's model…",
             speech_failed: "Apple's model was not downloaded. Try again later; Whisper still hears.",
-            service_group: "A service",
             service_option: "A service I name",
-            service_other_model: "Another model…",
             service_address: "Its address",
             service_model: "Its model",
             service_key: "Its key, if it asks for one",
@@ -1125,19 +1130,17 @@ pub fn window(language: Language) -> Window {
             not_saved: "The setting was not saved: {}",
             key_not_kept: "The choice is saved, but the key was not kept in the system's keyring: {}",
             minutes_step: "Minutes",
-            ollama_group: "On this computer — found in Ollama",
-            online_group: "Online",
-            other_group: "Other",
-            custom: "Custom…",
             address: "Address (OpenAI-compatible)",
             model_name: "Model",
             key: "Key",
             key_kept: "A key is kept in the system's keyring; a new one replaces it.",
+            where_service: "A service",
+            service_name: "Service",
+            key_test: "Check the key",
             save: "Save",
             where_online: "Online — the transcript's text is sent",
             ollama_lacks: "Ollama, on this computer, has no model named {}: choose one in the list, or fetch it with Ollama.",
             ollama_silent: "Ollama, on this computer, does not answer, or has no model: start it, or fetch a model with it.",
-            not_chosen: "Not chosen yet",
             welcome_title: "Let’s set Kitokey up with one question.",
             welcome_question: "Do your meetings discuss confidential matters?",
             welcome_examples: "Clients, human resources, health, legal matters, unpublished figures…",
@@ -1260,7 +1263,6 @@ pub fn window(language: Language) -> Window {
             settings_banner: "Les réglages ne peuvent pas être lus\u{a0}: vos réunions ne sont pas affichées.",
             settings_banner_kept: "Les réglages ne peuvent pas être lus\u{a0}: les derniers lus restent en usage, et aucun changement n’est enregistré tant que le fichier n’est pas corrigé.",
             again_refused: "Impossible de recommencer\u{a0}: {}",
-            hearing_models_refused: "Les modèles de ce service n’ont pas pu être lus, vous pouvez en saisir un\u{a0}: {}",
             fold_not_kept: "La barre latérale reviendra comme avant au prochain démarrage\u{a0}: {}",
             agreement_refused: "Cette réunion ne peut pas être envoyée\u{a0}: {}",
             meeting_not_opened: "Cette réunion n’a pas pu être ouverte\u{a0}: {}",
@@ -1337,9 +1339,7 @@ pub fn window(language: Language) -> Window {
             speech_fetch: "Télécharger le modèle d’Apple (macOS le télécharge depuis Apple)",
             speech_fetching: "macOS télécharge le modèle d’Apple…",
             speech_failed: "Le modèle d’Apple n’a pas été téléchargé. Réessayez plus tard\u{202f}; Whisper reste disponible.",
-            service_group: "Un service",
             service_option: "Un service que je choisis",
-            service_other_model: "Un autre modèle…",
             service_address: "Son adresse",
             service_model: "Son modèle",
             service_key: "Sa clé, s’il en demande une",
@@ -1555,19 +1555,17 @@ pub fn window(language: Language) -> Window {
             not_saved: "Le réglage n’a pas été enregistré\u{a0}: {}",
             key_not_kept: "Le choix est enregistré, mais la clé n’a pas été gardée dans le trousseau du système\u{a0}: {}",
             minutes_step: "Compte rendu",
-            ollama_group: "Sur cet ordinateur — trouvés dans Ollama",
-            online_group: "En ligne",
-            other_group: "Autre",
-            custom: "Personnalisé…",
             address: "Adresse (compatible OpenAI)",
             model_name: "Modèle",
             key: "Clé d’API",
             key_kept: "Une clé est gardée dans le trousseau du système\u{202f}; une nouvelle la remplace.",
+            where_service: "Un service",
+            service_name: "Service",
+            key_test: "Vérifier la clé",
             save: "Enregistrer",
             where_online: "En ligne — le texte de la transcription est envoyé",
             ollama_lacks: "Ollama, sur cet ordinateur, n’a pas de modèle nommé {}\u{a0}: choisissez-en un dans la liste, ou téléchargez-le avec Ollama.",
             ollama_silent: "Ollama ne répond pas ou n’a aucun modèle\u{a0}: lancez Ollama, puis téléchargez un modèle.",
-            not_chosen: "Pas encore choisi",
             welcome_title: "Réglons Kitokey en une question.",
             welcome_question: "Vos réunions parlent-elles de sujets confidentiels\u{202f}?",
             welcome_examples: "Clients, ressources humaines, santé, juridique, chiffres non publiés…",
