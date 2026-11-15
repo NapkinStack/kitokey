@@ -5709,6 +5709,81 @@ def meeting_told_once(now: dt.datetime) -> None:
             monitor.wait(timeout=10)
 
 
+def redo_choice_starts_nothing(now: dt.datetime) -> None:
+    """BO. A model chosen in a redo panel — on a meeting's page, or in the bar's « Avancé » — starts nothing,
+    and the panel stays open, the choice shown; Escape leaves everything as it was (D96, criterion 2: the
+    decider saw a choice close the panel, 2026-11-15)."""
+    print("BO. a model chosen in a redo panel, on the page or in the bar, starts nothing and the panel stays open (D96)")
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            try:
+                self.send_response(200)
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                pass
+
+        def log_message(self, *_):
+            pass
+
+    tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
+    threading.Thread(target=tags.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{tags.server_address[1]}"
+    named = f'after = "nothing"\nreminder = false\nminutes_provider = "{base}/v1"\nminutes_model = "qwen3:14b"\n'
+    meetings = WORK / "redo-choice"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 3, {"local.wav": 1000})
+    (meeting / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n'
+    )
+    minutes = "---\ncontract: minutes/v1\nmodel: qwen3:14b\ncontext: null\n---\n\n## A\n\nLes minutes d'avant.\n\n## B\n\n## C\n"
+    (meeting / "minutes.md").write_text(minutes)
+    (WORK / "summary-args").unlink(missing_ok=True)
+    idle = "return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null)"
+    untouched = lambda: (meeting / "minutes.md").read_text() == minutes and not (WORK / "summary-args").exists()
+    try:
+        with Window(meetings, "fr_FR.UTF-8", named, ollama=base) as browser:
+            browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+            press(browser, "redo-minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+            redo_pick(browser, "redo-panel", "minutes", 1)
+            picked = browser.execute_script("const p = document.getElementById('redo-panel-minutes-model'); return p ? p.value : ''")
+            # Past the page's own reading, a second and a half: drawn again, the panel would be gone.
+            time.sleep(3)
+            kept = browser.execute_script("const p = document.getElementById('redo-panel-minutes-model'); return p ? p.value : null")
+            check("on the page: a model chosen in the redo panel starts nothing, and the panel stays open, the choice shown (D96)",
+                  bool(picked) and kept == picked and browser.find_elements(By.ID, "redo-do") and browser.execute_script(idle) and untouched(),
+                  (picked, kept, bool(browser.find_elements(By.ID, "redo-do")), browser.execute_script(idle)))
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-panel"), 3)
+            check("on the page: Escape leaves everything as it was — the panel closed, nothing kept for the meeting, nothing made",
+                  closed and not (meeting / "models.json").exists() and untouched() and browser.execute_script(idle),
+                  (closed, (meeting / "models.json").exists()))
+        with Window(meetings, "fr_FR.UTF-8", named, ollama=base, small=True) as browser:
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-more").is_displayed(), 10)
+            if browser.find_element(By.ID, "small-more").get_attribute("aria-expanded") != "true":
+                press(browser, "small-more")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-advanced"), 10)
+            if browser.find_element(By.ID, "small-advanced").get_attribute("aria-expanded") != "true":
+                press(browser, "small-advanced")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-minutes-model") and b.find_element(By.ID, "small-minutes-model").is_displayed(), 10)
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_index(1)
+            picked = browser.execute_script("return document.getElementById('small-minutes-model')?.value || ''")
+            time.sleep(3)
+            state = browser.execute_script("const t = document.getElementById('small-advanced'); const p = document.getElementById('small-advanced-panel');"
+                                           " const m = document.getElementById('small-minutes-model');"
+                                           " return {expanded: t?.getAttribute('aria-expanded'), hidden: p?.hidden, value: m?.value}")
+            check("in the bar: a model chosen in « Avancé » starts nothing, and the panel stays open, the choice shown (D96)",
+                  bool(picked) and state == {"expanded": "true", "hidden": False, "value": picked} and browser.execute_script(idle) and untouched(),
+                  (picked, state))
+    finally:
+        tags.shutdown()
+
 def two_panes(now: dt.datetime) -> None:
     """AD. The window in two panes: the meetings in a sidebar, the one chosen beside them (D61)."""
     print("AD. the window in two panes: the sidebar, the meeting chosen beside it, as wide as the window (D61)")
@@ -9782,6 +9857,7 @@ def main() -> int:
     microphone_chosen(now)
     microphone_latest_answer(now)
     microphone_rollback(now)
+    redo_choice_starts_nothing(now)
     settings_folded(now)
     sound_checked(now)
     bar_window(now)
