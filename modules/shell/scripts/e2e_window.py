@@ -4904,7 +4904,11 @@ def meeting_renamed(now: dt.datetime) -> None:
         # The meeting being recorded can be named too.
         live = lambda b: "live" in (b.find_element(By.ID, "record").get_attribute("class") or "")
         recording = meetings / "2026-10-18_12-00"
+        # The window's presses on « Enregistrer », counted as they reach it, for the stop's check (#763).
+        browser.execute_script("window.__recordClicks = 0; document.getElementById('record')"
+                               ".addEventListener('click', () => { window.__recordClicks += 1; }, true)")
         browser.find_element(By.ID, "record").click()
+        start_pressed = time.monotonic()
         wait_for(browser, lambda b: (recording / "session.json").exists() and live(b), 10)
         # D89: while it records, the header's name says it — the dot of its i red and 1.375 times larger, the cut following.
         dot = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
@@ -4924,18 +4928,26 @@ def meeting_renamed(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{recording.name}'")
         wait_for(browser, lambda b: head(b) == "En direct", 10)
         # Pressed once it is the stop gesture, as the shell says it: recording, nothing stopping, no
-        # press of the window's still answered — not after a fixed delay (#763). On a miss, the
-        # button's state, the shell's and the folder's are said.
+        # press of the window's still answered — and once the shell's half second has passed since
+        # the start's press, which takes a press within it for the same one (D68). 6eb6ce0's red in a
+        # full run: the meeting named 0.26 s after the start, the stop pressed inside that half second,
+        # no stop logged (#763). On a miss, the button's, the shell's and the folder's states are said,
+        # and how many presses reached the button.
         state = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('header').then((h) =>"
                  " done({recording: h.recording, stopping: h.stopping, asked: recordAsked,"
                  " button: document.getElementById('record').className}))")
         gesture = lambda b: (lambda s: s["recording"] and not s["stopping"] and s["asked"] is None and "live" in s["button"])(b.execute_async_script(state))
         ready = wait_for(browser, gesture, 10)
+        time.sleep(max(0.0, 0.6 - (time.monotonic() - start_pressed)))
         before = browser.execute_async_script(state)
+        clicks = browser.execute_script("return window.__recordClicks")
+        after_start = round(time.monotonic() - start_pressed, 2)
         browser.find_element(By.ID, "record").click()
         stopped = wait_for(browser, lambda b: "stopped" in (recording / "session.json").read_text() and not live(b), 10)
         check("stopped: the name stays", ready and stopped and (recording / "title.txt").read_text() == "En direct\n" and head(browser) == "En direct",
               {"name": head(browser), "before the press": before, "after": browser.execute_async_script(state),
+               "presses reaching the button": [clicks, browser.execute_script("return window.__recordClicks")],
+               "pressed, seconds after the start's press": after_start,
                "session.json": (recording / "session.json").read_text()})
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
