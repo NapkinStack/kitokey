@@ -349,3 +349,80 @@ fn a_service_that_lists_its_models_to_anyone_has_its_key_asked_first() {
     assert_eq!(asked.recv().unwrap().0, "/api/v1/key");
     assert_eq!(asked.recv().unwrap(), ("/api/v1/models".to_string(), "Bearer sk-good".to_string()));
 }
+
+#[test]
+fn a_hearing_service_s_key_is_tested_at_once_then_its_transcription_models_listed() {
+    use kitokey_shell::{
+        providers::{Hearing, hearing_models},
+        summarising::Cause,
+    };
+    // OpenRouter lists to anyone: its key asked first, at `GET /key`; OpenAI's `GET /models` asks for it.
+    assert_eq!(
+        hearing().iter().map(|service| service.key_checked).collect::<Vec<_>>(),
+        [true, false]
+    );
+    let openrouter = |address: String| Hearing {
+        name: "OpenRouter",
+        address,
+        listed: true,
+        key_checked: true,
+        models: &["openai/whisper-large-v3-turbo"],
+    };
+    let (refusing, asked) = serving(
+        &[
+            ("/api/v1/key", 401, r#"{"error":{"message":"Invalid credentials","code":401}}"#),
+            ("/api/v1/models?output_modalities=transcription", 200, r#"{"data":[{"id":"a/b"}]}"#),
+        ],
+        2,
+    );
+    assert_eq!(hearing_models(&openrouter(refusing), Some("sk-false")), Err(Cause::RefusedKey));
+    assert_eq!(asked.recv().unwrap(), ("/api/v1/key".to_string(), "Bearer sk-false".to_string()));
+    // Refused there, its models are not asked.
+    assert!(asked.recv_timeout(std::time::Duration::from_millis(300)).is_err());
+    // Taken: the models it lists by what they do, the ids alone.
+    let (good, asked) = serving(
+        &[
+            ("/api/v1/key", 200, r#"{"data":{"label":"x"}}"#),
+            (
+                "/api/v1/models?output_modalities=transcription",
+                200,
+                r#"{"data":[{"id":"openai/whisper-large-v3"},{"id":""},{"id":"vendor/scribe"}]}"#,
+            ),
+        ],
+        2,
+    );
+    assert_eq!(
+        hearing_models(&openrouter(good), Some("sk-good")).unwrap(),
+        ["openai/whisper-large-v3", "vendor/scribe"]
+    );
+    assert_eq!(asked.recv().unwrap().0, "/api/v1/key");
+    assert_eq!(asked.recv().unwrap().0, "/api/v1/models?output_modalities=transcription");
+    // Taken, its list unread or empty: the models it publishes.
+    let (silent, _) = serving(
+        &[
+            ("/api/v1/key", 200, "{}"),
+            ("/api/v1/models?output_modalities=transcription", 200, r#"{"data":[]}"#),
+        ],
+        2,
+    );
+    assert_eq!(
+        hearing_models(&openrouter(silent), Some("k")).unwrap(),
+        ["openai/whisper-large-v3-turbo"]
+    );
+    // OpenAI: its key tested at `GET /models`; taken, the model it publishes with segments, not its list.
+    let openai = |address: String| Hearing {
+        name: "OpenAI",
+        address,
+        listed: false,
+        key_checked: false,
+        models: &["whisper-1"],
+    };
+    let (refusing, asked) = serving(&[("/api/v1/models", 401, r#"{"error":"Incorrect API key"}"#)], 1);
+    assert_eq!(hearing_models(&openai(refusing), Some("sk-false")), Err(Cause::RefusedKey));
+    assert_eq!(asked.recv().unwrap(), ("/api/v1/models".to_string(), "Bearer sk-false".to_string()));
+    let (taking, _) = serving(&[("/api/v1/models", 200, r#"{"data":[{"id":"gpt-4o"},{"id":"whisper-1"}]}"#)], 1);
+    assert_eq!(hearing_models(&openai(taking), Some("sk-good")).unwrap(), ["whisper-1"]);
+    // Every other refusal its own cause, as the summary's services' are.
+    let (credit, _) = serving(&[("/api/v1/models", 402, "{}")], 1);
+    assert_eq!(hearing_models(&openai(credit), Some("k")), Err(Cause::NoCredit));
+}

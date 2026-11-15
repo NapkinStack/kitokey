@@ -58,35 +58,38 @@ pub fn online() -> Vec<OnlineOffered> {
         .collect()
 }
 
-/// A service's models, asked with the key — the key tested at once (D95): OpenAI's and Mistral's
-/// `GET /models` ask for it; OpenRouter lists to anyone, so its key is asked first at `GET /key`.
-/// Only the ids are read, in OpenAI's form (`data[].id`) or a bare list, as Mistral's example has
-/// it. Refused, the cause as the Tester names it: 401/403 the refused key.
-pub fn service_models(address: &str, key_checked: bool, key: Option<&str>) -> Result<Vec<String>, Cause> {
+/// A route of a service asked with the key, its body read — refused, the cause as the Tester
+/// names it: 401/403 the refused key (D95).
+fn keyed(address: &str, route: &str, key: Option<&str>) -> Result<String, Cause> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(10)))
         .http_status_as_error(false)
         .build()
         .into();
-    let base = address.trim_end_matches('/');
-    let ask = |route: &str| {
-        let mut asked = agent.get(format!("{base}/{route}"));
-        if let Some(key) = key.filter(|key| !key.trim().is_empty()) {
-            asked = asked.header("authorization", format!("Bearer {}", key.trim()));
-        }
-        let mut answer = asked.call().map_err(|error| match error {
-            ureq::Error::Timeout(_) => Cause::TooSlow,
-            _ => Cause::Unreachable,
-        })?;
-        match answer.status().as_u16() {
-            200..=299 => answer.body_mut().read_to_string().map_err(|_| Cause::ProviderFailed),
-            401 | 403 => Err(Cause::RefusedKey),
-            402 => Err(Cause::NoCredit),
-            429 => Err(Cause::TooMany),
-            500..=599 => Err(Cause::Down),
-            _ => Err(Cause::ProviderFailed),
-        }
-    };
+    let mut asked = agent.get(format!("{}/{route}", address.trim_end_matches('/')));
+    if let Some(key) = key.filter(|key| !key.trim().is_empty()) {
+        asked = asked.header("authorization", format!("Bearer {}", key.trim()));
+    }
+    let mut answer = asked.call().map_err(|error| match error {
+        ureq::Error::Timeout(_) => Cause::TooSlow,
+        _ => Cause::Unreachable,
+    })?;
+    match answer.status().as_u16() {
+        200..=299 => answer.body_mut().read_to_string().map_err(|_| Cause::ProviderFailed),
+        401 | 403 => Err(Cause::RefusedKey),
+        402 => Err(Cause::NoCredit),
+        429 => Err(Cause::TooMany),
+        500..=599 => Err(Cause::Down),
+        _ => Err(Cause::ProviderFailed),
+    }
+}
+
+/// A service's models, asked with the key — the key tested at once (D95): OpenAI's and Mistral's
+/// `GET /models` ask for it; OpenRouter lists to anyone, so its key is asked first at `GET /key`.
+/// Only the ids are read, in OpenAI's form (`data[].id`) or a bare list, as Mistral's example has
+/// it. Refused, the cause as the Tester names it: 401/403 the refused key.
+pub fn service_models(address: &str, key_checked: bool, key: Option<&str>) -> Result<Vec<String>, Cause> {
+    let ask = |route: &str| keyed(address, route, key);
     if key_checked {
         ask("key")?;
     }
@@ -108,6 +111,8 @@ pub struct Hearing {
     pub address: String,
     /// It lists its transcription models itself (`models?output_modalities=transcription`).
     pub listed: bool,
+    /// It lists its models to anyone: its key is asked first at its own route, `GET /key` (D95).
+    pub key_checked: bool,
     pub models: &'static [&'static str],
 }
 
@@ -122,12 +127,14 @@ pub fn hearing() -> Vec<Hearing> {
             name: ONLINE[0].name,
             address: openrouter,
             listed: true,
+            key_checked: ONLINE[0].key_checked,
             models: &["openai/whisper-large-v3-turbo", "openai/whisper-large-v3"],
         },
         Hearing {
             name: ONLINE[1].name,
             address: ONLINE[1].address.to_string(),
             listed: false,
+            key_checked: ONLINE[1].key_checked,
             // `gpt-4o-transcribe` and its smaller one answer without segments.
             models: &["whisper-1"],
         },
@@ -153,6 +160,18 @@ pub fn hearing_listed(address: &str) -> Option<Vec<String>> {
         .filter(|name| !name.trim().is_empty() && !name.chars().any(char::is_control))
         .collect();
     (!names.is_empty()).then_some(names)
+}
+
+/// A hearing service's key tested at once (D95), as the summary's services' are: OpenRouter's at
+/// `GET /key`, OpenAI's at `GET /models`; taken, its transcription models — those it lists by what
+/// they do, else those it publishes. Refused, the cause as the Tester names it.
+pub fn hearing_models(service: &Hearing, key: Option<&str>) -> Result<Vec<String>, Cause> {
+    keyed(&service.address, if service.key_checked { "key" } else { "models" }, key)?;
+    let published = || service.models.iter().map(|model| model.to_string()).collect();
+    if !service.listed {
+        return Ok(published());
+    }
+    Ok(hearing_listed(&service.address).unwrap_or_else(published))
 }
 
 /// The local model recommended for the minutes: tried on real meetings, it holds `minutes/v1`'s
