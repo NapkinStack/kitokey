@@ -2,19 +2,19 @@ name: Pull request
 
 # The rules read from the pull request's description: the test sheet
 # (.nstack/handbook/05-workflow.md §7) and the cycle (.nstack/handbook/project.md). Editing the
-# description or a label re-evaluates them on the same head commit; so does a review, which is a
-# person's hand on the pull request when they are its named verifier (T2).
+# description or a label re-evaluates them on the same head commit. A review or a comment is a
+# person's hand on the pull request when they are its named verifier (T2), read at the next run:
+# never a trigger, since a review's failed run stays beside the later ones and blocks the merge,
+# and an attested record, pushed as notes, is no event that could replace it (D218, #394).
 #
 # The description is untrusted input: it reaches nstack through env:, never a script.
 
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened, labeled, unlabeled]
-  pull_request_review:
-    types: [submitted]
 
 permissions:
-  contents: read
+  contents: read        # the head, and the attested record in the remote's notes (A1, A2)
   pull-requests: read   # whose hand is on the pull request: a person named verifier (T2)
 
 # Each event's run reads the description and the head as they were at that event: a later event

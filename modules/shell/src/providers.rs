@@ -4,6 +4,8 @@
 
 use std::time::Duration;
 
+use crate::summarising::Cause;
+
 /// Ollama on this computer, where it listens unless told otherwise.
 pub const OLLAMA: &str = "http://localhost:11434";
 
@@ -12,6 +14,8 @@ pub const OLLAMA: &str = "http://localhost:11434";
 pub struct Online {
     pub name: &'static str,
     pub address: &'static str,
+    /// It lists its models to anyone: its key is asked first at its own route, `GET /key` (D95).
+    pub key_checked: bool,
 }
 
 /// The online services offered; any other is the user's own address.
@@ -19,16 +23,82 @@ pub const ONLINE: [Online; 3] = [
     Online {
         name: "OpenRouter",
         address: "https://openrouter.ai/api/v1",
+        key_checked: true,
     },
     Online {
         name: "OpenAI",
         address: "https://api.openai.com/v1",
+        key_checked: false,
     },
     Online {
         name: "Mistral",
         address: "https://api.mistral.ai/v1",
+        key_checked: false,
     },
 ];
+
+/// The online services as Settings offer them: their own addresses, or — for a run that stands them
+/// in, as `KITOKEY_HEARING` does OpenRouter's for hearing — the one `KITOKEY_ONLINE` names (D95).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct OnlineOffered {
+    pub name: &'static str,
+    pub address: String,
+    pub key_checked: bool,
+}
+
+pub fn online() -> Vec<OnlineOffered> {
+    let stand_in = std::env::var("KITOKEY_ONLINE").ok().filter(|address| !address.trim().is_empty());
+    ONLINE
+        .iter()
+        .map(|service| OnlineOffered {
+            name: service.name,
+            address: stand_in.clone().unwrap_or_else(|| service.address.to_string()),
+            key_checked: service.key_checked,
+        })
+        .collect()
+}
+
+/// A service's models, asked with the key — the key tested at once (D95): OpenAI's and Mistral's
+/// `GET /models` ask for it; OpenRouter lists to anyone, so its key is asked first at `GET /key`.
+/// Only the ids are read, in OpenAI's form (`data[].id`) or a bare list, as Mistral's example has
+/// it. Refused, the cause as the Tester names it: 401/403 the refused key.
+pub fn service_models(address: &str, key_checked: bool, key: Option<&str>) -> Result<Vec<String>, Cause> {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(10)))
+        .http_status_as_error(false)
+        .build()
+        .into();
+    let base = address.trim_end_matches('/');
+    let ask = |route: &str| {
+        let mut asked = agent.get(format!("{base}/{route}"));
+        if let Some(key) = key.filter(|key| !key.trim().is_empty()) {
+            asked = asked.header("authorization", format!("Bearer {}", key.trim()));
+        }
+        let mut answer = asked.call().map_err(|error| match error {
+            ureq::Error::Timeout(_) => Cause::TooSlow,
+            _ => Cause::Unreachable,
+        })?;
+        match answer.status().as_u16() {
+            200..=299 => answer.body_mut().read_to_string().map_err(|_| Cause::ProviderFailed),
+            401 | 403 => Err(Cause::RefusedKey),
+            402 => Err(Cause::NoCredit),
+            429 => Err(Cause::TooMany),
+            500..=599 => Err(Cause::Down),
+            _ => Err(Cause::ProviderFailed),
+        }
+    };
+    if key_checked {
+        ask("key")?;
+    }
+    let listed: serde_json::Value = serde_json::from_str(&ask("models")?).map_err(|_| Cause::ProviderFailed)?;
+    let models = listed.get("data").unwrap_or(&listed).as_array().ok_or(Cause::ProviderFailed)?;
+    Ok(models
+        .iter()
+        .filter_map(|model| model.get("id").and_then(serde_json::Value::as_str).map(str::to_string))
+        // A name the step would refuse is not offered.
+        .filter(|name| !name.trim().is_empty() && !name.chars().any(char::is_control))
+        .collect())
+}
 
 /// A service that hears, offered by name as the minutes' are (D63): its address, and the
 /// transcription models it publishes where it does not list them by what they do.
