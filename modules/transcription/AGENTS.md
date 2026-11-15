@@ -43,7 +43,7 @@ Turns the audio of a session into a timestamped transcript.
 
 ## Business invariants
 
-- `transcript.jsonl` only grows, and is true up to its last line: a step killed anywhere is run again and gives, byte for byte, the transcript of a run never stopped.
+- `transcript.jsonl` only grows, and is true up to its last line: a step killed anywhere is run again and gives, byte for byte, the transcript of a run never stopped — but for the `complete` line's `made`, when each run made it whole (D93).
 - A transcript another engine, model, language or context made is never continued.
 - Whatever is refused, the engine is asked nothing and no transcript is created or changed.
 - `complete` is written only when the session's record says `stopped`.

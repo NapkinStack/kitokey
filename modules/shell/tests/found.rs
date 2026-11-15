@@ -274,3 +274,65 @@ fn a_program_has_a_start_while_it_runs_and_none_once_ended() {
     child.wait().unwrap();
     assert_eq!(recording::since(child.id()), None);
 }
+
+/// The folder beside the settings made read-only for `run`, as a full disk or a locked config
+/// folder leaves it (#818), then writable again — `None` when this user writes anyway (root).
+fn read_only<T>(folder: &Path, run: impl FnOnce() -> T) -> Option<T> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(folder, fs::Permissions::from_mode(0o555)).unwrap();
+    let writes = fs::write(folder.join("probe"), "").is_ok();
+    let done = (!writes).then(run);
+    fs::set_permissions(folder, fs::Permissions::from_mode(0o755)).unwrap();
+    done
+}
+
+#[test]
+fn a_kept_file_that_cannot_be_removed_finds_nothing_at_each_start_and_stays() {
+    let sessions = tempfile::tempdir().unwrap();
+    let mut child = recorder(sessions.path(), "");
+    let kept = Kept::of(child.id(), &session(sessions.path())).unwrap();
+    child.kill().unwrap();
+    child.wait().unwrap();
+    let file = sessions.path().join("recording.json");
+    recording::keep(&file, &kept).unwrap();
+    // The recording stopped, its file not removed; then the next start, and the one after.
+    let Some((forgotten, next, after)) = read_only(sessions.path(), || {
+        (
+            recording::forget(&file),
+            recording::find(&file, now()).is_none(),
+            recording::find(&file, now()).is_none(),
+        )
+    }) else {
+        return; // run as a user who writes anywhere: there is no read-only folder to make
+    };
+    assert!(forgotten.is_err(), "not removed: said to the caller, who logs it");
+    assert!(next && after, "a program gone: nothing found, at the next start and the one after");
+    assert_eq!(fs::read(&file).unwrap(), serde_json::to_vec(&kept).unwrap(), "left as it was");
+}
+
+#[test]
+fn a_kept_file_that_can_be_neither_read_nor_set_aside_finds_nothing_at_each_start_and_stays() {
+    use std::os::unix::fs::PermissionsExt;
+    let sessions = tempfile::tempdir().unwrap();
+    let file = sessions.path().join("recording.json");
+    fs::write(&file, "{}").unwrap();
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::read(&file).is_ok() {
+        return; // run as a user who reads anything: there is no unreadable file to make
+    }
+    let Some((next, after)) = read_only(sessions.path(), || {
+        (recording::find(&file, now()).is_none(), recording::find(&file, now()).is_none())
+    }) else {
+        return;
+    };
+    assert!(next && after, "nothing found, at the next start and the one after");
+    assert!(file.exists(), "left in place: neither removed nor set aside");
+    let aside = fs::read_dir(sessions.path())
+        .unwrap()
+        .flatten()
+        .filter(|entry| entry.file_name().to_string_lossy().contains("unreadable"))
+        .count();
+    assert_eq!(aside, 0);
+    fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(fs::read_to_string(&file).unwrap(), "{}", "whole");
+}

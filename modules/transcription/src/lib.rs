@@ -293,11 +293,13 @@ impl Transcript {
         Ok(())
     }
 
-    /// Says the whole session was heard, once: `duration` seconds of sound.
+    /// Says the whole session was heard, once: `duration` seconds of sound, and when — this
+    /// computer's time, its offset said, to the second.
     pub fn complete(&mut self, duration: f64) -> io::Result<()> {
         let duration = hundredths(duration)?;
         if !self.complete {
-            self.add(&[json!({ "type": "complete", "duration": duration as f64 / 100.0 })])?;
+            let made = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+            self.add(&[json!({ "type": "complete", "duration": duration as f64 / 100.0, "made": made })])?;
             self.complete = true;
         }
         Ok(())
