@@ -324,7 +324,9 @@ pub fn read(path: &Path) -> Result<Settings, Unread> {
     let key = |at: usize| {
         let start = text[..at.min(text.len())].rfind('\n').map_or(0, |end| end + 1);
         let (named, _) = text[start..].split_once('=')?;
-        KEYS.into_iter().find(|key| *key == named.trim())
+        // A key written in quotes, as TOML allows, is the same key.
+        let named = named.trim().trim_matches(|c| c == '"' || c == '\'');
+        KEYS.into_iter().find(|key| *key == named)
     };
     let written: Written = toml::from_str(&text).map_err(|error| match error.span() {
         Some(span) => unread(
@@ -545,4 +547,56 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     written.and_then(|()| fs::rename(&draft, path)).inspect_err(|_| {
         let _ = fs::remove_file(&draft);
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `KEYS` names each of `Written`'s fields, and nothing else (#813): a setting added to the file
+    /// is named by a refusal. The pattern lists every field — one added or taken out fails to compile
+    /// here — and the names compared are the pattern's own.
+    #[test]
+    fn the_keys_a_refusal_names_are_the_files_fields() {
+        macro_rules! fields {
+            ($($field:ident),* $(,)?) => {{
+                #[allow(dead_code)]
+                fn every(written: Written) {
+                    let Written { $($field: _),* } = written;
+                }
+                [$(stringify!($field)),*]
+            }};
+        }
+        let mut fields = fields!(
+            reminder,
+            sessions,
+            transcript,
+            after,
+            model,
+            engine,
+            transcription_provider,
+            transcription_model,
+            transcription_agreed,
+            minutes_provider,
+            minutes_model,
+            meeting_language,
+            minutes_agreed,
+            keep_audio,
+            developer,
+            offer,
+            autostart,
+            window,
+            log,
+            welcomed,
+            folded,
+            bar_at,
+            language,
+            microphone,
+            microphone_description,
+        );
+        let mut keys = KEYS;
+        fields.sort_unstable();
+        keys.sort_unstable();
+        assert_eq!(keys, fields);
+    }
 }

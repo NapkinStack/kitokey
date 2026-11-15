@@ -122,6 +122,21 @@ fn a_file_refused_names_the_setting_and_its_line() {
                 key: Some("reminder"),
             },
         ),
+        // A key in quotes, as TOML allows, is named the same (#813).
+        (
+            "\"after\" = \"sometimes\"\n",
+            Refused::Unparsed {
+                line: 1,
+                key: Some("after"),
+            },
+        ),
+        (
+            "'after' = \"sometimes\"\n",
+            Refused::Unparsed {
+                line: 1,
+                key: Some("after"),
+            },
+        ),
         ("this is not TOML\n", Refused::Unparsed { line: 1, key: None }),
         ("reminder = true\n= 3\n", Refused::Unparsed { line: 2, key: None }),
         (
