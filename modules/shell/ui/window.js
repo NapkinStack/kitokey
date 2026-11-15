@@ -3002,6 +3002,26 @@ function showSettings(shown, minutes, words) {
     save({ language: speaksPick.value });
   });
   speaks.append(speaksSaid, speaksPick);
+  // The appearance (D98): the system's by default, or light or dark whatever the system says —
+  // taken at once here, by the bar at its next look.
+  const looks = element("div", "row");
+  const looksSaid = element("label", "said");
+  looksSaid.htmlFor = "appearance";
+  looksSaid.append(element("span", "name", words.appearance[0]), element("span", "says", words.appearance[1]));
+  const looksPick = element("select");
+  looksPick.id = "appearance";
+  looksPick.disabled = locked;
+  ["system", "light", "dark"].forEach((value, at) => {
+    const option = element("option", "", words.appearance_choices[at]);
+    option.value = value;
+    looksPick.append(option);
+  });
+  looksPick.value = shown.appearance;
+  looksPick.addEventListener("change", () => {
+    takeAppearance(looksPick.value);
+    save({ appearance: looksPick.value });
+  });
+  looks.append(looksSaid, looksPick);
   // « Vérifier le son » (D88): the microphone and the meeting's sound, before a recording — the panel
   // the bar opens too.
   const check = element("div", "row");
@@ -3014,7 +3034,7 @@ function showSettings(shown, minutes, words) {
   checkButton.addEventListener("click", () => checkSound(words, checkButton));
   check.append(checkSaid, checkButton);
   // Outside Windows' package, no startup task: nothing offered (D84).
-  more.append(speaks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
+  more.append(speaks, looks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
   // What becomes of a recording: where it goes and how long its sound stays, after what is made.
   after.append(where, keep);
 
@@ -3881,6 +3901,8 @@ function showSmall(words) {
   // The shortcut, in ●'s and ■'s tooltips, as the desktop grants it.
   const paintKeys = async () => {
     const header = await invoke("header").catch(() => null);
+    // Chosen in Settings meanwhile: the bar takes it too (D98).
+    if (header !== null) takeAppearance(header.appearance);
     if (header === null || header.shortcut === keys) return;
     keys = header.shortcut;
     named(start, start.getAttribute("aria-label"));
@@ -4388,6 +4410,12 @@ let drawnMeeting = null;
 // `again`: the list's address drawn once more after a page gone — never more than once.
 // Whoever asked: a drawing still the current one that fails says so; one superseded answers for
 // nothing. The failure goes on to `page_failed`, with its stack.
+// Every window's look (D98): the system's, or the one chosen whatever the system says.
+function takeAppearance(appearance) {
+  if (appearance === "light" || appearance === "dark") document.documentElement.dataset.theme = appearance;
+  else delete document.documentElement.dataset.theme;
+}
+
 async function refresh(again = false) {
   const mine = ++drawing;
   try {
@@ -4415,6 +4443,7 @@ async function draw(mine, again) {
     if (!document.body.classList.contains("small-window")) {
       const listing = await window.__TAURI__.core.invoke("listed");
       words = listing.words;
+      takeAppearance(listing.appearance);
       document.documentElement.lang = words.locale;
       document.getElementById("small").hidden = false;
       document.getElementById("frame").hidden = true;
@@ -4429,6 +4458,7 @@ async function draw(mine, again) {
   const listing = await window.__TAURI__.core.invoke("listed");
   if (mine !== drawing) return;
   words = listing.words;
+  takeAppearance(listing.appearance);
   show(listing);
   const wanted = location.hash.match(/^#\/meeting\/(.+)$/);
   // The list's address: the pane shows the last meeting beside it (D61); under 840 px, the list alone.
@@ -4665,6 +4695,7 @@ setInterval(async () => {
   if (asked === null) return;
   readMakings();
   const { recording, stopping, shortcut, refused } = asked;
+  takeAppearance(asked.appearance);
   // The shortcut, granted or changed meanwhile: in the recording's tooltip and the empty state (D89).
   recordKeys = shortcut ?? null;
   paintRecord(recording, stopping);

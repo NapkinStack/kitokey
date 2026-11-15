@@ -420,6 +420,21 @@ fn colours_in_page(page: &str) -> Vec<String> {
         .collect()
 }
 
+/// Dark chosen in Settings whatever the system says (D98) is the system's dark itself, token for
+/// token: a palette of its own would drift from the one the thresholds above are read on.
+#[test]
+fn the_dark_chosen_in_settings_is_the_systems_dark() {
+    let forced = STYLE
+        .split_once("[data-theme=\"dark\"]:root {")
+        .unwrap()
+        .1
+        .split_once('}')
+        .unwrap()
+        .0;
+    let [_, dark] = themes(STYLE);
+    assert_eq!(tokens(forced), dark);
+}
+
 #[test]
 fn red_says_a_recording_and_nothing_else() {
     assert_eq!(red_outside_a_recording(STYLE), Vec::<String>::new());

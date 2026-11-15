@@ -789,6 +789,12 @@ pub struct Window {
     /// The language Kitokey speaks (D64): its row in Settings, and the system's, its default.
     pub app_language: [&'static str; 2],
     pub app_language_system: &'static str,
+    /// Shows: Settings, « Général », the appearance's row (D98): its name, then what it changes. When:
+    /// always. At most: one line each. Placeholders: none.
+    pub appearance: [&'static str; 2],
+    /// Shows: Settings, « Général », the appearance's list, in that order (D98). When: always. At most:
+    /// 18 characters each. Placeholders: none.
+    pub appearance_choices: [&'static str; 3],
     /// A transcript's line corrected by whoever listens (D62).
     pub correct_line: &'static str,
     pub corrected: &'static str,
@@ -1219,6 +1225,11 @@ pub fn window(language: Language) -> Window {
                 "Its window, its menu and its notifications; what the system draws itself keeps the system’s.",
             ],
             app_language_system: "The system’s language",
+            appearance: [
+                "Appearance",
+                "Every window of Kitokey, the bar too; System follows the system’s light or dark.",
+            ],
+            appearance_choices: ["System", "Light", "Dark"],
             correct_line: "Correct the line at {}",
             corrected: "corrected",
             correction_empty: "A line is not left empty: Escape leaves it as it was.",
@@ -1644,6 +1655,11 @@ pub fn window(language: Language) -> Window {
                 "Sa fenêtre, son menu et ses notifications\u{202f}; ce que le système dessine lui-même garde la sienne.",
             ],
             app_language_system: "Langue du système",
+            appearance: [
+                "Apparence",
+                "Toutes les fenêtres de Kitokey, la barre aussi\u{202f}; Système suit le clair ou le sombre du système.",
+            ],
+            appearance_choices: ["Système", "Clair", "Sombre"],
             correct_line: "Corriger la ligne de {}",
             corrected: "corrigé",
             correction_empty: "Une ligne ne reste pas vide\u{a0}: Échap la laisse comme elle était.",
