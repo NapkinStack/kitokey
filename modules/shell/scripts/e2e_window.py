@@ -59,6 +59,11 @@ if [ "$1" != --test ]; then
   provider=local
   case "$3" in http://127.0.0.1*|http://localhost*) ;; *) provider=$(python3 -c "$HOST" "$3"); [ -n "$STANDIN" ] && python3 -c "$SEND" "$STANDIN/write";; esac
   [ -e "$here/slow-minutes" ] && sleep 3
+  # Held, as a model answering slowly (D92): its number and its child's — deaf to TERM — noted, then waits.
+  if [ -e "$here/hold-minutes" ]; then
+    echo '{"event": "sending", "host": "h", "model": "m", "characters": 1}'
+    echo $$ > "$here/held-minutes"; ( trap '' TERM; exec sleep 60 ) & echo $! > "$here/held-minutes-child"; sleep 60; exit 0
+  fi
   [ -e "$here/fail-minutes" ] && { echo '{"event": "failed", "code": "answer.not_minutes"}'; echo "kitokey-summary: the provider's answer is not minutes" >&2; exit 1; }
   [ -e "$here/fail-plainly" ] && { echo "kitokey-summary: a failure no code names" >&2; exit 1; }
   context=$(python3 -c "$CONTEXT" "$1")
@@ -97,6 +102,13 @@ if [ "$2" = --provider ]; then
   [ -n "$STANDIN" ] && python3 -c "$SEND" "$STANDIN/hear"
 fi
 [ -e "$(dirname "$0")/slow-hearing" ] && sleep 3
+# Held, as a long meeting heard (D92): a transcript begun, its number and its child's — deaf to TERM — noted, then waits.
+if [ -e "$(dirname "$0")/hold-hearing" ]; then
+  printf '{"type":"header","contract":"transcript/v1","engine":"%s","model":"%s","language":null,"context":null}\n' "$engine" "$model" > "$1/transcript.jsonl"
+  # Told to stop, it finishes all the same when the scenario says so: a transcript written after « Annuler ».
+  [ -e "$(dirname "$0")/hold-hearing-finish" ] && trap 'printf '"'"'{"type":"complete","duration":1.0}\n'"'"' >> "$1/transcript.jsonl"; exit 0' TERM
+  echo $$ > "$(dirname "$0")/held-hearing"; ( trap '' TERM; exec sleep 60 ) & echo $! > "$(dirname "$0")/held-hearing-child"; sleep 60; exit 0
+fi
 context=$(python3 -c "$CONTEXT" "$1")
 printf '{"type":"header","contract":"transcript/v1","engine":"%s","model":"%s","language":null,"context":%s}\\n{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Refait avec %s."}\\n{"type":"complete","duration":1.0}\\n' "$engine" "$model" "$context" "$model" > "$1/transcript.jsonl"
 """
@@ -2063,7 +2075,29 @@ def meeting_language(now: dt.datetime) -> None:
         check("its transcript is heard in the meeting's own language", made and "--language de" in told(), told())
         choose(browser, "meeting-language", "")
         removed = wait_for(browser, lambda b: not (heard / "language").exists(), 5)
-        check("« Celle des Réglages »: the file removed", removed)
+        # Flaky once in five full runs, never alone (#735): a miss says what the page, the folder and
+        # the shell's log said, so that its cause is read, not guessed.
+        def said_then() -> dict:
+            # Each part read on its own: one that raises — the file gone between two looks, a log cut
+            # inside a character, a page that does not answer — says why, and never stops the run.
+            def part(read):
+                try:
+                    return read()
+                except Exception as why:  # noqa: BLE001 — a diagnostic never raises
+                    return repr(why)
+            return {
+                "page": part(lambda: browser.execute_script(
+                    "const p = document.getElementById('meeting-language'), s = document.getElementById('language-said');"
+                    " return [p && p.value, s && s.textContent]")),
+                "language": part(lambda: (heard / "language").read_text()),
+                "makings": part(lambda: browser.execute_async_script(
+                    "const done = arguments[arguments.length - 1];"
+                    " window.__TAURI__.core.invoke('makings').then(done, (why) => done(String(why)))")),
+                "log": part(lambda: [line for log in sorted((WORK / "state" / "kitokey" / "logs").glob("*.jsonl"))
+                                     for line in log.read_text(errors="replace").splitlines()
+                                     if any(word in line for word in ("language_set", "\"WARN\"", "\"ERROR\"", "panicked"))][-8:]),
+            }
+        check("« Celle des Réglages »: the file removed", removed, None if removed else said_then())
         args.unlink(missing_ok=True)
         browser.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", heard.name, str(model))
         again = wait_for(browser, lambda b: "--language" in told(), 15)
@@ -2467,6 +2501,183 @@ def own_models(now: dt.datetime) -> None:
         browser.execute_script("return window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: {}})", meeting.name)
         removed = wait_for(browser, lambda b: not (meeting / "models.json").exists(), 5)
         check("none chosen: models.json removed", removed)
+
+
+def gone(pid: int) -> bool:
+    """A process ended: none by that number, or one ended and not yet waited for."""
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] == "Z"
+    except (FileNotFoundError, ProcessLookupError, IndexError):
+        return True
+
+
+def cancelled_at_once(now: dt.datetime) -> None:
+    """BE. « Annuler » on a making the page started (D92, criterion 4, the decider's word of
+    2026-11-13): ended within two seconds — its program and what it started, one deaf to TERM —,
+    the version already whole shown as it was, byte for byte, nothing said by a notification;
+    then another model chosen and started at once, the version shown saying it made it."""
+    print("BE. Annuler: a making ended within 2 s, child and all; the whole version kept byte for byte; no notification; another model at once (D92)")
+    meetings = WORK / "cancelled"
+    meeting = meetings / "2026-11-13_17-31"
+    session(meeting, now - dt.timedelta(hours=1), 1, {"local.wav": 1000})
+    whole = ('{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"ggml-tiny-first","language":null,"context":null}\n'
+             '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"La version entière."}\n'
+             '{"type":"complete","duration":1.0}\n')
+    (meeting / "transcript.jsonl").write_text(whole)
+    (meeting / "minutes.md").write_text("---\ncontract: minutes/v2\nmade: 2026-11-13T17:40:00+01:00\nprovider: local\nmodel: writer-first\n"
+                                        "context: null\n---\n\n## A\n\nLa version entière.\n\n## B\n\n## C\n")
+    data = WORK / "data-cancelled"
+    folder = data / "kitokey" / "models"
+    folder.mkdir(parents=True)
+    a, b = folder / "ggml-tiny-a.bin", folder / "ggml-tiny-b.bin"
+    for model in (a, b):
+        model.write_bytes(b"\0" * 16)
+    local = "http://localhost:11434/v1"
+    # The minutes follow a transcript (`after`): none must follow one written after « Annuler ».
+    window = Window(meetings, "fr_FR.UTF-8", f'reminder = false\nafter = "minutes"\nmodel = "{a}"\nminutes_provider = "{local}"\nminutes_model = "writer-a"\n')
+    window.env.update(XDG_DATA_HOME=str(data))
+    sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+    idle = "return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)"
+    makers = lambda b: " | ".join(b.execute_script("return [...document.querySelectorAll('.maker')].map(m => m.textContent)")).lower()
+    steps = (
+        ("the transcript", meeting / "transcript.jsonl", "hearing",
+         lambda b, model: b.execute_script("return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", meeting.name, str(model)),
+         (a, b), "tiny b"),
+        ("the minutes", meeting / "minutes.md", "minutes",
+         lambda b, model: b.execute_script("return window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: arguments[1], model: arguments[2]})", meeting.name, local, model),
+         ("writer-a", "writer-b"), "writer b"),
+    )
+    with window as browser:
+        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        for what, file, step, start, (first, second), said_after in steps:
+            before, listed = sha(file), sorted(p.name for p in meeting.iterdir())
+            held, child = WORK / f"held-{step}", WORK / f"held-{step}-child"
+            held.unlink(missing_ok=True)
+            child.unlink(missing_ok=True)
+            (WORK / f"hold-{step}").touch()
+            notified = WORK / f"notified-cancelled-{step}"
+            monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                       stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+            try:
+                time.sleep(0.5)
+                start(browser, first)
+                running = wait_for(browser, lambda b: held.exists() and child.exists() and child.read_text().strip() != "", 15)
+                check(f"{what}: made again with the first model, held running", running)
+                if not running:
+                    continue
+                pids = int(held.read_text()), int(child.read_text())
+                offered = wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 10)
+                check(f"{what}: « Annuler » on its page while it is made", offered)
+                if not offered:
+                    continue
+                if step == "hearing":
+                    # Refused — its meeting gone meanwhile, the answer stood in for here —: said beside its
+                    # line, and still said once the makings are read again; the making goes on (D92).
+                    browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                           " asked === 'making_cancelled' ? Promise.reject('the meeting is gone') : real.invoke(asked, ...rest) };"
+                                           " window.restore = () => { window.__TAURI__.core = real; };")
+                    press(browser, "making-cancel")
+                    refusal = lambda b: b.execute_script("const n = document.querySelector('.note.warn[data-refused]'); return n ? n.textContent : ''")
+                    said_now = wait_for(browser, lambda b: "Kitokey n’a pas pu annuler" in refusal(b), 3)
+                    # The makings read again meanwhile: by the gesture itself, then by the page's own reading.
+                    time.sleep(1.5)
+                    kept = refusal(browser)
+                    role = browser.execute_script("return document.querySelector('.note.warn[data-refused]')?.getAttribute('role')")
+                    check(f"{what}: « Annuler » refused: said beside its making in its own words, an alert, still said once the makings are read again, the making going on",
+                          said_now and kept.startswith("Kitokey n’a pas pu annuler") and "the meeting is gone" in kept and role == "alert" and not gone(pids[0])
+                          and browser.execute_script("const c = document.getElementById('making-cancel'); return !!c && !c.disabled"), kept)
+                    browser.execute_script("window.restore()")
+                pressed = time.monotonic()
+                press(browser, "making-cancel")
+                ended = wait_for(browser, lambda b: all(gone(pid) for pid in pids) and b.execute_script(idle), 2)
+                took = time.monotonic() - pressed
+                check(f"{what}: ended within two seconds, its program and the child deaf to TERM ({took:.2f} s)",
+                      ended and took <= 2, [(pid, gone(pid)) for pid in pids])
+                check(f"{what}: the version already whole kept, byte for byte, nothing left beside it",
+                      wait_for(browser, lambda b: sha(file) == before and sorted(p.name for p in meeting.iterdir()) == listed, 3),
+                      sorted(p.name for p in meeting.iterdir()))
+                stopped_said = lambda b: b.execute_script("const s = document.getElementById('making-stopped'); return s ? s.textContent : ''")
+                said_in_time = wait_for(browser, lambda b: "arrêté" in stopped_said(b).lower(), max(0.0, 2 - (time.monotonic() - pressed)))
+                stopped_in = time.monotonic() - pressed
+                check(f"{what}: the page says what was stopped, within two seconds of « Annuler » ({stopped_in:.2f} s)",
+                      said_in_time and stopped_in <= 2, stopped_said(browser))
+                # And it stays said: no reading answered late draws the making again over it, « Annuler » back.
+                flicker = []
+                for _ in range(20):
+                    seen = browser.execute_script("const s = document.getElementById('making-stopped'); const c = document.getElementById('making-cancel');"
+                                                  " return [s ? s.textContent : '', !!c && c.getClientRects().length > 0]")
+                    if "arrêté" not in seen[0].lower() or seen[1]:
+                        flicker.append(seen)
+                    time.sleep(0.1)
+                check(f"{what}: said stopped for the two seconds after, never drawn again as made", said_in_time and not flicker, flicker[:3])
+                check(f"{what}: a refusal said before is gone with the gesture that followed it",
+                      not browser.execute_script("return document.querySelector('.note.warn[data-refused]')"))
+                time.sleep(2)
+                check(f"{what}: no notification for a cancel", "member=Notify" not in notified.read_text(), notified.read_text()[-300:])
+            finally:
+                monitor.terminate()
+                (WORK / f"hold-{step}").unlink(missing_ok=True)
+            start(browser, second)
+            made = wait_for(browser, lambda b: sha(file) != before and b.execute_script(idle), 15)
+            check(f"{what}: another model started at once, without restarting Kitokey — the version shown says it made it",
+                  made and wait_for(browser, lambda b: said_after in makers(b), 10), makers(browser))
+        # A first transcript, none whole before it: cancelled, nothing of it is left to be taken up by
+        # another model's making — the page offers to make it, and the next model makes it whole.
+        fresh = meetings / "2026-11-13_18-02"
+        session(fresh, now - dt.timedelta(minutes=30), 1, {"local.wav": 1000})
+        held = WORK / "held-hearing"
+        held.unlink(missing_ok=True)
+        (WORK / "hold-hearing").touch()
+        try:
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", fresh.name)
+            running = wait_for(browser, lambda b: held.exists(), 15)
+            browser.execute_script(f"location.hash = '#/meeting/{fresh.name}'")
+            offered = running and wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 10)
+            check("a first transcript: « Annuler » on its page while it is made", offered)
+            if offered:
+                press(browser, "making-cancel")
+                ended = wait_for(browser, lambda b: b.execute_script(idle), 2)
+                check("a first transcript cancelled: ended within two seconds, nothing of it left in the meeting's folder",
+                      ended and sorted(p.name for p in fresh.iterdir()) == ["local.wav", "session.json"], sorted(p.name for p in fresh.iterdir()))
+        finally:
+            (WORK / "hold-hearing").unlink(missing_ok=True)
+        browser.execute_script("return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", fresh.name, str(b))
+        made = wait_for(browser, lambda b: (fresh / "transcript.jsonl").exists() and b.execute_script(idle), 15)
+        check("then another model makes it whole at once", made and '"model":"ggml-tiny-b"' in (fresh / "transcript.jsonl").read_text())
+        # Written all the same after « Annuler » (the decider's decision, 2026-11-13): kept, being
+        # whole, shown as written — never said stopped —, and nothing follows it: no notification,
+        # no minutes made with the model the user was changing, though the settings chain them.
+        finished = meetings / "2026-11-13_18-30"
+        session(finished, now - dt.timedelta(minutes=20), 1, {"local.wav": 1000})
+        held.unlink(missing_ok=True)
+        (WORK / "summary-args").unlink(missing_ok=True)
+        (WORK / "hold-hearing").touch()
+        (WORK / "hold-hearing-finish").touch()
+        notified = WORK / "notified-cancelled-finished"
+        monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                   stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+        try:
+            time.sleep(0.5)
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", finished.name)
+            running = wait_for(browser, lambda b: held.exists(), 15)
+            browser.execute_script(f"location.hash = '#/meeting/{finished.name}'")
+            offered = running and wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 10)
+            check("finishing all the same: « Annuler » on its page", offered)
+            if offered:
+                press(browser, "making-cancel")
+                ended = wait_for(browser, lambda b: b.execute_script(idle), 3)
+                whole = (finished / "transcript.jsonl").read_text() if (finished / "transcript.jsonl").exists() else ""
+                check("written all the same after « Annuler »: kept whole", ended and '"type":"complete"' in whole, whole)
+                time.sleep(3)
+                stopped = browser.execute_script("const s = document.getElementById('making-stopped'); return s ? s.textContent : ''")
+                check("written all the same: not said stopped on its page", stopped == "", stopped)
+                check("written all the same: no minutes made after it, though the settings chain them",
+                      not (WORK / "summary-args").exists() and not (finished / "minutes.md").exists())
+                check("written all the same: no notification", "member=Notify" not in notified.read_text(), notified.read_text()[-300:])
+        finally:
+            monitor.terminate()
+            (WORK / "hold-hearing").unlink(missing_ok=True)
+            (WORK / "hold-hearing-finish").unlink(missing_ok=True)
 
 
 LONG = "hf.co/unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF:UD-Q4_K_XL-very-long-name"
@@ -3582,11 +3793,25 @@ def sound_checked(now: dt.datetime) -> None:
                 # Closed and opened again, « Jouer un son de test » pressed at once, the call still held: nothing plays.
                 press(browser, "check-sound-close")
                 wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3)
-                press(browser, "check-sound-open")
-                browser.execute_script("document.getElementById('check-play').click()")
-                time.sleep(1.0)
-                outputs = [kind for kind in kitokey_streams(window) if kind == "Stream/Output/Audio"]
-                check("pressed at once while a call holds a microphone: no sound, no stream on the output", outputs == [] and not played_to(window), [outputs, played_to(window)])
+                # Opened and pressed in one script: the panel is drawn before its first await, so no answer
+                # of the shell's can have come — what is read is the button as offered before it (#751).
+                offered = browser.execute_script("document.getElementById('check-sound-open').click();"
+                                                 " const play = document.getElementById('check-play');"
+                                                 " const disabled = play.disabled; play.click(); return disabled")
+                check("pressed at once while a call holds a microphone: « Jouer un son de test » not offered before the shell's first answer",
+                      offered is True, offered)
+                # Read from the press on, not a second after: the half-second sound would be over (#751).
+                heard_out, outputs, stamps = set(), [], []
+                until = time.monotonic() + 1.5
+                while time.monotonic() < until:
+                    stamps.append(time.monotonic())
+                    heard_out |= played_to(window)
+                    outputs += [kind for kind in kitokey_streams(window) if kind == "Stream/Output/Audio"]
+                    time.sleep(0.03)
+                widest = max((b - a for a, b in zip(stamps, stamps[1:])), default=0.0)
+                print(f"  G2 sampling: {len(stamps)} samples in 1.5 s, widest gap {widest * 1000:.0f} ms")
+                check("pressed at once while a call holds a microphone: no sound, no stream on the output, from the press on",
+                      outputs == [] and not heard_out, [outputs, heard_out, len(stamps), round(widest, 3)])
             finally:
                 call.terminate()
                 call.wait(timeout=5)
@@ -3616,6 +3841,29 @@ def sound_checked(now: dt.datetime) -> None:
             check("closed before its opening was counted: no stream of Kitokey's left within a second of the opening's answer",
                   none_left, [kitokey_streams(window), time.monotonic() - closed_early])
             browser.execute_script("window.restoreInvoke()")
+            # A closed panel's late answers never act on the one opened after it (#751): its polls held,
+            # sent to the shell once it is closed — « nothing open » —, given back with the next panel open.
+            opened(browser)
+            browser.execute_script("const real = window.__TAURI__.core; window.held = []; window.holding = true;"
+                                   " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'sound_check_now' && window.holding"
+                                   " ? new Promise((done) => window.held.push({ ask: () => real.invoke(asked, ...rest), done })) : real.invoke(asked, ...rest) };"
+                                   " window.restoreInvoke = () => { window.__TAURI__.core = real; };")
+            time.sleep(0.3)
+            browser.execute_script("window.holding = false")
+            took = closed_within(window, browser, lambda b: press(b, "check-sound-close"))
+            late = browser.execute_async_script("const done = arguments[arguments.length - 1];"
+                                                " Promise.all(window.held.map((h) => h.ask().then((a) => { h.answer = a; return a.open; }))).then(done)")
+            check("held, then asked once the first panel closed: the shell says nothing is open", took is not None and late and not any(late), [took, late])
+            # Gone from the page too, before the next opens: the same id, never read for the next one's.
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3)
+            opened(browser)
+            browser.execute_script("for (const h of window.held) h.done(h.answer); window.held = []; window.restoreInvoke()")
+            time.sleep(1.0)
+            kept = browser.execute_script("const d = document.getElementById('check-sound'); return d !== null && d.open")
+            check("the closed panel's late answers given back: the one opened after it stays open, listening",
+                  kept and "Stream/Input/Audio" in kitokey_streams(window), [kept, kitokey_streams(window)])
+            press(browser, "check-sound-close")
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('check-sound') === null"), 3)
             ended = WORK / "listen-ended"
             # A recording started elsewhere — the tray — while the panel shows: capture stops listening
             # within a second, before it records, and the panel goes.
@@ -3665,9 +3913,9 @@ def sound_checked(now: dt.datetime) -> None:
             check("never listening while a recording runs", refused == {"opened": False}, refused)
             browser.execute_script("window.__TAURI__.core.invoke('record')")
             wait_for(browser, lambda b: not b.execute_script("return window.__TAURI__.core.invoke('recording_now').then(n => n.recording)"), 8)
-        # Its window destroyed with the panel open — the full window replaced by the bar —: the shell
-        # ends the listening on the window's end, within a second; the page can say nothing then. The
-        # driver's window is the one destroyed: what it says of that is not this check's.
+        # Its window hidden with the panel open — the full window replaced by the bar, which only hides
+        # it (`show_small` → `main.hide()`) —: the page hidden closes the panel (`visibilitychange`), and
+        # capture stops listening within a second.
         ended = WORK / "listen-ended"
         asked, gone = None, False
         try:
@@ -3679,6 +3927,28 @@ def sound_checked(now: dt.datetime) -> None:
                 asked = time.time()
                 try:
                     browser.execute_script("window.__TAURI__.core.invoke('small_window')")
+                except (NoSuchWindowException, WebDriverException):
+                    pass
+                gone = wait_for(None, lambda b: ended.is_file(), 3)
+        except (NoSuchWindowException, WebDriverException):
+            gone = gone or ended.is_file()
+        check("its window hidden for the bar with the panel open: capture stops listening within a second",
+              asked is not None and gone and float(ended.read_text()) - asked <= 1.0, asked and ended.is_file() and float(ended.read_text()) - asked)
+        # Its window destroyed with the panel open — the bar replaced by the full window, which closes
+        # it; the full window replaced by the bar is only hidden (#751) —: the shell ends the listening
+        # on the window's end, within a second; the page can say nothing then. The driver's window is
+        # the one destroyed: what it says of that is not this check's.
+        ended = WORK / "listen-ended"
+        asked, gone = None, False
+        try:
+            with Window(sessions, "fr_FR.UTF-8", small=True) as browser:
+                wait_for(browser, lambda b: b.find_element(By.ID, "small-hide").is_displayed(), 8)
+                browser.execute_script("checkSound(words, null)")
+                wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("me"), 5)
+                ended.unlink(missing_ok=True)
+                asked = time.time()
+                try:
+                    browser.execute_script("window.__TAURI__.core.invoke('full_window', {page: null})")
                 except (NoSuchWindowException, WebDriverException):
                     pass
                 gone = wait_for(None, lambda b: ended.is_file(), 3)
@@ -3766,9 +4036,9 @@ def bar_window(now: dt.datetime) -> None:
 
 
 def recording_found(now: dt.datetime) -> None:
-    """BE. A recording left running by a Kitokey ended before this one, found at the start (#773): the bar
+    """BI. A recording left running by a Kitokey ended before this one, found at the start (#773): the bar
     shows it with ■ and its time from the session's own start, and its ■ stops it by a signal."""
-    print("BE. a recording left running by an ended Kitokey: the bar shows ■ and its time from its real start, and stops it (#773)")
+    print("BI. a recording left running by an ended Kitokey: the bar shows ■ and its time from its real start, and stops it (#773)")
     taping = WORK / "recording-found"
     taping.mkdir()
     folder = taping / "2026-11-13_09-00"
@@ -3814,6 +4084,145 @@ def recording_found(now: dt.datetime) -> None:
         if recorder.poll() is None:
             recorder.kill()
         recorder.wait()
+
+
+def recording_found_not_forgotten(now: dt.datetime) -> None:
+    """BH. A recording found at the start, the settings' folder read-only, so that its `recording.json`
+    can be neither removed nor set aside (#818): stopped, the bar at rest, the removal refused logged once;
+    at the next start, nothing found again, the bar at rest, nothing more warned. Then a `recording.json`
+    that cannot be read: nothing found at that start nor the next, its warning once at each."""
+    print("BH. a found recording whose recording.json cannot be removed: stopped, at rest at that start and the next, its warning once (#818)")
+    logs = WORK / "state" / "kitokey" / "logs"
+    logged = lambda message: sum(f.read_text().count(f'"message":"{message}"') for f in logs.glob("shell.*.jsonl"))
+    counted = ("shell.recording_found", "shell.recording_gone", "shell.recording_not_forgotten", "shell.recording_unread")
+    since_start = lambda before: {name: logged(name) - before[name] for name in counted}
+    at_rest = lambda b: (b.find_element(By.ID, "small-record").is_displayed() and not b.find_element(By.ID, "small-stop").is_displayed()
+                         and tray_colour() == "blue")
+    taping = WORK / "recording-not-forgotten"
+    taping.mkdir()
+    folder = taping / "2026-11-14_09-00"
+    folder.mkdir()
+    started = dt.datetime.now().astimezone() - dt.timedelta(seconds=90)
+    stamp = started.isoformat(timespec="seconds")
+    (folder / "session.json").write_text(json.dumps({"contract": "session-audio/v3", "started": stamp, "tracks": {}}))
+    # The recorder left running, as BI plays it: stopped by a signal that writes `stopped`.
+    script = (
+        "trap '' PIPE\n"
+        "trap 'printf %s \"$2\" > \"$1/session.json\"; exit 0' TERM INT\n"
+        "while :; do sleep 0.1 & wait $!; done\n"
+    )
+    ended = json.dumps({"contract": "session-audio/v3", "started": stamp, "stopped": dt.datetime.now().astimezone().isoformat(timespec="seconds"), "tracks": {}})
+    recorder = subprocess.Popen(["sh", "-c", script, "sh", str(folder), ended], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    # The start-up entry decided already: the start writes nothing to the settings, which BH does not claim (D32).
+    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\nautostart = false\n', small=True)
+    settings = window.file.parent
+    kept = settings / "recording.json"
+    try:
+        since = int(Path(f"/proc/{recorder.pid}/stat").read_text().rsplit(")", 1)[1].split()[19])
+        text = json.dumps({"id": recorder.pid, "since": since, "folder": str(folder)})
+        kept.write_text(text)
+        settings.chmod(0o555)
+        before = {name: logged(name) for name in counted}
+        with window as browser:
+            shown = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+            check("the settings' folder read-only: the recording left running is found, ■ shown", shown)
+            stop_from_small(browser)
+            gone = wait_for(None, lambda b: recorder.poll() is not None, 10)
+            check("■ stops it", gone and recorder.returncode == 0, recorder.returncode)
+            check("the bar and the tray back at rest", wait_for(browser, at_rest, 10), tray_colour())
+            removed = wait_for(None, lambda b: since_start(before)["shell.recording_not_forgotten"] >= 1, 5)
+            check("recording.json cannot be removed: left as it was, its removal refused logged once",
+                  removed and kept.read_text() == text and since_start(before) == {"shell.recording_found": 1, "shell.recording_gone": 0,
+                                                                                    "shell.recording_not_forgotten": 1, "shell.recording_unread": 0},
+                  since_start(before))
+        before = {name: logged(name) for name in counted}
+        with window as browser:
+            # Found at the start, before the window opens: read once the shell said what it found.
+            read = wait_for(None, lambda b: since_start(before)["shell.recording_gone"] >= 1, 10)
+            check("the next start: the program kept is gone, nothing found, the bar and the tray at rest",
+                  read and wait_for(browser, at_rest, 5) and not browser.find_element(By.ID, "small-stop").is_displayed(), tray_colour())
+            time.sleep(1)
+            check("the next start: nothing more warned — its file still there, read as gone",
+                  since_start(before) == {"shell.recording_found": 0, "shell.recording_gone": 1, "shell.recording_not_forgotten": 0, "shell.recording_unread": 0}
+                  and kept.exists() and at_rest(browser), since_start(before))
+        # A file that cannot be read, in the same read-only folder: it cannot be set aside either.
+        settings.chmod(0o755)
+        kept.write_text("{}")
+        kept.chmod(0)
+        settings.chmod(0o555)
+        for start in ("its first start", "the next start"):
+            before = {name: logged(name) for name in counted}
+            with window as browser:
+                read = wait_for(None, lambda b: since_start(before)["shell.recording_unread"] >= 1, 10)
+                check(f"recording.json unreadable, {start}: nothing found, the bar and the tray at rest",
+                      read and wait_for(browser, at_rest, 5), tray_colour())
+                time.sleep(1)
+                check(f"recording.json unreadable, {start}: said once, left in place",
+                      since_start(before) == {"shell.recording_found": 0, "shell.recording_gone": 0, "shell.recording_not_forgotten": 0, "shell.recording_unread": 1}
+                      and kept.exists() and not list(settings.glob("recording.json.unreadable-*")), since_start(before))
+    finally:
+        settings.chmod(0o755)
+        if kept.exists():
+            kept.chmod(0o644)
+        if recorder.poll() is None:
+            recorder.kill()
+        recorder.wait()
+
+
+def microphone_latest_answer(now: dt.datetime) -> None:
+    """BK. The bar's microphone (#750): the list asked after a choice, before the shell has kept it, answers
+    with the microphone as it was; that answer never brings it back. The choice's save is held in the
+    page, the list opened again meanwhile — as the window's at-rest redraw can ask it, under a full run's load."""
+    print("BK. the bar's microphone: a list read after a choice not yet kept never brings the microphone before back (#750)")
+    captured = WORK / "microphones"
+    left = captured.read_text() if captured.exists() else None
+    captured.write_text("".join(json.dumps({"event": "microphone", "name": name, "description": said}) + "\n"
+                                              for name, said in [("alsa_laptop", "Digital Microphone"), ("bluez_input.AA_BB", "USB Headset")]))
+    (WORK / "microphones-slow").unlink(missing_ok=True)
+    taping = WORK / "microphone-latest"
+    taping.mkdir()
+    name = "const b = document.getElementById('small-microphone'); return b ? b.textContent : ''"
+    panel = "const p = document.getElementById('small-microphones'); return !!p && !p.hidden"
+    # The choice's save held until released; each list read counted once answered.
+    hold = ("const real = window.__TAURI__.core; let release; const held = new Promise((r) => { release = r; });"
+            " window.releaseSave = release; window.listsAnswered = 0;"
+            " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'microphone_chosen' ? held.then(() => real.invoke(asked, ...rest))"
+            " : asked === 'microphones_listed' ? real.invoke(asked, ...rest).finally(() => { window.listsAnswered += 1; }) : real.invoke(asked, ...rest) };"
+            " window.restoreCore = () => { window.__TAURI__.core = real; };")
+    answered = lambda b: b.execute_script("return window.listsAnswered")
+    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nmicrophone = "alsa_laptop"\nmicrophone_description = "Digital Microphone"\n', small=True)
+    with window as browser:
+        wait_for(browser, lambda b: b.find_element(By.ID, "small-more").is_displayed(), 8)
+        if browser.find_element(By.ID, "small-more").get_attribute("aria-expanded") != "true":
+            press(browser, "small-more")
+        shown = wait_for(browser, lambda b: "Digital Microphone" in b.execute_script(name), 8)
+        check("the bar's options: the microphone kept is named", shown, browser.execute_script(name))
+        browser.execute_script(hold)
+        press(browser, "small-microphone")
+        listed = wait_for(browser, lambda b: b.execute_script(panel) and answered(b) >= 1 and len(b.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")) == 3, 5)
+        browser.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")[0].click()
+        closed = wait_for(browser, lambda b: not b.execute_script(panel), 3)
+        check("Auto clicked, its save held: the list closes, the name says Auto at once",
+              listed and closed and "Auto" in browser.execute_script(name), browser.execute_script(name))
+        # Asked after the choice, before the shell has it: the shell answers with the microphone before.
+        before = answered(browser)
+        press(browser, "small-microphone")
+        read = wait_for(browser, lambda b: answered(b) > before, 5)
+        time.sleep(0.3)
+        check("the list read after the choice, its save still held: the name still says Auto (#750)",
+              read and "Auto" in browser.execute_script(name), browser.execute_script(name))
+        browser.execute_script("window.releaseSave()")
+        kept = wait_for(None, lambda b: 'microphone = "alsa_laptop"' not in window.file.read_text(), 5)
+        time.sleep(0.3)
+        check("the save let through: Auto kept in the settings, and still named (#750)",
+              kept and "Auto" in browser.execute_script(name), (window.file.read_text(), browser.execute_script(name)))
+        browser.execute_script("window.restoreCore()")
+    # What capture lists is left as the scenarios before had it.
+    if left is None:
+        captured.unlink()
+    else:
+        captured.write_text(left)
 
 
 def bar_opened(now: dt.datetime) -> None:
@@ -5612,9 +6021,9 @@ def corrections_gated(now: dt.datetime) -> None:
 
 
 def press_on_the_page_left(now: dt.datetime) -> None:
-    """AS. Another page asked for: the page left is gone at once, nothing of it to press; a drawing
+    """BL. Another page asked for: the page left is gone at once, nothing of it to press; a drawing
     that fails is said, with a way out and a way to try again; what is agreed to names its meeting."""
-    print("AS. the page left goes at once: nothing to press, nothing sent; a failed drawing has a way out; the agreement names its meeting")
+    print("BL. the page left goes at once: nothing to press, nothing sent; a failed drawing has a way out; the agreement names its meeting")
     meetings = WORK / "pressed"
     minutes = ("---\ncontract: minutes/v2\nmade: 2026-10-28T10:00:00+01:00\nprovider: writes.example\nmodel: m\ncontext: null\n{}---\n\n"
                "## 1.\n\nLe budget.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
@@ -5632,7 +6041,7 @@ def press_on_the_page_left(now: dt.datetime) -> None:
     # `opened` answers 800 ms late; `listed` refused by `refusing` calls from now, each `after` ms late.
     late = ("const real = window.__TAURI__.core; window.refusing = arguments[0] ?? 0; const after = arguments[1] ?? 0; window.__TAURI__.core = { ...real, invoke: async (asked, ...rest) => {"
             " if (asked === 'opened') await new Promise((r) => setTimeout(r, 800));"
-            " if (asked === 'listed' && window.refusing > 0) { window.refusing -= 1; await new Promise((r) => setTimeout(r, after)); window.threw = true; throw Object.assign(new Error('REFUS'), { name: 'ScenarioAS' }); }"
+            " if (asked === 'listed' && window.refusing > 0) { window.refusing -= 1; await new Promise((r) => setTimeout(r, after)); window.threw = true; throw Object.assign(new Error('REFUS'), { name: 'ScenarioBL' }); }"
             " return real.invoke(asked, ...rest); } }; window.restore = () => { window.__TAURI__.core = real; };")
     page_of = "return document.getElementById('meeting').hidden ? null : document.getElementById('minutes-state')?.dataset.name ?? null"
     said = "const p = document.getElementById('pane-said'); return p.hidden ? '' : p.textContent"
@@ -5724,14 +6133,14 @@ def press_on_the_page_left(now: dt.datetime) -> None:
         # A throw in the drawing: nothing of the page left, said; tried again, drawn; logged.
         at_page(browser, left)
         browser.execute_script("window.logged = []; const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => { if (asked === 'page_failed') window.logged.push(rest[0]); return real.invoke(asked, ...rest); } }; window.restore = () => { window.__TAURI__.core = real; };"
-                               "window.__drawn = showMeeting; showMeeting = () => { throw Object.assign(new Error('REFUS'), { name: 'ScenarioAS' }); };")
+                               "window.__drawn = showMeeting; showMeeting = () => { throw Object.assign(new Error('REFUS'), { name: 'ScenarioBL' }); };")
         browser.execute_script("player = { name: arguments[0], stop() { window.stopped = true; } }", asked.name)
         browser.execute_script(f"location.hash = '#/meeting/{asked.name}'")
         told = wait_for(browser, lambda b: b.execute_script(said) == not_shown, 5)
         check("a throw in the drawing: said, nothing of the page left, what played stopped",
               told and browser.execute_script("return document.getElementById('meeting').querySelector('button, a, input, textarea, select') === null && window.stopped === true"), browser.execute_script("return [window.stopped, document.getElementById('meeting').textContent.slice(0, 80)]"))
         logged = browser.execute_script("return window.logged")
-        check("a throw in the drawing: logged, with its kind", bool(logged) and logged[0]["kind"] == "ScenarioAS", logged)
+        check("a throw in the drawing: logged, with its kind", bool(logged) and logged[0]["kind"] == "ScenarioBL", logged)
         browser.execute_script("showMeeting = window.__drawn; window.restore()")
         again = browser.find_element(By.ID, "pane-again")
         check("tried again: offered, its words", again.is_displayed() and again.text == "Réessayer", again.text)
@@ -7426,6 +7835,21 @@ def trial_left(now: dt.datetime) -> None:
 
 def main() -> int:
     now = dt.datetime.now().astimezone()
+    # A partial run (pytest's -k, scripts/e2e_only.py): the scenarios KITOKEY_E2E_ONLY names, alone,
+    # said first — never read as a full run: e2e.sh says it again, and never passes it.
+    if os.environ.get("KITOKEY_E2E_ONLY", "").strip():
+        import e2e_only
+
+        try:
+            played = e2e_only.chosen(Path(__file__).read_text(), os.environ["KITOKEY_E2E_ONLY"])
+        except SystemExit as refused:
+            # On the output the evidence keeps, as every line of the run.
+            print(refused)
+            return 1
+        print(f"partial run: {', '.join(played)}")
+        for name in played:
+            globals()[name](now)
+        return 1 if FAILED else 0
     sessions = WORK / "sessions"
     # Sessions this week, last week, earlier this month when there is room for one, two months
     # ago; one whose start is written with an offset of hours alone; one whose start is no instant.
@@ -9120,12 +9544,15 @@ def main() -> int:
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
+    microphone_latest_answer(now)
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
     recording_found(now)
+    recording_found_not_forgotten(now)
     context_before_start(now)
     own_models(now)
+    cancelled_at_once(now)
     models_advanced(now)
     meeting_named(now)
     word_after_a_gap(now)

@@ -104,6 +104,9 @@ impl Summarising {
         if let Some(key) = key {
             command.env("KITOKEY_PROVIDER_KEY", key);
         }
+        // A group of its own, as the transcript's: cancelled, whatever it started ends with it (D92).
+        #[cfg(unix)]
+        std::os::unix::process::CommandExt::process_group(&mut command, 0);
         let mut child = command
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -183,6 +186,20 @@ impl Summarising {
     pub fn end(&self) {
         if let Ok(mut child) = self.program.lock() {
             let _ = child.kill();
+        }
+    }
+
+    /// Stops the program on the user's word, « Annuler » (D92), as a transcript's: within two
+    /// seconds, without waiting here; the minutes there stay.
+    pub fn cancel(&self) {
+        (self.stopper())();
+    }
+
+    /// The same, to be held by the making's token (`crate::cancel::Cancel::hold`).
+    pub fn stopper(&self) -> impl FnOnce() + Send + 'static {
+        let program = Arc::clone(&self.program);
+        move || {
+            thread::spawn(move || crate::transcription::cancel(&program));
         }
     }
 }

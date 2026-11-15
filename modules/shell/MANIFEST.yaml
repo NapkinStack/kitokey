@@ -313,6 +313,14 @@ evidence:
     - pattern: '"message":"shell\.recording_not_kept"'
       level: warning
       scenario: AO
+    # The window's BH: a recording found, the settings' folder read-only, so that what was kept of it
+    # can be neither removed nor, unreadable, set aside (#818).
+    - pattern: '"message":"shell\.recording_not_forgotten"'
+      level: warning
+      scenario: BH
+    - pattern: '"message":"shell\.recording_unread"'
+      level: warning
+      scenario: BH
     # The window's AN starts a recording with no microphone to open, its side said waiting (D49).
     - pattern: '"message":"shell\.recording_unavailable"'
       level: warning
@@ -371,14 +379,14 @@ evidence:
     - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioI")'
       level: error
       scenario: I
-    # A reading refused on the way to a page: what is shown takes presses again.
-    - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioAS")'
+    # The window's BL: a reading refused on the way to a page: what is shown takes presses again.
+    - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioBL")'
       level: error
-      scenario: AS
+      scenario: BL
     # An address that does not decode: its drawing fails, said on the page.
     - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"URIError")'
       level: error
-      scenario: AS
+      scenario: BL
 
 docs:
   readme: README.md
