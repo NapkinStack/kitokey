@@ -441,6 +441,16 @@ def instances() -> list[int]:
     return found
 
 
+def single_instance_held() -> bool:
+    """Whether a Kitokey still holds its single-instance name on this session's bus
+    (`com.napkinstack.Kitokey.SingleInstance…`, tauri-plugin-single-instance): a start made meanwhile
+    hands its arguments over to it and leaves, logging « shell.started » and nothing else (#853). The
+    name is held to the last instant of a Kitokey that is leaving, when /proc can no longer say it is
+    one; and each session has its bus, so another shard's never counts."""
+    listed = subprocess.run(["busctl", "--user", "--timeout=1", "list", "--no-legend"], capture_output=True, text=True).stdout
+    return any(line.split()[0].startswith("com.napkinstack.Kitokey.SingleInstance") for line in listed.splitlines() if line.strip())
+
+
 def tray_entries() -> tuple[str, str, list[tuple[int, str]]]:
     """The tray's menu of the Kitokey under test, as the desktop reads it: its bus, its path, and
     each entry's number and words (D64)."""
@@ -538,8 +548,8 @@ class Window:
     def __enter__(self) -> webdriver.Remote:
         # One Kitokey per session: one still leaving takes this start's arguments and this one
         # leaves, its session never opened (#510). Waited for.
-        until = time.monotonic() + 10
-        while instances() and time.monotonic() < until:
+        until = time.monotonic() + 20
+        while (instances() or single_instance_held()) and time.monotonic() < until:
             time.sleep(0.1)
         port, native = free_port(), free_port()
         self.driver_process = subprocess.Popen(
@@ -563,7 +573,8 @@ class Window:
             except ReadTimeoutError:
                 self.driver_process.terminate()
                 self.driver_process.wait(timeout=10)
-                raise RuntimeError(f"tauri-driver opened no session in a minute; Kitokey's processes: {instances()}") from None
+                raise RuntimeError(f"tauri-driver opened no session in a minute; Kitokey's processes: {instances()},"
+                                   f" its single-instance name held: {single_instance_held()}") from None
             except (WebDriverException, HTTPError):
                 time.sleep(0.2)
         else:
