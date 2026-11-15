@@ -114,8 +114,9 @@ How it is observed: <metric, user feedback, usage>
 If the criterion is not met: <adjust · supersede · remove>
 
 <!-- Read at each cycle's closure that names it, or that reaches a date of this criterion: a
-     cycle by its file (03-the-window) or as "cycle 03", a date written YYYY-MM-DD — written
-     otherwise it is not read. The plan warns until a line of its own says it (C10):
+     cycle by its file (03-the-window) or as "cycle 03", a date written in bold, **YYYY-MM-DD**
+     — a plain date, an amendment's or a reference's, is not read. The plan warns until a line
+     of its own says it (C10):
 Read at <cycle>'s closure, <YYYY-MM-DD>: met | missed | superseded -->
 
 ---
