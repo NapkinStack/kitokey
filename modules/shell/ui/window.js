@@ -2578,13 +2578,22 @@ function showSettings(shown, minutes, words) {
   const [modelsWrap, serviceModels] = guidedList("transcription-models", words.service_model, locked);
   const [agreeWrap, agreeBox, agreeHost, agreeShown] = agreement("transcription-agreed");
   const saveService = guidedButton("transcription-save", words.service_save, true, locked);
+  // One « Enregistrer » and one agreement at a time (#860): the service's, « Avancé » folded; unfolded,
+  // its own, which saves what the page shows.
+  let listedShown = false;
+  const paintSaves = () => {
+    const open = guided.transcription.advanced;
+    saveService.hidden = !listedShown || open;
+    agreeShown(listedShown && !open);
+  };
   // The models listed with its key, the one saved chosen.
   const shownListed = (models) => {
     serviceModels.replaceChildren();
     for (const id of models) guidedOption(serviceModels, id, modelSaid(id));
     if (models.includes(shown.transcription_model)) serviceModels.value = shown.transcription_model;
-    modelsWrap.hidden = saveService.hidden = models.length === 0;
-    agreeShown(models.length > 0);
+    modelsWrap.hidden = models.length === 0;
+    listedShown = models.length > 0;
+    paintSaves();
   };
   // This service's last answer, said again; else the model saved with it — the others come with its key.
   const shownSaved = () => {
@@ -2595,8 +2604,9 @@ function showSettings(shown, minutes, words) {
     if (answer?.models) return shownListed(answer.models);
     serviceModels.replaceChildren();
     if (saved) guidedOption(serviceModels, shown.transcription_model, modelSaid(shown.transcription_model));
-    modelsWrap.hidden = saveService.hidden = !saved;
-    agreeShown(!!saved);
+    modelsWrap.hidden = !saved;
+    listedShown = !!saved;
+    paintSaves();
   };
   shownSaved();
   guidedKeyTested("transcription", words, locked, { servicePick, key: serviceKey, keyTest, keySaid, modelsPick: serviceModels },
@@ -2619,6 +2629,11 @@ function showSettings(shown, minutes, words) {
   });
   const ownSave = guidedButton("transcription-own-save", words.service_save, false, locked);
   const [hearToggle, hearAdvanced] = guidedAdvanced("transcription", words, own, [addressWrap, modelWrap, ownAgreeWrap, ownSave]);
+  hearToggle.addEventListener("click", paintSaves);
+  paintSaves();
+  // What « Avancé »'s « Enregistrer » saves: its model typed, or else — its address left empty, the
+  // service chosen above — the model chosen in that service's list (#860).
+  const ownModel = () => serviceModel.value.trim() || (address.value.trim() ? "" : serviceModels.value);
   const serviceSaid = element("p", "says");
   serviceSaid.id = "transcription-said";
   serviceSaid.setAttribute("role", "status");
@@ -2647,7 +2662,7 @@ function showSettings(shown, minutes, words) {
     serviceSaid.textContent = saved;
   };
   saveService.addEventListener("click", () => saveHearing(hearing().address, serviceModels.value, serviceKey.value, agreeBox, null, serviceModels));
-  ownSave.addEventListener("click", () => saveHearing(ownAddress(), serviceModel.value, serviceKey.value, ownAgreeBox, address, serviceModel));
+  ownSave.addEventListener("click", () => saveHearing(ownAddress(), ownModel(), serviceKey.value, ownAgreeBox, address, serviceModel));
   const testService = element("button", "open", words.service_test);
   testService.type = "button";
   testService.id = "transcription-test";
