@@ -919,6 +919,9 @@ def list_refreshed(now: dt.datetime) -> None:
             body = serving["signature"] if self.path.endswith(".minisig") else serving["list"]
             self.send_response(404 if body is None else 200)
             self.send_header("Content-Length", str(len(body or b"")))
+            # HTTP/1.0 closes each connection: said, so that the shell's client never sends the
+            # signature's request on the list's, closed under it (« Peer disconnected », #866).
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(body or b"")
 
@@ -935,7 +938,10 @@ def list_refreshed(now: dt.datetime) -> None:
     window.env.update(KITOKEY_REGISTRY=f"http://{at}/models.json")
     with window as browser:
         browser.find_element(By.ID, "settings-link").click()
-        button = wait_for(browser, lambda b: b.find_elements(By.ID, "offered-refresh"), 10)
+        # « Modèles à télécharger » folded at first (#782): unfolded, as the user does, to reach its button.
+        wait_for(browser, lambda b: b.find_elements(By.ID, "offered-toggle"), 10)
+        press(browser, "offered-toggle")
+        button = wait_for(browser, lambda b: b.find_elements(By.ID, "offered-refresh") and b.find_element(By.ID, "offered-refresh").is_displayed(), 10)
         check("the key built in: a button offers to read the list again, its host shown, nothing said of a key awaited",
               button and at in browser.find_element(By.ID, "offered-refresh").text and "attend la clé" not in browser.execute_script(said)
               and asked == [], (browser.execute_script(said), asked))
@@ -1187,8 +1193,10 @@ def service_named(now: dt.datetime) -> None:
               models and listed == ["/api/v1/key", "/api/v1/models?output_modalities=transcription"] and not browser.find_element(By.ID, "transcription-provider").is_displayed(),
               (offered(browser, "transcription-models"), listed))
         Select(browser.find_element(By.ID, "transcription-models")).select_by_value("vendor/scribe")
-        if not browser.find_element(By.ID, "transcription-agreed").is_selected():
-            browser.find_element(By.ID, "transcription-agreed").click()
+        # The stand-in is on this computer: no agreement asked, and it saves without one (#859); a host
+        # elsewhere is agreed to above, under « Avancé ».
+        asked = browser.execute_script("const a = document.getElementById('transcription-agreed'); return !!a && a.getClientRects().length > 0")
+        check("OpenRouter's stand-in on this computer: no agreement asked to send the sound (#859)", not asked, asked)
         press(browser, "transcription-save")
         saved = wait_for(browser, lambda b: f'transcription_provider = "{stand}"' in window.file.read_text(), 5)
         text = window.file.read_text()
@@ -1411,6 +1419,13 @@ def transcription_guided(now: dt.datetime) -> None:
     address typed but under « Avancé ». The stand-in is on this computer: D43's agreement, owed to a
     host elsewhere, is held by tests/transcription.rs."""
     print("BG. Settings: the transcription set up in a few guided steps, a service's key tested at once (D95)")
+    # This computer's Whisper models, as K writes them in main(): BG's own, so that it reads the same
+    # alone (KITOKEY_E2E_ONLY) as in the whole run; K's, when it ran, left as they are.
+    models = WORK / "data" / "kitokey" / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    for name in ("ggml-large-v3-turbo-q8_0.bin", "ggml-small.bin"):
+        if not (models / name).exists():
+            (models / name).write_bytes(b"x" * 1000)
     good, false = "sk-stand-in-good", "sk-stand-in-false"
     asked = []
 
@@ -1500,12 +1515,18 @@ def transcription_guided(now: dt.datetime) -> None:
             # address elsewhere can be named without being asked: tests/transcription.rs,
             # a_service_is_saved_only_once_its_host_elsewhere_is_agreed_to.
             choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
+            # No agreement asked where none is owed: the address is this computer's (#859).
+            agreement_shown = browser.execute_script("const a = document.getElementById('transcription-agreed'); return !!a && a.getClientRects().length > 0")
+            check("the service on this computer: no agreement to send the sound asked (#859)", not agreement_shown, agreement_shown)
             press(browser, "transcription-save")
             saved = wait_for(browser, lambda b: 'transcription_model = "openai/whisper-large-v3-turbo"' in window.file.read_text(), 5)
             text = window.file.read_text()
             check("saved: who hears is the service, its address, the model chosen; its host this computer's, no agreement recorded; never the key",
                   saved and 'engine = "service"' in text and f'transcription_provider = "{stand}"' in text and "transcription_agreed" not in text
                   and "sk-stand-in" not in text, text)
+            host = stand.split("/")[2]
+            told = browser.execute_script("return document.getElementById('transcription-said')?.textContent || ''")
+            check("saved on this computer: said so, not as an address and a port (#775)", "cet ordinateur" in told and host not in told, told)
             logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and "sk-stand-in" in f.read_text(errors="ignore")]
             check("the key never logged", logged == [], logged)
             # Drawn again: the service and its model said as chosen, no address shown.
@@ -1519,6 +1540,17 @@ def transcription_guided(now: dt.datetime) -> None:
             press(browser, "transcription-advanced")
             unfolded = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-provider").is_displayed(), 3)
             check("« Avancé » unfolded: an address of one's own, and a model named by hand", unfolded and browser.find_element(By.ID, "transcription-model").is_displayed())
+            # One's own address: an agreement asked for a host elsewhere, none for this computer (#859).
+            own_agreement = "const a = document.getElementById('transcription-own-agreed'); return !!a && a.getClientRects().length > 0"
+            own = browser.find_element(By.ID, "transcription-provider")
+            own.clear()
+            own.send_keys("http://localhost:8000/v1")
+            here_none = wait_for(browser, lambda b: not b.execute_script(own_agreement), 3)
+            own.clear()
+            own.send_keys("https://hears.example/v1")
+            away_asked = wait_for(browser, lambda b: b.execute_script(own_agreement), 3)
+            check("one's own address: no agreement for this computer, one for a host elsewhere (#859)", here_none and away_asked, [here_none, away_asked])
+            own.clear()
             browser.execute_script("document.getElementById('transcription-where').scrollIntoView({block: 'start'})")
             shot_themed(browser, "d95-transcription-service-light", "light")
             shot_themed(browser, "d95-transcription-service-dark", "dark")
@@ -4334,6 +4366,35 @@ def microphone_rollback(now: dt.datetime) -> None:
         captured.unlink()
     else:
         captured.write_text(left)
+
+
+def settings_folded(now: dt.datetime) -> None:
+    """BN. Settings after D95, what the 0.2.5 audit still saw (#782): « Modèles à télécharger » folded, a
+    disclosure (ARIA APG) that stays as the user left it when the page is drawn again; « Refaire le
+    réglage » in « Général », not among the models."""
+    print("BN. Settings: « Modèles à télécharger » folded, kept as left when drawn again; « Refaire le réglage » in « Général » (#782)")
+    taping = WORK / "settings-folded"
+    taping.mkdir()
+    toggle = ("const t = document.getElementById('offered-toggle'), l = document.getElementById('offered');"
+              " return {toggle: !!t, expanded: t && t.getAttribute('aria-expanded'), controls: t && t.getAttribute('aria-controls'),"
+              " name: t && t.textContent.trim(), list: !!l && l.getClientRects().length > 0, rows: l ? l.querySelectorAll('li').length : 0}")
+    card = ("const b = document.getElementById('welcome-again'); const c = b && b.closest('section.card');"
+            " return c ? c.querySelector('h2').textContent : null")
+    with Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n') as browser:
+        browser.execute_script("location.hash = '#/settings'")
+        drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "model") and b.find_element(By.ID, "model").is_displayed(), 10)
+        got = browser.execute_script(toggle)
+        check("« Modèles à télécharger » folded at first: a disclosure, closed, its list not shown (#782)",
+              drawn and got["toggle"] and got["expanded"] == "false" and got["controls"] == "offered" and got["name"] == "Modèles à télécharger"
+              and not got["list"] and got["rows"] > 0, got)
+        if got["toggle"]:
+            press(browser, "offered-toggle")
+        opened = wait_for(browser, lambda b: b.execute_script(toggle)["list"], 3)
+        check("pressed: unfolded, the list shown (#782)", opened and browser.execute_script(toggle)["expanded"] == "true", browser.execute_script(toggle))
+        browser.execute_async_script("const done = arguments[0]; refresh().then(() => done(true), () => done(false))")
+        check("drawn again: still unfolded, as the user left it (#782)",
+              browser.execute_script(toggle)["list"] and browser.execute_script(toggle)["expanded"] == "true", browser.execute_script(toggle))
+        check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
 def bar_opened(now: dt.datetime) -> None:
@@ -9705,6 +9766,7 @@ def main() -> int:
     microphone_chosen(now)
     microphone_latest_answer(now)
     microphone_rollback(now)
+    settings_folded(now)
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
