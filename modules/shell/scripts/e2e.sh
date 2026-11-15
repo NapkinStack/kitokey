@@ -89,17 +89,19 @@ start() { # the language, the settings file's text, the recorder
   # Its own tray item, found by its program's number: a Kitokey the user runs has one too. The
   # watcher lists an item as `bus@path`, or since GNOME's AppIndicator 66 as its path alone: the
   # bus is the one of the program's own that answers for that path's menu.
+  # Each call bounded to a second: one of the program's connections that does not serve the menu
+  # left a call waiting for D-Bus's own 25 s, twice a start — 50 s each, 23 minutes a run (#862).
+  # The same 50 s bound the whole search; found, it stops at once.
   item="" started_at=$SECONDS tries=0
-  for _ in $(seq 100); do
+  while [ -z "$item" ] && [ $((SECONDS - started_at)) -lt 50 ]; do
     tries=$((tries + 1))
-    for one in $(busctl --user get-property $watcher RegisteredStatusNotifierItems | grep -o '[^" ]*kitokey[^" ]*'); do
-      for name in $(busctl --user list --no-legend 2>/dev/null | awk -v pid="$app" '$2 == pid && $1 ~ /^:/ {print $1}'); do
-        busctl --user call "$name" "${one#*@}/Menu" com.canonical.dbusmenu GetLayout iias 0 -- -1 0 >/dev/null 2>&1 &&
-          item="$name@${one#*@}"
+    for one in $(busctl --user --timeout=1 get-property $watcher RegisteredStatusNotifierItems | grep -o '[^" ]*kitokey[^" ]*'); do
+      for name in $(busctl --user --timeout=1 list --no-legend 2>/dev/null | awk -v pid="$app" '$2 == pid && $1 ~ /^:/ {print $1}'); do
+        busctl --user --timeout=1 call "$name" "${one#*@}/Menu" com.canonical.dbusmenu GetLayout iias 0 -- -1 0 >/dev/null 2>&1 &&
+          item="$name@${one#*@}" && break 2
       done
     done
-    [ -n "$item" ] && break
-    sleep 0.1
+    [ -n "$item" ] || sleep 0.1
   done
   # How long the tray item took to be found, and in how many looks (#862).
   say "    (started: its tray item found in $((SECONDS - started_at)) s, $tries look(s))"
@@ -517,7 +519,7 @@ else
   pactl unload-module "$mic_module"; mic_module=""
 fi
 
-say "S2. Kitokey ended while recording, started again: the recording it left is found, shown from its start, and stopped (#773)"
+scenario S2 "Kitokey ended while recording, started again: the recording it left is found, shown from its start, and stopped (#773)"
 # The recorder played as the real one behaves when its shell is gone: the session's file written at the
 # start, its input closed and its output gone no order to stop, stopped by a signal (recording/v1).
 cat > "$work/orphaned" <<'PLAYED'
