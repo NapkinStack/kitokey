@@ -3,8 +3,9 @@ name: Windows app
 # The zip a Windows colleague unpacks (D53), made by `nstack release` as on the Mac, judged, and kept
 # 7 days on the run — a build for the project's colleagues, never a published one (cycle 04, the
 # decider's answer of 2026-10-26). Built on main, on a pull request that changes install, which
-# makes it, and on demand; never on every pull request — the Windows minutes spent where they say
-# something, as the Mac's. What compiles is windows.yml's, on every change. Beside the zip, the
+# makes it, or a program that links C or C++ under +crt-static, and on demand; never on every
+# pull request — the Windows minutes spent where they say something, as the Mac's. What compiles
+# is windows.yml's, on every change. Beside the zip, the
 # package the Store takes (D54), signed for the run, tried, read by the certification kit (D77) and
 # kept the same 7 days with the kit's report.
 
@@ -12,6 +13,10 @@ on:
   pull_request:
     paths:
       - "modules/install/**"
+      # C and C++ linked into the programs under +crt-static, which windows.yml does not build
+      # with: libFLAC in capture, whisper.cpp in transcription (#794's LNK2019, seen by hand).
+      - "modules/capture/**"
+      - "modules/transcription/**"
       - ".github/workflows/windows-app.yml"
   push:
     branches: [main]

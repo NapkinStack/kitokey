@@ -38,7 +38,7 @@ use kitokey_shell::{
     minutes::{self, Minutes},
     model::{self, Published},
     named, player,
-    providers::{self, Online},
+    providers::{self, OnlineOffered},
     recording::{self, Recording, Said, Source},
     registry,
     sessions::{self, Listed},
@@ -362,7 +362,7 @@ fn main() {
             speech_shown,
             transcription_saved,
             transcription_tested,
-            hearing_models,
+            transcription_models,
             speech_installed,
             ollama_pull_offered,
             header,
@@ -406,6 +406,7 @@ fn main() {
             settings_saved,
             minutes_shown,
             minutes_saved,
+            minutes_models,
             minutes_tested,
             agreement_shown,
             agreed,
@@ -2636,7 +2637,7 @@ struct MinutesShown {
     ollama_address: String,
     /// The local model recommended for the minutes, said so when Ollama holds it (#261).
     recommended: &'static str,
-    online: [Online; 3],
+    online: Vec<OnlineOffered>,
     provider: Option<String>,
     model: Option<String>,
     key_kept: bool,
@@ -2667,7 +2668,7 @@ async fn minutes_shown(shell: State<'_, Shell>) -> Result<MinutesShown, Told> {
         ollama: models.unwrap_or_default(),
         ollama_address: providers::ollama_address(&ollama()),
         recommended: providers::RECOMMENDED,
-        online: providers::ONLINE,
+        online: providers::online(),
         provider: settings.minutes_provider,
         model: settings.minutes_model,
         key_kept: kept,
@@ -2722,6 +2723,31 @@ async fn minutes_saved(
     Ok(not_kept)
 }
 
+/// A service's models for the summary, asked with the key the user typed — or the one kept for its
+/// host —: the key tested at once (D95). Only the ids come back; nothing is kept, the key never
+/// logged. Refused, the cause in the Tester's own sentence.
+#[tauri::command]
+async fn minutes_models(shell: State<'_, Shell>, provider: String, key: Option<String>) -> Result<Vec<String>, Told> {
+    let host = providers::host(provider.trim()).ok_or_else(|| shell.told(Failure::BadAddress, "no provider's address"))?;
+    let key_checked = providers::online()
+        .iter()
+        .any(|service| service.address == provider.trim() && service.key_checked);
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&host).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::service_models(provider.trim(), key_checked, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
+}
+
 /// Who hears, when a service does (D43): its address and model saved, the user's agreement to its
 /// host with them, its key kept in the keyring under the transcription's own account. A host on
 /// this computer needs no agreement. Nothing is sent here.
@@ -2771,23 +2797,30 @@ async fn transcription_saved(
     Ok(not_kept)
 }
 
-/// The transcription models a service that hears offers (D63): listed by the service where it
-/// lists them, else those it publishes. Nothing of a meeting is sent; no key is needed to list.
+/// A hearing service's models, asked with the key the user typed — or the one kept for its host
+/// under the transcription's account —: the key tested at once (D95), as the summary's is. Only the
+/// ids come back; nothing is kept, the key never logged. Refused, the cause in the Tester's sentence.
 #[tauri::command]
-async fn hearing_models(shell: State<'_, Shell>, index: usize) -> Result<Vec<String>, Told> {
+async fn transcription_models(shell: State<'_, Shell>, index: usize, key: Option<String>) -> Result<Vec<String>, Told> {
     let service = providers::hearing()
         .into_iter()
         .nth(index)
         .ok_or_else(|| shell.told(Failure::Unexpected, "no such service"))?;
-    let published = || service.models.iter().map(|model| model.to_string()).collect();
-    if !service.listed {
-        return Ok(published());
-    }
-    let address = service.address.clone();
-    let listed = tauri::async_runtime::spawn_blocking(move || providers::hearing_listed(&address))
-        .await
-        .map_err(|error| shell.told(Failure::Unexpected, error))?;
-    Ok(listed.unwrap_or_else(published))
+    let host = providers::host(&service.address).unwrap_or_default();
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&transcription::key_account(&host)).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::hearing_models(&service, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
 }
 
 /// *Tester* for who hears: `kitokey-transcription --test` sends a sound of its own to the service
