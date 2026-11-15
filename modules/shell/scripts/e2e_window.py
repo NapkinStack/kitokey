@@ -1482,12 +1482,18 @@ def transcription_guided(now: dt.datetime) -> None:
             # address elsewhere can be named without being asked: tests/transcription.rs,
             # a_service_is_saved_only_once_its_host_elsewhere_is_agreed_to.
             choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
+            # No agreement asked where none is owed: the address is this computer's (#859).
+            agreement_shown = browser.execute_script("const a = document.getElementById('transcription-agreed'); return !!a && a.getClientRects().length > 0")
+            check("the service on this computer: no agreement to send the sound asked (#859)", not agreement_shown, agreement_shown)
             press(browser, "transcription-save")
             saved = wait_for(browser, lambda b: 'transcription_model = "openai/whisper-large-v3-turbo"' in window.file.read_text(), 5)
             text = window.file.read_text()
             check("saved: who hears is the service, its address, the model chosen; its host this computer's, no agreement recorded; never the key",
                   saved and 'engine = "service"' in text and f'transcription_provider = "{stand}"' in text and "transcription_agreed" not in text
                   and "sk-stand-in" not in text, text)
+            host = stand.split("/")[2]
+            told = browser.execute_script("return document.getElementById('transcription-said')?.textContent || ''")
+            check("saved on this computer: said so, not as an address and a port (#775)", "cet ordinateur" in told and host not in told, told)
             logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and "sk-stand-in" in f.read_text(errors="ignore")]
             check("the key never logged", logged == [], logged)
             # Drawn again: the service and its model said as chosen, no address shown.
@@ -1501,6 +1507,17 @@ def transcription_guided(now: dt.datetime) -> None:
             press(browser, "transcription-advanced")
             unfolded = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-provider").is_displayed(), 3)
             check("« Avancé » unfolded: an address of one's own, and a model named by hand", unfolded and browser.find_element(By.ID, "transcription-model").is_displayed())
+            # One's own address: an agreement asked for a host elsewhere, none for this computer (#859).
+            own_agreement = "const a = document.getElementById('transcription-own-agreed'); return !!a && a.getClientRects().length > 0"
+            own = browser.find_element(By.ID, "transcription-provider")
+            own.clear()
+            own.send_keys("http://localhost:8000/v1")
+            here_none = wait_for(browser, lambda b: not b.execute_script(own_agreement), 3)
+            own.clear()
+            own.send_keys("https://hears.example/v1")
+            away_asked = wait_for(browser, lambda b: b.execute_script(own_agreement), 3)
+            check("one's own address: no agreement for this computer, one for a host elsewhere (#859)", here_none and away_asked, [here_none, away_asked])
+            own.clear()
             browser.execute_script("document.getElementById('transcription-where').scrollIntoView({block: 'start'})")
             shot_themed(browser, "d95-transcription-service-light", "light")
             shot_themed(browser, "d95-transcription-service-dark", "dark")
@@ -4316,6 +4333,35 @@ def microphone_rollback(now: dt.datetime) -> None:
         captured.unlink()
     else:
         captured.write_text(left)
+
+
+def settings_folded(now: dt.datetime) -> None:
+    """BN. Settings after D95, what the 0.2.5 audit still saw (#782): « Modèles à télécharger » folded, a
+    disclosure (ARIA APG) that stays as the user left it when the page is drawn again; « Refaire le
+    réglage » in « Général », not among the models."""
+    print("BN. Settings: « Modèles à télécharger » folded, kept as left when drawn again; « Refaire le réglage » in « Général » (#782)")
+    taping = WORK / "settings-folded"
+    taping.mkdir()
+    toggle = ("const t = document.getElementById('offered-toggle'), l = document.getElementById('offered');"
+              " return {toggle: !!t, expanded: t && t.getAttribute('aria-expanded'), controls: t && t.getAttribute('aria-controls'),"
+              " name: t && t.textContent.trim(), list: !!l && l.getClientRects().length > 0, rows: l ? l.querySelectorAll('li').length : 0}")
+    card = ("const b = document.getElementById('welcome-again'); const c = b && b.closest('section.card');"
+            " return c ? c.querySelector('h2').textContent : null")
+    with Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n') as browser:
+        browser.execute_script("location.hash = '#/settings'")
+        drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "model") and b.find_element(By.ID, "model").is_displayed(), 10)
+        got = browser.execute_script(toggle)
+        check("« Modèles à télécharger » folded at first: a disclosure, closed, its list not shown (#782)",
+              drawn and got["toggle"] and got["expanded"] == "false" and got["controls"] == "offered" and got["name"] == "Modèles à télécharger"
+              and not got["list"] and got["rows"] > 0, got)
+        if got["toggle"]:
+            press(browser, "offered-toggle")
+        opened = wait_for(browser, lambda b: b.execute_script(toggle)["list"], 3)
+        check("pressed: unfolded, the list shown (#782)", opened and browser.execute_script(toggle)["expanded"] == "true", browser.execute_script(toggle))
+        browser.execute_async_script("const done = arguments[0]; refresh().then(() => done(true), () => done(false))")
+        check("drawn again: still unfolded, as the user left it (#782)",
+              browser.execute_script(toggle)["list"] and browser.execute_script(toggle)["expanded"] == "true", browser.execute_script(toggle))
+        check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
 def bar_opened(now: dt.datetime) -> None:
@@ -9666,6 +9712,7 @@ def main() -> int:
     microphone_chosen(now)
     microphone_latest_answer(now)
     microphone_rollback(now)
+    settings_folded(now)
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
