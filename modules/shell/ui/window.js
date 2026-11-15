@@ -1568,7 +1568,12 @@ function transcriptCard(read, words, session) {
   const heardSaid = service
     ? fill(words.written_by, read.model || "—") + fill(words.written_via, read.engine)
     : fill(words.heard_by, read.model ? spoken(read.model) : read.engine || "—");
-  heard.append(element("p", "maker", heardSaid));
+  // When it was made whole (D93), as the minutes' maker says theirs: the day without its year.
+  const madeWhole = read.made && dayOf({ instant: Date.parse(read.made) / 1000 || null });
+  const when = madeWhole
+    ? ` · ${new Intl.DateTimeFormat(words.locale, { weekday: "short", day: "numeric", month: "short" }).format(madeWhole)} ${words.at} ${new Intl.DateTimeFormat(words.locale, { hour: "2-digit", minute: "2-digit" }).format(madeWhole)}`
+    : "";
+  heard.append(element("p", "maker", heardSaid + when));
   card.append(heard);
   if (!read.complete) card.append(element("p", "note", words.being_made));
   if (read.unread > 0) card.append(element("p", "note", fill(words.unread, read.unread)));
