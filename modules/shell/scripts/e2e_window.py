@@ -4077,6 +4077,103 @@ def microphone_latest_answer(now: dt.datetime) -> None:
         captured.write_text(left)
 
 
+def microphone_rollback(now: dt.datetime) -> None:
+    """BM. The bar's microphone (#839): a choice refused by the shell while a later one stands never puts the
+    bar back. A then B chosen, both saves held in the page; A's refused, then B's let through: the bar names B
+    throughout, the refusal is said while B waits, and B kept takes it away. First, one choice refused alone
+    goes back to the microphone read from the shell at the start; then two choices both refused:
+    the bar goes back to what the shell last kept, never to a choice it refused; last, the first of two
+    quick choices kept and the second refused: back to the first."""
+    print("BM. the bar's microphone: an earlier choice refused while a later one stands never puts the bar back (#839)")
+    captured = WORK / "microphones"
+    left = captured.read_text() if captured.exists() else None
+    captured.write_text("".join(json.dumps({"event": "microphone", "name": name, "description": said}) + "\n"
+                                for name, said in [("alsa_laptop", "Digital Microphone"), ("bluez_input.AA_BB", "USB Headset")]))
+    (WORK / "microphones-slow").unlink(missing_ok=True)
+    taping = WORK / "microphone-rollback"
+    taping.mkdir()
+    name = "const b = document.getElementById('small-microphone'); return b ? b.textContent : ''"
+    panel = "const p = document.getElementById('small-microphones'); return !!p && !p.hidden"
+    said = "const s = document.getElementById('small-said'); return s && !s.hidden ? s.textContent : ''"
+    refused = "Votre choix de micro n’a pas pu être gardé"
+    # Each choice's save held in the page, in the order made, until let through or refused.
+    hold = ("const real = window.__TAURI__.core; window.saves = [];"
+            " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'microphone_chosen'"
+            " ? new Promise((ok, no) => window.saves.push({ go: () => real.invoke(asked, ...rest).then(ok, no), refuse: () => no('REFUS') }))"
+            " : real.invoke(asked, ...rest) };"
+            " window.restoreCore = () => { window.__TAURI__.core = real; };")
+    saves = lambda b: b.execute_script("return window.saves.length")
+
+    def choose(browser, row: int) -> bool:
+        press(browser, "small-microphone")
+        listed = wait_for(browser, lambda b: b.execute_script(panel) and len(b.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")) == 3, 5)
+        if listed:
+            browser.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")[row].click()
+        return listed and wait_for(browser, lambda b: not b.execute_script(panel), 3)
+
+    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nmicrophone = "alsa_laptop"\nmicrophone_description = "Digital Microphone"\n', small=True)
+    with window as browser:
+        wait_for(browser, lambda b: b.find_element(By.ID, "small-more").is_displayed(), 8)
+        if browser.find_element(By.ID, "small-more").get_attribute("aria-expanded") != "true":
+            press(browser, "small-more")
+        shown = wait_for(browser, lambda b: "Digital Microphone" in b.execute_script(name), 8)
+        check("the bar's options: the microphone kept is named", shown, browser.execute_script(name))
+        browser.execute_script(hold)
+        # The microphone read from the shell at the start, never chosen here, is what a lone refusal goes back to.
+        chosen = choose(browser, 2) and wait_for(browser, lambda b: saves(b) == 1, 3)
+        browser.execute_script("window.saves[0].refuse()")
+        told = wait_for(browser, lambda b: refused in b.execute_script(said), 3)
+        time.sleep(0.3)
+        check("the headset alone chosen and refused: the bar names Digital Microphone, read from the shell at the start, not Auto (#839)",
+              chosen and told and "Digital Microphone" in browser.execute_script(name), (chosen, browser.execute_script(name), browser.execute_script(said)))
+        # A, the headset; then B, Auto: both saves held.
+        chosen = choose(browser, 2) and choose(browser, 0) and wait_for(browser, lambda b: saves(b) == 3, 3)
+        check("A then B chosen, both saves held: the bar names B", chosen and "Auto" in browser.execute_script(name),
+              (chosen, browser.execute_script(name)))
+        browser.execute_script("window.saves[1].refuse()")
+        told = wait_for(browser, lambda b: refused in b.execute_script(said), 3)
+        time.sleep(0.3)
+        check("A's save refused while B stands: the refusal said, the bar still names B (#839)",
+              told and "Auto" in browser.execute_script(name), (browser.execute_script(said), browser.execute_script(name)))
+        check("A refused: nothing of it in the settings", 'microphone = "alsa_laptop"' in window.file.read_text(), window.file.read_text())
+        browser.execute_script("window.saves[2].go()")
+        kept = wait_for(None, lambda b: 'microphone = "alsa_laptop"' not in window.file.read_text(), 5)
+        gone = wait_for(browser, lambda b: b.execute_script(said) == "", 3)
+        check("B let through: Auto kept in the settings, the bar names it, nothing left said (#839)",
+              kept and gone and "Auto" in browser.execute_script(name),
+              (window.file.read_text(), browser.execute_script(name), browser.execute_script(said)))
+        # Both refused, from Auto kept: the headset, then « Digital Microphone »; each refused in turn.
+        # The bar goes back to what the shell last kept, Auto — never to the headset, never kept.
+        chosen = choose(browser, 2) and choose(browser, 1) and wait_for(browser, lambda b: saves(b) == 5, 3)
+        check("from Auto kept, the headset then Digital chosen, both saves held: the bar names Digital",
+              chosen and "Digital Microphone" in browser.execute_script(name), (chosen, browser.execute_script(name)))
+        browser.execute_script("window.saves[3].refuse()")
+        wait_for(browser, lambda b: refused in b.execute_script(said), 3)
+        browser.execute_script("window.saves[4].refuse()")
+        time.sleep(0.5)
+        check("both refused: the bar names Auto, the microphone the shell kept, never the headset; the refusal said (#839)",
+              "Auto" in browser.execute_script(name) and refused in browser.execute_script(said) and 'microphone = ' not in window.file.read_text(),
+              (browser.execute_script(name), browser.execute_script(said), window.file.read_text()))
+        # Two quick choices, the first kept, the second refused: the headset held, Digital chosen while it
+        # waits — the list read on opening not taken —, the headset let through, Digital refused. The bar
+        # goes back to the headset, the shell's last kept, not to what the list read before them.
+        chosen = choose(browser, 2) and choose(browser, 1) and wait_for(browser, lambda b: saves(b) == 7, 3)
+        browser.execute_script("window.saves[5].go()")
+        kept = wait_for(None, lambda b: 'microphone = "bluez_input.AA_BB"' in window.file.read_text(), 5)
+        browser.execute_script("window.saves[6].refuse()")
+        told = wait_for(browser, lambda b: refused in b.execute_script(said), 3)
+        time.sleep(0.3)
+        check("the headset kept, then Digital refused: the bar names the headset, the shell's last kept (#839)",
+              chosen and kept and told and "USB Headset" in browser.execute_script(name),
+              (chosen, kept, browser.execute_script(name), browser.execute_script(said), window.file.read_text()))
+        browser.execute_script("window.restoreCore()")
+    # What capture lists is left as the scenarios before had it.
+    if left is None:
+        captured.unlink()
+    else:
+        captured.write_text(left)
+
+
 def bar_opened(now: dt.datetime) -> None:
     """BA. The bar opened (D90, board 6): at rest, the microphone, « Vérifier le son » — D88's panel in
     the bar — and « Avancé » closed; recording, the context, the microphone recorded, « Confidentielle »
@@ -9405,6 +9502,7 @@ def main() -> int:
     heard_checked(now)
     microphone_chosen(now)
     microphone_latest_answer(now)
+    microphone_rollback(now)
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
