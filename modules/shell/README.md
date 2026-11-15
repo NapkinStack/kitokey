@@ -265,8 +265,8 @@ the Whisper models of [`registry/models.json`](registry/models.json), the list s
 ADR-0010), and for the minutes `qwen3:8b` fetched by Ollama's own pull (`POST /api/pull`) —,
 one fetch at a time. The Whisper models are read again from `main` only on *Mettre à jour la
 liste (raw.githubusercontent.com)*, and offered then until Kitokey quits, only when the
-decider's minisign key signed them (D56). Until that key is built in, no list is read again and
-*Réglages* say it waits on it; a list that cannot be read, unsigned, signed by another key or changed since leaves the one offered, and says so; a model fetched joins those to choose, the choice staying the
+decider's minisign key signed them (D56): its public key, `28AD0E835D7AF31E`, is built in
+(`registry::PUBLIC_KEY`). A list that cannot be read, unsigned, signed by another key or changed since leaves the one offered, and says so; a model fetched joins those to choose, the choice staying the
 user's. With no Ollama answering, the row says where to get it: Kitokey never installs it (D37). A model the settings name, and which is not
 there, is said with where it was looked for: it is the user's own, never fetched.
 

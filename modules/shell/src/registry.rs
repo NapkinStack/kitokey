@@ -13,10 +13,10 @@ pub const SHIPPED: &str = include_str!("../registry/models.json");
 /// Where the list is read again from, on the user's gesture: the file on `main`.
 pub const ADDRESS: &str = "https://raw.githubusercontent.com/NapkinStack/wholeheard/main/modules/shell/registry/models.json";
 
-/// The decider's public key, as `minisign -G` writes it on the second line of its `.pub` file.
-/// None until they give it (cycle 05, *Dependency with a date*): no list is read again, Settings
-/// say so, and so does the check of the list in the repository.
-pub const PUBLIC_KEY: Option<&str> = None;
+/// The decider's public key, as `minisign -G` writes it on the second line of its `.pub` file:
+/// `minisign public key 28AD0E835D7AF31E`, made in their own terminal (D56). Its private key is in
+/// no repository and no session: a list is signed by the decider alone (`AGENTS.md`).
+pub const PUBLIC_KEY: Option<&str> = Some("RWQe83pdgw6tKGbfv/lHOXQkpVU+KJcfXp3KiOmb2JIVn9Lz0ojPkotS");
 
 /// What no list is read again without, said to the logs and to whoever reads the check.
 const WAITS: &str = "the list is not read again: it waits on the decider's key";
@@ -99,13 +99,17 @@ fn answered(agent: &ureq::Agent, address: &str, limit: usize) -> Result<String, 
     Ok(text)
 }
 
+/// minisign's legacy form — the list signed whole, not its hash — is refused: `minisign -S` writes
+/// the pre-hashed form, and `minisign-verify` takes the other only when it is asked to (D56).
+const LEGACY_ALLOWED: bool = false;
+
 /// Whether `signature` is `key`'s over the bytes of `list`. minisign's pre-hashed signature only,
 /// what `minisign -S` writes: the legacy form is refused.
 pub fn verify(list: &str, signature: &str, key: &str) -> Result<(), String> {
     let key = minisign_verify::PublicKey::from_base64(key).map_err(|error| format!("the key built in does not read ({error})"))?;
     let signature =
         minisign_verify::Signature::decode(signature).map_err(|error| format!("the list's signature does not read ({error})"))?;
-    key.verify(list.as_bytes(), &signature, false)
+    key.verify(list.as_bytes(), &signature, LEGACY_ALLOWED)
         .map_err(|error| format!("the list's signature does not verify ({error})"))
 }
 
