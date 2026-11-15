@@ -66,6 +66,8 @@ pub struct Notice {
 /// A day as the window's `Intl` says it, with CLDR's abbreviated months: « 18 oct. », "Oct 18".
 /// One formatter for every day Kitokey says beside a meeting (D92, D93).
 pub fn day(day: chrono::NaiveDate, language: Language) -> String {
+    // Shows: in a notification's body, the day a meeting was recorded. When: a meeting is named by
+    // its day and hour, not recorded today. At most: no limit. Placeholders: none.
     use chrono::Datelike;
     // CLDR's abbreviated months, as `Intl.DateTimeFormat` gives them with `month: "short"`.
     let month = day.month0() as usize;
@@ -85,6 +87,8 @@ pub fn day(day: chrono::NaiveDate, language: Language) -> String {
 
 /// An hour as the window's `Intl` says it, two digits: « 09:42 », "09:42 AM".
 pub fn hour(time: chrono::NaiveTime, language: Language) -> String {
+    // Shows: in a notification's body, the hour a meeting was recorded. When: a meeting is named by
+    // its hour. At most: no limit. Placeholders: none.
     match language {
         Language::English => time.format("%I:%M %p").to_string(),
         // `%R`: the hour and minutes on 24 hours, as `%H:%M`.
@@ -96,6 +100,8 @@ pub fn hour(time: chrono::NaiveTime, language: Language) -> String {
 /// hour on the day it is said, its day and hour after. Used where a sentence names the meeting it
 /// is about; the window names it in its list and page itself.
 pub fn meeting(title: Option<&str>, started: Option<chrono::NaiveDateTime>, today: chrono::NaiveDate, language: Language) -> String {
+    // Shows: in a notification's body, the meeting it is about. When: a meeting is named, without a
+    // title of its own. At most: no limit. Placeholders: {} its hour, or its day then its hour.
     use Language::{English, French};
     match (title.map(str::trim).filter(|title| !title.is_empty()), started, language) {
         (Some(title), _, French) => format!("«\u{a0}{title}\u{a0}»"),
@@ -117,11 +123,11 @@ pub fn meeting(title: Option<&str>, started: Option<chrono::NaiveDateTime>, toda
     }
 }
 
-/// The notification that ends a meeting's making, its meeting named first (D92). Shows: a
-/// notification's body, before the sentences it had. When: the meeting's last step ended — written
-/// or failed —, no window of Kitokey having the focus. At most: no limit. Placeholders: {} the
-/// meeting, as `meeting` names it.
+/// The notification that ends a meeting's making, its meeting named first (D92).
 pub fn for_meeting(notice: Notice, meeting: &str, language: Language) -> Notice {
+    // Shows: a notification's body, before the sentences it had. When: the meeting's last step
+    // ended — written or failed —, no window of Kitokey having the focus. At most: no limit.
+    // Placeholders: {meeting} the meeting, as `meeting` names it.
     let named = match language {
         Language::French => format!("Pour {meeting}."),
         Language::English => format!("For {meeting}."),
