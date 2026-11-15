@@ -21,7 +21,7 @@ impl Engine for Heard {
 
     fn hear(&mut self, sound: &[f32], _: Option<&str>, _: Option<&str>) -> io::Result<Vec<Segment>> {
         let end = sound.len() as f64 / RATE as f64;
-        let text = "le chiffre secret est 4217".into();
+        let text = "le mot secret est hirondeau".into();
         Ok(vec![Segment { start: 0.0, end, text }])
     }
 }
@@ -89,9 +89,14 @@ fn each_span_is_logged_and_nothing_that_was_said() {
         (lines[4]["speaker"].as_str(), lines[4]["until"].as_f64()),
         (Some("others"), Some(10.0))
     );
-    for said in ["secret", "4217", "Quatre", "Hirondelle", &*folder.path().to_string_lossy()] {
+    // Letters only: a log line's timestamp is digits, and once held « 4217 » (#761).
+    for said in ["secret", "hirondeau", "Quatre", "Hirondelle", &*folder.path().to_string_lossy()] {
         assert!(!text.contains(said), "the log holds {said:?}: {text}");
     }
     // What was heard is in the transcript, where it belongs.
-    assert!(fs::read_to_string(folder.path().join("transcript.jsonl")).unwrap().contains("4217"));
+    assert!(
+        fs::read_to_string(folder.path().join("transcript.jsonl"))
+            .unwrap()
+            .contains("hirondeau")
+    );
 }

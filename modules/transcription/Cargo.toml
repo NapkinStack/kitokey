@@ -8,6 +8,8 @@ publish = false
 # The transcription service the user names (D43, ADR-0013), as the shell and summary reach theirs.
 ureq = { version = "3.4.2", features = ["json"] }
 rubato = "5.0.1"
+# When the transcript was made whole, written on its `complete` line (transcript/v1, D93).
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 serde_json = "1.0.154"
 # A track kept as FLAC once its recording stopped, read as its WAV was (ADR-0016).
 symphonia = { version = "0.6.1", default-features = false, features = ["flac"] }
