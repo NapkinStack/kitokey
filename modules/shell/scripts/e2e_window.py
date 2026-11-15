@@ -2625,12 +2625,14 @@ def advanced_latest_answer(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
             press(browser, "small-more")
             wait_for(browser, lambda b: b.find_elements(By.ID, "small-advanced") and b.find_element(By.ID, "small-advanced").is_displayed(), 5)
-            # The start's ask held in the page, answered once « Avancé » is open, and as #815's was: Ollama
-            # past the shell's 2 s, so none of its models — an older answer, other than the opening's, come last.
+            # The start's ask for the recording's meeting held in the page, answered once « Avancé » is open, and
+            # as #815's was: Ollama past the shell's 2 s, so none of its models — an older answer, other than the
+            # opening's, come last. Not the ask made as the start clears the bar (`name` null): its answer, for
+            # no meeting, is dropped by the later ask's meeting whatever its order.
             browser.execute_script(
                 "const real = window.__TAURI__.core; window.held = []; window.armed = true;"
                 " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {"
-                "   if (asked === 'models_offered' && window.armed) { window.armed = false;"
+                "   if (asked === 'models_offered' && window.armed && rest[0] && rest[0].name) { window.armed = false; window.heldFor = rest[0].name;"
                 "     return new Promise((ok, no) => window.held.push(() => real.invoke(asked, ...rest).then((a) => ok({ ...a, ollama: [] }), no))); }"
                 "   return real.invoke(asked, ...rest); } };"
                 " window.restoreCore = () => { window.__TAURI__.core = real; };")
@@ -2641,7 +2643,8 @@ def advanced_latest_answer(now: dt.datetime) -> None:
                 press(browser, "small-more")
             press(browser, "small-advanced")
             shown = wait_for(browser, lambda b: b.execute_script(opened), 5)
-            check("recording: « Avancé » opened while the start's ask is held", started and held and shown, [started, held, shown])
+            check("recording: « Avancé » opened while the start's ask for its meeting is held", started and held and shown,
+                  [started, held, shown, browser.execute_script("return window.heldFor")])
             # The start's answer let through, after the opening's: « Avancé » stays open.
             browser.execute_script("window.held[0]()")
             closed = wait_for(browser, lambda b: not b.execute_script(opened), 2)
