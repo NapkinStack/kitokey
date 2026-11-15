@@ -1387,10 +1387,11 @@ def models_guided(now: dt.datetime) -> None:
 
 
 def transcription_guided(now: dt.datetime) -> None:
-    """BG. D95, criterion 2. The transcription set up in « Modèles » as the summary is (BE): here or a
+    """BG. D95, criterion 2. The transcription set up in « Modèles » as the summary is (BJ): here or a
     service; a service named, its key tested at once against a stand-in made for the run — refused,
-    said with its cause; taken, its transcription models listed as people say them —; its host
-    agreed to before anything is saved (D43); no address typed but under « Avancé »."""
+    said with its cause; taken, its transcription models listed as people say them —; saved; no
+    address typed but under « Avancé ». The stand-in is on this computer: D43's agreement, owed to a
+    host elsewhere, is held by tests/transcription.rs."""
     print("BG. Settings: the transcription set up in a few guided steps, a service's key tested at once (D95)")
     good, false = "sk-stand-in-good", "sk-stand-in-false"
     asked = []
@@ -1425,7 +1426,6 @@ def transcription_guided(now: dt.datetime) -> None:
     window = Window(guided, "fr_FR.UTF-8")
     window.env.update(KITOKEY_HEARING=stand)
     said = "return document.getElementById('transcription-key-said')?.textContent || ''"
-    saved_said = "return document.getElementById('transcription-said')?.textContent || ''"
     options = "return [...document.querySelectorAll(`#${arguments[0]} option`)].filter(o => !o.disabled).map(o => o.textContent)"
     addresses = "return [...document.querySelectorAll('#settings input[type=url]')].filter(i => i.getClientRects().length > 0).map(i => i.id)"
     try:
@@ -1477,20 +1477,16 @@ def transcription_guided(now: dt.datetime) -> None:
             check("drawn again by itself: the models listed with the key still offered",
                   browser.find_element(By.ID, "transcription-models").is_displayed() and browser.execute_script(options, "transcription-models") == offered,
                   browser.execute_script(options, "transcription-models"))
-            # Its host agreed to first (D43): not agreed, nothing saved, the agreement asked, the host named.
+            # Saved. The stand-in is on this computer, where nothing of a meeting leaves it: no agreement is
+            # owed nor recorded (ADR-0013). D43, a host elsewhere refused until agreed to, is held where an
+            # address elsewhere can be named without being asked: tests/transcription.rs,
+            # a_service_is_saved_only_once_its_host_elsewhere_is_agreed_to.
             choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
-            host = stand.split("/")[2]
-            agreement = browser.find_element(By.ID, "transcription-agreed").find_element(By.XPATH, "..").text
-            press(browser, "transcription-save")
-            asked_first = wait_for(browser, lambda b: "acceptez d’abord" in b.execute_script(saved_said), 5)
-            check("a service's host not agreed to: nothing saved, the agreement asked, its host named (D43)",
-                  asked_first and host in agreement and "transcription_provider" not in window.file.read_text(), [agreement, browser.execute_script(saved_said)])
-            press(browser, "transcription-agreed")
             press(browser, "transcription-save")
             saved = wait_for(browser, lambda b: 'transcription_model = "openai/whisper-large-v3-turbo"' in window.file.read_text(), 5)
             text = window.file.read_text()
-            check("agreed and saved: who hears is the service, its address, the model chosen, its host agreed, never the key",
-                  saved and 'engine = "service"' in text and f'transcription_provider = "{stand}"' in text and f'transcription_agreed = "{host}"' in text
+            check("saved: who hears is the service, its address, the model chosen; its host this computer's, no agreement recorded; never the key",
+                  saved and 'engine = "service"' in text and f'transcription_provider = "{stand}"' in text and "transcription_agreed" not in text
                   and "sk-stand-in" not in text, text)
             logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and "sk-stand-in" in f.read_text(errors="ignore")]
             check("the key never logged", logged == [], logged)
@@ -8170,7 +8166,8 @@ def main() -> int:
         checked = browser.execute_script("return document.querySelector('input[name=after]:checked').value")
         check("out of the box, the transcript follows", checked == "transcript", checked)
         names = [o.text.split(" — ")[0] for o in browser.find_elements(By.CSS_SELECTOR, "#model option")]
-        check("the models on this computer are offered, by the names people say", names == ["Whisper large v3 turbo", "Whisper small", "OpenRouter", "OpenAI", "Un service que je choisis"], names)
+        # The services are no longer in this list: « Un service », a step of its own (D95, BG).
+        check("the models on this computer are offered, by the names people say", names == ["Whisper large v3 turbo", "Whisper small"], names)
         ready = browser.find_element(By.ID, "model-state").text
         check("the transcription model's state is said at the page's end", "Prêt" in ready and "sans réseau" in ready, ready)
         # Each change is saved, then the page is drawn again: the next acts on the new one.
