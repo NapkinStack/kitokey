@@ -1393,6 +1393,13 @@ def transcription_guided(now: dt.datetime) -> None:
     address typed but under « Avancé ». The stand-in is on this computer: D43's agreement, owed to a
     host elsewhere, is held by tests/transcription.rs."""
     print("BG. Settings: the transcription set up in a few guided steps, a service's key tested at once (D95)")
+    # This computer's Whisper models, as K writes them in main(): BG's own, so that it reads the same
+    # alone (KITOKEY_E2E_ONLY) as in the whole run; K's, when it ran, left as they are.
+    models = WORK / "data" / "kitokey" / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    for name in ("ggml-large-v3-turbo-q8_0.bin", "ggml-small.bin"):
+        if not (models / name).exists():
+            (models / name).write_bytes(b"x" * 1000)
     good, false = "sk-stand-in-good", "sk-stand-in-false"
     asked = []
 
