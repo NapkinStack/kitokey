@@ -5364,7 +5364,7 @@ def two_panes(now: dt.datetime) -> None:
         {"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0", "language": "fr", "context": None},
         *({"type": "segment", "speaker": "me", "track": "local", "voice": None, "start": 2.0 * i, "end": 2.0 * i + 1.5,
            "text": "Une phrase assez longue pour aller à la ligne dans une colonne de lecture, ni plus ni moins."} for i in range(1, 6)),
-        {"type": "complete", "duration": 1800.0},
+        {"type": "complete", "duration": 1800.0, "made": "2026-10-23T10:42:00+02:00"},
     ]
     (newest / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
     (newest / "minutes.md").write_text(
@@ -5387,6 +5387,12 @@ def two_panes(now: dt.datetime) -> None:
     with Window(meetings, "fr_FR.UTF-8") as browser:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1], 10)
+        # When its transcript was made whole (D93): beside its model, as the minutes' maker says theirs.
+        heard = browser.find_element(By.CSS_SELECTOR, "#meeting .made .maker").text
+        when = heard.split(" · ")[-1]
+        check("the transcript says when it was made beside its model, the day without its year, as the minutes say theirs (D93)",
+              heard.startswith("Transcrit par Whisper large v3 turbo, sur cet ordinateur · ") and " à " in when and "oct." in when
+              and "2026" not in when and "," not in when, heard)
         side, pane = box(browser, "#sidebar"), box(browser, "#pane")
         check("840 px and more: the sidebar on the left, 280 px, the pane beside it",
               side is not None and pane is not None and abs(side[2] - side[0] - 280) <= 1 and side[2] <= pane[0] + 1, (side, pane))
