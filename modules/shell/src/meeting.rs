@@ -21,6 +21,9 @@ pub struct Transcript {
     pub context: Option<String>,
     /// The `complete` line is there: the step finished.
     pub complete: bool,
+    /// When it was made whole, as its `complete` line says it (D93): RFC 3339 with its offset,
+    /// absent in one made before that was written — or written otherwise.
+    pub made: Option<String>,
     pub segments: Vec<Segment>,
     /// Lines that were not lines of the contract, left out.
     pub unread: usize,
@@ -71,6 +74,7 @@ pub fn transcript(folder: &Path) -> Read<Transcript> {
         model: text_of(&header, "model"),
         context: text_of(&header, "context"),
         complete: false,
+        made: None,
         segments: Vec::new(),
         unread: 0,
     };
@@ -85,7 +89,11 @@ pub fn transcript(folder: &Path) -> Read<Transcript> {
                 None => read.unread += 1,
             },
             Some("covered") => {}
-            Some("complete") => read.complete = true,
+            Some("complete") => {
+                read.complete = true;
+                // An instant the window can place in its day, or none: never a time made up.
+                read.made = text_of(&value, "made").filter(|made| chrono::DateTime::parse_from_rfc3339(made).is_ok());
+            }
             _ => read.unread += 1,
         }
     }

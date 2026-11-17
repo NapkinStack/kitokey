@@ -7,7 +7,7 @@ use std::{fs, io, path::Path};
 
 use kitokey_transcription::{
     Segment,
-    step::{Engine, RATE, read, sound, transcribe},
+    step::{Engine, RATE, hear_since, read, sound, transcribe},
 };
 use made::unmade;
 
@@ -287,4 +287,33 @@ fn the_length_the_last_line_says_is_the_one_the_session_was_covered_to() {
         unmade(&text).trim_end().ends_with(r#"{"duration":1.01,"type":"complete"}"#),
         "{text}"
     );
+}
+
+#[test]
+fn a_session_heard_whole_in_one_step_says_how_long_the_step_took_and_one_heard_live_does_not() {
+    // After the recording: one step, from its start, its loading included (D97).
+    let folder = session();
+    audio(&folder.path().join("me.wav"), 40.0, &[(3.0, 5.0)]);
+    audio(&folder.path().join("others.wav"), 40.0, &[(0.5, 2.5)]);
+    let began = std::time::Instant::now();
+    let (_, whole) = read(folder.path()).unwrap();
+    hear_since(folder.path(), whole, &mut Played::default(), None, 30, began).unwrap();
+    let text = fs::read_to_string(folder.path().join("transcript.jsonl")).unwrap();
+    let last: serde_json::Value = serde_json::from_str(text.lines().last().unwrap()).unwrap();
+    assert!(last["made_in"].as_f64().is_some_and(|took| took >= 0.0), "{last}");
+
+    // Live: heard while recording, made whole by a later step — no time said.
+    let folder = session();
+    fs::write(folder.path().join("session.json"), GOING).unwrap();
+    audio(&folder.path().join("me.wav"), 40.0, &[(3.0, 5.0)]);
+    audio(&folder.path().join("others.wav"), 40.0, &[(0.5, 2.5)]);
+    let (_, going) = read(folder.path()).unwrap();
+    hear_since(folder.path(), going, &mut Played::default(), None, 30, std::time::Instant::now()).unwrap();
+    fs::write(folder.path().join("session.json"), STOPPED).unwrap();
+    let (_, stopped) = read(folder.path()).unwrap();
+    hear_since(folder.path(), stopped, &mut Played::default(), None, 30, std::time::Instant::now()).unwrap();
+    let text = fs::read_to_string(folder.path().join("transcript.jsonl")).unwrap();
+    let last: serde_json::Value = serde_json::from_str(text.lines().last().unwrap()).unwrap();
+    assert_eq!(last["type"], "complete", "{text}");
+    assert!(last.get("made_in").is_none(), "{last}");
 }
