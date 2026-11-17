@@ -4441,24 +4441,6 @@ for (const type of ["change", "input"]) {
     if (document.activeElement === null || document.activeElement === document.body) changed.focus({ preventScroll: true });
   }, true);
 }
-// A control disabled while it holds the focus loses it in WebKit, and enabled again does not take it
-// back (#886, ines's probe): it takes it back then, when nothing else took it meanwhile — whichever of
-// the window's controls is disabled while its answer comes.
-let lostToDisabled = null;
-document.addEventListener("focusout", (event) => {
-  const left = event.target;
-  if (left instanceof Element && left.matches(":disabled") && !event.relatedTarget) lostToDisabled = left;
-}, true);
-document.addEventListener("focusin", () => {
-  lostToDisabled = null;
-}, true);
-new MutationObserver(() => {
-  const back = lostToDisabled;
-  if (!back || back.matches(":disabled")) return;
-  lostToDisabled = null;
-  const at = document.activeElement;
-  if (back.isConnected && (at === null || at === document.body)) back.focus({ preventScroll: true });
-}).observe(document.documentElement, { attributes: true, attributeFilter: ["disabled"], subtree: true });
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
 function placeOf() {
   const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [] };
