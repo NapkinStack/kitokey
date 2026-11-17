@@ -966,7 +966,8 @@ def list_refreshed(now: dt.datetime) -> None:
             asked.clear()
             browser.find_element(By.ID, "offered-refresh").click()
             wait_for(browser, lambda b: b.execute_script(said) or len(asked) == 2 and b.find_elements(By.ID, "offered-refresh")
-                     and b.find_element(By.ID, "offered-refresh").is_enabled(), 10)
+                     and b.find_element(By.ID, "offered-refresh").is_enabled()
+                     and b.find_element(By.ID, "offered-refresh").get_attribute("aria-disabled") != "true", 10)
             time.sleep(0.5)
             return browser.execute_script(said)
 
@@ -1109,14 +1110,15 @@ def service_named(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.execute_script("return window.answer !== null"), 5)
         browser.execute_script("refresh()")
         drawn = wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && document.getElementById('transcription-said') !== null"), 5)
-        check("drawn anew while it asks: Tester stays disabled", drawn and browser.execute_script("return document.getElementById('transcription-test').disabled"))
+        check("drawn anew while it asks: Tester stays disabled", drawn and browser.execute_script("const t = document.getElementById('transcription-test'); return t.disabled || t.getAttribute('aria-disabled') === 'true'"))
         browser.execute_script("window.answer()")
         kept = wait_for(browser, lambda b: b.execute_script(said).startswith("Il entend, avec les temps de chaque segment"), 10)
-        check("drawn anew while it asks: the answer is said on the page as it is", kept and not browser.execute_script("return document.getElementById('transcription-test').disabled") and browser.execute_script("return window.asked") == 1, browser.execute_script(said))
+        check("drawn anew while it asks: the answer is said on the page as it is", kept and not browser.execute_script("const t = document.getElementById('transcription-test'); return t.disabled || t.getAttribute('aria-disabled') === 'true'") and browser.execute_script("return window.asked") == 1, browser.execute_script(said))
         browser.execute_script("window.restore(); window.__old = document.getElementById('transcription-said'); refresh()")
         wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && document.getElementById('transcription-said') !== null"), 5)
         hears = "Il entend, avec les temps de chaque segment"
-        testing = "return document.getElementById('transcription-test').disabled"
+        # Waiting, said by aria-disabled — never `disabled`, which lets the focus go (#886).
+        testing = "const t = document.getElementById('transcription-test'); return t.disabled || t.getAttribute('aria-disabled') === 'true'"
         check("drawn anew after it answered: the answer stays", browser.execute_script(said).startswith(hears), browser.execute_script(said))
         check("drawn anew after it answered: Tester can be asked again", not browser.execute_script(testing))
         # Enregistrer while Tester asks: the sentence said, then the answer; the button given back.
@@ -4469,6 +4471,10 @@ def focus_kept(now: dt.datetime) -> None:
           for (const type of ['focusin', 'focusout', 'click', 'change']) document.addEventListener(type, (e) => note(type, e.target), true);
           const drawn = window.refresh;
           window.refresh = async (...asked) => { note('refresh', null); try { return await drawn(...asked); } finally { note('drawn', null); } };
+          // #886: `disabled` put on the control holding the focus, as the mutation lands — never, on any step.
+          window.__disabledFocused = [];
+          new MutationObserver((changes) => { for (const c of changes) if (c.target === document.activeElement && c.target.disabled)
+            window.__disabledFocused.push(named(c.target)); }).observe(document.documentElement, { attributes: true, attributeFilter: ['disabled'], subtree: true });
           let there = !!document.getElementById('model-fetch');
           new MutationObserver(() => { const now = !!document.getElementById('model-fetch'); if (now !== there) { there = now; note(now ? 'fetch back' : 'fetch gone', null); } })
             .observe(document.body, { childList: true, subtree: true });
@@ -4485,6 +4491,7 @@ def focus_kept(now: dt.datetime) -> None:
         browser.execute_script("const t = document.getElementById(arguments[0]); t.scrollIntoView({block: 'center'});"
                                " if (arguments[1]) document.activeElement?.blur(); else t.focus(); window.__was = t;", target, mouse)
         time.sleep(0.4)
+        browser.execute_script("window.__disabledFocused = []")
         before = browser.execute_script(where)
         act(browser)
         done = wait_for(None, lambda _: saved(), 5)
@@ -4492,8 +4499,10 @@ def focus_kept(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.execute_script("return document.getElementById(arguments[0]) !== window.__was", target), 3)
         time.sleep(0.5)
         after = browser.execute_script(where)
-        check(f"{what}: once saved and drawn again, the focus on #{target}, the page where it was (D101)",
-              done and after[0] == target and abs(after[1] - before[1]) <= 1, {"saved": done, "before": before, "after": after, "trace": traced(browser)})
+        lost = browser.execute_script("return window.__disabledFocused || []")
+        check(f"{what}: once saved and drawn again, the focus on #{target}, the page where it was, never disabled while focused (D101, #886)",
+              done and after[0] == target and abs(after[1] - before[1]) <= 1 and lost == [],
+              {"saved": done, "before": before, "after": after, "disabled while focused": lost, "trace": traced(browser)})
 
     # This computer's Whisper models, as BG and K write them: two, so that one can be chosen in Settings.
     models = WORK / "data" / "kitokey" / "models"
@@ -4637,14 +4646,17 @@ def focus_kept(now: dt.datetime) -> None:
         if wait_for(browser, lambda b: b.find_elements(By.ID, "model-fetch"), 5):
             browser.execute_script("const t = document.getElementById('model-fetch'); t.scrollIntoView({block: 'center'}); t.focus();")
             time.sleep(0.4)
+            browser.execute_script("window.__disabledFocused = []")
             before = browser.execute_script(where)
             keys(browser, Keys.ENTER)
             gone = wait_for(browser, lambda b: not b.find_elements(By.ID, "model-fetch"), 3)
             time.sleep(0.5)
             after = browser.execute_script(where)
             inside = browser.execute_script("const a = document.activeElement; return !!a && a !== document.body && !!a.closest('#settings')")
-            check("Settings, « Télécharger le modèle » gone once pressed: the focus in Settings, not the page's start; the page where it was (D101)",
-                  gone and inside and abs(after[1] - before[1]) <= 1, {"before": before, "after": after, "trace": traced(browser)})
+            lost = browser.execute_script("return window.__disabledFocused || []")
+            check("Settings, « Télécharger le modèle » gone once pressed: the focus in Settings, not the page's start; the page where it was; never disabled while focused (D101, #886)",
+                  gone and inside and abs(after[1] - before[1]) <= 1 and lost == [],
+                  {"before": before, "after": after, "disabled while focused": lost, "trace": traced(browser)})
         else:
             check("Settings offer « Télécharger le modèle », to be pressed (D101)", False, browser.execute_script(where))
     slow.shutdown()
