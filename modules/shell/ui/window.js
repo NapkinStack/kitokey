@@ -2078,6 +2078,8 @@ function choice(name, value, [label, says], checked, disabled) {
 let testing = false;
 // Settings' « Avancé » unfolded: kept while Settings are drawn again, as a choice there redraws them.
 let generalAdvanced = false;
+// « Modèles à télécharger » unfolded by the user, kept over the page's drawings (#782).
+let offeredOpen = false;
 // Each guided path's own (D95), the summary's and the transcription's: « Avancé » unfolded, kept
 // while Settings are drawn again; each service's last answer to « Vérifier la clé », by its place
 // in the list — what it refused, or the models it listed —, and where and which service chosen,
@@ -2535,6 +2537,10 @@ function showSettings(shown, minutes, words) {
   // A service (D43): nothing sent of a meeting before the user agreed to its host; a host on this
   // computer needs no agreement.
   const hostOf = (text) => { try { return new URL(text).host; } catch { return ""; } };
+  // This computer's own host needs no agreement: nothing of the meeting leaves it.
+  // The whole host, its port aside: `localhost.example` or `127.example` is elsewhere. The shell
+  // judges again (`providers::local`); this only spares the agreement where none is needed.
+  const isHere = (host) => /^(localhost|127(\.\d{1,3}){3}|\[::1\])(:\d+)?$/i.test(host);
   const agreement = (id) => {
     const wrap = element("label", "row");
     const box = element("input");
@@ -2545,12 +2551,19 @@ function showSettings(shown, minutes, words) {
     box.disabled = locked;
     const said = element("span", "says");
     wrap.append(box, said);
+    // Shown where the form asks for it, and only for a host elsewhere: none is owed on this computer (#859).
+    let wanted = true;
+    let here = false;
+    const paint = () => { wrap.hidden = !wanted || here; };
     // Ticked only for the host already agreed to.
     const hostIs = (host) => {
       said.textContent = fill(words.service_agree, host || "—");
       box.checked = !!shown.transcription_agreed && shown.transcription_agreed === host;
+      here = isHere(host);
+      paint();
     };
-    return [wrap, box, hostIs];
+    const shownIs = (now) => { wanted = now; paint(); };
+    return [wrap, box, hostIs, shownIs];
   };
   const [serviceWrap, servicePick] = guidedList("transcription-service", words.service_name, locked);
   shown.hearing.forEach((hearing, index) => guidedOption(servicePick, String(index), hearing.name));
@@ -2563,14 +2576,24 @@ function showSettings(shown, minutes, words) {
   keySaid.id = "transcription-key-said";
   keySaid.setAttribute("role", "status");
   const [modelsWrap, serviceModels] = guidedList("transcription-models", words.service_model, locked);
-  const [agreeWrap, agreeBox, agreeHost] = agreement("transcription-agreed");
+  const [agreeWrap, agreeBox, agreeHost, agreeShown] = agreement("transcription-agreed");
   const saveService = guidedButton("transcription-save", words.service_save, true, locked);
+  // One « Enregistrer » and one agreement at a time (#860): the service's, « Avancé » folded; unfolded,
+  // its own, which saves what the page shows.
+  let listedShown = false;
+  const paintSaves = () => {
+    const open = guided.transcription.advanced;
+    saveService.hidden = !listedShown || open;
+    agreeShown(listedShown && !open);
+  };
   // The models listed with its key, the one saved chosen.
   const shownListed = (models) => {
     serviceModels.replaceChildren();
     for (const id of models) guidedOption(serviceModels, id, modelSaid(id));
     if (models.includes(shown.transcription_model)) serviceModels.value = shown.transcription_model;
-    modelsWrap.hidden = agreeWrap.hidden = saveService.hidden = models.length === 0;
+    modelsWrap.hidden = models.length === 0;
+    listedShown = models.length > 0;
+    paintSaves();
   };
   // This service's last answer, said again; else the model saved with it — the others come with its key.
   const shownSaved = () => {
@@ -2581,7 +2604,9 @@ function showSettings(shown, minutes, words) {
     if (answer?.models) return shownListed(answer.models);
     serviceModels.replaceChildren();
     if (saved) guidedOption(serviceModels, shown.transcription_model, modelSaid(shown.transcription_model));
-    modelsWrap.hidden = agreeWrap.hidden = saveService.hidden = !saved;
+    modelsWrap.hidden = !saved;
+    listedShown = !!saved;
+    paintSaves();
   };
   shownSaved();
   guidedKeyTested("transcription", words, locked, { servicePick, key: serviceKey, keyTest, keySaid, modelsPick: serviceModels },
@@ -2604,13 +2629,14 @@ function showSettings(shown, minutes, words) {
   });
   const ownSave = guidedButton("transcription-own-save", words.service_save, false, locked);
   const [hearToggle, hearAdvanced] = guidedAdvanced("transcription", words, own, [addressWrap, modelWrap, ownAgreeWrap, ownSave]);
+  hearToggle.addEventListener("click", paintSaves);
+  paintSaves();
+  // What « Avancé »'s « Enregistrer » saves: its model typed, or else — its address left empty, the
+  // service chosen above — the model chosen in that service's list (#860).
+  const ownModel = () => serviceModel.value.trim() || (address.value.trim() ? "" : serviceModels.value);
   const serviceSaid = element("p", "says");
   serviceSaid.id = "transcription-said";
   serviceSaid.setAttribute("role", "status");
-  // This computer's own host needs no agreement: nothing of the meeting leaves it.
-  // The whole host, its port aside: `localhost.example` or `127.example` is elsewhere. The shell
-  // judges again (`providers::local`); this only spares the agreement where none is needed.
-  const isHere = (host) => /^(localhost|127(\.\d{1,3}){3}|\[::1\])(:\d+)?$/i.test(host);
   const saveHearing = async (provider, model, key, box, addressField, modelField) => {
     const { invoke } = window.__TAURI__.core;
     if (!/^https?:$/.test((() => { try { return new URL(provider.trim()).protocol; } catch { return ""; } })()) || !hostOf(provider.trim())) {
@@ -2627,14 +2653,16 @@ function showSettings(shown, minutes, words) {
     }
     const saved = await invoke("transcription_saved", {
       provider, model, key: key || null, agreed: box.checked,
-    }).then((notKept) => (notKept === null ? fill(words.service_saved, hostOf(provider)) : fill(words.key_not_kept, notKept)), (why) => fill(words.not_saved, why));
+    }).then((notKept) => (notKept !== null ? fill(words.key_not_kept, notKept)
+      // This computer's: said so, never as an address and a port (#775).
+      : isHere(hostOf(provider)) ? words.service_saved_here : fill(words.service_saved, hostOf(provider))), (why) => fill(words.not_saved, why));
     // A Tester still asking stays: its answer comes after this, the button its own.
     serviceAnswer ??= { said: "", asking: false };
     serviceAnswer.said = saved;
     serviceSaid.textContent = saved;
   };
   saveService.addEventListener("click", () => saveHearing(hearing().address, serviceModels.value, serviceKey.value, agreeBox, null, serviceModels));
-  ownSave.addEventListener("click", () => saveHearing(ownAddress(), serviceModel.value, serviceKey.value, ownAgreeBox, address, serviceModel));
+  ownSave.addEventListener("click", () => saveHearing(ownAddress(), ownModel(), serviceKey.value, ownAgreeBox, address, serviceModel));
   const testService = element("button", "open", words.service_test);
   testService.type = "button";
   testService.id = "transcription-test";
@@ -2765,8 +2793,8 @@ function showSettings(shown, minutes, words) {
   pulled.append(pulledSaid, element("span", "state"));
   offered.append(pulled);
   // The list read again from where it is kept, only on this click, its host shown (D40): read,
-  // the page is drawn with it; refused, the list above stays, and it is said. Until the key that
-  // signs it is built in, no click is offered, and that is said (D56).
+  // the page is drawn with it; refused, the list above stays, and it is said — signed by the
+  // decider's key alone, built in since D56.
   const refreshed = element("p", "says");
   refreshed.id = "offered-refreshed";
   refreshed.setAttribute("role", "status");
@@ -2781,8 +2809,23 @@ function showSettings(shown, minutes, words) {
     refresh_.disabled = false;
     refreshed.textContent = words.offered_refresh_failed;
   });
-  if (shown.registry_waits) refreshed.textContent = words.offered_refresh_waits;
-  step.append(element("h3", "", words.offered_title), offered, ...(shown.registry_waits ? [] : [refresh_]), refreshed);
+  // Folded at first (#782): a disclosure (ARIA APG), as « Avancé », left as the user leaves it when
+  // the page is drawn again — a download running in it goes on either way.
+  const offeredToggle = element("button", "disclose-advanced");
+  offeredToggle.type = "button";
+  offeredToggle.id = "offered-toggle";
+  offeredToggle.setAttribute("aria-controls", "offered");
+  offeredToggle.append(icon("chevron-right"), element("span", "", words.offered_title));
+  const offeredPanel = [offered, refresh_, refreshed];
+  const unfoldOffered = (now) => {
+    offeredOpen = now;
+    offeredToggle.setAttribute("aria-expanded", String(now));
+    offeredToggle.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
+    for (const part of offeredPanel) part.hidden = !now;
+  };
+  offeredToggle.addEventListener("click", () => unfoldOffered(!offeredOpen));
+  unfoldOffered(offeredOpen);
+  step.append(offeredToggle, ...offeredPanel);
   paintOffered(offered);
   models.append(step, minutesRow(minutes, words, locked), element("p", "says", words.models_note));
   parts.push(models);

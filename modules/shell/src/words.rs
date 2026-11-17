@@ -507,7 +507,6 @@ pub struct Window {
     /// what is said when it could not be.
     pub offered_refresh: &'static str,
     pub offered_refresh_failed: &'static str,
-    pub offered_refresh_waits: &'static str,
     /// Apple's SpeechAnalyzer among who hears, on a Mac with macOS 26 (D42): its name in the
     /// choice; its model not on the Mac yet; the gesture that has macOS fetch it, and from whom;
     /// while it comes; when it did not.
@@ -527,6 +526,9 @@ pub struct Window {
     pub service_test: &'static str,
     pub service_tested: &'static str,
     pub service_saved: &'static str,
+    /// Shows: Settings, « Transcription », under the service's form, once saved. When: the address saved is
+    /// this computer's, where nothing leaves it (#775). At most: one line. Placeholders: none.
+    pub service_saved_here: &'static str,
     pub service_agree_first: &'static str,
     pub service_address_bad: &'static str,
     pub service_model_named: &'static str,
@@ -984,7 +986,6 @@ pub fn window(language: Language) -> Window {
             offered_needs_ollama: "Needs Ollama — install it from ollama.com",
             offered_refresh: "Update the list ({})",
             offered_refresh_failed: "The list could not be updated: the models above are still offered.",
-            offered_refresh_waits: "The list cannot be updated yet: it waits on the key that signs it. The models above are still offered.",
             speech_option: "Apple's SpeechAnalyzer, on this Mac",
             speech_missing: "Apple's model is not on this Mac yet",
             speech_fetch: "Download Apple's model (macOS fetches it from Apple)",
@@ -999,6 +1000,7 @@ pub fn window(language: Language) -> Window {
             service_test: "Test",
             service_tested: "It hears, with each segment’s times: a sound of Kitokey’s own was transcribed.",
             service_saved: "Saved: {} hears your next meetings.",
+            service_saved_here: "Saved: this computer hears your next meetings.",
             service_agree_first: "Nothing is saved: agree first that your meetings’ sound is sent to {}.",
             service_address_bad: "Nothing is saved: the address starts with https:// or http://, then the service’s host — for example https://api.groq.com/openai/v1.",
             service_model_named: "Nothing is saved: name the model the service hears with — for example whisper-large-v3.",
@@ -1409,7 +1411,6 @@ pub fn window(language: Language) -> Window {
             offered_needs_ollama: "Nécessite Ollama, à installer depuis ollama.com",
             offered_refresh: "Mettre à jour la liste ({})",
             offered_refresh_failed: "La liste n’a pas pu être mise à jour\u{a0}: les modèles ci-dessus restent proposés.",
-            offered_refresh_waits: "La liste ne peut pas encore être mise à jour\u{a0}: elle attend la clé qui la signe. Les modèles ci-dessus restent proposés.",
             speech_option: "SpeechAnalyzer d’Apple, sur ce Mac",
             speech_missing: "le modèle d’Apple n’est pas encore sur ce Mac",
             speech_fetch: "Télécharger le modèle d’Apple (macOS le télécharge depuis Apple)",
@@ -1424,6 +1425,7 @@ pub fn window(language: Language) -> Window {
             service_test: "Tester",
             service_tested: "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit.",
             service_saved: "Enregistré\u{a0}: {} transcrira vos prochaines réunions.",
+            service_saved_here: "Enregistré\u{a0}: cet ordinateur transcrira vos prochaines réunions.",
             service_agree_first: "Rien n’est enregistré\u{a0}: acceptez d’abord que le son de vos réunions soit envoyé à {}.",
             service_address_bad: "Rien n’est enregistré\u{a0}: l’adresse commence par https:// ou http://, puis l’hôte du service — par exemple https://api.groq.com/openai/v1.",
             service_model_named: "Rien n’est enregistré\u{a0}: nommez le modèle avec lequel le service entend — par exemple whisper-large-v3.",

@@ -39,8 +39,9 @@ for number, log in enumerate(sorted(work.glob("**/logs/*.jsonl"))):
         if not hit:
             unknown.setdefault(entry.get("message", line), line)
 unseen = [item for item in declared if item["pattern"] not in seen]
-# A partial run (KITOKEY_E2E_ONLY) plays some scenarios: what the others provoke is not owed.
-partial = bool(os.environ.get("KITOKEY_E2E_ONLY", "").strip())
+# A partial run (KITOKEY_E2E_ONLY), or a shard (KITOKEY_E2E_PART, #862), plays some scenarios: what
+# the others provoke is not owed — a sharded run judges every shard's logs together, once.
+partial = bool(os.environ.get("KITOKEY_E2E_ONLY", "").strip() or os.environ.get("KITOKEY_E2E_PART", "").strip())
 print(f"    {lines} log lines kept in {kept}; {len(unknown)} warning or error message(s) not provoked, "
       f"{len(unseen)} declared and never logged")
 for line in unknown.values():
