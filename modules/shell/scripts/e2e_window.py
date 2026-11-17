@@ -2240,6 +2240,18 @@ app.run([])
 """
 
 
+def away(b, made) -> None:
+    """A making's end awaited with another application in front: told only then (D92)."""
+    other = subprocess.Popen(["/usr/bin/python3", "-c", ELSEWHERE], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        wait_for(b, lambda b: not b.execute_script("return document.hasFocus()"), 10)
+        made()
+    finally:
+        other.terminate()
+        other.wait(timeout=10)
+        wait_for(b, lambda b: b.execute_script("return document.hasFocus()"), 5)
+
+
 def app_language(now: dt.datetime) -> None:
     """AF. The language Kitokey speaks, chosen in Settings, the system's by default (D64)."""
     print("AF. the app's language chosen in Settings: spoken at once and after a restart, never the meetings' (D64)")
@@ -2264,17 +2276,6 @@ echo '{{"available":true,"installed":true,"supported":true}}'
     english = ["Open Kitokey", "Start recording", "Transcribe the last recording", "Write the minutes of the last recording", "Quit Kitokey"]
     sections = lambda b: b.execute_script("return [document.getElementById('settings-link').getAttribute('aria-label'), document.documentElement.lang]")
     redo = lambda b: b.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", heard.name, str(model))
-
-    def away(b, made) -> None:
-        """A making's end awaited with another application in front: told only then (D92)."""
-        other = subprocess.Popen(["/usr/bin/python3", "-c", ELSEWHERE], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        try:
-            wait_for(b, lambda b: not b.execute_script("return document.hasFocus()"), 10)
-            made()
-        finally:
-            other.terminate()
-            other.wait(timeout=10)
-            wait_for(b, lambda b: b.execute_script("return document.hasFocus()"), 5)
 
     def by_settings(b, ready: str) -> str:
         """The transcript made again by whoever the settings name to hear (D59): what it was told."""
@@ -3110,7 +3111,8 @@ def models_advanced(now: dt.datetime) -> None:
             try:
                 press(browser, "redo-minutes")
                 wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
-                press(browser, "redo-do")
+                # Its end awaited with another application in front: told only then (D92).
+                away(browser, lambda: (press(browser, "redo-do"), wait_for(None, lambda b: "pas été refait" in notified.read_text(), 15)))
                 failed = wait_for(browser, lambda b: "pas été fait" in b.execute_script(failure), 15)
                 told = browser.execute_script(failure)
                 check("the meeting's own minutes model fails: the page names it, and Refaire… › Avancé to choose another",
@@ -3130,7 +3132,8 @@ def models_advanced(now: dt.datetime) -> None:
                 press(browser, "redo-minutes")
                 wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
                 writing.unlink(missing_ok=True)
-                press(browser, "redo-do")
+                away(browser, lambda: (press(browser, "redo-do"),
+                                       wait_for(None, lambda b: "pas été refait" in notified.read_text()[since:], 15)))
                 failed = wait_for(browser, lambda b: "qwen3:14b" in read(writing) and "pas été fait" in b.execute_script(failure), 15)
                 told = browser.execute_script(failure)
                 check("Settings' minutes model fails: Settings' wording, no « Avancé »",
