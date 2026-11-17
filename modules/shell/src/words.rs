@@ -390,10 +390,16 @@ pub struct Window {
     pub written_by: &'static str,
     /// Its provider, when known, said after the model.
     pub written_via: &'static str,
-    /// Between a day and its hour: "mar. 13 oct. à 12:21", "Tue, Oct 13 at 12:21 PM".
+    /// Between a day and its hour: "13 oct. à 12:21", "Oct 13 at 12:21 PM".
     pub at: &'static str,
     /// The transcript's maker: the model, on this computer.
     pub heard_by: &'static str,
+    /// A transcript that says when it was made whole: that day and hour first, its model after —
+    /// "Transcrit le 13 nov. à 09:42 · Whisper small" (D93).
+    pub transcribed_on: &'static str,
+    /// Minutes that say when they were made: that day and hour first, their model after —
+    /// "Compte rendu du 13 nov. à 09:45 · Qwen3 8B" (D93).
+    pub minutes_of: &'static str,
     pub here: &'static str,
     pub remote: &'static str,
     /// A voice told within a track: its label.
@@ -892,6 +898,8 @@ pub fn window(language: Language) -> Window {
             written_via: ", via {}",
             at: "at",
             heard_by: "Written by {}, on this computer",
+            transcribed_on: "Transcribed on {}",
+            minutes_of: "Summary of {}",
             here: "Here",
             remote: "Remote",
             voice: "voice {}",
@@ -1322,6 +1330,8 @@ pub fn window(language: Language) -> Window {
             written_via: ", via {}",
             at: "à",
             heard_by: "Transcrit par {}, sur cet ordinateur",
+            transcribed_on: "Transcrit le {}",
+            minutes_of: "Compte rendu du {}",
             here: "Ici",
             remote: "À distance",
             voice: "voix {}",

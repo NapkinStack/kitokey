@@ -184,3 +184,33 @@ fn the_complete_line_says_when_in_the_computers_own_time_zone() {
     let made = lines(folder.path()).last().unwrap()["made"].as_str().unwrap().to_string();
     assert!(made.ends_with("+05:30"), "{made} is not Kolkata's time");
 }
+
+#[test]
+fn a_transcript_one_step_made_whole_says_how_long_that_step_took() {
+    let folder = tempfile::tempdir().unwrap();
+    // The step began a second and a half ago: its loading counts, as the user waited for it (D97).
+    let began = std::time::Instant::now() - std::time::Duration::from_millis(1500);
+    let mut transcript = Transcript::start(folder.path(), &making()).unwrap().since(began);
+    transcript.heard(Speaker::Me, &[said(0.0, 1.0, "Bonjour.")], 30.0).unwrap();
+    transcript.complete(30.0).unwrap();
+    let last = &lines(folder.path())[3];
+    let took = last["made_in"].as_f64().expect("the complete line says how long the step took");
+    assert!((1.5..15.0).contains(&took), "{last}");
+    // To the hundredth, as `duration` is written.
+    assert_eq!((took * 100.0).round() / 100.0, took, "{last}");
+}
+
+#[test]
+fn a_transcript_taken_up_from_an_earlier_step_says_no_time() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut first = Transcript::start(folder.path(), &making()).unwrap();
+    first.heard(Speaker::Me, &[said(0.0, 1.0, "Bonjour.")], 30.0).unwrap();
+    drop(first);
+    // Live: a later step takes it up and makes it whole. Its time alone would say a speed the
+    // transcript never had (D97).
+    let mut later = Transcript::open(folder.path(), &making()).unwrap().since(std::time::Instant::now());
+    later.complete(30.0).unwrap();
+    let last = lines(folder.path()).pop().unwrap();
+    assert_eq!(last["type"], "complete");
+    assert!(last.get("made_in").is_none(), "{last}");
+}
