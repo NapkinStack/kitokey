@@ -68,6 +68,18 @@ deliverables:
     state: ready
     acceptance:
       - "Given the bar's options, when they show — at rest for the next meeting, while recording for the meeting in progress —, then they offer the meeting's language, the same list and the same refusal said as on the meeting's page (D89), « Celle des Réglages » first; the language chosen at rest is the next meeting's; held by the e2e, in French and in English, by keyboard alone"
+  - id: D100
+    title: "A meeting can be moved to the trash from its own page"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given a meeting's page, when it shows, then beside the button that opens its folder a button « Mettre à la corbeille » / \"Move to trash\" — an icon with its name said to assistive technology and as a tooltip — asks, in place, « Mettre cette réunion à la corbeille ? » with what it holds (audio, transcript, summary) and that it can be restored from the system's trash, « Annuler » focused first; confirmed, the meeting's folder goes to the system's trash as « Faire de la place » sends it (never deleted for good), the page closes onto the list with the focus on the next meeting or, with none, on the list itself; Escape or « Annuler » leaves everything as it was; refused while that meeting is recording or being made, saying why; held by the e2e, in French and in English (the decider, 2026-11-17)"
+  - id: D101
+    title: "A setting changed keeps the focus where the user is"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given a meeting's page or Settings, when the user changes a choice there with the keyboard or the mouse — a model, a language, the context, the appearance, a model to download —, then once it is saved and the page drawn again the focus is on the same control and the page has not scrolled; a control the change removes gives the focus to the one that took its place, never to the page's start; held by the e2e for every choice of both pages, each read by `document.activeElement` and the scroll position after the redraw (the decider, 2026-11-17)"
 
 ---
 
@@ -249,6 +261,20 @@ keyring, handed to the program alone, never written, logged or sent to the windo
   palettes exist; only the choice is new.
 - **D99** — the page's language row (D89), offered in the bar's options; no new language.
 - Cut first, in this order, when the breaker nears: D99, then D97's cost, said at the closure.
+
+### D100 and D101, added on the decider's word
+
+The decider, 2026-11-17, in his session with the coordinator: « petites remarques qu'on devrait pouvoir traiter
+rapidement dans le même cycle », its end unchanged.
+
+- **D100** — a meeting moved to the trash from its page, beside its folder. Prior art: Apple Notes, Otter and
+  Granola offer « delete » on the open item; the GNOME HIG asks a confirmation only for what cannot be undone,
+  but the decider asked for one, and the system's trash keeps it restorable. The sending is the one
+  « Faire de la place » already does; only the button and its question are new.
+- **D101** — the focus kept across a redraw. Prior art: the WAI-ARIA Authoring Practices keep the focus on the
+  control that changed; every React-style view keeps it by drawing in place. #777 is one case (the 840 px
+  break); this deliverable holds every choice of the two pages.
+- Cut first, before D99, when the breaker nears: D100.
 
 ## What needs a person
 
