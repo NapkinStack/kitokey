@@ -5359,8 +5359,21 @@ def word_after_a_gap(now: dt.datetime) -> None:
     check("the track is unchanged (ADR-0004)", hashlib.sha256((played / "local.wav").read_bytes()).hexdigest() == before)
 
 
+class NeverOpened(Exception):
+    """AS's field to name a meeting never came: a FAIL has said what was there instead (#897)."""
+
+
 def meeting_renamed(now: dt.datetime) -> None:
     """AS. A meeting renamed by hand (D70): the heading a field, the name everywhere at once, as text."""
+    # A field never opened ends AS on the FAIL that names it, never on an exception out of main():
+    # none of its later steps could hold, and the next scenario is played (#897).
+    try:
+        renaming(now)
+    except NeverOpened:
+        pass
+
+
+def renaming(now: dt.datetime) -> None:
     print("AS. a meeting's heading clicked, a name typed: the list, the page and Libérer de l'espace show it; Escape leaves it; emptied, the minutes' title or the date comes back (D70)")
     meetings = WORK / "renaming"
     with_minutes, bare = meetings / "2026-10-28_14-00", meetings / "2026-10-27_14-00"
@@ -5378,7 +5391,12 @@ def meeting_renamed(now: dt.datetime) -> None:
     # A save draws the page again a moment after the heading changes: pressed and typed through what is there then.
     def opened(b) -> None:
         press(b, "rename")
-        wait_for(b, lambda c: c.execute_script("const f = document.getElementById('naming'); if (f && document.activeElement === f) { f.select(); return true; } return false"), 5)
+        if not wait_for(b, lambda c: c.execute_script("const f = document.getElementById('naming'); if (f && document.activeElement === f) { f.select(); return true; } return false"), 5):
+            seen = b.execute_script("const r = document.getElementById('rename'), a = document.activeElement;"
+                                    " return {heading: document.querySelector('#meeting h1')?.textContent ?? null, rename: r ? (r.disabled ? 'disabled' : 'enabled') : null,"
+                                    " naming: !!document.getElementById('naming'), active: a ? a.id || a.tagName : null}")
+            check("the heading pressed opens the field to name the meeting, focused", False, seen)
+            raise NeverOpened
     typed = lambda b, *keys: ActionChains(b).send_keys(*keys).perform()
     def name(b, text: str, key: str) -> None:
         opened(b)
@@ -5583,7 +5601,7 @@ def meeting_renamed(now: dt.datetime) -> None:
         browser.execute_script("window.restore()")
         # Marks that show nothing, as a paste gives them: no name, and nothing to apologise for.
         name(browser, "Provisoire", Keys.ENTER)
-        wait_for(browser, lambda b: head(b) == "Provisoire", 5)
+        check("named again: the page shows it", wait_for(browser, lambda b: head(b) == "Provisoire", 5), head(browser))
         opened(browser)
         browser.execute_script("document.getElementById('naming').value = '\\u200b\\u2060'")
         typed(browser, Keys.ENTER)
