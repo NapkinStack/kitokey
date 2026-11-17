@@ -4432,7 +4432,9 @@ def focus_kept(now: dt.datetime) -> None:
         "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
     # Where the focus is, and how far the page is scrolled: an element's id, or what it is when it has none.
     where = ("const a = document.activeElement;"
-             " return [!a || a === document.body ? 'body' : a.id || ('no id: ' + a.tagName.toLowerCase() + '.' + a.className), Math.round(scrollY)]")
+             " return [!a || a === document.body ? 'body' : a.id || ('no id: ' + a.tagName.toLowerCase() + '.' + a.className), Math.round(scrollY),"
+             # What explains a scroll, when one is seen: how far the page can scroll, whether « Enregistré » is said.
+             " Math.round(document.scrollingElement.scrollHeight - innerHeight), !!document.getElementById('saved-said')]")
     # The controls a user reaches on the page shown, and those of them with no id.
     nameless = ("const page = document.getElementById(arguments[0]);"
                 " return [...page.querySelectorAll('button, select, input, textarea, a[href], summary, [tabindex]:not([tabindex=\"-1\"])')]"
@@ -4536,6 +4538,8 @@ def focus_kept(now: dt.datetime) -> None:
                 keys(browser, Keys.ARROW_UP if browser.execute_script("return document.getElementById('minutes').selectedIndex") > 0 else Keys.ARROW_DOWN)
                 time.sleep(0.3)
                 browser.execute_script("document.getElementById('minutes-save').focus()")
+                # Where the user is as they press « Enregistrer ».
+                before = browser.execute_script(where)
                 keys(browser, Keys.ENTER)
                 done = wait_for(None, lambda _: 'minutes_model = "qwen3:14b"' not in settings(), 5)
                 time.sleep(1)
