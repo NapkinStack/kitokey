@@ -4152,7 +4152,9 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
                 .lock()
                 .unwrap()
                 .insert(folder.clone(), format!("{} is no model on this computer", model.display()));
-            // The meeting's last step, failed: told as its end is (D92).
+            // The meeting's last step, failed: told as its end is (D92) — the line let go first, as
+            // `tell_made` asks the main thread, which may be waiting for it (`show`).
+            drop(running);
             tell_made(app, &words::trouble(&trouble, shell.language()), &folder, false);
         }
         return;
@@ -4171,6 +4173,7 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
         Err(error) => {
             shell.transcripts_failed.lock().unwrap().insert(folder.clone(), error.to_string());
             let notice = words::trouble(&Trouble::NoTranscriber(error.to_string()), shell.language());
+            drop(running);
             return tell_made(app, &notice, &folder, false);
         }
     };
@@ -4600,6 +4603,8 @@ fn of_meeting(app: &AppHandle, notice: &Notice, folder: &Path) -> Notice {
 /// The notification that ends a meeting's making — its last step written or failed, or the next
 /// one unable to start (D25) —: told naming the meeting, and only when no window of Kitokey has the
 /// focus, the window saying it there (D92). `opening`: its click opens the meeting (D44).
+/// Never called holding a lock the main thread takes: asking the focus waits for the main thread,
+/// which would wait for that lock — the window frozen, nothing told (#824).
 fn tell_made(app: &AppHandle, notice: &Notice, folder: &Path, opening: bool) {
     if window_focused(app) {
         tracing::info!("shell.made_not_told");
