@@ -602,3 +602,8 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .check-actions .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .check-actions .open:disabled { border-style: dashed; color: var(--soft); cursor: default; }
 .check-note { margin-top: 12px; margin-bottom: 16px; font-size: 12.5px; color: var(--soft); }
+/* A meeting to the trash, asked in place under its page's actions (D100). */
+.trash-ask { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding: 14px 18px; }
+.trash-ask .trash-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.trash-ask .trash-choices button { white-space: nowrap; }
+.trash-ask .note:empty { display: none; }
