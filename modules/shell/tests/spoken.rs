@@ -52,7 +52,10 @@ fn the_next_meetings_language_is_kept_across_starts_none_removes_it_and_no_code_
     keep_next(&file, Some("en")).unwrap();
     assert_eq!(fs::read_to_string(&file).unwrap(), "en\n");
     assert_eq!(read_next(&file), Some("en".to_string()));
-    assert_eq!(keep_next(&file, Some("English")).unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
+    assert_eq!(
+        keep_next(&file, Some("English")).unwrap_err().kind(),
+        std::io::ErrorKind::InvalidInput
+    );
     assert_eq!(read_next(&file), Some("en".to_string()));
     assert!(!file.with_extension("part").exists());
     keep_next(&file, None).unwrap();
