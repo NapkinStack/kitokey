@@ -427,15 +427,28 @@ def session(folder: Path, started: dt.datetime, minutes: float | None, files: di
 
 
 def instances() -> list[int]:
-    """The processes of the Kitokey under test."""
+    """The processes of the Kitokey under test, in this session alone: a run cut in shards plays the
+    same binary in sessions side by side, each its own XDG_RUNTIME_DIR, and never ends another's (#862)."""
+    session = f"XDG_RUNTIME_DIR={os.environ.get('XDG_RUNTIME_DIR', '')}".encode()
     found = []
     for process in Path("/proc").iterdir():
         try:
-            if process.name.isdigit() and os.readlink(process / "exe") == str(BINARY.resolve()):
+            if (process.name.isdigit() and os.readlink(process / "exe") == str(BINARY.resolve())
+                    and session in (process / "environ").read_bytes().split(b"\0")):
                 found.append(int(process.name))
         except OSError:
             pass
     return found
+
+
+def single_instance_held() -> bool:
+    """Whether a Kitokey still holds its single-instance name on this session's bus
+    (`com.napkinstack.Kitokey.SingleInstance…`, tauri-plugin-single-instance): a start made meanwhile
+    hands its arguments over to it and leaves, logging « shell.started » and nothing else (#853). The
+    name is held to the last instant of a Kitokey that is leaving, when /proc can no longer say it is
+    one; and each session has its bus, so another shard's never counts."""
+    listed = subprocess.run(["busctl", "--user", "--timeout=1", "list", "--no-legend"], capture_output=True, text=True).stdout
+    return any(line.split()[0].startswith("com.napkinstack.Kitokey.SingleInstance") for line in listed.splitlines() if line.strip())
 
 
 def tray_entries() -> tuple[str, str, list[tuple[int, str]]]:
@@ -535,8 +548,8 @@ class Window:
     def __enter__(self) -> webdriver.Remote:
         # One Kitokey per session: one still leaving takes this start's arguments and this one
         # leaves, its session never opened (#510). Waited for.
-        until = time.monotonic() + 10
-        while instances() and time.monotonic() < until:
+        until = time.monotonic() + 20
+        while (instances() or single_instance_held()) and time.monotonic() < until:
             time.sleep(0.1)
         port, native = free_port(), free_port()
         self.driver_process = subprocess.Popen(
@@ -560,7 +573,8 @@ class Window:
             except ReadTimeoutError:
                 self.driver_process.terminate()
                 self.driver_process.wait(timeout=10)
-                raise RuntimeError(f"tauri-driver opened no session in a minute; Kitokey's processes: {instances()}") from None
+                raise RuntimeError(f"tauri-driver opened no session in a minute; Kitokey's processes: {instances()},"
+                                   f" its single-instance name held: {single_instance_held()}") from None
             except (WebDriverException, HTTPError):
                 time.sleep(0.2)
         else:
@@ -5736,6 +5750,13 @@ def meeting_told_once(now: dt.datetime) -> None:
 def two_panes(now: dt.datetime) -> None:
     """AD. The window in two panes: the meetings in a sidebar, the one chosen beside them (D61)."""
     print("AD. the window in two panes: the sidebar, the meeting chosen beside it, as wide as the window (D61)")
+    # Its Settings with two models on this computer, as K leaves them in a whole run: played in a shard
+    # of its own, Settings would draw the guided step in their place (#862).
+    models = WORK / "data" / "kitokey" / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    for name in ("ggml-large-v3-turbo-q8_0.bin", "ggml-small.bin"):
+        if not (models / name).exists():
+            (models / name).write_bytes(b"x" * 1000)
     meetings = WORK / "panes"
     names = [f"2026-10-{day:02d}_10-00" for day in range(10, 24)]
     for index, name in enumerate(names):
@@ -8084,11 +8105,14 @@ def timed(scenario):
 
 def main() -> int:
     now = dt.datetime.now().astimezone()
-    # Each scenario main() plays, timed (#862).
+    began = time.monotonic()
+    # Each scenario main() plays, timed (#862). In the shard that plays main()'s own scenarios alone
+    # (KITOKEY_E2E_PART=main, scripts/e2e_sharded.sh), the others are the other shards'.
     import e2e_only
 
+    inline = os.environ.get("KITOKEY_E2E_PART", "") == "main"
     for name in e2e_only.scenarios(Path(__file__).read_text()):
-        globals()[name] = timed(globals()[name])
+        globals()[name] = (lambda now: None) if inline else timed(globals()[name])
     # A partial run (pytest's -k, scripts/e2e_only.py): the scenarios KITOKEY_E2E_ONLY names, alone,
     # said first — never read as a full run: e2e.sh says it again, and never passes it.
     if os.environ.get("KITOKEY_E2E_ONLY", "").strip():
@@ -9774,6 +9798,8 @@ def main() -> int:
               there and "supprimé pour faire de la place" not in browser.execute_script(no_player), browser.execute_script(no_player))
     # None remembered before the run, as on a desktop where Kitokey never played: none of the user's to keep.
     check("the volume the system remembers for the user's Kitokey is left as it was", kept is None or same_volume(remembered(), kept), [remembered(), kept])
+    # main()'s own scenarios, H to R, timed as one (#862).
+    print(f"    (main: {time.monotonic() - began:.1f} s)")
     model_offered(now)
     models_listed(now)
     list_refreshed(now)
