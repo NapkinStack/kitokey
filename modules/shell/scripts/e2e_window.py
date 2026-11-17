@@ -2190,7 +2190,7 @@ def meeting_language(now: dt.datetime) -> None:
             "return window.__TAURI__.core.invoke('language_set', {name: arguments[0], language: arguments[1]}).then(() => 'kept', (why) => String(why))", heard.name, text)
             for text in ("Deutsch", "zz")]
         check("a text that is not a code of ISO 639-1 is refused, nothing written", "kept" not in refused and not (heard / "language").exists(), refused)
-        browser.execute_script(f"location.hash = '#/'")
+        browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
@@ -2636,6 +2636,8 @@ def cancelled_at_once(now: dt.datetime) -> None:
                                        stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
             try:
                 time.sleep(0.5)
+                # What the page reads before the making starts: the later answer of #823's race.
+                browser.execute_script("window.__TAURI__.core.invoke('makings').then((m) => { window.before = m; })")
                 start(browser, first)
                 running = wait_for(browser, lambda b: held.exists() and child.exists() and child.read_text().strip() != "", 15)
                 check(f"{what}: made again with the first model, held running", running)
@@ -2646,23 +2648,51 @@ def cancelled_at_once(now: dt.datetime) -> None:
                 check(f"{what}: « Annuler » on its page while it is made", offered)
                 if not offered:
                     continue
+                # Refused — its meeting gone meanwhile, the answer stood in for here —: said beside its
+                # line, and still said once the makings are read again; the making goes on (D92). The
+                # transcript's and the minutes' alike: one button, one note (#823).
+                browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                       " asked === 'making_cancelled' ? Promise.reject('the meeting is gone') : real.invoke(asked, ...rest) };"
+                                       " window.restore = () => { window.__TAURI__.core = real; };")
+                press(browser, "making-cancel")
+                refusal = lambda b: b.execute_script("const n = document.querySelector('.note.warn[data-refused]'); return n ? n.textContent : ''")
+                said_now = wait_for(browser, lambda b: "Kitokey n’a pas pu annuler" in refusal(b), 3)
+                # The makings read again meanwhile: by the gesture itself, then by the page's own reading.
+                time.sleep(1.5)
+                kept = refusal(browser)
+                role = browser.execute_script("return document.querySelector('.note.warn[data-refused]')?.getAttribute('role')")
+                check(f"{what}: « Annuler » refused: said beside its making in its own words, an alert, still said once the makings are read again, the making going on",
+                      said_now and kept.startswith("Kitokey n’a pas pu annuler") and "the meeting is gone" in kept and role == "alert" and not gone(pids[0])
+                      and browser.execute_script("const c = document.getElementById('making-cancel'); return !!c && !c.disabled"), kept)
+                browser.execute_script("window.restore()")
                 if step == "hearing":
-                    # Refused — its meeting gone meanwhile, the answer stood in for here —: said beside its
-                    # line, and still said once the makings are read again; the making goes on (D92).
-                    browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
-                                           " asked === 'making_cancelled' ? Promise.reject('the meeting is gone') : real.invoke(asked, ...rest) };"
-                                           " window.restore = () => { window.__TAURI__.core = real; };")
-                    press(browser, "making-cancel")
-                    refusal = lambda b: b.execute_script("const n = document.querySelector('.note.warn[data-refused]'); return n ? n.textContent : ''")
-                    said_now = wait_for(browser, lambda b: "Kitokey n’a pas pu annuler" in refusal(b), 3)
-                    # The makings read again meanwhile: by the gesture itself, then by the page's own reading.
-                    time.sleep(1.5)
-                    kept = refusal(browser)
-                    role = browser.execute_script("return document.querySelector('.note.warn[data-refused]')?.getAttribute('role')")
-                    check(f"{what}: « Annuler » refused: said beside its making in its own words, an alert, still said once the makings are read again, the making going on",
-                          said_now and kept.startswith("Kitokey n’a pas pu annuler") and "the meeting is gone" in kept and role == "alert" and not gone(pids[0])
-                          and browser.execute_script("const c = document.getElementById('making-cancel'); return !!c && !c.disabled"), kept)
+                    # Two readings of the makings answered out of order (#823), as #816 has the bar's asks: the
+                    # first answered a second late with the making still made, the second at once with the
+                    # page's state before it started. The later reading wins: the late one is dropped.
+                    browser.execute_script("""
+                        const real = window.__TAURI__.core; let n = 0; window.raced = null;
+                        window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {
+                          if (asked !== 'makings') return real.invoke(asked, ...rest);
+                          n += 1;
+                          if (n > 1) return Promise.resolve(window.before);
+                          return real.invoke('makings').then((made) => new Promise((done) => setTimeout(() => {
+                            done(made);
+                            // Read once the late answer has been taken or dropped: after its reading's own turn.
+                            setTimeout(() => { window.raced = [JSON.stringify(makings) === JSON.stringify(window.before),
+                              !!document.getElementById('making-cancel')?.getClientRects().length]; }, 0);
+                          }, 1000)));
+                        } };
+                        window.restore = () => { window.__TAURI__.core = real; };
+                        readMakings(); readMakings();""")
+                    # wait_for says whether it came, not what came: what came is read after it.
+                    came = wait_for(browser, lambda b: b.execute_script("return window.raced"), 5)
+                    raced = browser.execute_script("return window.raced")
+                    check(f"{what}: two readings answered out of order — the late one dropped, the page drawn with the later one (#823)",
+                          came and raced == [True, False], raced)
                     browser.execute_script("window.restore()")
+                    # The page's own next reading draws the making again, still made, its « Annuler » back.
+                    check(f"{what}: read again for real, the making is drawn as made again",
+                          wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 5))
                 pressed = time.monotonic()
                 press(browser, "making-cancel")
                 ended = wait_for(browser, lambda b: all(gone(pid) for pid in pids) and b.execute_script(idle), 2)
@@ -2893,7 +2923,7 @@ def models_advanced(now: dt.datetime) -> None:
                   told == {"size": "12px", "context": "12px", "described": "small-models-kept"}, told)
             # Kitokey quit and started again: the models chosen at rest are still the next recording's, and said.
             window.__exit__()
-            browser = window.__enter__()
+            browser = window.__enter__()  # noqa: PLW2901 — Kitokey quit and started again: its window reopened on purpose
             wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
             again = wait_for(browser, lambda b: b.execute_script(line) == keptSaid, 5)
             chosen_again = browser.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
@@ -3002,7 +3032,7 @@ def models_advanced(now: dt.datetime) -> None:
                 # Quit and started again after a recording took them: nothing comes back.
                 wait_for(browser, lambda b: b.execute_script(idle), 15)
                 window.__exit__()
-                browser = window.__enter__()
+                browser = window.__enter__()  # noqa: PLW2901 — Kitokey quit and started again: its window reopened on purpose
                 wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
                 time.sleep(1)
                 check("started again after a recording took them: no models kept, none said, nothing on disk",
@@ -5040,6 +5070,11 @@ def minutes_checked(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.find_elements(By.ID, "play"), 10)
             got = browser.execute_script(maker)
             check(f"{short}: the maker's line ends with the cost, in the window's language, its currency, two significant digits", got.endswith(f" · {cost}"), got)
+            # D93, as the decider confirmed it: when first, then the model via its service, then the cost (D51).
+            parts = got.split(" · ")
+            check(f"{short}: when the minutes were made, then the model via its service, then the cost — none lost (D93)",
+                  len(parts) == 3 and re.fullmatch({"fr": r"Compte rendu du 13 oct\. à \d\d:\d\d", "en": r"Summary of Oct 13 at \d\d:\d\d [AP]M"}[short], parts[0])
+                  and parts[1].endswith(", via openrouter.ai") and parts[2] == cost, parts)
             colours = browser.execute_script(
                 "const m = getComputedStyle(document.querySelector('#meeting .minutes .maker')).color, p = document.createElement('p');"
                 "p.style.color = 'var(--soft)'; document.body.append(p); const s = getComputedStyle(p).color; p.remove(); return [m, s]")
@@ -5742,9 +5777,12 @@ def two_panes(now: dt.datetime) -> None:
         {"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0", "language": "fr", "context": None},
         *({"type": "segment", "speaker": "me", "track": "local", "voice": None, "start": 2.0 * i, "end": 2.0 * i + 1.5,
            "text": "Une phrase assez longue pour aller à la ligne dans une colonne de lecture, ni plus ni moins."} for i in range(1, 6)),
-        {"type": "complete", "duration": 1800.0},
+        {"type": "complete", "duration": 1800.0, "made": "2026-10-23T10:42:00+02:00"},
     ]
     (newest / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
+    # The meeting before it: a transcript made before `made` was written — its model alone (D93).
+    (meetings / names[-2] / "transcript.jsonl").write_text(
+        "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in [*lines[:-1], {"type": "complete", "duration": 1800.0}]))
     (newest / "minutes.md").write_text(
         "---\ncontract: minutes/v1\nmade: 2026-10-23T11:00:00+02:00\nprovider: openrouter.ai\nmodel: claude-sonnet\ncontext: null\n---\n\n"
         "## 1.\n\n" + "Un compte rendu assez long pour que son texte aille à la ligne bien avant le bord de sa carte. " * 6 + "\n\n"
@@ -5762,9 +5800,20 @@ def two_panes(now: dt.datetime) -> None:
         time.sleep(0.3)
         shot_themed(browser, name, "light" if "light" in name.split("-") else "dark")
 
-    with Window(meetings, "fr_FR.UTF-8") as browser:
+    # When a version was made, in the system's local time (D93): a zone far from UTC and from the
+    # instants' own offset, +02:00 — 10:42 there is 04:42 in New York, 08:42 in UTC.
+    zone = "America/New_York"
+    makers = lambda b: [p.text for p in b.find_elements(By.CSS_SELECTOR, "#meeting .maker")]
+    window = Window(meetings, "fr_FR.UTF-8")
+    window.env["TZ"] = zone
+    with window as browser:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1], 10)
+        # Each version says when it was made, then the model, as criterion 2 writes it (D93).
+        made = makers(browser)
+        check("the transcript and the minutes say when they were made, in local time, then their model (D93)",
+              sorted(made) == sorted(["Transcrit le 23 oct. à 04:42 · Whisper large v3 turbo",
+                                      "Compte rendu du 23 oct. à 05:00 · Claude Sonnet, via openrouter.ai"]), made)
         side, pane = box(browser, "#sidebar"), box(browser, "#pane")
         check("840 px and more: the sidebar on the left, 280 px, the pane beside it",
               side is not None and pane is not None and abs(side[2] - side[0] - 280) <= 1 and side[2] <= pane[0] + 1, (side, pane))
@@ -5907,9 +5956,15 @@ def two_panes(now: dt.datetime) -> None:
         check("the keyboard: the sidebar before the pane", inside, browser.execute_script("return document.activeElement.outerHTML.slice(0, 80)"))
 
     # In English, gone through with the keyboard alone: the sidebar first, the focus always seen.
-    with Window(meetings, "en_GB.UTF-8") as browser:
+    window = Window(meetings, "en_GB.UTF-8")
+    window.env["TZ"] = zone
+    with window as browser:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1] and b.find_elements(By.CSS_SELECTOR, ".transcript .lines li"), 10)
+        made = makers(browser)
+        check("in English: when each version was made, in local time, then its model (D93)",
+              sorted(made) == sorted(["Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo",
+                                      "Summary of Oct 23 at 05:00 AM · Claude Sonnet, via openrouter.ai"]), made)
         english = [browser.find_element(By.ID, "record-said").text] + [
             [browser.find_element(By.ID, i).get_attribute(a) for a in ("aria-label", "title")] for i in ("fold", "unfold", "free-link", "small-link", "settings-link")]
         browser.execute_script("document.activeElement.blur()")
@@ -5934,6 +5989,11 @@ def two_panes(now: dt.datetime) -> None:
               and places[0] == "side" and "pane" in places and set(places[places.index("pane"):last + 1]) == {"pane"} and "other" not in places,
               (english, places))
         check("the focus is always seen", unseen == [], unseen)
+        # A transcript whose last line says no `made`: its model alone, no time (D93).
+        browser.execute_script(f"location.hash = '#/meeting/{names[-2]}'")
+        alone = wait_for(browser, lambda b: shown(b) == names[-2] and makers(b), 10)
+        check("a transcript that does not say when it was made: its model alone, no time (D93)",
+              alone and makers(browser) == ["Written by Whisper large v3 turbo, on this computer"], makers(browser))
 
     empty = WORK / "panes-none"
     empty.mkdir()
@@ -6133,7 +6193,7 @@ def transcript_corrected(now: dt.datetime) -> None:
         warned = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-loses-corrections"), 5)
         check("Refaire… of a corrected transcript says, before it starts, that its corrections will not be kept",
               warned and "ne seront pas gardées" in browser.find_element(By.ID, "redo-loses-corrections").text)
-        browser.execute_script(f"location.hash = '#/'")
+        browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "redo-corrections"), 10)
@@ -7468,7 +7528,6 @@ def gestures_answer(now: dt.datetime) -> None:
         "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
     slow = ("const real = window.__TAURI__.core; window.__asked = 0; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'record'"
             " ? (window.__asked++, new Promise((done) => setTimeout(done, 2000)).then(() => real.invoke(asked, ...rest))) : real.invoke(asked, ...rest) };")
-    shown = lambda b, id_: b.find_element(By.ID, id_).is_displayed()
     said = lambda b: b.find_element(By.ID, "record-said").get_attribute("textContent")
     running = lambda b: b.execute_async_script("const d = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('recording_now').then((n) => d(n.recording))")
     with Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n') as browser:
@@ -8272,8 +8331,8 @@ def main() -> int:
         )
         maker = minutes.find_element(By.CSS_SELECTOR, ".maker").text
         check(
-            "who wrote the minutes, and where, as the board says it — the model as people say it, the day without its year",
-            maker.startswith("Écrit par Claude Sonnet, via openrouter.ai · ") and "2026" not in maker and "," not in maker.split(" · ")[-1] and " à " in maker.split(" · ")[-1],
+            "when the minutes were made, then who wrote them and where (D93) — the model as people say it, the day without its year",
+            maker.startswith("Compte rendu du 13 oct. à ") and maker.endswith(" · Claude Sonnet, via openrouter.ai") and "2026" not in maker,
             maker,
         )
         named = browser.execute_script(
@@ -8618,7 +8677,7 @@ def main() -> int:
         # never says « Aucune réunion ». The file fixed, the banner goes and the meeting is listed.
         session(elsewhere / "kept", now - dt.timedelta(hours=1), 10, {"transcript.jsonl": 100})
         window.__exit__()
-        browser = window.__enter__()
+        browser = window.__enter__()  # noqa: PLW2901 — Kitokey quit and started again: its window reopened on purpose
         banner = ("const b = document.getElementById('settings-banner');"
                   "return b && b.getClientRects().length > 0 ? [document.getElementById('settings-banner-said').textContent,"
                   " document.getElementById('settings-banner-link').textContent, document.getElementById('settings-banner-link').getAttribute('href')] : null")
@@ -8706,7 +8765,7 @@ def main() -> int:
         # No settings file at all — a first start —: nothing unreadable, no banner.
         window.file.unlink()
         window.__exit__()
-        browser = window.__enter__()
+        browser = window.__enter__()  # noqa: PLW2901 — Kitokey quit and started again: its window reopened on purpose
         first = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('listed').then(l => l.settings_unread)") is False, 10)
         time.sleep(0.5)
         check("no settings file, a first start: not said unreadable, no banner", first and browser.execute_script(region) == ["status", True, 0],

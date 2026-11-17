@@ -140,7 +140,7 @@ things the forge and the sheet do then, to know before the first merge:
 - the next one's head moves when the default branch is merged into it, and a sheet is tied to
   the commit tested. When that merge brings no file the branch did not already carry, the two
   commits hold the same tree and the sheet stands; when it brings one, the automated scenarios
-  are run again at the new head (§7);
+  are run again at the new head — unless it changed nothing their modules read (§7);
 - a **squash** merge writes the first one's work as a new commit, and the next branch still
   carries the old ones: it conflicts with what it already holds. Note the merged branch's last
   commit before the branch goes, move the next one onto the default branch, `git rebase --onto
@@ -315,7 +315,14 @@ the change, and the stricter applies:
   - a commit whose files are exactly the head's **is** the head: a hash changed by a merge
     that brought nothing sends no scenario back;
   - an **automated** scenario is **run again** at the head — CI replays it when the module
-    declares `e2e`, so it costs nothing; its Commit cell takes the head commit;
+    declares `e2e`, so it costs nothing; its Commit cell takes the head commit. Where checks are
+    attested, it stands when nothing its modules read moved since its run: the records of its
+    commit and of the head hold the same `inputs` digest — the modules run, those they consume
+    from or assemble, the files outside the modules, `contracts/` and `platform/` included, the
+    engine and the person — and the run is at
+    most 7 days old, the default branch moved by 20 commits at most. A module that reads something
+    it does not declare is the risk: declare it in `consumes`, and the default branch's own
+    `Module checks` run catches what was missed;
   - one **explored** by hand keeps the commit its evidence was produced on, and the verifier
     adds a **`Confirmed`** column on the head commit saying **what moved since and why it leaves
     the result standing**. Reading three fixes is not the same work as driving six scenarios
