@@ -3,6 +3,7 @@
 //! and the files beside it; nothing here writes, moves or opens a file for writing.
 
 use std::io::ErrorKind;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -307,7 +308,60 @@ pub fn settle(current: &Path, previous: &Path, written: bool, dispose: impl FnOn
 /// will do first —, leaving nothing: a folder that refuses is said before any recorder starts.
 pub fn writable(folder: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(folder)?;
-    let probe = folder.join(format!(".kitokey-writable-{}", std::process::id()));
-    std::fs::write(&probe, b"")?;
-    std::fs::remove_file(&probe)
+    std::fs::remove_file(probe(folder)?)
+}
+
+/// The count of the next probe's name, one for the process (`probe`).
+static PROBES: AtomicU64 = AtomicU64::new(0);
+
+/// A file made new in `folder` for `writable`: its path. Its name is never given twice in a
+/// process, as the trial's beside the day (#759): on Windows, a name just removed can stay taken a
+/// while, its deletion pending, and making it again answers « Access is denied » (#705, #760).
+fn probe(folder: &Path) -> std::io::Result<PathBuf> {
+    for _ in 0..1000 {
+        let count = PROBES.fetch_add(1, Ordering::Relaxed);
+        let probe = folder.join(format!(".kitokey-writable-{}-{count}", std::process::id()));
+        match fs::OpenOptions::new().write(true).create_new(true).open(&probe) {
+            Ok(_) => return Ok(probe),
+            // One an earlier Kitokey left under the same number: passed over.
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(std::io::Error::other("no name free for a probe of the folder"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// On Windows a removed file's name can stay taken a while, its deletion pending — « Access is
+    /// denied » to whoever makes it again (#705, #760): the next probe never depends on the last
+    /// one's going. Its name kept taken here by a folder, which refuses a file as Windows does.
+    #[test]
+    fn a_second_probe_does_not_wait_on_the_first_ones_deletion() {
+        let folder = tempfile::tempdir().unwrap();
+        let first = probe(folder.path()).unwrap();
+        fs::remove_file(&first).unwrap();
+        fs::create_dir(&first).unwrap();
+        let second = probe(folder.path()).unwrap();
+        assert_ne!(first, second);
+        fs::remove_file(second).unwrap();
+        assert!(writable(folder.path()).is_ok());
+    }
+
+    /// A probe an earlier Kitokey left under this process's number is passed over, never an error.
+    #[test]
+    fn a_probe_left_in_the_folder_is_passed_over() {
+        let folder = tempfile::tempdir().unwrap();
+        let next = PROBES.load(Ordering::Relaxed);
+        let left: Vec<_> = (next..next + 50)
+            .map(|count| folder.path().join(format!(".kitokey-writable-{}-{count}", std::process::id())))
+            .collect();
+        for path in &left {
+            fs::write(path, "").unwrap();
+        }
+        let made = probe(folder.path()).unwrap();
+        assert!(!left.contains(&made), "{made:?}");
+    }
 }
