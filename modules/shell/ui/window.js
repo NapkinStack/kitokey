@@ -527,6 +527,8 @@ function modelFetch(busy = false) {
     // Where the user is, read before the button goes: what says the model coming takes its place (D101).
     const place = placeOf();
     fetch_.disabled = true;
+    // Disabled, it lets its focus go at once (WebKit): to what says the model, now.
+    placeBack(place);
     await window.__TAURI__.core.invoke("model_fetch").catch(() => {});
     await readMakings();
     placeBack(place);
