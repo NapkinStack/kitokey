@@ -5070,6 +5070,11 @@ def minutes_checked(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.find_elements(By.ID, "play"), 10)
             got = browser.execute_script(maker)
             check(f"{short}: the maker's line ends with the cost, in the window's language, its currency, two significant digits", got.endswith(f" · {cost}"), got)
+            # D93, as the decider confirmed it: when first, then the model via its service, then the cost (D51).
+            parts = got.split(" · ")
+            check(f"{short}: when the minutes were made, then the model via its service, then the cost — none lost (D93)",
+                  len(parts) == 3 and re.fullmatch({"fr": r"Compte rendu du 13 oct\. à \d\d:\d\d", "en": r"Summary of Oct 13 at \d\d:\d\d [AP]M"}[short], parts[0])
+                  and parts[1].endswith(", via openrouter.ai") and parts[2] == cost, parts)
             colours = browser.execute_script(
                 "const m = getComputedStyle(document.querySelector('#meeting .minutes .maker')).color, p = document.createElement('p');"
                 "p.style.color = 'var(--soft)'; document.body.append(p); const s = getComputedStyle(p).color; p.remove(); return [m, s]")
@@ -5772,9 +5777,12 @@ def two_panes(now: dt.datetime) -> None:
         {"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0", "language": "fr", "context": None},
         *({"type": "segment", "speaker": "me", "track": "local", "voice": None, "start": 2.0 * i, "end": 2.0 * i + 1.5,
            "text": "Une phrase assez longue pour aller à la ligne dans une colonne de lecture, ni plus ni moins."} for i in range(1, 6)),
-        {"type": "complete", "duration": 1800.0},
+        {"type": "complete", "duration": 1800.0, "made": "2026-10-23T10:42:00+02:00"},
     ]
     (newest / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
+    # The meeting before it: a transcript made before `made` was written — its model alone (D93).
+    (meetings / names[-2] / "transcript.jsonl").write_text(
+        "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in [*lines[:-1], {"type": "complete", "duration": 1800.0}]))
     (newest / "minutes.md").write_text(
         "---\ncontract: minutes/v1\nmade: 2026-10-23T11:00:00+02:00\nprovider: openrouter.ai\nmodel: claude-sonnet\ncontext: null\n---\n\n"
         "## 1.\n\n" + "Un compte rendu assez long pour que son texte aille à la ligne bien avant le bord de sa carte. " * 6 + "\n\n"
@@ -5792,9 +5800,20 @@ def two_panes(now: dt.datetime) -> None:
         time.sleep(0.3)
         shot_themed(browser, name, "light" if "light" in name.split("-") else "dark")
 
-    with Window(meetings, "fr_FR.UTF-8") as browser:
+    # When a version was made, in the system's local time (D93): a zone far from UTC and from the
+    # instants' own offset, +02:00 — 10:42 there is 04:42 in New York, 08:42 in UTC.
+    zone = "America/New_York"
+    makers = lambda b: [p.text for p in b.find_elements(By.CSS_SELECTOR, "#meeting .maker")]
+    window = Window(meetings, "fr_FR.UTF-8")
+    window.env["TZ"] = zone
+    with window as browser:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1], 10)
+        # Each version says when it was made, then the model, as criterion 2 writes it (D93).
+        made = makers(browser)
+        check("the transcript and the minutes say when they were made, in local time, then their model (D93)",
+              sorted(made) == sorted(["Transcrit le 23 oct. à 04:42 · Whisper large v3 turbo",
+                                      "Compte rendu du 23 oct. à 05:00 · Claude Sonnet, via openrouter.ai"]), made)
         side, pane = box(browser, "#sidebar"), box(browser, "#pane")
         check("840 px and more: the sidebar on the left, 280 px, the pane beside it",
               side is not None and pane is not None and abs(side[2] - side[0] - 280) <= 1 and side[2] <= pane[0] + 1, (side, pane))
@@ -5937,9 +5956,15 @@ def two_panes(now: dt.datetime) -> None:
         check("the keyboard: the sidebar before the pane", inside, browser.execute_script("return document.activeElement.outerHTML.slice(0, 80)"))
 
     # In English, gone through with the keyboard alone: the sidebar first, the focus always seen.
-    with Window(meetings, "en_GB.UTF-8") as browser:
+    window = Window(meetings, "en_GB.UTF-8")
+    window.env["TZ"] = zone
+    with window as browser:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1] and b.find_elements(By.CSS_SELECTOR, ".transcript .lines li"), 10)
+        made = makers(browser)
+        check("in English: when each version was made, in local time, then its model (D93)",
+              sorted(made) == sorted(["Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo",
+                                      "Summary of Oct 23 at 05:00 AM · Claude Sonnet, via openrouter.ai"]), made)
         english = [browser.find_element(By.ID, "record-said").text] + [
             [browser.find_element(By.ID, i).get_attribute(a) for a in ("aria-label", "title")] for i in ("fold", "unfold", "free-link", "small-link", "settings-link")]
         browser.execute_script("document.activeElement.blur()")
@@ -5964,6 +5989,11 @@ def two_panes(now: dt.datetime) -> None:
               and places[0] == "side" and "pane" in places and set(places[places.index("pane"):last + 1]) == {"pane"} and "other" not in places,
               (english, places))
         check("the focus is always seen", unseen == [], unseen)
+        # A transcript whose last line says no `made`: its model alone, no time (D93).
+        browser.execute_script(f"location.hash = '#/meeting/{names[-2]}'")
+        alone = wait_for(browser, lambda b: shown(b) == names[-2] and makers(b), 10)
+        check("a transcript that does not say when it was made: its model alone, no time (D93)",
+              alone and makers(browser) == ["Written by Whisper large v3 turbo, on this computer"], makers(browser))
 
     empty = WORK / "panes-none"
     empty.mkdir()
@@ -8301,8 +8331,8 @@ def main() -> int:
         )
         maker = minutes.find_element(By.CSS_SELECTOR, ".maker").text
         check(
-            "who wrote the minutes, and where, as the board says it — the model as people say it, the day without its year",
-            maker.startswith("Écrit par Claude Sonnet, via openrouter.ai · ") and "2026" not in maker and "," not in maker.split(" · ")[-1] and " à " in maker.split(" · ")[-1],
+            "when the minutes were made, then who wrote them and where (D93) — the model as people say it, the day without its year",
+            maker.startswith("Compte rendu du 13 oct. à ") and maker.endswith(" · Claude Sonnet, via openrouter.ai") and "2026" not in maker,
             maker,
         )
         named = browser.execute_script(
