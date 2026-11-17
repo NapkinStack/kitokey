@@ -65,6 +65,24 @@ function chip(text, kind) {
   return element;
 }
 
+// A control waiting for its answer (#886, D101): said disabled to assistive technology and deaf to
+// what would change it, never `disabled` — WebKit lets the focus of a disabled control go and never
+// gives it back (ines's probe: focused, disabled three frames, then body). WAI-ARIA's practice: it
+// stays focusable, inert. A click, a press or a key that would change it is held back.
+function waiting(control, on) {
+  if (on) control.setAttribute("aria-disabled", "true");
+  else control.removeAttribute("aria-disabled");
+}
+const HELD_KEYS = new Set([" ", "Enter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"]);
+for (const type of ["click", "mousedown", "keydown"]) {
+  document.addEventListener(type, (event) => {
+    const control = event.target instanceof Element ? event.target.closest('[aria-disabled="true"]') : null;
+    if (!control || (type === "keydown" && !HELD_KEYS.has(event.key))) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+}
+
 // A lock, Lucide's: its meaning is always in the words beside it (D60, D89).
 function lock() {
   const svg = icon("lock");
@@ -311,7 +329,7 @@ function confidentialCard(session, confidential, words) {
     said.hidden = said.textContent === "";
   };
   box.addEventListener("change", async () => {
-    box.disabled = true;
+    waiting(box, true);
     try {
       const shown = await window.__TAURI__.core.invoke("confidential_set", { name, on: box.checked });
       said.textContent = "";
@@ -321,7 +339,7 @@ function confidentialCard(session, confidential, words) {
       said.textContent = words.confidential_not_saved;
       said.hidden = false;
     }
-    box.disabled = false;
+    waiting(box, false);
     readMakings();
   });
   card.append(element("span", "name", words.confidential_chip), box);
@@ -422,7 +440,7 @@ function cancelButton(said, id) {
   cancel.type = "button";
   if (id) cancel.id = id;
   cancel.addEventListener("click", async () => {
-    cancel.disabled = true;
+    waiting(cancel, true);
     cancelledFrom = said.id;
     // A refusal said before was the last gesture's: this one says its own.
     document.querySelector(`.note[data-refused="${said.id}"]`)?.remove();
@@ -430,7 +448,7 @@ function cancelButton(said, id) {
       // Said beside the line, which is drawn again as the makings are read: kept until the next gesture.
       said.after(refusalNote(said.id, fill(words.making_cancel_failed, why)));
       cancelledFrom = null;
-      cancel.disabled = false;
+      waiting(cancel, false);
       return false;
     });
     // Asked: it ends within two seconds; read again until its line says it, not at the page's
@@ -493,7 +511,7 @@ function paintState(said, shown, of) {
       fetch_.id = "ollama-fetch";
       fetch_.disabled = shown.busy;
       fetch_.addEventListener("click", async () => {
-        fetch_.disabled = true;
+        waiting(fetch_, true);
         await window.__TAURI__.core.invoke("ollama_pull_offered").catch(() => {});
         readMakings();
       });
@@ -526,9 +544,7 @@ function modelFetch(busy = false) {
   fetch_.addEventListener("click", async () => {
     // Where the user is, read before the button goes: what says the model coming takes its place (D101).
     const place = placeOf();
-    fetch_.disabled = true;
-    // Disabled, it lets its focus go at once (WebKit): to what says the model, now.
-    placeBack(place);
+    waiting(fetch_, true);
     await window.__TAURI__.core.invoke("model_fetch").catch(() => {});
     await readMakings();
     placeBack(place);
@@ -555,7 +571,7 @@ function paintOffered(list = document.getElementById("offered")) {
       fetch_.type = "button";
       fetch_.disabled = kind === "busy";
       fetch_.addEventListener("click", async () => {
-        fetch_.disabled = true;
+        waiting(fetch_, true);
         const { invoke } = window.__TAURI__.core;
         const asked = item.dataset.by ? invoke("ollama_pull_offered") : invoke("model_offered_fetch", { file: item.dataset.offered });
         await asked.catch(() => {});
@@ -632,7 +648,7 @@ function paintMakings() {
 
 // *Réessayer*: fails only when the meeting is gone, said there (D67); a later failure is on this page.
 async function askAgain(of, said, again) {
-  again.disabled = true;
+  waiting(again, true);
   try {
     await window.__TAURI__.core.invoke(of.ask, { name: said.dataset.name });
   } catch (why) {
@@ -1001,12 +1017,12 @@ function contextCard(session, { context, transcript, minutes }, words, settings,
   redo.type = "button";
   redo.id = "context-redo";
   redo.addEventListener("click", async () => {
-    redo.disabled = true;
+    waiting(redo, true);
     await window.__TAURI__.core.invoke("context_redo", { name }).catch((why) => {
       said.textContent = fill(words.not_saved, why);
     });
     await readMakings();
-    redo.disabled = false;
+    waiting(redo, false);
   });
   changed.append(element("p", "says", words.context_changed[minutes.state === "present" ? 1 : 0]), redo);
   const toggle = element("button", "setting context-toggle");
@@ -1132,7 +1148,7 @@ function offer(card, label, id, command, session, words) {
   button.type = "button";
   button.id = id;
   button.addEventListener("click", async () => {
-    button.disabled = true;
+    waiting(button, true);
     try {
       await window.__TAURI__.core.invoke(command, { name: nameOf(session) });
       // Its state is said where it is made (D25).
@@ -1325,7 +1341,7 @@ function redoWith(offered, session, words, button, id, title, notes, again) {
   go.type = "button";
   go.id = id.replace(/-panel$/, "-do");
   go.addEventListener("click", async () => {
-    go.disabled = true;
+    waiting(go, true);
     try {
       const chosen = advanced.models();
       const own = { transcription: offered.chosen.transcription ?? null, minutes: offered.chosen.minutes ?? null };
@@ -1434,7 +1450,7 @@ function minutesCard(read, words, session, transcript) {
     again.type = "button";
     again.id = "redo-corrections";
     again.addEventListener("click", async () => {
-      again.disabled = true;
+      waiting(again, true);
       await window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }).catch((why) => {
         since.append(element("p", "note warn", fill(words.not_saved, why)));
       });
@@ -2187,7 +2203,7 @@ function guidedWhere(path, words, way, locked) {
 // service chosen, the page says its own.
 function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySaid, modelsPick }, ask, shownSaved) {
   keyTest.addEventListener("click", async () => {
-    keyTest.disabled = true;
+    waiting(keyTest, true);
     keySaid.textContent = words.testing;
     const asked = servicePick.value;
     let models = null;
@@ -2200,7 +2216,7 @@ function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySa
     guided[path].answers.set(asked, { said, models });
     const now = document.getElementById(`${path}-service`);
     if (now !== servicePick) return now?.dispatchEvent(new Event("change"));
-    keyTest.disabled = locked;
+    waiting(keyTest, false);
     if (servicePick.value !== asked) return;
     shownSaved();
     if (models !== null) modelsPick.focus();
@@ -2384,7 +2400,7 @@ function minutesRow(minutes, words, locked) {
     button.dataset.locked = String(locked);
     button.addEventListener("click", async () => {
       testing = true;
-      button.disabled = true;
+      waiting(button, true);
       tested.textContent = words.testing;
       let said;
       try {
@@ -2398,7 +2414,10 @@ function minutesRow(minutes, words, locked) {
       const now = document.getElementById("minutes-tested");
       if (now) now.textContent = said;
       const again = document.getElementById("minutes-test");
-      if (again) again.disabled = again.dataset.locked === "true";
+      if (again) {
+        waiting(again, false);
+        again.disabled = again.dataset.locked === "true";
+      }
     });
     test.append(button, tested);
     box.append(test);
@@ -2539,13 +2558,13 @@ function showSettings(shown, minutes, words) {
   fetchApple.id = "speech-fetch";
   fetchApple.hidden = true;
   fetchApple.addEventListener("click", async () => {
-    fetchApple.disabled = true;
+    waiting(fetchApple, true);
     speechSaid.textContent = words.speech_fetching;
     const fetched = await window.__TAURI__.core.invoke("speech_installed").then(() => true, () => false);
     // Chosen only while it is still the user's choice: Settings may have been drawn again meanwhile.
     if (fetched && document.getElementById("model")?.value === "speechanalyzer") return save({ engine: "speechanalyzer" });
     if (fetched) return;
-    fetchApple.disabled = false;
+    waiting(fetchApple, false);
     speechSaid.textContent = words.speech_failed;
     // Not fetched: who hears is still the Whisper model, and the choice says so.
     if (shown.models.some((model) => model.path === shown.model)) pick.value = shown.model;
@@ -2707,11 +2726,13 @@ function showSettings(shown, minutes, words) {
   const testService = element("button", "open", words.service_test);
   testService.type = "button";
   testService.id = "transcription-test";
-  testService.disabled = locked || serviceAnswer?.asking === true;
+  testService.disabled = locked;
+  // Drawn anew while it asks: waiting still, never `disabled` (#886).
+  waiting(testService, serviceAnswer?.asking === true);
   serviceSaid.textContent = serviceAnswer?.said ?? "";
   testService.addEventListener("click", async () => {
     const mine = (serviceAnswer = { said: "", asking: true });
-    testService.disabled = true;
+    waiting(testService, true);
     serviceSaid.textContent = "";
     // The service asked, as saved: an answer for one no longer saved is no answer for what is.
     const asking = async () => {
@@ -2737,14 +2758,17 @@ function showSettings(shown, minutes, words) {
     const said = document.getElementById("transcription-said");
     if (said) said.textContent = mine.said;
     const button = document.getElementById("transcription-test");
-    if (button) button.disabled = locked;
+    if (button) {
+      waiting(button, false);
+      button.disabled = locked;
+    }
   });
   // Another service chosen: what was said of the last goes at once, its button given back.
   servicePick.addEventListener("change", () => {
     guided.transcription.chosen.service = servicePick.value;
     serviceAnswer = null;
     serviceSaid.textContent = "";
-    testService.disabled = locked;
+    waiting(testService, false);
     shownSaved();
     standsIn();
   });
@@ -2843,11 +2867,11 @@ function showSettings(shown, minutes, words) {
   refresh_.type = "button";
   refresh_.id = "offered-refresh";
   refresh_.addEventListener("click", async () => {
-    refresh_.disabled = true;
+    waiting(refresh_, true);
     refreshed.textContent = "";
     const read = await window.__TAURI__.core.invoke("registry_refresh").then(() => true, () => false);
     if (read) return refresh();
-    refresh_.disabled = false;
+    waiting(refresh_, false);
     refreshed.textContent = words.offered_refresh_failed;
   });
   // Folded at first (#782): a disclosure (ARIA APG), as « Avancé », left as the user leaves it when
