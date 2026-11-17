@@ -4422,6 +4422,10 @@ def bar_language(now: dt.datetime) -> None:
     picked = ("const p = document.getElementById('small-language'); return p && p.getClientRects().length"
               " ? [p.value, [...p.options].map(o => o.text)] : null")
     offered = ["Français", "English", "Deutsch", "Español", "Italiano", "Português", "Nederlands", "العربية"]
+    # The language's row and its sentence start where « Avancé » starts: the options' one indent (#877's T8).
+    lined = ("const left = (x) => x ? Math.round(x.getBoundingClientRect().left) : null;"
+             " const p = document.getElementById('small-language');"
+             " return [left(p && p.closest('label')), left(document.getElementById('small-language-said')), left(document.getElementById('small-advanced'))]")
     def keys(browser, *pressed) -> None:
         ActionChains(browser).send_keys(*pressed).perform()
         time.sleep(0.2)
@@ -4459,6 +4463,8 @@ def bar_language(now: dt.datetime) -> None:
             keys(browser, Keys.ARROW_DOWN)
             kept = wait_for(browser, lambda b: (b.execute_script(picked) or [None])[0] == "en", 3)
             check(f"{short}: at rest, English chosen by the arrows, for the next meeting (D99)", kept, browser.execute_script(picked))
+            got = browser.execute_script(lined)
+            check(f"{short}: at rest, the language's row and its sentence start where « Avancé » does (D99)", got[2] is not None and got[2] > 0 and got == [got[2]] * 3, got)
             # Started by the keyboard: the meeting takes it once its folder holds its session.
             keys(browser, Keys.ESCAPE)
             browser.execute_script("document.getElementById('small-record').focus()")
@@ -4486,6 +4492,8 @@ def bar_language(now: dt.datetime) -> None:
             said = wait_for(browser, lambda b: b.execute_script("return document.getElementById('small-language-said')?.textContent ?? ''").startswith(refused), 5)
             got = [browser.execute_script("return document.getElementById('small-language-said')?.textContent ?? ''"), (browser.execute_script(picked) or [None])[0]]
             check(f"{short}: recording, a language refused: « {refused}… » said, the choice put back (D99)", said and got[1] == "de", got)
+            got = browser.execute_script(lined)
+            check(f"{short}: recording, the language's row and its refusal start where « Avancé » does (D99)", got[2] is not None and got[2] > 0 and got == [got[2]] * 3, got)
             shutil.rmtree(folder / "language", ignore_errors=True)
             shot(browser, f"d99-bar-language-{short}")
             stop_from_small(browser)
