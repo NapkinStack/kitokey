@@ -966,7 +966,8 @@ def list_refreshed(now: dt.datetime) -> None:
             asked.clear()
             browser.find_element(By.ID, "offered-refresh").click()
             wait_for(browser, lambda b: b.execute_script(said) or len(asked) == 2 and b.find_elements(By.ID, "offered-refresh")
-                     and b.find_element(By.ID, "offered-refresh").is_enabled(), 10)
+                     and b.find_element(By.ID, "offered-refresh").is_enabled()
+                     and b.find_element(By.ID, "offered-refresh").get_attribute("aria-disabled") != "true", 10)
             time.sleep(0.5)
             return browser.execute_script(said)
 
@@ -1109,14 +1110,15 @@ def service_named(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.execute_script("return window.answer !== null"), 5)
         browser.execute_script("refresh()")
         drawn = wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && document.getElementById('transcription-said') !== null"), 5)
-        check("drawn anew while it asks: Tester stays disabled", drawn and browser.execute_script("return document.getElementById('transcription-test').disabled"))
+        check("drawn anew while it asks: Tester stays disabled", drawn and browser.execute_script("const t = document.getElementById('transcription-test'); return t.disabled || t.getAttribute('aria-disabled') === 'true'"))
         browser.execute_script("window.answer()")
         kept = wait_for(browser, lambda b: b.execute_script(said).startswith("Il entend, avec les temps de chaque segment"), 10)
-        check("drawn anew while it asks: the answer is said on the page as it is", kept and not browser.execute_script("return document.getElementById('transcription-test').disabled") and browser.execute_script("return window.asked") == 1, browser.execute_script(said))
+        check("drawn anew while it asks: the answer is said on the page as it is", kept and not browser.execute_script("const t = document.getElementById('transcription-test'); return t.disabled || t.getAttribute('aria-disabled') === 'true'") and browser.execute_script("return window.asked") == 1, browser.execute_script(said))
         browser.execute_script("window.restore(); window.__old = document.getElementById('transcription-said'); refresh()")
         wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && document.getElementById('transcription-said') !== null"), 5)
         hears = "Il entend, avec les temps de chaque segment"
-        testing = "return document.getElementById('transcription-test').disabled"
+        # Waiting, said by aria-disabled — never `disabled`, which lets the focus go (#886).
+        testing = "const t = document.getElementById('transcription-test'); return t.disabled || t.getAttribute('aria-disabled') === 'true'"
         check("drawn anew after it answered: the answer stays", browser.execute_script(said).startswith(hears), browser.execute_script(said))
         check("drawn anew after it answered: Tester can be asked again", not browser.execute_script(testing))
         # Enregistrer while Tester asks: the sentence said, then the answer; the button given back.
@@ -4457,6 +4459,264 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def focus_kept(now: dt.datetime) -> None:
+    """BS. D101: a choice changed on a meeting's page or in Settings, by the keyboard or the mouse, keeps the
+    focus on that control once saved and the page drawn again, the page not scrolled; a control the change
+    removes leaves the focus near what took its place, never on the page's start. Every control of both
+    pages has an id of its own, so that it can be found again once drawn anew. A control waiting for its
+    answer is never disabled, so never loses the focus (#886): « confidentielle » clicked twice while its
+    save runs keeps the first click's state, and while it waits a click, Space or Enter changes nothing."""
+    print("BS. a choice changed on a meeting's page or in Settings: the focus stays on it, the page where it was — keyboard and mouse (D101)")
+    meetings = WORK / "focus-kept"
+    folder = meetings / "2026-10-29_10-00"
+    session(folder, now - dt.timedelta(days=1), 30, {"local.wav": 4000})
+    (folder / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in [
+        {"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-small", "language": "fr", "context": None},
+        *({"type": "segment", "speaker": "me", "track": "local", "start": 4.0 * i, "end": 4.0 * i + 3.0,
+           "text": "Une phrase de la réunion, assez longue pour que la page défile sous la fenêtre."} for i in range(40)),
+        {"type": "complete", "duration": 1800.0}]))
+    (folder / "minutes.md").write_text(
+        "---\ncontract: minutes/v1\nmade: 2026-10-29T11:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+        "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+    # Where the focus is, and how far the page is scrolled: an element's id, or what it is when it has none.
+    where = ("const a = document.activeElement;"
+             " return [!a || a === document.body ? 'body' : a.id || ('no id: ' + a.tagName.toLowerCase() + '.' + a.className), Math.round(scrollY),"
+             # What explains a scroll, when one is seen: how far the page can scroll, whether « Enregistré » is said.
+             " Math.round(document.scrollingElement.scrollHeight - innerHeight), !!document.getElementById('saved-said')]")
+    # The controls a user reaches on the page shown, and those of them with no id.
+    nameless = ("const page = document.getElementById(arguments[0]);"
+                " return [...page.querySelectorAll('button, select, input, textarea, a[href], summary, [tabindex]:not([tabindex=\"-1\"])')]"
+                ".filter(c => c.getClientRects().length && !c.id).map(c => c.tagName.toLowerCase() + '.' + c.className + ' « ' + (c.textContent || c.value || '').trim().slice(0, 30) + ' »')")
+
+    def keys(browser, *pressed) -> None:
+        ActionChains(browser).send_keys(*pressed).perform()
+
+    # Who takes the focus, and when (D101's diagnostic, the coordinator's word, 2026-11-17): each focus
+    # moved, click and change, with what is focused, whether the window has the system's focus and is
+    # shown; each drawing; #model-fetch gone or back.
+    trace = """
+        if (!window.__trace) {
+          window.__trace = [];
+          const named = (e) => !e ? null : e === document.body ? 'body' : (e.id || e.tagName.toLowerCase()) + (e.type ? ':' + e.type : '');
+          const note = (what, target) => window.__trace.push([Math.round(performance.now()), what, named(target), named(document.activeElement),
+                                                              document.hasFocus(), document.visibilityState]);
+          for (const type of ['focusin', 'focusout', 'click', 'change']) document.addEventListener(type, (e) => note(type, e.target), true);
+          const drawn = window.refresh;
+          window.refresh = async (...asked) => { note('refresh', null); try { return await drawn(...asked); } finally { note('drawn', null); } };
+          // #886: `disabled` put on the control holding the focus, as the mutation lands — never, on any step.
+          window.__disabledFocused = [];
+          new MutationObserver((changes) => { for (const c of changes) if (c.target === document.activeElement && c.target.disabled)
+            window.__disabledFocused.push(named(c.target)); }).observe(document.documentElement, { attributes: true, attributeFilter: ['disabled'], subtree: true });
+          let there = !!document.getElementById('model-fetch');
+          new MutationObserver(() => { const now = !!document.getElementById('model-fetch'); if (now !== there) { there = now; note(now ? 'fetch back' : 'fetch gone', null); } })
+            .observe(document.body, { childList: true, subtree: true });
+        }"""
+    traced = lambda b: b.execute_script("return (window.__trace || []).slice(-30)")
+
+    def kept(browser, what: str, target: str, act, saved, mouse: bool = False) -> None:
+        """`target` in the middle of the window, focused (or, for the mouse, nothing focused); `act` changes it;
+        once `saved` holds and the page is drawn again — the control a new node —, where the focus and the page are."""
+        found = wait_for(browser, lambda b: b.find_elements(By.ID, target) and b.find_element(By.ID, target).is_displayed(), 5)
+        if not found:
+            check(f"{what}: #{target} shown, to be changed (D101)", False, browser.execute_script(where))
+            return
+        browser.execute_script("const t = document.getElementById(arguments[0]); t.scrollIntoView({block: 'center'});"
+                               " if (arguments[1]) document.activeElement?.blur(); else t.focus(); window.__was = t;", target, mouse)
+        time.sleep(0.4)
+        browser.execute_script("window.__disabledFocused = []")
+        before = browser.execute_script(where)
+        act(browser)
+        done = wait_for(None, lambda _: saved(), 5)
+        # Drawn again: the control is a new node — or, never drawn again, the same one.
+        wait_for(browser, lambda b: b.execute_script("return document.getElementById(arguments[0]) !== window.__was", target), 3)
+        time.sleep(0.5)
+        after = browser.execute_script(where)
+        lost = browser.execute_script("return window.__disabledFocused || []")
+        check(f"{what}: once saved and drawn again, the focus on #{target}, the page where it was, never disabled while focused (D101, #886)",
+              done and after[0] == target and abs(after[1] - before[1]) <= 1 and lost == [],
+              {"saved": done, "before": before, "after": after, "disabled while focused": lost, "trace": traced(browser)})
+
+    # This computer's Whisper models, as BG and K write them: two, so that one can be chosen in Settings.
+    models = WORK / "data" / "kitokey" / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    for name in ("ggml-large-v3-turbo-q8_0.bin", "ggml-small.bin"):
+        if not (models / name).exists():
+            (models / name).write_bytes(b"x" * 1000)
+
+    # Ollama's stand-in: two models, so that the minutes' model can be chosen on this computer.
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            try:
+                self.send_response(200)
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                pass
+
+        def log_message(self, *_):
+            pass
+
+    tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
+    threading.Thread(target=tags.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{tags.server_address[1]}"
+    window = Window(meetings, "fr_FR.UTF-8", f'after = "nothing"\nreminder = false\nmodel = "{models / 'ggml-small.bin'}"\nminutes_provider = "{base}/v1"\nminutes_model = "qwen3:14b"\n', ollama=base)
+    try:
+        window.env.update(KITOKEY_MODEL_PUBLISHED="http://127.0.0.1:9/model.bin 300000 " + "0" * 64)
+        with window as browser:
+            browser.set_window_size(1100, 700)
+            settings = lambda: window.file.read_text()
+            # A meeting's page.
+            browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
+            browser.execute_script(trace)
+            missing = browser.execute_script(nameless, "meeting")
+            check("a meeting's page: every control a user reaches has an id of its own (D101)", missing == [], missing)
+            kept(browser, "a meeting's page, its language chosen by the arrows", "meeting-language",
+                 lambda b: keys(b, Keys.ARROW_DOWN), lambda: (folder / "language").is_file())
+            kept(browser, "a meeting's page, said confidential by a click", "confidential-switch",
+                 lambda b: ActionChains(b).click(b.find_element(By.ID, "confidential-switch")).perform(), lambda: (folder / "confidential").exists(), mouse=True)
+            # ines's probe (#886, T10): a box clicked twice while its save runs keeps the first click's state.
+            # Two clicks in one script: the first's change handler marks it waiting before it awaits, so the
+            # second meets the guard whatever the IPC's speed.
+            twice = browser.execute_script("""const b = document.getElementById('confidential-switch');
+              b.click(); const between = [b.checked, b.getAttribute('aria-disabled')];
+              b.click(); return [between, [b.checked, b.getAttribute('aria-disabled')]];""")
+            settled = wait_for(browser, lambda b: not (folder / "confidential").exists() and b.execute_script(
+                "const b = document.getElementById('confidential-switch'); return !!b && b.getAttribute('aria-disabled') !== 'true'"), 10)
+            time.sleep(1)
+            after = browser.execute_script("const b = document.getElementById('confidential-switch'); return [b.checked, b.getAttribute('aria-disabled')]")
+            check("probe: « confidentielle » clicked twice in one go: the second held, the first's state saved and kept",
+                  twice == [[False, "true"], [False, "true"]] and settled and after == [False, None] and not (folder / "confidential").exists(),
+                  {"twice": twice, "settled": settled, "after": after, "file": (folder / "confidential").exists()})
+            # The guard by itself, mouse and keyboard: waiting set by hand, a real click and a real Space.
+            browser.execute_script("const b = document.getElementById('confidential-switch'); b.focus(); b.setAttribute('aria-disabled', 'true')")
+            ActionChains(browser).click(browser.find_element(By.ID, "confidential-switch")).perform()
+            keys(browser, Keys.SPACE)
+            keys(browser, Keys.ENTER)
+            time.sleep(1)
+            held = browser.execute_script("const b = document.getElementById('confidential-switch'); return [b.checked, document.activeElement && document.activeElement.id]")
+            check("probe: waiting, a click, Space and Enter change nothing, the focus kept",
+                  held == [False, "confidential-switch"] and not (folder / "confidential").exists(), {"held": held, "file": (folder / "confidential").exists()})
+            browser.execute_script("document.getElementById('confidential-switch').removeAttribute('aria-disabled')")
+            if browser.execute_script("const p = document.getElementById('context-panel'); return !!p && p.hidden"):
+                press(browser, "context-toggle")
+            kept(browser, "a meeting's page, its context typed", "context-text",
+                 lambda b: keys(b, "Point budget"), lambda: (folder / "context.txt").is_file() and "Point budget" in (folder / "context.txt").read_text())
+            # Settings.
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "meetings-language"), 10)
+            missing = browser.execute_script(nameless, "settings")
+            check("Settings: every control a user reaches has an id of its own (D101)", missing == [], missing)
+            kept(browser, "Settings, the meetings' language chosen by the arrows", "meetings-language",
+                 lambda b: keys(b, Keys.ARROW_DOWN), lambda: "meeting_language =" in settings())
+            kept(browser, "Settings, the reminder turned by Space", "reminder",
+                 lambda b: keys(b, Keys.SPACE), lambda: "reminder = true" in settings())
+            # « Enregistré » in the line changed, over neither its name nor its control, at full width and
+            # at 420×400 (the coordinator, 2026-11-17, D101).
+            clear = ("const s = document.getElementById('saved-said'); if (!s) return null; const r = s.closest('.saying');"
+                     " const box = (e) => e && e.getBoundingClientRect(); const meet = (a, b) => !!a && !!b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;"
+                     " const said = box(s); return {inLine: !!r && r.contains(document.getElementById('reminder')),"
+                     " overName: meet(said, box(r?.querySelector('.name'))), overControl: meet(said, box(document.getElementById('reminder'))),"
+                     " inside: said.left >= box(r).left - 0.5 && said.right <= box(r).right + 0.5}")
+            for size, name in (((1100, 700), "d101-saved-1100"), ((420, 400), "d101-saved-420")):
+                browser.set_window_size(*size)
+                browser.execute_script("const t = document.getElementById('reminder'); t.scrollIntoView({block: 'center'}); t.focus();")
+                time.sleep(0.4)
+                before = browser.execute_script(where)
+                keys(browser, Keys.SPACE)
+                shown = wait_for(browser, lambda b: b.execute_script(clear) is not None, 5)
+                got = browser.execute_script(clear)
+                shot(browser, name)
+                after = browser.execute_script(where)
+                check(f"{size[0]}×{size[1]}: « Enregistré » in the reminder's line, over neither its name nor its switch, the page not moved (D101)",
+                      shown and got == {"inLine": True, "overName": False, "overControl": False, "inside": True} and after[:2] == before[:2],
+                      {"said": got, "before": before, "after": after})
+                wait_for(browser, lambda b: b.execute_script(clear) is None, 3)
+            browser.set_window_size(1100, 700)
+            kept(browser, "Settings, what is kept of the audio chosen by the arrows", "keep",
+                 lambda b: keys(b, Keys.ARROW_DOWN), lambda: "keep" in settings())
+            if browser.execute_script("const p = document.getElementById('general-advanced-panel'); return !!p && p.hidden"):
+                press(browser, "general-advanced")
+            kept(browser, "Settings, the developer mode turned by a click", "developer",
+                 lambda b: ActionChains(b).click(b.find_element(By.ID, "developer")).perform(), lambda: "developer = true" in settings(), mouse=True)
+            kept(browser, "Settings, the logs' level chosen by the arrows", "log-level",
+                 lambda b: keys(b, Keys.ARROW_DOWN), lambda: "log = " in settings())
+            kept(browser, "Settings, Kitokey's language chosen by the arrows", "app-language",
+                 lambda b: keys(b, Keys.ARROW_DOWN), lambda: re.search(r"^language = ", settings(), re.M) is not None)
+            # The model changed (the decider: « dans les réglages durant le changement de modèle »): the
+            # transcription's, saved at once; the minutes', on this computer, saved by its « Enregistrer ».
+            kept(browser, "Settings, the transcription's model chosen by the arrows", "model",
+                 lambda b: keys(b, Keys.ARROW_UP if b.execute_script("return document.getElementById('model').selectedIndex") > 0 else Keys.ARROW_DOWN),
+                 lambda: "ggml-large-v3-turbo-q8_0" in settings())
+            if wait_for(browser, lambda b: b.find_elements(By.ID, "minutes") and b.find_element(By.ID, "minutes").is_displayed(), 5):
+                browser.execute_script("const t = document.getElementById('minutes'); t.scrollIntoView({block: 'center'}); t.focus();")
+                time.sleep(0.4)
+                before = browser.execute_script(where)
+                keys(browser, Keys.ARROW_UP if browser.execute_script("return document.getElementById('minutes').selectedIndex") > 0 else Keys.ARROW_DOWN)
+                time.sleep(0.3)
+                browser.execute_script("document.getElementById('minutes-save').focus()")
+                # Where the user is as they press « Enregistrer ».
+                before = browser.execute_script(where)
+                keys(browser, Keys.ENTER)
+                done = wait_for(None, lambda _: 'minutes_model = "qwen3:14b"' not in settings(), 5)
+                time.sleep(1)
+                after = browser.execute_script(where)
+                check("Settings, the minutes' model chosen by the arrows and saved by Enter: the focus on its list or its « Enregistrer », the page where it was (D101)",
+                      done and after[0] in ("minutes", "minutes-save") and abs(after[1] - before[1]) <= 1, {"saved": done, "before": before, "after": after})
+            else:
+                check("Settings offer the minutes' model on this computer, to be chosen (D101)", False, browser.execute_script(where))
+    finally:
+        tags.shutdown()
+    # A control the change removes, on a Kitokey with no model, which offers to fetch it: served slowly, so
+    # that the model is coming while the check reads — a refused host leaves the button there, disabled.
+    class Slow(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            try:
+                self.send_response(200)
+                self.send_header("content-length", "300000")
+                self.end_headers()
+                for _ in range(100):
+                    self.wfile.write(b"x" * 3000)
+                    self.wfile.flush()
+                    time.sleep(0.2)
+            except OSError:
+                pass
+
+        def log_message(self, *_):
+            pass
+
+    slow = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Slow)
+    threading.Thread(target=slow.serve_forever, daemon=True).start()
+    bare = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n')
+    bare.env.update(XDG_DATA_HOME=str(WORK / "data-focus-kept"),
+                    KITOKEY_MODEL_PUBLISHED=f"http://127.0.0.1:{slow.server_address[1]}/model.bin 300000 " + "0" * 64)
+    with bare as browser:
+        browser.set_window_size(1100, 700)
+        browser.execute_script("location.hash = '#/settings'")
+        browser.execute_script(trace)
+        # A control the change removes: « Télécharger le modèle » pressed by Enter goes while the model comes —
+        # the focus near what took its place, in its card, never the page's start.
+        if wait_for(browser, lambda b: b.find_elements(By.ID, "model-fetch"), 5):
+            browser.execute_script("const t = document.getElementById('model-fetch'); t.scrollIntoView({block: 'center'}); t.focus();")
+            time.sleep(0.4)
+            browser.execute_script("window.__disabledFocused = []")
+            before = browser.execute_script(where)
+            keys(browser, Keys.ENTER)
+            gone = wait_for(browser, lambda b: not b.find_elements(By.ID, "model-fetch"), 3)
+            time.sleep(0.5)
+            after = browser.execute_script(where)
+            inside = browser.execute_script("const a = document.activeElement; return !!a && a !== document.body && !!a.closest('#settings')")
+            lost = browser.execute_script("return window.__disabledFocused || []")
+            check("Settings, « Télécharger le modèle » gone once pressed: the focus in Settings, not the page's start; the page where it was; never disabled while focused (D101, #886)",
+                  gone and inside and abs(after[1] - before[1]) <= 1 and lost == [],
+                  {"before": before, "after": after, "disabled while focused": lost, "trace": traced(browser)})
+        else:
+            check("Settings offer « Télécharger le modèle », to be pressed (D101)", False, browser.execute_script(where))
+    slow.shutdown()
+
+
 def bar_opened(now: dt.datetime) -> None:
     """BA. The bar opened (D90, board 6): at rest, the microphone, « Vérifier le son » — D88's panel in
     the bar — and « Avancé » closed; recording, the context, the microphone recorded, « Confidentielle »
@@ -7574,9 +7834,10 @@ def gestures_answer(now: dt.datetime) -> None:
         browser.execute_script("document.getElementById('reminder').click()")
         here = lambda b: b.find_elements(By.ID, "saved-said")
         told = wait_for(browser, here, 3)
-        check("a setting written says Enregistré, under it", told and here(browser)[0].text == "Enregistré"
+        # In its own line, no longer under it: laid over the line, the page never moved (the coordinator, 2026-11-17, D101).
+        check("a setting written says Enregistré, in its own line", told and here(browser)[0].text == "Enregistré"
               and here(browser)[0].get_attribute("role") == "status"
-              and browser.execute_script("const s = document.getElementById('saved-said'), r = document.getElementById('reminder').closest('label, .row, .field'); return r.nextElementSibling === s"))
+              and browser.execute_script("const s = document.getElementById('saved-said'), r = document.getElementById('reminder').closest('label, .row, .field'); return r.contains(s)"))
         wait_for(browser, lambda b: b.execute_script("return window.said.gone !== undefined"), 4)
         said_for = browser.execute_script("window.saidWatch.disconnect(); return window.said.gone === undefined ? null : window.said.gone - window.said.shown")
         check("still said after a second", said_for is not None and said_for >= 1000, said_for)
@@ -7599,13 +7860,13 @@ def gestures_answer(now: dt.datetime) -> None:
         check("Settings left and opened again: the refusal is no longer said (#655)",
               back and not refusal(browser).is_displayed(), refusal(browser).text if back else "Settings not drawn again")
         browser.execute_script("window.restore()")
-        # A radio with no id, far down at the smallest size: said under it, in view.
+        # A radio far down at the smallest size: said in its line, in view.
         time.sleep(0.5)
         browser.set_window_size(420, 400)
         browser.execute_script("document.querySelector('input[name=after][value=nothing]').scrollIntoView(); document.querySelectorAll('input[name=after]')[1].click()")
         wait_for(browser, here, 3)
-        check("said under a radio with no id, in view", here(browser) and browser.execute_script(
-            "const r = document.getElementById('saved-said').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && document.getElementById('saved-said').previousElementSibling.querySelector('input[name=after]') !== null"))
+        check("said in a radio's line, in view", here(browser) and browser.execute_script(
+            "const s = document.getElementById('saved-said'), r = s.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && s.closest('label, .row, .field')?.querySelector('input[name=after]') !== null"))
         wait_for(browser, lambda b: not here(b), 3)
         # A button in no row: said beside it, the page not sent to its top.
         browser.execute_script("const p = document.getElementById('minutes-online'); p.scrollIntoView({block: 'center'}); p.click();"
@@ -7613,11 +7874,13 @@ def gestures_answer(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_element(By.ID, "minutes-address").is_displayed(), 5)
         browser.find_element(By.ID, "minutes-address").send_keys("http://127.0.0.1:9/v1")
         browser.find_element(By.ID, "minutes-model").send_keys("mistral")
-        browser.execute_script("document.getElementById('minutes-own-save').click()")
+        # Pressed where the user sees it: « Enregistré » said beside it, the page no longer moved to show it (D101).
+        browser.execute_script("const b = document.getElementById('minutes-own-save'); b.scrollIntoView({block: 'center'}); b.click()")
         wait_for(browser, here, 5)
         check("the minutes' Enregistrer: said beside its button, in view", here(browser) and browser.execute_script(
-            "const s = document.getElementById('saved-said'), r = s.getBoundingClientRect(); return s.previousElementSibling?.id === 'minutes-own-save' && r.top >= 0 && r.top + r.height / 2 <= innerHeight"),
-              browser.execute_script("const s = document.getElementById('saved-said'); return [s?.previousElementSibling?.id, s?.getBoundingClientRect().top]"))
+            "const s = document.getElementById('saved-said'), r = s.getBoundingClientRect(), b = document.getElementById('minutes-own-save');"
+            " return s.parentElement.contains(b) && r.left >= b.getBoundingClientRect().right && r.top >= 0 && r.top + r.height / 2 <= innerHeight"),
+              browser.execute_script("const s = document.getElementById('saved-said'); return [s?.parentElement?.id, s?.getBoundingClientRect().left, s?.getBoundingClientRect().top]"))
         browser.set_window_size(1100, 800)
         browser.execute_script("location.hash = '#/'")
         time.sleep(0.5)
@@ -9868,6 +10131,7 @@ def main() -> int:
     microphone_latest_answer(now)
     microphone_rollback(now)
     settings_folded(now)
+    focus_kept(now)
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
