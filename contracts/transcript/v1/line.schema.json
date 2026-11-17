@@ -148,7 +148,7 @@
           }
         },
         "made_in": {
-          "description": "How long the making took, from its start to its last line written, in seconds. Absent: not measured.",
+          "description": "The time the one step that made it whole took, from its start to its last line, in seconds. Absent: made in several steps (live), or not measured.",
           "$ref": "#/$defs/seconds"
         },
         "cost": {
