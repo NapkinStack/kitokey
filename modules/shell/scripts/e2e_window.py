@@ -4605,9 +4605,29 @@ def focus_kept(now: dt.datetime) -> None:
                 check("Settings offer the minutes' model on this computer, to be chosen (D101)", False, browser.execute_script(where))
     finally:
         tags.shutdown()
-    # A control the change removes, on a Kitokey with no model, which offers to fetch it.
+    # A control the change removes, on a Kitokey with no model, which offers to fetch it: served slowly, so
+    # that the model is coming while the check reads — a refused host leaves the button there, disabled.
+    class Slow(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            try:
+                self.send_response(200)
+                self.send_header("content-length", "300000")
+                self.end_headers()
+                for _ in range(100):
+                    self.wfile.write(b"x" * 3000)
+                    self.wfile.flush()
+                    time.sleep(0.2)
+            except OSError:
+                pass
+
+        def log_message(self, *_):
+            pass
+
+    slow = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Slow)
+    threading.Thread(target=slow.serve_forever, daemon=True).start()
     bare = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n')
-    bare.env.update(XDG_DATA_HOME=str(WORK / "data-focus-kept"), KITOKEY_MODEL_PUBLISHED="http://127.0.0.1:9/model.bin 300000 " + "0" * 64)
+    bare.env.update(XDG_DATA_HOME=str(WORK / "data-focus-kept"),
+                    KITOKEY_MODEL_PUBLISHED=f"http://127.0.0.1:{slow.server_address[1]}/model.bin 300000 " + "0" * 64)
     with bare as browser:
         browser.set_window_size(1100, 700)
         browser.execute_script("location.hash = '#/settings'")
@@ -4627,6 +4647,7 @@ def focus_kept(now: dt.datetime) -> None:
                   gone and inside and abs(after[1] - before[1]) <= 1, {"before": before, "after": after, "trace": traced(browser)})
         else:
             check("Settings offer « Télécharger le modèle », to be pressed (D101)", False, browser.execute_script(where))
+    slow.shutdown()
 
 
 def bar_opened(now: dt.datetime) -> None:
