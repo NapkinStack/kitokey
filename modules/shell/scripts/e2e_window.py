@@ -4415,44 +4415,49 @@ def settings_folded(now: dt.datetime) -> None:
 
 def appearance_chosen(now: dt.datetime) -> None:
     """BP. D98: Settings' « Général » offers the appearance — « Système », « Clair », « Sombre » —; chosen,
-    the window takes it at once, the other one than the system says; kept across starts, the bar
+    the window takes it at once, the other one than the system says — the system light, then dark —; kept across starts, the bar
     taking it too; « Système » by default, following the system as before."""
     print("BP. Settings: the appearance System, Light or Dark, taken at once, kept across starts, the bar too (D98)")
-    taping = WORK / "appearance"
-    taping.mkdir()
     ground = "return getComputedStyle(document.documentElement).getPropertyValue('--ground').trim().toUpperCase()"
     grounds = {"light": "#F2F4F7", "dark": "#15171C"}
-    window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n')
-    with window as browser:
-        browser.execute_script("location.hash = '#/settings'")
-        offered = wait_for(browser, lambda b: b.find_elements(By.ID, "appearance"), 10)
-        system = "dark" if browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches") else "light"
-        other = "light" if system == "dark" else "dark"
-        pick = browser.find_elements(By.ID, "appearance")
-        choices = [(o.get_attribute("value"), o.text) for o in Select(pick[0]).options] if pick else []
-        check("« Général » offers the appearance, « Système » chosen by default (D98)",
-              offered and choices == [("system", "Système"), ("light", "Clair"), ("dark", "Sombre")]
-              and Select(pick[0]).first_selected_option.get_attribute("value") == "system"
-              and browser.execute_script(ground) == grounds[system], (choices, browser.execute_script(ground)))
-        if pick:
-            Select(pick[0]).select_by_value(other)
-        taken = wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
-        check(f"« {'Clair' if other == 'light' else 'Sombre'} » chosen while the system says the other: the window takes it at once, kept (D98)",
-              taken and f'appearance = "{other}"' in window.file.read_text(), (browser.execute_script(ground), window.file.read_text()))
-        shot(browser, f"d98-settings-{other}")
-        if pick:
-            Select(browser.find_element(By.ID, "appearance")).select_by_value("system")
-        back = wait_for(browser, lambda b: b.execute_script(ground) == grounds[system], 3)
-        check("« Système » chosen again: the system's appearance followed, as before (D98)", back, browser.execute_script(ground))
-        if pick:
-            Select(browser.find_element(By.ID, "appearance")).select_by_value(other)
-        wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
-    # Started again, the bar alone: it takes the appearance kept.
-    window.file.write_text(window.file.read_text().replace('window = "full"\n', ""))
-    with window as browser:
-        bar = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.execute_script(ground) == grounds[other], 10)
-        check("started again: the bar takes the appearance kept, not the system's (D98)", bar, browser.execute_script(ground))
-        shot(browser, f"d98-bar-{other}")
+    # Each choice against the system: « Sombre » while it is light, « Clair » while it is dark.
+    for wanted in ("light", "dark"):
+        taping = WORK / f"appearance-{wanted}"
+        taping.mkdir()
+        window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n')
+        # The system's look asked of GTK, as a desktop asks it: WebKitGTK's prefers-color-scheme follows it.
+        window.env.update(GTK_THEME="Adwaita:dark" if wanted == "dark" else "Adwaita")
+        with window as browser:
+            browser.execute_script("location.hash = '#/settings'")
+            offered = wait_for(browser, lambda b: b.find_elements(By.ID, "appearance"), 10)
+            system = "dark" if browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches") else "light"
+            other = "light" if system == "dark" else "dark"
+            check(f"the system {wanted}: the window says so before any choice (D98)", system == wanted, system)
+            pick = browser.find_elements(By.ID, "appearance")
+            choices = [(o.get_attribute("value"), o.text) for o in Select(pick[0]).options] if pick else []
+            check(f"the system {wanted}: « Général » offers the appearance, « Système » chosen by default (D98)",
+                  offered and choices == [("system", "Système"), ("light", "Clair"), ("dark", "Sombre")]
+                  and Select(pick[0]).first_selected_option.get_attribute("value") == "system"
+                  and browser.execute_script(ground) == grounds[system], (choices, browser.execute_script(ground)))
+            if pick:
+                Select(pick[0]).select_by_value(other)
+            taken = wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
+            check(f"the system {wanted}: « {'Clair' if other == 'light' else 'Sombre'} » chosen while the system says the other: the window takes it at once, kept (D98)",
+                  taken and f'appearance = "{other}"' in window.file.read_text(), (browser.execute_script(ground), window.file.read_text()))
+            shot(browser, f"d98-settings-{other}")
+            if pick:
+                Select(browser.find_element(By.ID, "appearance")).select_by_value("system")
+            back = wait_for(browser, lambda b: b.execute_script(ground) == grounds[system], 3)
+            check(f"the system {wanted}: « Système » chosen again: the system's appearance followed, as before (D98)", back, browser.execute_script(ground))
+            if pick:
+                Select(browser.find_element(By.ID, "appearance")).select_by_value(other)
+            wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
+        # Started again, the bar alone: it takes the appearance kept.
+        window.file.write_text(window.file.read_text().replace('window = "full"\n', ""))
+        with window as browser:
+            bar = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.execute_script(ground) == grounds[other], 10)
+            check(f"the system {wanted}: started again, the bar takes the appearance kept, not the system's (D98)", bar, browser.execute_script(ground))
+            shot(browser, f"d98-bar-{other}")
 
 
 def bar_opened(now: dt.datetime) -> None:
