@@ -137,8 +137,9 @@ def test_the_comparator_refuses_a_schemas_breaks_wherever_they_are(path, tmp_pat
 # The fields a page says may be absent: `stopped`, while a session is recording; a segment's
 # `track` and `voice`, in a transcript written before they were; a `silent`'s `nothing`, said by
 # a capture that knows it (#361); a `device`'s `headset`, said by a capture that listens (D88); a
-# `complete`'s `made`, in a transcript written before it was (D93).
-OPTIONAL = {"stopped", "track", "voice", "nothing", "headset", "made"}
+# `complete`'s `made`, in a transcript written before it was (D93); its `made_in`, `cost` and
+# `currency`, said only when the producer knows them (D97).
+OPTIONAL = {"stopped", "track", "voice", "nothing", "headset", "made", "made_in", "cost", "currency"}
 SHOWN_AS_LINES = {
     "transcript/v1/line.schema.json",
     "recording/v1/event.schema.json",
@@ -192,6 +193,9 @@ EXAMPLES = {
             {"type": "covered", "speaker": "me", "until": 30.0},
             {"type": "complete", "duration": 1912.4},
             {"type": "complete", "duration": 1912.4, "made": "2026-11-13T09:42:10+01:00"},
+            {"type": "complete", "duration": 1912.4, "made": "2026-11-13T09:42:10+01:00", "made_in": 40.2},
+            {"type": "complete", "duration": 1912.4, "made_in": 0, "cost": 0.0021, "currency": "USD"},
+            {"type": "complete", "duration": 1912.4, "cost": 1.2e-6, "currency": "EUR"},
             {"type": "a type of a later version", "anything": 1},
         ],
         [
@@ -223,6 +227,16 @@ EXAMPLES = {
             {"type": "complete", "duration": 1.0, "made": 1763023330},
             {"type": "complete", "duration": 1.0, "made": "2026-11-13T09:42:10+01:00\n"},
             {"type": "complete", "duration": 1.0, "made": "2026-11-13T09:42:10+01:00\r"},
+            {"type": "complete", "duration": 1.0, "made_in": -1},
+            {"type": "complete", "duration": 1.0, "made_in": "40 s"},
+            {"type": "complete", "duration": 1.0, "made_in": None},
+            {"type": "complete", "duration": 1.0, "cost": 0.002},
+            {"type": "complete", "duration": 1.0, "currency": "USD"},
+            {"type": "complete", "duration": 1.0, "cost": -0.002, "currency": "USD"},
+            {"type": "complete", "duration": 1.0, "cost": "0.002", "currency": "USD"},
+            {"type": "complete", "duration": 1.0, "cost": 0.002, "currency": "usd"},
+            {"type": "complete", "duration": 1.0, "cost": 0.002, "currency": "US"},
+            {"type": "complete", "duration": 1.0, "cost": 0.002, "currency": "USD\n"},
             {
                 "type": "header",
                 "contract": "transcript/v2",

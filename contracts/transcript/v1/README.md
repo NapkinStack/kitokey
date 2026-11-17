@@ -38,7 +38,7 @@ may rewrite a segment's `text` (below). Every line has a `type`.
 | `header` | First line, once | `contract`: `transcript/v1` · `engine` and `model`: what transcribed · `language`: the language asked for, or `null` when detected · `context`: the text the engine received, or `null` |
 | `segment` | Each stretch of speech | `speaker`: `me` or `others` · `track`: the track it was heard on, `local` for `me`, `remote` for `others` · `voice`: which voice within the track, `null` until voices are told apart · `start` and `end`: seconds from the session's `started`, to the hundredth · `text`: what was said, one line · `edited`, optional: when a person corrected `text`, RFC 3339 with its offset |
 | `covered` | After each span is done | `speaker` · `until`: seconds; every segment of that speaker that starts before `until` is in the file |
-| `complete` | Last line, once | `duration`: seconds of audio transcribed · `made`, optional: when the transcript was made whole, RFC 3339 with its offset — absent in a transcript made before it was written |
+| `complete` | Last line, once | `duration`: seconds of audio transcribed · `made`, optional: when the transcript was made whole, RFC 3339 with its offset — absent in a transcript made before it was written · `made_in`, optional: how long the making took, in seconds, from its start to its last line written — absent when not measured · `cost`, optional: the price the service reported for the making, a JSON number at least zero, as it reported it — never an estimate, absent when it reported none · `currency`, optional: that price's currency, an ISO 4217 code; `cost` and `currency` come both or neither |
 
 - **Order.** Lines come in the order they were made, not the order of the meeting: a reader
   that wants the meeting sorts the segments by `start`.
@@ -58,6 +58,11 @@ may rewrite a segment's `text` (below). Every line has a `type`.
   again, the shell may rewrite one segment's `text` on the user's word and set its `edited` to when:
   the file replaced whole — written beside, then renamed —, its lines in the same order, nothing else
   changed. A reader reads the text as it finds it; `edited` absent is the text as heard.
+- **What the making cost, in time and money, is said only when known** (D97). `made_in` is the
+  producer's own measure, from its start to its last line written, the transcript made again
+  included: it says how long that version took, not the meeting. A reader takes a `cost` that is not
+  a JSON number at least zero, a `currency` that is not three capital letters, or either one without
+  the other, as neither, as `minutes/v3` reads them: the transcript still reads.
 
 ## A test of a service
 
@@ -111,6 +116,12 @@ Valid, and complete — its last line:
 
 ```json
 {"type": "complete", "duration": 1912.4, "made": "2026-11-13T09:42:10+01:00"}
+```
+
+Valid, and complete — made by a service that said what it cost:
+
+```json
+{"type": "complete", "duration": 1912.4, "made": "2026-11-13T09:42:10+01:00", "made_in": 40.2, "cost": 0.0021, "currency": "USD"}
 ```
 
 To refuse: a file whose first line is not a `header` of `transcript/v1`; a `segment` whose
