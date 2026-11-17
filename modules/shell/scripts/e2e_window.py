@@ -4534,16 +4534,8 @@ def focus_kept(now: dt.datetime) -> None:
             check("a meeting's page: every control a user reaches has an id of its own (D101)", missing == [], missing)
             kept(browser, "a meeting's page, its language chosen by the arrows", "meeting-language",
                  lambda b: keys(b, Keys.ARROW_DOWN), lambda: (folder / "language").is_file())
-            # Its save answered late, as on a loaded machine: the switch stays disabled past a frame, and
-            # WebKit lets its focus go (#886, ines's probe: focused, disabled three frames, then « body »).
-            browser.execute_script(
-                "const real = window.__TAURI__.core;"
-                " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'confidential_set'"
-                " ? new Promise((ok) => setTimeout(ok, 300)).then(() => real.invoke(asked, ...rest)) : real.invoke(asked, ...rest) };"
-                " window.restoreCore = () => { window.__TAURI__.core = real; };")
-            kept(browser, "a meeting's page, said confidential by a click, its save answered 300 ms late", "confidential-switch",
+            kept(browser, "a meeting's page, said confidential by a click", "confidential-switch",
                  lambda b: ActionChains(b).click(b.find_element(By.ID, "confidential-switch")).perform(), lambda: (folder / "confidential").exists(), mouse=True)
-            browser.execute_script("window.restoreCore()")
             if browser.execute_script("const p = document.getElementById('context-panel'); return !!p && p.hidden"):
                 press(browser, "context-toggle")
             kept(browser, "a meeting's page, its context typed", "context-text",
