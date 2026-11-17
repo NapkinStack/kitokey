@@ -5828,15 +5828,17 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
     models on this computer alone (D91)."""
     print("BQ. Refaire: a service set up with its key offers every model it lists, grouped under its name (D96)")
     good = "sk-stand-in-good"
-    # The transcription's own key, other than the summary's: each list is answered to its own key alone, so a
-    # transcript's models read with the summary's key — kept under the host — are refused (D43, D96).
+    # The service that transcribes answers on a host of its own, to its own key alone: its key is kept under the
+    # transcription's account (D43), and read under the host — where none is kept for it — no model is offered.
     heard = "sk-stand-in-heard"
 
-    class Service(http.server.BaseHTTPRequestHandler):
+    class Answer(http.server.BaseHTTPRequestHandler):
+        accepted = good
+
         def do_GET(self):
             key = (self.headers.get("authorization") or "").removeprefix("Bearer ")
-            hearing = self.path.endswith("/models?output_modalities=transcription")
-            if key not in (good, heard) or (hearing and key != heard) or (self.path.endswith("/models") and key != good):
+            # The lists of models are public, as OpenRouter's are; a key given is checked.
+            if key != self.accepted and (key or "/models" not in self.path):
                 status, body = 401, {"error": {"message": "Invalid credentials", "code": 401}}
             elif self.path.endswith("/key"):
                 status, body = 200, {"data": {"label": "stand-in"}}
@@ -5866,7 +5868,8 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
         def log_message(self, *_):
             pass
 
-    servers = [http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler) for handler in (Service, Tags)]
+    Heard = type("Heard", (Answer,), {"accepted": heard})
+    servers = [http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler) for handler in (Answer, Tags, Heard)]
     for server in servers:
         threading.Thread(target=server.serve_forever, daemon=True).start()
     stand = f"http://127.0.0.1:{servers[0].server_address[1]}/api/v1"
@@ -5879,7 +5882,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
         (meetings / name / "minutes.md").write_text("---\ncontract: minutes/v1\nmodel: m\ncontext: null\n---\n\n## A\n\n## B\n\n## C\n")
     (meetings / "2026-10-18_14-00" / "confidential").touch()
     window = Window(meetings, "fr_FR.UTF-8", ollama=f"http://127.0.0.1:{servers[1].server_address[1]}")
-    window.env.update(KITOKEY_ONLINE=stand, KITOKEY_HEARING=stand)
+    window.env.update(KITOKEY_ONLINE=stand, KITOKEY_HEARING=f"http://127.0.0.1:{servers[2].server_address[1]}/api/v1")
     options = "return [...document.querySelectorAll(`#${arguments[0]} option`)].filter(o => !o.disabled).map(o => o.textContent)"
     # Each group of a list: its label, and the entries under it.
     grouped = ("const s = document.getElementById(arguments[0]); return s ? [...s.querySelectorAll('optgroup')]"
