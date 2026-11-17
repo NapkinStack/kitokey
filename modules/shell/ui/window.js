@@ -98,6 +98,7 @@ const ICONS = {
   lock: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2, ry: 2 }], "M7 11V7a5 5 0 0 1 10 0v4"],
   copy: [["rect", { width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2 }], "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"],
   "rotate-ccw": ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5"],
+  "trash-2": ["M10 11v6", "M14 11v6", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
   "folder-open": ["m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"],
   ellipsis: [["circle", { cx: 12, cy: 12, r: 1 }], ["circle", { cx: 19, cy: 12, r: 1 }], ["circle", { cx: 5, cy: 12, r: 1 }]],
   "message-square-text": ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z", "M7 11h10", "M7 15h6", "M7 7h8"],
@@ -1862,6 +1863,91 @@ document.addEventListener("keydown", (event) => {
   player.playing() ? player.pause() : player.play();
 });
 
+// A meeting to the trash from its page (D100): the question shows while `trashAsking` names it — a
+// drawing meanwhile draws it again as it was —; once it went, the list focuses `trashedFocus`.
+let trashAsking = null;
+let trashedFocus = null;
+
+// The question, in place: what the meeting holds, that the system's trash restores it, « Annuler »
+// first; confirmed, sent as « Faire de la place » sends it — the whole folder to the system's trash.
+function trashQuestion(session, transcript, minutes, words, trash) {
+  const name = nameOf(session);
+  const ask = element("section", "card trash-ask");
+  ask.id = "trash-ask";
+  ask.hidden = trashAsking !== name;
+  ask.setAttribute("role", "group");
+  ask.setAttribute("aria-labelledby", "trash-ask-title");
+  const title = element("p", "name", words.trash_ask);
+  title.id = "trash-ask-title";
+  const held = [session.audio > 0, transcript.state === "present", minutes.state === "present"]
+    .map((there, at) => (there ? words.trash_parts[at] : null))
+    .filter(Boolean);
+  const holds = element("p", "says", held.length ? fill(words.trash_holds, new Intl.ListFormat(words.locale, { type: "conjunction" }).format(held)) : "");
+  const restore = element("p", "says", words.trash_restore);
+  const cancel = element("button", "open", words.trash_cancel);
+  cancel.type = "button";
+  cancel.id = "trash-cancel";
+  // Never red: red says a recording, and nothing else (look.rs).
+  const confirm = element("button", "open", words.trash_confirm);
+  confirm.type = "button";
+  confirm.id = "trash-confirm";
+  const said = element("p", "note warn");
+  said.id = "trash-said";
+  said.setAttribute("role", "status");
+  const close = () => {
+    trashAsking = null;
+    ask.hidden = true;
+    said.textContent = "";
+    trash.setAttribute("aria-expanded", "false");
+    trash.focus();
+  };
+  cancel.addEventListener("click", close);
+  ask.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+  });
+  confirm.addEventListener("click", async () => {
+    // Never disabled while it holds the focus: WebKit would let it go (#886).
+    if (confirm.getAttribute("aria-disabled") === "true") return;
+    confirm.setAttribute("aria-disabled", "true");
+    try {
+      await window.__TAURI__.core.invoke("freed", { names: [name], whole: true });
+    } catch (why) {
+      // Being recorded or made, or the trash refused: said, nothing moved.
+      said.textContent = fill(words.trash_refused, why);
+      confirm.removeAttribute("aria-disabled");
+      return;
+    }
+    trashAsking = null;
+    // The list next, the focus on the meeting after it — or before it, the last one —, or on the list.
+    const links = [...document.querySelectorAll("#groups .session")];
+    const at = links.findIndex((link) => link.getAttribute("href") === `#/meeting/${encodeURIComponent(name)}`);
+    const next = at < 0 ? null : (links[at + 1] ?? links[at - 1] ?? null);
+    trashedFocus = next ? next.getAttribute("href") : "";
+    location.hash = "#/";
+  });
+  const choices = element("div", "trash-choices");
+  choices.append(cancel, confirm);
+  ask.append(title, holds, restore, choices, said);
+  return ask;
+}
+
+// After a drawing of the list: the focus a meeting gone to the trash asked for (D100).
+function trashedFocused() {
+  if (trashedFocus === null || !(location.hash === "" || location.hash === "#/")) return;
+  const to = trashedFocus;
+  trashedFocus = null;
+  const link = to ? document.querySelector(`#groups .session[href="${CSS.escape(to)}"]`) : null;
+  const list = document.getElementById("list");
+  if (link) link.focus();
+  else if (list) {
+    list.tabIndex = -1;
+    list.focus();
+  }
+}
+
 function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
@@ -1869,6 +1955,17 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   open.addEventListener("click", () => window.__TAURI__.core.invoke("open_folder", { name: nameOf(session) }).catch((why) => {
     open.replaceWith(element("p", "note warn", why));
   }));
+  // To the system's trash from its page (D100): asked in place first, « Annuler » focused.
+  const trash = iconButton("trash-2", words.trash_meeting, "trash-meeting");
+  const ask = trashQuestion(session, transcript, minutes, words, trash);
+  trash.setAttribute("aria-controls", ask.id);
+  trash.setAttribute("aria-expanded", String(!ask.hidden));
+  trash.addEventListener("click", () => {
+    trashAsking = nameOf(session);
+    ask.hidden = false;
+    trash.setAttribute("aria-expanded", "true");
+    document.getElementById("trash-cancel")?.focus();
+  });
   const actions = element("div", "actions");
   // The rarer actions, behind « Plus d’actions » (D89, board 4): the name, as its heading clicked.
   const rarer = [["rename-item", words.rename_meeting, () => document.getElementById("rename")?.click()]];
@@ -1889,7 +1986,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     }]);
     actions.append(copied);
   }
-  actions.append(open, moreActions(rarer, words));
+  actions.append(open, trash, moreActions(rarer, words));
   // The way back is the pane's, under 840 px alone (D61).
   top.append(actions);
   // The meeting's header (D89, board 4): a bar of 56 px, its name, how long and how heavy beside
@@ -1904,7 +2001,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   if (session.seconds !== null) lasts.append(element("span", "length", length(session.seconds)));
   if (session.audio > 0) lasts.append(element("span", "weighs", fill(words.audio_weighs, size(session.audio, words))));
   title.append(named, lasts, holdings(session, words, true));
-  head.append(title, top);
+  head.append(title, top, ask);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
   const drawn = element("section", "card drawn");
@@ -4391,7 +4488,9 @@ let drawnMeeting = null;
 async function refresh(again = false) {
   const mine = ++drawing;
   try {
-    return await draw(mine, again);
+    const drawn = await draw(mine, again);
+    if (mine === drawing) trashedFocused();
+    return drawn;
   } catch (why) {
     if (mine === drawing) {
       // Nothing left to stop it with.
