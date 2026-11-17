@@ -1624,6 +1624,8 @@ function transcriptCard(read, words, session) {
       const pencil = element("button", "edit");
       pencil.append(icon("pencil"));
       pencil.type = "button";
+      // Its own id, the line's track and start — never its place —: found again once drawn anew (D101).
+      pencil.id = `correct-${segment.track}-${segment.start}`;
       pencil.dataset.name = nameOf(session);
       pencil.setAttribute("aria-label", fill(words.correct_line, clock(segment.start)));
       pencil.title = pencil.getAttribute("aria-label");
@@ -2065,6 +2067,8 @@ function choice(name, value, [label, says], checked, disabled) {
   input.type = "radio";
   input.name = name;
   input.value = value;
+  // Its own id, from what it chooses — never its place —: found again once drawn anew (D101).
+  input.id = `${name}-${value}`;
   input.checked = checked;
   input.disabled = disabled;
   const text = element("span", "said");
@@ -4385,13 +4389,60 @@ function notShown(said) {
 // What the meeting's page was drawn from, to know whether it changed since.
 let drawnMeeting = null;
 
+// Where the user is on a page (D101), as WAI-ARIA's practices keep it across a change: the control
+// focused — or the one just changed, a click in WebKit focusing none —, the boxes holding it, how far
+// the page is scrolled. The address it was read at: given back once that page is drawn again there,
+// never on another page.
+let drawnAddress = null;
+let changedLast = null;
+for (const type of ["change", "input"]) {
+  document.addEventListener(type, (event) => {
+    const changed = event.target;
+    if (changed instanceof Element && changed.id && changed.closest("#meeting, #settings")) changedLast = { id: changed.id, at: Date.now() };
+  }, true);
+}
+const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
+function placeOf() {
+  const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [] };
+  const at = document.activeElement;
+  const focused = at && at !== document.body && at.id && at.closest("#meeting, #settings") ? at : null;
+  const changed = changedLast && Date.now() - changedLast.at < 5000 ? document.getElementById(changedLast.id) : null;
+  const control = focused ?? changed;
+  if (!control) return place;
+  place.id = control.id;
+  // Its boxes with an id, nearest first: where a control the change removed was.
+  for (let up = control.parentElement; up && up.id !== "meeting" && up.id !== "settings"; up = up.parentElement) if (up.id) place.near.push(up.id);
+  return place;
+}
+// Drawn again at the same address: the focus back on the same control — or, removed, on the first one
+// in the nearest box left that holds one —, the page where it was. A focus the user moved meanwhile stays.
+function placeBack(place) {
+  if (place.address === null || place.address !== location.hash) return;
+  if (place.id !== null && (document.activeElement === null || document.activeElement === document.body)) {
+    const same = document.getElementById(place.id);
+    let target = same?.getClientRects().length ? same : null;
+    for (const id of place.near) {
+      if (target) break;
+      target = [...(document.getElementById(id)?.querySelectorAll(FOCUSABLE) ?? [])].find((control) => control.getClientRects().length) ?? null;
+    }
+    target?.focus({ preventScroll: true });
+  }
+  if (Math.round(scrollY) !== Math.round(place.y)) window.scrollTo(0, place.y);
+}
+
 // `again`: the list's address drawn once more after a page gone — never more than once.
 // Whoever asked: a drawing still the current one that fails says so; one superseded answers for
 // nothing. The failure goes on to `page_failed`, with its stack.
 async function refresh(again = false) {
   const mine = ++drawing;
+  const place = placeOf();
   try {
-    return await draw(mine, again);
+    const drawn = await draw(mine, again);
+    if (mine === drawing) {
+      placeBack(place);
+      drawnAddress = location.hash;
+    }
+    return drawn;
   } catch (why) {
     if (mine === drawing) {
       // Nothing left to stop it with.
