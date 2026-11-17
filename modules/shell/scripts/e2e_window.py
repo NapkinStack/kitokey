@@ -3779,10 +3779,15 @@ def microphone_chosen(now: dt.datetime) -> None:
     unread.touch()
     with Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n', small=True) as browser:
         pick(browser)
-        wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#small-microphones [role=status]"), 5)
+        # The sentence and the options are drawn together: both awaited, bounded, before either is read; a
+        # list never opened is a FAIL naming what was there, never an exception that stops the shard (#896).
+        drawn = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#small-microphones [role=status]") and b.execute_script(choices), 10)
         said = browser.execute_script("return document.querySelector('#small-microphones [role=status]')?.textContent ?? ''")
-        check("a list that cannot be read is said, Auto still offered", "Auto" in browser.execute_script(choices)[0][0] and "ne peut pas être lue" in said, said)
-        fit(browser, "the list unread")
+        shown = browser.execute_script(choices)
+        check("a list that cannot be read is said, Auto still offered", drawn and "Auto" in shown[0][0] and "ne peut pas être lue" in said,
+              {"said": said, "options": shown, "state": browser.execute_script(state)})
+        if drawn:
+            fit(browser, "the list unread")
     unread.unlink()
     listed.unlink()
     taping = WORK / "microphones-none"
