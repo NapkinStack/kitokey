@@ -5762,12 +5762,24 @@ def redo_choice_starts_nothing(now: dt.datetime) -> None:
             # Past the page's own reading, a second and a half: drawn again, the panel would be gone.
             time.sleep(3)
             kept = browser.execute_script("const p = document.getElementById('redo-panel-minutes-model'); return p ? p.value : null")
+            # Shown, not only there: the panel, its list and its button seen by the user (sam's o1, a panel hidden).
+            seen = lambda b: all(b.find_elements(By.ID, i) and b.find_element(By.ID, i).is_displayed()
+                                 for i in ("redo-panel", "redo-panel-minutes-model", "redo-do"))
             check("on the page: a model chosen in the redo panel starts nothing, and the panel stays open, the choice shown (D96)",
-                  bool(picked) and kept == picked and browser.find_elements(By.ID, "redo-do") and browser.execute_script(idle) and untouched(),
-                  (picked, kept, bool(browser.find_elements(By.ID, "redo-do")), browser.execute_script(idle)))
+                  bool(picked) and kept == picked and seen(browser) and browser.execute_script(idle) and untouched(),
+                  (picked, kept, seen(browser), browser.execute_script(idle)))
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
             closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-panel"), 3)
             check("on the page: Escape leaves everything as it was — the panel closed, nothing kept for the meeting, nothing made",
+                  closed and not (meeting / "models.json").exists() and untouched() and browser.execute_script(idle),
+                  (closed, (meeting / "models.json").exists()))
+            # « Annuler », after a choice: the same.
+            press(browser, "redo-minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+            redo_pick(browser, "redo-panel", "minutes", 1)
+            press(browser, "redo-panel-cancel")
+            closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-panel"), 3)
+            check("on the page: « Annuler » after a choice leaves everything as it was — the panel closed, nothing kept, nothing made",
                   closed and not (meeting / "models.json").exists() and untouched() and browser.execute_script(idle),
                   (closed, (meeting / "models.json").exists()))
         with Window(meetings, "fr_FR.UTF-8", named, ollama=base, small=True) as browser:
@@ -5816,11 +5828,15 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
     models on this computer alone (D91)."""
     print("BQ. Refaire: a service set up with its key offers every model it lists, grouped under its name (D96)")
     good = "sk-stand-in-good"
+    # The transcription's own key, other than the summary's: each list is answered to its own key alone, so a
+    # transcript's models read with the summary's key — kept under the host — are refused (D43, D96).
+    heard = "sk-stand-in-heard"
 
     class Service(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             key = (self.headers.get("authorization") or "").removeprefix("Bearer ")
-            if key != good:
+            hearing = self.path.endswith("/models?output_modalities=transcription")
+            if key not in (good, heard) or (hearing and key != heard) or (self.path.endswith("/models") and key != good):
                 status, body = 401, {"error": {"message": "Invalid credentials", "code": 401}}
             elif self.path.endswith("/key"):
                 status, body = 200, {"data": {"label": "stand-in"}}
@@ -5887,7 +5903,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "transcription-online")
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            browser.find_element(By.ID, "transcription-key").send_keys(good)
+            browser.find_element(By.ID, "transcription-key").send_keys(heard)
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
             choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
