@@ -313,6 +313,15 @@ by a commit with no change of its own — tracked or not. The record says which 
 outside it hold is not compared: `nstack attest --again` runs them. Where the answer is `forge`, a record is
 information, and on a guarded repository the forge's required checks stay the barrier — a
 decider who wants the record to gate a protected branch requires its name at the forge.
+Where the answer is `attested`, requiring it is what keeps a pull request moving: the record
+holds the description's sheet, so it is made after its last edit, and notes start no run — the
+pull request's last run, from before the record, would stay red. The status is the record's own
+event: when the base branch's ruleset requires `nstack / local checks`, the pull request's run
+leaves A1 and A2 to it, and says so. Posting it needs a token that may write commit statuses
+(an agent's App made by `nstack agent add` has it; an older App gets Commit statuses: write in
+its settings, accepted on its installation); without one, the record is said *not shown*, and
+the merge waits. A required name is matched by any check of that name: where every record is an
+agent's, the ruleset can pin the status's source to the agent's App.
 
 The record names who ran it, as git would sign a commit made in that checkout, and travels to the
 remote with the notes: it never publishes an address the project's history does not already show.
