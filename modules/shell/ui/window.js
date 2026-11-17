@@ -4407,15 +4407,15 @@ function notShown(said) {
 // What the meeting's page was drawn from, to know whether it changed since.
 let drawnMeeting = null;
 
-// `again`: the list's address drawn once more after a page gone — never more than once.
-// Whoever asked: a drawing still the current one that fails says so; one superseded answers for
-// nothing. The failure goes on to `page_failed`, with its stack.
 // Every window's look (D98): the system's, or the one chosen whatever the system says.
 function takeAppearance(appearance) {
   if (appearance === "light" || appearance === "dark") document.documentElement.dataset.theme = appearance;
   else delete document.documentElement.dataset.theme;
 }
 
+// `again`: the list's address drawn once more after a page gone — never more than once.
+// Whoever asked: a drawing still the current one that fails says so; one superseded answers for
+// nothing. The failure goes on to `page_failed`, with its stack.
 async function refresh(again = false) {
   const mine = ++drawing;
   try {
