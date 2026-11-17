@@ -4457,6 +4457,24 @@ def focus_kept(now: dt.datetime) -> None:
     def keys(browser, *pressed) -> None:
         ActionChains(browser).send_keys(*pressed).perform()
 
+    # Who takes the focus, and when (D101's diagnostic, the coordinator's word, 2026-11-17): each focus
+    # moved, click and change, with what is focused, whether the window has the system's focus and is
+    # shown; each drawing; #model-fetch gone or back.
+    trace = """
+        if (!window.__trace) {
+          window.__trace = [];
+          const named = (e) => !e ? null : e === document.body ? 'body' : (e.id || e.tagName.toLowerCase()) + (e.type ? ':' + e.type : '');
+          const note = (what, target) => window.__trace.push([Math.round(performance.now()), what, named(target), named(document.activeElement),
+                                                              document.hasFocus(), document.visibilityState]);
+          for (const type of ['focusin', 'focusout', 'click', 'change']) document.addEventListener(type, (e) => note(type, e.target), true);
+          const drawn = window.refresh;
+          window.refresh = async (...asked) => { note('refresh', null); try { return await drawn(...asked); } finally { note('drawn', null); } };
+          let there = !!document.getElementById('model-fetch');
+          new MutationObserver(() => { const now = !!document.getElementById('model-fetch'); if (now !== there) { there = now; note(now ? 'fetch back' : 'fetch gone', null); } })
+            .observe(document.body, { childList: true, subtree: true });
+        }"""
+    traced = lambda b: b.execute_script("return (window.__trace || []).slice(-30)")
+
     def kept(browser, what: str, target: str, act, saved, mouse: bool = False) -> None:
         """`target` in the middle of the window, focused (or, for the mouse, nothing focused); `act` changes it;
         once `saved` holds and the page is drawn again — the control a new node —, where the focus and the page are."""
@@ -4475,7 +4493,7 @@ def focus_kept(now: dt.datetime) -> None:
         time.sleep(0.5)
         after = browser.execute_script(where)
         check(f"{what}: once saved and drawn again, the focus on #{target}, the page where it was (D101)",
-              done and after[0] == target and abs(after[1] - before[1]) <= 1, {"saved": done, "before": before, "after": after})
+              done and after[0] == target and abs(after[1] - before[1]) <= 1, {"saved": done, "before": before, "after": after, "trace": traced(browser)})
 
     # This computer's Whisper models, as BG and K write them: two, so that one can be chosen in Settings.
     models = WORK / "data" / "kitokey" / "models"
@@ -4511,6 +4529,7 @@ def focus_kept(now: dt.datetime) -> None:
             # A meeting's page.
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
+            browser.execute_script(trace)
             missing = browser.execute_script(nameless, "meeting")
             check("a meeting's page: every control a user reaches has an id of its own (D101)", missing == [], missing)
             kept(browser, "a meeting's page, its language chosen by the arrows", "meeting-language",
@@ -4592,6 +4611,7 @@ def focus_kept(now: dt.datetime) -> None:
     with bare as browser:
         browser.set_window_size(1100, 700)
         browser.execute_script("location.hash = '#/settings'")
+        browser.execute_script(trace)
         # A control the change removes: « Télécharger le modèle » pressed by Enter goes while the model comes —
         # the focus near what took its place, in its card, never the page's start.
         if wait_for(browser, lambda b: b.find_elements(By.ID, "model-fetch"), 5):
@@ -4604,7 +4624,7 @@ def focus_kept(now: dt.datetime) -> None:
             after = browser.execute_script(where)
             inside = browser.execute_script("const a = document.activeElement; return !!a && a !== document.body && !!a.closest('#settings')")
             check("Settings, « Télécharger le modèle » gone once pressed: the focus in Settings, not the page's start; the page where it was (D101)",
-                  gone and inside and abs(after[1] - before[1]) <= 1, {"before": before, "after": after})
+                  gone and inside and abs(after[1] - before[1]) <= 1, {"before": before, "after": after, "trace": traced(browser)})
         else:
             check("Settings offer « Télécharger le modèle », to be pressed (D101)", False, browser.execute_script(where))
 
