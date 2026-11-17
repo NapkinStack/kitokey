@@ -4461,8 +4461,11 @@ for (const type of ["change", "input"]) {
     const changed = event.target;
     if (!(changed instanceof Element) || !changed.id || !changed.closest("#meeting, #settings")) return;
     changedLast = { id: changed.id, at: Date.now() };
-    // Changed by a click WebKit gave no focus to: the control acted on has it, as a key would have given it.
-    if (document.activeElement === null || document.activeElement === document.body) changed.focus({ preventScroll: true });
+    // Changed by a click WebKit gave no focus to — a box, a radio, a list —: the control acted on has it,
+    // as a key would have given it. Never a field of text: its change comes as it is left, the focus
+    // passing by the page on its way elsewhere (meeting_renamed, « leaving the field keeps it »).
+    const clicked = changed.matches("input[type=checkbox], input[type=radio], select");
+    if (clicked && (document.activeElement === null || document.activeElement === document.body)) changed.focus({ preventScroll: true });
   }, true);
 }
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
