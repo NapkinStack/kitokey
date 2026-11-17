@@ -4458,16 +4458,16 @@ function placeBack(place) {
   if (place.address === null || place.address !== location.hash) return;
   if (place.id !== null && (document.activeElement === null || document.activeElement === document.body)) {
     const same = document.getElementById(place.id);
-    let target = same?.getClientRects().length ? same : null;
+    // Disabled, a control takes no focus: as good as gone.
+    let target = same?.getClientRects().length && !same.disabled ? same : null;
     for (const id of place.near) {
       if (target) break;
       target = [...(document.getElementById(id)?.querySelectorAll(FOCUSABLE) ?? [])].find((control) => control.getClientRects().length) ?? null;
     }
     // None left to take it: the nearest box still there, focused itself — never the page's start.
-    if (!target) {
-      target = place.near.map((id) => document.getElementById(id)).find((box) => box?.getClientRects().length) ?? null;
-      if (target && !target.hasAttribute("tabindex")) target.tabIndex = -1;
-    }
+    target ??= place.near.map((id) => document.getElementById(id)).find((box) => box?.getClientRects().length) ?? null;
+    // A box — the one focused before, drawn anew, too — takes the focus by script alone.
+    if (target && !target.matches(FOCUSABLE) && !target.hasAttribute("tabindex")) target.tabIndex = -1;
     target?.focus({ preventScroll: true });
   }
   if (Math.round(scrollY) !== Math.round(place.y)) window.scrollTo(0, place.y);
