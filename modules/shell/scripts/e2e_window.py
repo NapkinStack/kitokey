@@ -4488,7 +4488,9 @@ def meeting_trashed(now: dt.datetime) -> None:
                     " const r = (e) => e.getBoundingClientRect(); const a = r(q);"
                     " const out = [...q.querySelectorAll('p:not(:empty), button')].filter((e) => { const b = r(e); return b.left < a.left + 12 || b.right > a.right - 12; })"
                     ".map((e) => e.id || e.textContent.trim().slice(0, 20));"
-                    " const wrapped = [...q.querySelectorAll('button')].filter((b) => r(b).height > 44).map((b) => b.id);"
+                    # Each button's words counted by their lines, not by its height: two lines of a small text fit in 44 px.
+                    " const lines = (b) => { const t = document.createRange(); t.selectNodeContents(b); return new Set([...t.getClientRects()].map((x) => Math.round(x.top))).size; };"
+                    " const wrapped = [...q.querySelectorAll('button')].filter((b) => lines(b) > 1).map((b) => b.id);"
                     " return {under: a.top >= r(h).bottom - 0.5, wide: Math.abs(a.left - r(c).left) <= 1 && Math.abs(a.right - r(c).right) <= 1, out, wrapped}")
             for size in ((1100, 800), (420, 800)):
                 browser.set_window_size(*size)
