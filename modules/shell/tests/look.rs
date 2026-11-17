@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::LazyLock;
 
 use oxc_allocator::Allocator;
-use oxc_ast::ast::{StringLiteral, TemplateElement};
-use oxc_ast_visit::Visit;
+use oxc_ast::ast::{AssignmentExpression, AssignmentTarget, CallExpression, Expression, StringLiteral, TemplateElement};
+use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
 use oxc_span::SourceType;
 
@@ -30,6 +30,66 @@ impl<'a> Visit<'a> for Texts {
 
     fn visit_template_element(&mut self, element: &TemplateElement<'a>) {
         self.0.push(element.value.raw.as_str().to_string());
+    }
+}
+
+/// What the page sets as a style's value: `x.style.borderColor = …`, `x.style.cssText = …`,
+/// `x.style.setProperty(name, …)` — its texts, where a word is a value and not a class (#739).
+#[derive(Default)]
+struct StyleValues(Vec<String>);
+
+/// A text written in the code as it is: a string, or a template's parts joined.
+fn written(expression: &Expression) -> Option<String> {
+    match expression {
+        Expression::StringLiteral(literal) => Some(literal.value.as_str().unwrap_or_default().to_string()),
+        Expression::TemplateLiteral(template) => Some(
+            template
+                .quasis
+                .iter()
+                .map(|part| part.value.raw.as_str())
+                .collect::<Vec<_>>()
+                .join(" "),
+        ),
+        _ => None,
+    }
+}
+
+/// Whether an expression is some element's `.style`.
+fn a_style(expression: &Expression) -> bool {
+    matches!(expression, Expression::StaticMemberExpression(member) if member.property.name == "style")
+}
+
+impl<'a> Visit<'a> for StyleValues {
+    fn visit_assignment_expression(&mut self, assigned: &AssignmentExpression<'a>) {
+        if let AssignmentTarget::StaticMemberExpression(member) = &assigned.left
+            && a_style(&member.object)
+            && let Some(text) = written(&assigned.right)
+        {
+            // A property set alone gives its value; `cssText` gives its declarations.
+            self.0.push(if member.property.name == "cssText" {
+                text
+            } else {
+                format!("{}: {text}", member.property.name)
+            });
+        }
+        walk::walk_assignment_expression(self, assigned);
+    }
+
+    fn visit_call_expression(&mut self, call: &CallExpression<'a>) {
+        if let Expression::StaticMemberExpression(member) = &call.callee
+            && member.property.name == "setProperty"
+            && a_style(&member.object)
+            && let Some(text) = call.arguments.get(1).and_then(|value| value.as_expression()).and_then(written)
+        {
+            let name = call
+                .arguments
+                .first()
+                .and_then(|name| name.as_expression())
+                .and_then(written)
+                .unwrap_or_default();
+            self.0.push(format!("{name}: {text}"));
+        }
+        walk::walk_call_expression(self, call);
     }
 }
 
@@ -366,6 +426,97 @@ peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue
 seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal \
 thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen";
 
+/// CSS Color 4's system colours (https://www.w3.org/TR/css-color-4/#css-system-colors): the system's
+/// palette, not the theme's — a value as a name is (#739).
+const SYSTEM_COLOURS: [&str; 19] = [
+    "accentcolor",
+    "accentcolortext",
+    "activetext",
+    "buttonborder",
+    "buttonface",
+    "buttontext",
+    "canvas",
+    "canvastext",
+    "field",
+    "fieldtext",
+    "graytext",
+    "highlight",
+    "highlighttext",
+    "linktext",
+    "mark",
+    "marktext",
+    "selecteditem",
+    "selecteditemtext",
+    "visitedtext",
+];
+
+/// CSS Color 4's functions that write a colour by value; `color-mix` mixes what it is given, tokens here.
+const COLOUR_FUNCTIONS: [&str; 10] = [
+    "rgb(", "rgba(", "hsl(", "hsla(", "hwb(", "lab(", "lch(", "oklab(", "oklch(", "color(",
+];
+
+/// CSS Color 4's deprecated system colours (§6.2), which browsers still draw: a value as the others.
+/// Some are words a rule says otherwise (`background`, `menu`): read in a value alone.
+const DEPRECATED_SYSTEM_COLOURS: [&str; 23] = [
+    "activeborder",
+    "activecaption",
+    "appworkspace",
+    "background",
+    "buttonhighlight",
+    "buttonshadow",
+    "captiontext",
+    "inactiveborder",
+    "inactivecaption",
+    "inactivecaptiontext",
+    "infobackground",
+    "infotext",
+    "menu",
+    "menutext",
+    "scrollbar",
+    "threeddarkshadow",
+    "threedface",
+    "threedhighlight",
+    "threedlightshadow",
+    "threedshadow",
+    "window",
+    "windowframe",
+    "windowtext",
+];
+
+/// The properties whose value names other properties, never a colour: `transition: background 0.2s`.
+const NAMING_PROPERTIES: [&str; 3] = ["transition", "transition-property", "will-change"];
+
+/// Whether a value names one of the system's colours, current or deprecated, as a word of its own.
+fn names_a_system_colour(value: &str) -> bool {
+    value
+        .to_lowercase()
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
+        .any(|word| SYSTEM_COLOURS.contains(&word) || DEPRECATED_SYSTEM_COLOURS.contains(&word))
+}
+
+/// Whether a rule's declarations — or a text the page sets, `border-color: Highlight` or `Highlight`
+/// alone — give a system colour as a value: never in a property's name, nor where a value names
+/// properties (#739).
+fn sets_a_system_colour(declarations: &str) -> bool {
+    declarations.split(';').any(|one| match one.split_once(':') {
+        Some((key, value)) => !NAMING_PROPERTIES.contains(&key.trim().to_lowercase().as_str()) && names_a_system_colour(value),
+        None => {
+            let word = one.trim().to_lowercase();
+            SYSTEM_COLOURS.contains(&word.as_str()) || DEPRECATED_SYSTEM_COLOURS.contains(&word.as_str())
+        }
+    })
+}
+
+/// Whether a text writes a colour by one of CSS Color 4's functions: `color(` alone, never `color-mix(`.
+fn writes_a_colour(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    COLOUR_FUNCTIONS.iter().any(|f| {
+        lower
+            .match_indices(f)
+            .any(|(at, _)| !lower[..at].ends_with(|c: char| c.is_ascii_alphanumeric() || c == '-'))
+    })
+}
+
 /// Whether a text names a colour among its words, a word keeping its hyphens: `white-space` names none.
 fn names_a_colour(text: &str) -> bool {
     static NAMED: LazyLock<BTreeSet<&str>> = LazyLock::new(|| NAMED_COLOURS.split_whitespace().collect());
@@ -384,15 +535,18 @@ fn red_outside_a_recording(style: &str) -> Vec<String> {
         .filter(|(_, body)| {
             let body = body.to_lowercase();
             let literal = names_a_colour(&body)
+                || sets_a_system_colour(&body)
                 || body.split(|c: char| !(c.is_ascii_alphanumeric() || c == '#')).any(|word| {
                     word.starts_with('#') && [4, 5, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit())
                 });
-            let function = ["rgb(", "rgba(", "hsl(", "hsla("].iter().any(|f| {
-                body.replace(f, "\u{0}")
-                    .split('\u{0}')
-                    .skip(1)
-                    .any(|args| !args.trim_start().starts_with("0 0 0"))
-            });
+            // Each function's arguments, but a shadow's black.
+            let function = writes_a_colour(&body)
+                && COLOUR_FUNCTIONS.iter().any(|f| {
+                    body.replace(f, "\u{0}")
+                        .split('\u{0}')
+                        .skip(1)
+                        .any(|args| !args.trim_start().starts_with("0 0 0"))
+                });
             body.contains("var(--red)") || literal || function
         })
         .map(|(selector, _)| selector)
@@ -415,7 +569,13 @@ fn colours_in_page(page: &str) -> Vec<String> {
             let hex = lower
                 .split(|c: char| !(c.is_ascii_alphanumeric() || c == '#'))
                 .any(|word| word.starts_with('#') && [4, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit()));
-            hex || names_a_colour(&lower) || lower.contains("--red") || ["rgb(", "rgba(", "hsl(", "hsla("].iter().any(|f| lower.contains(f))
+            hex || names_a_colour(&lower) || lower.contains("--red") || writes_a_colour(&lower)
+        })
+        .chain({
+            // A system colour, where the page sets a style's value (#739).
+            let mut styles = StyleValues::default();
+            styles.visit_program(&parsed.program);
+            styles.0.into_iter().filter(|set| sets_a_system_colour(set))
         })
         .collect()
 }
@@ -440,6 +600,14 @@ fn red_says_a_recording_and_nothing_else() {
         "firebrick",
         "rgb(194, 53, 45)",
         "var(--red)",
+        // The system's colours and every function of CSS Color 4 (#739).
+        "AccentColor",
+        "ButtonHighlight",
+        "Window",
+        "Background",
+        "oklch(0.55 0.2 27)",
+        "lab(45 60 40)",
+        "color(srgb 0.76 0.21 0.18)",
     ] {
         let mutated = STYLE.replacen(
             ".making-state.failed { background: transparent; border: 1px solid var(--edge); }",
@@ -461,6 +629,11 @@ fn red_says_a_recording_and_nothing_else() {
         "row.style.cssText = \"border-color: tomato\";",
         "row.style.setProperty(\"background\", `indianred`);",
         "row.style.setProperty(\"color\", \"var(--red)\");",
+        "row.style.borderColor = `oklch(0.55 0.2 27)`;",
+        // The system's colours set by the page, current or deprecated (#739).
+        "row.style.borderColor = \"Highlight\";",
+        "row.style.cssText = \"border-color: ButtonHighlight\";",
+        "row.style.setProperty(\"background\", \"Window\");",
     ] {
         assert_eq!(colours_in_page(&format!("{PAGE}\n{set}")).len(), 1, "{set}");
     }
@@ -512,13 +685,15 @@ const CONTROL_PARTS: [&str; 21] = [
 
 /// The heights a control keeps under 32 px, each with its reason: a box to tick, a switch's track
 /// inside its setting, a time in a line of text that is a link and no button.
-const SMALLER: [(&str, f64); 5] = [
+const SMALLER: [(&str, f64); 6] = [
     (".choice input, .row input[type=\"checkbox\"]", 20.0),
     // A switch's track, inside its 32 px setting.
     (".setting input[type=\"checkbox\"]", 20.0),
     (".remember input", 20.0),
     (".freeable input", 20.0),
     (".line-time", 24.0),
+    // The language's list inside its 32 px setting: no minimum of its own, read since #739.
+    (".setting select", 0.0),
 ];
 
 /// Each property that sets a box's height: one of them at another than its control's height contradicts it.
@@ -531,11 +706,34 @@ const HEIGHTS: [&str; 6] = [
     "max-block-size",
 ];
 
-fn px(body: &str, name: &str) -> Option<f64> {
-    body.split(';')
+/// A height as the rule sets it, in px: a `rem` is 16 px; any other unit or keyword is said as it is
+/// written, a control's height being a length the grid can check (#739).
+fn height(body: &str, name: &str) -> Option<Result<f64, String>> {
+    let (_, value) = body
+        .split(';')
         .filter_map(|one| one.split_once(':'))
-        .rfind(|(key, _)| key.trim() == name)
-        .and_then(|(_, value)| value.trim().strip_suffix("px")?.parse::<f64>().ok())
+        .rfind(|(key, _)| key.trim() == name)?;
+    let value = value.trim();
+    let read = |unit: &str, scale: f64| value.strip_suffix(unit)?.parse::<f64>().ok().map(|n| n * scale);
+    let zero = (value == "0").then_some(0.0);
+    Some(
+        zero.or_else(|| read("px", 1.0))
+            .or_else(|| read("rem", 16.0))
+            .ok_or_else(|| value.to_string()),
+    )
+}
+
+fn px(body: &str, name: &str) -> Option<f64> {
+    height(body, name)?.ok()
+}
+
+/// Whether a rule is the small window's (D90's), every selector of it in the bar: `#small` and what
+/// it holds, its `.small-` parts, the page drawn as the bar — not `#small-link`, the frame's button (#739).
+fn of_the_bar(selector: &str) -> bool {
+    selector.split(',').all(|one| {
+        let one = one.trim();
+        one == "#small" || one.starts_with("#small ") || one.starts_with(".small-") || one.starts_with("body.small-window")
+    })
 }
 
 /// The ids the page's frame gives to what is no control. Every other id is taken for a control's — the
@@ -583,14 +781,14 @@ fn names_a_control(selector: &str) -> bool {
 fn controls_not_32(style: &str) -> Vec<String> {
     rules(style)
         .into_iter()
-        .filter(|(selector, _)| !selector.contains("small") && names_a_control(selector))
+        .filter(|(selector, _)| !of_the_bar(selector) && names_a_control(selector))
         .filter_map(|(selector, body)| {
             let allowed = SMALLER.iter().find(|(name, _)| *name == selector).map_or(32.0, |(_, px)| *px);
             let set: Vec<String> = HEIGHTS
                 .iter()
-                .filter_map(|name| px(&body, name))
-                .filter(|set| *set != allowed)
-                .map(|set| set.to_string())
+                .filter_map(|name| height(&body, name))
+                .filter(|set| *set != Ok(allowed))
+                .map(|set| set.map_or_else(|written| written, |px| px.to_string()))
                 .collect();
             (!set.is_empty()).then(|| format!("{selector}: {}", set.join(", ")))
         })
@@ -621,6 +819,10 @@ fn controls_are_32_px_high_on_a_4_px_grid() {
         ".lines .edit { min-height: 40px; }",
         "#record { min-height: 40px; }",
         ".sidebar #find:focus { height: 28px; }",
+        // The frame's button, whose id holds « small » and is no part of the bar; a height in rem (#739).
+        "#small-link { min-height: 40px; }",
+        ".menu-item { height: 2.5rem; }",
+        ".menu-item { height: 3em; }",
     ] {
         assert_eq!(controls_not_32(&format!("{STYLE}\n{wrong}")).len(), 1, "{wrong}");
     }
@@ -657,7 +859,7 @@ fn controls_are_32_px_high_on_a_4_px_grid() {
     // Every height the window sets is on the grid; the small window's are D90's.
     let off: Vec<String> = all
         .iter()
-        .filter(|(selector, _)| !selector.contains("small"))
+        .filter(|(selector, _)| !of_the_bar(selector))
         .filter_map(|(selector, body)| {
             px(body, "min-height")
                 .filter(|px| px % 4.0 != 0.0)
