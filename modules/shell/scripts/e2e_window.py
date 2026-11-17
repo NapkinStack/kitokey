@@ -5908,7 +5908,7 @@ def two_panes(now: dt.datetime) -> None:
         made = makers(browser)
         check("in English: when each version was made, in local time, then its model (D93)",
               sorted(made) == sorted(["Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo",
-                                      "Minutes of Oct 23 at 05:00 AM · Claude Sonnet, via openrouter.ai"]), made)
+                                      "Summary of Oct 23 at 05:00 AM · Claude Sonnet, via openrouter.ai"]), made)
         english = [browser.find_element(By.ID, "record-said").text] + [
             [browser.find_element(By.ID, i).get_attribute(a) for a in ("aria-label", "title")] for i in ("fold", "unfold", "free-link", "small-link", "settings-link")]
         browser.execute_script("document.activeElement.blur()")

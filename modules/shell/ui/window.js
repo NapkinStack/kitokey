@@ -1377,14 +1377,13 @@ function minutesCard(read, words, session, transcript) {
   const actions = element("span", "minutes-actions");
   actions.append(copied, copy, redo);
   top.append(actions);
-  const made = read.made && dayOf({ instant: Date.parse(read.made) / 1000 || null });
-  // As the board says it: the day of the week, no year, and the model as people say it.
-  const day = { weekday: "short", day: "numeric", month: "short" };
-  const hour = { hour: "2-digit", minute: "2-digit" };
-  // What is known of who wrote them, and when: what is not known is left unsaid.
-  let maker = fill(words.written_by, read.model ? modelSaid(read.model) : "—");
-  if (read.provider) maker += fill(words.written_via, read.provider);
-  if (made) maker += ` · ${new Intl.DateTimeFormat(words.locale, day).format(made)} ${words.at} ${new Intl.DateTimeFormat(words.locale, hour).format(made)}`;
+  // When they were made first, then who wrote them, the model as people say it (D93); what is not
+  // known is left unsaid.
+  const when = madeOn(words, read.made);
+  const by = read.model ? modelSaid(read.model) + (read.provider ? fill(words.written_via, read.provider) : "") : "";
+  let maker = when
+    ? fill(words.minutes_of, when) + (by ? ` · ${by}` : "")
+    : fill(words.written_by, read.model ? modelSaid(read.model) : "—") + (read.provider ? fill(words.written_via, read.provider) : "");
   // What the call cost, as the provider reported it (D51); the shell gives both or neither.
   if (read.cost !== null) maker += ` · ${new Intl.NumberFormat(words.locale, { style: "currency", currency: read.currency, maximumSignificantDigits: 2 }).format(read.cost)}`;
   card.append(element("p", "maker", maker));
@@ -1518,6 +1517,15 @@ function roam(lines, line) {
   }
 }
 
+// When a version was made, in the system's language and local time: the day without its year, then
+// the hour — "13 nov. à 09:42", "Nov 13 at 09:42 AM" (D93). An instant not read, nothing.
+function madeOn(words, made) {
+  const at = made && dayOf({ instant: Date.parse(made) / 1000 || null });
+  if (!at) return "";
+  const day = new Intl.DateTimeFormat(words.locale, { day: "numeric", month: "short" }).format(at);
+  return `${day} ${words.at} ${new Intl.DateTimeFormat(words.locale, { hour: "2-digit", minute: "2-digit" }).format(at)}`;
+}
+
 function transcriptCard(read, words, session) {
   const card = element("aside", "card transcript");
   card.setAttribute("aria-label", words.transcript_title);
@@ -1565,15 +1573,16 @@ function transcriptCard(read, words, session) {
   // computer » — a host of one word (`http://transcriber/v1`) is a service too. This computer's
   // engines name themselves: whisper.cpp, SpeechAnalyzer; none named, nothing is claimed.
   const service = read.engine && !["whisper.cpp", "SpeechAnalyzer"].includes(read.engine);
-  const heardSaid = service
-    ? fill(words.written_by, read.model || "—") + fill(words.written_via, read.engine)
-    : fill(words.heard_by, read.model ? spoken(read.model) : read.engine || "—");
-  // When it was made whole (D93), as the minutes' maker says theirs: the day without its year.
-  const madeWhole = read.made && dayOf({ instant: Date.parse(read.made) / 1000 || null });
-  const when = madeWhole
-    ? ` · ${new Intl.DateTimeFormat(words.locale, { weekday: "short", day: "numeric", month: "short" }).format(madeWhole)} ${words.at} ${new Intl.DateTimeFormat(words.locale, { hour: "2-digit", minute: "2-digit" }).format(madeWhole)}`
-    : "";
-  heard.append(element("p", "maker", heardSaid + when));
+  // Made whole at a time it says (D93): that time first, then its model, as the minutes say theirs;
+  // a transcript that does not say it, its model alone, as before.
+  const when = madeOn(words, read.made);
+  const by = service ? (read.model || "—") + fill(words.written_via, read.engine) : read.model ? spoken(read.model) : read.engine || "";
+  const heardSaid = when
+    ? fill(words.transcribed_on, when) + (by ? ` · ${by}` : "")
+    : service
+      ? fill(words.written_by, read.model || "—") + fill(words.written_via, read.engine)
+      : fill(words.heard_by, read.model ? spoken(read.model) : read.engine || "—");
+  heard.append(element("p", "maker", heardSaid));
   card.append(heard);
   if (!read.complete) card.append(element("p", "note", words.being_made));
   if (read.unread > 0) card.append(element("p", "note", fill(words.unread, read.unread)));
