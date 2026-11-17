@@ -4479,15 +4479,14 @@ def bar_language(now: dt.datetime) -> None:
             check(f"{short}: recording, Deutsch chosen by the arrows: the meeting's language file holds « de » (D99)", written,
                   (folder / "language").read_text() if (folder / "language").is_file() else None)
             # Refused — its file a folder that cannot be replaced —: said as the page says it, the choice put back.
-            (folder / "language").unlink()
+            (folder / "language").unlink(missing_ok=True)
             (folder / "language").mkdir()
             (folder / "language" / "held").write_text("")
             keys(browser, Keys.ARROW_UP)
             said = wait_for(browser, lambda b: b.execute_script("return document.getElementById('small-language-said')?.textContent ?? ''").startswith(refused), 5)
             got = [browser.execute_script("return document.getElementById('small-language-said')?.textContent ?? ''"), (browser.execute_script(picked) or [None])[0]]
             check(f"{short}: recording, a language refused: « {refused}… » said, the choice put back (D99)", said and got[1] == "de", got)
-            (folder / "language" / "held").unlink()
-            (folder / "language").rmdir()
+            shutil.rmtree(folder / "language", ignore_errors=True)
             shot(browser, f"d99-bar-language-{short}")
             stop_from_small(browser)
             back = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
