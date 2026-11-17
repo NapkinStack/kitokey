@@ -310,7 +310,10 @@ module checks the commit's record passed — they read the tree and the base, ne
 when the base commit, the engine and the person are the same, and the engine is published or named
 by a commit with no change of its own — tracked or not. The record says which run they come from
 (`kept_from`), with that run's evidence; what the tree's ignored files, the environment or the tools
-outside it hold is not compared: `nstack attest --again` runs them. Where the answer is `forge`, a record is
+outside it hold is not compared: `nstack attest --again` runs them. They are also kept
+across commits — a merge of the default branch that touched nothing they read: their modules,
+those they consume from, `contracts/`, `platform/` and the files outside the modules — while the
+digest of what they read is unchanged, for 7 days and 20 default-branch commits at most. Where the answer is `forge`, a record is
 information, and on a guarded repository the forge's required checks stay the barrier — a
 decider who wants the record to gate a protected branch requires its name at the forge.
 Where the answer is `attested`, requiring it is what keeps a pull request moving: the record
