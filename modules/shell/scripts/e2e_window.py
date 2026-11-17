@@ -148,7 +148,8 @@ if [ "$1" = listen ]; then
   # a copy of pw-cat, told to record — its name no longer says it.
   mkdir -p "$here/own"; [ -x "$here/own/kitokey-capture" ] || cp "$(command -v pw-cat)" "$here/own/kitokey-capture"
   "$here/own/kitokey-capture" --record --target kitokey_e2e_check_mic "$here/listen.wav" & held=$!
-  ended() { kill "$held" 2>/dev/null; wait "$held" 2>/dev/null; date +%s.%N > "$here/listen-ended"; exit 0; }
+  # Written whole, then renamed over: a scenario that sees the file reads its time, never an empty one (#891).
+  ended() { kill "$held" 2>/dev/null; wait "$held" 2>/dev/null; date +%s.%N > "$here/listen-ended.part"; mv "$here/listen-ended.part" "$here/listen-ended"; exit 0; }
   trap ended TERM INT
   headset=false; [ -e "$here/listen-headset" ] && headset=true
   echo '{"event":"device","source":"me","device":"Kitokey e2e mic","headset":'$headset'}'
