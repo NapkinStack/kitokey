@@ -4501,6 +4501,8 @@ def focus_kept(now: dt.datetime) -> None:
                  lambda b: keys(b, Keys.ARROW_DOWN), lambda: (folder / "language").is_file())
             kept(browser, "a meeting's page, said confidential by a click", "confidential-switch",
                  lambda b: ActionChains(b).click(b.find_element(By.ID, "confidential-switch")).perform(), lambda: (folder / "confidential").exists(), mouse=True)
+            if browser.execute_script("const p = document.getElementById('context-panel'); return !!p && p.hidden"):
+                press(browser, "context-toggle")
             kept(browser, "a meeting's page, its context typed", "context-text",
                  lambda b: keys(b, "Point budget"), lambda: (folder / "context.txt").is_file() and "Point budget" in (folder / "context.txt").read_text())
             # Settings.
@@ -4514,6 +4516,8 @@ def focus_kept(now: dt.datetime) -> None:
                  lambda b: keys(b, Keys.SPACE), lambda: "reminder = true" in settings())
             kept(browser, "Settings, what is kept of the audio chosen by the arrows", "keep",
                  lambda b: keys(b, Keys.ARROW_DOWN), lambda: "keep" in settings())
+            if browser.execute_script("const p = document.getElementById('general-advanced-panel'); return !!p && p.hidden"):
+                press(browser, "general-advanced")
             kept(browser, "Settings, the developer mode turned by a click", "developer",
                  lambda b: ActionChains(b).click(b.find_element(By.ID, "developer")).perform(), lambda: "developer = true" in settings(), mouse=True)
             kept(browser, "Settings, the logs' level chosen by the arrows", "log-level",
@@ -4529,35 +4533,40 @@ def focus_kept(now: dt.datetime) -> None:
                 browser.execute_script("const t = document.getElementById('minutes'); t.scrollIntoView({block: 'center'}); t.focus();")
                 time.sleep(0.4)
                 before = browser.execute_script(where)
-                keys(browser, Keys.ARROW_DOWN)
+                keys(browser, Keys.ARROW_UP if browser.execute_script("return document.getElementById('minutes').selectedIndex") > 0 else Keys.ARROW_DOWN)
                 time.sleep(0.3)
                 browser.execute_script("document.getElementById('minutes-save').focus()")
                 keys(browser, Keys.ENTER)
-                done = wait_for(None, lambda _: 'minutes_model = "mistral:7b"' in settings(), 5)
+                done = wait_for(None, lambda _: 'minutes_model = "qwen3:14b"' not in settings(), 5)
                 time.sleep(1)
                 after = browser.execute_script(where)
                 check("Settings, the minutes' model chosen by the arrows and saved by Enter: the focus on its list or its « Enregistrer », the page where it was (D101)",
                       done and after[0] in ("minutes", "minutes-save") and abs(after[1] - before[1]) <= 1, {"saved": done, "before": before, "after": after})
             else:
                 check("Settings offer the minutes' model on this computer, to be chosen (D101)", False, browser.execute_script(where))
-            # A control the change removes: « Télécharger le modèle » pressed by Enter goes while the model comes —
-            # the focus near what took its place, in its card, never the page's start.
-            if wait_for(browser, lambda b: b.find_elements(By.ID, "model-fetch"), 5):
-                browser.execute_script("const t = document.getElementById('model-fetch'); t.scrollIntoView({block: 'center'}); t.focus();")
-                time.sleep(0.4)
-                before = browser.execute_script(where)
-                keys(browser, Keys.ENTER)
-                gone = wait_for(browser, lambda b: not b.find_elements(By.ID, "model-fetch"), 3)
-                time.sleep(0.5)
-                after = browser.execute_script(where)
-                inside = browser.execute_script("const a = document.activeElement; return !!a && a !== document.body && !!a.closest('#settings')")
-                check("Settings, « Télécharger le modèle » gone once pressed: the focus in Settings, not the page's start; the page where it was (D101)",
-                      gone and inside and abs(after[1] - before[1]) <= 1, {"before": before, "after": after})
-            else:
-                check("Settings offer « Télécharger le modèle », to be pressed (D101)", False, browser.execute_script(where))
     finally:
         tags.shutdown()
-
+    # A control the change removes, on a Kitokey with no model, which offers to fetch it.
+    bare = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n')
+    bare.env.update(XDG_DATA_HOME=str(WORK / "data-focus-kept"), KITOKEY_MODEL_PUBLISHED="http://127.0.0.1:9/model.bin 300000 " + "0" * 64)
+    with bare as browser:
+        browser.set_window_size(1100, 700)
+        browser.execute_script("location.hash = '#/settings'")
+        # A control the change removes: « Télécharger le modèle » pressed by Enter goes while the model comes —
+        # the focus near what took its place, in its card, never the page's start.
+        if wait_for(browser, lambda b: b.find_elements(By.ID, "model-fetch"), 5):
+            browser.execute_script("const t = document.getElementById('model-fetch'); t.scrollIntoView({block: 'center'}); t.focus();")
+            time.sleep(0.4)
+            before = browser.execute_script(where)
+            keys(browser, Keys.ENTER)
+            gone = wait_for(browser, lambda b: not b.find_elements(By.ID, "model-fetch"), 3)
+            time.sleep(0.5)
+            after = browser.execute_script(where)
+            inside = browser.execute_script("const a = document.activeElement; return !!a && a !== document.body && !!a.closest('#settings')")
+            check("Settings, « Télécharger le modèle » gone once pressed: the focus in Settings, not the page's start; the page where it was (D101)",
+                  gone and inside and abs(after[1] - before[1]) <= 1, {"before": before, "after": after})
+        else:
+            check("Settings offer « Télécharger le modèle », to be pressed (D101)", False, browser.execute_script(where))
 
 
 def bar_opened(now: dt.datetime) -> None:
