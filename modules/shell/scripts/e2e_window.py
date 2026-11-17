@@ -4516,6 +4516,28 @@ def focus_kept(now: dt.datetime) -> None:
                  lambda b: keys(b, Keys.ARROW_DOWN), lambda: "meeting_language =" in settings())
             kept(browser, "Settings, the reminder turned by Space", "reminder",
                  lambda b: keys(b, Keys.SPACE), lambda: "reminder = true" in settings())
+            # « Enregistré » in the line changed, over neither its name nor its control, at full width and
+            # at 420×400 (the coordinator, 2026-11-17, D101).
+            clear = ("const s = document.getElementById('saved-said'); if (!s) return null; const r = s.closest('.saying');"
+                     " const box = (e) => e && e.getBoundingClientRect(); const meet = (a, b) => !!a && !!b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;"
+                     " const said = box(s); return {inLine: !!r && r.contains(document.getElementById('reminder')),"
+                     " overName: meet(said, box(r?.querySelector('.name'))), overControl: meet(said, box(document.getElementById('reminder'))),"
+                     " inside: said.left >= box(r).left - 0.5 && said.right <= box(r).right + 0.5}")
+            for size, name in (((1100, 700), "d101-saved-1100"), ((420, 400), "d101-saved-420")):
+                browser.set_window_size(*size)
+                browser.execute_script("const t = document.getElementById('reminder'); t.scrollIntoView({block: 'center'}); t.focus();")
+                time.sleep(0.4)
+                before = browser.execute_script(where)
+                keys(browser, Keys.SPACE)
+                shown = wait_for(browser, lambda b: b.execute_script(clear) is not None, 5)
+                got = browser.execute_script(clear)
+                shot(browser, name)
+                after = browser.execute_script(where)
+                check(f"{size[0]}×{size[1]}: « Enregistré » in the reminder's line, over neither its name nor its switch, the page not moved (D101)",
+                      shown and got == {"inLine": True, "overName": False, "overControl": False, "inside": True} and after[:2] == before[:2],
+                      {"said": got, "before": before, "after": after})
+                wait_for(browser, lambda b: b.execute_script(clear) is None, 3)
+            browser.set_window_size(1100, 700)
             kept(browser, "Settings, what is kept of the audio chosen by the arrows", "keep",
                  lambda b: keys(b, Keys.ARROW_DOWN), lambda: "keep" in settings())
             if browser.execute_script("const p = document.getElementById('general-advanced-panel'); return !!p && p.hidden"):
@@ -7654,9 +7676,10 @@ def gestures_answer(now: dt.datetime) -> None:
         browser.execute_script("document.getElementById('reminder').click()")
         here = lambda b: b.find_elements(By.ID, "saved-said")
         told = wait_for(browser, here, 3)
-        check("a setting written says Enregistré, under it", told and here(browser)[0].text == "Enregistré"
+        # In its own line, no longer under it: laid over the line, the page never moved (the coordinator, 2026-11-17, D101).
+        check("a setting written says Enregistré, in its own line", told and here(browser)[0].text == "Enregistré"
               and here(browser)[0].get_attribute("role") == "status"
-              and browser.execute_script("const s = document.getElementById('saved-said'), r = document.getElementById('reminder').closest('label, .row, .field'); return r.nextElementSibling === s"))
+              and browser.execute_script("const s = document.getElementById('saved-said'), r = document.getElementById('reminder').closest('label, .row, .field'); return r.contains(s)"))
         wait_for(browser, lambda b: b.execute_script("return window.said.gone !== undefined"), 4)
         said_for = browser.execute_script("window.saidWatch.disconnect(); return window.said.gone === undefined ? null : window.said.gone - window.said.shown")
         check("still said after a second", said_for is not None and said_for >= 1000, said_for)
@@ -7679,13 +7702,13 @@ def gestures_answer(now: dt.datetime) -> None:
         check("Settings left and opened again: the refusal is no longer said (#655)",
               back and not refusal(browser).is_displayed(), refusal(browser).text if back else "Settings not drawn again")
         browser.execute_script("window.restore()")
-        # A radio with no id, far down at the smallest size: said under it, in view.
+        # A radio far down at the smallest size: said in its line, in view.
         time.sleep(0.5)
         browser.set_window_size(420, 400)
         browser.execute_script("document.querySelector('input[name=after][value=nothing]').scrollIntoView(); document.querySelectorAll('input[name=after]')[1].click()")
         wait_for(browser, here, 3)
-        check("said under a radio with no id, in view", here(browser) and browser.execute_script(
-            "const r = document.getElementById('saved-said').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && document.getElementById('saved-said').previousElementSibling.querySelector('input[name=after]') !== null"))
+        check("said in a radio's line, in view", here(browser) and browser.execute_script(
+            "const s = document.getElementById('saved-said'), r = s.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && s.closest('label, .row, .field')?.querySelector('input[name=after]') !== null"))
         wait_for(browser, lambda b: not here(b), 3)
         # A button in no row: said beside it, the page not sent to its top.
         browser.execute_script("const p = document.getElementById('minutes-online'); p.scrollIntoView({block: 'center'}); p.click();"
@@ -7696,8 +7719,9 @@ def gestures_answer(now: dt.datetime) -> None:
         browser.execute_script("document.getElementById('minutes-own-save').click()")
         wait_for(browser, here, 5)
         check("the minutes' Enregistrer: said beside its button, in view", here(browser) and browser.execute_script(
-            "const s = document.getElementById('saved-said'), r = s.getBoundingClientRect(); return s.previousElementSibling?.id === 'minutes-own-save' && r.top >= 0 && r.top + r.height / 2 <= innerHeight"),
-              browser.execute_script("const s = document.getElementById('saved-said'); return [s?.previousElementSibling?.id, s?.getBoundingClientRect().top]"))
+            "const s = document.getElementById('saved-said'), r = s.getBoundingClientRect(), b = document.getElementById('minutes-own-save');"
+            " return s.parentElement.contains(b) && r.left >= b.getBoundingClientRect().right && r.top >= 0 && r.top + r.height / 2 <= innerHeight"),
+              browser.execute_script("const s = document.getElementById('saved-said'); return [s?.parentElement?.id, s?.getBoundingClientRect().left, s?.getBoundingClientRect().top]"))
         browser.set_window_size(1100, 800)
         browser.execute_script("location.hash = '#/'")
         time.sleep(0.5)
