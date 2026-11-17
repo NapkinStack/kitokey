@@ -2001,7 +2001,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   if (session.seconds !== null) lasts.append(element("span", "length", length(session.seconds)));
   if (session.audio > 0) lasts.append(element("span", "weighs", fill(words.audio_weighs, size(session.audio, words))));
   title.append(named, lasts, holdings(session, words, true));
-  head.append(title, top, ask);
+  head.append(title, top);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
   const drawn = element("section", "card drawn");
@@ -2032,7 +2032,8 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   gone.textContent = models_gone.map((step) => (step === "transcription" ? words.models_gone_transcription : words.models_gone_minutes)).join(" ");
   gone.hidden = models_gone.length === 0;
   const settings = contextCard(session, { context, transcript, minutes }, words, [spoken, secret], [left, secretSaid, spokenSaid, secretDescribed, gone]);
-  page.replaceChildren(head, settings, drawn, columns);
+  // The trash's question in its own card, under the head, as wide as the page's cards (D100).
+  page.replaceChildren(head, ask, settings, drawn, columns);
   // The line being said, marked while it plays; the page stays where the user left it (D26, the
   // decider, 2026-10-24: following the line was intrusive).
   if (player?.name === nameOf(session)) {
