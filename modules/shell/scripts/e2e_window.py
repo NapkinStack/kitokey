@@ -4433,7 +4433,9 @@ def focus_kept(now: dt.datetime) -> None:
     """BS. D101: a choice changed on a meeting's page or in Settings, by the keyboard or the mouse, keeps the
     focus on that control once saved and the page drawn again, the page not scrolled; a control the change
     removes leaves the focus near what took its place, never on the page's start. Every control of both
-    pages has an id of its own, so that it can be found again once drawn anew."""
+    pages has an id of its own, so that it can be found again once drawn anew. A control waiting for its
+    answer is never disabled, so never loses the focus (#886): « confidentielle » clicked twice while its
+    save runs keeps the first click's state, and while it waits a click, Space or Enter changes nothing."""
     print("BS. a choice changed on a meeting's page or in Settings: the focus stays on it, the page where it was — keyboard and mouse (D101)")
     meetings = WORK / "focus-kept"
     folder = meetings / "2026-10-29_10-00"
@@ -4545,6 +4547,29 @@ def focus_kept(now: dt.datetime) -> None:
                  lambda b: keys(b, Keys.ARROW_DOWN), lambda: (folder / "language").is_file())
             kept(browser, "a meeting's page, said confidential by a click", "confidential-switch",
                  lambda b: ActionChains(b).click(b.find_element(By.ID, "confidential-switch")).perform(), lambda: (folder / "confidential").exists(), mouse=True)
+            # ines's probe (#886, T10): a box clicked twice while its save runs keeps the first click's state.
+            # Two clicks in one script: the first's change handler marks it waiting before it awaits, so the
+            # second meets the guard whatever the IPC's speed.
+            twice = browser.execute_script("""const b = document.getElementById('confidential-switch');
+              b.click(); const between = [b.checked, b.getAttribute('aria-disabled')];
+              b.click(); return [between, [b.checked, b.getAttribute('aria-disabled')]];""")
+            settled = wait_for(browser, lambda b: not (folder / "confidential").exists() and b.execute_script(
+                "const b = document.getElementById('confidential-switch'); return !!b && b.getAttribute('aria-disabled') !== 'true'"), 10)
+            time.sleep(1)
+            after = browser.execute_script("const b = document.getElementById('confidential-switch'); return [b.checked, b.getAttribute('aria-disabled')]")
+            check("probe: « confidentielle » clicked twice in one go: the second held, the first's state saved and kept",
+                  twice == [[False, "true"], [False, "true"]] and settled and after == [False, None] and not (folder / "confidential").exists(),
+                  {"twice": twice, "settled": settled, "after": after, "file": (folder / "confidential").exists()})
+            # The guard by itself, mouse and keyboard: waiting set by hand, a real click and a real Space.
+            browser.execute_script("const b = document.getElementById('confidential-switch'); b.focus(); b.setAttribute('aria-disabled', 'true')")
+            ActionChains(browser).click(browser.find_element(By.ID, "confidential-switch")).perform()
+            keys(browser, Keys.SPACE)
+            keys(browser, Keys.ENTER)
+            time.sleep(1)
+            held = browser.execute_script("const b = document.getElementById('confidential-switch'); return [b.checked, document.activeElement && document.activeElement.id]")
+            check("probe: waiting, a click, Space and Enter change nothing, the focus kept",
+                  held == [False, "confidential-switch"] and not (folder / "confidential").exists(), {"held": held, "file": (folder / "confidential").exists()})
+            browser.execute_script("document.getElementById('confidential-switch').removeAttribute('aria-disabled')")
             if browser.execute_script("const p = document.getElementById('context-panel'); return !!p && p.hidden"):
                 press(browser, "context-toggle")
             kept(browser, "a meeting's page, its context typed", "context-text",
