@@ -214,10 +214,15 @@ impl Shell {
     /// Reads the settings file again — the user may have changed it by hand — and holds what it
     /// says; a file that cannot be read is said, by its name and not its path, and what was held
     /// stays.
-    fn reread(&self) -> Result<Settings, String> {
+    fn reread(&self) -> Result<Settings, settings::Unread> {
         let read = settings::file().map_or_else(
             || Ok(Settings::default()),
-            |file| settings::read(&file).map_err(|why| settings::unnamed(&why, &file)),
+            |file| {
+                settings::read(&file).map_err(|why| settings::Unread {
+                    detail: settings::unnamed(&why.detail, &file),
+                    ..why
+                })
+            },
         );
         if let Ok(settings) = &read {
             *self.settings.lock().unwrap() = settings.clone();
@@ -266,7 +271,7 @@ impl Shell {
 
     /// The settings read again for a command.
     fn read_or_told(&self) -> Result<Settings, Told> {
-        self.reread().map_err(|why| self.told(Failure::SettingsUnread, why))
+        self.reread().map_err(|why| self.told(Failure::SettingsUnread(why.refused), why))
     }
 
     /// The settings written for a command.
@@ -362,7 +367,7 @@ fn main() {
             speech_shown,
             transcription_saved,
             transcription_tested,
-            hearing_models,
+            transcription_models,
             speech_installed,
             ollama_pull_offered,
             header,
@@ -585,7 +590,11 @@ fn main() {
             let refused = licence::refused(&licence, &sessions, seconds_now());
             tracing::info!(licence = %answer, refused, "shell.licence_read");
             if let Err(why) = read {
-                tell(app.handle(), &words::trouble(&Trouble::Settings(why), language));
+                // The sentence of `settings.rs` to the log, by the file's name; the user is told which
+                // setting and what to do (#783).
+                let detail = settings::file().map_or_else(|| why.detail.clone(), |file| settings::unnamed(&why.detail, &file));
+                tracing::warn!(%detail, "shell.settings_unread");
+                tell(app.handle(), &words::trouble(&Trouble::Settings(why.refused), language));
             }
             // A recording a Kitokey ended before this one left running: shown, and stopped from here (#773).
             found(app.handle());
@@ -672,7 +681,7 @@ fn offer_recording(app: &AppHandle, application: String) {
                 tracing::info!("shell.offer_off");
                 let shell = app.state::<Shell>();
                 let _saving = shell.saving.lock().unwrap();
-                let saved = shell.reread().and_then(|mut settings| {
+                let saved = shell.reread().map_err(|why| why.detail).and_then(|mut settings| {
                     settings.offer = false;
                     let file = settings::file().ok_or("this system names no folder for settings")?;
                     settings::write(&file, &settings).map_err(|error| error.to_string())?;
@@ -732,7 +741,7 @@ fn show_welcome(app: &AppHandle) {
     let shell = app.state::<Shell>();
     {
         let _saving = shell.saving.lock().unwrap();
-        let written = shell.reread().and_then(|mut settings| {
+        let written = shell.reread().map_err(|why| why.detail).and_then(|mut settings| {
             settings.welcomed = true;
             let file = settings::file().ok_or("this system names no folder for settings")?;
             settings::write(&file, &settings).map_err(|error| error.to_string())?;
@@ -1699,7 +1708,7 @@ fn models_offered(shell: State<'_, Shell>, name: Option<String>) -> Result<Model
     // Settings unreadable: offered from those in memory, and said — the panel still opens.
     let (settings, unreadable) = match shell.reread() {
         Ok(settings) => (settings, None),
-        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked, why))),
+        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked(why.refused), why))),
     };
     let (mut chosen, gone, confidential) = match &name {
         Some(name) => {
@@ -2337,7 +2346,6 @@ struct SettingsShown {
     /// host it is read again from on the user's gesture (D40).
     offered: Vec<Offered>,
     registry_host: String,
-    registry_waits: bool,
     /// The services that hear, offered by name (D63).
     hearing: Vec<providers::Hearing>,
     /// The language meetings are spoken in, none: detected; and those offered first (D65).
@@ -2384,7 +2392,7 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
     let (autostart, autostart_offered, autostart_held) = startup_shown();
     let (settings, unreadable) = match shell.reread() {
         Ok(settings) => (settings, None),
-        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked, why))),
+        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked(why.refused), why))),
     };
     let models = settings::whisper_models(&models_folder(), &settings)
         .into_iter()
@@ -2423,7 +2431,6 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
         transcription_agreed: settings.transcription_agreed.clone(),
         models,
         registry_host: registry::host(&registry_address()).to_owned(),
-        registry_waits: registry::PUBLIC_KEY.is_none(),
         hearing: providers::hearing(),
         meeting_language: settings.meeting_language.clone(),
         languages: spoken::OFFERED.to_vec(),
@@ -2797,23 +2804,30 @@ async fn transcription_saved(
     Ok(not_kept)
 }
 
-/// The transcription models a service that hears offers (D63): listed by the service where it
-/// lists them, else those it publishes. Nothing of a meeting is sent; no key is needed to list.
+/// A hearing service's models, asked with the key the user typed — or the one kept for its host
+/// under the transcription's account —: the key tested at once (D95), as the summary's is. Only the
+/// ids come back; nothing is kept, the key never logged. Refused, the cause in the Tester's sentence.
 #[tauri::command]
-async fn hearing_models(shell: State<'_, Shell>, index: usize) -> Result<Vec<String>, Told> {
+async fn transcription_models(shell: State<'_, Shell>, index: usize, key: Option<String>) -> Result<Vec<String>, Told> {
     let service = providers::hearing()
         .into_iter()
         .nth(index)
         .ok_or_else(|| shell.told(Failure::Unexpected, "no such service"))?;
-    let published = || service.models.iter().map(|model| model.to_string()).collect();
-    if !service.listed {
-        return Ok(published());
-    }
-    let address = service.address.clone();
-    let listed = tauri::async_runtime::spawn_blocking(move || providers::hearing_listed(&address))
-        .await
-        .map_err(|error| shell.told(Failure::Unexpected, error))?;
-    Ok(listed.unwrap_or_else(published))
+    let host = providers::host(&service.address).unwrap_or_default();
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&transcription::key_account(&host)).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::hearing_models(&service, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
 }
 
 /// *Tester* for who hears: `kitokey-transcription --test` sends a sound of its own to the service
@@ -3283,8 +3297,8 @@ fn write_minutes_from(
     let settings = match shell.reread() {
         Ok(settings) => settings,
         Err(why) => {
-            refused(why.clone());
-            return tell(app, &words::trouble(&Trouble::Settings(why), shell.language()));
+            refused(why.detail);
+            return tell(app, &words::trouble(&Trouble::Settings(why.refused), shell.language()));
         }
     };
     let named = settings.minutes_provider.clone().zip(settings.minutes_model.clone());
@@ -3917,7 +3931,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         return Ok(());
     }
     shell.transcripts_tried.lock().unwrap().insert(folder.clone(), Some(again.clone()));
-    let read = shell.reread().map_err(|why| (Failure::SettingsUnread, why))?;
+    let read = shell.reread().map_err(|why| (Failure::SettingsUnread(why.refused), why.detail))?;
     // The models this computer lists, as Settings name theirs: a Refaire… may pick Settings' own.
     let listed = settings::whisper_models(&models_folder(), &read);
     let settings = own(&read, &folder);

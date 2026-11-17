@@ -4,6 +4,7 @@
 use crate::{
     recording::{Said, Source},
     registry::Good,
+    settings::Refused,
     summarising::Cause,
     transcription::Made,
     trial::Left,
@@ -337,10 +338,13 @@ pub struct Window {
     pub list_unread_do: &'static str,
     /// The settings file cannot be read: said above every page but Settings (#770) — never read since
     /// Kitokey started, then read before and its last settings held.
+    /// Shows: a banner above every page but Settings. When: the settings file cannot be read and was
+    /// never read since Kitokey started. At most: no limit. Placeholders: none.
     pub settings_banner: &'static str,
+    /// Shows: a banner above every page but Settings. When: the settings file cannot be read, read
+    /// before, its last settings held. At most: no limit. Placeholders: none.
     pub settings_banner_kept: &'static str,
     pub again_refused: &'static str,
-    pub hearing_models_refused: &'static str,
     pub fold_not_kept: &'static str,
     pub agreement_refused: &'static str,
     pub meeting_not_opened: &'static str,
@@ -428,7 +432,6 @@ pub struct Window {
     /// what is said when it could not be.
     pub offered_refresh: &'static str,
     pub offered_refresh_failed: &'static str,
-    pub offered_refresh_waits: &'static str,
     /// Apple's SpeechAnalyzer among who hears, on a Mac with macOS 26 (D42): its name in the
     /// choice; its model not on the Mac yet; the gesture that has macOS fetch it, and from whom;
     /// while it comes; when it did not.
@@ -437,12 +440,9 @@ pub struct Window {
     pub speech_fetch: &'static str,
     pub speech_fetching: &'static str,
     pub speech_failed: &'static str,
-    /// A service that hears (D43): the choice's group, its fields, the agreement before anything is
-    /// sent to its host, the gestures, and what they say.
-    pub service_group: &'static str,
+    /// A service that hears (D43): its fields, the agreement before anything is sent to its host,
+    /// the gestures, and what they say.
     pub service_option: &'static str,
-    /// A model the service's list does not hold, typed (D63).
-    pub service_other_model: &'static str,
     pub service_address: &'static str,
     pub service_model: &'static str,
     pub service_key: &'static str,
@@ -451,6 +451,9 @@ pub struct Window {
     pub service_test: &'static str,
     pub service_tested: &'static str,
     pub service_saved: &'static str,
+    /// Shows: Settings, « Transcription », under the service's form, once saved. When: the address saved is
+    /// this computer's, where nothing leaves it (#775). At most: one line. Placeholders: none.
+    pub service_saved_here: &'static str,
     pub service_agree_first: &'static str,
     pub service_address_bad: &'static str,
     pub service_model_named: &'static str,
@@ -476,6 +479,7 @@ pub struct Window {
     pub autostart_held: [&'static str; 2],
     pub keep_audio: [&'static str; 2],
     /// The settings' last group: Kitokey itself, as GNOME's preferences name it (D95).
+    /// Shows: Settings, as a heading. When: always. At most: no limit. Placeholders: none.
     pub general_title: &'static str,
     /// Folded at the bottom of « Général », and its one switch: what a program said of a failure,
     /// shown on the page under the sentence (D29).
@@ -644,13 +648,19 @@ pub struct Window {
     pub transcript_model_needed: &'static str,
     pub transcript_model_coming: &'static str,
     /// The button that ends what is being made of a meeting, or takes it out of the line (D92).
+    /// Shows: a button on a meeting's page, beside what is being made. When: its transcript or minutes
+    /// are being made, or waiting in line. At most: no limit. Placeholders: none.
     pub making_cancel: &'static str,
     /// « Annuler » refused — its meeting gone meanwhile (D92). Shows: a meeting's page, beside the
     /// making's line, until the next gesture on it. When: the shell refused to end or take out the
     /// making. At most: no limit. Placeholders: {} why it was refused.
     pub making_cancel_failed: &'static str,
     /// Said on its page once the user cancelled its transcript, or its minutes: what was there stays.
+    /// Shows: a meeting's page, where its transcript is. When: the user cancelled its transcript.
+    /// At most: no limit. Placeholders: none.
     pub transcript_stopped: &'static str,
+    /// Shows: a meeting's page, where its minutes are. When: the user cancelled its minutes.
+    /// At most: no limit. Placeholders: none.
     pub minutes_stopped: &'static str,
     pub ran_online: &'static str,
     /// The header's button, at rest and while a recording runs.
@@ -834,7 +844,6 @@ pub fn window(language: Language) -> Window {
             settings_banner: "Settings cannot be read: your meetings are not shown.",
             settings_banner_kept: "Settings cannot be read: the last ones read stay in use, and no change is saved until the file is fixed.",
             again_refused: "It could not start again: {}",
-            hearing_models_refused: "This service’s models could not be read, you can type one: {}",
             fold_not_kept: "The sidebar will be back as it was at the next start: {}",
             agreement_refused: "This meeting cannot be sent: {}",
             meeting_not_opened: "This meeting could not be opened: {}",
@@ -902,15 +911,12 @@ pub fn window(language: Language) -> Window {
             offered_needs_ollama: "Needs Ollama — install it from ollama.com",
             offered_refresh: "Update the list ({})",
             offered_refresh_failed: "The list could not be updated: the models above are still offered.",
-            offered_refresh_waits: "The list cannot be updated yet: it waits on the key that signs it. The models above are still offered.",
             speech_option: "Apple's SpeechAnalyzer, on this Mac",
             speech_missing: "Apple's model is not on this Mac yet",
             speech_fetch: "Download Apple's model (macOS fetches it from Apple)",
             speech_fetching: "macOS is downloading Apple's model…",
             speech_failed: "Apple's model was not downloaded. Try again later; Whisper still hears.",
-            service_group: "A service",
             service_option: "A service I name",
-            service_other_model: "Another model…",
             service_address: "Its address",
             service_model: "Its model",
             service_key: "Its key, if it asks for one",
@@ -919,6 +925,7 @@ pub fn window(language: Language) -> Window {
             service_test: "Test",
             service_tested: "It hears, with each segment’s times: a sound of Kitokey’s own was transcribed.",
             service_saved: "Saved: {} hears your next meetings.",
+            service_saved_here: "Saved: this computer hears your next meetings.",
             service_agree_first: "Nothing is saved: agree first that your meetings’ sound is sent to {}.",
             service_address_bad: "Nothing is saved: the address starts with https:// or http://, then the service’s host — for example https://api.groq.com/openai/v1.",
             service_model_named: "Nothing is saved: name the model the service hears with — for example whisper-large-v3.",
@@ -1259,7 +1266,6 @@ pub fn window(language: Language) -> Window {
             settings_banner: "Les réglages ne peuvent pas être lus\u{a0}: vos réunions ne sont pas affichées.",
             settings_banner_kept: "Les réglages ne peuvent pas être lus\u{a0}: les derniers lus restent en usage, et aucun changement n’est enregistré tant que le fichier n’est pas corrigé.",
             again_refused: "Impossible de recommencer\u{a0}: {}",
-            hearing_models_refused: "Les modèles de ce service n’ont pas pu être lus, vous pouvez en saisir un\u{a0}: {}",
             fold_not_kept: "La barre latérale reviendra comme avant au prochain démarrage\u{a0}: {}",
             agreement_refused: "Cette réunion ne peut pas être envoyée\u{a0}: {}",
             meeting_not_opened: "Cette réunion n’a pas pu être ouverte\u{a0}: {}",
@@ -1330,15 +1336,12 @@ pub fn window(language: Language) -> Window {
             offered_needs_ollama: "Nécessite Ollama, à installer depuis ollama.com",
             offered_refresh: "Mettre à jour la liste ({})",
             offered_refresh_failed: "La liste n’a pas pu être mise à jour\u{a0}: les modèles ci-dessus restent proposés.",
-            offered_refresh_waits: "La liste ne peut pas encore être mise à jour\u{a0}: elle attend la clé qui la signe. Les modèles ci-dessus restent proposés.",
             speech_option: "SpeechAnalyzer d’Apple, sur ce Mac",
             speech_missing: "le modèle d’Apple n’est pas encore sur ce Mac",
             speech_fetch: "Télécharger le modèle d’Apple (macOS le télécharge depuis Apple)",
             speech_fetching: "macOS télécharge le modèle d’Apple…",
             speech_failed: "Le modèle d’Apple n’a pas été téléchargé. Réessayez plus tard\u{202f}; Whisper reste disponible.",
-            service_group: "Un service",
             service_option: "Un service que je choisis",
-            service_other_model: "Un autre modèle…",
             service_address: "Son adresse",
             service_model: "Son modèle",
             service_key: "Sa clé, s’il en demande une",
@@ -1347,6 +1350,7 @@ pub fn window(language: Language) -> Window {
             service_test: "Tester",
             service_tested: "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit.",
             service_saved: "Enregistré\u{a0}: {} transcrira vos prochaines réunions.",
+            service_saved_here: "Enregistré\u{a0}: cet ordinateur transcrira vos prochaines réunions.",
             service_agree_first: "Rien n’est enregistré\u{a0}: acceptez d’abord que le son de vos réunions soit envoyé à {}.",
             service_address_bad: "Rien n’est enregistré\u{a0}: l’adresse commence par https:// ou http://, puis l’hôte du service — par exemple https://api.groq.com/openai/v1.",
             service_model_named: "Rien n’est enregistré\u{a0}: nommez le modèle avec lequel le service entend — par exemple whisper-large-v3.",
@@ -1669,8 +1673,8 @@ pub fn window(language: Language) -> Window {
 pub enum Trouble {
     /// The program that records could not be started: what the system said of it.
     NoRecorder(String),
-    /// The settings file was not read: the sentence that says which file, and what in it.
-    Settings(String),
+    /// The settings file was not read: which setting, on which line (#783).
+    Settings(Refused),
     /// The desktop did not bind the global shortcut: what it said of it.
     Shortcut(String),
     /// The model a transcript is heard with is not on the machine: where it was looked for.
@@ -1712,8 +1716,10 @@ pub enum Failure {
     FolderNotWhole,
     FolderUnmade,
     Autostart,
-    SettingsUnread,
-    SettingsLocked,
+    /// The settings file refused, which setting and where (#783): under the command it stopped,
+    /// and, `SettingsLocked`, alone on Settings.
+    SettingsUnread(Refused),
+    SettingsLocked(Refused),
     SettingsUnwritten,
     FolderNotOpened,
     KeyboardSettings,
@@ -1768,12 +1774,29 @@ pub fn failure(failure: Failure, language: Language) -> String {
         (Failure::Autostart, French) => {
             "le démarrage à l’ouverture de session n’a pas pu être changé\u{a0}: vérifiez que votre dossier personnel peut être écrit."
         }
-        (Failure::SettingsUnread, English) => "the settings file cannot be read: correct it, then try again.",
-        (Failure::SettingsUnread, French) => "le fichier des réglages ne peut pas être lu\u{a0}: corrigez-le, puis réessayez.",
-        (Failure::SettingsLocked, English) => "The settings file cannot be read: Kitokey does not write over it until it is corrected.",
-        (Failure::SettingsLocked, French) => {
-            "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé."
+        // Shows: under a command the window refused, after « not saved: », then the refusal.
+        // When: the settings file cannot be read as settings. At most: no limit. Placeholders: {} the refusal.
+        (Failure::SettingsUnread(why), English) => return format!("the settings file cannot be read. {}", refused(&why, language)),
+        (Failure::SettingsUnread(why), French) => {
+            return format!("le fichier des réglages ne peut pas être lu. {}", refused(&why, language));
         }
+        // Shows: alone on Settings, then the refusal. When: the settings file cannot be read.
+        // At most: no limit. Placeholders: {} the refusal.
+        (Failure::SettingsLocked(why), English) => {
+            return format!(
+                "The settings file cannot be read: Kitokey does not write over it until it is corrected. {}",
+                refused(&why, language)
+            );
+        }
+        (Failure::SettingsLocked(why), French) => {
+            return format!(
+                "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {}",
+                refused(&why, language)
+            );
+        }
+        // Shows: under a command the window refused, after « not saved: », or alone where the page
+        // shows it (the folder, the keyboard settings). When: the command named by its arm fails.
+        // At most: no limit. Placeholders: none.
         (Failure::SettingsUnwritten, English) => "the settings file could not be written: check that the disk has room, then try again.",
         (Failure::SettingsUnwritten, French) => {
             "le fichier des réglages n’a pas pu être écrit\u{a0}: vérifiez qu’il reste de la place, puis réessayez."
@@ -2051,6 +2074,49 @@ pub fn cause(cause: Cause, language: Language) -> &'static str {
     }
 }
 
+/// What the user is told of a settings file refused (#783): which setting, on which line, and the
+/// gesture — never `settings.rs`'s own sentence, which stays for the log and developer mode.
+pub fn refused(refused: &Refused, language: Language) -> String {
+    use Language::{English, French};
+    // Shows: after the sentence of a notification or a page that says the file was not read.
+    // When: `settings::read` refuses the file. At most: no limit. Placeholders: {line} the line,
+    // {key} the setting's name as the file writes it — one of Kitokey's own, never what the user typed.
+    match (*refused, language) {
+        (Refused::Unopened, English) => "Kitokey cannot open its settings file: check that you may read it.".into(),
+        (Refused::Unopened, French) => "Kitokey ne peut pas ouvrir son fichier de réglages\u{a0}: vérifiez que vous pouvez le lire.".into(),
+        (Refused::Unparsed { line, key: Some(key) }, English) => {
+            format!("Line {line}: Kitokey does not understand the value of “{key}”. Correct it, or remove the line.")
+        }
+        (Refused::Unparsed { line, key: Some(key) }, French) => {
+            format!("Ligne {line}\u{a0}: Kitokey ne comprend pas la valeur de «\u{a0}{key}\u{a0}». Corrigez-la, ou supprimez la ligne.")
+        }
+        (Refused::Unparsed { line, key: None }, English) => {
+            format!("Line {line} is not written as a setting. Correct it, or remove it.")
+        }
+        (Refused::Unparsed { line, key: None }, French) => {
+            format!("La ligne {line} n’est pas écrite comme un réglage. Corrigez-la, ou supprimez-la.")
+        }
+        (Refused::SessionsNotWhole { line }, English) => {
+            format!("Line {line}: “sessions” gives a folder’s whole path, from / or from ~. Correct it.")
+        }
+        (Refused::SessionsNotWhole { line }, French) => {
+            format!("Ligne {line}\u{a0}: «\u{a0}sessions\u{a0}» donne le chemin entier d’un dossier, depuis / ou depuis ~. Corrigez-le.")
+        }
+        (Refused::ModelNotWhole { line }, English) => {
+            format!("Line {line}: “model” gives a file’s whole path, from / or from ~. Correct it.")
+        }
+        (Refused::ModelNotWhole { line }, French) => {
+            format!("Ligne {line}\u{a0}: «\u{a0}model\u{a0}» donne le chemin entier d’un fichier, depuis / ou depuis ~. Corrigez-le.")
+        }
+        (Refused::KeepAudio { line }, English) => {
+            format!("Line {line}: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it.")
+        }
+        (Refused::KeepAudio { line }, French) => format!(
+            "Ligne {line}\u{a0}: «\u{a0}keep_audio\u{a0}» vaut «\u{a0}always\u{a0}» ou un nombre de jours, de 1 à 36\u{202f}500. Corrigez-le."
+        ),
+    }
+}
+
 /// What the user is told of a trouble: what it is, and what still works. Where the user has
 /// something to put right — the settings file's line, the place the model goes —, it says where;
 /// never what a program or the system said (D29).
@@ -2066,21 +2132,30 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
             "Kitokey ne peut pas enregistrer",
             "Son programme d’enregistrement n’a pas pu démarrer. Réinstaller Kitokey le remet en place.",
         ),
+        // Shows: a notification at a start, its body then the refusal. When: the settings file cannot
+        // be read. At most: no limit. Placeholders: {} the refusal.
         (Trouble::Settings(why), English) => {
             return said(
                 "Your settings were not read",
-                format!("Kitokey runs with its defaults until the file is corrected: {}.", detail(why)),
+                format!(
+                    "Kitokey runs with its defaults until the file is corrected. {}",
+                    refused(why, language)
+                ),
             );
         }
         (Trouble::Settings(why), French) => {
             return said(
                 "Vos réglages n’ont pas été lus",
                 format!(
-                    "Kitokey fonctionne avec ses réglages par défaut tant que le fichier n’est pas corrigé\u{a0}: {}.",
-                    detail(why)
+                    "Kitokey fonctionne avec ses réglages par défaut tant que le fichier n’est pas corrigé. {}",
+                    refused(why, language)
                 ),
             );
         }
+        // Shows: a notification, its title then its body. When: the shortcut is not bound, the model or
+        // the program that hears is missing, the meetings' folder cannot be written, or no recording is
+        // there to transcribe. At most: the title, 50 characters; the body, no limit. Placeholders:
+        // {at} where the model is looked for, or the folder.
         (Trouble::Shortcut(_), English) => (
             "The keyboard shortcut is not set",
             "The menu of Kitokey’s icon still starts and stops a recording.",

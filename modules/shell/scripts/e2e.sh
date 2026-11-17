@@ -11,6 +11,11 @@ cd "$(dirname "$0")/.."
 mkdir -p .evidence
 : > .evidence/e2e.txt
 say() { echo "$*" | tee -a .evidence/e2e.txt; }
+# Each of the tray's scenarios timed, said when the next one begins or the window's part does: where
+# a run's minutes go (#862). `SECONDS` is bash's own clock, whole seconds.
+scenario="" scenario_at=0
+scenario_done() { [ -z "$scenario" ] || say "    ($scenario: $((SECONDS - scenario_at)) s)"; scenario=""; }
+scenario() { scenario_done; scenario=$1; scenario_at=$SECONDS; say "$1. $2"; }
 # A partial run's names (KITOKEY_E2E_ONLY, scripts/e2e_only.py), checked before anything is built or
 # started: a typo refused at once, named; a blank value a full run. Passed on as read, for the window
 # and the logs to read the same.
@@ -84,17 +89,22 @@ start() { # the language, the settings file's text, the recorder
   # Its own tray item, found by its program's number: a Kitokey the user runs has one too. The
   # watcher lists an item as `bus@path`, or since GNOME's AppIndicator 66 as its path alone: the
   # bus is the one of the program's own that answers for that path's menu.
-  item=""
-  for _ in $(seq 100); do
-    for one in $(busctl --user get-property $watcher RegisteredStatusNotifierItems | grep -o '[^" ]*kitokey[^" ]*'); do
-      for name in $(busctl --user list --no-legend 2>/dev/null | awk -v pid="$app" '$2 == pid && $1 ~ /^:/ {print $1}'); do
-        busctl --user call "$name" "${one#*@}/Menu" com.canonical.dbusmenu GetLayout iias 0 -- -1 0 >/dev/null 2>&1 &&
-          item="$name@${one#*@}"
+  # Each call bounded to a second: one of the program's connections that does not serve the menu
+  # left a call waiting for D-Bus's own 25 s, twice a start — 50 s each, 23 minutes a run (#862).
+  # The same 50 s bound the whole search; found, it stops at once.
+  item="" started_at=$SECONDS tries=0
+  while [ -z "$item" ] && [ $((SECONDS - started_at)) -lt 50 ]; do
+    tries=$((tries + 1))
+    for one in $(busctl --user --timeout=1 get-property $watcher RegisteredStatusNotifierItems | grep -o '[^" ]*kitokey[^" ]*'); do
+      for name in $(busctl --user --timeout=1 list --no-legend 2>/dev/null | awk -v pid="$app" '$2 == pid && $1 ~ /^:/ {print $1}'); do
+        busctl --user --timeout=1 call "$name" "${one#*@}/Menu" com.canonical.dbusmenu GetLayout iias 0 -- -1 0 >/dev/null 2>&1 &&
+          item="$name@${one#*@}" && break 2
       done
     done
-    [ -n "$item" ] && break
-    sleep 0.1
+    [ -n "$item" ] || sleep 0.1
   done
+  # How long the tray item took to be found, and in how many looks (#862).
+  say "    (started: its tray item found in $((SECONDS - started_at)) s, $tries look(s))"
   bus=${item%@*}; menu=${item#*@}/Menu
 }
 again() { # a second start, the first one's settings: it hands over to the running one and leaves
@@ -144,7 +154,7 @@ PLAYED
 chmod +x "$work/kitokey-transcription"
 : > "$work/model.bin"
 
-say "A. in French: start from the menu, the reminder, a silent source, stop"
+scenario A "in French: start from the menu, the reminder, a silent source, stop"
 start fr_FR.UTF-8 "transcript = false" "$work/kitokey-capture"
 check is "$(labels)" "Ouvrir Kitokey|Démarrer un enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Kitokey"
 # A window is a web view, a process of WebKit's under Kitokey: none before the user asks.
@@ -184,13 +194,13 @@ check is "$(titles 'Enregistrement arrêté')" 0
 check test ! -e "$work/sessions/heard"
 check is "$(grep -c 'La transcription suit' "$work/notified")" 0
 
-say "B. quit while recording: the recording is stopped first, then Kitokey leaves"
+scenario B "quit while recording: the recording is stopped first, then Kitokey leaves"
 click 3; rm -f "$work/sessions/told"
 click 6; sleep 1
 check is "$(cat "$work/sessions/told")" "stop"
 check is "$(kill -0 "$app" 2>/dev/null && echo running || echo gone)" "gone"
 
-say "C. in English, the reminder switched off; Kitokey killed while recording"
+scenario C "in English, the reminder switched off; Kitokey killed while recording"
 start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/kitokey-capture"
 check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
 click 3
@@ -201,7 +211,7 @@ check test ! -e "$work/sessions/told"          # the recorder was not told to st
 check kill -0 "$recorder"                       # and it records on
 kill "$recorder" 2>/dev/null || true            # gone before the next start finds it (S2)
 
-say "D. no recorder, or one that ends before it starts: said, and the menu still offers to start"
+scenario D "no recorder, or one that ends before it starts: said, and the menu still offers to start"
 start en_GB.UTF-8 "transcript = false" "$work/nowhere"
 click 3
 check is "$(titles 'Kitokey cannot record')" 1
@@ -217,7 +227,7 @@ check grep -q 'Installing Kitokey again puts it back.' "$work/notified"
 check is "$(grep -c 'nothing to record' "$work/notified")" 0
 click 6
 
-say "E. one gesture, pressed twice: one recording; a recorder that never ends: quit asked twice leaves"
+scenario E "one gesture, pressed twice: one recording; a recorder that never ends: quit asked twice leaves"
 printf '#!/bin/sh\necho $$ > "$2/stubborn"\necho x >> "$2/starts"\necho "{\\"event\\":\\"started\\",\\"folder\\":\\"$2/s\\"}"\nwhile read line; do echo "$line" >> "$2/told"; done\nexec sleep 20\n' > "$work/stubborn"; chmod +x "$work/stubborn"
 start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/stubborn"
 busctl --user call "$bus" "$menu" com.canonical.dbusmenu Event isvu 3 clicked s "" 0 >/dev/null
@@ -232,7 +242,7 @@ click 6
 check is "$(kill -0 "$app" 2>/dev/null && echo waiting || echo gone)" "gone"
 kill "$(cat "$work/sessions/stubborn")" 2>/dev/null || true   # still going: gone before F's start finds it
 
-say "F. the transcript follows the stop; a failed one is made again from the menu; no model is said"
+scenario F "the transcript follows the stop; a failed one is made again from the menu; no model is said"
 # The logs' level chosen in the developer mode reaches the programs Kitokey starts (D29).
 start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"\nlog = \"debug\"" "$work/kitokey-capture"
 click 3; click 3; sleep 1
@@ -278,7 +288,7 @@ check is "$(titles 'No transcript: the model is missing')" 1
 check is "$(wc -l < "$work/sessions/heard")" 7
 click 6
 
-say "G. the default model missing: offered with its size and host, fetched on the click, then the transcripts in line"
+scenario G "the default model missing: offered with its size and host, fetched on the click, then the transcripts in line"
 mkdir -p "$work/served"; head -c 300000 /dev/urandom > "$work/served/model.bin"; head -c 300000 /dev/urandom > "$work/right.bin"
 # Served slowly — 30 kB every 0.6 s, six seconds a fetch — so that a stop can come during one.
 (cd "$work/served" && exec python3 -u -c '
@@ -324,7 +334,7 @@ check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording
 click 6
 published=""
 
-say "L. audio kept longer than the settings say goes to the trash, the transcript stays"
+scenario L "audio kept longer than the settings say goes to the trash, the transcript stays"
 old="$work/sessions/2026-01-05_09-00"
 mkdir -p "$old/derived"
 printf '{"contract":"session-audio/v2","started":"2026-01-05T09:00:00+01:00","stopped":"2026-01-05T10:00:00+01:00","tracks":{}}' > "$old/session.json"
@@ -349,7 +359,7 @@ check test -n "$(find "$work/data/Trash/files" -name 'local*.wav' 2>/dev/null)"
 check is "$(titles 'Audio mis à la corbeille')" 1
 click 6
 
-say "M. the minutes from the tray: on this computer at once; online only once agreed, nothing sent before"
+scenario M "the minutes from the tray: on this computer at once; online only once agreed, nothing sent before"
 # kitokey-summary played here: it says what it was given and writes the minutes.
 cat > "$work/kitokey-summary" <<'PLAYED'
 #!/bin/sh
@@ -404,7 +414,7 @@ check is "$(( $(titles 'Enregistrement en cours') - reminded ))/$(( $(titles 'En
 check grep -Eq '[0-9] (s|min) enregistrées?\. La transcription suit\.' "$work/notified"
 click 6
 
-say "S. a call takes a microphone in another application: offered once, named; never while recording, nor with offers off (D30)"
+scenario S "a call takes a microphone in another application: offered once, named; never while recording, nor with offers off (D30)"
 # The call is pw-record on a microphone made for the run, the system's default meanwhile, so
 # that nothing reaches the computer's own: nobody is recorded.
 if ! command -v pw-record >/dev/null || [ -n "$(pactl list short source-outputs 2>/dev/null)" ]; then
@@ -422,9 +432,24 @@ else
   # pressed as a click presses them — the signal the desktop sends, typed as it types it (u, s).
   dbus-monitor --session "type='method_return',sender='org.freedesktop.Notifications'" > "$work/answered" 2>/dev/null &
   answers=$!
+  # The offer is counted when Kitokey asks for it; its number comes with the desktop's answer to
+  # that very call, a moment later: a gesture waits for it, never takes the last number seen.
   gesture() {
+    local call id=""
+    call=$(awk -v title="   string \"pw-cat utilise votre micro\"" '
+      /^method call/ { ours = / destination=org\.freedesktop\.Notifications /
+        match($0, / sender=[^ ]+/); from = substr($0, RSTART + 8, RLENGTH - 8)
+        match($0, / serial=[0-9]+/); serial = substr($0, RSTART + 8, RLENGTH - 8) }
+      ours && $0 == title { last = from " " serial } END { print last }' "$work/notified")
+    for _ in $(seq 50); do
+      id=$(awk -v to="${call% *}" -v serial="${call#* }" '
+        /^method return/ { ours = index($0, " destination=" to " ") && $0 ~ (" reply_serial=" serial "$") }
+        ours && /^ +uint32 / { print $2; exit }' "$work/answered")
+      [ -n "$id" ] && break
+      sleep 0.1
+    done
     gdbus emit --session --object-path /org/freedesktop/Notifications --signal \
-      org.freedesktop.Notifications.ActionInvoked "uint32 $(grep -oE '^ +uint32 [0-9]+' "$work/answered" | tail -1 | awk '{print $2}')" "'$1'" >/dev/null
+      org.freedesktop.Notifications.ActionInvoked "uint32 $id" "'$1'" >/dev/null
     sleep 1
   }
   settings_file="$work/config/kitokey/settings.toml"
@@ -509,7 +534,7 @@ else
   pactl unload-module "$mic_module"; mic_module=""
 fi
 
-say "S2. Kitokey ended while recording, started again: the recording it left is found, shown from its start, and stopped (#773)"
+scenario S2 "Kitokey ended while recording, started again: the recording it left is found, shown from its start, and stopped (#773)"
 # The recorder played as the real one behaves when its shell is gone: the session's file written at the
 # start, its input closed and its output gone no order to stop, stopped by a signal (recording/v1).
 cat > "$work/orphaned" <<'PLAYED'
@@ -577,6 +602,7 @@ rm -rf "$work/sessions/2026-11-13_09-00" "$work/sessions/recorder"
 
 fi
 
+scenario_done
 # The window (cycle 03): Kitokey started with --window by tauri-driver, its page read over
 # WebDriver (scripts/e2e_window.py). For a few seconds a window appears, twice.
 if ! command -v WebKitWebDriver >/dev/null; then

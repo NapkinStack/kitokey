@@ -2083,14 +2083,114 @@ function choice(name, value, [label, says], checked, disabled) {
 let testing = false;
 // Settings' « Avancé » unfolded: kept while Settings are drawn again, as a choice there redraws them.
 let generalAdvanced = false;
-// The summary's « Avancé » unfolded: kept while Settings are drawn again (D95).
-let minutesAdvanced = false;
-// Each service's last answer to « Vérifier la clé », by its place in the list: what it refused, or
-// the models it listed — kept while Settings are drawn again by a model come or the window's
-// width, until the user acts (ux.md: an error stays until corrected). Another address forgets it.
-let minutesAnswers = new Map();
-// Where, and which service, chosen and not yet saved: kept the same way.
-let minutesChosen = {};
+// « Modèles à télécharger » unfolded by the user, kept over the page's drawings (#782).
+let offeredOpen = false;
+// Each guided path's own (D95), the summary's and the transcription's: « Avancé » unfolded, kept
+// while Settings are drawn again; each service's last answer to « Vérifier la clé », by its place
+// in the list — what it refused, or the models it listed —, and where and which service chosen,
+// not yet saved: kept while Settings are drawn again by a model come or the window's width, until
+// the user acts (ux.md: an error stays until corrected). Another address forgets these two.
+const guided = {};
+for (const path of ["minutes", "transcription"]) guided[path] = { advanced: false, answers: new Map(), chosen: {} };
+
+// The guided path's pieces (D95), the same for the transcription and the summary.
+function guidedField(id, text, type, value, locked) {
+  const wrap = element("label", "field");
+  wrap.htmlFor = id;
+  const input = element("input");
+  input.id = id;
+  input.type = type;
+  input.value = value || "";
+  input.defaultValue = input.value;
+  input.disabled = locked;
+  wrap.append(element("span", "name", text), input);
+  return [wrap, input];
+}
+
+function guidedList(id, text, locked) {
+  const wrap = element("label", "field");
+  wrap.htmlFor = id;
+  const pick = element("select");
+  pick.id = id;
+  pick.disabled = locked;
+  wrap.append(element("span", "name", text), pick);
+  return [wrap, pick];
+}
+
+function guidedOption(pick, value, text) {
+  const one = element("option", "", text);
+  one.value = value;
+  pick.append(one);
+}
+
+function guidedButton(id, text, primary, locked) {
+  const one = element("button", primary ? "primary" : "open", text);
+  one.type = "button";
+  one.id = id;
+  one.disabled = locked;
+  return one;
+}
+
+// First: on this computer, or a service — one choice, named by the step's title; the way chosen
+// kept as the path's own. `way` is the one shown checked.
+function guidedWhere(path, words, way, locked) {
+  const group = element("div", "choices");
+  group.id = `${path}-where`;
+  group.setAttribute("role", "radiogroup");
+  group.setAttribute("aria-labelledby", `${path}-title`);
+  const here = choice(`${path}-where`, "here", [words.welcome_on_this_computer, ""], way === "here", locked);
+  const away = choice(`${path}-where`, "online", [words.where_service, ""], way === "online", locked);
+  here.querySelector("input").id = `${path}-here`;
+  away.querySelector("input").id = `${path}-online`;
+  group.append(here, away);
+  return [group, here.querySelector("input"), away.querySelector("input")];
+}
+
+// « Vérifier la clé »: the service's models asked with the key typed — or the one kept —, its
+// answer kept as the path's own, said on the page as it is now: drawn again meanwhile, or another
+// service chosen, the page says its own.
+function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySaid, modelsPick }, ask, shownSaved) {
+  keyTest.addEventListener("click", async () => {
+    keyTest.disabled = true;
+    keySaid.textContent = words.testing;
+    const asked = servicePick.value;
+    let models = null;
+    let said = "";
+    try {
+      models = await ask(asked, key.value || null);
+    } catch (why) {
+      said = why;
+    }
+    guided[path].answers.set(asked, { said, models });
+    const now = document.getElementById(`${path}-service`);
+    if (now !== servicePick) return now?.dispatchEvent(new Event("change"));
+    keyTest.disabled = locked;
+    if (servicePick.value !== asked) return;
+    shownSaved();
+    if (models !== null) modelsPick.focus();
+  });
+}
+
+// « Avancé », folded unless the path keeps it unfolded or `own` is saved: what it holds hidden.
+function guidedAdvanced(path, words, own, contents) {
+  const toggle = element("button", "disclose-advanced");
+  toggle.type = "button";
+  toggle.id = `${path}-advanced`;
+  toggle.setAttribute("aria-controls", `${path}-advanced-panel`);
+  toggle.append(icon("chevron-right"), element("span", "", words.advanced_title));
+  const panel = element("div", "fields");
+  panel.id = `${path}-advanced-panel`;
+  panel.append(...contents);
+  const unfold = (now) => {
+    guided[path].advanced = now;
+    toggle.setAttribute("aria-expanded", String(now));
+    toggle.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
+    panel.hidden = !now;
+  };
+  toggle.addEventListener("click", () => unfold(!guided[path].advanced));
+  unfold(guided[path].advanced || own);
+  return [toggle, panel];
+}
 
 function minutesRow(minutes, words, locked) {
   const box = element("div", "step");
@@ -2100,52 +2200,14 @@ function minutesRow(minutes, words, locked) {
   const savedHere = !!minutes.provider && minutes.provider === minutes.ollama_address;
   const own = !!minutes.provider && !savedHere && online < 0;
   // First (D95): on this computer, or a service — one choice; an address of one's own under « Avancé ».
-  const way = element("div", "choices");
-  way.id = "minutes-where";
-  way.setAttribute("role", "radiogroup");
-  way.setAttribute("aria-labelledby", "minutes-title");
-  const way_ = minutesChosen.way ?? (savedHere ? "here" : minutes.provider ? "online" : null);
-  const hereChoice = choice("minutes-where", "here", [words.welcome_on_this_computer, ""], way_ === "here", locked);
-  const awayChoice = choice("minutes-where", "online", [words.where_service, ""], way_ === "online", locked);
-  hereChoice.querySelector("input").id = "minutes-here";
-  awayChoice.querySelector("input").id = "minutes-online";
-  way.append(hereChoice, awayChoice);
+  const [way, hereRadio, awayRadio] = guidedWhere("minutes", words, guided.minutes.chosen.way ?? (savedHere ? "here" : minutes.provider ? "online" : null), locked);
   const where = element("p", "status");
   where.id = "minutes-status";
   const fields = element("div", "fields");
-  const field = (id, text, type, value) => {
-    const wrap = element("label", "field");
-    wrap.htmlFor = id;
-    const input = element("input");
-    input.id = id;
-    input.type = type;
-    input.value = value || "";
-    input.defaultValue = input.value;
-    input.disabled = locked;
-    wrap.append(element("span", "name", text), input);
-    return [wrap, input];
-  };
-  const listed = (id, text) => {
-    const wrap = element("label", "field");
-    wrap.htmlFor = id;
-    const pick = element("select");
-    pick.id = id;
-    pick.disabled = locked;
-    wrap.append(element("span", "name", text), pick);
-    return [wrap, pick];
-  };
-  const option = (pick, value, text) => {
-    const one = element("option", "", text);
-    one.value = value;
-    pick.append(one);
-  };
-  const button = (id, text, primary) => {
-    const one = element("button", primary ? "primary" : "open", text);
-    one.type = "button";
-    one.id = id;
-    one.disabled = locked;
-    return one;
-  };
+  const field = (id, text, type, value) => guidedField(id, text, type, value, locked);
+  const listed = (id, text) => guidedList(id, text, locked);
+  const option = guidedOption;
+  const button = (id, text, primary) => guidedButton(id, text, primary, locked);
   // Saved or not, the page is drawn again from what the shell holds; a failure stays said.
   const save = async (provider, model, key) => {
     let failed = null;
@@ -2175,7 +2237,7 @@ function minutesRow(minutes, words, locked) {
   // A service: named, its key tested at once — its models asked with it —, then one of them (D95).
   const [serviceWrap, servicePick] = listed("minutes-service", words.service_name);
   minutes.online.forEach((service, index) => option(servicePick, String(index), service.name));
-  servicePick.value = minutesChosen.service ?? String(Math.max(online, 0));
+  servicePick.value = guided.minutes.chosen.service ?? String(Math.max(online, 0));
   const [keyWrap, key] = field("minutes-key", words.key, "password", "");
   key.autocomplete = "off";
   const keyTest = button("minutes-key-test", words.key_test, false);
@@ -2196,7 +2258,7 @@ function minutesRow(minutes, words, locked) {
   const shownSaved = () => {
     const saved = online >= 0 && Number(servicePick.value) === online && minutes.model;
     key.placeholder = saved && minutes.key_kept ? words.key_kept : "";
-    const answer = minutesAnswers.get(servicePick.value);
+    const answer = guided.minutes.answers.get(servicePick.value);
     keySaid.textContent = answer?.said ?? "";
     if (answer?.models) return shownListed(answer.models);
     modelsPick.replaceChildren();
@@ -2205,39 +2267,14 @@ function minutesRow(minutes, words, locked) {
   };
   shownSaved();
   servicePick.addEventListener("change", () => {
-    minutesChosen.service = servicePick.value;
+    guided.minutes.chosen.service = servicePick.value;
     shownSaved();
     address.placeholder = service().address;
   });
-  keyTest.addEventListener("click", async () => {
-    keyTest.disabled = true;
-    keySaid.textContent = words.testing;
-    const asked = servicePick.value;
-    let models = null;
-    let said = "";
-    try {
-      models = await window.__TAURI__.core.invoke("minutes_models", { provider: service().address, key: key.value || null });
-    } catch (why) {
-      said = why;
-    }
-    minutesAnswers.set(asked, { said, models });
-    // Said on the page as it is now: drawn again meanwhile, or another service chosen, it says its own.
-    const now = document.getElementById("minutes-service");
-    if (now !== servicePick) return now?.dispatchEvent(new Event("change"));
-    keyTest.disabled = locked;
-    if (servicePick.value !== asked) return;
-    shownSaved();
-    if (models !== null) modelsPick.focus();
-  });
+  guidedKeyTested("minutes", words, locked, { servicePick, key, keyTest, keySaid, modelsPick },
+    (index, typed) => window.__TAURI__.core.invoke("minutes_models", { provider: minutes.online[Number(index)].address, key: typed }), shownSaved);
   onlineSave.addEventListener("click", () => save(service().address, modelsPick.value, key.value || null));
   // « Avancé »: an address of one's own, OpenAI's way of asking, its model named by hand.
-  const toggle = element("button", "disclose-advanced");
-  toggle.type = "button";
-  toggle.id = "minutes-advanced";
-  toggle.setAttribute("aria-controls", "minutes-advanced-panel");
-  toggle.append(icon("chevron-right"), element("span", "", words.advanced_title));
-  const advanced = element("div", "fields");
-  advanced.id = "minutes-advanced-panel";
   const [addressWrap, address] = field("minutes-address", words.address, "url", own ? minutes.provider : "");
   const [modelWrap, model] = field("minutes-model", words.model_name, "text", own ? minutes.model : "");
   const ownSave = button("minutes-own-save", words.save, false);
@@ -2245,15 +2282,7 @@ function minutesRow(minutes, words, locked) {
   // an id of its own — named by hand.
   address.placeholder = service().address;
   ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, key.value || null));
-  advanced.append(addressWrap, modelWrap, ownSave);
-  const unfold = (now) => {
-    minutesAdvanced = now;
-    toggle.setAttribute("aria-expanded", String(now));
-    toggle.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
-    advanced.hidden = !now;
-  };
-  toggle.addEventListener("click", () => unfold(!minutesAdvanced));
-  unfold(minutesAdvanced || own);
+  const [toggle, advanced] = guidedAdvanced("minutes", words, own, [addressWrap, modelWrap, ownSave]);
   const away = element("div", "fields");
   away.append(serviceWrap, keyWrap, keyTest, keySaid, modelsWrap, onlineSave, toggle, advanced);
   const here = element("div", "fields");
@@ -2262,8 +2291,8 @@ function minutesRow(minutes, words, locked) {
   // Said once: Ollama saved here says it already, below the choice.
   else if (!savedHere) here.append(element("p", "says", words.ollama_silent));
   const draw = () => {
-    const isHere = hereChoice.querySelector("input").checked;
-    const isAway = awayChoice.querySelector("input").checked;
+    const isHere = hereRadio.checked;
+    const isAway = awayRadio.checked;
     here.hidden = !isHere;
     away.hidden = !isAway;
     unsaved.hidden = !(isHere && minutes.ollama.length > 0 && !(savedHere && herePick.value === minutes.model));
@@ -2282,9 +2311,9 @@ function minutesRow(minutes, words, locked) {
       where.replaceChildren(words.where_online, element("code", "tag", host));
     }
   };
-  for (const radio of [hereChoice, awayChoice]) {
-    radio.querySelector("input").addEventListener("change", () => {
-      minutesChosen.way = radio.querySelector("input").value;
+  for (const radio of [hereRadio, awayRadio]) {
+    radio.addEventListener("change", () => {
+      guided.minutes.chosen.way = radio.value;
       draw();
     });
   }
@@ -2393,10 +2422,9 @@ function showSettings(shown, minutes, words) {
   }
   const failed = element("p", "card note warn");
   failed.id = "not-saved";
-  // What the last save could not do, said on the page drawn after it — once.
+  // What the last save could not do, said on every drawing of the page until the next save (#655).
   failed.textContent = notSaved ?? "";
   failed.hidden = notSaved === null;
-  notSaved = null;
   parts.push(failed);
   // What is left of the trial, on a trial licence alone (D83): said first, nothing to change.
   if (shown.trial !== null) {
@@ -2436,8 +2464,17 @@ function showSettings(shown, minutes, words) {
   redoButton.addEventListener("click", () => (location.hash = "#/welcome/again"));
   redo.append(redoSaid, redoButton);
   const step = element("div", "step");
+  // Who hears (D95): on this computer — a Whisper model, or Apple's SpeechAnalyzer — or a service
+  // named, its key tested at once, then one of its models; an address of one's own under « Avancé ».
+  const title = element("span", "name", words.transcription);
+  title.id = "transcription-title";
+  // The services that hear, offered by name as the minutes' are (D63); any other, an address of the user's.
+  const presetOf = (text) => shown.hearing.findIndex((hearing) => hearing.address === text);
+  const preset = shown.engine === "service" ? presetOf(shown.transcription_provider) : -1;
+  const own = shown.engine === "service" && preset < 0;
+  const [way, hereRadio, awayRadio] = guidedWhere("transcription", words, guided.transcription.chosen.way ?? (shown.engine === "service" ? "online" : "here"), locked);
   const row = element("div", "row");
-  const label = element("label", "name", words.transcription);
+  const label = element("label", "name", words.model_name);
   label.htmlFor = "model";
   const pick = element("select");
   pick.id = "model";
@@ -2487,158 +2524,150 @@ function showSettings(shown, minutes, words) {
     option.selected = shown.engine === "speechanalyzer";
     pick.append(option);
   }).catch(() => {});
-  // A service that hears, as the minutes' (D43): its fields under the choice, nothing sent before
-  // the user agreed to its host; a host on this computer needs no agreement.
-  const groupService = element("optgroup");
-  groupService.label = words.service_group;
-  // The services that hear, offered by name as the minutes' are (D63); any other, an address of the user's.
-  const presetOf = (text) => shown.hearing.findIndex((hearing) => hearing.address === text);
-  const preset = shown.engine === "service" ? presetOf(shown.transcription_provider) : -1;
-  shown.hearing.forEach((hearing, index) => {
-    const option = element("option", "", hearing.name);
-    option.value = `service:${index}`;
-    option.selected = preset === index;
-    groupService.append(option);
+  // On this computer, chosen at once; while a service hears, with « Enregistrer » — going through
+  // the list, with the keyboard's arrows too, never changes who hears (D25).
+  const hereSave = guidedButton("transcription-here-save", words.save, false, locked);
+  hereSave.hidden = shown.engine !== "service";
+  const chooseHere = () => {
+    if (pick.value !== "speechanalyzer") return save({ model: pick.value });
+    if (appleHere) return save({ engine: "speechanalyzer" });
+    // Not chosen until its model is on the Mac: the gesture comes first, never the download.
+    fetchApple.hidden = false;
+    fetchApple.focus();
+  };
+  pick.addEventListener("change", () => {
+    if (shown.engine !== "service") chooseHere();
   });
-  const serviceOption = element("option", "", words.service_option);
-  serviceOption.value = "service";
-  serviceOption.selected = shown.engine === "service" && preset < 0;
-  groupService.append(serviceOption);
-  pick.append(groupService);
-  const service = element("div", "fields");
-  service.id = "transcription-service";
-  service.hidden = shown.engine !== "service";
-  const serviceField = (id, text, type, value) => {
-    const wrap = element("label", "field");
-    wrap.htmlFor = id;
-    const input = element("input");
-    input.id = id;
-    input.type = type;
-    input.value = value || "";
-    input.defaultValue = input.value;
-    input.disabled = locked;
-    wrap.append(element("span", "name", text), input);
-    service.append(wrap);
-    return input;
-  };
-  const address = serviceField("transcription-provider", words.service_address, "url", shown.transcription_provider);
-  const serviceModel = serviceField("transcription-model", words.service_model, "text", shown.transcription_model);
-  const serviceKey = serviceField("transcription-key", words.service_key, "password", "");
-  // A service offered by name: its models to choose from, another typed (D63).
-  const serviceModels = element("select");
-  serviceModels.id = "transcription-models";
-  serviceModels.disabled = locked;
-  const modelsWrap = element("label", "field");
-  modelsWrap.htmlFor = serviceModels.id;
-  modelsWrap.append(element("span", "name", words.service_model), serviceModels);
-  serviceModel.parentElement.before(modelsWrap);
-  const modelsRefused = element("p", "note warn");
-  modelsRefused.id = "transcription-models-refused";
-  modelsRefused.setAttribute("role", "status");
-  modelsRefused.hidden = true;
-  modelsWrap.after(modelsRefused);
-  const showModel = () => {
-    const named = pick.value.startsWith("service:");
-    modelsWrap.hidden = !named;
-    serviceModel.parentElement.hidden = named && serviceModels.value !== "";
-    if (named && serviceModels.value !== "") serviceModel.value = serviceModels.value;
-  };
-  const offerModels = async (index) => {
-    // Refused: an empty list, and said; the model can still be typed.
-    let listed = [];
-    let refused = "";
-    try {
-      listed = await window.__TAURI__.core.invoke("hearing_models", { index });
-    } catch (why) {
-      refused = fill(words.hearing_models_refused, why);
-    }
-    // Another chosen meanwhile: its own list comes.
-    if (pick.value !== `service:${index}`) return;
-    modelsRefused.textContent = refused;
-    modelsRefused.hidden = refused === "";
-    // The model saved for this service, if it is the one saved; another service starts from its list.
-    const typed = index === preset ? (shown.transcription_model ?? "").trim() : "";
-    serviceModel.value = typed;
-    serviceModels.replaceChildren(...listed.map((name) => {
-      const option = element("option", "", name);
-      option.value = name;
-      return option;
-    }));
-    const other = element("option", "", words.service_other_model);
-    other.value = "";
-    serviceModels.append(other);
-    serviceModels.value = listed.includes(typed) ? typed : typed ? "" : listed[0] ?? "";
-    showModel();
-  };
-  serviceModels.addEventListener("change", () => {
-    if (serviceModels.value === "") serviceModel.value = "";
-    showModel();
-    if (serviceModels.value === "") serviceModel.focus();
-  });
-  const agree = element("label", "row");
-  const agreeBox = element("input");
-  agreeBox.type = "checkbox";
-  agreeBox.id = "transcription-agreed";
-  // A box ticked is no text being typed: the page still comes back when the window does.
-  agreeBox.defaultValue = agreeBox.value;
-  agreeBox.disabled = locked;
-  const agreeSaid = element("span", "says");
+  hereSave.addEventListener("click", chooseHere);
+  // A service (D43): nothing sent of a meeting before the user agreed to its host; a host on this
+  // computer needs no agreement.
   const hostOf = (text) => { try { return new URL(text).host; } catch { return ""; } };
-  const sayAgree = () => (agreeSaid.textContent = fill(words.service_agree, hostOf(address.value) || "—"));
-  agreeBox.checked = !!shown.transcription_agreed && shown.transcription_agreed === hostOf(address.value);
-  address.addEventListener("input", () => { sayAgree(); agreeBox.checked = false; });
-  sayAgree();
-  // A service offered by name fills its address; one of the user's shows the field. The agreement
-  // ticked only for the host already agreed to.
-  const chooseService = () => {
-    const index = pick.value.startsWith("service:") ? Number(pick.value.split(":")[1]) : -1;
-    if (index >= 0) address.value = shown.hearing[index].address;
-    else if (presetOf(address.value) >= 0) address.value = preset < 0 ? shown.transcription_provider || "" : "";
-    address.parentElement.hidden = index >= 0;
-    agreeBox.checked = !!shown.transcription_agreed && shown.transcription_agreed === hostOf(address.value);
-    sayAgree();
-    if (index < 0) return showModel();
-    // Its list coming: nothing of another service's shown meanwhile, the list said when it comes.
-    serviceModels.replaceChildren();
-    serviceModel.value = index === preset ? shown.transcription_model ?? "" : "";
-    modelsWrap.hidden = false;
-    serviceModel.parentElement.hidden = true;
-    offerModels(index);
-  };
-  agree.append(agreeBox, agreeSaid);
-  const serviceSaid = element("p", "says");
-  serviceSaid.id = "transcription-said";
-  serviceSaid.setAttribute("role", "status");
-  const saveService = element("button", "primary", words.service_save);
-  saveService.type = "button";
-  saveService.id = "transcription-save";
-  saveService.disabled = locked;
   // This computer's own host needs no agreement: nothing of the meeting leaves it.
   // The whole host, its port aside: `localhost.example` or `127.example` is elsewhere. The shell
   // judges again (`providers::local`); this only spares the agreement where none is needed.
   const isHere = (host) => /^(localhost|127(\.\d{1,3}){3}|\[::1\])(:\d+)?$/i.test(host);
-  saveService.addEventListener("click", async () => {
+  const agreement = (id) => {
+    const wrap = element("label", "row");
+    const box = element("input");
+    box.type = "checkbox";
+    box.id = id;
+    // A box ticked is no text being typed: the page still comes back when the window does.
+    box.defaultValue = box.value;
+    box.disabled = locked;
+    const said = element("span", "says");
+    wrap.append(box, said);
+    // Shown where the form asks for it, and only for a host elsewhere: none is owed on this computer (#859).
+    let wanted = true;
+    let here = false;
+    const paint = () => { wrap.hidden = !wanted || here; };
+    // Ticked only for the host already agreed to.
+    const hostIs = (host) => {
+      said.textContent = fill(words.service_agree, host || "—");
+      box.checked = !!shown.transcription_agreed && shown.transcription_agreed === host;
+      here = isHere(host);
+      paint();
+    };
+    const shownIs = (now) => { wanted = now; paint(); };
+    return [wrap, box, hostIs, shownIs];
+  };
+  const [serviceWrap, servicePick] = guidedList("transcription-service", words.service_name, locked);
+  shown.hearing.forEach((hearing, index) => guidedOption(servicePick, String(index), hearing.name));
+  servicePick.value = guided.transcription.chosen.service ?? String(Math.max(preset, 0));
+  const hearing = () => shown.hearing[Number(servicePick.value)];
+  const [keyWrap, serviceKey] = guidedField("transcription-key", words.service_key, "password", "", locked);
+  serviceKey.autocomplete = "off";
+  const keyTest = guidedButton("transcription-key-test", words.key_test, false, locked);
+  const keySaid = element("p", "says");
+  keySaid.id = "transcription-key-said";
+  keySaid.setAttribute("role", "status");
+  const [modelsWrap, serviceModels] = guidedList("transcription-models", words.service_model, locked);
+  const [agreeWrap, agreeBox, agreeHost, agreeShown] = agreement("transcription-agreed");
+  const saveService = guidedButton("transcription-save", words.service_save, true, locked);
+  // One « Enregistrer » and one agreement at a time (#860): the service's, « Avancé » folded; unfolded,
+  // its own, which saves what the page shows.
+  let listedShown = false;
+  const paintSaves = () => {
+    const open = guided.transcription.advanced;
+    saveService.hidden = !listedShown || open;
+    agreeShown(listedShown && !open);
+  };
+  // The models listed with its key, the one saved chosen.
+  const shownListed = (models) => {
+    serviceModels.replaceChildren();
+    for (const id of models) guidedOption(serviceModels, id, modelSaid(id));
+    if (models.includes(shown.transcription_model)) serviceModels.value = shown.transcription_model;
+    modelsWrap.hidden = models.length === 0;
+    listedShown = models.length > 0;
+    paintSaves();
+  };
+  // This service's last answer, said again; else the model saved with it — the others come with its key.
+  const shownSaved = () => {
+    const saved = preset >= 0 && Number(servicePick.value) === preset && shown.transcription_model;
+    agreeHost(hostOf(hearing().address));
+    const answer = guided.transcription.answers.get(servicePick.value);
+    keySaid.textContent = answer?.said ?? "";
+    if (answer?.models) return shownListed(answer.models);
+    serviceModels.replaceChildren();
+    if (saved) guidedOption(serviceModels, shown.transcription_model, modelSaid(shown.transcription_model));
+    modelsWrap.hidden = !saved;
+    listedShown = !!saved;
+    paintSaves();
+  };
+  shownSaved();
+  guidedKeyTested("transcription", words, locked, { servicePick, key: serviceKey, keyTest, keySaid, modelsPick: serviceModels },
+    (index, typed) => window.__TAURI__.core.invoke("transcription_models", { index: Number(index), key: typed }), shownSaved);
+  // « Avancé »: an address of one's own, OpenAI's way of asking, its model named by hand.
+  const [addressWrap, address] = guidedField("transcription-provider", words.service_address, "url", own ? shown.transcription_provider : "", locked);
+  const [modelWrap, serviceModel] = guidedField("transcription-model", words.service_model, "text", own ? shown.transcription_model : "", locked);
+  const [ownAgreeWrap, ownAgreeBox, ownAgreeHost] = agreement("transcription-own-agreed");
+  // Its address left empty: the service chosen above, with a model it does not list — a new release,
+  // an id of its own — named by hand; the field shows that address as it stands in.
+  const ownAddress = () => address.value.trim() || hearing().address;
+  const standsIn = () => {
+    address.placeholder = hearing().address;
+    ownAgreeHost(hostOf(ownAddress()));
+  };
+  standsIn();
+  address.addEventListener("input", () => {
+    ownAgreeHost(hostOf(ownAddress()));
+    ownAgreeBox.checked = false;
+  });
+  const ownSave = guidedButton("transcription-own-save", words.service_save, false, locked);
+  const [hearToggle, hearAdvanced] = guidedAdvanced("transcription", words, own, [addressWrap, modelWrap, ownAgreeWrap, ownSave]);
+  hearToggle.addEventListener("click", paintSaves);
+  paintSaves();
+  // What « Avancé »'s « Enregistrer » saves: its model typed, or else — its address left empty, the
+  // service chosen above — the model chosen in that service's list (#860).
+  const ownModel = () => serviceModel.value.trim() || (address.value.trim() ? "" : serviceModels.value);
+  const serviceSaid = element("p", "says");
+  serviceSaid.id = "transcription-said";
+  serviceSaid.setAttribute("role", "status");
+  const saveHearing = async (provider, model, key, box, addressField, modelField) => {
     const { invoke } = window.__TAURI__.core;
-    if (!/^https?:$/.test((() => { try { return new URL(address.value.trim()).protocol; } catch { return ""; } })()) || !hostOf(address.value.trim())) {
+    if (!/^https?:$/.test((() => { try { return new URL(provider.trim()).protocol; } catch { return ""; } })()) || !hostOf(provider.trim())) {
       serviceSaid.textContent = words.service_address_bad;
-      return address.focus();
+      return addressField?.focus();
     }
-    if (!serviceModel.value.trim()) {
+    if (!model.trim()) {
       serviceSaid.textContent = words.service_model_named;
-      return serviceModel.focus();
+      return modelField.focus();
     }
-    if (!agreeBox.checked && !isHere(hostOf(address.value))) {
-      serviceSaid.textContent = fill(words.service_agree_first, hostOf(address.value) || "—");
-      return agreeBox.focus();
+    if (!box.checked && !isHere(hostOf(provider))) {
+      serviceSaid.textContent = fill(words.service_agree_first, hostOf(provider) || "—");
+      return box.focus();
     }
     const saved = await invoke("transcription_saved", {
-      provider: address.value, model: serviceModel.value, key: serviceKey.value || null, agreed: agreeBox.checked,
-    }).then((notKept) => (notKept === null ? fill(words.service_saved, hostOf(address.value)) : fill(words.key_not_kept, notKept)), (why) => fill(words.not_saved, why));
+      provider, model, key: key || null, agreed: box.checked,
+    }).then((notKept) => (notKept !== null ? fill(words.key_not_kept, notKept)
+      // This computer's: said so, never as an address and a port (#775).
+      : isHere(hostOf(provider)) ? words.service_saved_here : fill(words.service_saved, hostOf(provider))), (why) => fill(words.not_saved, why));
     // A Tester still asking stays: its answer comes after this, the button its own.
     serviceAnswer ??= { said: "", asking: false };
     serviceAnswer.said = saved;
     serviceSaid.textContent = saved;
-  });
+  };
+  saveService.addEventListener("click", () => saveHearing(hearing().address, serviceModels.value, serviceKey.value, agreeBox, null, serviceModels));
+  ownSave.addEventListener("click", () => saveHearing(ownAddress(), ownModel(), serviceKey.value, ownAgreeBox, address, serviceModel));
   const testService = element("button", "open", words.service_test);
   testService.type = "button";
   testService.id = "transcription-test";
@@ -2674,24 +2703,19 @@ function showSettings(shown, minutes, words) {
     const button = document.getElementById("transcription-test");
     if (button) button.disabled = locked;
   });
-  service.append(agree, saveService, testService, serviceSaid);
-  if (pick.value.startsWith("service")) chooseService();
-  pick.addEventListener("change", () => {
+  // Another service chosen: what was said of the last goes at once, its button given back.
+  servicePick.addEventListener("change", () => {
+    guided.transcription.chosen.service = servicePick.value;
     serviceAnswer = null;
     serviceSaid.textContent = "";
     testService.disabled = locked;
-    service.hidden = !pick.value.startsWith("service");
-    if (pick.value.startsWith("service")) {
-      chooseService();
-      return (pick.value === "service" ? address : serviceModels).focus();
-    }
-    if (pick.value !== "speechanalyzer") return save({ model: pick.value });
-    if (appleHere) return save({ engine: "speechanalyzer" });
-    // Not chosen until its model is on the Mac: the gesture comes first, never the download.
-    fetchApple.hidden = false;
-    fetchApple.focus();
+    shownSaved();
+    standsIn();
   });
-  row.append(label, pick);
+  const service = element("div", "fields");
+  service.id = "transcription-away";
+  service.append(serviceWrap, keyWrap, keyTest, keySaid, modelsWrap, agreeWrap, saveService, hearToggle, hearAdvanced, testService, serviceSaid);
+  row.append(label, pick, hereSave);
   const here = element("p", "status here", words.on_this_computer);
   here.append(element("code", "tag", words.builtin));
   // The language meetings are spoken in, unless one says its own (D65): detected by default.
@@ -2734,7 +2758,21 @@ function showSettings(shown, minutes, words) {
   else state.dataset.missing = "true";
   state.id = "model-state";
   paintModel(state);
-  step.append(row, state, speech, service, here, spokenRow);
+  const hereBox = element("div");
+  hereBox.id = "transcription-on-computer";
+  hereBox.append(row, state, speech, here);
+  const drawWhere = () => {
+    hereBox.hidden = !hereRadio.checked;
+    service.hidden = !awayRadio.checked;
+  };
+  for (const radio of [hereRadio, awayRadio]) {
+    radio.addEventListener("change", () => {
+      guided.transcription.chosen.way = radio.value;
+      drawWhere();
+    });
+  }
+  drawWhere();
+  step.append(title, way, hereBox, service, spokenRow);
   // The short list of models to download, each said by what it is good for (D37).
   const offered = element("ul", "offered");
   offered.id = "offered";
@@ -2760,8 +2798,8 @@ function showSettings(shown, minutes, words) {
   pulled.append(pulledSaid, element("span", "state"));
   offered.append(pulled);
   // The list read again from where it is kept, only on this click, its host shown (D40): read,
-  // the page is drawn with it; refused, the list above stays, and it is said. Until the key that
-  // signs it is built in, no click is offered, and that is said (D56).
+  // the page is drawn with it; refused, the list above stays, and it is said — signed by the
+  // decider's key alone, built in since D56.
   const refreshed = element("p", "says");
   refreshed.id = "offered-refreshed";
   refreshed.setAttribute("role", "status");
@@ -2776,8 +2814,23 @@ function showSettings(shown, minutes, words) {
     refresh_.disabled = false;
     refreshed.textContent = words.offered_refresh_failed;
   });
-  if (shown.registry_waits) refreshed.textContent = words.offered_refresh_waits;
-  step.append(element("h3", "", words.offered_title), offered, ...(shown.registry_waits ? [] : [refresh_]), refreshed);
+  // Folded at first (#782): a disclosure (ARIA APG), as « Avancé », left as the user leaves it when
+  // the page is drawn again — a download running in it goes on either way.
+  const offeredToggle = element("button", "disclose-advanced");
+  offeredToggle.type = "button";
+  offeredToggle.id = "offered-toggle";
+  offeredToggle.setAttribute("aria-controls", "offered");
+  offeredToggle.append(icon("chevron-right"), element("span", "", words.offered_title));
+  const offeredPanel = [offered, refresh_, refreshed];
+  const unfoldOffered = (now) => {
+    offeredOpen = now;
+    offeredToggle.setAttribute("aria-expanded", String(now));
+    offeredToggle.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
+    for (const part of offeredPanel) part.hidden = !now;
+  };
+  offeredToggle.addEventListener("click", () => unfoldOffered(!offeredOpen));
+  unfoldOffered(offeredOpen);
+  step.append(offeredToggle, ...offeredPanel);
   paintOffered(offered);
   models.append(step, minutesRow(minutes, words, locked), element("p", "says", words.models_note));
   parts.push(models);
@@ -3504,18 +3557,24 @@ function showSmall(words) {
   // not yet kept, answers with the choice as it was then — never taken (#750).
   let choicesMade = 0;
   let choicesKept = 0;
+  // The choice the shell last kept, as an optimistic update keeps it: a refusal goes back to it (#839).
+  let confirmed = null;
   const choosePick = async (one) => {
-    choicesMade += 1;
-    const before = known.chosen;
+    const mine = ++choicesMade;
     known = { ...known, chosen: one };
     paintPick();
     try {
       await invoke("microphone_chosen", { name: one?.name ?? null, description: one?.description ?? null });
+      confirmed = one;
       smallSaid("microphone", null);
     } catch {
-      known = { ...known, chosen: before };
-      paintPick();
-      drawPicks();
+      // Put back only while it is the last choice made — a later one stands, refused or not yet —, and
+      // to what the shell kept, never to a choice it was still to answer (#839).
+      if (mine === choicesMade) {
+        known = { ...known, chosen: confirmed };
+        paintPick();
+        drawPicks();
+      }
       smallSaid("microphone", words.microphone_not_kept);
     } finally {
       choicesKept += 1;
@@ -3536,7 +3595,9 @@ function showSmall(words) {
     const same = JSON.stringify(read.list) === JSON.stringify(known.list) && read.unread === known.unread;
     // The list and whether it read are taken; the choice, only if none was made since it was asked,
     // nor was waiting for the shell when it was.
-    known = { ...read, chosen: asked === choicesMade && settled ? read.chosen : known.chosen };
+    const taken = asked === choicesMade && settled;
+    if (taken) confirmed = read.chosen;
+    known = { ...read, chosen: taken ? read.chosen : known.chosen };
     microphone.hidden = known.list.length === 0 && !known.unread && known.chosen === null;
     paintPick();
     if (!picks.hidden && !same) {
@@ -4366,6 +4427,10 @@ async function draw(mine, again) {
     }
     return;
   }
+  // What the last save could not do is said until the next save, or until Settings is left (#655):
+  // dropped as soon as another page is asked, before anything is awaited — a drawing the next one
+  // overtakes stops at its first answer, and would leave it to be said again.
+  if (location.hash !== "#/settings") notSaved = null;
   const listing = await window.__TAURI__.core.invoke("listed");
   if (mine !== drawing) return;
   words = listing.words;
@@ -4630,8 +4695,10 @@ window.addEventListener("hashchange", () => {
   document.getElementById("pane-said").hidden = true;
   notShown(false);
   serviceAnswer = null;
-  minutesAnswers = new Map();
-  minutesChosen = {};
+  for (const path of Object.values(guided)) {
+    path.answers = new Map();
+    path.chosen = {};
+  }
   if (nameRefused) paneSays(nameRefused);
   nameRefused = null;
   // Another address: the assistant, shown again, is drawn anew — even if the drawing that left it was cut short.
