@@ -5653,6 +5653,12 @@ def meeting_told_once(now: dt.datetime) -> None:
         other = subprocess.Popen(["/usr/bin/python3", "-c", ELSEWHERE], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return wait_for(browser, lambda b: not focused(b), 10)
 
+    def why(browser, recorded, ended, mark) -> dict:
+        """Each condition of a check, for one that fails: which one did."""
+        return {"recorded": recorded, "ended": ended, "focused": focused(browser), "idle": idle(browser),
+                "live": live(browser), "hash": browser.execute_script("return location.hash"),
+                "folder": sorted(p.name for p in meeting.iterdir()) if meeting.exists() else None, "seen": seen(mark)}
+
     def one_told(browser, mark: int, until) -> bool:
         """The making's end awaited, then two seconds more for a notification that would follow it."""
         ended = wait_for(browser, lambda b: until(told(mark)) and idle(b), 20)
@@ -5726,7 +5732,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             missing = one_told(browser, mark, lambda t: "member=Notify" in t)
             check("no model: one notification, what to do, naming the meeting",
                   recorded and missing and not focused(browser) and "le modèle manque" in told(mark)
-                  and "Placez le modèle Whisper" in told(mark) and names(told(mark)), seen(mark))
+                  and "Placez le modèle Whisper" in told(mark) and names(told(mark)), why(browser, recorded, missing, mark))
             window.file.write_text(settings)
             elsewhere(browser)
             HEARING.chmod(0o644)
@@ -5736,7 +5742,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             HEARING.chmod(0o755)
             check("its transcription program cannot start: one notification, what to do, naming the meeting",
                   recorded and unstarted and not focused(browser) and "Kitokey ne peut pas transcrire" in told(mark)
-                  and "réinstaller Kitokey" in told(mark) and names(told(mark)), seen(mark))
+                  and "réinstaller Kitokey" in told(mark) and names(told(mark)), why(browser, recorded, unstarted, mark))
 
             # 5. Its minutes not started — nobody named to write them: the transcript's end is the last
             # step's, one notification still, D25's, saying what to do and naming the meeting (D25, D92).
@@ -5747,7 +5753,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             asked = one_told(browser, mark, lambda t: "member=Notify" in t)
             check("its minutes not started: one notification, what to do for them, naming the meeting — the transcript not told on its own",
                   recorded and asked and "Transcription prête" not in told(mark) and "Aucun modèle choisi" in told(mark)
-                  and "Choisissez-le dans les réglages" in told(mark) and names(told(mark)), seen(mark))
+                  and "Choisissez-le dans les réglages" in told(mark) and names(told(mark)), why(browser, recorded, asked, mark))
 
             # 6. The same with Kitokey's window focused: nothing told, the window says it — Settings,
             # where the model is chosen.
@@ -5761,7 +5767,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             shown = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/settings" and idle(b), 20)
             time.sleep(2)
             check("its minutes not started, a window of Kitokey focused: nothing told, the window opened on Settings",
-                  recorded and shown and focused(browser) and not sent(mark), seen(mark))
+                  recorded and shown and focused(browser) and not sent(mark), why(browser, recorded, shown, mark))
     finally:
         HEARING.chmod(0o755)
         (WORK / "fail-minutes").unlink(missing_ok=True)
