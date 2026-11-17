@@ -4482,6 +4482,24 @@ def meeting_trashed(now: dt.datetime) -> None:
                   shown and said["ask"] in text and all(part in text.lower() for part in said["holds"]) and said["restore"] in text.lower()
                   and browser.execute_script(focused) == "trash-cancel"
                   and browser.find_element(By.ID, "trash-cancel").text == said["cancel"], [text, browser.execute_script(focused)])
+            # In its own card, under the page's head, as wide as the context's card; its sentences and buttons
+            # inside with the card's margin; each button on one line — at full width and at 420 px (#893, T7).
+            fits = ("const q = document.getElementById('trash-ask'), h = document.querySelector('.meeting-head'), c = document.getElementById('context');"
+                    " const r = (e) => e.getBoundingClientRect(); const a = r(q);"
+                    " const out = [...q.querySelectorAll('p:not(:empty), button')].filter((e) => { const b = r(e); return b.left < a.left + 12 || b.right > a.right - 12; })"
+                    ".map((e) => e.id || e.textContent.trim().slice(0, 20));"
+                    " const wrapped = [...q.querySelectorAll('button')].filter((b) => r(b).height > 44).map((b) => b.id);"
+                    " return {under: a.top >= r(h).bottom - 0.5, wide: Math.abs(a.left - r(c).left) <= 1 && Math.abs(a.right - r(c).right) <= 1, out, wrapped}")
+            for size in ((1100, 800), (420, 800)):
+                browser.set_window_size(*size)
+                time.sleep(0.4)
+                got = browser.execute_script(fits)
+                shot(browser, f"d100-ask-{short}-{size[0]}")
+                check(f"{short}, {size[0]} px: the question under the page's head, as wide as its cards, its sentences and buttons inside with the card's margin, each button on one line (D100)",
+                      got == {"under": True, "wide": True, "out": [], "wrapped": []}, got)
+            browser.set_window_size(1100, 800)
+            time.sleep(0.4)
+            browser.execute_script("document.getElementById('trash-cancel').focus()")
             # Escape, then « Annuler »: nothing changed, the focus back on the button.
             keys(browser, Keys.ESCAPE)
             gone = wait_for(browser, lambda b: b.execute_script(asked) is None, 3)
