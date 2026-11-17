@@ -524,9 +524,12 @@ function modelFetch(busy = false) {
   fetch_.id = "model-fetch";
   fetch_.disabled = busy;
   fetch_.addEventListener("click", async () => {
+    // Where the user is, read before the button goes: what says the model coming takes its place (D101).
+    const place = placeOf();
     fetch_.disabled = true;
     await window.__TAURI__.core.invoke("model_fetch").catch(() => {});
-    readMakings();
+    await readMakings();
+    placeBack(place);
   });
   return fetch_;
 }
@@ -4424,6 +4427,11 @@ function placeBack(place) {
     for (const id of place.near) {
       if (target) break;
       target = [...(document.getElementById(id)?.querySelectorAll(FOCUSABLE) ?? [])].find((control) => control.getClientRects().length) ?? null;
+    }
+    // None left to take it: the nearest box still there, focused itself — never the page's start.
+    if (!target) {
+      target = place.near.map((id) => document.getElementById(id)).find((box) => box?.getClientRects().length) ?? null;
+      if (target && !target.hasAttribute("tabindex")) target.tabIndex = -1;
     }
     target?.focus({ preventScroll: true });
   }
