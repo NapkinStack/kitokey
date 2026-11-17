@@ -517,7 +517,11 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .foot nav #settings-link { margin-left: auto; }
 .foot nav a[aria-current="page"] { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); }
 .pane { flex: 1; min-width: 0; container: pane / inline-size; }
-.saved-said { margin: 4px 0 0; color: var(--ok); font-size: 13px; }
+/* « Enregistré » laid over its own line, never in its flow (D101): over the description it hides the
+   while, right-aligned at its end — or on the name's line —, the line's box holding it. */
+.saying { position: relative; }
+.saved-said { position: absolute; margin: 0; color: var(--ok); font-size: 13px; line-height: 1.35; text-align: right; white-space: nowrap; pointer-events: none; }
+.saved-under { visibility: hidden; }
 .redo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .pane > .back { display: none; }
 #pane-again { margin: 8px 16px; align-self: flex-start; }

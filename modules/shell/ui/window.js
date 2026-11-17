@@ -642,8 +642,8 @@ async function askAgain(of, said, again) {
   readMakings();
 }
 
-// « Enregistré », a moment, under what was changed (D68): the page is drawn again by what it says,
-// so the sentence is put there after the drawing, by the name of what changed.
+// « Enregistré », a moment, in the line of what was changed (D68, D101): the page is drawn again by
+// what it says, so the sentence is put there after the drawing, by the name of what changed.
 let savedFor = null;
 let lastChanged = "";
 const remembered = (event) => {
@@ -655,17 +655,49 @@ document.addEventListener("change", remembered, true);
 document.addEventListener("click", remembered, true);
 function savedSaid(saved) {
   clearTimeout(savedFor);
-  document.getElementById("saved-said")?.remove();
+  savedGone();
   if (!saved) return;
-  const savedSentence = element("p", "says saved-said", words.saved);
+  const savedSentence = element("span", "saved-said", words.saved);
   savedSentence.id = "saved-said";
   savedSentence.setAttribute("role", "status");
+  savedSentence.setAttribute("aria-live", "polite");
+  // Said in the line changed itself, at its end, as a system's settings say a setting applied on its
+  // own line: over its description, hidden the while — never over its name or its control —, or on
+  // its name's line when it has none, or beside a button in no line. Laid over the line, never in its
+  // flow: the page neither grows nor moves (the coordinator, 2026-11-17, D101).
   const changed = lastChanged ? document.querySelector(`#settings ${lastChanged}`) : null;
-  const row = changed?.closest("label, .row, .field");
-  if (changed) (row ?? changed).after(savedSentence);
-  else document.getElementById("settings").prepend(savedSentence);
-  savedSentence.scrollIntoView({ block: "nearest" });
-  savedFor = setTimeout(() => savedSentence.remove(), 1500);
+  const row = changed?.closest("label, .row, .field") ?? null;
+  const box = row ?? changed?.parentElement ?? document.getElementById("settings");
+  box.classList.add("saying");
+  box.append(savedSentence);
+  const description = row?.querySelector(".says:not(:empty)") ?? null;
+  const name = row?.querySelector(".name") ?? null;
+  if (description) {
+    // Its description's own box, the sentence at its end.
+    savedSentence.style.top = `${description.offsetTop}px`;
+    savedSentence.style.left = `${description.offsetLeft}px`;
+    savedSentence.style.width = `${description.offsetWidth}px`;
+    description.classList.add("saved-under");
+  } else if (name) {
+    // The name's line, at the end of the column it is in — its text left as it is.
+    const column = name.parentElement === box ? null : name.parentElement;
+    savedSentence.style.top = `${name.offsetTop}px`;
+    savedSentence.style.left = `${column ? column.offsetLeft : 0}px`;
+    savedSentence.style.width = `${column ? column.offsetWidth : box.clientWidth}px`;
+  } else if (changed) {
+    savedSentence.style.top = `${changed.offsetTop}px`;
+    savedSentence.style.left = `${changed.offsetLeft + changed.offsetWidth + 8}px`;
+  }
+  savedFor = setTimeout(savedGone, 1500);
+}
+
+// « Enregistré » gone, and what it was laid over shown again.
+function savedGone() {
+  const sentence = document.getElementById("saved-said");
+  if (!sentence) return;
+  sentence.closest(".saying")?.classList.remove("saying");
+  for (const under of document.querySelectorAll(".saved-under")) under.classList.remove("saved-under");
+  sentence.remove();
 }
 
 // Each reading of the makings numbered: an answer a later reading has overtaken is dropped — the
@@ -4401,7 +4433,10 @@ let changedLast = null;
 for (const type of ["change", "input"]) {
   document.addEventListener(type, (event) => {
     const changed = event.target;
-    if (changed instanceof Element && changed.id && changed.closest("#meeting, #settings")) changedLast = { id: changed.id, at: Date.now() };
+    if (!(changed instanceof Element) || !changed.id || !changed.closest("#meeting, #settings")) return;
+    changedLast = { id: changed.id, at: Date.now() };
+    // Changed by a click WebKit gave no focus to: the control acted on has it, as a key would have given it.
+    if (document.activeElement === null || document.activeElement === document.body) changed.focus({ preventScroll: true });
   }, true);
 }
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
