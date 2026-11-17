@@ -5026,6 +5026,11 @@ def minutes_checked(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.find_elements(By.ID, "play"), 10)
             got = browser.execute_script(maker)
             check(f"{short}: the maker's line ends with the cost, in the window's language, its currency, two significant digits", got.endswith(f" · {cost}"), got)
+            # D93, as the decider confirmed it: when first, then the model via its service, then the cost (D51).
+            parts = got.split(" · ")
+            check(f"{short}: when the minutes were made, then the model via its service, then the cost — none lost (D93)",
+                  len(parts) == 3 and re.fullmatch({"fr": r"Compte rendu du 13 oct\. à \d\d:\d\d", "en": r"Summary of Oct 13 at \d\d:\d\d [AP]M"}[short], parts[0])
+                  and parts[1].endswith(", via openrouter.ai") and parts[2] == cost, parts)
             colours = browser.execute_script(
                 "const m = getComputedStyle(document.querySelector('#meeting .minutes .maker')).color, p = document.createElement('p');"
                 "p.style.color = 'var(--soft)'; document.body.append(p); const s = getComputedStyle(p).color; p.remove(); return [m, s]")
