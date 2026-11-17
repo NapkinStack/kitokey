@@ -5665,7 +5665,6 @@ def meeting_told_once(now: dt.datetime) -> None:
         time.sleep(2)
         return ended and len(sent(mark)) == 1
 
-    unchosen = f'after = "minutes"\nreminder = false\nmodel = "{model}"\n'
     try:
         time.sleep(0.5)
         window = Window(meetings, "fr_FR.UTF-8", settings)
@@ -5725,7 +5724,10 @@ def meeting_told_once(now: dt.datetime) -> None:
 
             # 4. No model where the settings name one: the transcript cannot start, the meeting's
             # last step; then its program missing. Each told once, naming the meeting (D92).
-            window.file.write_text(settings.replace(str(model), str(WORK / "telling-absent.bin")))
+            # The settings changed where they stand, the meetings' folder kept: written whole without it,
+            # the meetings went to the default folder, none of them seen here (#824).
+            written = window.file.read_text()
+            window.file.write_text(written.replace(str(model), str(WORK / "telling-absent.bin")))
             elsewhere(browser)
             mark = len(notified.read_text())
             recorded = stopped(browser)
@@ -5733,7 +5735,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             check("no model: one notification, what to do, naming the meeting",
                   recorded and missing and not focused(browser) and "le modèle manque" in told(mark)
                   and "Placez le modèle Whisper" in told(mark) and names(told(mark)), why(browser, recorded, missing, mark))
-            window.file.write_text(settings)
+            window.file.write_text(written)
             elsewhere(browser)
             HEARING.chmod(0o644)
             mark = len(notified.read_text())
@@ -5746,7 +5748,9 @@ def meeting_told_once(now: dt.datetime) -> None:
 
             # 5. Its minutes not started — nobody named to write them: the transcript's end is the last
             # step's, one notification still, D25's, saying what to do and naming the meeting (D25, D92).
-            window.file.write_text(unchosen)
+            chosen = 'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n'
+            assert chosen in window.file.read_text(), window.file.read_text()
+            window.file.write_text(window.file.read_text().replace(chosen, ""))
             elsewhere(browser)
             mark = len(notified.read_text())
             recorded = stopped(browser)
