@@ -4413,6 +4413,104 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def focus_kept(now: dt.datetime) -> None:
+    """BS. D101: a choice changed on a meeting's page or in Settings, by the keyboard or the mouse, keeps the
+    focus on that control once saved and the page drawn again, the page not scrolled; a control the change
+    removes leaves the focus near what took its place, never on the page's start. Every control of both
+    pages has an id of its own, so that it can be found again once drawn anew."""
+    print("BS. a choice changed on a meeting's page or in Settings: the focus stays on it, the page where it was — keyboard and mouse (D101)")
+    meetings = WORK / "focus-kept"
+    folder = meetings / "2026-10-29_10-00"
+    session(folder, now - dt.timedelta(days=1), 30, {"local.wav": 4000})
+    (folder / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in [
+        {"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-small", "language": "fr", "context": None},
+        *({"type": "segment", "speaker": "me", "track": "local", "start": 4.0 * i, "end": 4.0 * i + 3.0,
+           "text": "Une phrase de la réunion, assez longue pour que la page défile sous la fenêtre."} for i in range(40)),
+        {"type": "complete", "duration": 1800.0}]))
+    (folder / "minutes.md").write_text(
+        "---\ncontract: minutes/v1\nmade: 2026-10-29T11:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+        "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+    # Where the focus is, and how far the page is scrolled: an element's id, or what it is when it has none.
+    where = ("const a = document.activeElement;"
+             " return [!a || a === document.body ? 'body' : a.id || ('no id: ' + a.tagName.toLowerCase() + '.' + a.className), Math.round(scrollY)]")
+    # The controls a user reaches on the page shown, and those of them with no id.
+    nameless = ("const page = document.getElementById(arguments[0]);"
+                " return [...page.querySelectorAll('button, select, input, textarea, a[href], summary, [tabindex]:not([tabindex=\"-1\"])')]"
+                ".filter(c => c.getClientRects().length && !c.id).map(c => c.tagName.toLowerCase() + '.' + c.className + ' « ' + (c.textContent || c.value || '').trim().slice(0, 30) + ' »')")
+
+    def keys(browser, *pressed) -> None:
+        ActionChains(browser).send_keys(*pressed).perform()
+
+    def kept(browser, what: str, target: str, act, saved, mouse: bool = False) -> None:
+        """`target` in the middle of the window, focused (or, for the mouse, nothing focused); `act` changes it;
+        once `saved` holds and the page is drawn again — the control a new node —, where the focus and the page are."""
+        found = wait_for(browser, lambda b: b.find_elements(By.ID, target) and b.find_element(By.ID, target).is_displayed(), 5)
+        if not found:
+            check(f"{what}: #{target} shown, to be changed (D101)", False, browser.execute_script(where))
+            return
+        browser.execute_script("const t = document.getElementById(arguments[0]); t.scrollIntoView({block: 'center'});"
+                               " if (arguments[1]) document.activeElement?.blur(); else t.focus(); window.__was = t;", target, mouse)
+        time.sleep(0.4)
+        before = browser.execute_script(where)
+        act(browser)
+        done = wait_for(None, lambda _: saved(), 5)
+        # Drawn again: the control is a new node — or, never drawn again, the same one.
+        wait_for(browser, lambda b: b.execute_script("return document.getElementById(arguments[0]) !== window.__was", target), 3)
+        time.sleep(0.5)
+        after = browser.execute_script(where)
+        check(f"{what}: once saved and drawn again, the focus on #{target}, the page where it was (D101)",
+              done and after[0] == target and abs(after[1] - before[1]) <= 1, {"saved": done, "before": before, "after": after})
+
+    window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n')
+    window.env.update(KITOKEY_MODEL_PUBLISHED="http://127.0.0.1:9/model.bin 300000 " + "0" * 64)
+    with window as browser:
+        browser.set_window_size(1100, 700)
+        settings = lambda: window.file.read_text()
+        # A meeting's page.
+        browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
+        missing = browser.execute_script(nameless, "meeting")
+        check("a meeting's page: every control a user reaches has an id of its own (D101)", missing == [], missing)
+        kept(browser, "a meeting's page, its language chosen by the arrows", "meeting-language",
+             lambda b: keys(b, Keys.ARROW_DOWN), lambda: (folder / "language").is_file())
+        kept(browser, "a meeting's page, said confidential by a click", "confidential-switch",
+             lambda b: ActionChains(b).click(b.find_element(By.ID, "confidential-switch")).perform(), lambda: (folder / "confidential").exists(), mouse=True)
+        kept(browser, "a meeting's page, its context typed", "context-text",
+             lambda b: keys(b, "Point budget"), lambda: (folder / "context.txt").is_file() and "Point budget" in (folder / "context.txt").read_text())
+        # Settings.
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "meetings-language"), 10)
+        missing = browser.execute_script(nameless, "settings")
+        check("Settings: every control a user reaches has an id of its own (D101)", missing == [], missing)
+        kept(browser, "Settings, the meetings' language chosen by the arrows", "meetings-language",
+             lambda b: keys(b, Keys.ARROW_DOWN), lambda: "meeting_language =" in settings())
+        kept(browser, "Settings, the reminder turned by Space", "reminder",
+             lambda b: keys(b, Keys.SPACE), lambda: "reminder = true" in settings())
+        kept(browser, "Settings, what is kept of the audio chosen by the arrows", "keep",
+             lambda b: keys(b, Keys.ARROW_DOWN), lambda: "keep" in settings())
+        kept(browser, "Settings, the developer mode turned by a click", "developer",
+             lambda b: ActionChains(b).click(b.find_element(By.ID, "developer")).perform(), lambda: "developer = true" in settings(), mouse=True)
+        kept(browser, "Settings, the logs' level chosen by the arrows", "log-level",
+             lambda b: keys(b, Keys.ARROW_DOWN), lambda: "log = " in settings())
+        kept(browser, "Settings, Kitokey's language chosen by the arrows", "app-language",
+             lambda b: keys(b, Keys.ARROW_DOWN), lambda: re.search(r"^language = ", settings(), re.M) is not None)
+        # A control the change removes: « Télécharger le modèle » pressed by Enter goes while the model comes —
+        # the focus near what took its place, in its card, never the page's start.
+        if wait_for(browser, lambda b: b.find_elements(By.ID, "model-fetch"), 5):
+            browser.execute_script("const t = document.getElementById('model-fetch'); t.scrollIntoView({block: 'center'}); t.focus();")
+            time.sleep(0.4)
+            before = browser.execute_script(where)
+            keys(browser, Keys.ENTER)
+            gone = wait_for(browser, lambda b: not b.find_elements(By.ID, "model-fetch"), 3)
+            time.sleep(0.5)
+            after = browser.execute_script(where)
+            inside = browser.execute_script("const a = document.activeElement; return !!a && a !== document.body && !!a.closest('#settings')")
+            check("Settings, « Télécharger le modèle » gone once pressed: the focus in Settings, not the page's start; the page where it was (D101)",
+                  gone and inside and abs(after[1] - before[1]) <= 1, {"before": before, "after": after})
+        else:
+            check("Settings offer « Télécharger le modèle », to be pressed (D101)", False, browser.execute_script(where))
+
+
 def bar_opened(now: dt.datetime) -> None:
     """BA. The bar opened (D90, board 6): at rest, the microphone, « Vérifier le son » — D88's panel in
     the bar — and « Avancé » closed; recording, the context, the microphone recorded, « Confidentielle »
@@ -9783,6 +9881,7 @@ def main() -> int:
     microphone_latest_answer(now)
     microphone_rollback(now)
     settings_folded(now)
+    focus_kept(now)
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
