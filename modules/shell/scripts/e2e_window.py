@@ -4488,6 +4488,99 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def bar_language(now: dt.datetime) -> None:
+    """BR. D99: the bar's options offer the meeting's language — at rest the next meeting's, recording
+    the one in progress' —, the meeting's page's list (D65, D89), « Celle des Réglages » first, and its
+    refusal said as the page says it; by the keyboard alone, in French and in English."""
+    print("BR. the bar's options: the meeting's language, the next one's at rest, taken at the start, the one in progress' while recording, refused said — keyboard alone, French and English (D99)")
+    focused = "const a = document.activeElement; return a.id || a.className"
+    picked = ("const p = document.getElementById('small-language'); return p && p.getClientRects().length"
+              " ? [p.value, [...p.options].map(o => o.text)] : null")
+    offered = ["Français", "English", "Deutsch", "Español", "Italiano", "Português", "Nederlands", "العربية"]
+    # The language's row and its sentence start where « Avancé » starts: the options' one indent (#877's T8).
+    lined = ("const left = (x) => x ? Math.round(x.getBoundingClientRect().left) : null;"
+             " const p = document.getElementById('small-language');"
+             " return [left(p && p.closest('label')), left(document.getElementById('small-language-said')), left(document.getElementById('small-advanced'))]")
+    def keys(browser, *pressed) -> None:
+        ActionChains(browser).send_keys(*pressed).perform()
+        time.sleep(0.2)
+    def to(browser, target: str) -> bool:
+        for _ in range(12):
+            if browser.execute_script(focused) == target:
+                return True
+            keys(browser, Keys.TAB)
+        return browser.execute_script(focused) == target
+    def opened(browser) -> bool:
+        # « Plus d’options » reached by Tab and opened by Enter, from whatever the focus was on.
+        if not browser.execute_script("return document.getElementById('small-options').hidden"):
+            return True
+        if not to(browser, "small-more"):
+            return False
+        keys(browser, Keys.ENTER)
+        return wait_for(browser, lambda b: not b.execute_script("return document.getElementById('small-options').hidden"), 3)
+    for language, (short, settled, first, refused) in {
+        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Celle des Réglages — Deutsch", "La langue n’a pas été enregistrée : "),
+        "en_US.UTF-8": ("en", "", "As in Settings — detected", "The language was not saved: "),
+    }.items():
+        taping = WORK / f"bar-language-{short}"
+        taping.mkdir()
+        window = Window(taping, language, f'after = "nothing"\nreminder = false\n{settled}', small=True)
+        meetings = lambda: sorted(p for p in taping.iterdir() if p.is_dir() and (p / "session.json").is_file())
+        with window as browser:
+            wait_for(browser, lambda b: b.execute_script(focused) == "small-record", 10)
+            # At rest: the next meeting's language, in the options, reached by the keyboard.
+            reached = opened(browser) and to(browser, "small-language")
+            got = browser.execute_script(picked)
+            check(f"{short}: at rest, the options offer the meeting's language, reached by Tab: « {first} » first, chosen, then the page's list (D99)",
+                  reached and got == ["", [first, *offered]], [browser.execute_script(focused), got])
+            # Down twice: Français, then English — the next meeting's.
+            keys(browser, Keys.ARROW_DOWN)
+            keys(browser, Keys.ARROW_DOWN)
+            kept = wait_for(browser, lambda b: (b.execute_script(picked) or [None])[0] == "en", 3)
+            check(f"{short}: at rest, English chosen by the arrows, for the next meeting (D99)", kept, browser.execute_script(picked))
+            got = browser.execute_script(lined)
+            check(f"{short}: at rest, the language's row and its sentence start where « Avancé » does (D99)", got[2] is not None and got[2] > 0 and got == [got[2]] * 3, got)
+            # Started by the keyboard: the meeting takes it once its folder holds its session.
+            keys(browser, Keys.ESCAPE)
+            browser.execute_script("document.getElementById('small-record').focus()")
+            keys(browser, Keys.ENTER)
+            started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed() and meetings(), 10)
+            folder = meetings()[-1] if meetings() else taping
+            taken = wait_for(None, lambda b: (folder / "language").is_file() and (folder / "language").read_text() == "en\n", 5)
+            check(f"{short}: started, the meeting takes the language chosen at rest (D99)", started and taken,
+                  [started, (folder / "language").read_text() if (folder / "language").is_file() else None])
+            # Recording: the one in progress' own, shown, changed by the arrows, written to its folder.
+            browser.execute_script("document.getElementById('small-stop').focus()")
+            reached = opened(browser) and to(browser, "small-language")
+            got = browser.execute_script(picked)
+            check(f"{short}: recording, the options offer the meeting in progress' language, its own chosen (D99)",
+                  reached and got == ["en", [first, *offered]], [browser.execute_script(focused), got])
+            keys(browser, Keys.ARROW_DOWN)
+            written = wait_for(None, lambda b: (folder / "language").is_file() and (folder / "language").read_text() == "de\n", 5)
+            check(f"{short}: recording, Deutsch chosen by the arrows: the meeting's language file holds « de » (D99)", written,
+                  (folder / "language").read_text() if (folder / "language").is_file() else None)
+            # Refused — its file a folder that cannot be replaced —: said as the page says it, the choice put back.
+            (folder / "language").unlink(missing_ok=True)
+            (folder / "language").mkdir()
+            (folder / "language" / "held").write_text("")
+            keys(browser, Keys.ARROW_UP)
+            said = wait_for(browser, lambda b: b.execute_script("return document.getElementById('small-language-said')?.textContent ?? ''").startswith(refused), 5)
+            got = [browser.execute_script("return document.getElementById('small-language-said')?.textContent ?? ''"), (browser.execute_script(picked) or [None])[0]]
+            check(f"{short}: recording, a language refused: « {refused}… » said, the choice put back (D99)", said and got[1] == "de", got)
+            got = browser.execute_script(lined)
+            check(f"{short}: recording, the language's row and its refusal start where « Avancé » does (D99)", got[2] is not None and got[2] > 0 and got == [got[2]] * 3, got)
+            shutil.rmtree(folder / "language", ignore_errors=True)
+            shot(browser, f"d99-bar-language-{short}")
+            stop_from_small(browser)
+            back = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+            # At rest again: the next meeting's, none kept — the one chosen was taken.
+            browser.execute_script("document.getElementById('small-record').focus()")
+            reached = back and opened(browser) and to(browser, "small-language")
+            got = browser.execute_script(picked)
+            check(f"{short}: at rest again, the next meeting's language is « {first} »: the one chosen was taken (D99)",
+                  reached and got is not None and got[0] == "", got)
+
+
 def meeting_trashed(now: dt.datetime) -> None:
     """BT. D100: a meeting moved to the trash from its own page — beside the button that opens its folder,
     a question in place, « Annuler » focused first, what it holds and that the system's trash restores it;
@@ -10567,6 +10660,7 @@ def main() -> int:
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
+    bar_language(now)
     recording_found(now)
     recording_found_not_forgotten(now)
     context_before_start(now)

@@ -255,13 +255,14 @@ function leftSaid(words, left) {
 }
 
 // The language a meeting is spoken in (D65): the settings' own, or one of its own — its next
-// transcript heard in it. Written at once; refused, said, the choice put back.
-function languageRow(session, language, languages, words, settled, apple, system) {
+// transcript heard in it. Written at once by `save`; refused, said, the choice put back. The same
+// row in the bar's options (D99), its ids its own.
+function languageRow(save, language, languages, words, settled, apple, system, id = "meeting-language", saidId = "language-said") {
   // A setting of the meeting's row (D89): its icon, its name, its list.
   const row = element("label", "setting language");
-  row.htmlFor = "meeting-language";
+  row.htmlFor = id;
   const pick = element("select");
-  pick.id = "meeting-language";
+  pick.id = id;
   const add = (value, text) => {
     const option = element("option", "", text);
     option.value = value;
@@ -278,12 +279,12 @@ function languageRow(session, language, languages, words, settled, apple, system
   if (language && !heard.some(([code]) => code === language)) add(language, apple ? fill(words.language_heard_as, named(language), named(system)) : named(language));
   pick.value = language ?? "";
   const said = element("p", "says");
-  said.id = "language-said";
+  said.id = saidId;
   said.setAttribute("role", "status");
   let kept = pick.value;
   pick.addEventListener("change", async () => {
     try {
-      await window.__TAURI__.core.invoke("language_set", { name: nameOf(session), language: pick.value || null });
+      await save(pick.value || null);
       kept = pick.value;
       said.textContent = "";
     } catch (why) {
@@ -2122,7 +2123,10 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const typing = same && naming ? { value: naming.value, caret: naming.selectionStart, end: naming.selectionEnd, focused: document.activeElement === naming } : null;
   page.dataset.name = nameOf(session);
   const [secret, left, secretSaid, secretDescribed] = confidentialCard(session, confidential, words);
-  const [spoken, spokenSaid] = languageRow(session, language, languages, words, meeting_language, apple, system_language);
+  const [spoken, spokenSaid] = languageRow(
+    (chosen) => window.__TAURI__.core.invoke("language_set", { name: nameOf(session), language: chosen }),
+    language, languages, words, meeting_language, apple, system_language,
+  );
   // A model the meeting chose and cannot have now (D91): Settings' stands in, said, as Auto for a microphone.
   const gone = element("p", "note warn");
   gone.id = "models-gone";
@@ -3940,6 +3944,26 @@ function showSmall(words) {
     if (focused) document.getElementById(focused)?.focus();
   };
 
+  // The meeting's language (D99): the page's row, of the next meeting at rest — taken by it once it
+  // starts —, of the one recording while it runs. Read anew at each change of meeting.
+  const spokenBox = element("div", "small-language");
+  const languageOf = async () => {
+    const name = meeting.name;
+    const shown = await invoke("bar_language", { name }).catch((why) => {
+      smallSaid("language", fill(words.language_not_saved, why));
+      return null;
+    });
+    if (shown === null || meeting.name !== name) return;
+    smallSaid("language", null);
+    const save = name !== null ? (chosen) => invoke("language_set", { name, language: chosen }) : (chosen) => invoke("next_language_kept", { language: chosen });
+    const [row, said] = languageRow(save, shown.language, shown.languages, words, shown.meeting_language, shown.apple, shown.system_language,
+      "small-language", "small-language-said");
+    // The control the focus is on stays the one focused once drawn again (showSmall's rule).
+    const focused = spokenBox.contains(document.activeElement) ? document.activeElement.id : null;
+    spokenBox.replaceChildren(row, said);
+    if (focused) document.getElementById(focused)?.focus();
+  };
+
   const live = element("div", "small-live");
   // A thin meter for each side in the row (D90, board 5), named by its side and, in its tooltip, by
   // what it is recorded from (D33). Its health in a grey line under the row: a side silent for two
@@ -4016,6 +4040,7 @@ function showSmall(words) {
     unkeptSaid.hidden = unkept.size === 0;
   };
   advancedOf(false);
+  languageOf();
   readKept();
   const keep = async (last = false) => {
     const { name, typed } = meeting;
@@ -4072,7 +4097,7 @@ function showSmall(words) {
   lines.append(keptNext, modelsKept, announce, ...checks.map((check) => check.sentence), unkeptSaid);
   const options = element("div", "bar-options");
   options.id = "small-options";
-  options.append(rest, live, advanced);
+  options.append(rest, live, advanced, spokenBox);
   options.hidden = true;
   // Escape anywhere in the bar folds them (board 5): the focus back on « Plus d’options » from inside
   // them, where it is from the row — a field's text left as it is.
@@ -4136,6 +4161,7 @@ function showSmall(words) {
       Object.assign(meeting, { name: null, saved: null, typed: null, refused: null });
       // « Avancé » and what is said kept: of the next recording again, as the shell has them.
       advancedOf(false);
+      languageOf();
       readKept();
       mark.wanted = null;
       secret.box.checked = false;
@@ -4209,6 +4235,7 @@ function showSmall(words) {
       if (another) meeting.typed = null;
       // « Avancé » now speaks of this meeting — or, stopped, of the next one —, closed as board 6 draws it.
       advancedOf(false);
+      languageOf();
       if (now.meeting !== null) {
         const there = await invoke("context_shown", { name: now.meeting }).catch((why) => {
           smallSaid("context-read", fill(words.context_not_read, why));
