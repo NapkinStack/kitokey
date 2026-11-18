@@ -358,6 +358,8 @@ function confidentialCard(session, confidential, words) {
       const shown = await window.__TAURI__.core.invoke("confidential_set", { name, on: box.checked });
       said.textContent = "";
       paint(shown);
+      // Its lists read again, in place: no service offered once said confidential (D91, D93).
+      if (pageOffered?.name === name) pageOffered.again();
     } catch {
       box.checked = !box.checked;
       said.textContent = words.confidential_not_saved;
@@ -1468,17 +1470,22 @@ function redoTranscriptPanel(offered, session, words, button, corrected) {
 // page's opening by the first line that offers a choice, never at each drawing; shared by its two
 // lines, which keep the meeting's own choice whole between them. Dropped once another meeting is
 // shown, once it is said confidential or no longer (`at`), and once Refaire… keeps another choice.
+// Said so while the page is open, its lines are not drawn again (D101): `again` reads it anew for them.
 let pageOffered = null;
 
 function pageModels(session) {
   const at = `${nameOf(session)}\n${session.confidential}`;
   if (pageOffered?.at === at) return pageOffered;
-  const page = { at, name: nameOf(session), own: null, gone: [], asked: null };
+  const page = { at, name: nameOf(session), own: null, gone: [], asked: null, readers: new Set() };
   page.offered = () => (page.asked ??= window.__TAURI__.core.invoke("models_offered", { name: page.name }).then((offered) => {
     page.own = { transcription: offered.chosen.transcription ?? null, minutes: offered.chosen.minutes ?? null };
     page.gone = offered.gone;
     return offered;
   }));
+  page.again = () => {
+    page.asked = null;
+    page.readers.forEach((read) => read());
+  };
   pageOffered = page;
   return page;
 }
@@ -1532,7 +1539,8 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
     pick.title = pick.options[pick.selectedIndex]?.textContent ?? "";
   };
   if (version) box.hidden = true;
-  page.offered().then((offered) => {
+  const listed = (offered) => {
+    pick.replaceChildren(first);
     const values = [];
     if (step === "minutes") {
       values.push(...offered.ollama.map((model) => ({ provider: offered.ollama_address, model })));
@@ -1558,10 +1566,15 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
     }
     pick.value = kept;
     name();
-  }, (why) => {
+  };
+  const read = () => page.offered().then(listed, (why) => {
     said.textContent = fill(words.models_not_read, why);
     said.hidden = false;
   });
+  // Read again when `again` asks; a line no longer on the page, dropped instead.
+  const reader = () => (pick.isConnected ? read() : page.readers.delete(reader));
+  page.readers.add(reader);
+  read();
   const changed = async () => {
     if (!page.own) return;
     const chosen = { ...page.own, [step]: pick.value ? JSON.parse(pick.value) : null };
