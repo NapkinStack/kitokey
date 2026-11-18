@@ -650,7 +650,16 @@ pub struct Window {
     pub redo_title: &'static str,
     pub redo_with: &'static str,
     pub redo_note: &'static str,
-    pub redo_do: &'static str,
+    /// Shows: the summary's redo panel, its one button that starts, naming the making and its model
+    /// (D96): « Refaire le compte rendu avec Qwen3 14b ». When: a summary model is known, the meeting's,
+    /// the one chosen in « Avancé » or Settings'; else `redo_title`. At most: wraps inside the panel.
+    /// Placeholders: {} the model, as people say it.
+    pub redo_minutes_do: &'static str,
+    /// Shows: the transcript's redo panel, its one button that starts, naming its model (D96):
+    /// « Refaire la transcription avec Whisper Large V3 Turbo ». When: a transcription model is known;
+    /// else `redo_transcript_title`. At most: wraps inside the panel. Placeholders: {} the model, as
+    /// people say it.
+    pub redo_transcript_do: &'static str,
     pub on_computer: &'static str,
     pub redo_transcript_title: &'static str,
     pub redo_transcript_note: &'static str,
@@ -1115,10 +1124,11 @@ pub fn window(language: Language) -> Window {
             free_busy: "being recorded, transcribed or its minutes written",
             free_done: "Done: in the trash.",
             redo: "Redo…",
-            redo_title: "Write the minutes again",
+            redo_title: "Write the summary again",
             redo_with: "Made again with this meeting’s models: “Advanced” to choose them.",
-            redo_note: "The current minutes stay in place until the new ones are ready, then go to the trash.",
-            redo_do: "Redo",
+            redo_note: "The current summary stays in place until the new one is ready, then goes to the trash.",
+            redo_minutes_do: "Write the summary again with {}",
+            redo_transcript_do: "Write the transcript again with {}",
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript is kept until the new one is whole, then goes to the trash; if the new one fails, the current comes back.",
@@ -1558,7 +1568,8 @@ pub fn window(language: Language) -> Window {
             redo_title: "Refaire le compte rendu",
             redo_with: "Refait avec les modèles de cette réunion\u{a0}: «\u{a0}Avancé\u{a0}» pour les choisir.",
             redo_note: "Le compte rendu actuel reste en place tant que le nouveau n’est pas prêt, et se retrouve ensuite dans la corbeille.",
-            redo_do: "Refaire",
+            redo_minutes_do: "Refaire le compte rendu avec {}",
+            redo_transcript_do: "Refaire la transcription avec {}",
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle est gardée tant que la nouvelle n’est pas entière, puis part à la corbeille\u{202f}; si la nouvelle échoue, l’actuelle revient.",

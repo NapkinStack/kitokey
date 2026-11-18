@@ -539,6 +539,8 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .saved-said { position: absolute; margin: 0; color: var(--ok); font-size: 13px; line-height: 1.35; text-align: right; white-space: nowrap; pointer-events: none; }
 .saved-under { visibility: hidden; }
 .redo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+/* The button that starts names its model (D96): a long name wraps inside the panel, never past it. */
+.redo-actions .primary { max-width: 100%; padding-block: 6px; overflow-wrap: anywhere; text-align: start; }
 .pane > .back { display: none; }
 #pane-again { margin: 8px 16px; align-self: flex-start; }
 /* A page come after one left: it arrives, rather than blinks. */
