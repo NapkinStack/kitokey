@@ -4902,9 +4902,13 @@ def bar_after_stop(now: dt.datetime) -> None:
 
     for language, short, theme, meeting, stages, not_made in (
         ("fr_FR.UTF-8", "fr", "light", "La réunion du 18 oct. à 12:00",
-         (" : transcription en cours", " : compte rendu en cours", " : prête"), " : Le compte rendu n’a pas été fait."),
+         (" : transcription en cours", " : compte rendu en cours", " : prête"),
+         " : Le compte rendu n’a pas été fait. La transcription est intacte. Le modèle n’a pas écrit de compte rendu :"
+         " réessayez, ou choisissez un autre modèle dans les réglages de Kitokey."),
         ("en_US.UTF-8", "en", "dark", "The meeting of Oct 18 at 12:00 PM",
-         (": transcribing", ": summary being written", ": ready"), ": The minutes were not written."),
+         (": transcribing", ": summary being written", ": ready"),
+         ": The minutes were not written. The transcript is untouched. The model did not write minutes: try again, or choose another"
+         " model in Kitokey’s settings."),
     ):
         hearing, summary, ready = (meeting + stage for stage in stages)
         meetings = WORK / f"after-stop-{short}"
@@ -4957,18 +4961,27 @@ def bar_after_stop(now: dt.datetime) -> None:
                       reached and gone and browser.execute_script("return window.opened") == ["#/meeting/2026-10-18_12-00"],
                       [reached, browser.execute_script(said), browser.execute_script("return window.opened")])
                 browser.execute_script("window.restoreCore()")
-                # Another recording: nothing said of the last meeting while it records; its summary failing, said with its cause.
+                # Another meeting stopped, its transcript held — its page never opened —, and a recording started while it
+                # is made: nothing said of it while that one records (D92).
                 (WORK / "fail-minutes").touch()
-                browser.execute_script("document.getElementById('small-record').focus()")
-                keys(browser, Keys.ENTER)
-                wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
-                quiet = browser.execute_script(said) == ""
-                to(browser, "small-stop")
-                keys(browser, Keys.ENTER)
-                failed = wait_for(browser, lambda b: b.execute_script(said).startswith(meeting + not_made) and b.execute_script(shown), 15)
-                text = browser.execute_script(said)
-                check(f"{short}: recording again, nothing said of the last meeting; its summary failing, said in one line with its cause, « Ouvrir » beside it (D92)",
-                      quiet and failed and "\n" not in text, [quiet, text, browser.execute_script(shown)])
+                gates[0].touch()
+                record = lambda: (browser.execute_script("document.getElementById('small-record').focus()"), keys(browser, Keys.ENTER),
+                                  wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10))[2]
+                stop = lambda: (to(browser, "small-stop"), keys(browser, Keys.ENTER),
+                                wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10))[2]
+                held = record() and stop() and wait_for(browser, lambda b: b.execute_script(said) == hearing, 10)
+                again = record()
+                time.sleep(3.5)  # two of the window's readings at least, the first meeting still being made
+                quiet = browser.execute_script(said) == "" and not browser.execute_script(shown)
+                check(f"{short}: a meeting stopped and still made, its page not opened: another recording started, nothing said of it while it records (D92)",
+                      held and again and quiet, [held, again, browser.execute_script(said)])
+                # The first one ends meanwhile, its summary failing; the one recording stopped, its summary failing too:
+                # said in one line, the page's sentence and its cause, « Ouvrir » beside it.
+                gates[0].unlink()
+                ended = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.failed['2026-10-18_12-00'] !== undefined)"), 15)
+                failed = stop() and wait_for(browser, lambda b: b.execute_script(said) == meeting + not_made and b.execute_script(shown), 15)
+                check(f"{short}: its summary failing, the bar says so in one line, with the page's cause, « Ouvrir » beside it (D92)",
+                      ended and failed, [ended, browser.execute_script(said), browser.execute_script(shown)])
                 shot_themed(browser, f"d92-bar-failed-{short}-{theme}", theme)
             finally:
                 for gate in gates:
