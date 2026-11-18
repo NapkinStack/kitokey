@@ -1,5 +1,5 @@
 //! What `summary` reads and writes, with no provider in sight: the transcript of a session as
-//! `contracts/transcript/v1` describes it, and its minutes as `contracts/minutes/v3` does.
+//! `contracts/transcript/v1` describes it, and its minutes as `contracts/minutes/v4` does.
 //!
 //! The minutes exist whole or not at all: an answer that is not minutes is refused before a
 //! byte is written, and the file takes its name only once it is complete.
@@ -12,7 +12,7 @@ pub mod provider;
 /// The contract this module reads, as the transcript's first line names it.
 pub const TRANSCRIPT: &str = "transcript/v1";
 /// The contract this module provides, as the minutes' front matter names it.
-pub const MINUTES: &str = "minutes/v3";
+pub const MINUTES: &str = "minutes/v4";
 
 /// A stretch of speech, as the transcript holds it.
 #[derive(Debug, Clone, PartialEq)]
@@ -186,6 +186,9 @@ pub struct Made<'a> {
     pub context: Option<&'a str>,
     /// What the call cost, when the provider reported it (`reported`).
     pub cost: Option<Cost>,
+    /// How long the making took, in seconds, from its start (`minutes/v4`, D97): written to the
+    /// hundredth when it is a number at least zero, else not at all.
+    pub made_in: Option<f64>,
     /// The transcript the times of the answer are checked against.
     pub segments: &'a [Segment],
 }
@@ -530,9 +533,15 @@ pub fn minutes(answer: &str, made: &Made) -> Result<Minutes, Refused> {
     let priced = made.cost.as_ref().map_or(String::new(), |cost| {
         format!("cost: {}\ncurrency: {}\n", cost.amount, cost.currency)
     });
+    let took = made
+        .made_in
+        .filter(|seconds| seconds.is_finite() && *seconds >= 0.0)
+        .map_or(String::new(), |seconds| {
+            format!("made_in: {:?}\n", (seconds * 100.0).round() / 100.0)
+        });
     Ok(Minutes(
         format!(
-            "---\ncontract: {MINUTES}\nmade: {}\nprovider: {}\nmodel: {}\ncontext: {context}\n{named}{priced}---\n\n{body}\n",
+            "---\ncontract: {MINUTES}\nmade: {}\nprovider: {}\nmodel: {}\ncontext: {context}\n{named}{priced}{took}---\n\n{body}\n",
             made.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
             quoted(made.provider),
             quoted(made.model),

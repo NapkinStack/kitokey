@@ -64,6 +64,81 @@ pub struct Notice {
     pub body: String,
 }
 
+/// A day as the window's `Intl` says it, with CLDR's abbreviated months: « 18 oct. », "Oct 18".
+/// One formatter for every day Kitokey says beside a meeting (D92, D93).
+pub fn day(day: chrono::NaiveDate, language: Language) -> String {
+    // Shows: in a notification's body, the day a meeting was recorded. When: a meeting is named by
+    // its day and hour, not recorded today. At most: no limit. Placeholders: none.
+    use chrono::Datelike;
+    // CLDR's abbreviated months, as `Intl.DateTimeFormat` gives them with `month: "short"`.
+    let month = day.month0() as usize;
+    match language {
+        Language::English => {
+            let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            format!("{} {}", months[month], day.day())
+        }
+        Language::French => {
+            let months = [
+                "janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc.",
+            ];
+            format!("{} {}", day.day(), months[month])
+        }
+    }
+}
+
+/// An hour as the window's `Intl` says it, two digits: « 09:42 », "09:42 AM".
+pub fn hour(time: chrono::NaiveTime, language: Language) -> String {
+    // Shows: in a notification's body, the hour a meeting was recorded. When: a meeting is named by
+    // its hour. At most: no limit. Placeholders: none.
+    match language {
+        Language::English => time.format("%I:%M %p").to_string(),
+        // `%R`: the hour and minutes on 24 hours, as `%H:%M`.
+        Language::French => time.format("%R").to_string(),
+    }
+}
+
+/// A meeting named in a sentence (D92): the title it was given, else when it was recorded — its
+/// hour on the day it is said, its day and hour after. Used where a sentence names the meeting it
+/// is about; the window names it in its list and page itself.
+pub fn meeting(title: Option<&str>, started: Option<chrono::NaiveDateTime>, today: chrono::NaiveDate, language: Language) -> String {
+    // Shows: in a notification's body, the meeting it is about. When: a meeting is named, without a
+    // title of its own. At most: no limit. Placeholders: {} its hour, or its day then its hour.
+    use Language::{English, French};
+    match (title.map(str::trim).filter(|title| !title.is_empty()), started, language) {
+        (Some(title), _, French) => format!("«\u{a0}{title}\u{a0}»"),
+        (Some(title), _, English) => format!("“{title}”"),
+        (None, Some(started), French) if started.date() == today => format!("la réunion de {}", hour(started.time(), French)),
+        (None, Some(started), English) if started.date() == today => format!("the {} meeting", hour(started.time(), English)),
+        (None, Some(started), French) => {
+            format!("la réunion du {} à {}", day(started.date(), French), hour(started.time(), French))
+        }
+        (None, Some(started), English) => {
+            format!(
+                "the meeting of {} at {}",
+                day(started.date(), English),
+                hour(started.time(), English)
+            )
+        }
+        (None, None, French) => "la réunion".into(),
+        (None, None, English) => "the meeting".into(),
+    }
+}
+
+/// The notification that ends a meeting's making, its meeting named first (D92).
+pub fn for_meeting(notice: Notice, meeting: &str, language: Language) -> Notice {
+    // Shows: a notification's body, before the sentences it had. When: the meeting's last step
+    // ended — written or failed —, no window of Kitokey having the focus. At most: no limit.
+    // Placeholders: {meeting} the meeting, as `meeting` names it.
+    let named = match language {
+        Language::French => format!("Pour {meeting}."),
+        Language::English => format!("For {meeting}."),
+    };
+    Notice {
+        body: format!("{named} {}", notice.body),
+        ..notice
+    }
+}
+
 /// A length as a person says it: seconds under a minute, then minutes, then hours — each
 /// to the nearest, so that a minute and fifty-nine seconds is two minutes.
 pub fn length(seconds: f64) -> String {
@@ -416,6 +491,10 @@ pub struct Window {
     /// "Compte rendu du 13 nov. à 09:45 · Qwen3 8B" (D93). When: the summary says when it was made.
     /// At most: one line. Placeholders: {} the day and hour, in local time, without the year.
     pub minutes_of: &'static str,
+    /// Shows: a meeting's page, the line of its transcript and of its minutes, after the model — "en 3 s",
+    /// "in 31 min 52 s" (D97). When: the version says how long its making took. At most: one line.
+    /// Placeholders: `{}`, the time taken, its units the window's.
+    pub made_in: &'static str,
     pub here: &'static str,
     pub remote: &'static str,
     /// A voice told within a track: its label.
@@ -935,6 +1014,7 @@ pub fn window(language: Language) -> Window {
             heard_by: "Written by {}, on this computer",
             transcribed_on: "Transcribed on {}",
             minutes_of: "Summary of {}",
+            made_in: "in {}",
             here: "Here",
             remote: "Remote",
             voice: "voice {}",
@@ -1374,6 +1454,7 @@ pub fn window(language: Language) -> Window {
             heard_by: "Transcrit par {}, sur cet ordinateur",
             transcribed_on: "Transcrit le {}",
             minutes_of: "Compte rendu du {}",
+            made_in: "en {}",
             here: "Ici",
             remote: "À distance",
             voice: "voix {}",
