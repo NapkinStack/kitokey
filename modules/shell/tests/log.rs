@@ -122,10 +122,14 @@ exit 1"#,
     // A command refused by a settings file broken by hand: `settings::read` names its whole path.
     let broken = folder.path().join("settings.toml");
     fs::write(&broken, "keep_audio = 0\n").unwrap();
-    let raw = settings::read(&broken).unwrap_err();
+    let refused = settings::read(&broken).unwrap_err();
+    let raw = refused.detail.clone();
     assert!(raw.contains(&*folder.path().to_string_lossy()), "{raw}");
     let unread = "settings.toml, line 1: keep_audio is \"always\" or a number of days";
-    assert_eq!(log::command_failed(&Failure::SettingsUnread, &raw, Some(&broken)), unread);
+    assert_eq!(
+        log::command_failed(&Failure::SettingsUnread(refused.refused), &raw, Some(&broken)),
+        unread
+    );
 
     let text = String::from_utf8(kept.0.lock().unwrap().clone()).unwrap();
     let lines: Vec<serde_json::Value> = text.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
@@ -148,7 +152,7 @@ exit 1"#,
     let refused = lines.iter().find(|line| line["message"] == "shell.command_failed").unwrap();
     assert_eq!(
         (&refused["failure"], &refused["detail"]),
-        (&"SettingsUnread".into(), &unread.into()),
+        (&"SettingsUnread(KeepAudio { line: 1 })".into(), &unread.into()),
         "{text}"
     );
     let recorded = fs::read_to_string(folder.path().join("recording.trace")).unwrap();

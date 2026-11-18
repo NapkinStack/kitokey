@@ -87,6 +87,7 @@ lexicon window.minutes_making[0] "Writing the minutes" « minutes »
 lexicon window.minutes_not_copied[0] "The minutes could not be copied." « minutes »
 lexicon window.minutes_not_made[0] "The minutes were not written. The transcript is untouched." « minutes »
 lexicon window.minutes_step[0] "Minutes" « minutes »
+lexicon window.minutes_stopped[0] "Minutes stopped. You can start them again, with another model if you like." « minutes »
 lexicon window.minutes_title[0] "Minutes" « minutes »
 lexicon window.minutes_unsaved[0] "Not saved yet — the minutes are still written by {}." « minutes »
 lexicon window.minutes_unsaved_none[0] "Not saved yet — no minutes are written until it is." « minutes »
@@ -96,10 +97,7 @@ lexicon window.models_note[0] "The models “on this computer” are those Kitok
 lexicon window.no_minutes[0] "No minutes yet." « minutes »
 lexicon window.no_player[0] "Its audio was freed: the meeting can no longer be listened to. Its transcript and minutes stay." « minutes »
 lexicon window.offered_ollama_good[0] "For the minutes, on this computer, through Ollama" « minutes »
-lexicon window.redo_note[0] "The current minutes stay in place until the new ones are ready, then go to the trash." « minutes »
-lexicon window.redo_title[0] "Write the minutes again" « minutes »
 lexicon window.service_tested[0] "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit." « segment »
-lexicon window.weight_described[0] "The audio takes {}; the transcripts and minutes, {}." « minutes »
 lexicon window.welcome_connected[1] "The minutes are written by an online service; the transcription stays on this computer." « minutes »
 lexicon window.welcome_ollama_lacks[0] "Ollama does not hold {} yet: the minutes wait for it. Settings fetch it in one click." « minutes »
 lexicon window.welcome_ollama_silent[0] "Ollama does not answer on this computer: the minutes wait for it. It is free, at ollama.com." « minutes »

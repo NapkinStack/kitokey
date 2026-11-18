@@ -34,7 +34,6 @@
   <div class="foot">
     <section id="weight" class="weight" aria-live="polite" hidden>
       <div class="total"><strong id="total"></strong> · <span id="taken"></span></div>
-      <div id="bar" class="split" role="img"><span id="bar-audio" class="audio"></span><span id="bar-text" class="text"></span></div>
     </section>
     <nav id="sections"><a href="#/free" id="free-link" class="icon-button" hidden></a><button type="button" id="small-link" class="icon-button" hidden></button><a href="#/settings" id="settings-link" class="icon-button"></a></nav>
   </div>
@@ -42,9 +41,11 @@
 <div id="pane" class="pane">
   <button type="button" id="unfold" class="icon-button" aria-keyshortcuts="Control+B Meta+B"></button>
   <a href="#/" id="pane-back" class="back"></a>
+  <!-- A live region there before what it says (ARIA APG): the banner put in it is announced. -->
+  <div id="settings-banner-live" role="status"></div>
   <p id="pane-said" class="note warn" role="status" hidden></p>
   <button type="button" id="pane-again" class="open" hidden></button>
-  <section id="empty" class="empty" hidden><div class="card"><p id="none" class="none"></p><p id="none-do" class="says"></p><kbd id="empty-keys" class="keys" hidden></kbd><button type="button" id="empty-record" class="primary"></button><button type="button" id="empty-again" class="primary" hidden></button></div></section>
+  <section id="empty" class="empty" hidden><div class="card"><p id="none" class="none"></p><p id="none-do" class="says"></p><kbd id="empty-keys" class="keys" hidden></kbd><button type="button" id="empty-record" class="open"></button><button type="button" id="empty-again" class="primary" hidden></button><p id="empty-folder" class="folder"></p></div></section>
   <main id="meeting" hidden></main>
   <main id="settings" hidden></main>
   <main id="agree" hidden></main>

@@ -13,10 +13,10 @@ pub const SHIPPED: &str = include_str!("../registry/models.json");
 /// Where the list is read again from, on the user's gesture: the file on `main`.
 pub const ADDRESS: &str = "https://raw.githubusercontent.com/NapkinStack/wholeheard/main/modules/shell/registry/models.json";
 
-/// The decider's public key, as `minisign -G` writes it on the second line of its `.pub` file.
-/// None until they give it (cycle 05, *Dependency with a date*): no list is read again, Settings
-/// say so, and so does the check of the list in the repository.
-pub const PUBLIC_KEY: Option<&str> = None;
+/// The decider's public key, as `minisign -G` writes it on the second line of its `.pub` file:
+/// `minisign public key 28AD0E835D7AF31E`, made in their own terminal (D56). Its private key is in
+/// no repository and no session: a list is signed by the decider alone (`AGENTS.md`).
+pub const PUBLIC_KEY: Option<&str> = Some("RWQe83pdgw6tKGbfv/lHOXQkpVU+KJcfXp3KiOmb2JIVn9Lz0ojPkotS");
 
 /// What no list is read again without, said to the logs and to whoever reads the check.
 const WAITS: &str = "the list is not read again: it waits on the decider's key";
@@ -70,9 +70,10 @@ pub fn fetch(address: &str, key: Option<&str>) -> Result<Vec<Listed>, String> {
         .max_redirects(0)
         .build()
         .into();
-    let text = answered(&agent, address, LIMIT).map_err(|why| format!("the list {why}"))?;
+    let text = answered(&agent, address, LIMIT, false).map_err(|why| format!("the list {why}"))?;
+    // Asked on the connection the list came by, which a network or a proxy may have cut (#869).
     let signature =
-        answered(&agent, &format!("{address}.minisig"), SIGNATURE_LIMIT).map_err(|why| format!("the list's signature {why}"))?;
+        answered(&agent, &format!("{address}.minisig"), SIGNATURE_LIMIT, true).map_err(|why| format!("the list's signature {why}"))?;
     // Nothing of the list is read before it is known to be the decider's.
     verify(&text, &signature, key)?;
     let listed = read(&text)?;
@@ -82,9 +83,19 @@ pub fn fetch(address: &str, key: Option<&str>) -> Result<Vec<Listed>, String> {
     Ok(listed)
 }
 
-/// The text `address` answers, read up to one byte over `limit`.
-fn answered(agent: &ureq::Agent, address: &str, limit: usize) -> Result<String, String> {
-    let mut answer = agent.get(address).call().map_err(|error| format!("could not be read ({error})"))?;
+/// The text `address` answers, read up to one byte over `limit`. With `again`, asked once more when
+/// the connection was cut before any answer came: a GET, nothing done twice. Nothing else is asked
+/// again — an HTTP error, a body cut while read, a timeout (#869).
+fn answered(agent: &ureq::Agent, address: &str, limit: usize, again: bool) -> Result<String, String> {
+    let mut answer = match agent.get(address).call() {
+        Err(ureq::Error::Io(error)) if again => {
+            // Said, so that a retry that works never hides a network that cuts (operations, OPS1).
+            tracing::info!(detail = %error, "shell.registry_asked_again");
+            agent.get(address).call()
+        }
+        first => first,
+    }
+    .map_err(|error| format!("could not be read ({error})"))?;
     let status = answer.status().as_u16();
     if status != 200 {
         return Err(format!("could not be read (HTTP {status})"));
@@ -99,13 +110,17 @@ fn answered(agent: &ureq::Agent, address: &str, limit: usize) -> Result<String, 
     Ok(text)
 }
 
+/// minisign's legacy form — the list signed whole, not its hash — is refused: `minisign -S` writes
+/// the pre-hashed form, and `minisign-verify` takes the other only when it is asked to (D56).
+const LEGACY_ALLOWED: bool = false;
+
 /// Whether `signature` is `key`'s over the bytes of `list`. minisign's pre-hashed signature only,
 /// what `minisign -S` writes: the legacy form is refused.
 pub fn verify(list: &str, signature: &str, key: &str) -> Result<(), String> {
     let key = minisign_verify::PublicKey::from_base64(key).map_err(|error| format!("the key built in does not read ({error})"))?;
     let signature =
         minisign_verify::Signature::decode(signature).map_err(|error| format!("the list's signature does not read ({error})"))?;
-    key.verify(list.as_bytes(), &signature, false)
+    key.verify(list.as_bytes(), &signature, LEGACY_ALLOWED)
         .map_err(|error| format!("the list's signature does not verify ({error})"))
 }
 

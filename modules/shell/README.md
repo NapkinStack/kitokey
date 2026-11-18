@@ -26,6 +26,20 @@ it starts and never reads the code of · grey: files, the only thing it shares w
 **It holds no step** (ADR-0002): closed or crashed, a recording goes on, and every step still
 runs from a terminal.
 
+**A recording found again** (#773, Linux): while one runs, `recording.json` beside the settings keeps
+capture's process number, when the system started it (`/proc/<id>/stat`) and the session's folder,
+written whole once capture says `started`, removed once it has ended. A Kitokey started again after
+its shell was ended reads it: the same number and start — no other program can be that one — is the
+recording in progress, its tray and bar at ■, its length counted from `session.json`'s `started`,
+stopped by a termination signal (`recording/v1`), its transcript following as usual; a `stopped`
+already written is a recording ending. Its levels, devices and silences went with the output of the
+shell that read them: none are shown. A program gone, another under its number or a file that does
+not read finds nothing, and the file is removed; one that cannot be read — a file, or a folder in
+its place — is set aside as `recording.json.unreadable-<seconds>`, never deleted. The session left is
+listed as it is. Not found: a
+recording whose shell was ended before capture said `started`, and on macOS and Windows, which have
+no `/proc`.
+
 **Today**: an icon in the tray whose menu starts and stops a recording, the same from a
 global shortcut — Super+Alt+M under a Linux desktop — and a notification for what matters:
 the reminder to announce the recording, with the microphone recorded named in it — one
@@ -251,8 +265,8 @@ the Whisper models of [`registry/models.json`](registry/models.json), the list s
 ADR-0010), and for the minutes `qwen3:8b` fetched by Ollama's own pull (`POST /api/pull`) —,
 one fetch at a time. The Whisper models are read again from `main` only on *Mettre à jour la
 liste (raw.githubusercontent.com)*, and offered then until Kitokey quits, only when the
-decider's minisign key signed them (D56). Until that key is built in, no list is read again and
-*Réglages* say it waits on it; a list that cannot be read, unsigned, signed by another key or changed since leaves the one offered, and says so; a model fetched joins those to choose, the choice staying the
+decider's minisign key signed them (D56): its public key, `28AD0E835D7AF31E`, is built in
+(`registry::PUBLIC_KEY`). A list that cannot be read, unsigned, signed by another key or changed since leaves the one offered, and says so; a model fetched joins those to choose, the choice staying the
 user's. With no Ollama answering, the row says where to get it: Kitokey never installs it (D37). A model the settings name, and which is not
 there, is said with where it was looked for: it is the user's own, never fetched.
 

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use kitokey_shell::{
     recording::{Said, Source},
+    settings::Refused,
     words::{self, Failure, Language, Notice, Refusal},
 };
 
@@ -308,7 +309,10 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
     for language in BOTH {
         for trouble in [
             Trouble::NoRecorder(String::new()),
-            Trouble::Settings("settings.toml, line 3: invalid boolean".into()),
+            Trouble::Settings(Refused::Unparsed {
+                line: 3,
+                key: Some("reminder"),
+            }),
             Trouble::Shortcut(String::new()),
             Trouble::NoModel("<data>/kitokey/models/ggml.bin".into()),
             Trouble::NoTranscriber(String::new()),
@@ -319,8 +323,12 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
                 "{title} — {body}"
             );
         }
-        let settings = words::trouble(&Trouble::Settings("settings.toml, line 3: invalid boolean".into()), language).body;
-        assert!(settings.contains("settings.toml, line 3: invalid boolean"), "{settings}");
+        let unparsed = Refused::Unparsed {
+            line: 3,
+            key: Some("reminder"),
+        };
+        let settings = words::trouble(&Trouble::Settings(unparsed), language).body;
+        assert!(settings.ends_with(&words::refused(&unparsed, language)), "{settings}");
         let model = words::trouble(&Trouble::NoModel("<data>/kitokey/models/ggml.bin".into()), language).body;
         assert!(model.contains("<data>/kitokey/models/ggml.bin"), "{model}");
     }
@@ -328,10 +336,8 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
     let body = |trouble, language| words::trouble(&trouble, language).body;
     assert!(body(Trouble::NoRecorder(String::new()), Language::English).ends_with("Installing Kitokey again puts it back."));
     assert!(body(Trouble::NoRecorder(String::new()), Language::French).ends_with("Réinstaller Kitokey le remet en place."));
-    assert!(body(Trouble::Settings(String::new()), Language::English).contains("runs with its defaults"));
+    assert!(body(Trouble::Settings(Refused::Unopened), Language::English).contains("runs with its defaults"));
     assert!(body(Trouble::Shortcut(String::new()), Language::French).contains("permet toujours de démarrer"));
-    // What the settings file holds wrong comes out on one line.
-    assert!(body(Trouble::Settings("line one\n\tline two".into()), Language::English).contains("line one line two"));
 }
 
 #[test]
@@ -1231,7 +1237,7 @@ const STILL_WRONG: &str = include_str!("words_still_wrong.txt");
 
 /// The sentences still without their comment, counted: 602 keys would be three review budgets.
 /// The number only goes down, as the list does.
-const WITHOUT_COMMENT: usize = 491;
+const WITHOUT_COMMENT: usize = 464;
 
 /// A sentence of `src/words.rs`, as the file arranges it.
 #[derive(Debug)]
@@ -1559,17 +1565,18 @@ fn every_sentence_carries_its_comment() {
         .filter(|sentence| sentence.french != Some(true) && sentence.comment.is_none())
         .map(|s| s.name())
         .collect();
+    // A baseline, as ESLint's or Psalm's: it fails only when a sentence is written without its comment,
+    // never when one gains it or goes — two pull requests merged side by side each lowered it, and
+    // main went red twice (#857). Lower, it says by how much it can come down.
     assert!(
-        without.len() == WITHOUT_COMMENT,
-        "{} sentences without their comment, WITHOUT_COMMENT says {WITHOUT_COMMENT}: {}\n{}",
+        without.len() <= WITHOUT_COMMENT,
+        "{} sentences without their comment, WITHOUT_COMMENT says {WITHOUT_COMMENT}: a sentence was written without its comment\n{}",
         without.len(),
-        if without.len() < WITHOUT_COMMENT {
-            "lower it"
-        } else {
-            "a sentence was written without its comment"
-        },
         without.join("\n")
     );
+    if without.len() < WITHOUT_COMMENT {
+        eprintln!("WITHOUT_COMMENT can be lowered to {}", without.len());
+    }
 }
 
 /// The same placeholders in French and in English — a field's, or those one comment covers —, and
@@ -1696,13 +1703,6 @@ fn no_sentence_says_a_word_the_lexicon_refuses() {
         }
     }
     still_wrong("lexicon", wrong);
-}
-
-#[test]
-fn a_list_waiting_on_its_key_says_so_and_what_stays_offered() {
-    let (english, french) = (words::window(Language::English), words::window(Language::French));
-    assert!(english.offered_refresh_waits.contains("waits on the key") && english.offered_refresh_waits.contains("still offered"));
-    assert!(french.offered_refresh_waits.contains("attend la clé") && french.offered_refresh_waits.contains("restent proposés"));
 }
 
 #[test]
@@ -2010,18 +2010,25 @@ fn the_settings_files_path_stays_out_of_what_a_command_keeps_of_a_failure() {
 #[test]
 fn a_settings_file_that_cannot_be_read_is_said_whole_its_raw_text_under_it_only_in_developer_mode() {
     let raw = "settings.toml, line 1: keep_audio is \"always\" or a number of days";
-    let page = |language, developer| serde_json::to_value(words::told(Failure::SettingsLocked, raw, language, developer)).unwrap();
+    let locked = Failure::SettingsLocked(Refused::KeepAudio { line: 1 });
+    let page = |language, developer| serde_json::to_value(words::told(locked, raw, language, developer)).unwrap();
     assert_eq!(
         page(Language::French, false),
-        "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé."
+        "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. \
+         Ligne 1\u{a0}: «\u{a0}keep_audio\u{a0}» vaut «\u{a0}always\u{a0}» ou un nombre de jours, de 1 à 36\u{202f}500. Corrigez-le."
     );
     assert_eq!(
         page(Language::English, false),
-        "The settings file cannot be read: Kitokey does not write over it until it is corrected."
+        "The settings file cannot be read: Kitokey does not write over it until it is corrected. \
+         Line 1: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it."
     );
     assert_eq!(
         page(Language::English, true),
-        format!("The settings file cannot be read: Kitokey does not write over it until it is corrected.\n{raw}").as_str()
+        format!(
+            "The settings file cannot be read: Kitokey does not write over it until it is corrected. \
+             Line 1: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it.\n{raw}"
+        )
+        .as_str()
     );
 }
 
@@ -2217,4 +2224,421 @@ fn a_notice_of_minutes_failed_by_the_meetings_own_model_says_what_its_page_says(
             }
         }
     }
+}
+
+/// A meeting's day and hour, as the window's `Intl` says them (CLDR's abbreviated months).
+fn at(day: &str, time: &str) -> chrono::NaiveDateTime {
+    chrono::NaiveDateTime::parse_from_str(&format!("{day} {time}"), "%Y-%m-%d %H:%M").unwrap()
+}
+
+#[test]
+fn a_day_and_an_hour_are_said_as_the_window_says_them() {
+    let french = [
+        "janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc.",
+    ];
+    let english = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    for (month, (fr, en)) in french.iter().zip(english).enumerate() {
+        let day = chrono::NaiveDate::from_ymd_opt(2026, month as u32 + 1, 18).unwrap();
+        assert_eq!(words::day(day, Language::French), format!("18 {fr}"));
+        assert_eq!(words::day(day, Language::English), format!("{en} 18"));
+    }
+    let first = chrono::NaiveDate::from_ymd_opt(2026, 11, 1).unwrap();
+    assert_eq!(
+        (words::day(first, Language::French), words::day(first, Language::English)),
+        ("1 nov.".into(), "Nov 1".into())
+    );
+    for (time, fr, en) in [
+        ("12:00", "12:00", "12:00 PM"),
+        ("09:42", "09:42", "09:42 AM"),
+        ("00:05", "00:05", "12:05 AM"),
+        ("17:31", "17:31", "05:31 PM"),
+    ] {
+        let when = at("2026-11-13", time);
+        assert_eq!(words::hour(when.time(), Language::French), fr);
+        assert_eq!(words::hour(when.time(), Language::English), en);
+    }
+}
+
+#[test]
+fn a_meeting_is_named_by_its_title_else_its_hour_that_day_else_its_day_and_hour() {
+    let started = Some(at("2026-10-18", "12:00"));
+    let (that_day, later) = (at("2026-10-18", "23:59").date(), at("2026-11-14", "01:00").date());
+    let named = |title, when, today, language| words::meeting(title, when, today, language);
+    assert_eq!(
+        named(Some("Point hebdo"), started, later, Language::French),
+        "«\u{a0}Point hebdo\u{a0}»"
+    );
+    assert_eq!(named(Some("Weekly sync"), started, later, Language::English), "“Weekly sync”");
+    assert_eq!(named(None, started, that_day, Language::French), "la réunion de 12:00");
+    assert_eq!(named(None, started, that_day, Language::English), "the 12:00 PM meeting");
+    assert_eq!(named(None, started, later, Language::French), "la réunion du 18 oct. à 12:00");
+    assert_eq!(named(None, started, later, Language::English), "the meeting of Oct 18 at 12:00 PM");
+    // A title of blanks is none; a meeting whose start cannot be read is the meeting.
+    assert_eq!(
+        named(Some(" \t"), started, later, Language::French),
+        "la réunion du 18 oct. à 12:00"
+    );
+    assert_eq!(named(None, None, later, Language::French), "la réunion");
+    assert_eq!(named(None, None, later, Language::English), "the meeting");
+}
+
+#[test]
+fn the_notification_that_ends_a_meeting_names_it_first_and_keeps_its_title() {
+    for language in BOTH {
+        let notice = words::minutes(&words::Minutes::Ready, language);
+        let meeting = words::meeting(None, Some(at("2026-10-18", "12:00")), at("2026-11-14", "01:00").date(), language);
+        let told = words::for_meeting(notice.clone(), &meeting, language);
+        assert_eq!(told.title, notice.title);
+        assert!(told.body.ends_with(&notice.body), "{told:?}");
+        assert!(told.body.contains(&meeting), "{told:?}");
+        assert!(told.title.chars().count() <= 50, "{told:?}");
+    }
+    let told = words::for_meeting(
+        words::minutes(&words::Minutes::Ready, Language::French),
+        "«\u{a0}Point hebdo\u{a0}»",
+        Language::French,
+    );
+    assert!(told.body.starts_with("Pour «\u{a0}Point hebdo\u{a0}». "), "{told:?}");
+    let told = words::for_meeting(
+        words::minutes(&words::Minutes::Ready, Language::English),
+        "the 12:00 PM meeting",
+        Language::English,
+    );
+    assert!(told.body.starts_with("For the 12:00 PM meeting. "), "{told:?}");
+}
+
+/// A settings file refused is said in the user's language: which setting, on which line, and what
+/// to do — never `settings.rs`'s own sentence, which stays for the log and behind « Développeur »
+/// (#783, D94). The window says it under each command it refuses, and the notification at a start.
+#[test]
+fn a_settings_file_refused_says_which_setting_and_what_to_do_in_both_languages() {
+    use words::Trouble;
+    let said = [
+        (
+            Refused::Unopened,
+            "Kitokey cannot open its settings file: check that you may read it.",
+            "Kitokey ne peut pas ouvrir son fichier de réglages\u{a0}: vérifiez que vous pouvez le lire.",
+        ),
+        (
+            Refused::Unparsed {
+                line: 4,
+                key: Some("after"),
+            },
+            "Line 4: Kitokey does not understand the value of “after”. Correct it, or remove the line.",
+            "Ligne 4\u{a0}: Kitokey ne comprend pas la valeur de «\u{a0}after\u{a0}». Corrigez-la, ou supprimez la ligne.",
+        ),
+        (
+            Refused::Unparsed { line: 4, key: None },
+            "Line 4 is not written as a setting. Correct it, or remove it.",
+            "La ligne 4 n’est pas écrite comme un réglage. Corrigez-la, ou supprimez-la.",
+        ),
+        (
+            Refused::SessionsNotWhole { line: 4 },
+            "Line 4: “sessions” gives a folder’s whole path, from / or from ~. Correct it.",
+            "Ligne 4\u{a0}: «\u{a0}sessions\u{a0}» donne le chemin entier d’un dossier, depuis / ou depuis ~. Corrigez-le.",
+        ),
+        (
+            Refused::ModelNotWhole { line: 4 },
+            "Line 4: “model” gives a file’s whole path, from / or from ~. Correct it.",
+            "Ligne 4\u{a0}: «\u{a0}model\u{a0}» donne le chemin entier d’un fichier, depuis / ou depuis ~. Corrigez-le.",
+        ),
+        (
+            Refused::KeepAudio { line: 4 },
+            "Line 4: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it.",
+            "Ligne 4\u{a0}: «\u{a0}keep_audio\u{a0}» vaut «\u{a0}always\u{a0}» ou un nombre de jours, de 1 à 36\u{202f}500. Corrigez-le.",
+        ),
+    ];
+    // Each refusal `settings.rs` makes is said: one added fails to compile here until it is named.
+    for (refused, ..) in &said {
+        match refused {
+            Refused::Unopened
+            | Refused::Unparsed { .. }
+            | Refused::SessionsNotWhole { .. }
+            | Refused::ModelNotWhole { .. }
+            | Refused::KeepAudio { .. } => {}
+        }
+    }
+    let raw = "settings.toml, line 4: keep_audio is \"always\" or a number of days";
+    for (refused, english, french) in said {
+        for (language, sentence) in [(Language::English, english), (Language::French, french)] {
+            assert_eq!(words::refused(&refused, language), sentence);
+            // The notification at a start: what still works, then the setting and the gesture.
+            let Notice { title, body } = words::trouble(&Trouble::Settings(refused), language);
+            assert!(title.chars().count() <= 50 && body.ends_with(sentence), "{title} — {body}");
+            assert!(
+                body.starts_with(["Kitokey runs with its defaults", "Kitokey fonctionne avec ses réglages par défaut"][language as usize]),
+                "{body}"
+            );
+            // Under a command the window refused: its sentence, the refusal after it, the raw text
+            // only in developer mode.
+            for failure in [Failure::SettingsUnread(refused), Failure::SettingsLocked(refused)] {
+                let shown = |developer| serde_json::to_value(words::told(failure, raw, language, developer)).unwrap();
+                let shown = (shown(false), shown(true));
+                assert!(shown.0.as_str().unwrap().ends_with(sentence), "{shown:?}");
+                assert!(!shown.0.as_str().unwrap().contains(raw), "{shown:?}");
+                assert_eq!(shown.1.as_str().unwrap(), format!("{}\n{raw}", shown.0.as_str().unwrap()));
+            }
+        }
+    }
+}
+
+// The voice guide (`docs/voice.md`, D94): a notification's title, read whole as it is sent.
+
+/// The titles over 50 characters today, put right with the notifications' sentences (D94): a list
+/// that only shrinks.
+const TITLES_TOO_LONG: [&str; 2] = [
+    "Le son de la réunion n’est plus enregistré pour l’instant",
+    "Les réglages de Wholeheard n’ont pas tous été repris",
+];
+
+/// The functions of `words.rs` that return a notification, each read below: one added there fails
+/// the title's test until it is named here — and read in `every_notice`, which the review checks.
+const NOTIFYING: [&str; 18] = [
+    "for_meeting",
+    "of",
+    "notice",
+    "trouble",
+    "made",
+    "minutes",
+    "transcript_kept_beside",
+    "told",
+    "sends_nothing",
+    "lost_beside",
+    "back",
+    "offer",
+    "audio_trashed",
+    "carried_over",
+    "carry_failed",
+    "model_needed",
+    "pulled",
+    "fetched",
+];
+
+/// Every notification of the shell in one language, each variant of what it is sent for read. Each
+/// enum is matched here without a wildcard: a variant added fails to compile until it is named in
+/// that match — which does not give it a value in the list; the review of the change does.
+fn every_notice(language: Language) -> Vec<Notice> {
+    use kitokey_shell::{summarising::Cause, transcription::Made};
+    use words::{Minutes, Sides, Trouble};
+    let named = || Some("Jabra Evolve2 65".to_string());
+    let causes = [
+        Cause::Unreachable,
+        Cause::TooSlow,
+        Cause::RefusedKey,
+        Cause::NoCredit,
+        Cause::UnknownModel,
+        Cause::TooMany,
+        Cause::Down,
+        Cause::NoTimes,
+        Cause::Redirected,
+        Cause::ProviderFailed,
+        Cause::CutShort,
+        Cause::NotMinutes,
+        Cause::TranscriptUnusable,
+        Cause::NoSpeech,
+        Cause::Settings,
+        Cause::Unwritable,
+    ];
+    for cause in causes {
+        match cause {
+            Cause::Unreachable
+            | Cause::TooSlow
+            | Cause::RefusedKey
+            | Cause::NoCredit
+            | Cause::UnknownModel
+            | Cause::TooMany
+            | Cause::Down
+            | Cause::NoTimes
+            | Cause::Redirected
+            | Cause::ProviderFailed
+            | Cause::CutShort
+            | Cause::NotMinutes
+            | Cause::TranscriptUnusable
+            | Cause::NoSpeech
+            | Cause::Settings
+            | Cause::Unwritable => {}
+        }
+    }
+    let mut notices = Vec::new();
+    for source in [Source::Me, Source::Others] {
+        for said in [
+            Said::Unavailable(source, "x".into()),
+            Said::Started(PathBuf::from("/s"), named(), named()),
+            Said::Silent(source),
+            Said::Nothing,
+            Said::Heard(source),
+            Said::Level(source, 0.5),
+            Said::Moved(source, named()),
+            Said::Moved(source, None),
+            Said::Lost(source),
+            Said::MicrophoneGone,
+            Said::MicrophoneBack,
+            Said::Stopped(PathBuf::from("/s"), 3725.0),
+            Said::Failed("x".into()),
+        ] {
+            match said {
+                Said::Unavailable(..)
+                | Said::Started(..)
+                | Said::Silent(_)
+                | Said::Nothing
+                | Said::Heard(_)
+                | Said::Level(..)
+                | Said::Moved(..)
+                | Said::Lost(_)
+                | Said::MicrophoneGone
+                | Said::MicrophoneBack
+                | Said::Stopped(..)
+                | Said::Failed(_) => {}
+            }
+            notices.extend(words::of(&said, true, language));
+            let mut sides = Sides::default();
+            sides.told(&Said::Started(PathBuf::from("/s"), named(), named()), false, language);
+            notices.extend(sides.told(&said, false, language));
+        }
+        notices.push(words::back(named().as_deref(), language));
+    }
+    for trouble in [
+        Trouble::NoRecorder("x".into()),
+        Trouble::Settings(Refused::Unopened),
+        Trouble::Shortcut("x".into()),
+        Trouble::NoModel("x".into()),
+        Trouble::NoTranscriber("x".into()),
+        Trouble::NoFolder("x".into()),
+        Trouble::NoSession,
+    ] {
+        match trouble {
+            Trouble::NoRecorder(_)
+            | Trouble::Settings(_)
+            | Trouble::Shortcut(_)
+            | Trouble::NoModel(_)
+            | Trouble::NoTranscriber(_)
+            | Trouble::NoFolder(_)
+            | Trouble::NoSession => {}
+        }
+        notices.push(words::trouble(&trouble, language));
+    }
+    for made in [Made::Written(PathBuf::from("/s/transcript.jsonl")), Made::Failed("x".into())] {
+        match made {
+            Made::Written(_) | Made::Failed(_) => {}
+        }
+        notices.push(words::made(&made, language));
+    }
+    let mut minutes = vec![
+        Minutes::Ready,
+        Minutes::ReadyKeptBeside("x".into()),
+        Minutes::Failed(None),
+        Minutes::RedoFailed(None),
+        Minutes::Waiting("x".into()),
+        Minutes::Unchosen,
+        Minutes::NoProvider("x".into()),
+        Minutes::NoTranscript,
+        Minutes::OllamaWaits { silent: false },
+        Minutes::OllamaWaits { silent: true },
+    ];
+    for cause in causes {
+        minutes.push(Minutes::Failed(Some(cause)));
+        minutes.push(Minutes::RedoFailed(Some(cause)));
+        for again in [false, true] {
+            minutes.push(Minutes::FailedOwn {
+                cause,
+                model: "qwen3:8b".into(),
+                again,
+            });
+        }
+    }
+    for said in minutes {
+        match said {
+            Minutes::Ready
+            | Minutes::ReadyKeptBeside(_)
+            | Minutes::Failed(_)
+            | Minutes::RedoFailed(_)
+            | Minutes::FailedOwn { .. }
+            | Minutes::Waiting(_)
+            | Minutes::Unchosen
+            | Minutes::NoProvider(_)
+            | Minutes::NoTranscript
+            | Minutes::OllamaWaits { .. } => {}
+        }
+        notices.push(words::minutes(&said, language));
+    }
+    for not_put_back in [false, true] {
+        notices.push(words::transcript_kept_beside(language, "x", not_put_back));
+    }
+    notices.push(words::offer("Microsoft Teams", language).0);
+    for outcome in [
+        Ok((1, 30)),
+        Ok((3, 30)),
+        Err(Refusal::NotAllowed),
+        Err(Refusal::NoSpace),
+        Err(Refusal::Other),
+    ] {
+        if let Err(refusal) = outcome {
+            match refusal {
+                Refusal::NotAllowed | Refusal::NoSpace | Refusal::Other => {}
+            }
+        }
+        notices.push(words::audio_trashed(language, &outcome));
+    }
+    notices.push(words::carried_over(language));
+    notices.push(words::carry_failed(language));
+    notices.push(words::model_needed(language, "1.6 GB", "huggingface.co"));
+    for outcome in [Ok(()), Err("x".to_string())] {
+        notices.push(words::pulled(&outcome, "qwen3:8b", language));
+        for chosen in [false, true] {
+            notices.push(words::fetched(&outcome, chosen, language));
+        }
+    }
+    // Each one sent again with its meeting named first (D92): its title kept.
+    let named: Vec<_> = notices
+        .iter()
+        .map(|notice| words::for_meeting(notice.clone(), "x", language))
+        .collect();
+    notices.extend(named);
+    notices
+}
+
+#[test]
+fn a_notification_s_title_holds_50_characters() {
+    let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/words.rs")).unwrap();
+    // Read over the whole file, not line by line: a signature may span several lines.
+    let notifying: Vec<_> = source
+        .match_indices("fn ")
+        .filter(|(at, _)| source[..*at].ends_with(|c: char| c.is_whitespace()))
+        .filter_map(|(at, _)| {
+            let rest = &source[at + 3..];
+            let name = &rest[..rest.find(|c: char| !(c.is_alphanumeric() || c == '_'))?];
+            // Its parameters, to the parenthesis that closes them; then what it returns, to its body.
+            let (mut depth, mut close) = (0, None);
+            for (index, c) in rest.char_indices().skip_while(|&(_, c)| c != '(') {
+                depth += match c {
+                    '(' => 1,
+                    ')' => -1,
+                    _ => 0,
+                };
+                if depth == 0 {
+                    close = Some(index);
+                    break;
+                }
+            }
+            let after = &rest[close? + 1..];
+            let returns = &after[..after.find(['{', ';'])?];
+            returns.split_once("->")?.1.contains("Notice").then_some(name)
+        })
+        .collect();
+    assert_eq!(
+        notifying, NOTIFYING,
+        "a function that sends a notification: read it in `every_notice`"
+    );
+    let mut wrong: Vec<_> = BOTH
+        .iter()
+        .flat_map(|&language| every_notice(language))
+        .map(|notice| notice.title)
+        .filter(|title| title.chars().count() > 50)
+        .collect();
+    wrong.sort();
+    wrong.dedup();
+    assert_eq!(
+        wrong, TITLES_TOO_LONG,
+        "a title over 50 characters, or one put right: take it from the list"
+    );
 }

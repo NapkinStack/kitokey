@@ -6,6 +6,7 @@ use std::{
     net::TcpListener,
     sync::{Arc, Mutex},
     thread,
+    time::Duration,
 };
 
 use kitokey_shell::registry;
@@ -220,4 +221,200 @@ fn the_list_in_the_repository_verifies_or_waits_on_the_key_and_the_check_says_wh
         .expect("registry/models.json is signed by the key built in: minisign -Sm it, then commit its .minisig");
     // Straight to the error stream: what the test harness captures would not be seen when it passes.
     writeln!(std::io::stderr(), "registry/models.json: {said}").unwrap();
+}
+
+// Under the key built in (D56): the decider's, made in their own terminal — its private key in no
+// repository and no session. The lists here are signed by a test's key, or are the list on `main`
+// with the signature the decider made of it, `registry/models.json.minisig`.
+
+/// The decider's key, as its `.pub` names it: `minisign public key 28AD0E835D7AF31E`.
+const DECIDERS_KEY_ID: &str = "28AD0E835D7AF31E";
+
+/// The signature the decider made of the list in the repository.
+fn deciders_signature() -> String {
+    std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/registry/models.json.minisig"))
+        .expect("registry/models.json.minisig, the decider's signature of the list")
+}
+
+#[test]
+fn the_key_built_in_is_the_deciders() {
+    let key = registry::PUBLIC_KEY.expect("a key built in");
+    let key = minisign::PublicKey::from_base64(key).unwrap();
+    // minisign shows a key's number as its eight bytes read little-endian.
+    let id: String = key.keynum().iter().rev().map(|byte| format!("{byte:02X}")).collect();
+    assert_eq!(id, DECIDERS_KEY_ID);
+}
+
+#[test]
+fn under_the_key_built_in_a_list_signed_by_another_key_changed_after_it_was_signed_or_unsigned_is_refused() {
+    let list = registry::SHIPPED.to_owned();
+    let refused = [
+        ("signed by another key", signed_by(&test_key(), list.clone())),
+        (
+            "changed after the decider signed it",
+            served_with(
+                200,
+                list.replacen("\"version\": 1", "\"version\":  1", 1),
+                "",
+                Some(deciders_signature()),
+            ),
+        ),
+        ("unsigned", served_with(200, list.clone(), "", None)),
+    ];
+    for (what, served) in refused {
+        let why = registry::fetch(&served.address, registry::PUBLIC_KEY).expect_err(what);
+        assert!(why.contains("signature") && !why.contains("waits"), "{what}: {why}");
+        assert_eq!(*served.asked.lock().unwrap(), ["/models.json", "/models.json.minisig"], "{what}");
+    }
+}
+
+#[test]
+fn under_the_key_built_in_the_list_the_decider_signed_is_taken() {
+    let served = served_with(200, registry::SHIPPED.to_owned(), "", Some(deciders_signature()));
+    let listed = registry::fetch(&served.address, registry::PUBLIC_KEY).unwrap();
+    assert_eq!(listed, registry::shipped());
+}
+
+/// A key made for this test, outside it (openssl's Ed25519, the boxes as minisign writes them):
+/// `minisign` the crate writes the pre-hashed form only. Its private key was not kept.
+const FIXED_KEY: &str = "RWQBI0VniavN7wWzl40CApIQMFl5I82eP9r51HLn0+S12rpml2YUEJMN";
+/// What that key signed, both ways.
+const FIXED_LIST: &str = "A list signed by a key made for this test.\n";
+/// Its signature in minisign's pre-hashed form, `ED`: what `minisign -S` writes.
+const PREHASHED: &str = "untrusted comment: signature from minisign secret key\nRUQBI0VniavN7wrzXTMs5fdRG6KVz+5THLiu+a8cBCxN3Z4DuDpIiu2Cuw6V6r3uIeRW5H2FQ8B7Md7iETvI1lBzIvFSaYz98gs=\ntrusted comment: timestamp:1794666686\tfile:models.json\thashed\njSaui6oed+w24Xpc7qoBDxGb4ESZQFH+G1ZlPTqlNFx0oGA4rwdySDORy0ZpX4bGnpIEqTcPo1qHunqdHT7GAg==\n";
+/// The same bytes signed in the legacy form, `Ed`: the list itself, not its hash.
+const LEGACY: &str = "untrusted comment: signature from minisign secret key\nRWQBI0VniavN77JORcfb0/qk/S+eZJButt7IBOw0QkA5tgFZ6PaeIDWMDMQx9jpkVazHbKuJl/LBc6SjE2HJrM8V5/wcGoAWZgo=\ntrusted comment: timestamp:1794666686\tfile:models.json\thashed\ns6BDg+gP07KNfUzg51q7MJUZRhiw6Jt2I5D/UARqlcYKY/Z/aty8y7kYp9vXkt8Ezy0bjBGe/WWugAD6UjjkBA==\n";
+
+#[test]
+fn a_list_signed_in_minisigns_legacy_form_is_refused() {
+    // The same key and bytes, pre-hashed: verified — the refusal below is the form's alone.
+    assert_eq!(registry::verify(FIXED_LIST, PREHASHED, FIXED_KEY), Ok(()));
+    let why = registry::verify(FIXED_LIST, LEGACY, FIXED_KEY).unwrap_err();
+    assert!(why.contains("signature"), "{why}");
+    assert!(registry::in_the_repository(FIXED_LIST, Some(LEGACY), Some(FIXED_KEY)).is_err());
+}
+
+/// How the signature is answered, once its cuts are spent.
+enum Signature {
+    Signed,
+    /// An HTTP status other than 200, with a body.
+    Status(u16),
+    /// No answer at all for this long, then the connection closed: past the agent's timeout.
+    Late(Duration),
+}
+
+/// Answers `list` signed by `key`, but cuts the first `list_cuts` connections the list is asked on and
+/// the first `cuts` its signature is asked on before any answer — as a network or a proxy cuts a
+/// connection (#869) —, then answers as `signature` says.
+fn served_cutting(key: &TestKey, list: String, list_cuts: usize, cuts: usize, signature: Signature) -> Served {
+    let signed = key.signed(&list);
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = format!("http://{}/models.json", listener.local_addr().unwrap());
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let noted = asked.clone();
+    thread::spawn(move || {
+        let (mut list_cut, mut cut) = (0, 0);
+        for stream in listener.incoming() {
+            let mut stream = stream.unwrap();
+            let mut lines = BufReader::new(stream.try_clone().unwrap()).lines();
+            let first = lines.next().unwrap().unwrap();
+            let path = first.split(' ').nth(1).unwrap().to_owned();
+            for line in lines {
+                if line.unwrap().is_empty() {
+                    break;
+                }
+            }
+            noted.lock().unwrap().push(path.clone());
+            let of_signature = path.ends_with(".minisig");
+            if of_signature && cut < cuts {
+                cut += 1;
+                continue;
+            }
+            if !of_signature && list_cut < list_cuts {
+                list_cut += 1;
+                continue;
+            }
+            let (status, body) = match (of_signature, &signature) {
+                (false, _) | (true, Signature::Signed) => (200, if of_signature { signed.clone() } else { list.clone() }),
+                (true, Signature::Status(status)) => (*status, "Unavailable".to_owned()),
+                (true, Signature::Late(late)) => {
+                    thread::sleep(*late);
+                    continue;
+                }
+            };
+            let head = format!(
+                "HTTP/1.1 {status} Status\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(head.as_bytes());
+            let _ = stream.write_all(body.as_bytes());
+        }
+    });
+    Served { address, asked }
+}
+
+/// Answers `list` signed by `key`, but cuts the first `cuts` connections its signature is asked on.
+fn signature_cut(key: &TestKey, list: String, cuts: usize) -> Served {
+    served_cutting(key, list, 0, cuts, Signature::Signed)
+}
+
+#[test]
+fn the_signature_cut_before_any_answer_is_asked_once_more_and_the_list_taken() {
+    let key = test_key();
+    let served = signature_cut(&key, with_another(), 1);
+    let listed = registry::fetch(&served.address, Some(&key.public)).unwrap();
+    assert_eq!(listed.len(), registry::shipped().len() + 1);
+    assert_eq!(
+        *served.asked.lock().unwrap(),
+        ["/models.json", "/models.json.minisig", "/models.json.minisig"]
+    );
+}
+
+#[test]
+fn the_signature_cut_twice_is_refused_and_said_why() {
+    let key = test_key();
+    let served = signature_cut(&key, with_another(), 2);
+    let why = registry::fetch(&served.address, Some(&key.public)).unwrap_err();
+    assert!(why.starts_with("the list's signature could not be read"), "{why}");
+    assert_eq!(
+        *served.asked.lock().unwrap(),
+        ["/models.json", "/models.json.minisig", "/models.json.minisig"]
+    );
+}
+
+#[test]
+fn a_signature_answered_with_an_error_is_never_asked_again() {
+    let key = test_key();
+    let served = served_with(200, with_another(), "", None);
+    let why = registry::fetch(&served.address, Some(&key.public)).unwrap_err();
+    assert!(why.contains("HTTP 404"), "{why}");
+    assert_eq!(*served.asked.lock().unwrap(), ["/models.json", "/models.json.minisig"]);
+}
+
+#[test]
+fn the_list_cut_before_any_answer_is_never_asked_again() {
+    let key = test_key();
+    let served = served_cutting(&key, with_another(), 1, 0, Signature::Signed);
+    let why = registry::fetch(&served.address, Some(&key.public)).unwrap_err();
+    assert!(why.starts_with("the list could not be read"), "{why}");
+    assert_eq!(*served.asked.lock().unwrap(), ["/models.json"]);
+}
+
+#[test]
+fn a_signature_answered_by_a_server_error_is_never_asked_again() {
+    let key = test_key();
+    let served = served_cutting(&key, with_another(), 0, 0, Signature::Status(503));
+    let why = registry::fetch(&served.address, Some(&key.public)).unwrap_err();
+    assert!(why.contains("HTTP 503"), "{why}");
+    assert_eq!(*served.asked.lock().unwrap(), ["/models.json", "/models.json.minisig"]);
+}
+
+/// The agent's answer timeout is 20 s: this test waits for it once, and twice would say it was asked again.
+#[test]
+fn a_signature_that_answers_past_its_timeout_is_never_asked_again() {
+    let key = test_key();
+    let served = served_cutting(&key, with_another(), 0, 0, Signature::Late(Duration::from_secs(25)));
+    let why = registry::fetch(&served.address, Some(&key.public)).unwrap_err();
+    assert!(why.starts_with("the list's signature could not be read"), "{why}");
+    assert_eq!(*served.asked.lock().unwrap(), ["/models.json", "/models.json.minisig"]);
 }

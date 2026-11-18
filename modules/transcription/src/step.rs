@@ -231,6 +231,30 @@ pub fn transcribe(folder: &Path, engine: &mut dyn Engine, language: Option<&str>
 /// The same, of a session already read: a caller that judged the session before loading its
 /// engine does not read an hour of sound twice.
 pub fn hear(folder: &Path, session: Session, engine: &mut dyn Engine, language: Option<&str>, seconds: usize) -> io::Result<()> {
+    heard(folder, session, engine, language, seconds, None)
+}
+
+/// The same, by a step that began at `began`: a transcript it makes whole by itself says how
+/// long the step took (D97).
+pub fn hear_since(
+    folder: &Path,
+    session: Session,
+    engine: &mut dyn Engine,
+    language: Option<&str>,
+    seconds: usize,
+    began: std::time::Instant,
+) -> io::Result<()> {
+    heard(folder, session, engine, language, seconds, Some(began))
+}
+
+fn heard(
+    folder: &Path,
+    session: Session,
+    engine: &mut dyn Engine,
+    language: Option<&str>,
+    seconds: usize,
+    began: Option<std::time::Instant>,
+) -> io::Result<()> {
     let (stopped, context, sounds, as_delivered) = session;
     let (name, model) = engine.name();
     let making = Making {
@@ -240,6 +264,9 @@ pub fn hear(folder: &Path, session: Session, engine: &mut dyn Engine, language: 
         context,
     };
     let mut transcript = Transcript::open(folder, &making)?;
+    if let Some(began) = began {
+        transcript = transcript.since(began);
+    }
     // What the engine hears is made from the tracks, and kept apart: made again when it is not there.
     let begun = transcript.covered(Speaker::Me) > 0.0 || transcript.covered(Speaker::Others) > 0.0;
     if transcript.is_complete() {

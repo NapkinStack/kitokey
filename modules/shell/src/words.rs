@@ -4,6 +4,7 @@
 use crate::{
     recording::{Said, Source},
     registry::Good,
+    settings::Refused,
     summarising::Cause,
     transcription::Made,
     trial::Left,
@@ -61,6 +62,81 @@ const CLICKED: bool = cfg!(target_os = "linux");
 pub struct Notice {
     pub title: String,
     pub body: String,
+}
+
+/// A day as the window's `Intl` says it, with CLDR's abbreviated months: « 18 oct. », "Oct 18".
+/// One formatter for every day Kitokey says beside a meeting (D92, D93).
+pub fn day(day: chrono::NaiveDate, language: Language) -> String {
+    // Shows: in a notification's body, the day a meeting was recorded. When: a meeting is named by
+    // its day and hour, not recorded today. At most: no limit. Placeholders: none.
+    use chrono::Datelike;
+    // CLDR's abbreviated months, as `Intl.DateTimeFormat` gives them with `month: "short"`.
+    let month = day.month0() as usize;
+    match language {
+        Language::English => {
+            let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            format!("{} {}", months[month], day.day())
+        }
+        Language::French => {
+            let months = [
+                "janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc.",
+            ];
+            format!("{} {}", day.day(), months[month])
+        }
+    }
+}
+
+/// An hour as the window's `Intl` says it, two digits: « 09:42 », "09:42 AM".
+pub fn hour(time: chrono::NaiveTime, language: Language) -> String {
+    // Shows: in a notification's body, the hour a meeting was recorded. When: a meeting is named by
+    // its hour. At most: no limit. Placeholders: none.
+    match language {
+        Language::English => time.format("%I:%M %p").to_string(),
+        // `%R`: the hour and minutes on 24 hours, as `%H:%M`.
+        Language::French => time.format("%R").to_string(),
+    }
+}
+
+/// A meeting named in a sentence (D92): the title it was given, else when it was recorded — its
+/// hour on the day it is said, its day and hour after. Used where a sentence names the meeting it
+/// is about; the window names it in its list and page itself.
+pub fn meeting(title: Option<&str>, started: Option<chrono::NaiveDateTime>, today: chrono::NaiveDate, language: Language) -> String {
+    // Shows: in a notification's body, the meeting it is about. When: a meeting is named, without a
+    // title of its own. At most: no limit. Placeholders: {} its hour, or its day then its hour.
+    use Language::{English, French};
+    match (title.map(str::trim).filter(|title| !title.is_empty()), started, language) {
+        (Some(title), _, French) => format!("«\u{a0}{title}\u{a0}»"),
+        (Some(title), _, English) => format!("“{title}”"),
+        (None, Some(started), French) if started.date() == today => format!("la réunion de {}", hour(started.time(), French)),
+        (None, Some(started), English) if started.date() == today => format!("the {} meeting", hour(started.time(), English)),
+        (None, Some(started), French) => {
+            format!("la réunion du {} à {}", day(started.date(), French), hour(started.time(), French))
+        }
+        (None, Some(started), English) => {
+            format!(
+                "the meeting of {} at {}",
+                day(started.date(), English),
+                hour(started.time(), English)
+            )
+        }
+        (None, None, French) => "la réunion".into(),
+        (None, None, English) => "the meeting".into(),
+    }
+}
+
+/// The notification that ends a meeting's making, its meeting named first (D92).
+pub fn for_meeting(notice: Notice, meeting: &str, language: Language) -> Notice {
+    // Shows: a notification's body, before the sentences it had. When: the meeting's last step
+    // ended — written or failed —, no window of Kitokey having the focus. At most: no limit.
+    // Placeholders: {meeting} the meeting, as `meeting` names it.
+    let named = match language {
+        Language::French => format!("Pour {meeting}."),
+        Language::English => format!("For {meeting}."),
+    };
+    Notice {
+        body: format!("{named} {}", notice.body),
+        ..notice
+    }
 }
 
 /// A length as a person says it: seconds under a minute, then minutes, then hours — each
@@ -323,11 +399,6 @@ pub struct Window {
     /// Shows: the sidebar's foot, as a status. When: same, exactly one meeting. At most: about 24
     /// characters. Placeholders: {} the number of meetings, 1.
     pub weight_one: &'static str,
-    /// A picture of the two weights, for whoever does not see it.
-    /// Shows: the sidebar's foot, as a name for a screen reader. When: screen reader: description
-    /// of the audio/text bar. At most: no limit. Placeholders: {} the audio's size, then the
-    /// texts'.
-    pub weight_described: &'static str,
     /// Shows: the sidebar, as a heading. When: group heading in the meeting list. At most: about 24
     /// characters. Placeholders: none.
     pub this_week: &'static str,
@@ -362,10 +433,13 @@ pub struct Window {
     /// Shows: the sidebar, as a list label. When: on the row of a recording that ended abnormally.
     /// At most: 18 characters. Placeholders: none.
     pub interrupted: &'static str,
-    /// No session in the folder: the folder.
+    /// No session in the folder (#775): said without its path, which `none_folder` says under the action.
     /// Shows: the window with no meeting, as a heading. When: no meeting in the folder yet.
-    /// At most: no limit. Placeholders: {} folder.
+    /// At most: no limit. Placeholders: none.
     pub none: &'static str,
+    /// Shows: the empty pane, a discreet line under its action (#775). When: no meeting in the folder.
+    /// At most: no limit, a path wraps. Placeholders: `{}`, the folder's whole path.
+    pub none_folder: &'static str,
     /// The sidebar's search (D61): what its field says, and none of the meetings holding what is typed.
     /// No meeting yet: what to do.
     /// Shows: the window with no meeting, as a help line. When: under the empty-state title: how to
@@ -377,8 +451,15 @@ pub struct Window {
     /// Shows: the window with no meeting, as a help line. When: under that error: what to do.
     /// At most: no limit. Placeholders: none.
     pub list_unread_do: &'static str,
+    /// The settings file cannot be read: said above every page but Settings (#770) — never read since
+    /// Kitokey started, then read before and its last settings held.
+    /// Shows: a banner above every page but Settings. When: the settings file cannot be read and was
+    /// never read since Kitokey started. At most: no limit. Placeholders: none.
+    pub settings_banner: &'static str,
+    /// Shows: a banner above every page but Settings. When: the settings file cannot be read, read
+    /// before, its last settings held. At most: no limit. Placeholders: none.
+    pub settings_banner_kept: &'static str,
     pub again_refused: &'static str,
-    pub hearing_models_refused: &'static str,
     /// Shows: the sidebar, as an error. When: the folded/unfolded state could not be saved.
     /// At most: no limit. Placeholders: {} failure sentence.
     pub fold_not_kept: &'static str,
@@ -422,6 +503,32 @@ pub struct Window {
     /// One meeting's page.
     pub back: &'static str,
     pub open_folder: &'static str,
+    /// Shows: a meeting's page, beside « Ouvrir le dossier »: the icon's name, said and as its tooltip
+    /// (D100). When: always. At most: one line. Placeholders: none.
+    pub trash_meeting: &'static str,
+    /// Shows: a meeting's page, the question in place once the trash's icon is pressed: its title (D100).
+    /// When: the icon pressed. At most: one line. Placeholders: none.
+    pub trash_ask: &'static str,
+    /// Shows: the trash's question, under its title: what the meeting holds (D100). When: it holds an
+    /// audio, a transcript or a summary. At most: one line. Placeholders: {} the parts it holds, listed
+    /// in the window's language from `trash_parts`.
+    pub trash_holds: &'static str,
+    /// Shows: inside `trash_holds`, its audio, its transcript, its summary (D100). When: the meeting
+    /// holds it. At most: one line each. Placeholders: none.
+    pub trash_parts: [&'static str; 3],
+    /// Shows: the trash's question, under what it holds: that the system's trash gives it back (D100).
+    /// When: always with the question. At most: one line. Placeholders: none.
+    pub trash_restore: &'static str,
+    /// Shows: the trash's question, its first button, focused first (D100). When: always with the
+    /// question. At most: one line, never cut. Placeholders: none.
+    pub trash_cancel: &'static str,
+    /// Shows: the trash's question, its second button (D100). When: always with the question. At most:
+    /// one line, never cut. Placeholders: none.
+    pub trash_confirm: &'static str,
+    /// Shows: the trash's question, under its buttons, said to assistive technology too (D100). When: the
+    /// meeting is being recorded or made, or the system's trash refused it. At most: no limit.
+    /// Placeholders: {} the reason.
+    pub trash_refused: &'static str,
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
     pub more_actions: &'static str,
     /// Shows: the window, as a format. When: a setting's name before its value: "{}:". At most: no
@@ -434,10 +541,22 @@ pub struct Window {
     pub written_by: &'static str,
     /// Its provider, when known, said after the model.
     pub written_via: &'static str,
-    /// Between a day and its hour: "mar. 13 oct. à 12:21", "Tue, Oct 13 at 12:21 PM".
+    /// Between a day and its hour: "13 oct. à 12:21", "Oct 13 at 12:21 PM".
     pub at: &'static str,
     /// The transcript's maker: the model, on this computer.
     pub heard_by: &'static str,
+    /// Shows: a meeting's page, the transcript's maker line: that day and hour first, its model after —
+    /// "Transcrit le 13 nov. à 09:42 · Whisper small" (D93). When: the transcript says when it was made
+    /// whole. At most: one line. Placeholders: {} the day and hour, in local time, without the year.
+    pub transcribed_on: &'static str,
+    /// Shows: a meeting's page, the summary's maker line: that day and hour first, their model after —
+    /// "Compte rendu du 13 nov. à 09:45 · Qwen3 8B" (D93). When: the summary says when it was made.
+    /// At most: one line. Placeholders: {} the day and hour, in local time, without the year.
+    pub minutes_of: &'static str,
+    /// Shows: a meeting's page, the line of its transcript and of its minutes, after the model — "en 3 s",
+    /// "in 31 min 52 s" (D97). When: the version says how long its making took. At most: one line.
+    /// Placeholders: `{}`, the time taken, its units the window's.
+    pub made_in: &'static str,
     pub here: &'static str,
     pub remote: &'static str,
     /// A voice told within a track: its label.
@@ -490,7 +609,6 @@ pub struct Window {
     /// what is said when it could not be.
     pub offered_refresh: &'static str,
     pub offered_refresh_failed: &'static str,
-    pub offered_refresh_waits: &'static str,
     /// Apple's SpeechAnalyzer among who hears, on a Mac with macOS 26 (D42): its name in the
     /// choice; its model not on the Mac yet; the gesture that has macOS fetch it, and from whom;
     /// while it comes; when it did not.
@@ -499,12 +617,9 @@ pub struct Window {
     pub speech_fetch: &'static str,
     pub speech_fetching: &'static str,
     pub speech_failed: &'static str,
-    /// A service that hears (D43): the choice's group, its fields, the agreement before anything is
-    /// sent to its host, the gestures, and what they say.
-    pub service_group: &'static str,
+    /// A service that hears (D43): its fields, the agreement before anything is sent to its host,
+    /// the gestures, and what they say.
     pub service_option: &'static str,
-    /// A model the service's list does not hold, typed (D63).
-    pub service_other_model: &'static str,
     pub service_address: &'static str,
     pub service_model: &'static str,
     pub service_key: &'static str,
@@ -513,6 +628,9 @@ pub struct Window {
     pub service_test: &'static str,
     pub service_tested: &'static str,
     pub service_saved: &'static str,
+    /// Shows: Settings, « Transcription », under the service's form, once saved. When: the address saved is
+    /// this computer's, where nothing leaves it (#775). At most: one line. Placeholders: none.
+    pub service_saved_here: &'static str,
     pub service_agree_first: &'static str,
     pub service_address_bad: &'static str,
     pub service_model_named: &'static str,
@@ -537,8 +655,11 @@ pub struct Window {
     /// turned back on; by a policy.
     pub autostart_held: [&'static str; 2],
     pub keep_audio: [&'static str; 2],
-    /// The settings' last card, and its one switch: what a program said of a failure, shown on
-    /// the page under the sentence (D29).
+    /// The settings' last group: Kitokey itself, as GNOME's preferences name it (D95).
+    /// Shows: Settings, as a heading. When: always. At most: no limit. Placeholders: none.
+    pub general_title: &'static str,
+    /// Folded at the bottom of « Général », and its one switch: what a program said of a failure,
+    /// shown on the page under the sentence (D29).
     pub advanced_title: &'static str,
     pub developer: [&'static str; 2],
     /// Under a making not made, in developer mode: what its program said ({}).
@@ -802,7 +923,16 @@ pub struct Window {
     pub redo_title: &'static str,
     pub redo_with: &'static str,
     pub redo_note: &'static str,
-    pub redo_do: &'static str,
+    /// Shows: the summary's redo panel, its one button that starts, naming the making and its model
+    /// (D96): « Refaire le compte rendu avec Qwen3 14b ». When: a summary model is known, the meeting's,
+    /// the one chosen in « Avancé » or Settings'; else `redo_title`. At most: wraps inside the panel.
+    /// Placeholders: {} the model, as people say it.
+    pub redo_minutes_do: &'static str,
+    /// Shows: the transcript's redo panel, its one button that starts, naming its model (D96):
+    /// « Refaire la transcription avec Whisper Large V3 Turbo ». When: a transcription model is known;
+    /// else `redo_transcript_title`. At most: wraps inside the panel. Placeholders: {} the model, as
+    /// people say it.
+    pub redo_transcript_do: &'static str,
     /// Shows: the recording bar and Redo…, as a choice of a list. When: appended to a local model's
     /// name. At most: about 20 characters. Placeholders: none.
     pub on_computer: &'static str,
@@ -835,6 +965,12 @@ pub struct Window {
     /// Shows: the sidebar, as a list label. When: row: minutes failed. At most: 18 characters.
     /// Placeholders: none.
     pub chip_failed: &'static str,
+    /// Shows: a meeting's chip, in the list and on its page (#772). When: its minutes are kept and the
+    /// last Refaire… of them failed. At most: one line. Placeholders: none.
+    pub chip_redo_failed: &'static str,
+    /// Shows: a meeting's page, the minutes' state, before the cause when there is one (#772). When:
+    /// its minutes are kept and the last Refaire… of them failed. At most: no limit. Placeholders: none.
+    pub minutes_redo_failed: &'static str,
     /// The same for the transcript: being made (by, for how long), not made ({} the reason).
     pub transcript_making: &'static str,
     pub transcript_not_made: &'static str,
@@ -847,6 +983,21 @@ pub struct Window {
     /// A transcript waiting for the default Whisper model: offered in the menu, or coming.
     pub transcript_model_needed: &'static str,
     pub transcript_model_coming: &'static str,
+    /// The button that ends what is being made of a meeting, or takes it out of the line (D92).
+    /// Shows: a button on a meeting's page, beside what is being made. When: its transcript or minutes
+    /// are being made, or waiting in line. At most: no limit. Placeholders: none.
+    pub making_cancel: &'static str,
+    /// « Annuler » refused — its meeting gone meanwhile (D92). Shows: a meeting's page, beside the
+    /// making's line, until the next gesture on it. When: the shell refused to end or take out the
+    /// making. At most: no limit. Placeholders: {} why it was refused.
+    pub making_cancel_failed: &'static str,
+    /// Said on its page once the user cancelled its transcript, or its minutes: what was there stays.
+    /// Shows: a meeting's page, where its transcript is. When: the user cancelled its transcript.
+    /// At most: no limit. Placeholders: none.
+    pub transcript_stopped: &'static str,
+    /// Shows: a meeting's page, where its minutes are. When: the user cancelled its minutes.
+    /// At most: no limit. Placeholders: none.
+    pub minutes_stopped: &'static str,
     pub ran_online: &'static str,
     /// The header's button, at rest and while a recording runs.
     pub record_start: &'static str,
@@ -890,21 +1041,22 @@ pub struct Window {
     /// Who writes the minutes was saved, but the keyring did not keep the key: why.
     pub key_not_kept: &'static str,
     pub minutes_step: &'static str,
-    pub ollama_group: &'static str,
-    pub online_group: &'static str,
-    pub other_group: &'static str,
-    pub custom: &'static str,
     pub address: &'static str,
     pub model_name: &'static str,
     pub key: &'static str,
     pub key_kept: &'static str,
+    /// Settings, « Modèles », the summary's first step (D95): the choice beside « Sur cet ordinateur ».
+    pub where_service: &'static str,
+    /// The label of the list of the services offered by name (D95).
+    pub service_name: &'static str,
+    /// The button that asks the service its models with the key typed: the key tested at once (D95).
+    pub key_test: &'static str,
     pub save: &'static str,
     pub where_online: &'static str,
     /// The model saved, which this computer's Ollama does not have ({} the model).
     pub ollama_lacks: &'static str,
     /// This computer's Ollama, saved, not answering — or answering with no model.
     pub ollama_silent: &'static str,
-    pub not_chosen: &'static str,
     /// The first run's assistant (D58): its question, who writes the minutes, the setting said
     /// plainly, and its way back from Settings. Each answer is its name and its line.
     pub welcome_title: &'static str,
@@ -940,6 +1092,10 @@ pub struct Window {
     pub welcome_fetch_from: &'static str,
     pub welcome_done: &'static str,
     pub welcome_later: &'static str,
+    /// The welcome's « Later » when the transcription's model is still to be downloaded, saying what it
+    /// leaves waiting (#781). Shows: the welcome's last screen, a link-styled button. When: the model is
+    /// not on this computer and the welcome offers to download it. At most: about 50 characters. Placeholders: none.
+    pub welcome_later_waits: &'static str,
     pub welcome_choose: &'static str,
     pub welcome_again: [&'static str; 2],
     /// A meeting's context (D59): the small window's disclosure, closed then open; the field's
@@ -977,6 +1133,12 @@ pub struct Window {
     /// The language Kitokey speaks (D64): its row in Settings, and the system's, its default.
     pub app_language: [&'static str; 2],
     pub app_language_system: &'static str,
+    /// Shows: Settings, « Général », the appearance's row (D98): its name, then what it changes. When:
+    /// always. At most: one line each. Placeholders: none.
+    pub appearance: [&'static str; 2],
+    /// Shows: Settings, « Général », the appearance's list, in that order (D98). When: always. At most:
+    /// 18 characters each. Placeholders: none.
+    pub appearance_choices: [&'static str; 3],
     /// A transcript's line corrected by whoever listens (D62).
     pub correct_line: &'static str,
     pub corrected: &'static str,
@@ -1015,7 +1177,6 @@ pub fn window(language: Language) -> Window {
             meetings: "Meetings",
             weight: "{} meetings",
             weight_one: "{} meeting",
-            weight_described: "The audio takes {}; the transcripts and minutes, {}.",
             this_week: "This week",
             last_week: "Last week",
             earlier_in: "Earlier in {}",
@@ -1027,12 +1188,14 @@ pub fn window(language: Language) -> Window {
             audio_weighs: "audio {}",
             recording: "Recording now",
             interrupted: "Interrupted",
-            none: "No meeting in {} yet.",
+            none: "No meeting yet.",
+            none_folder: "Meetings are saved in {}.",
             none_do: "Start a recording: its button, its shortcut, or the tray’s icon.",
             list_unread: "The meetings in {} cannot be read.",
             list_unread_do: "Check that this folder’s disk is connected and that you may read it, then try again.",
+            settings_banner: "Settings cannot be read: your meetings are not shown.",
+            settings_banner_kept: "Settings cannot be read: the last ones read stay in use, and no change is saved until the file is fixed.",
             again_refused: "It could not start again: {}",
-            hearing_models_refused: "This service’s models could not be read, you can type one: {}",
             fold_not_kept: "The sidebar will be back as it was at the next start: {}",
             agreement_refused: "This meeting cannot be sent: {}",
             meeting_not_opened: "This meeting could not be opened: {}",
@@ -1052,6 +1215,14 @@ pub fn window(language: Language) -> Window {
             none_found: "No meeting holds these words.",
             back: "Meetings",
             open_folder: "Open the folder",
+            trash_meeting: "Move to trash",
+            trash_ask: "Move this meeting to the trash?",
+            trash_holds: "It holds {}.",
+            trash_parts: ["its audio", "its transcript", "its summary"],
+            trash_restore: "You can restore it from your system’s trash.",
+            trash_cancel: "Cancel",
+            trash_confirm: "Move to trash",
+            trash_refused: "Not moved to the trash: {}",
             more_actions: "More actions",
             labelled: "{}:",
             minutes_title: "Minutes",
@@ -1061,6 +1232,9 @@ pub fn window(language: Language) -> Window {
             written_via: ", via {}",
             at: "at",
             heard_by: "Written by {}, on this computer",
+            transcribed_on: "Transcribed on {}",
+            minutes_of: "Summary of {}",
+            made_in: "in {}",
             here: "Here",
             remote: "Remote",
             voice: "voice {}",
@@ -1100,15 +1274,12 @@ pub fn window(language: Language) -> Window {
             offered_needs_ollama: "Needs Ollama — install it from ollama.com",
             offered_refresh: "Update the list ({})",
             offered_refresh_failed: "The list could not be updated: the models above are still offered.",
-            offered_refresh_waits: "The list cannot be updated yet: it waits on the key that signs it. The models above are still offered.",
             speech_option: "Apple's SpeechAnalyzer, on this Mac",
             speech_missing: "Apple's model is not on this Mac yet",
             speech_fetch: "Download Apple's model (macOS fetches it from Apple)",
             speech_fetching: "macOS is downloading Apple's model…",
             speech_failed: "Apple's model was not downloaded. Try again later; Whisper still hears.",
-            service_group: "A service",
             service_option: "A service I name",
-            service_other_model: "Another model…",
             service_address: "Its address",
             service_model: "Its model",
             service_key: "Its key, if it asks for one",
@@ -1117,6 +1288,7 @@ pub fn window(language: Language) -> Window {
             service_test: "Test",
             service_tested: "It hears, with each segment’s times: a sound of Kitokey’s own was transcribed.",
             service_saved: "Saved: {} hears your next meetings.",
+            service_saved_here: "Saved: this computer hears your next meetings.",
             service_agree_first: "Nothing is saved: agree first that your meetings’ sound is sent to {}.",
             service_address_bad: "Nothing is saved: the address starts with https:// or http://, then the service’s host — for example https://api.groq.com/openai/v1.",
             service_model_named: "Nothing is saved: name the model the service hears with — for example whisper-large-v3.",
@@ -1144,6 +1316,7 @@ pub fn window(language: Language) -> Window {
                 "Turned off in Windows: turn it back on in Settings › Apps › Startup.",
                 "Set by your organisation: it cannot be changed here.",
             ],
+            general_title: "General",
             advanced_title: "Advanced",
             developer: [
                 "Developer mode",
@@ -1255,10 +1428,11 @@ pub fn window(language: Language) -> Window {
             free_busy: "being recorded, transcribed or its minutes written",
             free_done: "Done: in the trash.",
             redo: "Redo…",
-            redo_title: "Write the minutes again",
+            redo_title: "Write the summary again",
             redo_with: "Made again with this meeting’s models: “Advanced” to choose them.",
-            redo_note: "The current minutes stay in place until the new ones are ready, then go to the trash.",
-            redo_do: "Redo",
+            redo_note: "The current summary stays in place until the new one is ready, then goes to the trash.",
+            redo_minutes_do: "Write the summary again with {}",
+            redo_transcript_do: "Write the transcript again with {}",
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript is kept until the new one is whole, then goes to the trash; if the new one fails, the current comes back.",
@@ -1275,6 +1449,8 @@ pub fn window(language: Language) -> Window {
             chip_awaiting: "Your agreement",
             chip_transcribing: "Transcript…",
             chip_failed: "Minutes not written",
+            chip_redo_failed: "Redo failed",
+            minutes_redo_failed: "The last redo failed. The summary shown is the one before it.",
             transcript_making: "Writing the transcript",
             transcript_not_made: "The transcript was not written. The recording is untouched.",
             chip_transcript_failed: "Transcript not written",
@@ -1282,6 +1458,10 @@ pub fn window(language: Language) -> Window {
             minutes_unsaved_none: "Not saved yet — no minutes are written until it is.",
             transcript_model_needed: "Waiting for the Whisper model.",
             transcript_model_coming: "Waiting for the Whisper model, being downloaded.",
+            making_cancel: "Cancel",
+            making_cancel_failed: "Kitokey could not cancel: {}",
+            transcript_stopped: "Transcription stopped. You can start it again, with another model if you like.",
+            minutes_stopped: "Minutes stopped. You can start them again, with another model if you like.",
             ran_online: "online",
             record_start: "Start a recording",
             record_stop: "Stop the recording",
@@ -1319,19 +1499,17 @@ pub fn window(language: Language) -> Window {
             not_saved: "The setting was not saved: {}",
             key_not_kept: "The choice is saved, but the key was not kept in the system's keyring: {}",
             minutes_step: "Minutes",
-            ollama_group: "On this computer — found in Ollama",
-            online_group: "Online",
-            other_group: "Other",
-            custom: "Custom…",
             address: "Address (OpenAI-compatible)",
             model_name: "Model",
             key: "Key",
             key_kept: "A key is kept in the system's keyring; a new one replaces it.",
+            where_service: "A service",
+            service_name: "Service",
+            key_test: "Check the key",
             save: "Save",
             where_online: "Online — the transcript's text is sent",
             ollama_lacks: "Ollama, on this computer, has no model named {}: choose one in the list, or fetch it with Ollama.",
             ollama_silent: "Ollama, on this computer, does not answer, or has no model: start it, or fetch a model with it.",
-            not_chosen: "Not chosen yet",
             welcome_title: "Let’s set Kitokey up with one question.",
             welcome_question: "Do your meetings discuss confidential matters?",
             welcome_examples: "Clients, human resources, health, legal matters, unpublished figures…",
@@ -1369,6 +1547,7 @@ pub fn window(language: Language) -> Window {
             welcome_fetch_from: "From {}, checked before it is used.",
             welcome_done: "Finish",
             welcome_later: "Later",
+            welcome_later_waits: "Later — your meetings will wait for the model",
             welcome_choose: "Choose my service",
             welcome_again: [
                 "Set up again",
@@ -1407,6 +1586,11 @@ pub fn window(language: Language) -> Window {
                 "Its window, its menu and its notifications; what the system draws itself keeps the system’s.",
             ],
             app_language_system: "The system’s language",
+            appearance: [
+                "Appearance",
+                "Every window of Kitokey, the bar too; System follows the system’s light or dark.",
+            ],
+            appearance_choices: ["System", "Light", "Dark"],
             correct_line: "Correct the line at {}",
             corrected: "corrected",
             correction_empty: "A line is not left empty: Escape leaves it as it was.",
@@ -1435,7 +1619,6 @@ pub fn window(language: Language) -> Window {
             meetings: "Réunions",
             weight: "{} réunions",
             weight_one: "{} réunion",
-            weight_described: "L’audio occupe {}\u{202f}; les transcriptions et les comptes rendus, {}.",
             this_week: "Cette semaine",
             last_week: "La semaine dernière",
             earlier_in: "Plus tôt en {}",
@@ -1447,12 +1630,14 @@ pub fn window(language: Language) -> Window {
             audio_weighs: "audio {}",
             recording: "Enregistrement en cours",
             interrupted: "Interrompu",
-            none: "Aucune réunion dans {} pour l’instant.",
+            none: "Aucune réunion pour l’instant.",
+            none_folder: "Les réunions sont enregistrées dans {}.",
             none_do: "Démarrez un enregistrement\u{a0}: son bouton, son raccourci, ou l’icône de la barre système.",
             list_unread: "Les réunions de {} ne peuvent pas être lues.",
             list_unread_do: "Vérifiez que le disque de ce dossier est branché et que vous pouvez le lire, puis réessayez.",
+            settings_banner: "Les réglages ne peuvent pas être lus\u{a0}: vos réunions ne sont pas affichées.",
+            settings_banner_kept: "Les réglages ne peuvent pas être lus\u{a0}: les derniers lus restent en usage, et aucun changement n’est enregistré tant que le fichier n’est pas corrigé.",
             again_refused: "Impossible de recommencer\u{a0}: {}",
-            hearing_models_refused: "Les modèles de ce service n’ont pas pu être lus, vous pouvez en saisir un\u{a0}: {}",
             fold_not_kept: "La barre latérale reviendra comme avant au prochain démarrage\u{a0}: {}",
             agreement_refused: "Cette réunion ne peut pas être envoyée\u{a0}: {}",
             meeting_not_opened: "Cette réunion n’a pas pu être ouverte\u{a0}: {}",
@@ -1472,6 +1657,14 @@ pub fn window(language: Language) -> Window {
             none_found: "Aucune réunion ne contient ces mots.",
             back: "Réunions",
             open_folder: "Ouvrir le dossier",
+            trash_meeting: "Mettre à la corbeille",
+            trash_ask: "Mettre cette réunion à la corbeille\u{202f}?",
+            trash_holds: "Elle contient {}.",
+            trash_parts: ["son audio", "sa transcription", "son compte rendu"],
+            trash_restore: "Vous pourrez la restaurer depuis la corbeille de votre système.",
+            trash_cancel: "Annuler",
+            trash_confirm: "Mettre à la corbeille",
+            trash_refused: "Pas mise à la corbeille\u{a0}: {}",
             more_actions: "Plus d’actions",
             labelled: "{}\u{a0}:",
             minutes_title: "Compte rendu",
@@ -1481,6 +1674,9 @@ pub fn window(language: Language) -> Window {
             written_via: ", via {}",
             at: "à",
             heard_by: "Transcrit par {}, sur cet ordinateur",
+            transcribed_on: "Transcrit le {}",
+            minutes_of: "Compte rendu du {}",
+            made_in: "en {}",
             here: "Ici",
             remote: "À distance",
             voice: "voix {}",
@@ -1523,15 +1719,12 @@ pub fn window(language: Language) -> Window {
             offered_needs_ollama: "Nécessite Ollama, à installer depuis ollama.com",
             offered_refresh: "Mettre à jour la liste ({})",
             offered_refresh_failed: "La liste n’a pas pu être mise à jour\u{a0}: les modèles ci-dessus restent proposés.",
-            offered_refresh_waits: "La liste ne peut pas encore être mise à jour\u{a0}: elle attend la clé qui la signe. Les modèles ci-dessus restent proposés.",
             speech_option: "SpeechAnalyzer d’Apple, sur ce Mac",
             speech_missing: "le modèle d’Apple n’est pas encore sur ce Mac",
             speech_fetch: "Télécharger le modèle d’Apple (macOS le télécharge depuis Apple)",
             speech_fetching: "macOS télécharge le modèle d’Apple…",
             speech_failed: "Le modèle d’Apple n’a pas été téléchargé. Réessayez plus tard\u{202f}; Whisper reste disponible.",
-            service_group: "Un service",
             service_option: "Un service que je choisis",
-            service_other_model: "Un autre modèle…",
             service_address: "Son adresse",
             service_model: "Son modèle",
             service_key: "Sa clé, s’il en demande une",
@@ -1540,6 +1733,7 @@ pub fn window(language: Language) -> Window {
             service_test: "Tester",
             service_tested: "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit.",
             service_saved: "Enregistré\u{a0}: {} transcrira vos prochaines réunions.",
+            service_saved_here: "Enregistré\u{a0}: cet ordinateur transcrira vos prochaines réunions.",
             service_agree_first: "Rien n’est enregistré\u{a0}: acceptez d’abord que le son de vos réunions soit envoyé à {}.",
             service_address_bad: "Rien n’est enregistré\u{a0}: l’adresse commence par https:// ou http://, puis l’hôte du service — par exemple https://api.groq.com/openai/v1.",
             service_model_named: "Rien n’est enregistré\u{a0}: nommez le modèle avec lequel le service entend — par exemple whisper-large-v3.",
@@ -1567,6 +1761,7 @@ pub fn window(language: Language) -> Window {
                 "Désactivé dans Windows\u{a0}: réactivez-le dans Paramètres › Applications › Démarrage.",
                 "Défini par votre organisation\u{a0}: il ne peut pas être changé ici.",
             ],
+            general_title: "Général",
             advanced_title: "Avancé",
             developer: [
                 "Mode développeur",
@@ -1681,7 +1876,8 @@ pub fn window(language: Language) -> Window {
             redo_title: "Refaire le compte rendu",
             redo_with: "Refait avec les modèles de cette réunion\u{a0}: «\u{a0}Avancé\u{a0}» pour les choisir.",
             redo_note: "Le compte rendu actuel reste en place tant que le nouveau n’est pas prêt, et se retrouve ensuite dans la corbeille.",
-            redo_do: "Refaire",
+            redo_minutes_do: "Refaire le compte rendu avec {}",
+            redo_transcript_do: "Refaire la transcription avec {}",
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle est gardée tant que la nouvelle n’est pas entière, puis part à la corbeille\u{202f}; si la nouvelle échoue, l’actuelle revient.",
@@ -1698,6 +1894,8 @@ pub fn window(language: Language) -> Window {
             chip_awaiting: "Accord requis",
             chip_transcribing: "Transcription…",
             chip_failed: "Compte rendu non fait",
+            chip_redo_failed: "Refaire échoué",
+            minutes_redo_failed: "Le dernier Refaire a échoué. Le compte rendu affiché est le précédent.",
             transcript_making: "Transcription en cours",
             transcript_not_made: "La transcription n’a pas été faite. L’enregistrement est intact.",
             chip_transcript_failed: "Transcription non faite",
@@ -1705,6 +1903,10 @@ pub fn window(language: Language) -> Window {
             minutes_unsaved_none: "Pas encore enregistré — aucun compte rendu n’est fait tant que ce n’est pas le cas.",
             transcript_model_needed: "En attente du modèle Whisper.",
             transcript_model_coming: "En attente du modèle Whisper, en cours de téléchargement.",
+            making_cancel: "Annuler",
+            making_cancel_failed: "Kitokey n’a pas pu annuler\u{a0}: {}",
+            transcript_stopped: "Transcription arrêtée. Vous pouvez la relancer, avec un autre modèle si besoin.",
+            minutes_stopped: "Compte rendu arrêté. Vous pouvez le relancer, avec un autre modèle si besoin.",
             ran_online: "en ligne",
             record_start: "Démarrer un enregistrement",
             record_stop: "Arrêter l’enregistrement",
@@ -1742,19 +1944,17 @@ pub fn window(language: Language) -> Window {
             not_saved: "Le réglage n’a pas été enregistré\u{a0}: {}",
             key_not_kept: "Le choix est enregistré, mais la clé n’a pas été gardée dans le trousseau du système\u{a0}: {}",
             minutes_step: "Compte rendu",
-            ollama_group: "Sur cet ordinateur — trouvés dans Ollama",
-            online_group: "En ligne",
-            other_group: "Autre",
-            custom: "Personnalisé…",
             address: "Adresse (compatible OpenAI)",
             model_name: "Modèle",
             key: "Clé d’API",
             key_kept: "Une clé est gardée dans le trousseau du système\u{202f}; une nouvelle la remplace.",
+            where_service: "Un service",
+            service_name: "Service",
+            key_test: "Vérifier la clé",
             save: "Enregistrer",
             where_online: "En ligne — le texte de la transcription est envoyé",
             ollama_lacks: "Ollama, sur cet ordinateur, n’a pas de modèle nommé {}\u{a0}: choisissez-en un dans la liste, ou téléchargez-le avec Ollama.",
             ollama_silent: "Ollama ne répond pas ou n’a aucun modèle\u{a0}: lancez Ollama, puis téléchargez un modèle.",
-            not_chosen: "Pas encore choisi",
             welcome_title: "Réglons Kitokey en une question.",
             welcome_question: "Vos réunions parlent-elles de sujets confidentiels\u{202f}?",
             welcome_examples: "Clients, ressources humaines, santé, juridique, chiffres non publiés…",
@@ -1792,6 +1992,7 @@ pub fn window(language: Language) -> Window {
             welcome_fetch_from: "Depuis {}, vérifié avant d’être utilisé.",
             welcome_done: "Terminer",
             welcome_later: "Plus tard",
+            welcome_later_waits: "Plus tard — vos réunions attendront le modèle",
             welcome_choose: "Choisir mon service",
             welcome_again: [
                 "Refaire le réglage",
@@ -1830,6 +2031,11 @@ pub fn window(language: Language) -> Window {
                 "Sa fenêtre, son menu et ses notifications\u{202f}; ce que le système dessine lui-même garde la sienne.",
             ],
             app_language_system: "Langue du système",
+            appearance: [
+                "Apparence",
+                "Toutes les fenêtres de Kitokey, la barre aussi\u{202f}; Système suit le clair ou le sombre du système.",
+            ],
+            appearance_choices: ["Système", "Clair", "Sombre"],
             correct_line: "Corriger la ligne de {}",
             corrected: "corrigé",
             correction_empty: "Une ligne ne reste pas vide\u{a0}: Échap la laisse comme elle était.",
@@ -1859,8 +2065,8 @@ pub fn window(language: Language) -> Window {
 pub enum Trouble {
     /// The program that records could not be started: what the system said of it.
     NoRecorder(String),
-    /// The settings file was not read: the sentence that says which file, and what in it.
-    Settings(String),
+    /// The settings file was not read: which setting, on which line (#783).
+    Settings(Refused),
     /// The desktop did not bind the global shortcut: what it said of it.
     Shortcut(String),
     /// The model a transcript is heard with is not on the machine: where it was looked for.
@@ -1902,8 +2108,10 @@ pub enum Failure {
     FolderNotWhole,
     FolderUnmade,
     Autostart,
-    SettingsUnread,
-    SettingsLocked,
+    /// The settings file refused, which setting and where (#783): under the command it stopped,
+    /// and, `SettingsLocked`, alone on Settings.
+    SettingsUnread(Refused),
+    SettingsLocked(Refused),
     SettingsUnwritten,
     FolderNotOpened,
     KeyboardSettings,
@@ -1958,12 +2166,29 @@ pub fn failure(failure: Failure, language: Language) -> String {
         (Failure::Autostart, French) => {
             "le démarrage à l’ouverture de session n’a pas pu être changé\u{a0}: vérifiez que votre dossier personnel peut être écrit."
         }
-        (Failure::SettingsUnread, English) => "the settings file cannot be read: correct it, then try again.",
-        (Failure::SettingsUnread, French) => "le fichier des réglages ne peut pas être lu\u{a0}: corrigez-le, puis réessayez.",
-        (Failure::SettingsLocked, English) => "The settings file cannot be read: Kitokey does not write over it until it is corrected.",
-        (Failure::SettingsLocked, French) => {
-            "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé."
+        // Shows: under a command the window refused, after « not saved: », then the refusal.
+        // When: the settings file cannot be read as settings. At most: no limit. Placeholders: {} the refusal.
+        (Failure::SettingsUnread(why), English) => return format!("the settings file cannot be read. {}", refused(&why, language)),
+        (Failure::SettingsUnread(why), French) => {
+            return format!("le fichier des réglages ne peut pas être lu. {}", refused(&why, language));
         }
+        // Shows: alone on Settings, then the refusal. When: the settings file cannot be read.
+        // At most: no limit. Placeholders: {} the refusal.
+        (Failure::SettingsLocked(why), English) => {
+            return format!(
+                "The settings file cannot be read: Kitokey does not write over it until it is corrected. {}",
+                refused(&why, language)
+            );
+        }
+        (Failure::SettingsLocked(why), French) => {
+            return format!(
+                "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {}",
+                refused(&why, language)
+            );
+        }
+        // Shows: under a command the window refused, after « not saved: », or alone where the page
+        // shows it (the folder, the keyboard settings). When: the command named by its arm fails.
+        // At most: no limit. Placeholders: none.
         (Failure::SettingsUnwritten, English) => "the settings file could not be written: check that the disk has room, then try again.",
         (Failure::SettingsUnwritten, French) => {
             "le fichier des réglages n’a pas pu être écrit\u{a0}: vérifiez qu’il reste de la place, puis réessayez."
@@ -2241,6 +2466,49 @@ pub fn cause(cause: Cause, language: Language) -> &'static str {
     }
 }
 
+/// What the user is told of a settings file refused (#783): which setting, on which line, and the
+/// gesture — never `settings.rs`'s own sentence, which stays for the log and developer mode.
+pub fn refused(refused: &Refused, language: Language) -> String {
+    use Language::{English, French};
+    // Shows: after the sentence of a notification or a page that says the file was not read.
+    // When: `settings::read` refuses the file. At most: no limit. Placeholders: {line} the line,
+    // {key} the setting's name as the file writes it — one of Kitokey's own, never what the user typed.
+    match (*refused, language) {
+        (Refused::Unopened, English) => "Kitokey cannot open its settings file: check that you may read it.".into(),
+        (Refused::Unopened, French) => "Kitokey ne peut pas ouvrir son fichier de réglages\u{a0}: vérifiez que vous pouvez le lire.".into(),
+        (Refused::Unparsed { line, key: Some(key) }, English) => {
+            format!("Line {line}: Kitokey does not understand the value of “{key}”. Correct it, or remove the line.")
+        }
+        (Refused::Unparsed { line, key: Some(key) }, French) => {
+            format!("Ligne {line}\u{a0}: Kitokey ne comprend pas la valeur de «\u{a0}{key}\u{a0}». Corrigez-la, ou supprimez la ligne.")
+        }
+        (Refused::Unparsed { line, key: None }, English) => {
+            format!("Line {line} is not written as a setting. Correct it, or remove it.")
+        }
+        (Refused::Unparsed { line, key: None }, French) => {
+            format!("La ligne {line} n’est pas écrite comme un réglage. Corrigez-la, ou supprimez-la.")
+        }
+        (Refused::SessionsNotWhole { line }, English) => {
+            format!("Line {line}: “sessions” gives a folder’s whole path, from / or from ~. Correct it.")
+        }
+        (Refused::SessionsNotWhole { line }, French) => {
+            format!("Ligne {line}\u{a0}: «\u{a0}sessions\u{a0}» donne le chemin entier d’un dossier, depuis / ou depuis ~. Corrigez-le.")
+        }
+        (Refused::ModelNotWhole { line }, English) => {
+            format!("Line {line}: “model” gives a file’s whole path, from / or from ~. Correct it.")
+        }
+        (Refused::ModelNotWhole { line }, French) => {
+            format!("Ligne {line}\u{a0}: «\u{a0}model\u{a0}» donne le chemin entier d’un fichier, depuis / ou depuis ~. Corrigez-le.")
+        }
+        (Refused::KeepAudio { line }, English) => {
+            format!("Line {line}: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it.")
+        }
+        (Refused::KeepAudio { line }, French) => format!(
+            "Ligne {line}\u{a0}: «\u{a0}keep_audio\u{a0}» vaut «\u{a0}always\u{a0}» ou un nombre de jours, de 1 à 36\u{202f}500. Corrigez-le."
+        ),
+    }
+}
+
 /// What the user is told of a trouble: what it is, and what still works. Where the user has
 /// something to put right — the settings file's line, the place the model goes —, it says where;
 /// never what a program or the system said (D29).
@@ -2256,21 +2524,30 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
             "Kitokey ne peut pas enregistrer",
             "Son programme d’enregistrement n’a pas pu démarrer. Réinstaller Kitokey le remet en place.",
         ),
+        // Shows: a notification at a start, its body then the refusal. When: the settings file cannot
+        // be read. At most: no limit. Placeholders: {} the refusal.
         (Trouble::Settings(why), English) => {
             return said(
                 "Your settings were not read",
-                format!("Kitokey runs with its defaults until the file is corrected: {}.", detail(why)),
+                format!(
+                    "Kitokey runs with its defaults until the file is corrected. {}",
+                    refused(why, language)
+                ),
             );
         }
         (Trouble::Settings(why), French) => {
             return said(
                 "Vos réglages n’ont pas été lus",
                 format!(
-                    "Kitokey fonctionne avec ses réglages par défaut tant que le fichier n’est pas corrigé\u{a0}: {}.",
-                    detail(why)
+                    "Kitokey fonctionne avec ses réglages par défaut tant que le fichier n’est pas corrigé. {}",
+                    refused(why, language)
                 ),
             );
         }
+        // Shows: a notification, its title then its body. When: the shortcut is not bound, the model or
+        // the program that hears is missing, the meetings' folder cannot be written, or no recording is
+        // there to transcribe. At most: the title, 50 characters; the body, no limit. Placeholders:
+        // {at} where the model is looked for, or the folder.
         (Trouble::Shortcut(_), English) => (
             "The keyboard shortcut is not set",
             "The menu of Kitokey’s icon still starts and stops a recording.",

@@ -61,11 +61,19 @@ fn the_minutes_are_written_from_the_transcript_the_context_and_the_providers_ans
     );
 
     let minutes = fs::read_to_string(folder.path().join("minutes.md")).unwrap();
-    assert!(minutes.starts_with("---\ncontract: minutes/v3\nmade: "), "{minutes}");
+    assert!(minutes.starts_with("---\ncontract: minutes/v4\nmade: "), "{minutes}");
     assert!(
-        minutes.contains("\nprovider: \"local\"\nmodel: \"a-model\"\ncontext: \"Quatre personnes, réunion d'organisation.\"\n---\n"),
+        minutes.contains("\nprovider: \"local\"\nmodel: \"a-model\"\ncontext: \"Quatre personnes, réunion d'organisation.\"\nmade_in: "),
         "{minutes}"
     );
+    // How long the making took, measured by the program (D97): a number at least zero, then the end of the front matter.
+    let made_in = minutes
+        .split("\nmade_in: ")
+        .nth(1)
+        .and_then(|rest| rest.split_once("\n---\n"))
+        .unwrap()
+        .0;
+    assert!(made_in.parse::<f64>().is_ok_and(|seconds| seconds >= 0.0), "{made_in}");
     assert!(minutes.ends_with(MINUTES) && !minutes.contains("a-key-for-the-test"));
     // Said before anything left, then once written; the key is in neither.
     let events: Vec<serde_json::Value> = out.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
@@ -872,7 +880,8 @@ fn openrouters_cost_reaches_the_front_matter_as_it_reported_it() {
         return;
     };
     assert!(minutes.contains("\nprovider: \"openrouter.ai\"\n"), "{minutes}");
-    assert!(minutes.contains("\ncost: 1.20e-6\ncurrency: USD\n---\n"), "{minutes}");
+    // The cost as reported, then how long the making took, last of the front matter (minutes/v4, D97).
+    assert!(minutes.contains("\ncost: 1.20e-6\ncurrency: USD\nmade_in: "), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
 
     let (minutes, warnings) = at_openrouter(vec![priced(r#"{"cost": "0.012"}"#)]).unwrap();
@@ -894,7 +903,8 @@ fn openrouters_cost_reaches_the_front_matter_as_it_reported_it() {
     // Asked again: the cost of the answer written.
     let refused = answering("une phrase", "stop").replacen('{', r#"{"usage": {"cost": 0.1},"#, 1);
     let (minutes, warnings) = at_openrouter(vec![refused, priced(r#"{"cost": 0.2}"#)]).unwrap();
-    assert!(minutes.contains("\ncost: 0.2\ncurrency: USD\n---\n"), "{minutes}");
+    // The cost as reported, then how long the making took, last of the front matter (minutes/v4, D97).
+    assert!(minutes.contains("\ncost: 0.2\ncurrency: USD\nmade_in: "), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
 }
 
