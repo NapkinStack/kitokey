@@ -7273,6 +7273,52 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             server.shutdown()
 
 
+def unsaved_choice_kept(now: dt.datetime) -> None:
+    """CA. #948: a model chosen in Settings and not yet saved — its list waits for « Enregistrer » — stays
+    chosen, its note said, when another control is saved and the page drawn anew; « Enregistrer » then
+    saves the one chosen, never the one before."""
+    print("CA. Settings: a model chosen and not yet saved, kept when another control is saved (#948)")
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            self.send_response(200)
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_):
+            pass
+
+    tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
+    threading.Thread(target=tags.serve_forever, daemon=True).start()
+    ollama = f"http://127.0.0.1:{tags.server_address[1]}"
+    meetings = WORK / "unsaved-choice"
+    meetings.mkdir(exist_ok=True)
+    window = Window(meetings, "fr_FR.UTF-8", f'reminder = false\nminutes_provider = "{ollama}/v1"\nminutes_model = "qwen3:14b"\n', ollama=ollama)
+    try:
+        with window as browser:
+            browser.find_element(By.ID, "settings-link").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "minutes") and b.find_elements(By.ID, "reminder"), 10)
+            Select(browser.find_element(By.ID, "minutes")).select_by_visible_text("Mistral 7b")
+            unsaid = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-unsaved").is_displayed(), 3)
+            before = browser.find_element(By.ID, "minutes")
+            # Another control, saved at once: the page is drawn anew from what the shell holds.
+            browser.find_element(By.ID, "reminder").click()
+            saved = wait_for(browser, lambda b: "reminder = true" in window.file.read_text(), 5)
+            redrawn = wait_for(browser, lambda b: not b.execute_script("return arguments[0].isConnected", before), 5)
+            time.sleep(1)
+            got = browser.execute_script("const m = document.getElementById('minutes'), n = document.getElementById('minutes-unsaved');"
+                                         " return {value: m ? m.value : null, note: !!n && n.getClientRects().length > 0}")
+            check("Settings: a model chosen and not yet saved, another control saved meanwhile: still chosen, its note still said (#948)",
+                  unsaid and saved and redrawn and got["value"] == "mistral:7b" and got["note"], [unsaid, saved, redrawn, got])
+            browser.find_element(By.ID, "minutes-save").click()
+            kept = wait_for(browser, lambda b: 'minutes_model = "mistral:7b"' in window.file.read_text(), 5)
+            check("Settings: then « Enregistrer » saves the one chosen, never the one before (#948)", kept, window.file.read_text())
+    finally:
+        tags.shutdown()
+
+
 def models_on_the_page(now: dt.datetime) -> None:
     """BW. D93, criterion 5: on a meeting's page, each version's model is a list in its line itself — no redo
     panel opened —, showing the model that made it; a model chosen there starts nothing and is kept as the
@@ -11639,6 +11685,7 @@ def main() -> int:
     redo_choice_starts_nothing(now)
     redo_offers_the_services_models(now)
     models_on_the_page(now)
+    unsaved_choice_kept(now)
     settings_folded(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
