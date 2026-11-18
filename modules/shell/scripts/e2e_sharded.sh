@@ -68,6 +68,7 @@ mkdir -p "$evidence/shots"
 for number in "${!pids[@]}"; do
   cp -r "$shards/$number/e2e/shots/." "$evidence/shots/" 2>/dev/null || true
   cp "$shards/$number/headless-shell.log" "$out/headless-shell-$number.log" 2>/dev/null || true
+  cp "$shards/$number/headless-a11y.log" "$out/headless-a11y-$number.log" 2>/dev/null || true
 done
 logs=0
 env -u KITOKEY_E2E_ONLY -u KITOKEY_E2E_PART uv run --quiet --with pyyaml==6.0.3 python scripts/e2e_logs.py "$shards" "$evidence" MANIFEST.yaml \
