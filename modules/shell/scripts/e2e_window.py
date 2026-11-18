@@ -6692,14 +6692,15 @@ def two_panes(now: dt.datetime) -> None:
         {"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0", "language": "fr", "context": None},
         *({"type": "segment", "speaker": "me", "track": "local", "voice": None, "start": 2.0 * i, "end": 2.0 * i + 1.5,
            "text": "Une phrase assez longue pour aller à la ligne dans une colonne de lecture, ni plus ni moins."} for i in range(1, 6)),
-        {"type": "complete", "duration": 1800.0, "made": "2026-10-23T10:42:00+02:00"},
+        # How long its one step took and what the service said it cost (D97): said after the model.
+        {"type": "complete", "duration": 1800.0, "made": "2026-10-23T10:42:00+02:00", "made_in": 1912.4, "cost": 0.012, "currency": "USD"},
     ]
     (newest / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
     # The meeting before it: a transcript made before `made` was written — its model alone (D93).
     (meetings / names[-2] / "transcript.jsonl").write_text(
         "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in [*lines[:-1], {"type": "complete", "duration": 1800.0}]))
     (newest / "minutes.md").write_text(
-        "---\ncontract: minutes/v1\nmade: 2026-10-23T11:00:00+02:00\nprovider: openrouter.ai\nmodel: claude-sonnet\ncontext: null\n---\n\n"
+        "---\ncontract: minutes/v4\nmade: 2026-10-23T11:00:00+02:00\nprovider: openrouter.ai\nmodel: claude-sonnet\ncontext: null\nmade_in: 3.2\n---\n\n"
         "## 1.\n\n" + "Un compte rendu assez long pour que son texte aille à la ligne bien avant le bord de sa carte. " * 6 + "\n\n"
         "## 2.\n\n- Mettre à jour le planning — Marc — aujourd’hui\n\n## 3.\n\n- Un serveur est gardé pour la démonstration.\n"
     )
@@ -6726,9 +6727,9 @@ def two_panes(now: dt.datetime) -> None:
         wait_for(browser, lambda b: shown(b) == names[-1], 10)
         # Each version says when it was made, then the model, as criterion 2 writes it (D93).
         made = makers(browser)
-        check("the transcript and the minutes say when they were made, in local time, then their model (D93)",
-              sorted(made) == sorted(["Transcrit le 23 oct. à 04:42 · Whisper large v3 turbo",
-                                      "Compte rendu du 23 oct. à 05:00 · Claude Sonnet, via openrouter.ai"]), made)
+        check("the transcript and the minutes say when they were made, in local time, then their model, how long, what it cost (D93, D97)",
+              sorted(made) == sorted(["Transcrit le 23 oct. à 04:42 · Whisper large v3 turbo · en 31 min 52 s · 0,012 $US",
+                                      "Compte rendu du 23 oct. à 05:00 · Claude Sonnet, via openrouter.ai · en 3 s"]), made)
         side, pane = box(browser, "#sidebar"), box(browser, "#pane")
         check("840 px and more: the sidebar on the left, 280 px, the pane beside it",
               side is not None and pane is not None and abs(side[2] - side[0] - 280) <= 1 and side[2] <= pane[0] + 1, (side, pane))
@@ -6877,9 +6878,9 @@ def two_panes(now: dt.datetime) -> None:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1] and b.find_elements(By.CSS_SELECTOR, ".transcript .lines li"), 10)
         made = makers(browser)
-        check("in English: when each version was made, in local time, then its model (D93)",
-              sorted(made) == sorted(["Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo",
-                                      "Summary of Oct 23 at 05:00 AM · Claude Sonnet, via openrouter.ai"]), made)
+        check("in English: when each version was made, in local time, then its model, how long, what it cost (D93, D97)",
+              sorted(made) == sorted(["Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo · in 31 min 52 s · US$0.012",
+                                      "Summary of Oct 23 at 05:00 AM · Claude Sonnet, via openrouter.ai · in 3 s"]), made)
         english = [browser.find_element(By.ID, "record-said").text] + [
             [browser.find_element(By.ID, i).get_attribute(a) for a in ("aria-label", "title")] for i in ("fold", "unfold", "free-link", "small-link", "settings-link")]
         browser.execute_script("document.activeElement.blur()")
