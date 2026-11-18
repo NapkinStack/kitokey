@@ -6196,6 +6196,257 @@ def meeting_told_once(now: dt.datetime) -> None:
             monitor.wait(timeout=10)
 
 
+def redo_choice_starts_nothing(now: dt.datetime) -> None:
+    """BO. A model chosen in a redo panel — on a meeting's page, or in the bar's « Avancé » — starts nothing,
+    and the panel stays open, the choice shown; Escape leaves everything as it was (D96, criterion 2: the
+    decider saw a choice close the panel, 2026-11-15)."""
+    print("BO. a model chosen in a redo panel, on the page or in the bar, starts nothing and the panel stays open (D96)")
+
+    # Answered late once `late` is set: a real Ollama answers a reading after the choice later than
+    # the stand-in's at once (the coordinator's (c), 2026-11-15).
+    late = threading.Event()
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if late.is_set():
+                time.sleep(3)
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            try:
+                self.send_response(200)
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                pass
+
+        def log_message(self, *_):
+            pass
+
+    tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
+    threading.Thread(target=tags.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{tags.server_address[1]}"
+    named = f'after = "nothing"\nreminder = false\nminutes_provider = "{base}/v1"\nminutes_model = "qwen3:14b"\n'
+    meetings = WORK / "redo-choice"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 3, {"local.wav": 1000})
+    (meeting / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n'
+    )
+    minutes = "---\ncontract: minutes/v1\nmodel: qwen3:14b\ncontext: null\n---\n\n## A\n\nLes minutes d'avant.\n\n## B\n\n## C\n"
+    (meeting / "minutes.md").write_text(minutes)
+    (WORK / "summary-args").unlink(missing_ok=True)
+    idle = "return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null)"
+    untouched = lambda: (meeting / "minutes.md").read_text() == minutes and not (WORK / "summary-args").exists()
+    try:
+        with Window(meetings, "fr_FR.UTF-8", named, ollama=base) as browser:
+            browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+            press(browser, "redo-minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+            redo_pick(browser, "redo-panel", "minutes", 1)
+            picked = browser.execute_script("const p = document.getElementById('redo-panel-minutes-model'); return p ? p.value : ''")
+            # Past the page's own reading, a second and a half: drawn again, the panel would be gone.
+            time.sleep(3)
+            kept = browser.execute_script("const p = document.getElementById('redo-panel-minutes-model'); return p ? p.value : null")
+            # Shown, not only there: the panel, its list and its button seen by the user (sam's o1, a panel hidden).
+            seen = lambda b: all(b.find_elements(By.ID, i) and b.find_element(By.ID, i).is_displayed()
+                                 for i in ("redo-panel", "redo-panel-minutes-model", "redo-do"))
+            check("on the page: a model chosen in the redo panel starts nothing, and the panel stays open, the choice shown (D96)",
+                  bool(picked) and kept == picked and seen(browser) and browser.execute_script(idle) and untouched(),
+                  (picked, kept, seen(browser), browser.execute_script(idle)))
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-panel"), 3)
+            check("on the page: Escape leaves everything as it was — the panel closed, nothing kept for the meeting, nothing made",
+                  closed and not (meeting / "models.json").exists() and untouched() and browser.execute_script(idle),
+                  (closed, (meeting / "models.json").exists()))
+            # « Annuler », after a choice: the same.
+            press(browser, "redo-minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+            redo_pick(browser, "redo-panel", "minutes", 1)
+            press(browser, "redo-panel-cancel")
+            closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-panel"), 3)
+            check("on the page: « Annuler » after a choice leaves everything as it was — the panel closed, nothing kept, nothing made",
+                  closed and not (meeting / "models.json").exists() and untouched() and browser.execute_script(idle),
+                  (closed, (meeting / "models.json").exists()))
+        with Window(meetings, "fr_FR.UTF-8", named, ollama=base, small=True) as browser:
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-more").is_displayed(), 10)
+            if browser.find_element(By.ID, "small-more").get_attribute("aria-expanded") != "true":
+                press(browser, "small-more")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-advanced"), 10)
+            if browser.find_element(By.ID, "small-advanced").get_attribute("aria-expanded") != "true":
+                press(browser, "small-advanced")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-minutes-model") and b.find_element(By.ID, "small-minutes-model").is_displayed(), 10)
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_index(1)
+            picked = browser.execute_script("return document.getElementById('small-minutes-model')?.value || ''")
+            time.sleep(3)
+            state = browser.execute_script("const t = document.getElementById('small-advanced'); const p = document.getElementById('small-advanced-panel');"
+                                           " const m = document.getElementById('small-minutes-model');"
+                                           " return {expanded: t?.getAttribute('aria-expanded'), hidden: p?.hidden, value: m?.value}")
+            check("in the bar: a model chosen in « Avancé » starts nothing, and the panel stays open, the choice shown (D96)",
+                  bool(picked) and state == {"expanded": "true", "hidden": False, "value": picked} and browser.execute_script(idle) and untouched(),
+                  (picked, state))
+            opened = ("const t = document.getElementById('small-advanced'); const p = document.getElementById('small-advanced-panel');"
+                      " return t?.getAttribute('aria-expanded') === 'true' && p?.hidden === false")
+            # (c) Another choice, Ollama answering the readings after it three seconds late.
+            late.set()
+            Select(browser.find_element(By.ID, "small-minutes-model")).select_by_index(0)
+            time.sleep(6)
+            late.clear()
+            check("in the bar: a choice whose readings Ollama answers late leaves the panel open (D96)",
+                  browser.execute_script(opened) and browser.execute_script(idle) and untouched(), browser.execute_script(opened))
+            # (d) A making that ends while the panel is open: what is read after it never closes it.
+            (WORK / "slow-minutes").touch()
+            browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: arguments[1], model: 'mistral:7b'})",
+                                   meeting.name, f"{base}/v1")
+            began = wait_for(browser, lambda b: not b.execute_script(idle), 5)
+            (WORK / "slow-minutes").unlink()
+            ended = wait_for(browser, lambda b: b.execute_script(idle), 15)
+            time.sleep(2)
+            check("in the bar: a making that ends while « Avancé » is open leaves it open (D96)",
+                  began and ended and browser.execute_script(opened), browser.execute_script(opened))
+    finally:
+        tags.shutdown()
+
+def redo_offers_the_services_models(now: dt.datetime) -> None:
+    """BQ. D96, criterion 1. A service set up in Settings with its key: the redo panel of a meeting's summary
+    offers the models that service lists, said as people say them and grouped under the service's name,
+    beside those on this computer — not Settings' one alone; a meeting said confidential is offered the
+    models on this computer alone (D91)."""
+    print("BQ. Refaire: a service set up with its key offers every model it lists, grouped under its name (D96)")
+    good = "sk-stand-in-good"
+    # The service that transcribes answers on a host of its own, to its own key alone: its key is kept under the
+    # transcription's account (D43), and read under the host — where none is kept for it — no model is offered.
+    heard = "sk-stand-in-heard"
+
+    class Answer(http.server.BaseHTTPRequestHandler):
+        accepted = good
+
+        def do_GET(self):
+            key = (self.headers.get("authorization") or "").removeprefix("Bearer ")
+            # The lists of models are public, as OpenRouter's are; a key given is checked.
+            if key != self.accepted and (key or "/models" not in self.path):
+                status, body = 401, {"error": {"message": "Invalid credentials", "code": 401}}
+            elif self.path.endswith("/key"):
+                status, body = 200, {"data": {"label": "stand-in"}}
+            elif self.path.endswith("/models?output_modalities=transcription"):
+                status, body = 200, {"data": [{"id": "openai/whisper-large-v3-turbo"}, {"id": "openai/whisper-large-v3"}]}
+            elif self.path.endswith("/models"):
+                status, body = 200, {"data": [{"id": "anthropic/claude-sonnet-4-5"}, {"id": "openai/gpt-4o-mini"}, {"id": "mistralai/mistral-7b-instruct:free"}]}
+            else:
+                status, body = 404, {}
+            raw = json.dumps(body).encode()
+            self.send_response(status)
+            self.send_header("content-length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_):
+            pass
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            raw = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            self.send_response(200)
+            self.send_header("content-length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_):
+            pass
+
+    Heard = type("Heard", (Answer,), {"accepted": heard})
+    servers = [http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler) for handler in (Answer, Tags, Heard)]
+    for server in servers:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    stand = f"http://127.0.0.1:{servers[0].server_address[1]}/api/v1"
+    meetings = WORK / "redo-services"
+    made = '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n' \
+           '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n'
+    for name in ("2026-10-18_12-00", "2026-10-18_14-00"):
+        session(meetings / name, now - dt.timedelta(hours=2), 3, {"local.wav": 1000})
+        (meetings / name / "transcript.jsonl").write_text(made)
+        (meetings / name / "minutes.md").write_text("---\ncontract: minutes/v1\nmodel: m\ncontext: null\n---\n\n## A\n\n## B\n\n## C\n")
+    (meetings / "2026-10-18_14-00" / "confidential").touch()
+    window = Window(meetings, "fr_FR.UTF-8", ollama=f"http://127.0.0.1:{servers[1].server_address[1]}")
+    window.env.update(KITOKEY_ONLINE=stand, KITOKEY_HEARING=f"http://127.0.0.1:{servers[2].server_address[1]}/api/v1")
+    options = "return [...document.querySelectorAll(`#${arguments[0]} option`)].filter(o => !o.disabled).map(o => o.textContent)"
+    # Each group of a list: its label, and the entries under it.
+    grouped = ("const s = document.getElementById(arguments[0]); return s ? [...s.querySelectorAll('optgroup')]"
+               ".map(g => [g.label, [...g.querySelectorAll('option')].map(o => o.textContent)]) : null")
+    try:
+        with window as browser:
+            # The service set up as Settings guide it (BJ): a service, its key tested and kept, a model saved.
+            browser.find_element(By.ID, "settings-link").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-where"), 5)
+            press(browser, "minutes-online")
+            wait_for(browser, lambda b: b.execute_script(options, "minutes-service"), 5)
+            choose(browser, "minutes-service", "0")
+            browser.find_element(By.ID, "minutes-key").send_keys(good)
+            press(browser, "minutes-key-test")
+            wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
+            choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
+            press(browser, "minutes-online-save")
+            saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
+            check("a service set up in Settings, its key kept, a model saved", saved, window.file.read_text())
+            # A service that transcribes, set up as BG guides it: its key kept under the transcription's account.
+            press(browser, "transcription-online")
+            wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
+            choose(browser, "transcription-service", "0")
+            browser.find_element(By.ID, "transcription-key").send_keys(heard)
+            press(browser, "transcription-key-test")
+            wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
+            choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
+            press(browser, "transcription-save")
+            heard = wait_for(browser, lambda b: 'transcription_model = "openai/whisper-large-v3-turbo"' in window.file.read_text(), 5)
+            check("a service that transcribes set up, its key kept, a model saved", heard, window.file.read_text())
+            # A meeting's redo panel: the service's models, grouped under its name, beside this computer's.
+            browser.execute_script("location.hash = '#/meeting/2026-10-18_12-00'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+            press(browser, "redo-minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+            offered = redo_offered(browser, "redo-panel", "minutes")
+            groups = wait_for(browser, lambda b: b.execute_script(grouped, "redo-panel-minutes-model"), 10)
+            groups = browser.execute_script(grouped, "redo-panel-minutes-model")
+            service = [models for label, models in (groups or []) if label == "OpenRouter"]
+            check("Refaire offers the service's models, grouped under its name, each as people say it, beside this computer's (D96)",
+                  bool(service) and all(any(entry.startswith(name) for entry in service[0]) for name in ("GPT 4o Mini", "Mistral 7b Instruct Free"))
+                  and any("sur cet ordinateur" in o for o in offered), (groups, offered))
+            check("no raw identifier offered: no « / », no « : » in a model's name", not any("/" in o or ":free" in o for o in offered), offered)
+            # The transcript's redo panel: the service's transcription models, grouped under its name.
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script("location.hash = '#/meeting/2026-10-18_12-00'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 10)
+            press(browser, "redo-transcript")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
+            hearing = redo_offered(browser, "redo-transcript-panel", "transcription")
+            wait_for(browser, lambda b: b.execute_script(grouped, "redo-transcript-panel-transcription-model"), 10)
+            groups = browser.execute_script(grouped, "redo-transcript-panel-transcription-model")
+            service = [models for label, models in (groups or []) if label == "OpenRouter"]
+            check("Refaire the transcript offers the service's transcription models, grouped under its name, as people say them (D96)",
+                  bool(service) and any(entry.startswith("Whisper Large V3") for entry in service[0])
+                  and not any("/" in entry for entry in service[0]), (groups, hearing))
+            # Confidential: this computer's models alone.
+            browser.execute_script("location.hash = '#/meeting/2026-10-18_14-00'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+            press(browser, "redo-minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+            local = redo_offered(browser, "redo-panel", "minutes")
+            time.sleep(2)
+            groups = browser.execute_script(grouped, "redo-panel-minutes-model")
+            # The service's own answer for it: none. Settings' entry stays — the stand-in is on 127.0.0.1,
+            # which D91 rightly counts as this computer; what D96 adds is held here.
+            answered = browser.execute_async_script(
+                "const done = arguments[arguments.length - 1];"
+                " window.__TAURI__.core.invoke('services_offered', {name: arguments[0]}).then(done, (why) => done(String(why)))",
+                "2026-10-18_14-00")
+            check("a meeting said confidential: no service's models offered — none asked of the service, no group, none of its models (D91, D96)",
+                  answered == {"minutes": [], "transcription": []} and not groups and not any(o.startswith(("GPT 4o Mini", "Mistral 7b Instruct Free")) for o in local),
+                  (answered, groups, local))
+    finally:
+        for server in servers:
+            server.shutdown()
+
 def two_panes(now: dt.datetime) -> None:
     """AD. The window in two panes: the meetings in a sidebar, the one chosen beside them (D61)."""
     print("AD. the window in two panes: the sidebar, the meeting chosen beside it, as wide as the window (D61)")
@@ -10308,6 +10559,8 @@ def main() -> int:
     microphone_chosen(now)
     microphone_latest_answer(now)
     microphone_rollback(now)
+    redo_choice_starts_nothing(now)
+    redo_offers_the_services_models(now)
     settings_folded(now)
     focus_kept(now)
     meeting_trashed(now)
