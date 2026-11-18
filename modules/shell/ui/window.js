@@ -415,6 +415,9 @@ function holdings(session, words, compact = false) {
 // What Kitokey makes in the background (D25): read with the header, painted where it is shown.
 let makings = null;
 const chipsMaking = new Set();
+// The meeting last stopped, as the header says it, and the bar's way to say it with its stage (D92).
+let lastStopped = null;
+let paintLast = null;
 
 function minutesState(name) {
   if (makings === null) return null;
@@ -627,6 +630,7 @@ function paintModel(state = document.getElementById("model-state")) {
 let lastFetching = null;
 
 function paintMakings() {
+  paintLast?.();
   // Drawn again first, never painted then drawn over: what is under the focus stays one drawing.
   const fetching = makings?.model_fetching?.file ?? null;
   const ended = lastFetching !== null && fetching === null;
@@ -643,15 +647,19 @@ function paintMakings() {
     chip_.hidden = state === null;
     if (state === null) continue;
     if (minutes && chip_.dataset.first === "true") chipsMaking.add(chip_.dataset.name);
+    // Minutes kept, a redo of them failed (#772): said as the redo's failure, never as none made.
+    const kept = chip_.dataset.first === "false";
     chip_.textContent = minutes
-      ? { making: words.chip_making, waiting: words.chip_waiting, ollama: words.chip_waiting, awaiting: words.chip_awaiting, failed: words.chip_failed }[state.kind]
+      ? { making: words.chip_making, waiting: words.chip_waiting, ollama: words.chip_waiting, awaiting: words.chip_awaiting, failed: kept ? words.chip_redo_failed : words.chip_failed }[state.kind]
       : { making: words.chip_transcribing, waiting: words.chip_waiting, model: words.chip_waiting, failed: words.chip_transcript_failed }[state.kind];
     chip_.classList.toggle("failed", state.kind === "failed");
   }
   const minutes = document.getElementById("minutes-state");
   if (minutes) {
     paintState(minutes, minutesState(minutes.dataset.name), {
-      offer: "make-minutes", again: "minutes-again", ask: "minutes_again", making: words.minutes_making, not_made: words.minutes_not_made, stopped: words.minutes_stopped,
+      offer: "make-minutes", again: "minutes-again", ask: "minutes_again", making: words.minutes_making, stopped: words.minutes_stopped,
+      // The minutes kept (#772): the redo failed, the ones shown are those before it.
+      not_made: minutes.dataset.kept === "true" ? words.minutes_redo_failed : words.minutes_not_made,
     });
   }
   // No line corrected while the transcript is made or waits to be (D62): its pencils hidden.
@@ -903,7 +911,10 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   const weight = document.getElementById("weight");
   weight.hidden = sessions.length === 0;
   // A folder that cannot be read is no empty list: said, and tried again (D67).
-  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folder) : fill(words.none, folder);
+  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folder) : words.none;
+  // Where Kitokey looks, said under the action, never in the sentence (#775): a path is no title.
+  document.getElementById("empty-folder").textContent = unreadable ? "" : fill(words.none_folder, folder);
+  document.getElementById("empty-folder").hidden = unreadable;
   document.getElementById("none-do").textContent = unreadable ? words.list_unread_do : words.none_do;
   document.getElementById("empty-record").textContent = words.record_start;
   document.getElementById("empty-record").hidden = recording || unreadable;
@@ -915,13 +926,6 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   document.getElementById("total").textContent = size(audio + text, words);
   const taken = sessions.length === 1 ? words.weight_one : words.weight;
   document.getElementById("taken").textContent = fill(taken, sessions.length);
-  const share = audio + text > 0 ? (100 * audio) / (audio + text) : 0;
-  document.getElementById("bar-audio").style.width = `${share}%`;
-  document.getElementById("bar-text").style.width = `${100 - share}%`;
-  // Its two parts said in words, to the pointer as to a screen reader: no legend under it (board 4).
-  const described = fill(words.weight_described, size(audio, words), size(text, words));
-  document.getElementById("bar").setAttribute("aria-label", described);
-  document.getElementById("bar").title = described;
 
   const now = new Date();
   const groups = document.getElementById("groups");
@@ -1611,6 +1615,7 @@ function minutesCard(read, words, session, transcript, onPage) {
   const state = element("p", "making-state");
   state.id = "minutes-state";
   state.dataset.name = nameOf(session);
+  state.dataset.kept = String(read.state === "present");
   state.dataset.made = String(makings?.made[nameOf(session)] ?? 0);
   state.setAttribute("role", "status");
   state.hidden = true;
@@ -4359,8 +4364,58 @@ function showSmall(words) {
   });
   live.append(opened, micNext, secret.row, note);
   live.hidden = true;
+  // At rest, the meeting last stopped and its stage (D92): one line under the row, cut by an ellipsis
+  // where it is longer than the bar, the whole of it its tooltip; « Ouvrir » beside it once it is made,
+  // stopped or failed, never focused by itself. Between two steps, the stage said stays. Said by a
+  // polite live region of its own, unseen and always in the page — a region there before its first
+  // words says them —, whose text changes only with the stage: never said again as the makings are read.
+  const lastLive = element("span", "unseen");
+  lastLive.id = "small-last-live";
+  lastLive.setAttribute("aria-live", "polite");
+  const lastLine = element("p", "says small-last");
+  lastLine.id = "small-last";
+  lastLine.hidden = true;
+  const lastSaid = element("span");
+  lastSaid.id = "small-last-said";
+  const lastOpen = element("button", "link", words.bar_last_open);
+  lastOpen.type = "button";
+  lastOpen.id = "small-last-open";
+  lastOpen.hidden = true;
+  lastOpen.addEventListener("click", () => full(`#/meeting/${encodeURIComponent(lastOpen.dataset.name)}`));
+  lastLine.append(lastSaid, " ", lastOpen);
+  const lastStage = (last) => {
+    const heard = transcriptState(last.name);
+    const minutes = minutesState(last.name);
+    if (!last.ended) {
+      if (heard && heard.kind !== "failed" && heard.kind !== "stopped") return { said: words.bar_last_hearing };
+      if (minutes && minutes.kind !== "failed" && minutes.kind !== "stopped") return { said: words.bar_last_summary };
+      return null;
+    }
+    if (heard?.kind === "failed") return { said: words.bar_last_failed, why: words.transcript_not_made, open: true };
+    if (minutes?.kind === "failed") {
+      return { said: words.bar_last_failed, why: minutes.said ? `${words.minutes_not_made} ${minutes.said}` : words.minutes_not_made, open: true };
+    }
+    if (heard?.kind === "stopped" || minutes?.kind === "stopped") return { said: words.bar_last_stopped, open: true };
+    if (minutes) return { said: words.bar_last_summary };
+    return { said: words.bar_last_ready, open: true };
+  };
+  // Painted with each reading of the makings, and as a recording starts or ends (`recording`, below).
+  let lastShown = null;
+  paintLast = () => {
+    const last = recording === false ? lastStopped : null;
+    const stage = last && lastStage(last);
+    if (stage) lastShown = { name: last.name, text: fill(stage.said, last.said, stage.why ?? ""), open: !!stage.open };
+    else if (!last || lastShown?.name !== last.name) lastShown = null;
+    const text = lastShown?.text ?? "";
+    if (lastLive.textContent !== text) lastLive.textContent = text;
+    lastSaid.textContent = text;
+    lastSaid.title = text;
+    lastOpen.hidden = !lastShown?.open;
+    lastOpen.dataset.name = lastShown?.name ?? "";
+    lastLine.hidden = text === "";
+  };
   const lines = element("div", "bar-lines");
-  lines.append(keptNext, modelsKept, announce, ...checks.map((check) => check.sentence), unkeptSaid);
+  lines.append(lastLine, keptNext, modelsKept, announce, ...checks.map((check) => check.sentence), unkeptSaid);
   const options = element("div", "bar-options");
   options.id = "small-options";
   options.append(rest, live, advanced, spokenBox);
@@ -4372,7 +4427,7 @@ function showSmall(words) {
     event.preventDefault();
     unfoldOptions(false, options.contains(event.target));
   });
-  page.replaceChildren(row, lines, options);
+  page.replaceChildren(row, lines, options, lastLive);
 
   // The shortcut, in ●'s and ■'s tooltips, as the desktop grants it.
   const paintKeys = async () => {
@@ -4407,6 +4462,7 @@ function showSmall(words) {
       // Back at rest, and the first time: what capture lists now.
       if (!now.recording) readPicks();
       recording = now.recording;
+      paintLast();
       start.disabled = false;
       named(start, words.record_start);
       stop.disabled = false;
@@ -4660,7 +4716,9 @@ let focusLanguage = false;
 async function showWelcome(again, words) {
   const page = document.getElementById("welcome");
   const { invoke } = window.__TAURI__.core;
-  const [shown, minutes] = await Promise.all([invoke("settings_shown"), invoke("minutes_shown")]);
+  const [shown, minutesFirst] = await Promise.all([invoke("settings_shown"), invoke("minutes_shown")]);
+  // Asked again by « Réessayer » when Ollama does not answer (#781).
+  let minutes = minutesFirst;
   // Apple's SpeechAnalyzer, asked aside: only the summary needs it.
   const speech = invoke("speech_shown").catch(() => null);
   const local = !minutes.provider || minutes.provider_local;
@@ -4797,10 +4855,25 @@ async function showWelcome(again, words) {
     fact(reminder, shown.reminder ? words.welcome_reminder_on : words.welcome_reminder_off);
     made.append(mode, facts);
     // The minutes wait for Ollama: said, with where it comes from — Kitokey never installs it.
-    if (!online && !minutes.ollama_answers) made.append(element("p", "says welcome-wait", words.welcome_ollama_silent));
-    else if (!online && !minutes.ollama.includes(ollamaModel)) made.append(element("p", "says welcome-wait", fill(words.welcome_ollama_lacks, ollamaModel)));
+    if (!online && !minutes.ollama_answers) {
+      // Asked again on a click, as a meeting's page does: Ollama started meanwhile, the summary said anew (#781).
+      const again = button("welcome-ollama-again", "open", words.try_again, async () => {
+        waiting(again, true);
+        // Read at the click, as the pages read it, not the `invoke` the welcome took at its start.
+        minutes = await window.__TAURI__.core.invoke("minutes_shown").catch((why) => {
+          pageFailed(why);
+          return minutes;
+        });
+        await draw();
+      });
+      const wait = element("p", "says welcome-wait", words.welcome_ollama_silent);
+      wait.append(" ", again);
+      made.append(wait);
+    } else if (!online && !minutes.ollama.includes(ollamaModel)) made.append(element("p", "says welcome-wait", fill(words.welcome_ollama_lacks, ollamaModel)));
     const actions = element("div", "welcome-actions");
-    const later = button("welcome-later", "link", words.welcome_later, async () => {
+    // The model still to fetch: « Plus tard » says the meetings will wait for it (#781).
+    const waits = (engine === "speechanalyzer" && status?.offered && !status.installed) || (engine === "whisper" && fetchable);
+    const later = button("welcome-later", "link", waits ? words.welcome_later_waits : words.welcome_later, async () => {
       if (await save()) done();
     });
     let primary;
@@ -5015,6 +5088,8 @@ async function draw(mine, again) {
   document.body.dataset.at = listed ? "list" : "page";
   const beside = listed && !narrow.matches && listing.sessions.length > 0;
   const name = wanted ? decodeURIComponent(wanted[1]) : beside ? nameOf(listing.sessions[0]) : null;
+  // Its page opened: the bar no longer says the meeting last stopped (D92).
+  if (wanted && !document.hidden) window.__TAURI__.core.invoke("meeting_seen", { name }).catch(() => {});
   // A refused language is said until its meeting's own page is left (#841).
   if (languageRefused && !(wanted && decodeURIComponent(wanted[1]) === languageRefused.name)) languageRefused = null;
   // Another meeting shown, or none: its models are read again when it is (D93).
@@ -5246,6 +5321,7 @@ setInterval(async () => {
   if (document.hidden || words === null) return;
   const asked = await window.__TAURI__.core.invoke("header").catch(() => null);
   if (asked === null) return;
+  lastStopped = asked.last ?? null;
   readMakings();
   const { recording, stopping, shortcut, refused } = asked;
   takeAppearance(asked.appearance);

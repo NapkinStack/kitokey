@@ -48,9 +48,6 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .weight { padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; }
 .total strong { font-size: 26px; letter-spacing: -0.02em; }
 .total span, .legend { color: var(--soft); }
-.split { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--raised); }
-.split .audio { background: var(--accent); }
-.split .text { background: var(--ok); }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; }
 .legend li { display: flex; align-items: center; gap: 7px; }
 .none { color: var(--soft); }
@@ -351,6 +348,12 @@ body.small-window .frame { display: none; }
 #small .small-announce .link, #small .small-announce .says { font-size: 12px; line-height: 1.3; }
 #small #small-note { font-size: 12px; line-height: 1.25; }
 #small .bar-lines .small-said { margin: 0; }
+/* D92: the meeting last stopped, one line under the row at rest — cut by an ellipsis, the whole its tooltip —,
+   « Ouvrir » beside it; its live region unseen, at the window's top, never past its edge. */
+#small .small-last { display: flex; align-items: baseline; gap: 8px; margin: 0; font-size: 12px; line-height: 1.3; }
+#small #small-last-said { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#small .small-last .link { flex: none; font-size: 12px; line-height: 1.3; }
+#small-last-live { top: 0; left: 0; }
 .small-rest, .small-live { display: flex; flex-direction: column; gap: 12px; }
 #small .link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
 /* The microphone's name, and its list under it, the bar growing to hold it (D74, D90). */
@@ -569,6 +572,9 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .empty .card { max-width: 480px; padding: 22px 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .empty .none { margin: 0; color: var(--ink); font-weight: 600; }
 .empty .says { margin: 0; }
+.empty .folder { margin: 0; color: var(--soft); font-size: 12.5px; overflow-wrap: anywhere; }
+/* Waiting for what it needs, the transcript says that alone (#775): not also that there is none. */
+#transcript-state:not([hidden]) ~ .none { display: none; }
 /* Too low for the list to hold between the gesture and the foot: the sidebar scrolls with the page. */
 @media (max-width: 839px), (max-height: 559px) {
   .sidebar { position: static; height: auto; min-height: 100vh; }
