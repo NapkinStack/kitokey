@@ -5159,7 +5159,7 @@ def page_one_bar(now: dt.datetime) -> None:
                       got is not None and got["step"] == writing and got["segments"] == ["done", "running"], got)
                 wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == hearing, 5)
                 # From here, every state the bar shows, sampled, and every text its live region takes.
-                browser.execute_script("window.barSeen = []; window.barSaid = []; const s = document.getElementById('making-step');"
+                browser.execute_script("window.barSeen = []; window.barSaid = []; const s = document.getElementById('making-step'); window.stepNode = s;"
                                        " new MutationObserver(() => window.barSaid.push(s.textContent)).observe(s, {childList: true, characterData: true, subtree: true});"
                                        " window.barTick = setInterval(() => { const m = document.getElementById('making');"
                                        "   window.barSeen.push(m && m.getClientRects().length ? [...m.querySelectorAll('.segment')].map(g => g.dataset.state).join() : 'gone'); }, 50)")
@@ -5168,6 +5168,14 @@ def page_one_bar(now: dt.datetime) -> None:
                 got = browser.execute_script(bar)
                 check(f"{short}: then its summary: the same bar, the transcript's part full, the summary's running, « Annuler » in it (D92)",
                       second and got["segments"] == ["done", "running"] and got["cancel"] and got["cards"] == 0 and bool(timed.match(got["by"])), got)
+                # The page drawn again meanwhile — the window coming forward draws it anew —: the step's live
+                # region is the same node, and nothing is said again (#938's m5).
+                drawn = browser.execute_script("const before = document.querySelector('#meeting .columns'); window.dispatchEvent(new Event('focus'));"
+                                               " return new Promise((done) => setTimeout(() => done(document.querySelector('#meeting .columns') !== before), 1500))")
+                kept = browser.execute_script("return document.getElementById('making-step') === window.stepNode")
+                check(f"{short}: the page drawn again while its summary is made: the same live region, nothing said again (D92)",
+                      drawn and kept and browser.execute_script("return window.barSaid") == [writing],
+                      [drawn, kept, browser.execute_script("return window.barSaid")])
                 gates[1].unlink()
                 gone = wait_for(browser, lambda b: b.execute_script(bar) is None and (meeting / "minutes.md").is_file(), 15)
                 time.sleep(0.3)
