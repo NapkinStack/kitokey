@@ -443,6 +443,18 @@ pub struct Window {
     /// One meeting's page.
     pub back: &'static str,
     pub open_folder: &'static str,
+    /// Shows: a meeting's page, beside « Ouvrir le dossier »: the icon's name, said and as its tooltip;
+    /// then the question in place, its sentences and its two buttons (D100). When: always. At most: one
+    /// line each. Placeholders: `trash_holds` takes the parts it holds, `trash_refused` the reason.
+    pub trash_meeting: &'static str,
+    pub trash_ask: &'static str,
+    pub trash_holds: &'static str,
+    /// Its audio, its transcript, its summary, as `trash_holds` lists them.
+    pub trash_parts: [&'static str; 3],
+    pub trash_restore: &'static str,
+    pub trash_cancel: &'static str,
+    pub trash_confirm: &'static str,
+    pub trash_refused: &'static str,
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
     pub more_actions: &'static str,
     pub labelled: &'static str,
@@ -453,10 +465,16 @@ pub struct Window {
     pub written_by: &'static str,
     /// Its provider, when known, said after the model.
     pub written_via: &'static str,
-    /// Between a day and its hour: "mar. 13 oct. à 12:21", "Tue, Oct 13 at 12:21 PM".
+    /// Between a day and its hour: "13 oct. à 12:21", "Oct 13 at 12:21 PM".
     pub at: &'static str,
     /// The transcript's maker: the model, on this computer.
     pub heard_by: &'static str,
+    /// A transcript that says when it was made whole: that day and hour first, its model after —
+    /// "Transcrit le 13 nov. à 09:42 · Whisper small" (D93).
+    pub transcribed_on: &'static str,
+    /// Minutes that say when they were made: that day and hour first, their model after —
+    /// "Compte rendu du 13 nov. à 09:45 · Qwen3 8B" (D93).
+    pub minutes_of: &'static str,
     pub here: &'static str,
     pub remote: &'static str,
     /// A voice told within a track: its label.
@@ -938,6 +956,14 @@ pub fn window(language: Language) -> Window {
             none_found: "No meeting holds these words.",
             back: "Meetings",
             open_folder: "Open the folder",
+            trash_meeting: "Move to trash",
+            trash_ask: "Move this meeting to the trash?",
+            trash_holds: "It holds {}.",
+            trash_parts: ["its audio", "its transcript", "its summary"],
+            trash_restore: "You can restore it from your system’s trash.",
+            trash_cancel: "Cancel",
+            trash_confirm: "Move to trash",
+            trash_refused: "Not moved to the trash: {}",
             more_actions: "More actions",
             labelled: "{}:",
             minutes_title: "Minutes",
@@ -947,6 +973,8 @@ pub fn window(language: Language) -> Window {
             written_via: ", via {}",
             at: "at",
             heard_by: "Written by {}, on this computer",
+            transcribed_on: "Transcribed on {}",
+            minutes_of: "Summary of {}",
             here: "Here",
             remote: "Remote",
             voice: "voice {}",
@@ -1360,6 +1388,14 @@ pub fn window(language: Language) -> Window {
             none_found: "Aucune réunion ne contient ces mots.",
             back: "Réunions",
             open_folder: "Ouvrir le dossier",
+            trash_meeting: "Mettre à la corbeille",
+            trash_ask: "Mettre cette réunion à la corbeille\u{202f}?",
+            trash_holds: "Elle contient {}.",
+            trash_parts: ["son audio", "sa transcription", "son compte rendu"],
+            trash_restore: "Vous pourrez la restaurer depuis la corbeille de votre système.",
+            trash_cancel: "Annuler",
+            trash_confirm: "Mettre à la corbeille",
+            trash_refused: "Pas mise à la corbeille\u{a0}: {}",
             more_actions: "Plus d’actions",
             labelled: "{}\u{a0}:",
             minutes_title: "Compte rendu",
@@ -1369,6 +1405,8 @@ pub fn window(language: Language) -> Window {
             written_via: ", via {}",
             at: "à",
             heard_by: "Transcrit par {}, sur cet ordinateur",
+            transcribed_on: "Transcrit le {}",
+            minutes_of: "Compte rendu du {}",
             here: "Ici",
             remote: "À distance",
             voice: "voix {}",

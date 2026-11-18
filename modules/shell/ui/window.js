@@ -65,6 +65,24 @@ function chip(text, kind) {
   return element;
 }
 
+// A control waiting for its answer (#886, D101): said disabled to assistive technology and deaf to
+// what would change it, never `disabled` — WebKit lets the focus of a disabled control go and never
+// gives it back (ines's probe: focused, disabled three frames, then body). WAI-ARIA's practice: it
+// stays focusable, inert. A click, a press or a key that would change it is held back.
+function waiting(control, on) {
+  if (on) control.setAttribute("aria-disabled", "true");
+  else control.removeAttribute("aria-disabled");
+}
+const HELD_KEYS = new Set([" ", "Enter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"]);
+for (const type of ["click", "mousedown", "keydown"]) {
+  document.addEventListener(type, (event) => {
+    const control = event.target instanceof Element ? event.target.closest('[aria-disabled="true"]') : null;
+    if (!control || (type === "keydown" && !HELD_KEYS.has(event.key))) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+}
+
 // A lock, Lucide's: its meaning is always in the words beside it (D60, D89).
 function lock() {
   const svg = icon("lock");
@@ -98,6 +116,7 @@ const ICONS = {
   lock: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2, ry: 2 }], "M7 11V7a5 5 0 0 1 10 0v4"],
   copy: [["rect", { width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2 }], "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"],
   "rotate-ccw": ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5"],
+  "trash-2": ["M10 11v6", "M14 11v6", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
   "folder-open": ["m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"],
   ellipsis: [["circle", { cx: 12, cy: 12, r: 1 }], ["circle", { cx: 19, cy: 12, r: 1 }], ["circle", { cx: 5, cy: 12, r: 1 }]],
   "message-square-text": ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z", "M7 11h10", "M7 15h6", "M7 7h8"],
@@ -236,13 +255,14 @@ function leftSaid(words, left) {
 }
 
 // The language a meeting is spoken in (D65): the settings' own, or one of its own — its next
-// transcript heard in it. Written at once; refused, said, the choice put back.
-function languageRow(session, language, languages, words, settled, apple, system) {
+// transcript heard in it. Written at once by `save`; refused, said, the choice put back. The same
+// row in the bar's options (D99), its ids its own.
+function languageRow(save, language, languages, words, settled, apple, system, id = "meeting-language", saidId = "language-said") {
   // A setting of the meeting's row (D89): its icon, its name, its list.
   const row = element("label", "setting language");
-  row.htmlFor = "meeting-language";
+  row.htmlFor = id;
   const pick = element("select");
-  pick.id = "meeting-language";
+  pick.id = id;
   const add = (value, text) => {
     const option = element("option", "", text);
     option.value = value;
@@ -259,12 +279,12 @@ function languageRow(session, language, languages, words, settled, apple, system
   if (language && !heard.some(([code]) => code === language)) add(language, apple ? fill(words.language_heard_as, named(language), named(system)) : named(language));
   pick.value = language ?? "";
   const said = element("p", "says");
-  said.id = "language-said";
+  said.id = saidId;
   said.setAttribute("role", "status");
   let kept = pick.value;
   pick.addEventListener("change", async () => {
     try {
-      await window.__TAURI__.core.invoke("language_set", { name: nameOf(session), language: pick.value || null });
+      await save(pick.value || null);
       kept = pick.value;
       said.textContent = "";
     } catch (why) {
@@ -311,7 +331,7 @@ function confidentialCard(session, confidential, words) {
     said.hidden = said.textContent === "";
   };
   box.addEventListener("change", async () => {
-    box.disabled = true;
+    waiting(box, true);
     try {
       const shown = await window.__TAURI__.core.invoke("confidential_set", { name, on: box.checked });
       said.textContent = "";
@@ -321,7 +341,7 @@ function confidentialCard(session, confidential, words) {
       said.textContent = words.confidential_not_saved;
       said.hidden = false;
     }
-    box.disabled = false;
+    waiting(box, false);
     readMakings();
   });
   card.append(element("span", "name", words.confidential_chip), box);
@@ -422,7 +442,7 @@ function cancelButton(said, id) {
   cancel.type = "button";
   if (id) cancel.id = id;
   cancel.addEventListener("click", async () => {
-    cancel.disabled = true;
+    waiting(cancel, true);
     cancelledFrom = said.id;
     // A refusal said before was the last gesture's: this one says its own.
     document.querySelector(`.note[data-refused="${said.id}"]`)?.remove();
@@ -430,7 +450,7 @@ function cancelButton(said, id) {
       // Said beside the line, which is drawn again as the makings are read: kept until the next gesture.
       said.after(refusalNote(said.id, fill(words.making_cancel_failed, why)));
       cancelledFrom = null;
-      cancel.disabled = false;
+      waiting(cancel, false);
       return false;
     });
     // Asked: it ends within two seconds; read again until its line says it, not at the page's
@@ -493,7 +513,7 @@ function paintState(said, shown, of) {
       fetch_.id = "ollama-fetch";
       fetch_.disabled = shown.busy;
       fetch_.addEventListener("click", async () => {
-        fetch_.disabled = true;
+        waiting(fetch_, true);
         await window.__TAURI__.core.invoke("ollama_pull_offered").catch(() => {});
         readMakings();
       });
@@ -524,9 +544,12 @@ function modelFetch(busy = false) {
   fetch_.id = "model-fetch";
   fetch_.disabled = busy;
   fetch_.addEventListener("click", async () => {
-    fetch_.disabled = true;
+    // Where the user is, read before the button goes: what says the model coming takes its place (D101).
+    const place = placeOf();
+    waiting(fetch_, true);
     await window.__TAURI__.core.invoke("model_fetch").catch(() => {});
-    readMakings();
+    await readMakings();
+    placeBack(place);
   });
   return fetch_;
 }
@@ -550,7 +573,7 @@ function paintOffered(list = document.getElementById("offered")) {
       fetch_.type = "button";
       fetch_.disabled = kind === "busy";
       fetch_.addEventListener("click", async () => {
-        fetch_.disabled = true;
+        waiting(fetch_, true);
         const { invoke } = window.__TAURI__.core;
         const asked = item.dataset.by ? invoke("ollama_pull_offered") : invoke("model_offered_fetch", { file: item.dataset.offered });
         await asked.catch(() => {});
@@ -627,7 +650,7 @@ function paintMakings() {
 
 // *Réessayer*: fails only when the meeting is gone, said there (D67); a later failure is on this page.
 async function askAgain(of, said, again) {
-  again.disabled = true;
+  waiting(again, true);
   try {
     await window.__TAURI__.core.invoke(of.ask, { name: said.dataset.name });
   } catch (why) {
@@ -639,8 +662,8 @@ async function askAgain(of, said, again) {
   readMakings();
 }
 
-// « Enregistré », a moment, under what was changed (D68): the page is drawn again by what it says,
-// so the sentence is put there after the drawing, by the name of what changed.
+// « Enregistré », a moment, in the line of what was changed (D68, D101): the page is drawn again by
+// what it says, so the sentence is put there after the drawing, by the name of what changed.
 let savedFor = null;
 let lastChanged = "";
 const remembered = (event) => {
@@ -652,17 +675,49 @@ document.addEventListener("change", remembered, true);
 document.addEventListener("click", remembered, true);
 function savedSaid(saved) {
   clearTimeout(savedFor);
-  document.getElementById("saved-said")?.remove();
+  savedGone();
   if (!saved) return;
-  const savedSentence = element("p", "says saved-said", words.saved);
+  const savedSentence = element("span", "saved-said", words.saved);
   savedSentence.id = "saved-said";
   savedSentence.setAttribute("role", "status");
+  savedSentence.setAttribute("aria-live", "polite");
+  // Said in the line changed itself, at its end, as a system's settings say a setting applied on its
+  // own line: over its description, hidden the while — never over its name or its control —, or on
+  // its name's line when it has none, or beside a button in no line. Laid over the line, never in its
+  // flow: the page neither grows nor moves (the coordinator, 2026-11-17, D101).
   const changed = lastChanged ? document.querySelector(`#settings ${lastChanged}`) : null;
-  const row = changed?.closest("label, .row, .field");
-  if (changed) (row ?? changed).after(savedSentence);
-  else document.getElementById("settings").prepend(savedSentence);
-  savedSentence.scrollIntoView({ block: "nearest" });
-  savedFor = setTimeout(() => savedSentence.remove(), 1500);
+  const row = changed?.closest("label, .row, .field") ?? null;
+  const box = row ?? changed?.parentElement ?? document.getElementById("settings");
+  box.classList.add("saying");
+  box.append(savedSentence);
+  const description = row?.querySelector(".says:not(:empty)") ?? null;
+  const name = row?.querySelector(".name") ?? null;
+  if (description) {
+    // Its description's own box, the sentence at its end.
+    savedSentence.style.top = `${description.offsetTop}px`;
+    savedSentence.style.left = `${description.offsetLeft}px`;
+    savedSentence.style.width = `${description.offsetWidth}px`;
+    description.classList.add("saved-under");
+  } else if (name) {
+    // The name's line, at the end of the column it is in — its text left as it is.
+    const column = name.parentElement === box ? null : name.parentElement;
+    savedSentence.style.top = `${name.offsetTop}px`;
+    savedSentence.style.left = `${column ? column.offsetLeft : 0}px`;
+    savedSentence.style.width = `${column ? column.offsetWidth : box.clientWidth}px`;
+  } else if (changed) {
+    savedSentence.style.top = `${changed.offsetTop}px`;
+    savedSentence.style.left = `${changed.offsetLeft + changed.offsetWidth + 8}px`;
+  }
+  savedFor = setTimeout(savedGone, 1500);
+}
+
+// « Enregistré » gone, and what it was laid over shown again.
+function savedGone() {
+  const sentence = document.getElementById("saved-said");
+  if (!sentence) return;
+  sentence.closest(".saying")?.classList.remove("saying");
+  for (const under of document.querySelectorAll(".saved-under")) under.classList.remove("saved-under");
+  sentence.remove();
 }
 
 // Each reading of the makings numbered: an answer a later reading has overtaken is dropped — the
@@ -964,12 +1019,12 @@ function contextCard(session, { context, transcript, minutes }, words, settings,
   redo.type = "button";
   redo.id = "context-redo";
   redo.addEventListener("click", async () => {
-    redo.disabled = true;
+    waiting(redo, true);
     await window.__TAURI__.core.invoke("context_redo", { name }).catch((why) => {
       said.textContent = fill(words.not_saved, why);
     });
     await readMakings();
-    redo.disabled = false;
+    waiting(redo, false);
   });
   changed.append(element("p", "says", words.context_changed[minutes.state === "present" ? 1 : 0]), redo);
   const toggle = element("button", "setting context-toggle");
@@ -1095,7 +1150,7 @@ function offer(card, label, id, command, session, words) {
   button.type = "button";
   button.id = id;
   button.addEventListener("click", async () => {
-    button.disabled = true;
+    waiting(button, true);
     try {
       await window.__TAURI__.core.invoke(command, { name: nameOf(session) });
       // Its state is said where it is made (D25).
@@ -1250,7 +1305,31 @@ function modelsAdvanced(words, prefix, offered, chosen) {
   // What a choice here changes, said before the lists.
   panel.append(element("p", "says", words.models_own_note), hearRow, writeRow, said);
   box.append(toggle, panel);
-  return { box, toggle, panel, models, unfold };
+  // Each service set up with its key (D96): every model it lists, grouped under its name, as people
+  // say them — never Settings' own again, nor one already offered.
+  const grouped = (pick, offeredServices, valueOf, saidOf, settings) => {
+    const known = new Set([...pick.options].map((option) => option.value));
+    for (const service of offeredServices) {
+      const group = element("optgroup");
+      group.label = service.name;
+      for (const model of service.models) {
+        const value = valueOf(service.address, model);
+        if (known.has(value) || value === settings) continue;
+        const option = element("option", "", saidOf(service.address, model));
+        option.value = value;
+        group.append(option);
+        known.add(value);
+      }
+      if (group.childElementCount > 0) pick.append(group);
+    }
+    paintWhole(pick);
+  };
+  const services = (offeredServices) => {
+    grouped(writePick, offeredServices.minutes, (provider, model) => JSON.stringify({ provider, model }), writerSaid, settingsWriting);
+    grouped(hearPick, offeredServices.transcription, (provider, model) => JSON.stringify({ engine: "service", provider, model }),
+      (provider, model) => `${modelSaid(model)}${fill(words.written_via, via(provider))}`, settingsHearing);
+  };
+  return { box, toggle, panel, models, unfold, services };
 }
 
 // A panel of *Refaire…* closes on *Annuler* or Escape: nothing changed, the focus back on *Refaire…* (D68).
@@ -1284,11 +1363,15 @@ function redoWith(offered, session, words, button, id, title, notes, again) {
   panel.id = id;
   panel.append(element("h3", "", title), element("p", "says", words.redo_with));
   const advanced = modelsAdvanced(words, id, offered, async () => {});
+  // The services set up, read as the panel opens: their models join the list when they answer (D96).
+  if (!offered.confidential) {
+    window.__TAURI__.core.invoke("services_offered", { name: nameOf(session) }).then(advanced.services, () => {});
+  }
   const go = element("button", "primary", words.redo_do);
   go.type = "button";
   go.id = id.replace(/-panel$/, "-do");
   go.addEventListener("click", async () => {
-    go.disabled = true;
+    waiting(go, true);
     try {
       const chosen = advanced.models();
       const own = { transcription: offered.chosen.transcription ?? null, minutes: offered.chosen.minutes ?? null };
@@ -1377,14 +1460,13 @@ function minutesCard(read, words, session, transcript) {
   const actions = element("span", "minutes-actions");
   actions.append(copied, copy, redo);
   top.append(actions);
-  const made = read.made && dayOf({ instant: Date.parse(read.made) / 1000 || null });
-  // As the board says it: the day of the week, no year, and the model as people say it.
-  const day = { weekday: "short", day: "numeric", month: "short" };
-  const hour = { hour: "2-digit", minute: "2-digit" };
-  // What is known of who wrote them, and when: what is not known is left unsaid.
-  let maker = fill(words.written_by, read.model ? modelSaid(read.model) : "—");
-  if (read.provider) maker += fill(words.written_via, read.provider);
-  if (made) maker += ` · ${new Intl.DateTimeFormat(words.locale, day).format(made)} ${words.at} ${new Intl.DateTimeFormat(words.locale, hour).format(made)}`;
+  // When they were made first, then who wrote them, the model as people say it (D93); what is not
+  // known is left unsaid.
+  const when = madeOn(words, read.made);
+  const by = read.model ? modelSaid(read.model) + (read.provider ? fill(words.written_via, read.provider) : "") : "";
+  let maker = when
+    ? fill(words.minutes_of, when) + (by ? ` · ${by}` : "")
+    : fill(words.written_by, read.model ? modelSaid(read.model) : "—") + (read.provider ? fill(words.written_via, read.provider) : "");
   // What the call cost, as the provider reported it (D51); the shell gives both or neither.
   if (read.cost !== null) maker += ` · ${new Intl.NumberFormat(words.locale, { style: "currency", currency: read.currency, maximumSignificantDigits: 2 }).format(read.cost)}`;
   card.append(element("p", "maker", maker));
@@ -1397,7 +1479,7 @@ function minutesCard(read, words, session, transcript) {
     again.type = "button";
     again.id = "redo-corrections";
     again.addEventListener("click", async () => {
-      again.disabled = true;
+      waiting(again, true);
       await window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }).catch((why) => {
         since.append(element("p", "note warn", fill(words.not_saved, why)));
       });
@@ -1518,6 +1600,15 @@ function roam(lines, line) {
   }
 }
 
+// When a version was made, in the system's language and local time: the day without its year, then
+// the hour — "13 nov. à 09:42", "Nov 13 at 09:42 AM" (D93). An instant not read, nothing.
+function madeOn(words, made) {
+  const at = made && dayOf({ instant: Date.parse(made) / 1000 || null });
+  if (!at) return "";
+  const day = new Intl.DateTimeFormat(words.locale, { day: "numeric", month: "short" }).format(at);
+  return `${day} ${words.at} ${new Intl.DateTimeFormat(words.locale, { hour: "2-digit", minute: "2-digit" }).format(at)}`;
+}
+
 function transcriptCard(read, words, session) {
   const card = element("aside", "card transcript");
   card.setAttribute("aria-label", words.transcript_title);
@@ -1565,9 +1656,15 @@ function transcriptCard(read, words, session) {
   // computer » — a host of one word (`http://transcriber/v1`) is a service too. This computer's
   // engines name themselves: whisper.cpp, SpeechAnalyzer; none named, nothing is claimed.
   const service = read.engine && !["whisper.cpp", "SpeechAnalyzer"].includes(read.engine);
-  const heardSaid = service
-    ? fill(words.written_by, read.model || "—") + fill(words.written_via, read.engine)
-    : fill(words.heard_by, read.model ? spoken(read.model) : read.engine || "—");
+  // Made whole at a time it says (D93): that time first, then its model, as the minutes say theirs;
+  // a transcript that does not say it, its model alone, as before.
+  const when = madeOn(words, read.made);
+  const by = service ? (read.model || "—") + fill(words.written_via, read.engine) : read.model ? spoken(read.model) : read.engine || "";
+  const heardSaid = when
+    ? fill(words.transcribed_on, when) + (by ? ` · ${by}` : "")
+    : service
+      ? fill(words.written_by, read.model || "—") + fill(words.written_via, read.engine)
+      : fill(words.heard_by, read.model ? spoken(read.model) : read.engine || "—");
   heard.append(element("p", "maker", heardSaid));
   card.append(heard);
   if (!read.complete) card.append(element("p", "note", words.being_made));
@@ -1624,6 +1721,8 @@ function transcriptCard(read, words, session) {
       const pencil = element("button", "edit");
       pencil.append(icon("pencil"));
       pencil.type = "button";
+      // Its own id, the line's track and start — never its place —: found again once drawn anew (D101).
+      pencil.id = `correct-${segment.track}-${segment.start}`;
       pencil.dataset.name = nameOf(session);
       pencil.setAttribute("aria-label", fill(words.correct_line, clock(segment.start)));
       pencil.title = pencil.getAttribute("aria-label");
@@ -1862,6 +1961,91 @@ document.addEventListener("keydown", (event) => {
   player.playing() ? player.pause() : player.play();
 });
 
+// A meeting to the trash from its page (D100): the question shows while `trashAsking` names it — a
+// drawing meanwhile draws it again as it was —; once it went, the list focuses `trashedFocus`.
+let trashAsking = null;
+let trashedFocus = null;
+
+// The question, in place: what the meeting holds, that the system's trash restores it, « Annuler »
+// first; confirmed, sent as « Faire de la place » sends it — the whole folder to the system's trash.
+function trashQuestion(session, transcript, minutes, words, trash) {
+  const name = nameOf(session);
+  const ask = element("section", "card trash-ask");
+  ask.id = "trash-ask";
+  ask.hidden = trashAsking !== name;
+  ask.setAttribute("role", "group");
+  ask.setAttribute("aria-labelledby", "trash-ask-title");
+  const title = element("p", "name", words.trash_ask);
+  title.id = "trash-ask-title";
+  const held = [session.audio > 0, transcript.state === "present", minutes.state === "present"]
+    .map((there, at) => (there ? words.trash_parts[at] : null))
+    .filter(Boolean);
+  const holds = element("p", "says", held.length ? fill(words.trash_holds, new Intl.ListFormat(words.locale, { type: "conjunction" }).format(held)) : "");
+  const restore = element("p", "says", words.trash_restore);
+  const cancel = element("button", "open", words.trash_cancel);
+  cancel.type = "button";
+  cancel.id = "trash-cancel";
+  // Never red: red says a recording, and nothing else (look.rs).
+  const confirm = element("button", "open", words.trash_confirm);
+  confirm.type = "button";
+  confirm.id = "trash-confirm";
+  const said = element("p", "note warn");
+  said.id = "trash-said";
+  said.setAttribute("role", "status");
+  const close = () => {
+    trashAsking = null;
+    ask.hidden = true;
+    said.textContent = "";
+    trash.setAttribute("aria-expanded", "false");
+    trash.focus();
+  };
+  cancel.addEventListener("click", close);
+  ask.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+  });
+  confirm.addEventListener("click", async () => {
+    // Never disabled while it holds the focus: WebKit would let it go (#886).
+    if (confirm.getAttribute("aria-disabled") === "true") return;
+    waiting(confirm, true);
+    try {
+      await window.__TAURI__.core.invoke("freed", { names: [name], whole: true });
+    } catch (why) {
+      // Being recorded or made, or the trash refused: said, nothing moved.
+      said.textContent = fill(words.trash_refused, why);
+      waiting(confirm, false);
+      return;
+    }
+    trashAsking = null;
+    // The list next, the focus on the meeting after it — or before it, the last one —, or on the list.
+    const links = [...document.querySelectorAll("#groups .session")];
+    const at = links.findIndex((link) => link.getAttribute("href") === `#/meeting/${encodeURIComponent(name)}`);
+    const next = at < 0 ? null : (links[at + 1] ?? links[at - 1] ?? null);
+    trashedFocus = next ? next.getAttribute("href") : "";
+    location.hash = "#/";
+  });
+  const choices = element("div", "trash-choices");
+  choices.append(cancel, confirm);
+  ask.append(title, holds, restore, choices, said);
+  return ask;
+}
+
+// After a drawing of the list: the focus a meeting gone to the trash asked for (D100).
+function trashedFocused() {
+  if (trashedFocus === null || !(location.hash === "" || location.hash === "#/")) return;
+  const to = trashedFocus;
+  trashedFocus = null;
+  const link = to ? document.querySelector(`#groups .session[href="${CSS.escape(to)}"]`) : null;
+  const list = document.getElementById("list");
+  if (link) link.focus();
+  else if (list) {
+    list.tabIndex = -1;
+    list.focus();
+  }
+}
+
 function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
@@ -1869,6 +2053,17 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   open.addEventListener("click", () => window.__TAURI__.core.invoke("open_folder", { name: nameOf(session) }).catch((why) => {
     open.replaceWith(element("p", "note warn", why));
   }));
+  // To the system's trash from its page (D100): asked in place first, « Annuler » focused.
+  const trash = iconButton("trash-2", words.trash_meeting, "trash-meeting");
+  const ask = trashQuestion(session, transcript, minutes, words, trash);
+  trash.setAttribute("aria-controls", ask.id);
+  trash.setAttribute("aria-expanded", String(!ask.hidden));
+  trash.addEventListener("click", () => {
+    trashAsking = nameOf(session);
+    ask.hidden = false;
+    trash.setAttribute("aria-expanded", "true");
+    document.getElementById("trash-cancel")?.focus();
+  });
   const actions = element("div", "actions");
   // The rarer actions, behind « Plus d’actions » (D89, board 4): the name, as its heading clicked.
   const rarer = [["rename-item", words.rename_meeting, () => document.getElementById("rename")?.click()]];
@@ -1889,7 +2084,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     }]);
     actions.append(copied);
   }
-  actions.append(open, moreActions(rarer, words));
+  actions.append(open, trash, moreActions(rarer, words));
   // The way back is the pane's, under 840 px alone (D61).
   top.append(actions);
   // The meeting's header (D89, board 4): a bar of 56 px, its name, how long and how heavy beside
@@ -1928,14 +2123,18 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const typing = same && naming ? { value: naming.value, caret: naming.selectionStart, end: naming.selectionEnd, focused: document.activeElement === naming } : null;
   page.dataset.name = nameOf(session);
   const [secret, left, secretSaid, secretDescribed] = confidentialCard(session, confidential, words);
-  const [spoken, spokenSaid] = languageRow(session, language, languages, words, meeting_language, apple, system_language);
+  const [spoken, spokenSaid] = languageRow(
+    (chosen) => window.__TAURI__.core.invoke("language_set", { name: nameOf(session), language: chosen }),
+    language, languages, words, meeting_language, apple, system_language,
+  );
   // A model the meeting chose and cannot have now (D91): Settings' stands in, said, as Auto for a microphone.
   const gone = element("p", "note warn");
   gone.id = "models-gone";
   gone.textContent = models_gone.map((step) => (step === "transcription" ? words.models_gone_transcription : words.models_gone_minutes)).join(" ");
   gone.hidden = models_gone.length === 0;
   const settings = contextCard(session, { context, transcript, minutes }, words, [spoken, secret], [left, secretSaid, spokenSaid, secretDescribed, gone]);
-  page.replaceChildren(head, settings, drawn, columns);
+  // The trash's question in its own card, under the head, as wide as the page's cards (D100).
+  page.replaceChildren(head, ask, settings, drawn, columns);
   // The line being said, marked while it plays; the page stays where the user left it (D26, the
   // decider, 2026-10-24: following the line was intrusive).
   if (player?.name === nameOf(session)) {
@@ -2065,6 +2264,8 @@ function choice(name, value, [label, says], checked, disabled) {
   input.type = "radio";
   input.name = name;
   input.value = value;
+  // Its own id, from what it chooses — never its place —: found again once drawn anew (D101).
+  input.id = `${name}-${value}`;
   input.checked = checked;
   input.disabled = disabled;
   const text = element("span", "said");
@@ -2146,7 +2347,7 @@ function guidedWhere(path, words, way, locked) {
 // service chosen, the page says its own.
 function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySaid, modelsPick }, ask, shownSaved) {
   keyTest.addEventListener("click", async () => {
-    keyTest.disabled = true;
+    waiting(keyTest, true);
     keySaid.textContent = words.testing;
     const asked = servicePick.value;
     let models = null;
@@ -2159,7 +2360,7 @@ function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySa
     guided[path].answers.set(asked, { said, models });
     const now = document.getElementById(`${path}-service`);
     if (now !== servicePick) return now?.dispatchEvent(new Event("change"));
-    keyTest.disabled = locked;
+    waiting(keyTest, false);
     if (servicePick.value !== asked) return;
     shownSaved();
     if (models !== null) modelsPick.focus();
@@ -2343,7 +2544,7 @@ function minutesRow(minutes, words, locked) {
     button.dataset.locked = String(locked);
     button.addEventListener("click", async () => {
       testing = true;
-      button.disabled = true;
+      waiting(button, true);
       tested.textContent = words.testing;
       let said;
       try {
@@ -2357,7 +2558,10 @@ function minutesRow(minutes, words, locked) {
       const now = document.getElementById("minutes-tested");
       if (now) now.textContent = said;
       const again = document.getElementById("minutes-test");
-      if (again) again.disabled = again.dataset.locked === "true";
+      if (again) {
+        waiting(again, false);
+        again.disabled = again.dataset.locked === "true";
+      }
     });
     test.append(button, tested);
     box.append(test);
@@ -2498,13 +2702,13 @@ function showSettings(shown, minutes, words) {
   fetchApple.id = "speech-fetch";
   fetchApple.hidden = true;
   fetchApple.addEventListener("click", async () => {
-    fetchApple.disabled = true;
+    waiting(fetchApple, true);
     speechSaid.textContent = words.speech_fetching;
     const fetched = await window.__TAURI__.core.invoke("speech_installed").then(() => true, () => false);
     // Chosen only while it is still the user's choice: Settings may have been drawn again meanwhile.
     if (fetched && document.getElementById("model")?.value === "speechanalyzer") return save({ engine: "speechanalyzer" });
     if (fetched) return;
-    fetchApple.disabled = false;
+    waiting(fetchApple, false);
     speechSaid.textContent = words.speech_failed;
     // Not fetched: who hears is still the Whisper model, and the choice says so.
     if (shown.models.some((model) => model.path === shown.model)) pick.value = shown.model;
@@ -2666,11 +2870,13 @@ function showSettings(shown, minutes, words) {
   const testService = element("button", "open", words.service_test);
   testService.type = "button";
   testService.id = "transcription-test";
-  testService.disabled = locked || serviceAnswer?.asking === true;
+  testService.disabled = locked;
+  // Drawn anew while it asks: waiting still, never `disabled` (#886).
+  waiting(testService, serviceAnswer?.asking === true);
   serviceSaid.textContent = serviceAnswer?.said ?? "";
   testService.addEventListener("click", async () => {
     const mine = (serviceAnswer = { said: "", asking: true });
-    testService.disabled = true;
+    waiting(testService, true);
     serviceSaid.textContent = "";
     // The service asked, as saved: an answer for one no longer saved is no answer for what is.
     const asking = async () => {
@@ -2696,14 +2902,17 @@ function showSettings(shown, minutes, words) {
     const said = document.getElementById("transcription-said");
     if (said) said.textContent = mine.said;
     const button = document.getElementById("transcription-test");
-    if (button) button.disabled = locked;
+    if (button) {
+      waiting(button, false);
+      button.disabled = locked;
+    }
   });
   // Another service chosen: what was said of the last goes at once, its button given back.
   servicePick.addEventListener("change", () => {
     guided.transcription.chosen.service = servicePick.value;
     serviceAnswer = null;
     serviceSaid.textContent = "";
-    testService.disabled = locked;
+    waiting(testService, false);
     shownSaved();
     standsIn();
   });
@@ -2802,11 +3011,11 @@ function showSettings(shown, minutes, words) {
   refresh_.type = "button";
   refresh_.id = "offered-refresh";
   refresh_.addEventListener("click", async () => {
-    refresh_.disabled = true;
+    waiting(refresh_, true);
     refreshed.textContent = "";
     const read = await window.__TAURI__.core.invoke("registry_refresh").then(() => true, () => false);
     if (read) return refresh();
-    refresh_.disabled = false;
+    waiting(refresh_, false);
     refreshed.textContent = words.offered_refresh_failed;
   });
   // Folded at first (#782): a disclosure (ARIA APG), as « Avancé », left as the user leaves it when
@@ -3735,6 +3944,26 @@ function showSmall(words) {
     if (focused) document.getElementById(focused)?.focus();
   };
 
+  // The meeting's language (D99): the page's row, of the next meeting at rest — taken by it once it
+  // starts —, of the one recording while it runs. Read anew at each change of meeting.
+  const spokenBox = element("div", "small-language");
+  const languageOf = async () => {
+    const name = meeting.name;
+    const shown = await invoke("bar_language", { name }).catch((why) => {
+      smallSaid("language", fill(words.language_not_saved, why));
+      return null;
+    });
+    if (shown === null || meeting.name !== name) return;
+    smallSaid("language", null);
+    const save = name !== null ? (chosen) => invoke("language_set", { name, language: chosen }) : (chosen) => invoke("next_language_kept", { language: chosen });
+    const [row, said] = languageRow(save, shown.language, shown.languages, words, shown.meeting_language, shown.apple, shown.system_language,
+      "small-language", "small-language-said");
+    // The control the focus is on stays the one focused once drawn again (showSmall's rule).
+    const focused = spokenBox.contains(document.activeElement) ? document.activeElement.id : null;
+    spokenBox.replaceChildren(row, said);
+    if (focused) document.getElementById(focused)?.focus();
+  };
+
   const live = element("div", "small-live");
   // A thin meter for each side in the row (D90, board 5), named by its side and, in its tooltip, by
   // what it is recorded from (D33). Its health in a grey line under the row: a side silent for two
@@ -3811,6 +4040,7 @@ function showSmall(words) {
     unkeptSaid.hidden = unkept.size === 0;
   };
   advancedOf(false);
+  languageOf();
   readKept();
   const keep = async (last = false) => {
     const { name, typed } = meeting;
@@ -3867,7 +4097,7 @@ function showSmall(words) {
   lines.append(keptNext, modelsKept, announce, ...checks.map((check) => check.sentence), unkeptSaid);
   const options = element("div", "bar-options");
   options.id = "small-options";
-  options.append(rest, live, advanced);
+  options.append(rest, live, advanced, spokenBox);
   options.hidden = true;
   // Escape anywhere in the bar folds them (board 5): the focus back on « Plus d’options » from inside
   // them, where it is from the row — a field's text left as it is.
@@ -3931,6 +4161,7 @@ function showSmall(words) {
       Object.assign(meeting, { name: null, saved: null, typed: null, refused: null });
       // « Avancé » and what is said kept: of the next recording again, as the shell has them.
       advancedOf(false);
+      languageOf();
       readKept();
       mark.wanted = null;
       secret.box.checked = false;
@@ -4004,6 +4235,7 @@ function showSmall(words) {
       if (another) meeting.typed = null;
       // « Avancé » now speaks of this meeting — or, stopped, of the next one —, closed as board 6 draws it.
       advancedOf(false);
+      languageOf();
       if (now.meeting !== null) {
         const there = await invoke("context_shown", { name: now.meeting }).catch((why) => {
           smallSaid("context-read", fill(words.context_not_read, why));
@@ -4385,13 +4617,72 @@ function notShown(said) {
 // What the meeting's page was drawn from, to know whether it changed since.
 let drawnMeeting = null;
 
+// Where the user is on a page (D101), as WAI-ARIA's practices keep it across a change: the control
+// focused — or the one just changed, a click in WebKit focusing none —, the boxes holding it, how far
+// the page is scrolled. The address it was read at: given back once that page is drawn again there,
+// never on another page.
+let drawnAddress = null;
+let changedLast = null;
+for (const type of ["change", "input"]) {
+  document.addEventListener(type, (event) => {
+    const changed = event.target;
+    if (!(changed instanceof Element) || !changed.id || !changed.closest("#meeting, #settings")) return;
+    changedLast = { id: changed.id, at: Date.now() };
+    // Changed by a click WebKit gave no focus to — a box, a radio, a list —: the control acted on has it,
+    // as a key would have given it. Never a field of text: its change comes as it is left, the focus
+    // passing by the page on its way elsewhere (meeting_renamed, « leaving the field keeps it »).
+    const clicked = changed.matches("input[type=checkbox], input[type=radio], select");
+    if (clicked && (document.activeElement === null || document.activeElement === document.body)) changed.focus({ preventScroll: true });
+  }, true);
+}
+const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
+function placeOf() {
+  const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [] };
+  const at = document.activeElement;
+  const focused = at && at !== document.body && at.id && at.closest("#meeting, #settings") ? at : null;
+  const changed = changedLast && Date.now() - changedLast.at < 5000 ? document.getElementById(changedLast.id) : null;
+  const control = focused ?? changed;
+  if (!control) return place;
+  place.id = control.id;
+  // Its boxes with an id, nearest first: where a control the change removed was.
+  for (let up = control.parentElement; up && up.id !== "meeting" && up.id !== "settings"; up = up.parentElement) if (up.id) place.near.push(up.id);
+  return place;
+}
+// Drawn again at the same address: the focus back on the same control — or, removed, on the first one
+// in the nearest box left that holds one —, the page where it was. A focus the user moved meanwhile stays.
+function placeBack(place) {
+  if (place.address === null || place.address !== location.hash) return;
+  if (place.id !== null && (document.activeElement === null || document.activeElement === document.body)) {
+    const same = document.getElementById(place.id);
+    // Disabled, a control takes no focus: as good as gone.
+    let target = same?.getClientRects().length && !same.disabled ? same : null;
+    for (const id of place.near) {
+      if (target) break;
+      target = [...(document.getElementById(id)?.querySelectorAll(FOCUSABLE) ?? [])].find((control) => control.getClientRects().length) ?? null;
+    }
+    // None left to take it: the nearest box still there, focused itself — never the page's start.
+    target ??= place.near.map((id) => document.getElementById(id)).find((box) => box?.getClientRects().length) ?? null;
+    // A box — the one focused before, drawn anew, too — takes the focus by script alone.
+    if (target && !target.matches(FOCUSABLE) && !target.hasAttribute("tabindex")) target.tabIndex = -1;
+    target?.focus({ preventScroll: true });
+  }
+  if (Math.round(scrollY) !== Math.round(place.y)) window.scrollTo(0, place.y);
+}
+
 // `again`: the list's address drawn once more after a page gone — never more than once.
 // Whoever asked: a drawing still the current one that fails says so; one superseded answers for
 // nothing. The failure goes on to `page_failed`, with its stack.
 async function refresh(again = false) {
   const mine = ++drawing;
+  const place = placeOf();
   try {
-    return await draw(mine, again);
+    const drawn = await draw(mine, again);
+    if (mine === drawing) {
+      placeBack(place);
+      drawnAddress = location.hash;
+      trashedFocused();
+    }
+    return drawn;
   } catch (why) {
     if (mine === drawing) {
       // Nothing left to stop it with.

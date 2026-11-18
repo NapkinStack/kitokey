@@ -78,6 +78,9 @@ struct Shell {
     next_context: Mutex<String>,
     /// The models chosen in the bar at rest for the next recording (D91): its own once it starts.
     next_models: Mutex<meeting_models::Models>,
+    /// The language chosen in the bar at rest for the next meeting (D99), in `next_language_file`
+    /// too: its own once it starts, then none.
+    next_language: Mutex<Option<String>>,
     /// The menu's entry that starts and stops, relabelled as the recording goes.
     toggle: MenuItem<Wry>,
     /// The user asked to quit while a recording ran: it is stopped first, then Kitokey leaves.
@@ -392,6 +395,8 @@ fn main() {
             next_context,
             next_context_kept,
             language_set,
+            bar_language,
+            next_language_kept,
             meeting_models_shown,
             meeting_models_chosen,
             models_offered,
@@ -412,6 +417,7 @@ fn main() {
             minutes_shown,
             minutes_saved,
             minutes_models,
+            services_offered,
             minutes_tested,
             agreement_shown,
             agreed,
@@ -519,6 +525,7 @@ fn main() {
                 recorded: Mutex::new(None),
                 next_context: Mutex::new(next_file().map(|file| context::read_next(&file)).unwrap_or_default()),
                 next_models: Mutex::new(next_models_file().map(|file| meeting_models::read_next(&file)).unwrap_or_default()),
+                next_language: Mutex::new(next_language_file().and_then(|file| spoken::read_next(&file))),
                 toggle,
                 leaving: Mutex::new(false),
                 pressed: Mutex::new(None),
@@ -1658,6 +1665,61 @@ fn language_set(shell: State<'_, Shell>, name: String, language: Option<String>)
     Ok(())
 }
 
+/// The meeting's language as the bar's options offer it (D99): the one recording's own, or at rest
+/// the next meeting's, with what the meeting's page offers beside it (D65).
+#[derive(serde::Serialize)]
+struct BarLanguage {
+    language: Option<String>,
+    languages: Vec<(&'static str, &'static str)>,
+    meeting_language: Option<String>,
+    apple: bool,
+    system_language: &'static str,
+}
+
+#[tauri::command]
+fn bar_language(shell: State<'_, Shell>, name: Option<String>) -> Result<BarLanguage, Told> {
+    let language = match &name {
+        Some(name) => spoken::read(&session_folder(&shell, name)?),
+        None => shell.next_language.lock().unwrap().clone(),
+    };
+    Ok(BarLanguage {
+        language,
+        languages: spoken::OFFERED.to_vec(),
+        meeting_language: shell.settings().meeting_language,
+        apple: shell.settings().engine == Engine::SpeechAnalyzer,
+        system_language: shell.system.code(),
+    })
+}
+
+/// Where the language chosen at rest for the next meeting is, beside the settings (D99).
+fn next_language_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("next-language.txt"))
+}
+
+/// The bar's language at rest chosen (D99): kept for the next meeting, none being the settings'.
+/// Refused while a recording runs — that one's own is its meeting's —, and for a text that is not a
+/// code of ISO 639-1, what is kept staying as it is.
+#[tauri::command]
+fn next_language_kept(shell: State<'_, Shell>, language: Option<String>) -> Result<(), Told> {
+    let mut next = shell.next_language.lock().unwrap();
+    if shell.recording.lock().unwrap().is_some() {
+        return Err(shell.told(Failure::Busy, "a recording runs: its own language is its meeting's"));
+    }
+    let language = language.filter(|code| !code.trim().is_empty());
+    let file = next_language_file().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for settings"))?;
+    spoken::keep_next(&file, language.as_deref()).map_err(|error| {
+        let failure = if error.kind() == std::io::ErrorKind::InvalidInput {
+            Failure::Unexpected
+        } else {
+            Failure::MeetingFile
+        };
+        shell.told(failure, error)
+    })?;
+    *next = language.as_deref().and_then(spoken::code);
+    tracing::info!(language = next.as_deref().unwrap_or("none"), "shell.next_language_kept");
+    Ok(())
+}
+
 /// What a meeting chose for itself (D91), and the steps whose choice is gone: Settings' choice
 /// makes them, and the page says so.
 #[derive(serde::Serialize)]
@@ -2730,6 +2792,86 @@ async fn minutes_saved(
     Ok(not_kept)
 }
 
+/// A service set up for the summary, with every model it lists (D96).
+#[derive(serde::Serialize)]
+struct ServiceOffered {
+    /// As Settings name it: OpenRouter, OpenAI, Mistral.
+    name: &'static str,
+    address: String,
+    models: Vec<String>,
+}
+
+/// The services Refaire offers beyond Settings' own (D96): those that write the summary, those
+/// that transcribe.
+#[derive(serde::Serialize, Default)]
+struct ServicesOffered {
+    minutes: Vec<ServiceOffered>,
+    transcription: Vec<ServiceOffered>,
+}
+
+/// What Refaire offers beyond Settings' own (D96): each online service whose key is kept — the
+/// summary's under its host, the transcription's under its own account —, with every model it
+/// lists; one that does not answer is left out. A meeting said confidential is offered none
+/// (D60). Read off the window's thread: the keyring may ask the user first.
+#[tauri::command]
+async fn services_offered(shell: State<'_, Shell>, name: String) -> Result<ServicesOffered, Told> {
+    let folder = session_folder(&shell, &name)?;
+    if confidential::marked(&folder) {
+        return Ok(ServicesOffered::default());
+    }
+    tauri::async_runtime::spawn_blocking(|| {
+        let mut hearing: Vec<ServiceOffered> = Vec::new();
+        for service in providers::hearing() {
+            if hearing.iter().any(|known| known.address == service.address) {
+                continue;
+            }
+            let Some(host) = providers::host(&service.address) else {
+                continue;
+            };
+            let Some(key) = keys::key(&transcription::key_account(&host)).ok().flatten() else {
+                continue;
+            };
+            match providers::hearing_models(&service, Some(&key)) {
+                Ok(models) if !models.is_empty() => hearing.push(ServiceOffered {
+                    name: service.name,
+                    address: service.address.clone(),
+                    models,
+                }),
+                Ok(_) => {}
+                Err(cause) => tracing::warn!(cause = ?cause, "shell.services_unread"),
+            }
+        }
+        let mut offered: Vec<ServiceOffered> = Vec::new();
+        for service in providers::online() {
+            // One address once: a stand-in may answer for every service.
+            if offered.iter().any(|known| known.address == service.address) {
+                continue;
+            }
+            let Some(host) = providers::host(&service.address) else {
+                continue;
+            };
+            let Some(key) = keys::key(&host).ok().flatten() else {
+                continue;
+            };
+            match providers::service_models(&service.address, false, Some(&key)) {
+                Ok(models) if !models.is_empty() => offered.push(ServiceOffered {
+                    name: service.name,
+                    address: service.address,
+                    models,
+                }),
+                Ok(_) => {}
+                Err(cause) => tracing::warn!(cause = ?cause, "shell.services_unread"),
+            }
+        }
+        ServicesOffered {
+            minutes: offered,
+            transcription: hearing,
+        }
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))
+}
+
 /// A service's models for the summary, asked with the key the user typed — or the one kept for its
 /// host —: the key tested at once (D95). Only the ids come back; nothing is kept, the key never
 /// logged. Refused, the cause in the Tester's own sentence.
@@ -3728,6 +3870,17 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>, found: b
                     }
                 }
                 Err(error) => tracing::error!(kind = ?error.kind(), "shell.models_not_taken"),
+            }
+            drop(next);
+            // The language chosen at rest, the meeting's own the same way (D99); then none for the next.
+            let mut next = shell.next_language.lock().unwrap();
+            match spoken::taken(folder, &mut next) {
+                Ok(()) => {
+                    if let Some(Err(error)) = next_language_file().map(|file| spoken::keep_next(&file, None)) {
+                        tracing::error!(kind = ?error.kind(), "shell.language_not_cleared");
+                    }
+                }
+                Err(error) => tracing::error!(kind = ?error.kind(), "shell.language_not_taken"),
             }
             drop(next);
             // Kept beside the settings while it runs: a Kitokey started again finds it (#773).
