@@ -42,7 +42,7 @@ use kitokey_shell::{
     recording::{self, Recording, Said, Source},
     registry,
     sessions::{self, Listed},
-    settings::{self, After, Engine, KeepAudio, Log, Settings},
+    settings::{self, After, Appearance, Engine, KeepAudio, Log, Settings},
     sound_check, speech, spoken,
     summarising::{self, Summarising},
     transcription::{self, Hearer, Made, Transcription},
@@ -925,6 +925,8 @@ struct Listing {
     shortcut: Option<String>,
     /// The sidebar folded, as the user left it (D61).
     folded: bool,
+    /// Every window's look, as the settings hold it (D98): each window takes it when it draws.
+    appearance: Appearance,
     /// The meetings' folder is there and cannot be read (D67): `sessions` is empty for that reason.
     unreadable: bool,
     /// The settings file cannot be read (#770): never read since Kitokey started, the folder listed is
@@ -991,6 +993,7 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
             stopping: *shell.stopping.lock().unwrap(),
             shortcut: shell.shortcut.lock().unwrap().clone(),
             folded: shell.settings().folded,
+            appearance: shell.settings().appearance,
             unreadable: {
                 let folder = shell.settings().sessions.clone();
                 sessions::unreadable(&folder, folder == settings::Settings::default().sessions)
@@ -1014,6 +1017,9 @@ struct Header {
     shortcut: Option<String>,
     /// The last start refused, the trial over (D83).
     refused: bool,
+    /// Every window's look (D98): asked by each window as it asks the rest, so that one chosen in
+    /// Settings reaches the bar too.
+    appearance: Appearance,
 }
 
 #[tauri::command]
@@ -1023,6 +1029,7 @@ fn header(shell: State<'_, Shell>) -> Header {
         stopping: *shell.stopping.lock().unwrap(),
         shortcut: shell.shortcut.lock().unwrap().clone(),
         refused: *shell.refused.lock().unwrap(),
+        appearance: shell.settings().appearance,
     }
 }
 
@@ -2417,6 +2424,8 @@ struct SettingsShown {
     language: Option<&'static str>,
     developer: bool,
     log: Log,
+    /// Every window's look (D98).
+    appearance: Appearance,
     unreadable: Option<Told>,
     /// What is left of the trial, said on a trial licence alone, read anew (D83).
     trial: Option<String>,
@@ -2510,6 +2519,7 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
         language: settings.language.map(Language::code),
         developer: settings.developer,
         log: settings.log,
+        appearance: settings.appearance,
         unreadable,
         trial,
     })
@@ -2535,6 +2545,8 @@ struct Change {
     folded: Option<bool>,
     /// The language Kitokey speaks (D64): `fr`, `en`, or empty for the system's.
     language: Option<String>,
+    /// Every window's look (D98).
+    appearance: Option<Appearance>,
 }
 
 /// Writes a change to the settings file, then holds it: the next recording follows it. Nothing
@@ -2588,6 +2600,9 @@ fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Re
     }
     if let Some(folded) = change.folded {
         settings.folded = folded;
+    }
+    if let Some(appearance) = change.appearance {
+        settings.appearance = appearance;
     }
     let spoken = settings.language;
     if let Some(language) = change.language {

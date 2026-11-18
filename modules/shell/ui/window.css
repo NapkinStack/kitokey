@@ -7,11 +7,20 @@
   --edge: #808898;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :not([data-theme="light"]):root {
     --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
     --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
     --edge: #737B8C;
   }
+}
+/* The appearance chosen in Settings (D98): light or dark whatever the system says — the same two
+   palettes; « Système », no attribute, the system's as before. */
+[data-theme="light"]:root { color-scheme: light; }
+[data-theme="dark"]:root {
+  color-scheme: dark;
+  --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
+  --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+  --edge: #737B8C;
 }
 * { box-sizing: border-box; }
 ::placeholder { color: var(--soft); opacity: 1; }
