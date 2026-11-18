@@ -2684,6 +2684,8 @@ function showSettings(shown, minutes, words) {
     missing.disabled = true;
     missing.selected = true;
     pick.append(missing);
+    // Cut by an ellipsis on a narrow window (#868): whole as its tooltip too, and said under it by `#model-state`.
+    pick.title = missing.textContent;
   }
   for (const model of shown.models) {
     const option = element("option", "", `${spoken(model.name)} — ${fill(words.installed, size(model.bytes, words))}`);
