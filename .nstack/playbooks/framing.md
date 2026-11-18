@@ -207,4 +207,4 @@ concerns one module.
 | An accepted charter has to change — a constraint, a user, what the project is not | A **PDR** first, which the change cites; the charter is never rewritten in place (CI warns, C9) |
 | The framing chooses a module, a stack, a contract | An **ADR**: the module's creation decision is one |
 | A spike's result binds the project | A PDR or an ADR; otherwise a line in the project's log issue |
-| A cycle's **closure** | Read every decision the plan names as due (C10): its criterion names this cycle, or a date its end reached. The record gains one line under its criterion, *Read at <cycle>'s closure, <date>: met \| missed \| superseded*, and nothing else; a *missed* one is the decider's to answer, by a new record or the removal condition |
+| A cycle's **closure** | Read every decision the plan names as due (C10): its criterion names this cycle, or a date in bold, `**YYYY-MM-DD**`, its end reached. The record gains one line under its criterion, *Read at <cycle>'s closure, <date>: met \| missed \| superseded*, and nothing else; a *missed* one is the decider's to answer, by a new record or the removal condition |

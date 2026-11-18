@@ -228,10 +228,20 @@ hooks, your permissions apply to the agent too. For Claude Code, `nstack agent r
 adds `--settings` with a file of the agent's own: when your sandbox is on, it lets the agent reach
 the forge — on github.com, the host of a run's logs too — and write its `gh` folder, and sets `GIT_HTTP_PROXY_AUTHMETHOD=basic` for git behind the
 sandbox's proxy — nothing more; it never turns the sandbox off, and settings your organisation
-manages still win over it. Given your own `--settings`, it adds none and says so. A hook of yours that refuses `gh` — against your own
+manages still win over it. So that the agent builds and tests there, it also opens a cache of the
+agent's own (`~/.config/nstack/agents/scout/cache`, its `XDG_CACHE_HOME`) — uv and pre-commit keep
+your warm caches, `UV_CACHE_DIR` and `PRE_COMMIT_HOME`, since the sandbox opens no package index;
+builds that write elsewhere, such as Cargo's `~/.cargo`, need that folder in your sandbox's
+`allowWrite` — and sets the clone so
+that `git switch -c <branch> origin/main` and a plain `git push` never write `.git/config`, which
+the sandbox protects. Unix sockets — audio, display, the session bus — stay closed unless the
+project answers `agent_sockets: true` (`.nstack/handbook/07-governance.md` §7 says the risk).
+Given your own `--settings`, it adds none and says so. A hook of yours that refuses `gh` — against your own
 account — lets an agent's session through only when its `gh` is the App's
 (`.nstack/handbook/07-governance.md` §7 has the test). The agent checks who it is with
-`nstack agent status`; you list the agents of this workstation with the same command.
+`nstack agent status`; in a project, the same command lists that project's agents, and
+`--all` every project's on the workstation — shown only when asked, since one workstation may
+serve several clients.
 When you cannot create an App for this repository's owner, `--mine` makes it on your account and
 asks the owner to approve its installation. What the App gets — set by the command, and read
 by no check afterwards:
@@ -280,8 +290,9 @@ registry is asked one other question: `nstack update` says when the version it l
 on PyPI yet, since the project's CI installs it from there and stays red until it is.
 
 `nstack doctor` reads the token from `GH_TOKEN`, otherwise `GITHUB_TOKEN`: a fine-grained
-token, limited to the repository, with the **Administration: read** permission. Without a
-token, the GitHub part stays "not verified", never compliant.
+token, limited to the repository, with the **Administration: read** permission — and
+**Actions: read**, to be told of a workflow failing run after run on the default branch, which
+no required check shows. Without a token, the GitHub part stays "not verified", never compliant.
 
 ---
 
@@ -327,11 +338,12 @@ nstack check [module]   # the module's commands.check; default: every module
 nstack test [module]    # commands.test, likewise
 nstack bootstrap [module]   # commands.bootstrap, when declared
 nstack run <module>     # local start, when commands.run is declared
-nstack e2e [module]     # end-to-end scenarios, when commands.e2e is declared — one run at a time on a machine
+nstack e2e [module]     # end-to-end scenarios, when commands.e2e is declared — one run at a time on a machine, unless sealed
 nstack clean [module]   # removes a module's build outputs, when commands.clean is declared
 nstack pr-check --body-file <file> [--labels a,b]   # test sheet and cycle, as CI reads them from the pull request
+                                                    # with a token and one open pull request at the head, its own labels are read
 nstack attest --body-file <file> [--labels a,b]     # the CI's checks run here, recorded on the commit; labels as pr-check takes them
-                                                    # a sheet filled since: the module checks this commit passed are kept (--again runs them)
+                                                    # module checks kept while what they read is unchanged, 7 days at most (--again runs them)
 nstack modules --changed-since <base>   # the modules with a file changed, as CI lists them
 nstack modules --changed-since <base> --with-contract-sides   # ... and both sides of a changed contract
 nstack compat [module] --base <base>    # a contract version consumed or stable: the merged proof

@@ -302,14 +302,29 @@ as `nstack / local checks`, a name no CI job has. Such a change is **attested**,
 *checked*: the record makes a claim traceable — who ran it, on which commit, with what output
 — not true. Whether a record stands in for the forge's CI is the decider's word, the project's
 answer `checks: attested` in `.copier-answers.yml`, changed in a pull request; `pr-check` then
-requires a complete, passed record of the head (A1, A2). Attesting again once the test sheet is filled keeps the
+requires a complete, passed record of the head (A1, A2) — on the workstation and in the forge's
+CI alike, which reads the record from the remote's notes with the job's token: an unattested head
+is red there too. A record CI cannot read — no token, a remote that refuses — is said as a
+warning, never called compliant in silence. Attesting again once the test sheet is filled keeps the
 module checks the commit's record passed — they read the tree and the base, never the description —
 when the base commit, the engine and the person are the same, and the engine is published or named
 by a commit with no change of its own — tracked or not. The record says which run they come from
 (`kept_from`), with that run's evidence; what the tree's ignored files, the environment or the tools
-outside it hold is not compared: `nstack attest --again` runs them. Where the answer is `forge`, a record is
+outside it hold is not compared: `nstack attest --again` runs them. They are also kept
+across commits — a merge of the default branch that touched nothing they read: their modules,
+those they consume from, `contracts/`, `platform/` and the files outside the modules — while the
+digest of what they read is unchanged, for 7 days and 20 default-branch commits at most. Where the answer is `forge`, a record is
 information, and on a guarded repository the forge's required checks stay the barrier — a
 decider who wants the record to gate a protected branch requires its name at the forge.
+Where the answer is `attested`, requiring it is what keeps a pull request moving: the record
+holds the description's sheet, so it is made after its last edit, and notes start no run — the
+pull request's last run, from before the record, would stay red. The status is the record's own
+event: when the base branch's ruleset requires `nstack / local checks`, the pull request's run
+leaves A1 and A2 to it, and says so. Posting it needs a token that may write commit statuses
+(an agent's App made by `nstack agent add` has it; an older App gets Commit statuses: write in
+its settings, accepted on its installation); without one, the record is said *not shown*, and
+the merge waits. A required name is matched by any check of that name: where every record is an
+agent's, the ruleset can pin the status's source to the agent's App.
 
 The record names who ran it, as git would sign a commit made in that checkout, and travels to the
 remote with the notes: it never publishes an address the project's history does not already show.
@@ -345,6 +360,18 @@ settings close that door, and they only hold together:
    their own account, lets an agent's session through on one test only — its `gh` is the App's:
    `[[ -n "${NSTACK_AGENT:-}" && "$(command -v gh)" == "$(dirname "$GH_CONFIG_DIR")/bin/gh" ]] && exit 0`
    — the agent's `gh` folder sits beside its shim, wherever the agents' folder is.
+   Inside that sandbox the agent writes its clone, `.git/config` excepted, and a cache of its own
+   (`XDG_CACHE_HOME`; uv and pre-commit keep the person's); a build writing elsewhere, such as
+   Cargo's `~/.cargo`, needs the person to add that folder to their sandbox's `allowWrite`. It
+   branches without tracking and pushes plainly — `git switch -c d4-export origin/main`, then
+   `git push` — and needs no worktree, its clone being its own. Unix sockets
+   stay closed unless the project answers `agent_sockets: true` in `.copier-answers.yml`, read from
+   the default branch: an end-to-end test of audio or a display needs them, and a socket such as
+   `docker.sock` hands the agent the host.
+   Dispatching a workflow run needs Actions: write, which its App never has; changing a file under
+   `.github/workflows/` needs Workflows, which only `nstack agent add --workflows` grants. Both are
+   otherwise the person's gestures. The agent hands over the literal command (`gh workflow run <file> --ref <branch>`) and
+   never asks another session to make it — that would be one identity borrowing another's rights.
 2. **The merge requires a human code owner's approval**, and `CODEOWNERS` starts with a
    default owner: an App can approve, but it is never a code owner. On `approval: agent`, below,
    the code owners file names a human only where one must approve.

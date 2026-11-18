@@ -13,6 +13,11 @@ use oxc_span::{GetSpan, SourceType};
 /// promise calls —, how many times, and why.
 const SILENT: &[(&str, usize, &str)] = &[
     ("page_failed", 1, "the log itself: nowhere left to say it"),
+    (
+        "services_offered",
+        1,
+        "an addition to the redo list (D96): not read, Settings' models and this computer's are still offered; a service that does not answer is logged by the shell",
+    ),
     ("makings", 2, "returns no `Result`: it cannot fail"),
     ("header", 2, "returns no `Result`: it cannot fail"),
     (

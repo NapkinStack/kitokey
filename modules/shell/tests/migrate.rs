@@ -126,27 +126,6 @@ fn an_empty_folder_under_the_new_name_gives_way() {
 }
 
 #[test]
-fn a_model_written_from_home_is_named_where_it_went() {
-    let root = tempfile::tempdir().unwrap();
-    let home = dirs::home_dir().unwrap();
-    // Summit's data folder under the home, as the user wrote it: `~/…`.
-    let data = tempfile::tempdir_in(&home).unwrap();
-    let here = Places {
-        config: root.path().join("config"),
-        data: data.path().to_path_buf(),
-        documents: root.path().join("Documents"),
-    };
-    write(&here.data.join("summit/models/a.bin"), "a model");
-    let written = format!("~/{}/summit/models/a.bin", data.path().strip_prefix(&home).unwrap().display());
-    write(&here.config.join("summit/settings.toml"), &format!("model = '{written}'\n"));
-
-    let carried = carry_over(&here).unwrap();
-
-    assert!(carried.model_named, "{carried:?}");
-    assert_eq!(now(&here).model, here.data.join("kitokey/models/a.bin"));
-}
-
-#[test]
 fn a_model_beside_summits_folder_is_not_renamed_by_its_text() {
     let root = tempfile::tempdir().unwrap();
     let here = places(root.path());

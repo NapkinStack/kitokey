@@ -138,12 +138,43 @@
         },
         "duration": {
           "$ref": "#/$defs/seconds"
+        },
+        "made": {
+          "description": "When the transcript was made whole: RFC 3339 with its offset, as the page says — the page's promise, not this schema's. Absent: made before it was written.",
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "made_in": {
+          "description": "The time the one step that made it whole took, from its start to its last line, in seconds. Absent: made in several steps (live), or not measured.",
+          "$ref": "#/$defs/seconds"
+        },
+        "cost": {
+          "description": "The price the service reported for the making, as it reported it; never an estimate. With its currency, or neither.",
+          "type": "number",
+          "minimum": 0
+        },
+        "currency": {
+          "description": "That price's currency, an ISO 4217 code: three capital letters.",
+          "type": "string",
+          "pattern": "^[A-Z]{3}",
+          "maxLength": 3
         }
       },
       "required": [
         "type",
         "duration"
-      ]
+      ],
+      "dependentRequired": {
+        "cost": [
+          "currency"
+        ],
+        "currency": [
+          "cost"
+        ]
+      }
     },
     {
       "description": "A line of a type this version does not name: a reader skips it.",

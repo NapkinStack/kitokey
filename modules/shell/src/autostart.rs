@@ -104,7 +104,7 @@ pub fn carry_over(before: &Path, entry: &Path) -> io::Result<bool> {
 /// At a start: the entry written when the settings say it never was, and that it was, kept in
 /// them. True when it was written now. A settings file that cannot be read writes nothing.
 pub fn first(entry: &Path, settings_file: &Path) -> io::Result<bool> {
-    let mut settings = settings::read(settings_file).map_err(|why| io::Error::new(io::ErrorKind::InvalidData, why))?;
+    let mut settings = settings::read(settings_file).map_err(|why| io::Error::new(io::ErrorKind::InvalidData, why.detail))?;
     if settings.autostart.is_some() {
         return Ok(false);
     }

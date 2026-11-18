@@ -102,7 +102,17 @@ fn a_transcript_ended_by_kitokey_ends_with_what_it_started_and_is_not_written() 
     assert!(alive(&child));
     transcription.end();
     assert_eq!(end(&said), Made::Failed(String::new()));
-    assert!(!alive(&child), "what the program started is left running");
+    // Its group killed, the child is gone once the KILL is delivered and it is reaped — by the
+    // system, its parent gone: a moment after the answer on a loaded machine, a zombie meanwhile,
+    // which `kill -0` still finds (#845). Waited for as a state, within half a second.
+    let killed = std::time::Instant::now();
+    while !gone(&child) && killed.elapsed() < Duration::from_millis(500) {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        gone(&child),
+        "what the program started is left running half a second after the answer"
+    );
     assert!(!folder.path().join("session/transcript.jsonl").exists());
 }
 
@@ -311,4 +321,75 @@ fn the_meetings_language_is_told_to_each_engine_speechanalyzer_only_in_the_two_i
         assert_eq!(end(&said), Made::Written(session.clone()));
         assert!(args().ends_with(wanted), "{hearer:?} {spoken:?}: {}", args());
     }
+}
+
+/// Whether a process has ended: none by that number, or one ended and not yet waited for.
+fn gone(pid: &str) -> bool {
+    fs::read_to_string(format!("/proc/{}/stat", pid.trim())).map_or(true, |stat| {
+        stat.rsplit_once(')').and_then(|(_, rest)| rest.split_whitespace().next()) == Some("Z")
+    })
+}
+
+#[test]
+fn cancelled_it_ends_within_two_seconds_with_what_it_started_even_deaf_to_term() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    let (transcription, said) = made(
+        folder.path(),
+        r#"echo '{"type":"header"}' > "$1/transcript.jsonl"
+( trap '' TERM; exec sleep 60 ) & echo $! > "$1/child"
+sleep 60"#,
+    );
+    let child = folder.path().join("session/child");
+    for _ in 0..50 {
+        if fs::read_to_string(&child).is_ok_and(|pid| !pid.trim().is_empty()) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let child = fs::read_to_string(&child).expect("the program never started its child");
+    let pressed = std::time::Instant::now();
+    transcription.cancel();
+    let ended = said.recv_timeout(Duration::from_secs(2)).expect("not ended within two seconds");
+    let answered = pressed.elapsed();
+    assert!(matches!(ended, Made::Failed(_)), "{ended:?}");
+    assert!(answered <= Duration::from_secs(2), "{answered:?}");
+    // The KILL sent, the child is gone once the kernel has delivered it and the process is reaped:
+    // a moment after the answer on a loaded machine (#845). Waited for as a state, within half a second.
+    let killed = std::time::Instant::now();
+    while !gone(&child) && killed.elapsed() < Duration::from_millis(500) {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(gone(&child), "its child, deaf to TERM, still runs half a second after the answer");
+}
+
+#[test]
+fn cancelled_its_group_is_told_term_first_and_given_the_grace_to_end_by_it() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    // A child of the program, in its group, that ends on TERM saying so: TERM sent to the leader
+    // alone, or KILL at once, and it never says it.
+    let (transcription, said) = made(
+        folder.path(),
+        r#"( trap 'echo TERM > "$1/told"; exit 0' TERM; echo $$ > "$1/child"; sleep 60 & wait ) &
+sleep 60"#,
+    );
+    let child = folder.path().join("session/child");
+    for _ in 0..50 {
+        if fs::read_to_string(&child).is_ok_and(|pid| !pid.trim().is_empty()) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(child.exists(), "the program never started its child");
+    transcription.cancel();
+    said.recv_timeout(Duration::from_secs(2)).expect("not ended within two seconds");
+    assert_eq!(
+        fs::read_to_string(folder.path().join("session/told"))
+            .ok()
+            .as_deref()
+            .map(str::trim),
+        Some("TERM"),
+        "its child was not told TERM within the grace"
+    );
 }
