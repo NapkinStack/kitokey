@@ -880,7 +880,8 @@ fn openrouters_cost_reaches_the_front_matter_as_it_reported_it() {
         return;
     };
     assert!(minutes.contains("\nprovider: \"openrouter.ai\"\n"), "{minutes}");
-    assert!(minutes.contains("\ncost: 1.20e-6\ncurrency: USD\n---\n"), "{minutes}");
+    // The cost as reported, then how long the making took, last of the front matter (minutes/v4, D97).
+    assert!(minutes.contains("\ncost: 1.20e-6\ncurrency: USD\nmade_in: "), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
 
     let (minutes, warnings) = at_openrouter(vec![priced(r#"{"cost": "0.012"}"#)]).unwrap();
@@ -902,7 +903,8 @@ fn openrouters_cost_reaches_the_front_matter_as_it_reported_it() {
     // Asked again: the cost of the answer written.
     let refused = answering("une phrase", "stop").replacen('{', r#"{"usage": {"cost": 0.1},"#, 1);
     let (minutes, warnings) = at_openrouter(vec![refused, priced(r#"{"cost": 0.2}"#)]).unwrap();
-    assert!(minutes.contains("\ncost: 0.2\ncurrency: USD\n---\n"), "{minutes}");
+    // The cost as reported, then how long the making took, last of the front matter (minutes/v4, D97).
+    assert!(minutes.contains("\ncost: 0.2\ncurrency: USD\nmade_in: "), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
 }
 
