@@ -5041,6 +5041,30 @@ def focus_kept(now: dt.datetime) -> None:
                       {"said": got, "before": before, "after": after})
                 wait_for(browser, lambda b: b.execute_script(clear) is None, 3)
             browser.set_window_size(1100, 700)
+            # #906: a drawing already under way when the user moves the focus — its page read, then held —
+            # gives it back, once it ends, to the control the user went to, never to the one left. `listed`,
+            # the drawing's first ask, is held in the page until released: the race made certain.
+            browser.execute_script(
+                "if (!window.__held) { const t = window.__TAURI__, core = t.core, real = core.invoke.bind(core);"
+                " const held = Object.assign(Object.create(Object.getPrototypeOf(core)), core, {invoke: (c, a, o) =>"
+                " c === 'listed' && window.__hold ? window.__hold.then(() => real(c, a, o)) : real(c, a, o)});"
+                " const top = Object.assign({}, t, {core: held}); try { window.__TAURI__ = top; } catch (x) {}"
+                " if (window.__TAURI__ !== top) Object.defineProperty(window, '__TAURI__', {configurable: true, writable: true, value: top});"
+                " window.__held = true; }"
+                " const r = document.getElementById('reminder'); r.scrollIntoView({block: 'center'}); r.focus();")
+            time.sleep(0.4)
+            browser.execute_script("window.__hold = new Promise((r) => { window.__release = r; }); window.__drawnAgain = false;"
+                                   " refresh().then(() => { window.__drawnAgain = true; })")
+            time.sleep(0.3)
+            keys(browser, Keys.TAB)
+            moved = browser.execute_script(where)
+            browser.execute_script("window.__release(); window.__hold = null")
+            ended = wait_for(browser, lambda b: b.execute_script("return window.__drawnAgain"), 5)
+            time.sleep(0.5)
+            after = browser.execute_script(where)
+            check("Settings, a drawing under way as the focus moves by Tab: once drawn, the focus where the user moved it, not back on the one left (#906)",
+                  ended and moved[0] not in ("reminder", "body") and after[0] == moved[0],
+                  {"moved to": moved, "after": after, "trace": traced(browser)})
             kept(browser, "Settings, what is kept of the audio chosen by the arrows", "keep",
                  lambda b: keys(b, Keys.ARROW_DOWN), lambda: "keep" in settings())
             if browser.execute_script("const p = document.getElementById('general-advanced-panel'); return !!p && p.hidden"):
