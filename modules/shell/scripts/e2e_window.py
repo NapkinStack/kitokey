@@ -10637,7 +10637,7 @@ def main() -> int:
         # Which setting, on which line, and what to do (#783) — never settings.rs's own sentence.
         # WebDriver's `.text` reads U+00A0 as a space.
         which = lambda line: f"Ligne {line} : « keep_audio » vaut « always » ou un nombre de jours, de 1 à 36\u202f500. Corrigez-le."  # noqa: E731
-        refused = f"Le réglage n’a pas été enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
+        refused = f"Non enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
         locked_said = f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which(len(lines))}"
         unreadable = lambda: browser.find_element(By.ID, "settings-unreadable").text  # noqa: E731
         window.file.write_text(broken)
@@ -10655,7 +10655,7 @@ def main() -> int:
         window.file.write_text("\n".join(lines) + "\n")
         raw = f'settings.toml, line {len(lines)}: keep_audio is "always" or a number of days'
         # The file's line has moved with developer mode written: the sentences name the new one.
-        refused = f"Le réglage n’a pas été enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
+        refused = f"Non enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
         locked_said = f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which(len(lines))}"
         changed(lambda: browser.find_element(By.ID, "reminder").click())
         said = not_saved()
