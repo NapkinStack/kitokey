@@ -4799,10 +4799,12 @@ for (const type of ["change", "input"]) {
     if (!(changed instanceof Element) || !changed.id || !changed.closest("#meeting, #settings")) return;
     changedLast = { id: changed.id, at: Date.now() };
     // Changed by a click WebKit gave no focus to — a box, a radio, a list —: the control acted on has it,
-    // as a key would have given it. Never a field of text: its change comes as it is left, the focus
-    // passing by the page on its way elsewhere (meeting_renamed, « leaving the field keeps it »).
+    // as a key would have given it, wherever the focus was — on nothing, or left on another control, which
+    // a drawing would then give it back to (#944: the decider's #autostart). Never a field of text: its
+    // change comes as it is left, the focus passing by the page on its way elsewhere (meeting_renamed,
+    // « leaving the field keeps it »).
     const clicked = changed.matches("input[type=checkbox], input[type=radio], select");
-    if (clicked && (document.activeElement === null || document.activeElement === document.body)) changed.focus({ preventScroll: true });
+    if (clicked && document.activeElement !== changed) changed.focus({ preventScroll: true });
   }, true);
 }
 // The places of the drawings under way: the user moving the focus meanwhile moves where each one gives it
@@ -4812,13 +4814,28 @@ document.addEventListener("focusin", (event) => {
   if (placesPending.size === 0 || !(event.target instanceof Element) || !event.target.closest("#meeting, #settings")) return;
   for (const place of placesPending) Object.assign(place, placeOf());
 }, true);
+// The window's own focus gone — a list's menu, which GTK draws as a window of its own, or another
+// window —: where the user was, kept for the drawing its return asks (#944). The control the focus left
+// for nowhere, read as it leaves: by then the page's focus is already on nothing.
+let leftLast = null;
+let awayPlace = null;
+document.addEventListener("focusout", (event) => {
+  const left = event.target;
+  if (event.relatedTarget !== null || !(left instanceof Element) || !left.id || !left.closest("#meeting, #settings")) return;
+  leftLast = { place: placeOf(left), at: Date.now() };
+}, true);
+window.addEventListener("blur", () => {
+  const here = placeOf();
+  awayPlace = here.id === null && leftLast && Date.now() - leftLast.at < 1000 ? leftLast.place : here;
+});
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
-function placeOf() {
+// `given`: the control to read the place of, rather than the one focused or just changed.
+function placeOf(given = null) {
   const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [] };
   const at = document.activeElement;
   const focused = at && at !== document.body && at.id && at.closest("#meeting, #settings") ? at : null;
   const changed = changedLast && Date.now() - changedLast.at < 5000 ? document.getElementById(changedLast.id) : null;
-  const control = focused ?? changed;
+  const control = given ?? focused ?? changed;
   if (!control) return place;
   place.id = control.id;
   // Its boxes with an id, nearest first: where a control the change removed was.
@@ -4847,11 +4864,14 @@ function placeBack(place) {
 }
 
 // `again`: the list's address drawn once more after a page gone — never more than once.
+// `away`: where the user was as the window lost its focus — given back when the page itself knows of no
+// control now, as on its return from a list's menu (#944).
 // Whoever asked: a drawing still the current one that fails says so; one superseded answers for
 // nothing. The failure goes on to `page_failed`, with its stack.
-async function refresh(again = false) {
+async function refresh(again = false, away = null) {
   const mine = ++drawing;
   const place = placeOf();
+  if (place.id === null && away?.id && away.address === place.address) Object.assign(place, { id: away.id, near: away.near });
   placesPending.add(place);
   try {
     const drawn = await draw(mine, again);
@@ -5162,7 +5182,10 @@ window.addEventListener("focus", () => {
   const choosing = !document.getElementById("welcome").hidden
     || document.querySelector("#settings:not([hidden]) #minutes-unsaved:not([hidden])")
     || [...document.querySelectorAll("#settings:not([hidden]) .fields input")].some((input) => input.value !== input.defaultValue);
-  if (!choosing) refresh();
+  // Drawn anew where the user was as the window left: its focus is on nothing yet (#944).
+  const away = awayPlace;
+  awayPlace = null;
+  if (!choosing) refresh(false, away);
 });
 window.addEventListener("hashchange", () => {
   // Another address: the page still shown, or its agreement, acts on its own meeting: no press and
