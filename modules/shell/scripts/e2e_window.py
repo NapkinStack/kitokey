@@ -283,17 +283,30 @@ def choose(browser, element_id: str, value: str) -> None:
     Select(browser.find_element(By.ID, element_id)).select_by_value(value)
 
 
-def typed(browser, element_id: str, text: str) -> bool:
+def typed(browser, element_id: str, text: str, quarantined: str = "") -> bool:
     """Text typed in a field of the page once it is drawn, shown and enabled — a choice just made
     draws its fields anew, and one not yet there cannot take the focus (#901). A field that never
     comes is a FAIL naming it and what was there — absent, hidden or disabled —, nothing typed, never
-    an exception that stops the shard (#907): False, for its caller to stop where nothing could hold."""
+    an exception that stops the shard (#907): False, for its caller to stop where nothing could hold.
+    `quarantined`, the issue and the date it is taken back up: the same said as quarantined, not
+    failed (tests.md, *Flaky tests*), with what the page showed and a screenshot, for its cause."""
     ready = lambda b: any(f.is_displayed() and f.is_enabled() for f in b.find_elements(By.ID, element_id))
     if not wait_for(browser, ready, 10):
         seen = browser.execute_script(
             "const f = document.getElementById(arguments[0]);"
             " return f ? {shown: f.getClientRects().length > 0, disabled: f.disabled} : 'absent'", element_id)
-        check(f"the field « {element_id} » comes, shown and enabled, to be typed in", False, seen)
+        what = f"the field « {element_id} » comes, shown and enabled, to be typed in"
+        if not quarantined:
+            check(what, False, seen)
+            return False
+        # What hides it: the choice of where, its block, and Settings drawn — read when it happens.
+        page = browser.execute_script(
+            "const r = (id) => { const e = document.getElementById(id); return e ? {checked: e.checked, disabled: e.disabled,"
+            " hidden: e.hidden, shown: e.getClientRects().length > 0} : 'absent'; };"
+            " return {online: r('transcription-online'), here: r('transcription-here'), away: r('transcription-away'),"
+            " settings: r('settings'), hash: location.hash}")
+        print(f"  QUARANTINED  {what} ({quarantined})\n        got: {seen}\n        page: {page}")
+        shot(browser, f"quarantined-{element_id}")
         return False
     browser.find_element(By.ID, element_id).send_keys(text)
     return True
@@ -2916,11 +2929,55 @@ def cancelled_at_once(now: dt.datetime) -> None:
                 ended = wait_for(browser, lambda b: b.execute_script(idle), 2)
                 check("a first transcript cancelled: ended within two seconds, nothing of it left in the meeting's folder",
                       ended and sorted(p.name for p in fresh.iterdir()) == ["local.wav", "session.json"], sorted(p.name for p in fresh.iterdir()))
+                # The focus given to what the page offers in its place, never left on the button gone (D92, #938).
+                focus = "return document.activeElement ? document.activeElement.id || document.activeElement.tagName : ''"
+                given = wait_for(browser, lambda b: b.execute_script(focus) == "make-transcript", 2)
+                check("a first transcript cancelled: the focus on « make it » that its card offers, never on the page's body",
+                      given, browser.execute_script(focus))
+                # Given once: moved by the user afterwards, a later drawing — the window coming forward —
+                # leaves it where they put it (#938, ines' mutant G).
+                browser.execute_script("document.getElementById('rename').focus()")
+                redrawn = browser.execute_script("const before = document.querySelector('#meeting .columns'); window.dispatchEvent(new Event('focus'));"
+                                                 " return new Promise((done) => setTimeout(() => done(document.querySelector('#meeting .columns') !== before), 1500))")
+                check("a first transcript cancelled, the focus then moved by the user: the page drawn again leaves it there",
+                      given and redrawn and browser.execute_script(focus) == "rename", [given, redrawn, browser.execute_script(focus)])
         finally:
             (WORK / "hold-hearing").unlink(missing_ok=True)
         browser.execute_script("return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", fresh.name, str(b))
         made = wait_for(browser, lambda b: (fresh / "transcript.jsonl").exists() and b.execute_script(idle), 15)
         check("then another model makes it whole at once", made and '"model":"ggml-tiny-b"' in (fresh / "transcript.jsonl").read_text())
+        # « Annuler » on a meeting's page, another opened at once: that one's card, stopped from before and
+        # offering to make it, takes no focus — the cancel gives its own meeting's (#938, ines' mutant H).
+        stopped_before = meetings / "2026-11-13_18-10"
+        left = meetings / "2026-11-13_18-12"
+        session(stopped_before, now - dt.timedelta(minutes=28), 1, {"local.wav": 1000})
+        session(left, now - dt.timedelta(minutes=26), 1, {"local.wav": 1000})
+        held.unlink(missing_ok=True)
+        (WORK / "hold-hearing").touch()
+        try:
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", stopped_before.name)
+            stopped = (wait_for(browser, lambda b: held.exists(), 15)
+                       and browser.execute_script("return window.__TAURI__.core.invoke('making_cancelled', {name: arguments[0]}).then(() => true, () => false)", stopped_before.name)
+                       and wait_for(browser, lambda b: b.execute_script(idle), 2))
+            held.unlink(missing_ok=True)
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", left.name)
+            running = stopped and wait_for(browser, lambda b: held.exists(), 15)
+            browser.execute_script(f"location.hash = '#/meeting/{left.name}'")
+            offered = running and wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 10)
+            if offered:
+                press(browser, "making-cancel")
+                browser.execute_script(f"location.hash = '#/meeting/{stopped_before.name}'")
+            arrived = offered and wait_for(browser, lambda b: b.execute_script(
+                "const s = document.getElementById('transcript-state'); return !!s && s.dataset.name === arguments[0] && !!document.getElementById('make-transcript')",
+                stopped_before.name), 5)
+            # Its stop read meanwhile, and the page painted again by it.
+            focus = "return document.activeElement ? document.activeElement.id || document.activeElement.tagName : ''"
+            settled = arrived and wait_for(browser, lambda b: b.execute_script(idle), 2)
+            time.sleep(2)
+            check("« Annuler » on one meeting's page, another opened at once: its « make it », stopped from before, takes no focus",
+                  settled and browser.execute_script(focus) != "make-transcript", [stopped, offered, arrived, settled, browser.execute_script(focus)])
+        finally:
+            (WORK / "hold-hearing").unlink(missing_ok=True)
         # Written all the same after « Annuler » (the decider's decision, 2026-11-13): kept, being
         # whole, shown as written — never said stopped —, and nothing follows it: no notification,
         # no minutes made with the model the user was changing, though the settings chain them.
@@ -2950,6 +3007,11 @@ def cancelled_at_once(now: dt.datetime) -> None:
                 check("written all the same: not said stopped on its page", stopped == "", stopped)
                 check("written all the same: no minutes made after it, though the settings chain them",
                       not (WORK / "summary-args").exists() and not (finished / "minutes.md").exists())
+                # Nor said to come: never left between the two steps, its page shows no bar (#938, ines' mutant J).
+                barred = browser.execute_script("const m = document.getElementById('making'); return window.__TAURI__.core.invoke('makings')"
+                                                ".then((k) => ({ bar: !!m && m.getClientRects().length > 0, between: k.between }))")
+                check("written all the same: no summary said to come — no bar on its page, nothing between the two steps",
+                      not barred["bar"] and finished.name not in barred["between"], barred)
                 check("written all the same: no notification", "member=Notify" not in notified.read_text(), notified.read_text()[-300:])
         finally:
             monitor.terminate()
@@ -5144,8 +5206,22 @@ def page_one_bar(now: dt.datetime) -> None:
                       first and got["segments"] == ["running", "next"] and got["live"] == "polite" and got["cancel"] and got["cards"] == 0
                       and bool(timed.match(got["by"])), got)
                 shot_themed(browser, f"d92-page-bar-{short}-{theme}", theme)
+                # Between the two steps — its transcript written, its summary not yet in line — the shell says the
+                # meeting `between` them. That moment lasts a few milliseconds with no program to hold it open, so
+                # the page is given, for two of its readings, the makings as the shell says them then: the bar
+                # stays, on the summary's step, the transcript's part full (#938's m2).
+                browser.execute_script("const real = window.__TAURI__.core, name = arguments[0];"
+                                       " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'makings'"
+                                       "   ? real.invoke(asked, ...rest).then((m) => ({ ...m, transcript: null, between: [name] })) : real.invoke(asked, ...rest) };"
+                                       " window.restoreCore = () => { window.__TAURI__.core = real; };", meeting.name)
+                time.sleep(3.5)
+                got = browser.execute_script(bar)
+                browser.execute_script("window.restoreCore()")
+                check(f"{short}: between the two steps, as the shell says it, the bar stays: the summary's step, the transcript's part full (D92)",
+                      got is not None and got["step"] == writing and got["segments"] == ["done", "running"], got)
+                wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == hearing, 5)
                 # From here, every state the bar shows, sampled, and every text its live region takes.
-                browser.execute_script("window.barSeen = []; window.barSaid = []; const s = document.getElementById('making-step');"
+                browser.execute_script("window.barSeen = []; window.barSaid = []; const s = document.getElementById('making-step'); window.stepNode = s;"
                                        " new MutationObserver(() => window.barSaid.push(s.textContent)).observe(s, {childList: true, characterData: true, subtree: true});"
                                        " window.barTick = setInterval(() => { const m = document.getElementById('making');"
                                        "   window.barSeen.push(m && m.getClientRects().length ? [...m.querySelectorAll('.segment')].map(g => g.dataset.state).join() : 'gone'); }, 50)")
@@ -5154,6 +5230,21 @@ def page_one_bar(now: dt.datetime) -> None:
                 got = browser.execute_script(bar)
                 check(f"{short}: then its summary: the same bar, the transcript's part full, the summary's running, « Annuler » in it (D92)",
                       second and got["segments"] == ["done", "running"] and got["cancel"] and got["cards"] == 0 and bool(timed.match(got["by"])), got)
+                # Reached by the keyboard, « Annuler » stays the same node while its step runs: the bar's
+                # readings, two of them at least, never take its focus away (#938, ines' mutant I).
+                reached = browser.execute_script("const c = document.getElementById('making-cancel'); c.focus(); window.cancelNode = c; return document.activeElement === c")
+                time.sleep(2.5)
+                held_focus = browser.execute_script("return document.activeElement === window.cancelNode && document.activeElement.isConnected")
+                check(f"{short}: « Annuler » reached while its summary is made: the bar's next readings leave its focus there (D92)",
+                      reached and held_focus, [reached, held_focus, browser.execute_script("return document.activeElement ? document.activeElement.id || document.activeElement.tagName : ''")])
+                # The page drawn again meanwhile — the window coming forward draws it anew —: the step's live
+                # region is the same node, and nothing is said again (#938's m5).
+                drawn = browser.execute_script("const before = document.querySelector('#meeting .columns'); window.dispatchEvent(new Event('focus'));"
+                                               " return new Promise((done) => setTimeout(() => done(document.querySelector('#meeting .columns') !== before), 1500))")
+                kept = browser.execute_script("return document.getElementById('making-step') === window.stepNode")
+                check(f"{short}: the page drawn again while its summary is made: the same live region, nothing said again (D92)",
+                      drawn and kept and browser.execute_script("return window.barSaid") == [writing],
+                      [drawn, kept, browser.execute_script("return window.barSaid")])
                 gates[1].unlink()
                 gone = wait_for(browser, lambda b: b.execute_script(bar) is None and (meeting / "minutes.md").is_file(), 15)
                 time.sleep(0.3)
@@ -5176,9 +5267,38 @@ def page_one_bar(now: dt.datetime) -> None:
                 gates[1].unlink()
                 done = wait_for(browser, lambda b: b.execute_script(bar) is None, 15)
                 check(f"{short}: its summary made again alone: one part, running, then gone (D92)", alone and got["segments"] == ["running"] and done, got)
+                # Its transcript made again, its summary following (Refaire avec ce contexte): from its start, both
+                # parts — never a step that appears on the way (#938, ines' mutant L).
+                gates[0].touch()
+                browser.execute_script("window.__TAURI__.core.invoke('context_redo', {name: arguments[0]})", meeting.name)
+                again = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == hearing, 10)
+                got = browser.execute_script(bar)
+                gates[0].unlink()
+                done = wait_for(browser, lambda b: b.execute_script(bar) is None, 15)
+                check(f"{short}: its transcript made again, its summary following: both parts from its start, the summary next, then gone (D92)",
+                      again and got["segments"] == ["running", "next"] and done, got)
             finally:
                 for gate in gates:
                     gate.unlink(missing_ok=True)
+    # Its summary cancelled from the bar, none made before: the focus on what the summary's card offers in its
+    # place, never on the page's body — the bar's « Annuler » is the step's own card's (#938, ines' mutant B).
+    meetings = WORK / "one-bar-cancel"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 1, {"local.wav": 1000})
+    focus = "return document.activeElement ? document.activeElement.id || document.activeElement.tagName : ''"
+    with Window(meetings, "fr_FR.UTF-8", settings) as browser:
+        gates[1].touch()
+        try:
+            browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+            wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", meeting.name)
+            writing = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == "Rédaction du compte rendu", 15)
+            press(browser, "making-cancel")
+            given = wait_for(browser, lambda b: b.execute_script(focus) == "make-minutes", 3)
+            check("fr: its summary cancelled from the page's bar: the focus on « make it » that the summary's card offers, never on the page's body (D92)",
+                  writing and given, [writing, browser.execute_script(focus), browser.execute_script(bar)])
+        finally:
+            gates[1].unlink(missing_ok=True)
     # No summary following its transcript: one part, the transcript's.
     meetings = WORK / "one-bar-alone"
     meeting = meetings / "2026-10-18_12-00"
@@ -7279,7 +7399,9 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "transcription-online")
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            if not typed(browser, "transcription-key", heard):
+            # Quarantined (#930): the field sometimes never shown, 3 of about 15 full runs; its cause not
+            # yet known. Nothing after it is checked then. Taken back up on 2026-11-25 at the latest.
+            if not typed(browser, "transcription-key", heard, quarantined="#930, taken back up by 2026-11-25"):
                 return
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
@@ -11176,8 +11298,15 @@ def main() -> int:
         browser.find_element(By.ID, "small-stop").click()
         rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 5)
         check("opened from the full window during a recording, it too comes back to rest, in English", rest and browser.find_element(By.ID, "small-record").get_attribute("aria-label") == "Start a recording")
-        back = wait_for(browser, lambda b: b.execute_script("return [innerWidth, innerHeight]") == [440, 44], 5)
-        check("at rest, in English, 440 × 44 again", back, browser.execute_script("return [innerWidth, innerHeight]"))
+        # Its transcript follows the stop: the bar at rest is its row of 44 and D92's one line alone under it, saying
+        # that meeting (#939), as context_before_start reads it.
+        rest_alone = ("const lines = [...document.querySelectorAll('#small .bar-lines > *')].filter(e => e.id !== 'small-last' && e.getClientRects().length);"
+                      " const p = document.getElementById('small'), l = document.getElementById('small-last');"
+                      " return innerWidth === 440 && lines.length === 0 && Math.round(document.querySelector('#small .bar-row').getBoundingClientRect().height) === 44"
+                      " && Math.abs(innerHeight - Math.ceil(p.getBoundingClientRect().height)) <= 1 && (l.hidden || l.getBoundingClientRect().height <= 20)")
+        back = wait_for(browser, lambda b: b.execute_script(rest_alone), 5)
+        check("at rest, in English, 440 wide again: its row of 44, and D92's one line alone under it (#939)", back,
+              browser.execute_script("return [innerWidth, innerHeight, document.getElementById('small-last')?.textContent]"))
 
     print("I. the window, in English; and a folder with no session")
     empty = WORK / "empty"

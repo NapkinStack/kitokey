@@ -10,7 +10,7 @@ why, and the action.
 flowchart LR
     W["Workstation<br/>and forge settings"]:::place --> L["L · G"]:::rule
     C["Every commit<br/>and every CI run"]:::place --> F["M · B · S · C · H"]:::rule
-    P["A pull request"]:::place --> R["P · T · K · V · A · C9"]:::rule
+    P["A pull request"]:::place --> R["P · T · K · V · A · R · C9"]:::rule
     D["The default branch"]:::place --> X["W"]:::rule
 
     classDef place fill:#374151,color:#fff
@@ -110,6 +110,15 @@ in git; elsewhere a record is shown, and the forge's CI judges.
 | `A1` | In a project whose checks are attested, a head commit with no record — read from the remote's notes, in CI too | `07-governance.md` §7 |
 | `A2` | A record of the head that misses a check the CI runs, or holds a failed one | `07-governance.md` §7 |
 
+## R — the approvals a pull request carries
+
+On GitHub, read from the pull request by `nstack pr-check` on the forge's run. Where the forge
+dismisses stale approvals on push, it never has one to say.
+
+| Code | Refuses | Why |
+|---|---|---|
+| `R1` | *(warning)* An approval given on an earlier commit than the head, when commits other than the base branch's followed it — a merge that carries content of its own included —: the approver has not read them. A review starts no run, so it is said, as an annotation on the check, never failed. Unread, it is said | `07-governance.md` §7 |
+
 ## K — the cycle a change belongs to
 
 These rules bound work inside a cycle. A project with no accepted charter is **unframed**:
@@ -146,6 +155,7 @@ it has no cycle, K1 to K3 and K5 say nothing there, and every other rule applies
 | `L7` | A project created from a path on one machine | `INSTALL.md` |
 | `L8` | Off GitHub, `checks: forge`: no CI is shipped there, so nothing would run the checks | `INSTALL.md` |
 | `L9` | A `forge` answer the project's files were not written for — changed by hand; `nstack update --forge` changes it. A remote on another known forge is said, never a gap | `INSTALL.md` |
+| `L10` | On GitHub, a line of the code owners file naming an owner GitHub does not know — an organisation by its bare name, a deleted user, a team without access — read from GitHub's own validation of the default branch's file. Unread, it is said, never counted | `07-governance.md` §7 |
 
 ## G — the forge's settings
 
@@ -176,3 +186,4 @@ repository *unguarded*; `W1` does not run.
 | `G19` | A default branch other than `main`, which no workflow watches | `07-governance.md` §7 |
 | `G20` | A hold of a deliverable that can be force-pushed or deleted: the one way past its refusal | `project.md`, *Who holds a deliverable* |
 | `G21` | Where another agent approves, the one who pushed last approving what they pushed | `07-governance.md` §7 |
+| `G22` | A branch merged without being up to date with main: two changes green apart, red together | `07-governance.md` §7 |
