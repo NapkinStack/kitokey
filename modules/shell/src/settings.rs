@@ -22,6 +22,26 @@ pub enum After {
     Minutes,
 }
 
+/// The windows' look (D98): the system's light or dark, or one chosen whatever the system says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Appearance {
+    System,
+    Light,
+    Dark,
+}
+
+impl Appearance {
+    /// As the settings file writes it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Appearance::System => "system",
+            Appearance::Light => "light",
+            Appearance::Dark => "dark",
+        }
+    }
+}
+
 /// How much the logs hold: the usual steps, or more for whoever looks into a failure (D29).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -130,6 +150,8 @@ pub struct Settings {
     pub welcomed: bool,
     /// The full window's sidebar folded by the user (D61): opened again as it was left.
     pub folded: bool,
+    /// Every window's look, the system's by default (D98).
+    pub appearance: Appearance,
     /// Where the user left the recording bar, in the screen's logical pixels (D90): it opens there
     /// again where the system lets an application place itself — Windows, macOS —, a screen holding
     /// it still; never written nor read on Linux, where GNOME chooses.
@@ -169,6 +191,7 @@ impl Default for Settings {
             log: Log::Info,
             welcomed: false,
             folded: false,
+            appearance: Appearance::System,
             bar_at: None,
             language: None,
             microphone: None,
@@ -243,6 +266,7 @@ struct Written {
     log: Option<Log>,
     welcomed: Option<bool>,
     folded: Option<bool>,
+    appearance: Option<Appearance>,
     bar_at: Option<[i32; 2]>,
     language: Option<String>,
     microphone: Option<String>,
@@ -280,7 +304,7 @@ impl std::fmt::Display for Unread {
 }
 
 /// The keys a settings file may hold: those a refusal names.
-const KEYS: [&str; 25] = [
+const KEYS: [&str; 26] = [
     "reminder",
     "sessions",
     "transcript",
@@ -302,6 +326,7 @@ const KEYS: [&str; 25] = [
     "log",
     "welcomed",
     "folded",
+    "appearance",
     "bar_at",
     "language",
     "microphone",
@@ -362,6 +387,7 @@ pub fn read(path: &Path) -> Result<Settings, Unread> {
     settings.window = written.window.unwrap_or(settings.window);
     settings.welcomed = written.welcomed.unwrap_or(settings.welcomed);
     settings.folded = written.folded.unwrap_or(settings.folded);
+    settings.appearance = written.appearance.unwrap_or(settings.appearance);
     settings.bar_at = written.bar_at;
     // One it does not speak, written by hand: the system's.
     settings.language = written.language.as_deref().and_then(Language::named);
@@ -458,6 +484,9 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     }
     if settings.folded != before.folded {
         set(&mut document, "folded", Value::from(settings.folded));
+    }
+    if settings.appearance != before.appearance {
+        set(&mut document, "appearance", Value::from(settings.appearance.as_str()));
     }
     if let Some([x, y]) = settings.bar_at
         && settings.bar_at != before.bar_at
@@ -589,6 +618,7 @@ mod tests {
             log,
             welcomed,
             folded,
+            appearance,
             bar_at,
             language,
             microphone,

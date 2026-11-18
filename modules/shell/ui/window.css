@@ -7,11 +7,20 @@
   --edge: #808898;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :not([data-theme="light"]):root {
     --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
     --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
     --edge: #737B8C;
   }
+}
+/* The appearance chosen in Settings (D98): light or dark whatever the system says — the same two
+   palettes; « Système », no attribute, the system's as before. */
+[data-theme="light"]:root { color-scheme: light; }
+[data-theme="dark"]:root {
+  color-scheme: dark;
+  --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
+  --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+  --edge: #737B8C;
 }
 * { box-sizing: border-box; }
 ::placeholder { color: var(--soft); opacity: 1; }
@@ -151,7 +160,10 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
    anywhere: a folder's path, a model's id, a host; never a label's words (#782). */
 #settings { max-width: 720px; width: 100%; margin-inline: auto; }
 #settings .path, #settings code, #offered .name { overflow-wrap: anywhere; }
-#settings select { max-width: 100%; min-width: 0; }
+/* A list's choice longer than its room — « … pas encore sur cet ordinateur » at 420 px — cut inside the list:
+   WebKitGTK lays a menulist's whole text out past its box, and the page scrolled sideways; paint containment
+   keeps that overflow in the list (#868). The whole choice stays its tooltip, and the state is said under it. */
+#settings select { max-width: 100%; min-width: 0; contain: paint; }
 #settings .picks { flex-wrap: wrap; min-width: 0; max-width: 100%; }
 .general-advanced { display: flex; flex-direction: column; gap: 12px; }
 #settings .choices { display: flex; flex-direction: column; gap: 10px; }
@@ -357,6 +369,10 @@ body.small-window .frame { display: none; }
 #small .small-check .open { flex: none; min-height: 28px; padding: 0 10px; font-size: 13px; white-space: nowrap; }
 .small-check .says { min-width: 0; font-size: 12px; line-height: 1.3; }
 #small .small-advanced { padding: 8px 16px 12px; border-top: 1px solid var(--line); }
+/* The meeting's language (D99): the options' indent, as « Avancé »; its refusal under it. */
+#small .small-language { padding: 8px 16px 12px; border-top: 1px solid var(--line); }
+#small .small-language .says { margin: 6px 0 0; }
+#small .small-language .says:empty { margin: 0; }
 .disclose-advanced { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 4px 0 0; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
 .models-advanced-panel { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .models-advanced-panel .says, .models-advanced-panel .note { margin: 0; font-size: 12px; line-height: 1.3; }

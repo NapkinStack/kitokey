@@ -127,6 +127,16 @@ pipewire 2> "$logs/pipewire.log" &
 until [ -S "$run/pipewire-0" ]; do sleep 0.1; done
 wireplumber --profile policy 2> "$logs/wireplumber.log" &
 pipewire-pulse 2> "$logs/pipewire-pulse.log" &
+# The accessibility bus taken before anyone asks for it (#902): asked first, the session bus tries to
+# start it itself, fails, and gnome-shell and every Kitokey after it go without, saying so on stderr.
+owner="org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus NameHasOwner s org.a11y.Bus"
+for _ in $(seq 300); do [ "$(busctl --user call $owner 2>/dev/null)" = "b true" ] && break; sleep 0.1; done
+if [ "$(busctl --user call $owner 2>/dev/null)" != "b true" ]; then
+  mkdir -p "$out"
+  cp "$logs/a11y.log" "$out/headless-a11y.log" 2>/dev/null || true
+  echo "e2e: FAILED — the accessibility bus (org.a11y.Bus) never came on the session bus in 30 s; its launcher said:" | tee "$out/e2e.txt"
+  sed 's/^/    /' "$logs/a11y.log" | tee -a "$out/e2e.txt"; exit 1
+fi
 
 gnome-shell --wayland --no-x11 --headless --virtual-monitor 1920x1080 --wayland-display kitokey-0 > "$logs/shell.log" 2>&1 &
 export WAYLAND_DISPLAY=kitokey-0
@@ -163,4 +173,5 @@ status=0
 # The session's own log beside the run's evidence, never in it: what GNOME says of a session with
 # no logind nor accounts is no line of Kitokey's, and NapkinStack audits every log there.
 cp "$logs/shell.log" "$out/headless-shell.log" 2>/dev/null || true
+cp "$logs/a11y.log" "$out/headless-a11y.log" 2>/dev/null || true
 exit "$status"

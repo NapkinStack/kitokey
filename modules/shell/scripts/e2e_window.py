@@ -148,7 +148,8 @@ if [ "$1" = listen ]; then
   # a copy of pw-cat, told to record — its name no longer says it.
   mkdir -p "$here/own"; [ -x "$here/own/kitokey-capture" ] || cp "$(command -v pw-cat)" "$here/own/kitokey-capture"
   "$here/own/kitokey-capture" --record --target kitokey_e2e_check_mic "$here/listen.wav" & held=$!
-  ended() { kill "$held" 2>/dev/null; wait "$held" 2>/dev/null; date +%s.%N > "$here/listen-ended"; exit 0; }
+  # Written whole, then renamed over: a scenario that sees the file reads its time, never an empty one (#891).
+  ended() { kill "$held" 2>/dev/null; wait "$held" 2>/dev/null; date +%s.%N > "$here/listen-ended.part"; mv "$here/listen-ended.part" "$here/listen-ended"; exit 0; }
   trap ended TERM INT
   headset=false; [ -e "$here/listen-headset" ] && headset=true
   echo '{"event":"device","source":"me","device":"Kitokey e2e mic","headset":'$headset'}'
@@ -276,6 +277,14 @@ def choose(browser, element_id: str, value: str) -> None:
         except StaleElementReferenceException:
             time.sleep(0.2)
     Select(browser.find_element(By.ID, element_id)).select_by_value(value)
+
+
+def typed(browser, element_id: str, text: str) -> None:
+    """Text typed in a field of the page once it is drawn, shown and enabled — a choice just made
+    draws its fields anew, and one not yet there cannot take the focus (#901)."""
+    ready = lambda b: any(f.is_displayed() and f.is_enabled() for f in b.find_elements(By.ID, element_id))
+    wait_for(browser, ready, 10)
+    browser.find_element(By.ID, element_id).send_keys(text)
 
 
 def press(browser, element_id: str) -> None:
@@ -4488,6 +4497,199 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def settings_narrow_without_model(now: dt.datetime) -> None:
+    """BU. Settings at 420 px on a Kitokey with no model on this computer (#868): the guided step for the
+    transcription — its way, the model's state and its offer — inside its card, nothing spilling; « Avancé »
+    unfolds by a click where the user sees it. In French and in English."""
+    print("BU. Settings at 420 px with no model on this computer: the guided step inside its card, « Avancé » unfolds by a click — French and English (#868)")
+    # What spills, and the children past it: the box measured, then what goes beyond its right edge.
+    past = ("const out = []; for (const e of document.querySelectorAll('#settings *')) {"
+            " if (!e.getClientRects().length || ['INPUT', 'SELECT', 'TEXTAREA', 'OPTION'].includes(e.tagName) || e.scrollWidth <= e.clientWidth + 1) continue;"
+            " const r = e.getBoundingClientRect(); out.push([e.id || e.className || e.tagName, Math.round(r.width), e.scrollWidth,"
+            " [...e.children].filter(c => c.getBoundingClientRect().right > r.right + 0.5).map(c => [c.id || c.className || c.tagName, Math.round(c.getBoundingClientRect().width)])]) }"
+            " return out.slice(0, 8)")
+    for short, language in (("fr", "fr_FR.UTF-8"), ("en", "en_GB.UTF-8")):
+        sessions = WORK / f"narrow-none-{short}"
+        sessions.mkdir()
+        window = Window(sessions, language)
+        # A data folder of its own: no model on this computer, whatever another scenario left.
+        window.env["XDG_DATA_HOME"] = str(WORK / f"narrow-none-data-{short}")
+        with window as browser:
+            browser.set_window_size(420, 900)
+            browser.execute_script("location.hash = '#/settings'")
+            drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "transcription-on-computer")
+                             and b.find_element(By.ID, "transcription-on-computer").is_displayed(), 10)
+            missing = browser.execute_script("return document.getElementById('model-state')?.dataset.missing ?? null")
+            over = browser.execute_script(SETTINGS_OVERFLOW)
+            # What the user sees of a spill: the page, or its pane, scrolled sideways (#868's bar under Settings).
+            sideways_ = browser.execute_script(
+                "return [document.scrollingElement, document.body, document.getElementById('pane'), document.getElementById('settings')]"
+                ".filter((e) => e && e.scrollWidth > e.clientWidth + 1).map((e) => [e.id || e.tagName, e.clientWidth, e.scrollWidth])")
+            check(f"{short}, 420 px, no model on this computer: nothing scrolls sideways, the guided step inside its card (#868)",
+                  drawn and missing == "true" and sideways_ == [] and over == [],
+                  {"missing": missing, "sideways": sideways_, "over": over, "past": browser.execute_script(past)})
+            # The state cut in the list is never lost: the whole choice as its tooltip, and said under it.
+            said = browser.execute_script(
+                "const p = document.getElementById('model'); return [p.title, p.options[p.selectedIndex]?.text ?? null,"
+                " document.querySelector('#model-state .says')?.textContent ?? null]")
+            whole = {"fr": "pas encore sur cet ordinateur", "en": "not on this computer yet"}[short]
+            check(f"{short}, 420 px, no model on this computer: the choice whole as the list's tooltip, the state said under it (#868)",
+                  said[0] == said[1] and said[0] and said[0].endswith(whole) and said[2] and whole.split()[0] in said[2].lower(), said)
+            browser.execute_script("document.getElementById('model').scrollIntoView({block: 'center'})")
+            shot(browser, f"868-settings-420-{short}")
+            # « Avancé » as a person reaches it: scrolled to, then clicked where it shows.
+            toggle = browser.find_element(By.ID, "general-advanced")
+            browser.execute_script("arguments[0].scrollIntoView({block: 'center'})", toggle)
+            try:
+                ActionChains(browser).click(toggle).perform()
+                clicked = None
+            except Exception as why:  # noqa: BLE001 — the check says what stopped the click
+                clicked = type(why).__name__
+            opened = wait_for(browser, lambda b: b.find_element(By.ID, "general-advanced").get_attribute("aria-expanded") == "true"
+                              and b.find_element(By.ID, "developer").is_displayed(), 5)
+            check(f"{short}, 420 px, no model on this computer: « Avancé » unfolds by a click (#868)", clicked is None and opened,
+                  {"click": clicked, "expanded": toggle.get_attribute("aria-expanded")})
+
+def appearance_chosen(now: dt.datetime) -> None:
+    """BP. D98: Settings' « Général » offers the appearance — « Système », « Clair », « Sombre » —; chosen,
+    the window takes it at once, the other one than the system says — the system light, then dark —; kept across starts, the bar
+    taking it too; « Système » by default, following the system as before."""
+    print("BP. Settings: the appearance System, Light or Dark, taken at once, kept across starts, the bar too (D98)")
+    ground = "return getComputedStyle(document.documentElement).getPropertyValue('--ground').trim().toUpperCase()"
+    grounds = {"light": "#F2F4F7", "dark": "#15171C"}
+    # Each choice against the system: « Sombre » while it is light, « Clair » while it is dark.
+    for wanted in ("light", "dark"):
+        taping = WORK / f"appearance-{wanted}"
+        taping.mkdir()
+        window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n')
+        # The system's look asked of GTK, as a desktop asks it: WebKitGTK's prefers-color-scheme follows it.
+        window.env.update(GTK_THEME="Adwaita:dark" if wanted == "dark" else "Adwaita")
+        with window as browser:
+            browser.execute_script("location.hash = '#/settings'")
+            offered = wait_for(browser, lambda b: b.find_elements(By.ID, "appearance"), 10)
+            system = "dark" if browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches") else "light"
+            other = "light" if system == "dark" else "dark"
+            check(f"the system {wanted}: the window says so before any choice (D98)", system == wanted, system)
+            pick = browser.find_elements(By.ID, "appearance")
+            choices = [(o.get_attribute("value"), o.text) for o in Select(pick[0]).options] if pick else []
+            check(f"the system {wanted}: « Général » offers the appearance, « Système » chosen by default (D98)",
+                  offered and choices == [("system", "Système"), ("light", "Clair"), ("dark", "Sombre")]
+                  and Select(pick[0]).first_selected_option.get_attribute("value") == "system"
+                  and browser.execute_script(ground) == grounds[system], (choices, browser.execute_script(ground)))
+            if pick:
+                Select(pick[0]).select_by_value(other)
+            taken = wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
+            check(f"the system {wanted}: « {'Clair' if other == 'light' else 'Sombre'} » chosen while the system says the other: the window takes it at once, kept (D98)",
+                  taken and f'appearance = "{other}"' in window.file.read_text(), (browser.execute_script(ground), window.file.read_text()))
+            shot(browser, f"d98-settings-{other}")
+            if pick:
+                Select(browser.find_element(By.ID, "appearance")).select_by_value("system")
+            back = wait_for(browser, lambda b: b.execute_script(ground) == grounds[system], 3)
+            check(f"the system {wanted}: « Système » chosen again: the system's appearance followed, as before (D98)", back, browser.execute_script(ground))
+            if pick:
+                Select(browser.find_element(By.ID, "appearance")).select_by_value(other)
+            wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
+        # Started again, the bar alone: it takes the appearance kept.
+        window.file.write_text(window.file.read_text().replace('window = "full"\n', ""))
+        with window as browser:
+            bar = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.execute_script(ground) == grounds[other], 10)
+            check(f"the system {wanted}: started again, the bar takes the appearance kept, not the system's (D98)", bar, browser.execute_script(ground))
+            shot(browser, f"d98-bar-{other}")
+
+
+def bar_language(now: dt.datetime) -> None:
+    """BR. D99: the bar's options offer the meeting's language — at rest the next meeting's, recording
+    the one in progress' —, the meeting's page's list (D65, D89), « Celle des Réglages » first, and its
+    refusal said as the page says it; by the keyboard alone, in French and in English."""
+    print("BR. the bar's options: the meeting's language, the next one's at rest, taken at the start, the one in progress' while recording, refused said — keyboard alone, French and English (D99)")
+    focused = "const a = document.activeElement; return a.id || a.className"
+    picked = ("const p = document.getElementById('small-language'); return p && p.getClientRects().length"
+              " ? [p.value, [...p.options].map(o => o.text)] : null")
+    offered = ["Français", "English", "Deutsch", "Español", "Italiano", "Português", "Nederlands", "العربية"]
+    # The language's row and its sentence start where « Avancé » starts: the options' one indent (#877's T8).
+    lined = ("const left = (x) => x ? Math.round(x.getBoundingClientRect().left) : null;"
+             " const p = document.getElementById('small-language');"
+             " return [left(p && p.closest('label')), left(document.getElementById('small-language-said')), left(document.getElementById('small-advanced'))]")
+    def keys(browser, *pressed) -> None:
+        ActionChains(browser).send_keys(*pressed).perform()
+        time.sleep(0.2)
+    def to(browser, target: str) -> bool:
+        for _ in range(12):
+            if browser.execute_script(focused) == target:
+                return True
+            keys(browser, Keys.TAB)
+        return browser.execute_script(focused) == target
+    def opened(browser) -> bool:
+        # « Plus d’options » reached by Tab and opened by Enter, from whatever the focus was on.
+        if not browser.execute_script("return document.getElementById('small-options').hidden"):
+            return True
+        if not to(browser, "small-more"):
+            return False
+        keys(browser, Keys.ENTER)
+        return wait_for(browser, lambda b: not b.execute_script("return document.getElementById('small-options').hidden"), 3)
+    for language, (short, settled, first, refused) in {
+        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Celle des Réglages — Deutsch", "La langue n’a pas été enregistrée : "),
+        "en_US.UTF-8": ("en", "", "As in Settings — detected", "The language was not saved: "),
+    }.items():
+        taping = WORK / f"bar-language-{short}"
+        taping.mkdir()
+        window = Window(taping, language, f'after = "nothing"\nreminder = false\n{settled}', small=True)
+        meetings = lambda: sorted(p for p in taping.iterdir() if p.is_dir() and (p / "session.json").is_file())
+        with window as browser:
+            wait_for(browser, lambda b: b.execute_script(focused) == "small-record", 10)
+            # At rest: the next meeting's language, in the options, reached by the keyboard.
+            reached = opened(browser) and to(browser, "small-language")
+            got = browser.execute_script(picked)
+            check(f"{short}: at rest, the options offer the meeting's language, reached by Tab: « {first} » first, chosen, then the page's list (D99)",
+                  reached and got == ["", [first, *offered]], [browser.execute_script(focused), got])
+            # Down twice: Français, then English — the next meeting's.
+            keys(browser, Keys.ARROW_DOWN)
+            keys(browser, Keys.ARROW_DOWN)
+            kept = wait_for(browser, lambda b: (b.execute_script(picked) or [None])[0] == "en", 3)
+            check(f"{short}: at rest, English chosen by the arrows, for the next meeting (D99)", kept, browser.execute_script(picked))
+            got = browser.execute_script(lined)
+            check(f"{short}: at rest, the language's row and its sentence start where « Avancé » does (D99)", got[2] is not None and got[2] > 0 and got == [got[2]] * 3, got)
+            # Started by the keyboard: the meeting takes it once its folder holds its session.
+            keys(browser, Keys.ESCAPE)
+            browser.execute_script("document.getElementById('small-record').focus()")
+            keys(browser, Keys.ENTER)
+            started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed() and meetings(), 10)
+            folder = meetings()[-1] if meetings() else taping
+            taken = wait_for(None, lambda b: (folder / "language").is_file() and (folder / "language").read_text() == "en\n", 5)
+            check(f"{short}: started, the meeting takes the language chosen at rest (D99)", started and taken,
+                  [started, (folder / "language").read_text() if (folder / "language").is_file() else None])
+            # Recording: the one in progress' own, shown, changed by the arrows, written to its folder.
+            browser.execute_script("document.getElementById('small-stop').focus()")
+            reached = opened(browser) and to(browser, "small-language")
+            got = browser.execute_script(picked)
+            check(f"{short}: recording, the options offer the meeting in progress' language, its own chosen (D99)",
+                  reached and got == ["en", [first, *offered]], [browser.execute_script(focused), got])
+            keys(browser, Keys.ARROW_DOWN)
+            written = wait_for(None, lambda b: (folder / "language").is_file() and (folder / "language").read_text() == "de\n", 5)
+            check(f"{short}: recording, Deutsch chosen by the arrows: the meeting's language file holds « de » (D99)", written,
+                  (folder / "language").read_text() if (folder / "language").is_file() else None)
+            # Refused — its file a folder that cannot be replaced —: said as the page says it, the choice put back.
+            (folder / "language").unlink(missing_ok=True)
+            (folder / "language").mkdir()
+            (folder / "language" / "held").write_text("")
+            keys(browser, Keys.ARROW_UP)
+            said = wait_for(browser, lambda b: b.execute_script("return document.getElementById('small-language-said')?.textContent ?? ''").startswith(refused), 5)
+            got = [browser.execute_script("return document.getElementById('small-language-said')?.textContent ?? ''"), (browser.execute_script(picked) or [None])[0]]
+            check(f"{short}: recording, a language refused: « {refused}… » said, the choice put back (D99)", said and got[1] == "de", got)
+            got = browser.execute_script(lined)
+            check(f"{short}: recording, the language's row and its refusal start where « Avancé » does (D99)", got[2] is not None and got[2] > 0 and got == [got[2]] * 3, got)
+            shutil.rmtree(folder / "language", ignore_errors=True)
+            shot(browser, f"d99-bar-language-{short}")
+            stop_from_small(browser)
+            back = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+            # At rest again: the next meeting's, none kept — the one chosen was taken.
+            browser.execute_script("document.getElementById('small-record').focus()")
+            reached = back and opened(browser) and to(browser, "small-language")
+            got = browser.execute_script(picked)
+            check(f"{short}: at rest again, the next meeting's language is « {first} »: the one chosen was taken (D99)",
+                  reached and got is not None and got[0] == "", got)
+
+
 def meeting_trashed(now: dt.datetime) -> None:
     """BT. D100: a meeting moved to the trash from its own page — beside the button that opens its folder,
     a question in place, « Annuler » focused first, what it holds and that the system's trash restores it;
@@ -6400,7 +6602,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "minutes-online")
             wait_for(browser, lambda b: b.execute_script(options, "minutes-service"), 5)
             choose(browser, "minutes-service", "0")
-            browser.find_element(By.ID, "minutes-key").send_keys(good)
+            typed(browser, "minutes-key", good)
             press(browser, "minutes-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
             choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
@@ -6411,7 +6613,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "transcription-online")
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            browser.find_element(By.ID, "transcription-key").send_keys(heard)
+            typed(browser, "transcription-key", heard)
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
             choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
@@ -10591,11 +10793,14 @@ def main() -> int:
     redo_choice_starts_nothing(now)
     redo_offers_the_services_models(now)
     settings_folded(now)
+    settings_narrow_without_model(now)
+    appearance_chosen(now)
     focus_kept(now)
     meeting_trashed(now)
     sound_checked(now)
     bar_window(now)
     bar_opened(now)
+    bar_language(now)
     recording_found(now)
     recording_found_not_forgotten(now)
     context_before_start(now)
