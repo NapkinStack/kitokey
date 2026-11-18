@@ -1328,7 +1328,21 @@ function modelsAdvanced(words, prefix, offered, chosen) {
     grouped(hearPick, offeredServices.transcription, (provider, model) => JSON.stringify({ engine: "service", provider, model }),
       (provider, model) => `${modelSaid(model)}${fill(words.written_via, via(provider))}`, settingsHearing);
   };
-  return { box, toggle, panel, models, unfold, services };
+  // The model a step will be made by, as people say it — Settings' when none is chosen —, or null when
+  // there is none (D96: the button that starts names it).
+  const named = (step) => {
+    const chosen = models()[step];
+    if (step === "minutes") {
+      const model = chosen ? chosen.model : offered.minutes_provider && offered.minutes_model;
+      return model ? modelSaid(model) : null;
+    }
+    const heard = chosen ?? (offered.engine === "speechanalyzer" ? { engine: "speechanalyzer" }
+      : offered.engine === "service" && offered.transcription_model ? { engine: "service", model: offered.transcription_model }
+      : offered.model ? { engine: "whisper", model: offered.model } : null);
+    if (!heard) return null;
+    return heard.engine === "speechanalyzer" ? "SpeechAnalyzer" : heard.engine === "service" ? modelSaid(heard.model) : spoken(heard.model);
+  };
+  return { box, toggle, panel, models, unfold, services, named, picks: [hearPick, writePick] };
 }
 
 // A panel of *Refaire…* closes on *Annuler* or Escape: nothing changed, the focus back on *Refaire…* (D68).
@@ -1357,7 +1371,7 @@ function closes(panel, go, button, words) {
 
 // *Refaire…* (D11's sixth board, D91): made again by the meeting's own models, Settings' first; its
 // « Avancé », closed, chooses them — kept for the meeting once Refaire is pressed, never on Annuler.
-function redoWith(offered, session, words, button, id, title, notes, again) {
+function redoWith(offered, session, words, button, id, title, notes, again, step, doing) {
   const panel = element("section", "redo");
   panel.id = id;
   panel.append(element("h3", "", title), element("p", "says", words.redo_with));
@@ -1366,9 +1380,16 @@ function redoWith(offered, session, words, button, id, title, notes, again) {
   if (!offered.confidential) {
     window.__TAURI__.core.invoke("services_offered", { name: nameOf(session) }).then(advanced.services, () => {});
   }
-  const go = element("button", "primary", words.redo_do);
+  const go = element("button", "primary");
   go.type = "button";
   go.id = id.replace(/-panel$/, "-do");
+  // The one button that starts names the making and its model, as chosen (D96); with none, the making.
+  const name = () => {
+    const model = advanced.named(step);
+    go.textContent = model ? fill(doing, model) : title;
+  };
+  name();
+  for (const pick of advanced.picks) pick.addEventListener("change", name);
   go.addEventListener("click", async () => {
     waiting(go, true);
     try {
@@ -1391,7 +1412,7 @@ function redoWith(offered, session, words, button, id, title, notes, again) {
 
 function redoPanel(offered, session, words, button) {
   return redoWith(offered, session, words, button, "redo-panel", words.redo_title, [element("p", "says", words.redo_note)], () =>
-    window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }));
+    window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }), "minutes", words.redo_minutes_do);
 }
 
 function redoTranscriptPanel(offered, session, words, button, corrected) {
@@ -1403,7 +1424,7 @@ function redoTranscriptPanel(offered, session, words, button, corrected) {
     notes.push(lost);
   }
   return redoWith(offered, session, words, button, "redo-transcript-panel", words.redo_transcript_title, notes, () =>
-    window.__TAURI__.core.invoke("transcript_redo_own", { name: nameOf(session) }));
+    window.__TAURI__.core.invoke("transcript_redo_own", { name: nameOf(session) }), "transcription", words.redo_transcript_do);
 }
 
 function minutesCard(read, words, session, transcript) {
