@@ -4512,8 +4512,13 @@ def settings_narrow_without_model(now: dt.datetime) -> None:
                              and b.find_element(By.ID, "transcription-on-computer").is_displayed(), 10)
             missing = browser.execute_script("return document.getElementById('model-state')?.dataset.missing ?? null")
             over = browser.execute_script(SETTINGS_OVERFLOW)
-            check(f"{short}, 420 px, no model on this computer: the guided step inside its card, nothing spilling (#868)",
-                  drawn and missing == "true" and over == [], {"missing": missing, "over": over, "past": browser.execute_script(past)})
+            # What the user sees of a spill: the page, or its pane, scrolled sideways (#868's bar under Settings).
+            sideways_ = browser.execute_script(
+                "return [document.scrollingElement, document.body, document.getElementById('pane'), document.getElementById('settings')]"
+                ".filter((e) => e && e.scrollWidth > e.clientWidth + 1).map((e) => [e.id || e.tagName, e.clientWidth, e.scrollWidth])")
+            check(f"{short}, 420 px, no model on this computer: nothing scrolls sideways, the guided step inside its card (#868)",
+                  drawn and missing == "true" and sideways_ == [] and over == [],
+                  {"missing": missing, "sideways": sideways_, "over": over, "past": browser.execute_script(past)})
             # The state cut in the list is never lost: the whole choice as its tooltip, and said under it.
             said = browser.execute_script(
                 "const p = document.getElementById('model'); return [p.title, p.options[p.selectedIndex]?.text ?? null,"
