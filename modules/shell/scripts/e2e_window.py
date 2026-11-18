@@ -6146,8 +6146,8 @@ def minutes_checked(now: dt.datetime) -> None:
                  "const page = document.scrollingElement; return [page.scrollWidth - page.clientWidth, wide]")
 
     for language, short, cost, listen, passage, sections in (
-        ("fr_FR.UTF-8", "fr", "0,012 $US", "Écouter à partir de", "Voir le passage à", ("Points saillants", "Actions", "Points clés")),
-        ("en_US.UTF-8", "en", "$0.012", "Play from", "Go to", ("Highlights", "Actions", "Key points")),
+        ("fr_FR.UTF-8", "fr", "0,012 $US", "Écouter à partir de {}", "Voir le passage à {}", ("Points saillants", "Actions", "Points clés")),
+        ("en_US.UTF-8", "en", "$0.012", "Play from {}", "Go to {} in the transcript", ("Highlights", "Actions", "Key points")),
     ):
         with Window(meetings, language, "reminder = false\n") as browser:
             browser.set_window_size(1100, 800)
@@ -6173,7 +6173,7 @@ def minutes_checked(now: dt.datetime) -> None:
                   browser.execute_script("return document.querySelector('#meeting table.actions td.written button.line-time')?.textContent") == "01:50", got)
             got = browser.execute_script(labels)
             check(f"{short}: each time a link that says what it does; a time out of bounds stays the item's text",
-                  got == [[at, f"{listen} {at}"] for at in ("01:40", "01:50", "01:10")]
+                  got == [[at, listen.format(at)] for at in ("01:40", "01:50", "01:10")]
                   and "[12:75]" in browser.find_element(By.CSS_SELECTOR, "#meeting .minutes .body").text
                   and "[01:" not in browser.find_element(By.CSS_SELECTOR, "#meeting .minutes .body").text, got)
             told = browser.execute_script("return [...document.querySelectorAll('#meeting .minutes button.line-time')].map(l => l.title === l.getAttribute('aria-label') && l.title !== '')")
@@ -6247,7 +6247,7 @@ def minutes_checked(now: dt.datetime) -> None:
                 wait_for(browser, lambda b: b.find_elements(By.ID, "no-player") and b.find_elements(By.CSS_SELECTOR, "#meeting .lines li"), 10)
                 got = browser.execute_script(labels)
                 check(f"{short}: its audio {why}: a time brings its passage into view, and says that alone",
-                      got == [[at, f"{passage} {at}"] for at in ("01:40", "01:50", "01:10")], got)
+                      got == [[at, passage.format(at)] for at in ("01:40", "01:50", "01:10")], got)
                 browser.execute_script(away)
                 browser.execute_script(links)[0].click()
                 shown = wait_for(browser, lambda b: b.execute_script(in_view, 50), 3)
