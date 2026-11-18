@@ -11,7 +11,7 @@ flowchart LR
     T["transcript.jsonl<br/>context.txt"]:::file --> P["kitokey-summary<br/>a program, no window"]:::mod
     P -->|"one request"| V["The provider the user configured:<br/>a model on the machine, or online"]:::ext
     V --> P
-    P -->|"minutes/v3, whole or not at all"| M["minutes.md"]:::file
+    P -->|"minutes/v4, whole or not at all"| M["minutes.md"]:::file
     P -.->|"sending · written"| W["Whoever started it"]:::user
 
     classDef file fill:#1e3a8a,color:#fff
@@ -94,7 +94,7 @@ section of the [manifest](./MANIFEST.yaml), for this module's stack. What each o
 
 ## Contracts
 
-- Provided: [`minutes/v3`](../../contracts/minutes/v3/README.md) — written —, and [`minutes/v2`](../../contracts/minutes/v2/README.md) and [`minutes/v1`](../../contracts/minutes/v1/README.md) — written before, still read —, `experimental`; [`summarising/v1`](../../contracts/summarising/v1/README.md) — how it is started and what it says, `experimental`
+- Provided: [`minutes/v4`](../../contracts/minutes/v4/README.md) — written, how long the making took said (D97) —, and [`minutes/v3`](../../contracts/minutes/v3/README.md), [`minutes/v2`](../../contracts/minutes/v2/README.md) and [`minutes/v1`](../../contracts/minutes/v1/README.md) — written before, still read —, `experimental`; [`summarising/v1`](../../contracts/summarising/v1/README.md) — how it is started and what it says, `experimental`
 - Consumed: [`transcript/v1`](../../contracts/transcript/v1/README.md)
 
 ## Decisions
