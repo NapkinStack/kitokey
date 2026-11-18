@@ -5602,7 +5602,17 @@ def focus_swept(now: dt.datetime) -> None:
         except (ElementNotInteractableException, WebDriverException):
             ActionChains(browser).click(browser.execute_script("return arguments[0].closest('label') || arguments[0]", control)).perform()
 
-    def act(browser, control: dict, mouse: bool) -> str | None:
+    # A list chosen by the mouse opens GTK's own menu, a window of its own, which the driver never opens: the
+    # list focused by the click, then left for the menu — the focus nowhere in the page, Kitokey's window
+    # without the system's —, the value set, the window's focus given back; its change, before or after that
+    # focus, both played (#944: the decider's gesture, the coordinator's reading of it).
+    menu = ("const [s, at, changeFirst] = arguments; const changed = () => { s.dispatchEvent(new Event('input', {bubbles: true}));"
+            " s.dispatchEvent(new Event('change', {bubbles: true})); };"
+            " s.focus(); s.blur(); window.dispatchEvent(new FocusEvent('blur')); s.selectedIndex = at;"
+            " if (changeFirst) { changed(); window.dispatchEvent(new FocusEvent('focus')); }"
+            " else { window.dispatchEvent(new FocusEvent('focus')); setTimeout(changed, 500); }")
+
+    def act(browser, control: dict, mouse: bool, change_first: bool = False) -> str | None:
         """The control changed by a key or a click; the id the focus should be on after, None when it cannot change."""
         cid, kind = control["id"], control["kind"]
         if kind == "radio":
@@ -5623,11 +5633,7 @@ def focus_swept(now: dt.datetime) -> None:
                 return None
             other = control["index"] - 1 if control["index"] == control["options"] - 1 else control["index"] + 1
             if mouse:
-                # A list chosen by the mouse opens GTK's own menu, a window of its own: Kitokey's loses the
-                # system's focus and gets it back once it closes — which the driver's choice does not do.
-                browser.execute_script("document.activeElement?.blur(); window.dispatchEvent(new FocusEvent('blur'))")
-                Select(browser.find_element(By.ID, cid)).select_by_index(other)
-                browser.execute_script("window.dispatchEvent(new FocusEvent('focus'))")
+                browser.execute_script(menu, browser.find_element(By.ID, cid), other, change_first)
             else:
                 browser.execute_script("document.getElementById(arguments[0]).focus()", cid)
                 ActionChains(browser).send_keys(Keys.ARROW_UP if other < control["index"] else Keys.ARROW_DOWN).perform()
@@ -5664,8 +5670,9 @@ def focus_swept(now: dt.datetime) -> None:
                     if browser.execute_script(opened) == 0:
                         break
                     settle(browser)
-                for mouse in (False, True):
-                    how = "a click" if mouse else "the keyboard"
+                for how in ("the keyboard", "a click, the window's focus back before the change", "a click, the change before the window's focus"):
+                    mouse = how != "the keyboard"
+                    change_first = how.endswith("window's focus")
                     done: set[str] = set()
                     swept = 0
                     while swept < 60:
@@ -5677,13 +5684,13 @@ def focus_swept(now: dt.datetime) -> None:
                         control = todo[-1]
                         key = control["group"] or control["id"]
                         done.add(key)
-                        if mouse and control["kind"] == "field":
+                        if mouse and control["kind"] == "field" or change_first and control["kind"] != "list":
                             continue
                         browser.execute_script("document.getElementById(arguments[0]).scrollIntoView({block: 'center'}); window.__moves = []; window.__drawn = 0", control["id"])
                         time.sleep(0.4)
                         before = browser.execute_script(where)
                         try:
-                            expected = act(browser, control, mouse)
+                            expected = act(browser, control, mouse, change_first)
                         except WebDriverException as why:
                             check(f"{short}, {how}: #{key} ({control['kind']}) changed (#944)", False, str(why).splitlines()[0])
                             continue
@@ -5694,8 +5701,11 @@ def focus_swept(now: dt.datetime) -> None:
                         after = browser.execute_script(where)
                         if expected == "radio":
                             expected = next((rid for rid, on in browser.execute_script(radios, key) if on), "a radio of " + key)
+                        # The page cut shorter under the window by the change itself (the developer mode turned off, the
+                        # logs' rows gone): the browser brings it to its new end — as far as it can still be, no further.
+                        cut = before[1] > after[2] and abs(after[1] - after[2]) <= 1
                         check(f"{short}, {how}: #{key} ({control['kind']}) changed, the focus kept on #{expected}, the page where it was (#944, D101)",
-                              after[0] == expected and abs(after[1] - before[1]) <= 1,
+                              after[0] == expected and (abs(after[1] - before[1]) <= 1 or cut),
                               {"before": before, "after": after, "still": quiet, "focus moves": browser.execute_script("return window.__moves"),
                                "drawn": browser.execute_script("return window.__drawn")})
                         if control["kind"] == "field":
