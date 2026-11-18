@@ -295,6 +295,19 @@ def typed(browser, element_id: str, text: str) -> bool:
     return True
 
 
+def chosen(browser, element_id: str, value: str) -> None:
+    """A list's value chosen on the list as drawn now: a choice saved draws Settings anew, and the list
+    found a moment before is gone (#922). Not chosen within 10 s, a FAIL names it."""
+    def choose(b) -> bool:
+        try:
+            Select(b.find_element(By.ID, element_id)).select_by_value(value)
+            return True
+        except ElementNotInteractableException:
+            return False
+    if not wait_for(browser, choose, 10):
+        check(f"#{element_id}: « {value} » chosen", False, f"#{element_id} offered no « {value} » to choose for 10 s")
+
+
 def press(browser, element_id: str) -> None:
     """A click on the page as it is: drawn again under the driver, the element is found afresh;
     found before it can be clicked — shown, laid out — it is clicked a moment later (#510)."""
@@ -4744,17 +4757,17 @@ def appearance_chosen(now: dt.datetime) -> None:
                   and Select(pick[0]).first_selected_option.get_attribute("value") == "system"
                   and browser.execute_script(ground) == grounds[system], (choices, browser.execute_script(ground)))
             if pick:
-                Select(pick[0]).select_by_value(other)
+                chosen(browser, "appearance", other)
             taken = wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
             check(f"the system {wanted}: « {'Clair' if other == 'light' else 'Sombre'} » chosen while the system says the other: the window takes it at once, kept (D98)",
                   taken and f'appearance = "{other}"' in window.file.read_text(), (browser.execute_script(ground), window.file.read_text()))
             shot(browser, f"d98-settings-{other}")
             if pick:
-                Select(browser.find_element(By.ID, "appearance")).select_by_value("system")
+                chosen(browser, "appearance", "system")
             back = wait_for(browser, lambda b: b.execute_script(ground) == grounds[system], 3)
             check(f"the system {wanted}: « Système » chosen again: the system's appearance followed, as before (D98)", back, browser.execute_script(ground))
             if pick:
-                Select(browser.find_element(By.ID, "appearance")).select_by_value(other)
+                chosen(browser, "appearance", other)
             wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
         # Started again, the bar alone: it takes the appearance kept.
         window.file.write_text(window.file.read_text().replace('window = "full"\n', ""))
