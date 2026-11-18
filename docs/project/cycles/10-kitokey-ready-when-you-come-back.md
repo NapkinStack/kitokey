@@ -55,7 +55,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given a transcript or a summary made, when its page shows, then its line says how long the making took beside who made it and when — « Compte rendu du 13 nov. à 14:53 · Claude Sonnet 4.5, via openrouter.ai · en 3 s · 0,002 $ », « Transcrit le 13 nov. à 14:50 · Whisper small · en 40 s » / « … · in 3 s » —, one form for both lines (the decider, 2026-11-17): D93's date first, no day of the week, then the model and its service, the duration, and the cost D51 shows last, each only when known; no size on disk, the time from the making's start to its last line written, kept with the version it made: an optional field, added to the contract's page and schema in the contract's own pull request, then written by its producer in its own, before the shell reads it; a version without it shows the rest of the line; held by the contracts' tests on both sides and the e2e"
-      - "Given a service that reports what a making cost — OpenRouter's `usage.cost`, as D51 reads it for the summary —, when the line shows, then it adds the cost, rounded and written in the user's language — « · env. 0,2 ct $ » / « · about $0.002 » —; given a service that does not report it, or this computer, then no cost is said, never one Kitokey estimates; held by tests of the format and the e2e"
+      - "Given a service that reports what a making cost — OpenRouter's `usage.cost`, as D51 reads it for the summary —, when the line shows, then it adds the cost, rounded and written in the user's language as D51 writes the summary's — « · 0,012 $US » / « · $0.012 » (the decider, 2026-11-18: D51's form holds this criterion, in place of « · env. 0,2 ct $ » / « · about $0.002 ») —; given a service that does not report it, or this computer, then no cost is said, never one Kitokey estimates; held by tests of the format and the e2e"
   - id: D98
     title: "Settings offer the appearance: System, Light or Dark"
     module: shell
@@ -313,6 +313,19 @@ rapidement dans le même cycle », its end unchanged.
   (#781); unreadable settings never make the meetings look lost
   (#770); the polish of the 0.2.4 pass (#775).
 - A meeting named by its title, given or proposed by the summary (#504).
+- **Summary structures** (the decider, 2026-11-18): « suivant ses réunions un utilisateur peut avoir besoin d'une
+  "structure" de compte rendu différente […] lui en proposer des classiques mais aussi lui permettre d'en créer
+  d'autres, de les modifier, les supprimer ». The market already answers which ones: Granola, Fireflies, Otter,
+  tl;dv and Zoom ship built-in structures by meeting type (general, 1:1, stand-up, sales or client call,
+  brainstorm) and custom ones, chosen per meeting with a default, a change of structure making the summary
+  again ([Granola](https://docs.granola.ai/help-center/taking-notes/customise-notes-with-templates),
+  [Fireflies](https://guide.fireflies.ai/articles/7796555530-how-to-create-and-manage-custom-summary-templates),
+  [tl;dv](https://intercom.help/tldv/en/articles/9670088-meeting-templates)). What it costs here: `minutes/v4`
+  holds exactly three sections found by their place, so free structures are a `minutes/v5` through
+  expand/contract over contracts, summary and shell. Framer's proposal for cycle 11, not decided: a structure is a
+  name and sections (a title, one line saying what goes in it); built-in ones kept intact and duplicated to adapt;
+  the user's own created, edited and deleted in Settings; chosen as a default, per meeting in « Avancé » and in
+  Refaire. Proposed no-gos: no editable system prompt, no choice by calendar, no sharing.
 - **macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation, FLAC in WKWebView — moved from
   cycle 09's *Later*.
 - Fluent in place of `words.rs` at a third language or a translator who does not write Rust (the copy
