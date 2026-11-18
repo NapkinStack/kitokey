@@ -2646,6 +2646,21 @@ function guidedAdvanced(path, words, own, contents) {
   return [toggle, panel];
 }
 
+// A model chosen in a list that waits for « Enregistrer », not yet saved: kept across a drawing, as the
+// way and the service above it are — Settings are drawn anew from what is saved whenever another
+// control is (#948). `key`: which list of the step, read as it changes; else the one saved.
+function chosenKept(path, list, key, saved) {
+  const values = [...list.options].map((option) => option.value);
+  const pending = guided[path].chosen.models?.[key];
+  const kept = values.includes(pending) ? pending : values.includes(saved) ? saved : null;
+  if (kept !== null) list.value = kept;
+}
+function chosenKeeps(path, list, key) {
+  list.addEventListener("change", () => {
+    guided[path].chosen.models = { ...guided[path].chosen.models, [key()]: list.value };
+  });
+}
+
 function minutesRow(minutes, words, locked) {
   const box = element("div", "step");
   const title = element("span", "name", words.minutes_step);
@@ -2684,7 +2699,8 @@ function minutesRow(minutes, words, locked) {
   // On this computer: Ollama's models, each said as people say it.
   const [hereWrap, herePick] = listed("minutes", words.model_name);
   for (const name of minutes.ollama) option(herePick, name, name === minutes.recommended ? fill(words.model_recommended, modelSaid(name)) : modelSaid(name));
-  if (savedHere && minutes.ollama.includes(minutes.model)) herePick.value = minutes.model;
+  chosenKept("minutes", herePick, "here", savedHere ? minutes.model : null);
+  chosenKeeps("minutes", herePick, () => "here");
   const hereSave = button("minutes-save", words.save, false);
   hereSave.addEventListener("click", () => save(minutes.ollama_address, herePick.value, null));
   herePick.addEventListener("change", () => (unsaved.hidden = savedHere && herePick.value === minutes.model));
@@ -2701,11 +2717,12 @@ function minutesRow(minutes, words, locked) {
   const [modelsWrap, modelsPick] = listed("minutes-models", words.model_name);
   const onlineSave = button("minutes-online-save", words.save, true);
   const service = () => minutes.online[Number(servicePick.value)];
+  chosenKeeps("minutes", modelsPick, () => servicePick.value);
   // The models listed with its key, the one saved chosen.
   const shownListed = (models) => {
     modelsPick.replaceChildren();
     for (const id of models) option(modelsPick, id, modelSaid(id));
-    if (models.includes(minutes.model)) modelsPick.value = minutes.model;
+    chosenKept("minutes", modelsPick, servicePick.value, minutes.model);
     modelsWrap.hidden = onlineSave.hidden = models.length === 0;
   };
   // This service's last answer, said again; else the model saved with it — the others come with its key.
@@ -3040,6 +3057,7 @@ function showSettings(shown, minutes, words) {
   keySaid.id = "transcription-key-said";
   keySaid.setAttribute("role", "status");
   const [modelsWrap, serviceModels] = guidedList("transcription-models", words.service_model, locked);
+  chosenKeeps("transcription", serviceModels, () => servicePick.value);
   const [agreeWrap, agreeBox, agreeHost, agreeShown] = agreement("transcription-agreed");
   const saveService = guidedButton("transcription-save", words.service_save, true, locked);
   // One « Enregistrer » and one agreement at a time (#860): the service's, « Avancé » folded; unfolded,
@@ -3054,7 +3072,7 @@ function showSettings(shown, minutes, words) {
   const shownListed = (models) => {
     serviceModels.replaceChildren();
     for (const id of models) guidedOption(serviceModels, id, modelSaid(id));
-    if (models.includes(shown.transcription_model)) serviceModels.value = shown.transcription_model;
+    chosenKept("transcription", serviceModels, servicePick.value, shown.transcription_model);
     modelsWrap.hidden = models.length === 0;
     listedShown = models.length > 0;
     paintSaves();
