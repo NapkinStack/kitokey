@@ -14,14 +14,25 @@ VERSION=$(answer _commit)
 if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   # --refresh-package: a runner that outlives its jobs keeps uv's cache, and a page of the
   # registry read before a release would say this version does not exist.
-  uv tool install "napkinstack==${VERSION#v}" --refresh-package napkinstack --with-executables-from pre-commit || {
-    # D201: an update made by an engine run from its sources is ahead of the release
-    echo "FAIL [nstack] napkinstack ${VERSION#v} could not be installed from PyPI: not published yet — its release"
-    echo "      may await approval — or the registry did not answer."
-    echo "      Action: run this check again once https://pypi.org/project/napkinstack/${VERSION#v}/ answers."
-    exit 1
-  }
-  exit 0
+  # Minutes after a release, PyPI's index may not list the version its project page shows: a
+  # version not listed is asked again, a few times, said; any other failure fails at once.
+  ERRORS=$(mktemp)
+  trap 'rm -f "$ERRORS"' EXIT
+  for ATTEMPT in 1 2 3 4 5 6; do
+    if uv tool install "napkinstack==${VERSION#v}" --refresh-package napkinstack --with-executables-from pre-commit 2>"$ERRORS"; then
+      cat "$ERRORS" >&2
+      exit 0
+    fi
+    cat "$ERRORS" >&2
+    grep -q "no version of napkinstack" "$ERRORS" && [ "$ATTEMPT" -lt 6 ] || break
+    echo "[nstack] napkinstack ${VERSION#v} not listed yet by PyPI's index (attempt $ATTEMPT of 6): asked again in 30 s."
+    sleep 30
+  done
+  # D201: an update made by an engine run from its sources is ahead of the release
+  echo "FAIL [nstack] napkinstack ${VERSION#v} could not be installed from PyPI: not published yet — its release"
+  echo "      may await approval — or the registry did not answer."
+  echo "      Action: run this check again once https://pypi.org/project/napkinstack/${VERSION#v}/ answers."
+  exit 1
 fi
 
 SOURCE=$(answer _src_path)

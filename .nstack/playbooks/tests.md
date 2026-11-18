@@ -69,10 +69,21 @@ reads the log files the run wrote there:
 
 - **One run at a time, unless sealed.** What an end-to-end run drives — a sound server, a
   display, a port — is the machine's, so `nstack e2e` runs one at a time on a machine, and a run
-  that waits says for whom, every minute. A module whose run brings its own session, sound server
-  and ports, and reads nothing another run reads, declares `evidence.sealed: true`: its run
-  neither waits nor holds the machine. Declare it only when that is true: two runs that share a
-  device see each other's sounds and windows, and fail for no reason of their own.
+  that waits says for whom, every minute. A module whose run shares nothing with another run
+  declares `evidence.sealed: true`: its run neither waits nor holds the machine. Declare it only
+  when each of these is true — two runs that share one of them see each other's state, and fail
+  for no reason of their own:
+
+  | Not shared | How to check |
+  |---|---|
+  | Session and devices: display, sound server, session bus | its run starts them, headless, and passes their address to what it drives (`DISPLAY`, `PULSE_SERVER`, `DBUS_SESSION_BUS_ADDRESS` from `dbus-run-session`) |
+  | Ports | each server binds port 0 itself and reports the port it got; never a fixed number, nor one picked and released before the server binds it |
+  | Files: build output, temporary files, sockets, state, configuration | everything it writes goes under a folder of its own run — the build tool's output folder set per run (`CARGO_TARGET_DIR`, not `build-dir`), `TMPDIR`, `HOME` and `XDG_*_HOME` pointed there —, never a fixed path |
+  | Processes | its teardown stops what it started — a process group it created (`setsid`, `start_new_session`), or the PIDs it recorded for a daemon that detaches — never by name or executable path |
+  | Timings, whatever the load | it passes with the machine busy; a run that waits for a quiet machine is the opposite of sealed |
+
+  The lock keeps unsealed runs apart, not sealed ones: a run that needs a quiet machine cannot get
+  one from the lock while sealed runs go beside it.
 
 ```yaml
 evidence:
@@ -80,7 +91,7 @@ evidence:
     - pattern: "key refused"
       level: warning
       scenario: S3
-  sealed: true   # its own headless session and sound server: runs beside any other
+  sealed: true   # every row of the table above holds: runs beside any other
 ```
 
 ---

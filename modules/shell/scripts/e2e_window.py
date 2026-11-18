@@ -283,17 +283,30 @@ def choose(browser, element_id: str, value: str) -> None:
     Select(browser.find_element(By.ID, element_id)).select_by_value(value)
 
 
-def typed(browser, element_id: str, text: str) -> bool:
+def typed(browser, element_id: str, text: str, quarantined: str = "") -> bool:
     """Text typed in a field of the page once it is drawn, shown and enabled — a choice just made
     draws its fields anew, and one not yet there cannot take the focus (#901). A field that never
     comes is a FAIL naming it and what was there — absent, hidden or disabled —, nothing typed, never
-    an exception that stops the shard (#907): False, for its caller to stop where nothing could hold."""
+    an exception that stops the shard (#907): False, for its caller to stop where nothing could hold.
+    `quarantined`, the issue and the date it is taken back up: the same said as quarantined, not
+    failed (tests.md, *Flaky tests*), with what the page showed and a screenshot, for its cause."""
     ready = lambda b: any(f.is_displayed() and f.is_enabled() for f in b.find_elements(By.ID, element_id))
     if not wait_for(browser, ready, 10):
         seen = browser.execute_script(
             "const f = document.getElementById(arguments[0]);"
             " return f ? {shown: f.getClientRects().length > 0, disabled: f.disabled} : 'absent'", element_id)
-        check(f"the field « {element_id} » comes, shown and enabled, to be typed in", False, seen)
+        what = f"the field « {element_id} » comes, shown and enabled, to be typed in"
+        if not quarantined:
+            check(what, False, seen)
+            return False
+        # What hides it: the choice of where, its block, and Settings drawn — read when it happens.
+        page = browser.execute_script(
+            "const r = (id) => { const e = document.getElementById(id); return e ? {checked: e.checked, disabled: e.disabled,"
+            " hidden: e.hidden, shown: e.getClientRects().length > 0} : 'absent'; };"
+            " return {online: r('transcription-online'), here: r('transcription-here'), away: r('transcription-away'),"
+            " settings: r('settings'), hash: location.hash}")
+        print(f"  QUARANTINED  {what} ({quarantined})\n        got: {seen}\n        page: {page}")
+        shot(browser, f"quarantined-{element_id}")
         return False
     browser.find_element(By.ID, element_id).send_keys(text)
     return True
@@ -7325,7 +7338,9 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "transcription-online")
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            if not typed(browser, "transcription-key", heard):
+            # Quarantined (#930): the field sometimes never shown, 3 of about 15 full runs; its cause not
+            # yet known. Nothing after it is checked then. Taken back up on 2026-11-25 at the latest.
+            if not typed(browser, "transcription-key", heard, quarantined="#930, taken back up by 2026-11-25"):
                 return
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
@@ -11222,8 +11237,15 @@ def main() -> int:
         browser.find_element(By.ID, "small-stop").click()
         rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 5)
         check("opened from the full window during a recording, it too comes back to rest, in English", rest and browser.find_element(By.ID, "small-record").get_attribute("aria-label") == "Start a recording")
-        back = wait_for(browser, lambda b: b.execute_script("return [innerWidth, innerHeight]") == [440, 44], 5)
-        check("at rest, in English, 440 × 44 again", back, browser.execute_script("return [innerWidth, innerHeight]"))
+        # Its transcript follows the stop: the bar at rest is its row of 44 and D92's one line alone under it, saying
+        # that meeting (#939), as context_before_start reads it.
+        rest_alone = ("const lines = [...document.querySelectorAll('#small .bar-lines > *')].filter(e => e.id !== 'small-last' && e.getClientRects().length);"
+                      " const p = document.getElementById('small'), l = document.getElementById('small-last');"
+                      " return innerWidth === 440 && lines.length === 0 && Math.round(document.querySelector('#small .bar-row').getBoundingClientRect().height) === 44"
+                      " && Math.abs(innerHeight - Math.ceil(p.getBoundingClientRect().height)) <= 1 && (l.hidden || l.getBoundingClientRect().height <= 20)")
+        back = wait_for(browser, lambda b: b.execute_script(rest_alone), 5)
+        check("at rest, in English, 440 wide again: its row of 44, and D92's one line alone under it (#939)", back,
+              browser.execute_script("return [innerWidth, innerHeight, document.getElementById('small-last')?.textContent]"))
 
     print("I. the window, in English; and a folder with no session")
     empty = WORK / "empty"

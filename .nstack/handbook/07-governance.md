@@ -263,17 +263,17 @@ to use (GitHub wording, transposable elsewhere):
 |---|---|
 | Pull requests required | No direct change on the protected branch |
 | Required checks | A red CI blocks the merge, without exception |
-| CODEOWNERS | The right owner is asked automatically |
+| CODEOWNERS | The right owner is asked automatically — a user, or a team written organisation/team; GitHub reads an organisation named alone as no owner at all |
 | Rulesets / branch protection | The rules do not depend on goodwill |
 | Issue forms | What nobody planned arrives with what is needed to judge it |
 | PR template | The DoD is visible at review time |
 | Labels | Exceptions are visible and counted |
 | Protected environments | Deployment goes through an approval |
 | Dependency / security automation | CVEs do not depend on manual watching |
-| Merge queue | Avoids merges that break each other |
+| Branches up to date before merging (G22) — or a merge queue, where the forge offers one (organisation repositories) and the checks run on it | Two changes each green on its own base never turn main red together: what was checked is what lands. Updating a branch costs the cheap checks — attested, `nstack attest` on the updated head; a module's are kept while nothing they read moved. How to keep it cheap: `05-workflow.md`, *Up to date before merging* |
 | A dedicated identity for agents | An agent never merges around the approval the project asks for |
 | Rulesets with an empty bypass list | Nobody, administrators included, merges around a rule |
-| Stale approvals dismissed on push | An approval covers the commits its approver read |
+| Stale approvals dismissed on push | An approval covers the commits its approver read — where the plan has no ruleset, `pr-check` says each approval the head moved past (R1) |
 | A default code owner — on `approval: agent`, a human owner where one must approve | The code owner review covers every path a human must approve |
 | A record of what landed | Nothing reaches the protected branch in silence — it records, it never refuses |
 
@@ -313,7 +313,14 @@ by a commit with no change of its own — tracked or not. The record says which 
 outside it hold is not compared: `nstack attest --again` runs them. They are also kept
 across commits — a merge of the default branch that touched nothing they read: their modules,
 those they consume from, `contracts/`, `platform/` and the files outside the modules — while the
-digest of what they read is unchanged, for 7 days and 20 default-branch commits at most. Where the answer is `forge`, a record is
+digest of what they read is unchanged, for 7 days and 20 default-branch commits at most. A record
+known to be unsound — two runs that shared what a run must not share, a tool found lying — is
+voided: `nstack attest --void <commit> --reason "<why>"` adds a line naming who, why and every
+run the commit's note holds. None of them is a record afterwards, nor kept from — on its commit, or
+through another commit's record that kept from it —, and `pr-check` refuses a head whose record
+is voided or keeps a check from a voided run, until it is attested again. The runs stay in the
+note: evidence is never rewritten. A void travels as a record does, under the same identity
+rule; the status on the forge turns to *voided* only with a token that may write it. Where the answer is `forge`, a record is
 information, and on a guarded repository the forge's required checks stay the barrier — a
 decider who wants the record to gate a protected branch requires its name at the forge.
 Where the answer is `attested`, requiring it is what keeps a pull request moving: the record
@@ -333,6 +340,22 @@ often personal — is refused before any check runs; set the checkout's identity
 record of a new contributor, `nstack attest --accept-identity`. GitHub's noreply address is always
 accepted, and enough. A repository with no remote is never refused: nothing travels.
 
+**A dependency bot's pull request, where checks are attested.** Dependabot's — or Renovate's —
+pull requests carry no record, and the bot takes commands only from people with push access: an
+agent's App asking it to rebase is refused. Nothing is re-applied by hand. When the branch is
+behind and the ruleset asks it to be up to date, a person's `@dependabot rebase` keeps the bot
+maintaining it; otherwise the agent updates it on the forge
+(`gh api --method PUT repos/<owner>/<repo>/pulls/<number>/update-branch`, which the App's pull
+requests and contents write permissions allow, both given by `nstack agent add` — where the
+update touches workflow files, the App also needs the workflows permission, `nstack agent add
+--workflows`). The bot then stops maintaining that pull request: a conflict or a newer version is
+a person's `@dependabot recreate`. The agent fetches the base and the head together and checks
+the head out as it stands (`git fetch origin main pull/<number>/head:refs/remotes/origin/pr/<number>
+&& git checkout --detach origin/pr/<number>`), then runs `nstack attest`: the record names who ran
+the checks, never who wrote the commit, and each new head is attested again. The route covers
+updates outside the modules; a bot's update inside one is delivery work like any other, with its
+deliverable or the out-of-cycle label.
+
 **A record is published with the repository**: the notes are pushed, and every step's output
 travels in them. `nstack attest` writes the checkout's root as `<root>` and the home folder as `~`,
 whole folders only. Anything else a step prints travels as printed, and is the step's to keep out:
@@ -341,6 +364,13 @@ in a failed test's output. The SHA-256 of each step is of its output as it ran, 
 recomputed from the record. A record an earlier
 version pushed keeps its paths: notes are history, and rewriting them rewrites the evidence
 `pr-check` reads.
+
+**A failed check says what failed, and keeps its output on the workstation.** Under the check's
+FAIL line, `nstack attest` shows the last lines a module's own command wrote before it exited — a
+test runner's summary names the test that failed — and the path of the check's whole output, in
+the clone's git folder (`.git/nstack/attest/<commit>-<check>.log`, a worktree's own git folder in a
+worktree), never in the tree and never pushed. A test that fails once and passes again is named there: quarantine it by that name
+(`.nstack/playbooks/tests.md`).
 
 ### Agents and approval
 
@@ -377,7 +407,9 @@ settings close that door, and they only hold together:
    the code owners file names a human only where one must approve.
 3. **Nobody is on the rulesets' bypass list**, administrators included.
 4. **An approval is dismissed when new commits are pushed**: otherwise a force-push after
-   the approval merges content its approver never read.
+   the approval merges content its approver never read. Where the plan has no ruleset to
+   dismiss it, the forge still shows *approved*: `pr-check` says each approval the head moved
+   past (R1), and nobody merges on it until its approver has approved the head.
 
 The human who drove the agent may approve its pull request. A team that wants four eyes
 adds "require approval of the most recent reviewable push", or a second reviewer.
