@@ -7,11 +7,14 @@ use kitokey_shell::{
     sessions,
 };
 
-fn folder(name: &str) -> std::path::PathBuf {
-    let made = std::env::temp_dir().join(format!("kitokey-named-{name}-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&made);
-    fs::create_dir_all(&made).unwrap();
-    made
+/// A folder of the test's own, removed with what it holds when its `TempDir` is dropped (#830).
+fn folder(name: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+    let held = tempfile::Builder::new()
+        .prefix(&format!("kitokey-named-{name}-"))
+        .tempdir()
+        .unwrap();
+    let made = held.path().to_path_buf();
+    (held, made)
 }
 
 fn session(folder: &std::path::Path) {
@@ -91,7 +94,7 @@ fn a_name_is_one_line_not_blank_within_its_length_counted_in_characters() {
 
 #[test]
 fn written_whole_read_back_removed_blank_refused_before_session_json_or_for_no_line() {
-    let dir = folder("write");
+    let (_held, dir) = folder("write");
     assert_eq!(write(&dir, "Point").unwrap_err().kind(), ErrorKind::NotFound);
     assert!(!dir.join(FILE).exists());
     session(&dir);
@@ -112,7 +115,7 @@ fn written_whole_read_back_removed_blank_refused_before_session_json_or_for_no_l
 #[test]
 fn it_is_renamed_over_the_old_one_never_written_in_place_and_a_failure_leaves_nothing_beside() {
     use std::os::unix::fs::PermissionsExt;
-    let dir = folder("whole");
+    let (_held, dir) = folder("whole");
     session(&dir);
     write(&dir, "Avant").unwrap();
     // Refused to anyone writing in place; a rename does not ask the file.
@@ -129,7 +132,7 @@ fn it_is_renamed_over_the_old_one_never_written_in_place_and_a_failure_leaves_no
 
 #[test]
 fn a_file_that_is_no_such_line_gives_no_name() {
-    let dir = folder("read");
+    let (_held, dir) = folder("read");
     session(&dir);
     for not in [&b"two\nlines\n"[..], b"   \n", b"", b"\xff\xfe", "é".repeat(MOST + 1).as_bytes()] {
         fs::write(dir.join(FILE), not).unwrap();
@@ -139,7 +142,7 @@ fn a_file_that_is_no_such_line_gives_no_name() {
 
 #[test]
 fn the_name_comes_before_the_minutes_title_which_comes_back_when_it_goes() {
-    let all = folder("order");
+    let (_held, all) = folder("order");
     let dir = all.join("2026-10-28_14-00");
     fs::create_dir(&dir).unwrap();
     session(&dir);
@@ -159,7 +162,7 @@ fn the_name_comes_before_the_minutes_title_which_comes_back_when_it_goes() {
 
 #[test]
 fn marks_that_show_nothing_take_the_name_away_as_an_empty_field_does() {
-    let all = folder("marks");
+    let (_held, all) = folder("marks");
     let dir = all.join("2026-10-28_14-00");
     fs::create_dir(&dir).unwrap();
     session(&dir);
