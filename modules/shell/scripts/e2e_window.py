@@ -3131,7 +3131,7 @@ def models_advanced(now: dt.datetime) -> None:
                 press(browser, "redo-minutes")
                 wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
                 press(browser, "redo-do")
-                failed = wait_for(browser, lambda b: "pas été fait" in b.execute_script(failure), 15)
+                failed = wait_for(browser, lambda b: "Le dernier Refaire a échoué" in b.execute_script(failure), 15)
                 told = browser.execute_script(failure)
                 check("the meeting's own minutes model fails: the page names it, and Refaire… › Avancé to choose another",
                       failed and "Mistral 7b" in told and "Refaire…\u00a0› Avancé" in told and "réglages" not in told, told)
@@ -3151,7 +3151,7 @@ def models_advanced(now: dt.datetime) -> None:
                 wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
                 writing.unlink(missing_ok=True)
                 press(browser, "redo-do")
-                failed = wait_for(browser, lambda b: "qwen3:14b" in read(writing) and "pas été fait" in b.execute_script(failure), 15)
+                failed = wait_for(browser, lambda b: "qwen3:14b" in read(writing) and "Le dernier Refaire a échoué" in b.execute_script(failure), 15)
                 told = browser.execute_script(failure)
                 check("Settings' minutes model fails: Settings' wording, no « Avancé »",
                       failed and "dans les réglages de Kitokey" in told and "Avancé" not in told, told)
