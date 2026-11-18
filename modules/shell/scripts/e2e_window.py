@@ -793,6 +793,9 @@ def model_offered(now: dt.datetime) -> None:
         waits = "return document.getElementById('transcript-state')?.innerText || ''"
         offered = wait_for(browser, lambda b: "En attente du modèle Whisper" in b.execute_script(waits) and b.find_elements(By.CSS_SELECTOR, "#transcript-state #model-fetch"))
         check("a meeting waiting for the model offers it on its page", offered, browser.execute_script(waits))
+        # Said once (#775): what it waits for, never « Pas encore de transcription » beside it.
+        nones = browser.execute_script("return [...document.querySelectorAll('#meeting .transcript .none')].filter(e => e.offsetParent !== null).map(e => e.textContent)")
+        check("a transcript waiting for its model says that alone, not also that there is none (#775)", nones == [], nones)
         # The tray's entry that fetches it follows the language chosen, at once (D64).
         speak = lambda code: browser.execute_script("return window.__TAURI__.core.invoke('settings_saved', {change: {language: arguments[0]}})", code)
         tray = lambda b, said: any(label.startswith(said) for label in tray_labels())
@@ -7017,6 +7020,12 @@ def two_panes(now: dt.datetime) -> None:
         # D89: the shortcut, gone from under the sidebar's button, is said here, where nothing was recorded yet.
         keys = browser.execute_script("const k = document.getElementById('empty-keys'); return [!!k && k.offsetParent !== null, k && k.textContent, document.getElementById('record').title]")
         check("no meeting: the shortcut said beside what to do, and in the button's tooltip (D89)", keys[0] and keys[1] and keys[2] == f"Start a recording ({keys[1]})", keys)
+        # One primary action, the header's (#775): the pane's start is a secondary one, the folder a discreet line under it.
+        primaries = browser.execute_script("return [...document.querySelectorAll('button.primary')].filter(b => b.offsetParent !== null).map(b => b.id)")
+        under = browser.execute_script("const r = document.getElementById('empty-record').getBoundingClientRect(), f = document.getElementById('empty-folder');"
+                                       " return f.offsetParent !== null && f.getBoundingClientRect().top >= r.bottom")
+        check("no meeting: one primary action, the header's; the folder said under the pane's, never in its sentence (#775)",
+              primaries == ["record"] and under and browser.find_element(By.ID, "none").text == "No meeting yet.", (primaries, under))
         browser.set_window_size(420, 400)
         narrow = wait_for(browser, lambda b: b.find_element(By.ID, "sidebar").is_displayed() and b.find_element(By.ID, "none").is_displayed(), 5)
         check("under 840 px too: the sidebar, then what to do", narrow and not browser.execute_script(
@@ -9243,10 +9252,8 @@ def main() -> int:
         )
         check("a session with no readable day is named by its folder", listed[-1][1] == "g", listed[-1])
         total = browser.find_element(By.ID, "weight").text
-        check("what they weigh, on one line, then the bar, no legend (D89, board 4)", total == "201 Mo · 6 réunions", total)
-        bar = browser.find_element(By.ID, "bar")
-        check("the picture of the weights is described, to the pointer too", "L’audio occupe 201 Mo" in (bar.get_attribute("aria-label") or "")
-              and bar.get_attribute("title") == bar.get_attribute("aria-label"), bar.get_attribute("title"))
+        # No bar under it (#775): it showed the audio against the text, and read as a disk full.
+        check("what they weigh, on one line, no bar under it (#775)", total == "201 Mo · 6 réunions" and not browser.find_elements(By.ID, "bar"), total)
         # The theme is the system's: the page's ground is that of the theme the system shows.
         dark = browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
         ground = browser.execute_script("return getComputedStyle(document.body).backgroundColor")
@@ -9636,8 +9643,8 @@ def main() -> int:
         said = not_saved()
         check("a folder that is not a whole path is said, and nothing changes", said.startswith("Le réglage n’a pas été enregistré") and window.file.read_text() == text, said)
         browser.execute_script("location.hash = '#/'")
-        listed = wait_for(browser, lambda b: str(elsewhere) in b.find_element(By.ID, "none").text, 5)
-        check("the list reads the folder chosen", listed, browser.find_element(By.ID, "none").text)
+        listed = wait_for(browser, lambda b: str(elsewhere) in b.find_element(By.ID, "empty-folder").text, 5)
+        check("the list reads the folder chosen", listed, browser.find_element(By.ID, "empty-folder").text)
         browser.find_element(By.ID, "settings-link").click()
         wait_for(browser, lambda b: b.find_elements(By.ID, "reminder"))
         # This computer's Ollama saved, and not answering (here, nothing listens on its port): said
@@ -10221,7 +10228,11 @@ def main() -> int:
         browser.find_element(By.ID, "redo-do").click()
         told = wait_for(browser, lambda b: "pas été refait" in heard.read_text(), 10)
         check("minutes made again that fail: the ones there stay, and the notice says a redo", told and (asked / "minutes.md").read_text() == before, heard.read_text()[-400:])
-        failed = wait_for(browser, lambda b: "n’a pas été fait" in state(b) and b.find_elements(By.ID, "minutes-again"), 5)
+        failed = wait_for(browser, lambda b: "Le dernier Refaire a échoué" in state(b) and b.find_elements(By.ID, "minutes-again"), 5)
+        # The minutes kept, the failure is the redo's (#772): never « non fait » beside them, on the page nor in the list.
+        chips = [c.text for c in browser.find_elements(By.CSS_SELECTOR, ".chip.making") if c.is_displayed()]
+        check("minutes kept after a redo that failed: their chip says the last redo failed, never that none were made (#772)",
+              failed and "Dernier Refaire échoué" in chips and "Compte rendu non fait" not in chips and "pas été fait" not in state(browser), (chips, state(browser)))
         check("the failure said on the meeting's page too, in plain words, with a way to try again — never what the program said",
               failed and "not minutes" not in state(browser) and "not minutes" not in heard.read_text(), (state(browser), heard.read_text()[-400:]))
         # Its cause named by the program, its gesture said, on the page and in the notice (D29).
@@ -10234,7 +10245,7 @@ def main() -> int:
         press(browser, "developer")
         wait_for(browser, lambda b: "developer = true" in window.file.read_text(), 5)
         browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-        detailed = wait_for(browser, lambda b: "the provider's answer is not minutes" in state(b) and "n’a pas été fait" in state(b), 5)
+        detailed = wait_for(browser, lambda b: "the provider's answer is not minutes" in state(b) and "Le dernier Refaire a échoué" in state(b), 5)
         check("in developer mode, what the program said is under the sentence", detailed, state(browser))
         # And the meeting's diagnostic: its makings' lines, every program's — nothing of a path of the run.
         offered = wait_for(browser, lambda b: b.find_elements(By.ID, "copy-diagnostic"), 5)
@@ -10275,7 +10286,7 @@ def main() -> int:
         check("asked through the agreement, still a redo: its failure said as one", told and "pas été fait" not in said and (asked / "minutes.md").read_text() == before, said[-400:])
         browser.execute_script("location.hash = '#/'")
         browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-        plain = wait_for(browser, lambda b: "n’a pas été fait" in state(b), 5)
+        plain = wait_for(browser, lambda b: "Le dernier Refaire a échoué" in state(b), 5)
         check("a later failure that names no cause does not show the earlier one's",
               plain and "écrit de compte rendu" not in state(browser) and "écrit de compte rendu" not in said, (state(browser), said[-300:]))
         time.sleep(3)
@@ -10577,8 +10588,8 @@ def main() -> int:
     empty = WORK / "empty"
     empty.mkdir()
     with Window(empty, "en_GB.UTF-8") as browser:
-        said = browser.find_element(By.ID, "none").text
-        check("an empty folder is said, with its path", said == f"No meeting in {empty} yet.", said)
+        said = [browser.find_element(By.ID, i).text for i in ("none", "empty-folder")]
+        check("an empty folder is said, with its path on a line of its own (#775)", said == ["No meeting yet.", f"Meetings are saved in {empty}."], said)
         check("the sidebar is named in English", browser.find_element(By.ID, "sidebar").get_attribute("aria-label") == "Meetings")
         lang = browser.execute_script("return document.documentElement.lang")
         check("the page says it is in English", lang == "en", lang)
