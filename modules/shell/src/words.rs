@@ -443,17 +443,31 @@ pub struct Window {
     /// One meeting's page.
     pub back: &'static str,
     pub open_folder: &'static str,
-    /// Shows: a meeting's page, beside « Ouvrir le dossier »: the icon's name, said and as its tooltip;
-    /// then the question in place, its sentences and its two buttons (D100). When: always. At most: one
-    /// line each. Placeholders: `trash_holds` takes the parts it holds, `trash_refused` the reason.
+    /// Shows: a meeting's page, beside « Ouvrir le dossier »: the icon's name, said and as its tooltip
+    /// (D100). When: always. At most: one line. Placeholders: none.
     pub trash_meeting: &'static str,
+    /// Shows: a meeting's page, the question in place once the trash's icon is pressed: its title (D100).
+    /// When: the icon pressed. At most: one line. Placeholders: none.
     pub trash_ask: &'static str,
+    /// Shows: the trash's question, under its title: what the meeting holds (D100). When: it holds an
+    /// audio, a transcript or a summary. At most: one line. Placeholders: {} the parts it holds, listed
+    /// in the window's language from `trash_parts`.
     pub trash_holds: &'static str,
-    /// Its audio, its transcript, its summary, as `trash_holds` lists them.
+    /// Shows: inside `trash_holds`, its audio, its transcript, its summary (D100). When: the meeting
+    /// holds it. At most: one line each. Placeholders: none.
     pub trash_parts: [&'static str; 3],
+    /// Shows: the trash's question, under what it holds: that the system's trash gives it back (D100).
+    /// When: always with the question. At most: one line. Placeholders: none.
     pub trash_restore: &'static str,
+    /// Shows: the trash's question, its first button, focused first (D100). When: always with the
+    /// question. At most: one line, never cut. Placeholders: none.
     pub trash_cancel: &'static str,
+    /// Shows: the trash's question, its second button (D100). When: always with the question. At most:
+    /// one line, never cut. Placeholders: none.
     pub trash_confirm: &'static str,
+    /// Shows: the trash's question, under its buttons, said to assistive technology too (D100). When: the
+    /// meeting is being recorded or made, or the system's trash refused it. At most: no limit.
+    /// Placeholders: {} the reason.
     pub trash_refused: &'static str,
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
     pub more_actions: &'static str,
@@ -469,11 +483,13 @@ pub struct Window {
     pub at: &'static str,
     /// The transcript's maker: the model, on this computer.
     pub heard_by: &'static str,
-    /// A transcript that says when it was made whole: that day and hour first, its model after —
-    /// "Transcrit le 13 nov. à 09:42 · Whisper small" (D93).
+    /// Shows: a meeting's page, the transcript's maker line: that day and hour first, its model after —
+    /// "Transcrit le 13 nov. à 09:42 · Whisper small" (D93). When: the transcript says when it was made
+    /// whole. At most: one line. Placeholders: {} the day and hour, in local time, without the year.
     pub transcribed_on: &'static str,
-    /// Minutes that say when they were made: that day and hour first, their model after —
-    /// "Compte rendu du 13 nov. à 09:45 · Qwen3 8B" (D93).
+    /// Shows: a meeting's page, the summary's maker line: that day and hour first, their model after —
+    /// "Compte rendu du 13 nov. à 09:45 · Qwen3 8B" (D93). When: the summary says when it was made.
+    /// At most: one line. Placeholders: {} the day and hour, in local time, without the year.
     pub minutes_of: &'static str,
     pub here: &'static str,
     pub remote: &'static str,
@@ -882,6 +898,12 @@ pub struct Window {
     /// The language Kitokey speaks (D64): its row in Settings, and the system's, its default.
     pub app_language: [&'static str; 2],
     pub app_language_system: &'static str,
+    /// Shows: Settings, « Général », the appearance's row (D98): its name, then what it changes. When:
+    /// always. At most: one line each. Placeholders: none.
+    pub appearance: [&'static str; 2],
+    /// Shows: Settings, « Général », the appearance's list, in that order (D98). When: always. At most:
+    /// 18 characters each. Placeholders: none.
+    pub appearance_choices: [&'static str; 3],
     /// A transcript's line corrected by whoever listens (D62).
     pub correct_line: &'static str,
     pub corrected: &'static str,
@@ -1322,6 +1344,11 @@ pub fn window(language: Language) -> Window {
                 "Its window, its menu and its notifications; what the system draws itself keeps the system’s.",
             ],
             app_language_system: "The system’s language",
+            appearance: [
+                "Appearance",
+                "Every window of Kitokey, the bar too; System follows the system’s light or dark.",
+            ],
+            appearance_choices: ["System", "Light", "Dark"],
             correct_line: "Correct the line at {}",
             corrected: "corrected",
             correction_empty: "A line is not left empty: Escape leaves it as it was.",
@@ -1757,6 +1784,11 @@ pub fn window(language: Language) -> Window {
                 "Sa fenêtre, son menu et ses notifications\u{202f}; ce que le système dessine lui-même garde la sienne.",
             ],
             app_language_system: "Langue du système",
+            appearance: [
+                "Apparence",
+                "Toutes les fenêtres de Kitokey, la barre aussi\u{202f}; Système suit le clair ou le sombre du système.",
+            ],
+            appearance_choices: ["Système", "Clair", "Sombre"],
             correct_line: "Corriger la ligne de {}",
             corrected: "corrigé",
             correction_empty: "Une ligne ne reste pas vide\u{a0}: Échap la laisse comme elle était.",
