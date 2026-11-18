@@ -5217,7 +5217,7 @@ def page_one_bar(now: dt.datetime) -> None:
     timed = re.compile(r"\S.* · \d+:\d\d$")
     for language, short, theme, hearing, writing in (
         ("fr_FR.UTF-8", "fr", "light", "Transcription en cours", "Rédaction du compte rendu"),
-        ("en_US.UTF-8", "en", "dark", "Writing the transcript", "Writing the minutes"),
+        ("en_US.UTF-8", "en", "dark", "Transcribing", "Writing summary"),
     ):
         meetings = WORK / f"one-bar-{short}"
         meeting = meetings / "2026-10-18_12-00"
