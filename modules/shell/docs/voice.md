@@ -106,8 +106,15 @@ test cannot tell apart — is the review's.
 A sentence changed in `words.rs` changes every test that reads it — `tests/words.rs`, and the window's e2e
 (`scripts/e2e_window.py`), which waits for the sentences the window shows. Before a pull request, the e2e is
 searched from its own string literals, not from the sentence: each literal read as Python reads it — a
-` ` or a ` ` is the character itself —, then kept when it is part of the old sentence and not of the new
+`\u00a0` or a `\u202f` is the character itself —, then kept when it is part of the old sentence and not of the new
 one. A search for the whole sentence misses a check written with escapes, and one that tests a fragment
 (« absent », « n’a pas pu être gardé »); #950's first run failed 34 checks so. A check that fails on the new
 sentence says the old one's meaning: when the new sentence drops it — where a download comes from, where a
 meeting's words go (R7) —, the sentence is wrong, not the check.
+
+A sentence with a placeholder is searched a second time, by each of its fixed parts, in the whole e2e —
+`main()` included, which only the attest runs. A check that glues a value to a part both sentences share
+(« 0 n’est pas un nombre de jours »), or composes the sentence with its reason in an f-string
+(« Le réglage n’a pas été enregistré : {…} »), is no part of the old sentence alone, and the first search
+lets it through; #950 and P7 each had two. A check that reads `.text` reads a `\u00a0` as a space, a
+`\u202f` as itself: it waits for « « 0 » » with plain spaces.
