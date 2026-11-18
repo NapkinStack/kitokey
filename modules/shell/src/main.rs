@@ -184,6 +184,9 @@ struct Shell {
     /// What was last cancelled of a meeting — its transcript or its minutes —, said on its page
     /// until a making of it starts again.
     stopped: Mutex<HashMap<PathBuf, &'static str>>,
+    /// The meeting last stopped, said by the bar at rest with its stage until its page is opened or
+    /// another recording starts (D92); and whether its last step has ended, written or failed.
+    last: Mutex<Option<(PathBuf, bool)>>,
     /// What had left before a meeting was said confidential, and to which host: said on its page
     /// while it stays so, until Kitokey quits (D60).
     left: Mutex<HashMap<PathBuf, Vec<Left>>>,
@@ -374,6 +377,7 @@ fn main() {
             speech_installed,
             ollama_pull_offered,
             header,
+            meeting_seen,
             makings,
             record,
             buy,
@@ -571,6 +575,7 @@ fn main() {
                 promoted_transcript: Mutex::default(),
                 promoted_minutes: Mutex::default(),
                 stopped: Mutex::default(),
+                last: Mutex::default(),
                 left: Mutex::default(),
                 ollama_waiting: Mutex::default(),
                 fetching: Mutex::new(false),
@@ -1020,17 +1025,53 @@ struct Header {
     /// Every window's look (D98): asked by each window as it asks the rest, so that one chosen in
     /// Settings reaches the bar too.
     appearance: Appearance,
+    /// The meeting last stopped, for the bar at rest to say with its stage (D92).
+    last: Option<Last>,
+}
+
+#[derive(serde::Serialize)]
+struct Last {
+    /// Its folder's name, as `makings` names it.
+    name: String,
+    /// As a sentence names it, opening it: « La réunion de 17:31 ».
+    said: String,
+    /// Its last step ended, written or failed: told as it is told by a notification (`tell_made`).
+    /// Until then, a moment between its two steps is no « ready ».
+    ended: bool,
 }
 
 #[tauri::command]
 fn header(shell: State<'_, Shell>) -> Header {
+    let last = shell.last.lock().unwrap().clone();
     Header {
         recording: shell.recording_on(),
         stopping: *shell.stopping.lock().unwrap(),
         shortcut: shell.shortcut.lock().unwrap().clone(),
         refused: *shell.refused.lock().unwrap(),
         appearance: shell.settings().appearance,
+        last: last.map(|(folder, ended)| Last {
+            name: named(&folder),
+            said: capitalised(&meeting_said(&folder, shell.language())),
+            ended,
+        }),
     }
+}
+
+/// A meeting's page opened: the bar no longer says it (D92).
+#[tauri::command]
+fn meeting_seen(shell: State<'_, Shell>, name: String) {
+    let mut last = shell.last.lock().unwrap();
+    if last.as_ref().is_some_and(|(folder, _)| named(folder) == name) {
+        last.take();
+    }
+}
+
+/// A sentence's first letter in capitals, as it opens a line.
+fn capitalised(said: &str) -> String {
+    let mut letters = said.chars();
+    letters
+        .next()
+        .map_or_else(String::new, |first| first.to_uppercase().chain(letters).collect())
 }
 
 /// « Acheter Kitokey »: the purchase asked of the Store, by Kitokey's own Store ID, its dialog owned
@@ -3911,6 +3952,8 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>, found: b
                 tracing::warn!(kind = ?error.kind(), "shell.recording_not_kept");
             }
             *shell.recorded.lock().unwrap() = Some(folder.clone());
+            // Another recording: the one before is no longer said by the bar (D92).
+            shell.last.lock().unwrap().take();
             *shell.meter.lock().unwrap() = (Some(Instant::now()), [0.0, 0.0]);
             small_recording(app, true);
         }
@@ -3963,6 +4006,8 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>, found: b
     }
     // Quitting, the stop's transcript is not begun: it is made from the menu next time.
     if let Some(folder) = stopped.filter(|_| !*shell.leaving.lock().unwrap()) {
+        // Kept before its transcript is in line, however soon it ends: said by the bar at rest (D92).
+        *shell.last.lock().unwrap() = Some((folder.clone(), false));
         transcribe(app, folder, Cancel::default());
     }
 }
@@ -4756,11 +4801,15 @@ fn window_focused(app: &AppHandle) -> bool {
 /// A notice about a meeting, its meeting named first: its title, else when it was recorded (D92).
 fn of_meeting(app: &AppHandle, notice: &Notice, folder: &Path) -> Notice {
     let language = app.state::<Shell>().language();
+    words::for_meeting(notice.clone(), &meeting_said(folder, language), language)
+}
+
+/// A meeting as a sentence names it: its title, else when it was recorded (D92).
+fn meeting_said(folder: &Path, language: Language) -> String {
     let name = folder.file_name().unwrap_or_default().to_string_lossy();
     let title = named::read(folder).or_else(|| minutes::title(folder));
     let started = chrono::NaiveDateTime::parse_from_str(&name, "%Y-%m-%d_%H-%M").ok();
-    let meeting = words::meeting(title.as_deref(), started, chrono::Local::now().date_naive(), language);
-    words::for_meeting(notice.clone(), &meeting, language)
+    words::meeting(title.as_deref(), started, chrono::Local::now().date_naive(), language)
 }
 
 /// The notification that ends a meeting's making — its last step written or failed, or the next
@@ -4771,6 +4820,12 @@ fn of_meeting(app: &AppHandle, notice: &Notice, folder: &Path) -> Notice {
 /// window frozen, nothing told (#824). Nothing here waits for the main thread: the notification
 /// is sent from a thread of its own once the focus is known.
 fn tell_made(app: &AppHandle, notice: &Notice, folder: &Path, opening: bool) {
+    // The bar at rest says it ended there too, whoever has the focus (D92).
+    if let Some((last, ended)) = app.state::<Shell>().last.lock().unwrap().as_mut()
+        && last.as_path() == folder
+    {
+        *ended = true;
+    }
     let notice = of_meeting(app, notice, folder);
     let (app, folder) = (app.clone(), folder.to_path_buf());
     let _ = app.clone().run_on_main_thread(move || {

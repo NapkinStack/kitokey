@@ -401,6 +401,9 @@ function holdings(session, words, compact = false) {
 // What Kitokey makes in the background (D25): read with the header, painted where it is shown.
 let makings = null;
 const chipsMaking = new Set();
+// The meeting last stopped, as the header says it, and the bar's way to say it with its stage (D92).
+let lastStopped = null;
+let paintLast = null;
 
 function minutesState(name) {
   if (makings === null) return null;
@@ -613,6 +616,7 @@ function paintModel(state = document.getElementById("model-state")) {
 let lastFetching = null;
 
 function paintMakings() {
+  paintLast?.();
   // Drawn again first, never painted then drawn over: what is under the focus stays one drawing.
   const fetching = makings?.model_fetching?.file ?? null;
   const ended = lastFetching !== null && fetching === null;
@@ -4163,8 +4167,52 @@ function showSmall(words) {
   });
   live.append(opened, micNext, secret.row, note);
   live.hidden = true;
+  // At rest, the meeting last stopped and its stage (D92): a polite live region whose text changes
+  // only with the stage — never said again as the makings are read —; « Ouvrir » beside it once it
+  // is made, stopped or failed, never focused by itself. Between two steps, the stage said stays.
+  const lastLine = element("p", "says small-last unseen");
+  lastLine.id = "small-last";
+  const lastSaid = element("span");
+  lastSaid.id = "small-last-said";
+  lastSaid.setAttribute("aria-live", "polite");
+  const lastOpen = element("button", "open", words.bar_last_open);
+  lastOpen.type = "button";
+  lastOpen.id = "small-last-open";
+  lastOpen.hidden = true;
+  lastOpen.addEventListener("click", () => full(`#/meeting/${encodeURIComponent(lastOpen.dataset.name)}`));
+  lastLine.append(lastSaid, " ", lastOpen);
+  const lastStage = (last) => {
+    const heard = transcriptState(last.name);
+    const minutes = minutesState(last.name);
+    if (!last.ended) {
+      if (heard && heard.kind !== "failed" && heard.kind !== "stopped") return { said: words.bar_last_hearing };
+      if (minutes && minutes.kind !== "failed" && minutes.kind !== "stopped") return { said: words.bar_last_summary };
+      return null;
+    }
+    if (heard?.kind === "failed") return { said: words.bar_last_failed, why: words.transcript_not_made, open: true };
+    if (minutes?.kind === "failed") {
+      return { said: words.bar_last_failed, why: minutes.said ? `${words.minutes_not_made} ${minutes.said}` : words.minutes_not_made, open: true };
+    }
+    if (heard?.kind === "stopped" || minutes?.kind === "stopped") return { said: words.bar_last_stopped, open: true };
+    if (minutes) return { said: words.bar_last_summary };
+    return { said: words.bar_last_ready, open: true };
+  };
+  // Painted with each reading of the makings, and as a recording starts or ends (`recording`, below).
+  let lastShown = null;
+  paintLast = () => {
+    const last = recording === false ? lastStopped : null;
+    const stage = last && lastStage(last);
+    if (stage) lastShown = { name: last.name, text: fill(stage.said, last.said, stage.why ?? ""), open: !!stage.open };
+    else if (!last || lastShown?.name !== last.name) lastShown = null;
+    const text = lastShown?.text ?? "";
+    if (lastSaid.textContent !== text) lastSaid.textContent = text;
+    lastOpen.hidden = !lastShown?.open;
+    lastOpen.dataset.name = lastShown?.name ?? "";
+    // Empty, kept in the page unseen: a live region there before its first words says them.
+    lastLine.classList.toggle("unseen", text === "");
+  };
   const lines = element("div", "bar-lines");
-  lines.append(keptNext, modelsKept, announce, ...checks.map((check) => check.sentence), unkeptSaid);
+  lines.append(lastLine, keptNext, modelsKept, announce, ...checks.map((check) => check.sentence), unkeptSaid);
   const options = element("div", "bar-options");
   options.id = "small-options";
   options.append(rest, live, advanced, spokenBox);
@@ -4211,6 +4259,7 @@ function showSmall(words) {
       // Back at rest, and the first time: what capture lists now.
       if (!now.recording) readPicks();
       recording = now.recording;
+      paintLast();
       start.disabled = false;
       named(start, words.record_start);
       stop.disabled = false;
@@ -4819,6 +4868,8 @@ async function draw(mine, again) {
   document.body.dataset.at = listed ? "list" : "page";
   const beside = listed && !narrow.matches && listing.sessions.length > 0;
   const name = wanted ? decodeURIComponent(wanted[1]) : beside ? nameOf(listing.sessions[0]) : null;
+  // Its page opened: the bar no longer says the meeting last stopped (D92).
+  if (wanted && !document.hidden) window.__TAURI__.core.invoke("meeting_seen", { name }).catch(() => {});
   // A refused language is said until its meeting's own page is left (#841).
   if (languageRefused && !(wanted && decodeURIComponent(wanted[1]) === languageRefused.name)) languageRefused = null;
   // Another page, or another meeting: what was played stops — and the list alone under 840 px.
@@ -5048,6 +5099,7 @@ setInterval(async () => {
   if (document.hidden || words === null) return;
   const asked = await window.__TAURI__.core.invoke("header").catch(() => null);
   if (asked === null) return;
+  lastStopped = asked.last ?? null;
   readMakings();
   const { recording, stopping, shortcut, refused } = asked;
   takeAppearance(asked.appearance);
