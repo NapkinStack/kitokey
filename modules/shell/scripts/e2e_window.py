@@ -1275,6 +1275,11 @@ def service_named(now: dt.datetime) -> None:
         check("drawn anew before « Enregistrer »: the transcription model chosen in the service's list still chosen (#948)",
               browser.execute_script("return document.getElementById('transcription-models').value") == "vendor/scribe",
               browser.execute_script("return document.getElementById('transcription-models').value"))
+        # « Avancé », folded by the user above, stays folded: the service's « Enregistrer » still there to save it (#948).
+        folded = browser.execute_script("const t = document.getElementById('transcription-advanced'), s = document.getElementById('transcription-save');"
+                                        " return [t.getAttribute('aria-expanded'), !!s && s.getClientRects().length > 0]")
+        check("drawn anew before « Enregistrer »: « Avancé » left folded as the user folded it, the service's « Enregistrer » offered (#948)",
+              folded == ["false", True], folded)
         # The stand-in is on this computer: no agreement asked, and it saves without one (#859); a host
         # elsewhere is agreed to above, under « Avancé ».
         asked = browser.execute_script("const a = document.getElementById('transcription-agreed'); return !!a && a.getClientRects().length > 0")
