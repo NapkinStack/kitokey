@@ -1848,17 +1848,16 @@ def first_run(now: dt.datetime) -> None:
             until_question(browser)
             press(browser, "welcome-next")
             silent = wait_for(browser, lambda b: "ollama.com" in b.execute_script(summary), 5)
-            # The ask itself refused: logged with its kind, never silent (D29), the summary as it was. Refused
-            # beneath `core`, which the welcome holds from its start: every ask goes through the internals' invoke.
+            # The ask itself refused: logged with its kind, never silent (D29), the summary as it was.
             browser.execute_script(
-                "const inner = window.__TAURI_INTERNALS__, real = inner.invoke; window.logged = [];"
-                " const refusing = (asked, rest, options) => {"
+                "const t = window.__TAURI__, core = t.core; window.logged = [];"
+                " const refusing = Object.assign(Object.create(Object.getPrototypeOf(core)), core, { invoke: (asked, rest, options) => {"
                 "   if (asked === 'page_failed') { window.logged.push(rest); return Promise.resolve(null); }"
                 "   if (asked === 'minutes_shown') return Promise.reject(Object.assign(new Error('refused'), { name: 'ScenarioY' }));"
-                "   return real.call(inner, asked, rest, options); };"
-                " const put = (f) => { try { inner.invoke = f; } catch (x) {}"
-                "   if (inner.invoke !== f) Object.defineProperty(inner, 'invoke', { configurable: true, writable: true, value: f }); };"
-                " put(refusing); window.restoreCore = () => put(real);")
+                "   return core.invoke(asked, rest, options); } });"
+                " const put = (top) => { try { window.__TAURI__ = top; } catch (x) {}"
+                "   if (window.__TAURI__ !== top) Object.defineProperty(window, '__TAURI__', { configurable: true, writable: true, value: top }); };"
+                " put(Object.assign({}, t, { core: refusing })); window.restoreCore = () => put(t);")
             press(browser, "welcome-ollama-again")
             logged = wait_for(browser, lambda b: b.execute_script("return window.logged.length") > 0, 5)
             kept = wait_for(browser, lambda b: "ollama.com" in b.execute_script(summary) and b.find_elements(By.ID, "welcome-ollama-again"), 5)

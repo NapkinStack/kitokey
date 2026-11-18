@@ -4584,7 +4584,8 @@ async function showWelcome(again, words) {
       // Asked again on a click, as a meeting's page does: Ollama started meanwhile, the summary said anew (#781).
       const again = button("welcome-ollama-again", "open", words.try_again, async () => {
         waiting(again, true);
-        minutes = await invoke("minutes_shown").catch((why) => {
+        // Read at the click, as the pages read it, not the `invoke` the welcome took at its start.
+        minutes = await window.__TAURI__.core.invoke("minutes_shown").catch((why) => {
           pageFailed(why);
           return minutes;
         });
