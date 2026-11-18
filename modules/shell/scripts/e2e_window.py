@@ -10189,11 +10189,19 @@ def trial_left(now: dt.datetime) -> None:
 
 
 def timed(scenario):
-    """A scenario, its time said after it, done or failed: where a run's minutes go (#862)."""
+    """A scenario, its time said after it, done or failed: where a run's minutes go (#862). One that
+    raises is a FAIL named by it and by what it raised, its traceback under it, and the run goes on
+    to the next: never a shard cut short, the checks after it hidden as « NOT RUN » (#949)."""
     def played(*args, **kwargs):
         began = time.monotonic()
         try:
             return scenario(*args, **kwargs)
+        except Exception as why:
+            what = f"{scenario.__name__} raised {type(why).__name__}: {why}"
+            print(f"  FAIL  {what}")
+            print("".join(f"        {line}\n" for line in traceback.format_exc().splitlines()), end="")
+            FAILED.append(what)
+            return None
         finally:
             print(f"    ({scenario.__name__}: {time.monotonic() - began:.1f} s)")
     return played
