@@ -510,8 +510,10 @@ function paintState(said, shown, of) {
   }
   said.dataset.key = key;
   if (shown === null) return said.replaceChildren();
+  // Being made: said by the page's one bar across both steps, not by its card (D92, `paintBar`).
   if (shown.kind === "making") {
-    said.replaceChildren(element("span", "what", of.making), element("span", "by", `${by} · ${minutes}`), element("span", "making-bar"), cancelButton(said, "making-cancel"));
+    said.hidden = true;
+    said.replaceChildren();
   } else if (shown.kind === "waiting") {
     said.replaceChildren(element("span", "what", fill(words.minutes_waiting, shown.before)), cancelButton(said));
   } else if (shown.kind === "stopped") {
@@ -676,6 +678,55 @@ function paintMakings() {
     });
   }
   paintContext();
+  paintBar();
+}
+
+// A meeting's page while it is made (D92): one bar across both steps — its transcript, then its summary
+// when one follows —, naming the step and what makes it, each part full once done and never moving back,
+// « Annuler » in it for the step running. Between the two steps, the summary's part is said running.
+const barChained = new Set();
+
+function barOf(name) {
+  if (makings === null) return null;
+  const heard = transcriptState(name);
+  const minutes = minutesState(name);
+  if (heard?.kind === "making") {
+    if (heard.then) barChained.add(name);
+    return { step: "transcript", parts: heard.then ? ["running", "next"] : ["running"], shown: heard };
+  }
+  const between = makings.between.includes(name);
+  const chained = between || barChained.has(name);
+  if (minutes?.kind === "making") return { step: "minutes", parts: chained ? ["done", "running"] : ["running"], shown: minutes };
+  if (between) return { step: "minutes", parts: ["done", "running"], shown: null };
+  barChained.delete(name);
+  return null;
+}
+
+function paintBar() {
+  const bar = document.getElementById("making");
+  if (!bar || document.getElementById("meeting").hidden) return;
+  const state = barOf(bar.dataset.name);
+  bar.hidden = state === null;
+  if (state === null) return;
+  // The step said by a polite live region: its text changes only when the step does.
+  const step = document.getElementById("making-step");
+  const said = state.step === "transcript" ? words.transcript_making : words.minutes_making;
+  if (step.textContent !== said) step.textContent = said;
+  const shown = state.shown;
+  const by = shown === null ? "" : shown.host === undefined ? spoken(shown.model) : `${modelSaid(shown.model)} · ${shown.host}`;
+  const time = shown === null ? "" : `${Math.floor(shown.seconds / 60)}:${String(shown.seconds % 60).padStart(2, "0")}`;
+  bar.querySelector(".by").textContent = by ? `${by} · ${time}` : "";
+  const parts = bar.querySelector(".segments");
+  if (parts.childElementCount !== state.parts.length) parts.replaceChildren(...state.parts.map(() => element("span", "segment")));
+  state.parts.forEach((part, at) => { parts.children[at].dataset.state = part; });
+  // « Annuler » for the step running, its card's: cancelled, said there, as before (D92, criterion 4).
+  const card = document.getElementById(state.step === "transcript" ? "transcript-state" : "minutes-state");
+  const holder = bar.querySelector(".cancel");
+  if (shown === null || !card) holder.replaceChildren();
+  else if (holder.dataset.for !== state.step || !holder.firstChild) {
+    holder.dataset.for = state.step;
+    holder.replaceChildren(cancelButton(card, "making-cancel"));
+  }
 }
 
 // *Réessayer*: fails only when the meeting is gone, said there (D67); a later failure is on this page.
@@ -2202,7 +2253,20 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   gone.hidden = models_gone.length === 0;
   const settings = contextCard(session, { context, transcript, minutes }, words, [spoken, secret], [left, secretSaid, spokenSaid, secretDescribed, gone]);
   // The trash's question in its own card, under the head, as wide as the page's cards (D100).
-  page.replaceChildren(head, ask, settings, drawn, columns);
+  // Its making, one bar across both steps under its head (D92), painted with the makings.
+  const making = element("section", "card making");
+  making.id = "making";
+  making.dataset.name = nameOf(session);
+  making.hidden = true;
+  // The same meeting drawn again — its transcript written, say —: its step's live region is the same
+  // node, never one said anew, and the bar is painted before anything can show it missing.
+  const step = (same && document.getElementById("making-step")) || element("span", "what");
+  step.id = "making-step";
+  step.setAttribute("aria-live", "polite");
+  const cancel = element("span", "cancel");
+  making.append(step, element("span", "by"), cancel, element("div", "segments"));
+  page.replaceChildren(head, making, ask, settings, drawn, columns);
+  paintBar();
   // The line being said, marked while it plays; the page stays where the user left it (D26, the
   // decider, 2026-10-24: following the line was intrusive).
   if (player?.name === nameOf(session)) {

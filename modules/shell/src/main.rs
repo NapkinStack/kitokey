@@ -187,6 +187,11 @@ struct Shell {
     /// The meeting last stopped, said by the bar at rest with its stage until its page is opened or
     /// another recording starts (D92); and whether its last step has ended, written or failed.
     last: Mutex<Option<(PathBuf, bool)>>,
+    /// Whether the transcript being made is followed by its summary: the page's one bar has two parts (D92).
+    hearing_then: Mutex<bool>,
+    /// Meetings whose transcript is written and whose summary follows, not yet in line: between the two
+    /// steps, the page's bar says the summary's (D92).
+    between: Mutex<std::collections::HashSet<PathBuf>>,
     /// What had left before a meeting was said confidential, and to which host: said on its page
     /// while it stays so, until Kitokey quits (D60).
     left: Mutex<HashMap<PathBuf, Vec<Left>>>,
@@ -576,6 +581,8 @@ fn main() {
                 promoted_minutes: Mutex::default(),
                 stopped: Mutex::default(),
                 last: Mutex::default(),
+                hearing_then: Mutex::default(),
+                between: Mutex::default(),
                 left: Mutex::default(),
                 ollama_waiting: Mutex::default(),
                 fetching: Mutex::new(false),
@@ -3255,6 +3262,8 @@ struct Makings {
     minutes: Option<Making>,
     minutes_waiting: Vec<String>,
     transcript: Option<Hearing>,
+    /// Between their transcript and their summary, not yet in line (D92).
+    between: Vec<String>,
     transcripts_waiting: Vec<String>,
     /// The line waits for the default Whisper model, offered in the menu, or coming.
     model_needed: bool,
@@ -3292,6 +3301,8 @@ struct Hearing {
     name: String,
     model: String,
     seconds: u64,
+    /// Its summary follows it (D92).
+    then: bool,
 }
 
 #[derive(serde::Serialize)]
@@ -3327,6 +3338,21 @@ fn makings(shell: State<'_, Shell>) -> Makings {
             .collect();
         (failed, causes)
     };
+    // Read in the order a meeting goes through them — its transcript, between the two steps, its
+    // summary —, each set before the one before is cleared: a meeting made is never read in none (D92).
+    let transcript = shell
+        .hearing
+        .lock()
+        .unwrap()
+        .as_deref()
+        .zip(shell.hearing_by.lock().unwrap().clone())
+        .map(|(folder, (model, since))| Hearing {
+            name: named(folder),
+            model,
+            seconds: since.elapsed().as_secs(),
+            then: *shell.hearing_then.lock().unwrap(),
+        });
+    let between = shell.between.lock().unwrap().iter().map(|folder| named(folder)).collect();
     let writing = shell.writing_minutes.lock().unwrap().clone();
     let by = shell.minutes_by.lock().unwrap().clone();
     let settings = shell.settings();
@@ -3350,17 +3376,8 @@ fn makings(shell: State<'_, Shell>) -> Makings {
             .iter()
             .map(|queued| named(&queued.folder))
             .collect(),
-        transcript: shell
-            .hearing
-            .lock()
-            .unwrap()
-            .as_deref()
-            .zip(shell.hearing_by.lock().unwrap().clone())
-            .map(|(folder, (model, since))| Hearing {
-                name: named(folder),
-                model,
-                seconds: since.elapsed().as_secs(),
-            }),
+        transcript,
+        between,
         transcripts_waiting,
         model_needed,
         // The default model coming, not another: one fetch at a time, said as such (D37).
@@ -3446,7 +3463,9 @@ fn look_again(app: &AppHandle) {
 /// The same, `agreed_now` naming the host the user just agreed to send this meeting to, once:
 /// the gate is passed only if that is still the host the settings name as it is read here.
 fn write_minutes(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>, chosen: Option<(String, String)>) {
-    write_minutes_from(app, folder, agreed_now, chosen, false, Cancel::default());
+    write_minutes_from(app, folder.clone(), agreed_now, chosen, false, Cancel::default());
+    // Its summary written, in line, or set aside: no longer between the two steps (D92).
+    app.state::<Shell>().between.lock().unwrap().remove(&folder);
 }
 
 /// `from_line`: taken from the line, where nobody asked just now — an agreement it needs is set
@@ -4210,12 +4229,18 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
     // whichever comes first takes it, the other finds nothing.
     *shell.redoing.lock().unwrap() = previous.clone().map(|previous| (current.clone(), previous));
     hearing(&shell, &folder, &hearer);
+    *shell.hearing_then.lock().unwrap() = minutes_after;
     drop(running);
     transcribing(app, true);
     let app = app.clone();
     std::thread::spawn(move || {
         let made = made.recv().unwrap_or(Made::Failed(String::new()));
         let shell = app.state::<Shell>();
+        // Written, its summary following: between the two steps before the transcript is said ended (D92).
+        let chained = minutes_after && matches!(made, Made::Written(_)) && !cancel.cancelled();
+        if chained {
+            shell.between.lock().unwrap().insert(folder.clone());
+        }
         // Ended and said so at once: none begun in between loses what it says of itself.
         let mut running = shell.transcription.lock().unwrap();
         running.take();
@@ -4247,6 +4272,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         // Ended for its meeting said confidential: made again here, first in line. Cancelled:
         // nothing told — the earlier one not put back excepted —, nothing made after it.
         if here != Heard::Ended {
+            shell.between.lock().unwrap().remove(&folder);
             if let (Heard::Cancelled, Some((name, not_put_back))) = (&here, kept_beside) {
                 tell(&app, &words::transcript_kept_beside(shell.language(), &name, not_put_back));
             }
