@@ -278,6 +278,14 @@ def choose(browser, element_id: str, value: str) -> None:
     Select(browser.find_element(By.ID, element_id)).select_by_value(value)
 
 
+def typed(browser, element_id: str, text: str) -> None:
+    """Text typed in a field of the page once it is drawn, shown and enabled — a choice just made
+    draws its fields anew, and one not yet there cannot take the focus (#901)."""
+    ready = lambda b: any(f.is_displayed() and f.is_enabled() for f in b.find_elements(By.ID, element_id))
+    wait_for(browser, ready, 10)
+    browser.find_element(By.ID, element_id).send_keys(text)
+
+
 def press(browser, element_id: str) -> None:
     """A click on the page as it is: drawn again under the driver, the element is found afresh;
     found before it can be clicked — shown, laid out — it is clicked a moment later (#510)."""
@@ -6522,7 +6530,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "minutes-online")
             wait_for(browser, lambda b: b.execute_script(options, "minutes-service"), 5)
             choose(browser, "minutes-service", "0")
-            browser.find_element(By.ID, "minutes-key").send_keys(good)
+            typed(browser, "minutes-key", good)
             press(browser, "minutes-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
             choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
@@ -6533,7 +6541,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "transcription-online")
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            browser.find_element(By.ID, "transcription-key").send_keys(heard)
+            typed(browser, "transcription-key", heard)
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
             choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
