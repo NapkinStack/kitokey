@@ -2916,6 +2916,11 @@ def cancelled_at_once(now: dt.datetime) -> None:
                 ended = wait_for(browser, lambda b: b.execute_script(idle), 2)
                 check("a first transcript cancelled: ended within two seconds, nothing of it left in the meeting's folder",
                       ended and sorted(p.name for p in fresh.iterdir()) == ["local.wav", "session.json"], sorted(p.name for p in fresh.iterdir()))
+                # The focus given to what the page offers in its place, never left on the button gone (D92, #938).
+                focus = "return document.activeElement ? document.activeElement.id || document.activeElement.tagName : ''"
+                given = wait_for(browser, lambda b: b.execute_script(focus) == "make-transcript", 2)
+                check("a first transcript cancelled: the focus on « make it » that its card offers, never on the page's body",
+                      given, browser.execute_script(focus))
         finally:
             (WORK / "hold-hearing").unlink(missing_ok=True)
         browser.execute_script("return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", fresh.name, str(b))
@@ -5201,6 +5206,25 @@ def page_one_bar(now: dt.datetime) -> None:
             finally:
                 for gate in gates:
                     gate.unlink(missing_ok=True)
+    # Its summary cancelled from the bar, none made before: the focus on what the summary's card offers in its
+    # place, never on the page's body — the bar's « Annuler » is the step's own card's (#938, ines' mutant B).
+    meetings = WORK / "one-bar-cancel"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 1, {"local.wav": 1000})
+    focus = "return document.activeElement ? document.activeElement.id || document.activeElement.tagName : ''"
+    with Window(meetings, "fr_FR.UTF-8", settings) as browser:
+        gates[1].touch()
+        try:
+            browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+            wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", meeting.name)
+            writing = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == "Rédaction du compte rendu", 15)
+            press(browser, "making-cancel")
+            given = wait_for(browser, lambda b: b.execute_script(focus) == "make-minutes", 3)
+            check("fr: its summary cancelled from the page's bar: the focus on « make it » that the summary's card offers, never on the page's body (D92)",
+                  writing and given, [writing, browser.execute_script(focus), browser.execute_script(bar)])
+        finally:
+            gates[1].unlink(missing_ok=True)
     # No summary following its transcript: one part, the transcript's.
     meetings = WORK / "one-bar-alone"
     meeting = meetings / "2026-10-18_12-00"
