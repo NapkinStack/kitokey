@@ -407,12 +407,20 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .making-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--raised); }
 .making-state .what { font-weight: 600; }
 .making-state .by { color: var(--soft); font-size: 14px; }
-.making-state .making-bar { flex-basis: 100%; height: 4px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent) 0 0 / 40% 100% no-repeat, var(--line); animation: travel 1.4s ease-in-out infinite; }
 .making-state.failed { background: transparent; border: 1px solid var(--edge); }
 .making-state .detail { flex-basis: 100%; color: var(--soft); font-size: 13px; overflow-wrap: anywhere; }
 .making-state.failed .what { color: var(--ink); font-weight: 600; }
 @keyframes travel { from { background-position: -40% 0, 0 0; } to { background-position: 140% 0, 0 0; } }
-@media (prefers-reduced-motion: reduce) { .making-state .making-bar { animation: none; background: var(--accent); opacity: 0.5; } }
+/* D92: a meeting's making, one bar across both steps under its head: the step, what makes it, « Annuler »,
+   then a part per step — full once done, the one running moving, the next one empty —, never back. */
+.card.making { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.card.making .what { font-weight: 600; }
+.card.making .by { flex: 1 1 auto; color: var(--soft); font-size: 14px; }
+.card.making .segments { display: flex; gap: 4px; flex-basis: 100%; }
+.card.making .segment { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+.card.making .segment[data-state="done"] { background: var(--accent); }
+.card.making .segment[data-state="running"] { background: linear-gradient(90deg, transparent, var(--accent), transparent) 0 0 / 40% 100% no-repeat, var(--line); animation: travel 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .card.making .segment[data-state="running"] { animation: none; background: var(--accent); opacity: 0.5; } }
 
 /* The first run's assistant (D58's board): one card, centred, alone in the window; its answers
    are radio cards, the setting said in a tinted band, then plain rows. */
