@@ -429,12 +429,16 @@ pub struct Window {
     pub record_starting: &'static str,
     pub record_stopping: &'static str,
     pub redo_cancel: &'static str,
+    /// Shows: Settings, beside a setting just saved. When: for a moment after it is. At most: one
+    /// line. Placeholders: none.
     pub saved: &'static str,
     pub small_not_confidential: &'static str,
     /// A recording refused, the trial over (PDR-0005, D83): why and what stays, in one sentence; the one gesture.
     pub trial_over: &'static str,
     pub buy: &'static str,
     /// Settings on a trial licence (D83): the name of what they say is left of it (`trial_left`).
+    /// Shows: Settings, its first card, its label, beside what is left (`trial_left`). When: on a
+    /// trial licence (D83). At most: one line. Placeholders: none.
     pub trial: &'static str,
     pub find_meetings: &'static str,
     /// The sidebar folded and brought back (D61): each button's name; the shortcut is added beside.
@@ -513,91 +517,204 @@ pub struct Window {
     pub no_match: &'static str,
     /// The settings' page.
     pub settings: &'static str,
+    /// Shows: Settings, « Après un enregistrement », its heading. When: always. At most: one line.
+    /// Placeholders: none.
     pub after_title: &'static str,
     /// Each choice of what follows a recording: its name, then what it does.
+    /// Shows: Settings, « Après un enregistrement », a choice: its name, then its line under it.
+    /// When: always. At most: one line each. Placeholders: none.
     pub after_nothing: [&'static str; 2],
+    /// Shows: Settings, « Après un enregistrement », a choice: its name, then its line under it.
+    /// When: always. At most: one line each. Placeholders: none.
     pub after_transcript: [&'static str; 2],
+    /// Shows: Settings, « Après un enregistrement », a choice: its name, then its line under it.
+    /// When: always. At most: one line each. Placeholders: none.
     pub after_minutes: [&'static str; 2],
+    /// Shows: Settings, « Modèles », its heading. When: always. At most: one line. Placeholders:
+    /// none.
     pub models_title: &'static str,
     /// What the models' card says under its title, and under its steps.
+    /// Shows: Settings, « Modèles », under its heading. When: always. At most: no limit.
+    /// Placeholders: none.
     pub models_intro: &'static str,
+    /// Shows: Settings, « Modèles », its last line: where a key is kept, what leaves the computer.
+    /// When: always. At most: no limit. Placeholders: none.
     pub models_note: &'static str,
     /// The transcription model's state, at the page's end.
+    /// Shows: Settings, « Modèles », the transcription's step, the label of the transcription
+    /// model's state, under its choice. When: Whisper hears. At most: one line. Placeholders: none.
     pub model_state: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a tag beside that state. When: the
+    /// model is on this computer. At most: one line. Placeholders: none.
     pub model_ready: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, that state. When: the model is on
+    /// this computer. At most: one line. Placeholders: {} its size.
     pub model_here: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, that state. When: the model chosen
+    /// is Kitokey's and not here yet. At most: one line. Placeholders: none.
     pub model_missing: &'static str,
     /// One the user named, not on this computer: theirs, nothing offered (D36).
+    /// Shows: Settings, « Modèles », the transcription's step, that state, as an error. When: a
+    /// model the user named is not on this computer (D36). At most: no limit. Placeholders: none.
     pub model_named_missing: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, that state. When: the model is being
+    /// downloaded. At most: one line. Placeholders: none.
     pub model_coming: &'static str,
     pub model_offer: &'static str,
     /// The short list of models to download (D37): its heading, the gesture, how far, and the
     /// model chosen that is not here yet, in the choice.
+    /// Shows: Settings, « Modèles », the heading of the folded list of models to download (D37),
+    /// and its name for a screen reader. When: always. At most: one line. Placeholders: none.
     pub offered_title: &'static str,
+    /// Shows: Settings, « Modèles », models to download, a model's button. When: it is not on this
+    /// computer. At most: one line. Placeholders: none.
     pub offered_fetch: &'static str,
+    /// Shows: Settings, « Modèles », models to download, in place of that button. When: the model
+    /// is being downloaded. At most: one line. Placeholders: {} how far, in percent.
     pub offered_far: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, the Whisper model chosen, in the
+    /// list. When: it is not on this computer yet (D37). At most: one line. Placeholders: {} the
+    /// model, as people say it.
     pub model_chosen_missing: &'static str,
     /// The minutes' model of the list, fetched by Ollama (D37): its size, what it is good for,
     /// and Ollama needed when none answers.
+    /// Shows: Settings, « Modèles », models to download, the summary's model's size. When: always.
+    /// At most: one line. Placeholders: none.
     pub offered_ollama_size: &'static str,
+    /// Shows: Settings, « Modèles », models to download, what the summary's model is good for.
+    /// When: always. At most: one line. Placeholders: none.
     pub offered_ollama_good: &'static str,
+    /// Shows: Settings, « Modèles », models to download, beside the summary's model. When: no
+    /// Ollama answers on this computer. At most: one line. Placeholders: none.
     pub offered_needs_ollama: &'static str,
     /// The list read again on the user's gesture (D40): the button, its host filled in; and
     /// what is said when it could not be.
+    /// Shows: Settings, « Modèles », models to download, a button: the list read again, its host
+    /// shown (D40). When: always. At most: one line. Placeholders: {} the host.
     pub offered_refresh: &'static str,
+    /// Shows: Settings, « Modèles », models to download, under that button. When: the list could
+    /// not be read again, or was not signed. At most: no limit. Placeholders: none.
     pub offered_refresh_failed: &'static str,
     /// Apple's SpeechAnalyzer among who hears, on a Mac with macOS 26 (D42): its name in the
     /// choice; its model not on the Mac yet; the gesture that has macOS fetch it, and from whom;
     /// while it comes; when it did not.
+    /// Shows: Settings, « Modèles », the transcription's step, and the first run's assistant (D58),
+    /// a choice of who hears. When: on a Mac with macOS 26 (D42). At most: one line. Placeholders:
+    /// none.
     pub speech_option: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, appended to Apple's SpeechAnalyzer
+    /// in the list. When: its model is not on the Mac yet. At most: one line. Placeholders: none.
     pub speech_missing: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, and the first run's assistant (D58),
+    /// a button. When: Apple's SpeechAnalyzer chosen, its model not on the Mac yet. At most: one
+    /// line. Placeholders: none.
     pub speech_fetch: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a status in place of that button.
+    /// When: macOS downloads Apple's model. At most: one line. Placeholders: none.
     pub speech_fetching: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, an error under the choice. When:
+    /// macOS did not download Apple's model. At most: no limit. Placeholders: none.
     pub speech_failed: &'static str,
     /// A service that hears (D43): its fields, the agreement before anything is sent to its host,
     /// the gestures, and what they say.
     pub service_option: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, folded « Avancé »: a field's label,
+    /// an address of one's own. When: a service hears. At most: one line. Placeholders: none.
     pub service_address: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a field's label, its list or «
+    /// Avancé »'s. When: a service hears. At most: one line. Placeholders: none.
     pub service_model: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a field's label. When: a service
+    /// hears. At most: one line. Placeholders: none.
     pub service_key: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a checkbox before anything is sent
+    /// (D43). When: a service hears whose host is not this computer. At most: no limit.
+    /// Placeholders: {} the host.
     pub service_agree: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, the button that saves the service.
+    /// When: a service hears. At most: one line. Placeholders: none.
     pub service_save: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a button. When: a service is saved.
+    /// At most: one line. Placeholders: none.
     pub service_test: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, under « Tester ». When: the service
+    /// transcribed Kitokey's own sound. At most: no limit. Placeholders: none.
     pub service_tested: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, under « Enregistrer ». When: the
+    /// service is saved. At most: no limit. Placeholders: {} the host, or this computer said so
+    /// (#775).
     pub service_saved: &'static str,
     /// Shows: Settings, « Transcription », under the service's form, once saved. When: the address saved is
     /// this computer's, where nothing leaves it (#775). At most: one line. Placeholders: none.
     pub service_saved_here: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, under « Enregistrer ». When: the
+    /// agreement is not ticked. At most: no limit. Placeholders: {} the host.
     pub service_agree_first: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, under « Enregistrer ». When: the
+    /// address typed is not an http(s) address. At most: no limit. Placeholders: none.
     pub service_address_bad: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, under « Enregistrer ». When: no
+    /// model is named. At most: no limit. Placeholders: none.
     pub service_model_named: &'static str,
     /// The model's name as people say it, and its size once installed.
+    /// Shows: Settings, « Modèles », the transcription's step, a Whisper model of the list, after
+    /// its name. When: the model is on this computer. At most: one line. Placeholders: {} its size.
     pub installed: &'static str,
     /// Another number of days, typed; and what is said of one that is none.
+    /// Shows: Settings, « Après un enregistrement », that list's last choice, then the field it
+    /// opens. When: always. At most: one line. Placeholders: none.
     pub keep_other: &'static str,
+    /// Shows: Settings, « Après un enregistrement », under that field. When: what is typed is no
+    /// number of days the file allows. At most: no limit. Placeholders: {} what was typed.
     pub keep_not_days: &'static str,
     /// The engine that hears, shipped with Kitokey; and the user's home, as a folder is said.
+    /// Shows: Settings, « Modèles », the transcription's step, a tag beside Whisper, built into
+    /// Kitokey. When: always. At most: one line. Placeholders: none.
     pub builtin: &'static str,
+    /// Shows: Settings, « Après un enregistrement », the folder's path, in place of the user's
+    /// home. When: the folder is in it. At most: one line. Placeholders: none.
     pub home: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, its label. When: always. At most:
+    /// one line. Placeholders: none.
     pub transcription: &'static str,
+    /// Shows: Settings, « Modèles », the line under a step's choice, and models to download. When:
+    /// a model of this computer is chosen. At most: one line. Placeholders: none.
     pub on_this_computer: &'static str,
+    /// Shows: Settings, « Général », a switch: its name, then its line under it. When: always. At
+    /// most: one line for the name, the line wraps. Placeholders: none.
     pub reminder: [&'static str; 2],
     /// When an application takes the microphone (D30): its name and line, as board 4 has them.
+    /// Shows: Settings, « Général », a list: its name, then its line under it (D30). When: always.
+    /// At most: one line for the name, the line wraps. Placeholders: none.
     pub offer: [&'static str; 2],
     /// Its two choices: offer to record, do nothing.
+    /// Shows: Settings, « Général », that list's two choices. When: always. At most: one line each.
+    /// Placeholders: none.
     pub offer_choices: [&'static str; 2],
     /// Started with the user's session (D32): its name and line.
+    /// Shows: Settings, « Général », a switch: its name, then its line under it (D32). When: the
+    /// system offers it. At most: one line for the name, the line wraps. Placeholders: none.
     pub autostart: [&'static str; 2],
     /// On Windows, the switch held (D84): by the user in Windows' Startup settings, where it is
     /// turned back on; by a policy.
+    /// Shows: Settings, « Général », that switch's line in place of its own: held by the user in
+    /// Windows' settings, or by a policy (D84). When: on Windows, the switch held. At most: no
+    /// limit. Placeholders: none.
     pub autostart_held: [&'static str; 2],
+    /// Shows: Settings, « Après un enregistrement », a list: its name, then its line under it.
+    /// When: always. At most: one line for the name, the line wraps. Placeholders: none.
     pub keep_audio: [&'static str; 2],
     /// The settings' last group: Kitokey itself, as GNOME's preferences name it (D95).
     /// Shows: Settings, as a heading. When: always. At most: no limit. Placeholders: none.
     pub general_title: &'static str,
     /// Folded at the bottom of « Général », and its one switch: what a program said of a failure,
     /// shown on the page under the sentence (D29).
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, its heading; and a step's «
+    /// Avancé » in Settings, « Modèles ». When: always. At most: one line. Placeholders: none.
     pub advanced_title: &'static str,
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, a switch: its name, then its
+    /// line under it (D29). When: always. At most: one line for the name, the line wraps.
+    /// Placeholders: none.
     pub developer: [&'static str; 2],
     /// Under a making not made, in developer mode: what its program said ({}).
     pub program_said: &'static str,
@@ -609,6 +726,8 @@ pub struct Window {
     pub actions_cells: [&'static str; 3],
     pub unsettled: &'static str,
     /// A model of this computer that holds the minutes' form, as Settings offer it ({}).
+    /// Shows: Settings, « Modèles », the summary's step, a model of this computer in the list.
+    /// When: it holds the summary's form. At most: one line. Placeholders: {} the model.
     pub model_recommended: &'static str,
     /// A meeting's player (D26): its button, both ways, and why a meeting has none.
     pub play: &'static str,
@@ -623,18 +742,36 @@ pub struct Window {
     pub not_played: &'static str,
     pub playback: &'static str,
     /// In developer mode: the logs' level, the logs' folder, a meeting's diagnostic copied.
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, a list: its name, then its
+    /// line under it. When: the developer mode is on. At most: one line for the name, the line
+    /// wraps. Placeholders: none.
     pub log_level: [&'static str; 2],
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, the logs' level, a choice.
+    /// When: the developer mode is on. At most: one line. Placeholders: none.
     pub log_info: &'static str,
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, the logs' level, a choice.
+    /// When: the developer mode is on. At most: one line. Placeholders: none.
     pub log_debug: &'static str,
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, a row: its name, then its
+    /// line under it. When: the developer mode is on. At most: one line for the name, the line
+    /// wraps. Placeholders: none.
     pub logs: [&'static str; 2],
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, the logs' row, a button.
+    /// When: the developer mode is on. At most: one line. Placeholders: none.
     pub open_logs: &'static str,
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, under that button. When: the
+    /// logs' folder could not be opened. At most: no limit. Placeholders: none.
     pub logs_not_opened: &'static str,
     pub copy_diagnostic: &'static str,
     pub diagnostic_copied: &'static str,
     pub diagnostic_empty: &'static str,
     pub diagnostic_not_copied: &'static str,
     /// The folder the sessions go to, and the button that opens the system's dialog for it.
+    /// Shows: Settings, « Après un enregistrement », a row: its name, then its line under it. When:
+    /// always. At most: one line for the name, the line wraps. Placeholders: none.
     pub sessions_folder: [&'static str; 2],
+    /// Shows: Settings, « Après un enregistrement », the folder's button: the system's dialog.
+    /// When: always. At most: one line. Placeholders: none.
     pub choose: &'static str,
     /// The recording bar, its icon in the sidebar's foot (D89), what it says (D90).
     pub small: &'static str,
@@ -712,7 +849,11 @@ pub struct Window {
     pub bar_models_kept: &'static str,
     pub bar_model_kept: &'static str,
     /// « Vérifier le son » (D88, board 7): its title, and its row in Settings.
+    /// Shows: « Vérifier le son » (D88), its title, opened from Settings, « Général » or the bar;
+    /// and its row there. When: always. At most: one line. Placeholders: none.
     pub check_sound: &'static str,
+    /// Shows: Settings, « Général », the line under « Vérifier le son », and the bar's. When:
+    /// always. At most: no limit. Placeholders: none.
     pub check_sound_says: &'static str,
     /// A source capture could not open; none named yet.
     pub check_unavailable: &'static str,
@@ -802,10 +943,18 @@ pub struct Window {
     pub transcript_not_made: &'static str,
     pub chip_transcript_failed: &'static str,
     /// Who writes the minutes chosen on the settings' page, not yet saved: who still does ({}).
+    /// Shows: Settings, « Modèles », the summary's step, under « Enregistrer ». When: another
+    /// choice is made, not saved yet. At most: no limit. Placeholders: {} who writes it today.
     pub minutes_unsaved: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, under « Enregistrer ». When: a choice is
+    /// made, none saved yet. At most: no limit. Placeholders: none.
     pub minutes_unsaved_none: &'static str,
     /// A transcript waiting for the default Whisper model: offered in the menu, or coming.
+    /// Shows: a meeting's page, the transcript's card. When: the transcript waits for Kitokey's
+    /// Whisper model. At most: no limit. Placeholders: none.
     pub transcript_model_needed: &'static str,
+    /// Shows: a meeting's page, the transcript's card. When: the transcript waits for Kitokey's
+    /// Whisper model, being downloaded. At most: no limit. Placeholders: none.
     pub transcript_model_coming: &'static str,
     /// The button that ends what is being made of a meeting, or takes it out of the line (D92).
     /// Shows: a button on a meeting's page, beside what is being made. When: its transcript or minutes
@@ -824,6 +973,9 @@ pub struct Window {
     pub minutes_stopped: &'static str,
     pub ran_online: &'static str,
     /// The header's button, at rest and while a recording runs.
+    /// Shows: the button that records: in the window's header, its tooltip too; in the empty
+    /// window; in « Vérifier le son »; and the recording bar's, as its name for a screen reader.
+    /// When: no recording runs. At most: one line. Placeholders: none.
     pub record_start: &'static str,
     pub record_stop: &'static str,
     /// The agreement before a meeting first leaves for a host (D11's fifth board): what leaves,
@@ -842,81 +994,191 @@ pub struct Window {
     pub agree_local: &'static str,
     pub agree_local_write: &'static str,
     /// The global shortcut: its keys as granted, none granted, where it changes, the button there.
+    /// Shows: Settings, « Général », a row: its name, then its line under it. When: always. At
+    /// most: one line for the name, the line wraps. Placeholders: none.
     pub shortcut: [&'static str; 2],
+    /// Shows: Settings, « Général », the shortcut's keys, in their place. When: the desktop granted
+    /// none. At most: one line. Placeholders: none.
     pub shortcut_none: &'static str,
+    /// Shows: Settings, « Général », under the shortcut's keys. When: always. At most: no limit.
+    /// Placeholders: none.
     pub shortcut_where: &'static str,
+    /// Shows: Settings, « Général », a button: the desktop's keyboard settings. When: the desktop
+    /// has them. At most: one line. Placeholders: none.
     pub shortcut_open: &'static str,
     /// *Tester*: the button, what it sends and to whom, and what it found.
+    /// Shows: Settings, « Modèles », the summary's step, a button: the model asked one sentence.
+    /// When: a model is saved. At most: one line. Placeholders: none.
     pub test: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, beside « Tester » while it asks. When: the
+    /// model is a service's. At most: no limit. Placeholders: {} the host.
     pub test_sends: &'static str,
+    /// Shows: Settings, « Modèles », beside « Tester » or a key's test. When: while it asks. At
+    /// most: one line. Placeholders: none.
     pub testing: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, beside « Tester ». When: the model
+    /// answered. At most: one line. Placeholders: none.
     pub test_answered: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, beside « Tester », said by the shell.
+    /// When: the model did not answer. At most: no limit. Placeholders: {} the failure's sentence.
     pub test_failed: &'static str,
+    /// Shows: Settings, « Après un enregistrement », that list's first choice. When: always. At
+    /// most: one line. Placeholders: none.
     pub keep_always: &'static str,
     /// A number of days the audio is kept.
+    /// Shows: Settings, « Après un enregistrement », that list's choices. When: always. At most:
+    /// one line. Placeholders: {} a number of days.
     pub keep_days: &'static str,
     /// The settings file could not be read: why.
     /// A change could not be saved: why.
     pub not_saved: &'static str,
     /// Who writes the minutes was saved, but the keyring did not keep the key: why.
+    /// Shows: Settings, « Modèles », under « Enregistrer ». When: the choice was saved, the keyring
+    /// did not keep the key. At most: no limit. Placeholders: {} why.
     pub key_not_kept: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, its label. When: always. At most: one
+    /// line. Placeholders: none.
     pub minutes_step: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, folded « Avancé »: a field's label. When:
+    /// an address of one's own. At most: one line. Placeholders: none.
     pub address: &'static str,
+    /// Shows: Settings, « Modèles », a model's list or field, its label. When: a step's model is
+    /// chosen. At most: one line. Placeholders: none.
     pub model_name: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, a field's label. When: a service writes
+    /// it. At most: one line. Placeholders: none.
     pub key: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, the key field's placeholder. When: a key
+    /// is kept in the keyring. At most: one line. Placeholders: none.
     pub key_kept: &'static str,
     /// Settings, « Modèles », the summary's first step (D95): the choice beside « Sur cet ordinateur ».
+    /// Shows: Settings, « Modèles », the summary's step, its first choice, beside « Sur cet
+    /// ordinateur » (D95). When: always. At most: one line. Placeholders: none.
     pub where_service: &'static str,
     /// The label of the list of the services offered by name (D95).
+    /// Shows: Settings, « Modèles », the label of the list of services named, in the
+    /// transcription's and the summary's steps (D95). When: a service is chosen. At most: one line.
+    /// Placeholders: none.
     pub service_name: &'static str,
     /// The button that asks the service its models with the key typed: the key tested at once (D95).
+    /// Shows: Settings, « Modèles », the button beside a service's key: it asks the service its
+    /// models with that key (D95). When: a service is chosen. At most: one line. Placeholders:
+    /// none.
     pub key_test: &'static str,
+    /// Shows: Settings, « Modèles », the button that saves a step's choice. When: always. At most:
+    /// one line. Placeholders: none.
     pub save: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, the line under its choice. When: a service
+    /// writes the summary. At most: one line. Placeholders: none.
     pub where_online: &'static str,
     /// The model saved, which this computer's Ollama does not have ({} the model).
+    /// Shows: Settings, « Modèles », the summary's step, under its choice. When: the model saved is
+    /// not in Ollama. At most: no limit. Placeholders: {} the model.
     pub ollama_lacks: &'static str,
     /// This computer's Ollama, saved, not answering — or answering with no model.
+    /// Shows: Settings, « Modèles », the summary's step, under its choice. When: Ollama is saved
+    /// and does not answer, or has no model. At most: no limit. Placeholders: none.
     pub ollama_silent: &'static str,
     /// The first run's assistant (D58): its question, who writes the minutes, the setting said
     /// plainly, and its way back from Settings. Each answer is its name and its line.
+    /// Shows: the first run's assistant (D58), above its question. When: always. At most: one line.
+    /// Placeholders: none.
     pub welcome_title: &'static str,
+    /// Shows: the first run's assistant (D58), its first question, a heading. When: its first step.
+    /// At most: one line. Placeholders: none.
     pub welcome_question: &'static str,
+    /// Shows: the first run's assistant (D58), under its first question. When: its first step. At
+    /// most: no limit. Placeholders: none.
     pub welcome_examples: &'static str,
+    /// Shows: the first run's assistant (D58), an answer to its first question: its name, then its
+    /// line under it. When: its first step. At most: one line each. Placeholders: none.
     pub welcome_often: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), an answer to its first question: its name, then its
+    /// line under it. When: its first step. At most: one line each. Placeholders: none.
     pub welcome_rarely: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), an answer to its first question: its name, then its
+    /// line under it. When: its first step. At most: one line each. Placeholders: none.
     pub welcome_unsure: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), a link under its first step. When: the first run. At
+    /// most: one line. Placeholders: none.
     pub welcome_skip: &'static str,
+    /// Shows: the first run's assistant (D58), a link under its first step. When: opened again from
+    /// Settings, « Général ». At most: one line. Placeholders: none.
     pub welcome_cancel: &'static str,
+    /// Shows: the first run's assistant (D58), its button to the next step. When: its first two
+    /// steps. At most: one line. Placeholders: none.
     pub welcome_next: &'static str,
+    /// Shows: the first run's assistant (D58), its link to the step before. When: its second and
+    /// last steps. At most: one line. Placeholders: none.
     pub welcome_back: &'static str,
+    /// Shows: the first run's assistant (D58), its second question, a heading. When: its second
+    /// step, after « Rarement ou jamais ». At most: one line. Placeholders: none.
     pub welcome_writer: &'static str,
+    /// Shows: the first run's assistant (D58), an answer to its second question: its name, then its
+    /// line under it. When: its second step. At most: one line each. Placeholders: none.
     pub welcome_here: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), an answer to its second question: its name, then its
+    /// line under it. When: its second step. At most: one line each. Placeholders: none.
     pub welcome_service: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), its last step's heading: its name, then its line
+    /// under it. When: everything on this computer. At most: one line each. Placeholders: none.
     pub welcome_private: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), its last step's heading: its name, then its line
+    /// under it. When: a service writes the summary. At most: one line each. Placeholders: none.
     pub welcome_connected: [&'static str; 2],
     /// The summary's rows: who transcribes, who writes the minutes, the reminder.
+    /// Shows: the first run's assistant (D58), its last step: the names of its three rows. When:
+    /// its last step. At most: one line each. Placeholders: none.
     pub welcome_rows: [&'static str; 3],
+    /// Shows: the first run's assistant (D58), a row's value; and Settings, « Modèles », the
+    /// summary's step, its first choice. When: a step is on this computer. At most: one line.
+    /// Placeholders: none.
     pub welcome_on_this_computer: &'static str,
     /// Online, no service chosen yet; one chosen already.
+    /// Shows: the first run's assistant (D58), the summary's row. When: a service is to be chosen.
+    /// At most: one line. Placeholders: none.
     pub welcome_online: &'static str,
+    /// Shows: the first run's assistant (D58), the summary's row. When: a service is chosen
+    /// already. At most: one line. Placeholders: none.
     pub welcome_online_chosen: &'static str,
     /// Ollama and its model ({} the model as people say it).
+    /// Shows: the first run's assistant (D58), the summary's row. When: Ollama writes it. At most:
+    /// one line. Placeholders: {} the model, as people say it.
     pub welcome_ollama_by: &'static str,
+    /// Shows: the first run's assistant (D58), the reminder's row. When: the reminder is on. At
+    /// most: one line. Placeholders: none.
     pub welcome_reminder_on: &'static str,
+    /// Shows: the first run's assistant (D58), the reminder's row. When: the reminder is off. At
+    /// most: one line. Placeholders: none.
     pub welcome_reminder_off: &'static str,
     pub welcome_ollama_silent: &'static str,
     /// Ollama answers without the model ({} the model).
+    /// Shows: the first run's assistant (D58), its last step, under its rows. When: Ollama answers
+    /// without the summary's model. At most: no limit. Placeholders: {} the model.
     pub welcome_ollama_lacks: &'static str,
     /// The model's download ({} its size), and where from ({} the host).
+    /// Shows: the first run's assistant (D58), its last step's button. When: Whisper's model is not
+    /// here yet. At most: one line. Placeholders: {} its size.
     pub welcome_fetch: &'static str,
+    /// Shows: the first run's assistant (D58), under that button. When: Whisper's model is not here
+    /// yet. At most: no limit. Placeholders: {} the host.
     pub welcome_fetch_from: &'static str,
+    /// Shows: the first run's assistant (D58), its last step's button. When: on this computer, no
+    /// model left to fetch. At most: one line. Placeholders: none.
     pub welcome_done: &'static str,
+    /// Shows: the first run's assistant (D58), its last step, a link. When: no model is left to
+    /// fetch (`welcome_later_waits` else). At most: one line. Placeholders: none.
     pub welcome_later: &'static str,
     /// The welcome's « Later » when the transcription's model is still to be downloaded, saying what it
     /// leaves waiting (#781). Shows: the welcome's last screen, a link-styled button. When: the model is
     /// not on this computer and the welcome offers to download it. At most: about 50 characters. Placeholders: none.
     pub welcome_later_waits: &'static str,
+    /// Shows: the first run's assistant (D58), its last step's button: to Settings' summary choice.
+    /// When: a service writes the summary. At most: one line. Placeholders: none.
     pub welcome_choose: &'static str,
+    /// Shows: Settings, « Général », the row that opens the first run's assistant (D58) again: its
+    /// name, then its line under it. When: always. At most: one line for the name, the line wraps.
+    /// Placeholders: none.
     pub welcome_again: [&'static str; 2],
     /// A meeting's context (D59): the small window's disclosure, closed then open; the field's
     /// label, its example and why it helps; its count ({} the most, {} what is left — one, then
@@ -939,7 +1201,11 @@ pub struct Window {
     /// The language a meeting is spoken in (D65).
     pub language_label: &'static str,
     pub language_default: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
+    /// first choice. When: Whisper or a service hears. At most: one line. Placeholders: none.
     pub language_detected: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a list's label. When: always. At
+    /// most: one line. Placeholders: none.
     pub meetings_language: &'static str,
     pub language_not_saved: &'static str,
     pub rename_meeting: &'static str,
@@ -947,11 +1213,18 @@ pub struct Window {
     pub name_not_saved: &'static str,
     pub language_detected_short: &'static str,
     /// SpeechAnalyzer's language when the settings name none: the system's, never the app's (D64).
+    /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
+    /// first choice. When: Apple's SpeechAnalyzer hears (D64). At most: one line. Placeholders:
+    /// none.
     pub language_as_system: &'static str,
     /// A meeting's own language SpeechAnalyzer does not hear: the one it hears in, said (D65).
     pub language_heard_as: &'static str,
     /// The language Kitokey speaks (D64): its row in Settings, and the system's, its default.
+    /// Shows: Settings, « Général », a list: its name, then its line under it (D64). When: always.
+    /// At most: one line for the name, the line wraps. Placeholders: none.
     pub app_language: [&'static str; 2],
+    /// Shows: Settings, « Général », that list's first choice. When: always. At most: one line.
+    /// Placeholders: none.
     pub app_language_system: &'static str,
     /// Shows: Settings, « Général », the appearance's row (D98): its name, then what it changes. When:
     /// always. At most: one line each. Placeholders: none.
