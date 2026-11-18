@@ -795,6 +795,10 @@ pub struct Window {
     pub welcome_fetch_from: &'static str,
     pub welcome_done: &'static str,
     pub welcome_later: &'static str,
+    /// The welcome's « Later » when the transcription's model is still to be downloaded, saying what it
+    /// leaves waiting (#781). Shows: the welcome's last screen, a link-styled button. When: the model is
+    /// not on this computer and the welcome offers to download it. At most: about 50 characters. Placeholders: none.
+    pub welcome_later_waits: &'static str,
     pub welcome_choose: &'static str,
     pub welcome_again: [&'static str; 2],
     /// A meeting's context (D59): the small window's disclosure, closed then open; the field's
@@ -1241,6 +1245,7 @@ pub fn window(language: Language) -> Window {
             welcome_fetch_from: "From {}, checked before it is used.",
             welcome_done: "Finish",
             welcome_later: "Later",
+            welcome_later_waits: "Later — your meetings will wait for the model",
             welcome_choose: "Choose my service",
             welcome_again: [
                 "Set up again",
@@ -1682,6 +1687,7 @@ pub fn window(language: Language) -> Window {
             welcome_fetch_from: "Depuis {}, vérifié avant d’être utilisé.",
             welcome_done: "Terminer",
             welcome_later: "Plus tard",
+            welcome_later_waits: "Plus tard — vos réunions attendront le modèle",
             welcome_choose: "Choisir mon service",
             welcome_again: [
                 "Refaire le réglage",
