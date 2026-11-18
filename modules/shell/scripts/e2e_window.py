@@ -3281,7 +3281,8 @@ def advanced_latest_answer(now: dt.datetime) -> None:
     """BF. « Avancé » in the bar: an ask's answer come after a later ask's never draws over it (#815).
     The ask made as a recording starts is held in the page until « Avancé » is opened, then answered
     as #815's was — Ollama past models_offered's 2 s, none of its models —: come last, other than the
-    opening's, it would close « Avancé » under the user."""
+    opening's, it would close « Avancé » under the user. Then an ask held and refused, come after a later
+    one answered: its refusal is not said either, the panel showing the models (#852)."""
     print("BF. the bar's « Avancé » opened while the start's ask is held: its answer, come last, never closes it (#815)")
 
     class Tags(http.server.BaseHTTPRequestHandler):
@@ -3315,10 +3316,13 @@ def advanced_latest_answer(now: dt.datetime) -> None:
             # opening's, come last. Not the ask made as the start clears the bar (`name` null): its answer, for
             # no meeting, is dropped by the later ask's meeting whatever its order.
             browser.execute_script(
-                "const real = window.__TAURI__.core; window.held = []; window.armed = true;"
+                "const real = window.__TAURI__.core; window.held = []; window.armed = true; window.refusing = false;"
                 " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {"
+                "   if (asked === 'models_offered' && window.refusing && rest[0] && rest[0].name) { window.refusing = false;"
+                "     return new Promise((ok, no) => window.held.push(() => no('held, then refused (#852)'))); }"
                 "   if (asked === 'models_offered' && window.armed && rest[0] && rest[0].name) { window.armed = false; window.heldFor = rest[0].name;"
                 "     return new Promise((ok, no) => window.held.push(() => real.invoke(asked, ...rest).then((a) => ok({ ...a, ollama: [] }), no))); }"
+                "   if (asked === 'models_offered') return real.invoke(asked, ...rest).then((a) => { window.answered = (window.answered || 0) + 1; return a; });"
                 "   return real.invoke(asked, ...rest); } };"
                 " window.restoreCore = () => { window.__TAURI__.core = real; };")
             press(browser, "small-record")
@@ -3337,6 +3341,23 @@ def advanced_latest_answer(now: dt.datetime) -> None:
                   not closed and browser.execute_script("return document.getElementById('small-advanced').getAttribute('aria-expanded')") == "true",
                   browser.execute_script("const t = document.getElementById('small-advanced'); const p = document.getElementById('small-advanced-panel');"
                                          " return {expanded: t?.getAttribute('aria-expanded'), hidden: p?.hidden}"))
+            # #852: an ask for this meeting held, then refused once a later one has answered — « Avancé » closed and
+            # opened again: the later ask's models drawn, the older refusal not said under them.
+            toggled = "const t = document.getElementById('small-advanced'); t.click(); return t.getAttribute('aria-expanded')"
+            said = "const s = document.getElementById('small-said'); return s && !s.hidden ? s.textContent : ''"
+            browser.execute_script(toggled)
+            browser.execute_script("window.refusing = true")
+            browser.execute_script(toggled)
+            held = wait_for(browser, lambda b: b.execute_script("return window.held.length") == 2, 5)
+            before = browser.execute_script("return window.answered || 0")
+            browser.execute_script(toggled)
+            browser.execute_script(toggled)
+            answered = wait_for(browser, lambda b: b.execute_script("return window.answered || 0") > before and b.execute_script(opened), 5)
+            browser.execute_script("window.held[1]()")
+            refused = wait_for(browser, lambda b: "Les modèles n’ont pas pu être lus" in b.execute_script(said), 2)
+            check("an older ask refused after a later one answered: « Avancé » shows the models, and nothing says they could not be read (#852)",
+                  held and answered and not refused and browser.execute_script(opened),
+                  {"held": held, "answered": answered, "said": browser.execute_script(said), "open": browser.execute_script(opened)})
             browser.execute_script("window.restoreCore()")
             press(browser, "small-stop")
             wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
