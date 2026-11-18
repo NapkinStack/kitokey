@@ -1772,17 +1772,8 @@ struct ModelsOffered {
     unreadable: Option<Told>,
 }
 
-/// Read off the window's thread: Ollama asked for its models may take its two seconds, and a meeting's
-/// page asks it as it opens (D93) — never the window frozen meanwhile.
 #[tauri::command]
-async fn models_offered(app: AppHandle, name: Option<String>) -> Result<ModelsOffered, Told> {
-    let reading = app.clone();
-    tauri::async_runtime::spawn_blocking(move || models_offered_now(&reading.state::<Shell>(), name))
-        .await
-        .map_err(|error| app.state::<Shell>().told(Failure::Unexpected, error))?
-}
-
-fn models_offered_now(shell: &Shell, name: Option<String>) -> Result<ModelsOffered, Told> {
+fn models_offered(shell: State<'_, Shell>, name: Option<String>) -> Result<ModelsOffered, Told> {
     // Settings unreadable: offered from those in memory, and said — the panel still opens.
     let (settings, unreadable) = match shell.reread() {
         Ok(settings) => (settings, None),
@@ -1790,7 +1781,7 @@ fn models_offered_now(shell: &Shell, name: Option<String>) -> Result<ModelsOffer
     };
     let (mut chosen, gone, confidential) = match &name {
         Some(name) => {
-            let folder = session_folder(shell, name)?;
+            let folder = session_folder(&shell, name)?;
             (
                 meeting_models::read(&folder),
                 gone_of(&settings, &folder),
