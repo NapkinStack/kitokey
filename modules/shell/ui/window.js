@@ -2545,7 +2545,7 @@ let offeredOpen = false;
 // not yet saved: kept while Settings are drawn again by a model come or the window's width, until
 // the user acts (ux.md: an error stays until corrected). Another address forgets these two.
 const guided = {};
-for (const path of ["minutes", "transcription"]) guided[path] = { advanced: false, answers: new Map(), chosen: {} };
+for (const path of ["minutes", "transcription"]) guided[path] = { advanced: null, answers: new Map(), chosen: {} };
 
 // The guided path's pieces (D95), the same for the transcription and the summary.
 function guidedField(id, text, type, value, locked) {
@@ -2642,7 +2642,8 @@ function guidedAdvanced(path, words, own, contents) {
     panel.hidden = !now;
   };
   toggle.addEventListener("click", () => unfold(!guided[path].advanced));
-  unfold(guided[path].advanced || own);
+  // Folded or unfolded by the user, kept across a drawing; else unfolded when what is saved is of its own (#948).
+  unfold(guided[path].advanced ?? own);
   return [toggle, panel];
 }
 
@@ -5384,6 +5385,7 @@ window.addEventListener("hashchange", () => {
   for (const path of Object.values(guided)) {
     path.answers = new Map();
     path.chosen = {};
+    path.advanced = null;
   }
   if (nameRefused) paneSays(nameRefused);
   nameRefused = null;
