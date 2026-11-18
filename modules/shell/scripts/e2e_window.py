@@ -4955,18 +4955,30 @@ def bar_after_stop(now: dt.datetime) -> None:
                       and browser.execute_script(focused) != "small-last-open",
                       [browser.execute_script(said), browser.execute_script("return window.saidLast"), browser.execute_script(focused)])
                 shot_themed(browser, f"d92-bar-ready-{short}-{theme}", theme)
-                # « Ouvrir » by the keyboard: its page opened, the bar says no meeting any more.
-                browser.execute_script("const real = window.__TAURI__.core; window.opened = [];"
-                                       " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {"
-                                       "   if (asked === 'full_window') window.opened.push(rest[0] && rest[0].page);"
-                                       "   return real.invoke(asked, ...rest); } }; window.restoreCore = () => { window.__TAURI__.core = real; };")
+                # « Ouvrir » by the keyboard: the full window opens on its page, in the bar's place (one window, D35),
+                # and the shell no longer says the meeting; then back to the bar, as a person goes back.
+                small = browser.current_window_handle
                 reached = to(browser, "small-last-open")
-                keys(browser, Keys.ENTER)
-                gone = wait_for(browser, lambda b: b.execute_script(said) == "" and not b.execute_script(shown), 10)
-                check(f"{short}: « Ouvrir » by the keyboard opens its page, then the bar says no meeting (D92)",
-                      reached and gone and browser.execute_script("return window.opened") == ["#/meeting/2026-10-18_12-00"],
-                      [reached, browser.execute_script(said), browser.execute_script("return window.opened")])
-                browser.execute_script("window.restoreCore()")
+                try:
+                    keys(browser, Keys.ENTER)
+                except NoSuchWindowException:
+                    pass  # the bar goes with the press, sometimes before the driver has answered it
+                replaced = wait_for(browser, lambda b: len(b.window_handles) == 1 and b.window_handles != [small], 10)
+                browser.switch_to.window(browser.window_handles[0])
+                paged = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/meeting/2026-10-18_12-00"
+                                 and b.find_element(By.ID, "meeting").is_displayed(), 10)
+                forgotten = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('header').then(h => h.last === null)"), 5)
+                check(f"{short}: « Ouvrir » by the keyboard opens its page in the full window, and the meeting is said no more (D92)",
+                      reached and replaced and paged and forgotten,
+                      [reached, browser.window_handles, browser.execute_script("return location.hash"),
+                       browser.execute_script("return window.__TAURI__.core.invoke('header').then(h => h.last)")])
+                main = browser.current_window_handle
+                press(browser, "small-link")
+                wait_for(browser, lambda b: len(b.window_handles) == 2, 10)
+                browser.switch_to.window([h for h in browser.window_handles if h != main][0])
+                back = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+                check(f"{short}: back in the bar, it says no meeting (D92)", back and browser.execute_script(said) == "" and not browser.execute_script(shown),
+                      browser.execute_script(said))
                 # Another meeting stopped, its transcript held — its page never opened —, and a recording started while it
                 # is made: nothing said of it while that one records (D92).
                 (WORK / "fail-minutes").touch()
