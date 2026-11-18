@@ -11,6 +11,8 @@
 #     scripts/headless.sh            (scripts/e2e.sh alone runs on the user's desktop, as before)
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
+# Where its text goes: the module's `.evidence`, or a shard's own folder (scripts/e2e_sharded.sh).
+out=${KITOKEY_E2E_OUT:-$here/../.evidence}
 
 if [ "${1:-}" != --inside ]; then
   missing=""
@@ -19,14 +21,20 @@ if [ "${1:-}" != --inside ]; then
   done
   [ -d /usr/share/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com ] || missing="$missing AppIndicator-extension"
   if [ -n "$missing" ]; then
-    mkdir -p "$here/../.evidence"
-    echo "e2e: NOT RUN — no GNOME to run it in here, missing:$missing" | tee "$here/../.evidence/e2e.txt"; exit 77
+    mkdir -p "$out"
+    echo "e2e: NOT RUN — no GNOME to run it in here, missing:$missing" | tee "$out/e2e.txt"; exit 77
   fi
   # A partial run's names checked before the session is made (scripts/e2e_only.py): a typo refused
   # at once, named, as e2e.sh would refuse it minutes later.
   if ! asked=$(python3 -I "$here/e2e_only.py" --asked "$here/e2e_window.py" 2>&1); then
-    mkdir -p "$here/../.evidence"
-    echo "$asked" | tee "$here/../.evidence/e2e.txt"; exit 3
+    mkdir -p "$out"
+    echo "$asked" | tee "$out/e2e.txt"; exit 3
+  fi
+  # A full run is cut in shards side by side, each a session of its own like this one (#862): the
+  # tray's part, and the window's scenarios balanced by their measured times. KITOKEY_E2E_SHARDS=1
+  # runs it whole, in this one session, as before.
+  if [ -z "${KITOKEY_E2E_PART:-}" ] && [ -z "$asked" ] && [ "${KITOKEY_E2E_SHARDS:-3}" -gt 1 ]; then
+    exec bash "$here/e2e_sharded.sh"
   fi
   root=${XDG_CACHE_HOME:-$HOME/.cache}/kitokey-headless/run-$$
   mkdir -p "$root/run" "$root/user/.config" "$root/user/.local/share" "$root/user/.local/state" "$root/user/.cache" "$root/tmp"
@@ -45,7 +53,7 @@ if [ "${1:-}" != --inside ]; then
   trap ended EXIT
   # Of the user's environment, their tools and caches and NapkinStack's, and the scenarios a partial
   # run plays (KITOKEY_E2E_ONLY, scripts/e2e_only.py); nothing of their desktop.
-  mapfile -t kept < <(env | grep -E '^(NSTACK_[A-Z_]*|CARGO_TARGET_DIR|KITOKEY_SCREENSHOTS|KITOKEY_E2E_ONLY)=' || true)
+  mapfile -t kept < <(env | grep -E '^(NSTACK_[A-Z_]*|CARGO_TARGET_DIR|KITOKEY_SCREENSHOTS|KITOKEY_E2E_ONLY|KITOKEY_E2E_PART|KITOKEY_E2E_OUT)=' || true)
   setsid env -i PATH="$PATH" USER="$USER" LOGNAME="$USER" LANG="${LANG:-C.UTF-8}" "${kept[@]}" \
     CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
     UV_CACHE_DIR="${UV_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/uv}" \
@@ -145,14 +153,14 @@ GLib.MainLoop().run()
 EOF
 for _ in $(seq 100); do [ -s "$logs/keyboard" ] && break; sleep 0.1; done
 if [ ! -s "$logs/keyboard" ]; then
-  mkdir -p "$here/../.evidence"
-  echo "e2e: FAILED — the session has no keyboard, so no window would have the focus:" | tee "$here/../.evidence/e2e.txt"
-  sed 's/^/    /' "$logs/keyboard.log" | tee -a "$here/../.evidence/e2e.txt"; exit 1
+  mkdir -p "$out"
+  echo "e2e: FAILED — the session has no keyboard, so no window would have the focus:" | tee "$out/e2e.txt"
+  sed 's/^/    /' "$logs/keyboard.log" | tee -a "$out/e2e.txt"; exit 1
 fi
 
 status=0
 "$here/e2e.sh" "$@" || status=$?
 # The session's own log beside the run's evidence, never in it: what GNOME says of a session with
 # no logind nor accounts is no line of Kitokey's, and NapkinStack audits every log there.
-cp "$logs/shell.log" "$here/../.evidence/headless-shell.log" 2>/dev/null || true
+cp "$logs/shell.log" "$out/headless-shell.log" 2>/dev/null || true
 exit "$status"

@@ -67,12 +67,20 @@ reads the log files the run wrote there:
   it ran; 77 for any other reason — some tools use it for a refused permission — reads as *not
   run*, so a run that fails exits with another code.
 
+- **One run at a time, unless sealed.** What an end-to-end run drives — a sound server, a
+  display, a port — is the machine's, so `nstack e2e` runs one at a time on a machine, and a run
+  that waits says for whom, every minute. A module whose run brings its own session, sound server
+  and ports, and reads nothing another run reads, declares `evidence.sealed: true`: its run
+  neither waits nor holds the machine. Declare it only when that is true: two runs that share a
+  device see each other's sounds and windows, and fail for no reason of their own.
+
 ```yaml
 evidence:
   provoked:
     - pattern: "key refused"
       level: warning
       scenario: S3
+  sealed: true   # its own headless session and sound server: runs beside any other
 ```
 
 ---

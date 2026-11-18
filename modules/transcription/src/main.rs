@@ -20,7 +20,7 @@ use kitokey_transcription::{
     log,
     online::{Refused, Service},
     speech::SpeechAnalyzer,
-    step::{Engine, hear, read},
+    step::{Engine, hear_since, read},
     whisper::{Whisper, knows},
 };
 use serde_json::json;
@@ -155,7 +155,7 @@ fn run(folder: &Path, hearer: Hearer, language: Option<&str>) -> Result<(), Stri
         "{}",
         json!({ "event": "hearing", "engine": name, "model": model, "language": language, "audio": form, "times": times })
     );
-    hear(folder, session, engine.as_mut(), language, SPAN).map_err(|error| error.to_string())?;
+    hear_since(folder, session, engine.as_mut(), language, SPAN, began).map_err(|error| error.to_string())?;
     info!(milliseconds = began.elapsed().as_millis() as u64, "transcription.written");
     let _ = writeln!(
         std::io::stdout(),
