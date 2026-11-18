@@ -722,6 +722,11 @@ function paintBar() {
   const by = shown === null ? "" : shown.host === undefined ? spoken(shown.model) : `${modelSaid(shown.model)} · ${shown.host}`;
   const time = shown === null ? "" : `${Math.floor(shown.seconds / 60)}:${String(shown.seconds % 60).padStart(2, "0")}`;
   bar.querySelector(".by").textContent = by ? `${by} · ${time}` : "";
+  // What is left, from the speeds measured here: none known, nothing said — never a number made up.
+  const minutesLeft = makings.left?.[bar.dataset.name];
+  const left = bar.querySelector(".left");
+  left.textContent = minutesLeft === undefined ? "" : fill(words.making_left, minutesLeft);
+  left.hidden = minutesLeft === undefined;
   const parts = bar.querySelector(".segments");
   if (parts.childElementCount !== state.parts.length) parts.replaceChildren(...state.parts.map(() => element("span", "segment")));
   state.parts.forEach((part, at) => { parts.children[at].dataset.state = part; });
@@ -2289,7 +2294,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   step.id = "making-step";
   step.setAttribute("aria-live", "polite");
   const cancel = element("span", "cancel");
-  making.append(step, element("span", "by"), cancel, element("div", "segments"));
+  making.append(step, element("span", "by"), element("span", "left"), cancel, element("div", "segments"));
   page.replaceChildren(head, making, ask, settings, drawn, columns);
   paintBar();
   // The line being said, marked while it plays; the page stays where the user left it (D26, the

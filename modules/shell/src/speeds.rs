@@ -60,7 +60,8 @@ impl Speeds {
 /// The minutes said for seconds left (GNOME HIG: a bar says what is left past about thirty
 /// seconds): none up to thirty seconds; to the minute up to ten, at least one; to five after.
 pub fn said(seconds: f64) -> Option<u64> {
-    if !(seconds > 30.0) {
+    // Not a number, or thirty seconds or less: none.
+    if seconds.is_nan() || seconds <= 30.0 {
         return None;
     }
     let minutes = (seconds / 60.0).round().max(1.0);

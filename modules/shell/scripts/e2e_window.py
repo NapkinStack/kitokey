@@ -5337,7 +5337,7 @@ def page_estimate(now: dt.datetime) -> None:
     measured = json.dumps({"transcript": {model.name: 0.5}, "minutes": {"mistral": 0.5}})
     swift = json.dumps({"transcript": {model.name: 0.01}, "minutes": {"mistral": 0.01}})
     for case, kept, language, hearing, writing, first, then in (
-        ("fr, measured", measured, "fr_FR.UTF-8", "Transcription en cours", "Rédaction du compte rendu", "environ 10 min", "environ 5 min"),
+        ("fr, measured", measured, "fr_FR.UTF-8", "Transcription en cours", "Rédaction du compte rendu", "environ 10\u00a0min", "environ 5\u00a0min"),
         ("en, measured", measured, "en_US.UTF-8", "Writing the transcript", "Writing the minutes", "about 10 min", "about 5 min"),
         ("fr, none measured", None, "fr_FR.UTF-8", "Transcription en cours", "Rédaction du compte rendu", "", ""),
         ("fr, unreadable", "{ not json", "fr_FR.UTF-8", "Transcription en cours", "Rédaction du compte rendu", "", ""),
@@ -5377,7 +5377,7 @@ def page_estimate(now: dt.datetime) -> None:
                 seen = browser.execute_script("clearInterval(window.leftTick); return window.leftSeen")
                 minutes = [int(re.sub(r"\D", "", text)) for text in seen if re.search(r"\d", text)]
                 check(f"{case}: what is left never goes up, and nothing else is said there (D92)",
-                      done and all(b <= a for a, b in zip(minutes, minutes[1:])) and all(text == "" or re.fullmatch(r"(environ|about) \d+ min", text) for text in seen),
+                      done and all(b <= a for a, b in zip(minutes, minutes[1:])) and all(text == "" or re.fullmatch(r"(environ|about) \d+[ \u00a0]min", text) for text in seen),
                       sorted(set(seen)))
             finally:
                 for gate in gates:

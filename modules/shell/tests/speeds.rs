@@ -20,7 +20,13 @@ fn nothing_measured_says_no_number() {
     // One step measured, the other not: no number for the making, never half of one.
     let mut half = Speeds::default();
     half.measured(Step::Transcript, "ggml-small", 60.0, AUDIO);
-    assert_eq!(half.left(&[(Step::Transcript, "ggml-small", Some(10.0)), (Step::Minutes, "qwen3:8b", None)], AUDIO), None);
+    assert_eq!(
+        half.left(
+            &[(Step::Transcript, "ggml-small", Some(10.0)), (Step::Minutes, "qwen3:8b", None)],
+            AUDIO
+        ),
+        None
+    );
     // Another model than the one measured: not this one's speed.
     assert_eq!(half.left(&[(Step::Transcript, "ggml-large", Some(10.0))], AUDIO), None);
 }
@@ -28,12 +34,21 @@ fn nothing_measured_says_no_number() {
 #[test]
 fn what_is_left_is_each_step_at_its_speed_less_what_ran() {
     let kept = measured();
-    let left = kept.left(&[(Step::Transcript, "ggml-small", Some(20.0)), (Step::Minutes, "qwen3:8b", None)], AUDIO);
+    let left = kept.left(
+        &[(Step::Transcript, "ggml-small", Some(20.0)), (Step::Minutes, "qwen3:8b", None)],
+        AUDIO,
+    );
     assert_eq!(left, Some(40.0 + 120.0));
     // The same audio twice as long: twice the time.
     assert_eq!(kept.left(&[(Step::Minutes, "qwen3:8b", Some(0.0))], 2.0 * AUDIO), Some(240.0));
     // Past its estimate, a step running has nothing left, never less.
-    assert_eq!(kept.left(&[(Step::Transcript, "ggml-small", Some(90.0)), (Step::Minutes, "qwen3:8b", None)], AUDIO), Some(120.0));
+    assert_eq!(
+        kept.left(
+            &[(Step::Transcript, "ggml-small", Some(90.0)), (Step::Minutes, "qwen3:8b", None)],
+            AUDIO
+        ),
+        Some(120.0)
+    );
 }
 
 #[test]
@@ -41,7 +56,16 @@ fn it_never_moves_back_as_the_making_goes_on() {
     let kept = measured();
     let mut seen = Vec::new();
     for second in 0..80 {
-        seen.push(kept.left(&[(Step::Transcript, "ggml-small", Some(f64::from(second))), (Step::Minutes, "qwen3:8b", None)], AUDIO).unwrap());
+        seen.push(
+            kept.left(
+                &[
+                    (Step::Transcript, "ggml-small", Some(f64::from(second))),
+                    (Step::Minutes, "qwen3:8b", None),
+                ],
+                AUDIO,
+            )
+            .unwrap(),
+        );
     }
     // The transcript ended, slower than measured: the summary from its start.
     for second in 0..130 {
@@ -96,5 +120,8 @@ fn kept_as_numbers_by_step_and_model_alone_and_an_unreadable_file_is_none() {
     assert_eq!(speeds::read(&file), kept);
     // Only numbers by step and model: no meeting, no date, no length of audio.
     let written: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
-    assert_eq!(written, serde_json::json!({"transcript": {"ggml-small": 0.1}, "minutes": {"qwen3:8b": 0.2}}));
+    assert_eq!(
+        written,
+        serde_json::json!({"transcript": {"ggml-small": 0.1}, "minutes": {"qwen3:8b": 0.2}})
+    );
 }

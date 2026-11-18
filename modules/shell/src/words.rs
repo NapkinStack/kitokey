@@ -803,6 +803,10 @@ pub struct Window {
     /// making's line, until the next gesture on it. When: the shell refused to end or take out the
     /// making. At most: no limit. Placeholders: {} why it was refused.
     pub making_cancel_failed: &'static str,
+    /// What is left of a meeting's making, in minutes, from the speeds measured here (D92). Shows: in a
+    /// meeting's page bar, after the step. When: both steps' speeds are known and more than thirty
+    /// seconds are left. At most: « about 100 min ». Placeholders: {} the minutes, rounded.
+    pub making_left: &'static str,
     /// Said on its page once the user cancelled its transcript, or its minutes: what was there stays.
     /// Shows: a meeting's page, where its transcript is. When: the user cancelled its transcript.
     /// At most: no limit. Placeholders: none.
@@ -1272,6 +1276,7 @@ pub fn window(language: Language) -> Window {
             transcript_model_coming: "Waiting for the Whisper model, being downloaded.",
             making_cancel: "Cancel",
             making_cancel_failed: "Kitokey could not cancel: {}",
+            making_left: "about {} min",
             transcript_stopped: "Transcription stopped. You can start it again, with another model if you like.",
             minutes_stopped: "Minutes stopped. You can start them again, with another model if you like.",
             ran_online: "online",
@@ -1723,6 +1728,7 @@ pub fn window(language: Language) -> Window {
             transcript_model_coming: "En attente du modèle Whisper, en cours de téléchargement.",
             making_cancel: "Annuler",
             making_cancel_failed: "Kitokey n’a pas pu annuler\u{a0}: {}",
+            making_left: "environ {}\u{a0}min",
             transcript_stopped: "Transcription arrêtée. Vous pouvez la relancer, avec un autre modèle si besoin.",
             minutes_stopped: "Compte rendu arrêté. Vous pouvez le relancer, avec un autre modèle si besoin.",
             ran_online: "en ligne",

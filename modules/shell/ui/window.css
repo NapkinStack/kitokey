@@ -407,6 +407,7 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .card.making { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .card.making .what { font-weight: 600; }
 .card.making .by { flex: 1 1 auto; color: var(--soft); font-size: 14px; }
+.card.making .left { color: var(--ink); font-size: 14px; white-space: nowrap; }
 .card.making .segments { display: flex; gap: 4px; flex-basis: 100%; }
 .card.making .segment { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
 .card.making .segment[data-state="done"] { background: var(--accent); }

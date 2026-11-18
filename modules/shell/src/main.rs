@@ -43,7 +43,9 @@ use kitokey_shell::{
     registry,
     sessions::{self, Listed},
     settings::{self, After, Appearance, Engine, KeepAudio, Log, Settings},
-    sound_check, speech, spoken,
+    sound_check, speech,
+    speeds::{self, Speeds, Step},
+    spoken,
     summarising::{self, Summarising},
     transcription::{self, Hearer, Made, Transcription},
     trial,
@@ -192,6 +194,9 @@ struct Shell {
     /// Meetings whose transcript is written and whose summary follows, not yet in line: between the two
     /// steps, the page's bar says the summary's (D92).
     between: Mutex<std::collections::HashSet<PathBuf>>,
+    /// How fast this machine made each step, by model, as last measured: what the page's bar says is
+    /// left (D92). Kept beside the settings.
+    speeds: Mutex<Speeds>,
     /// What had left before a meeting was said confidential, and to which host: said on its page
     /// while it stays so, until Kitokey quits (D60).
     left: Mutex<HashMap<PathBuf, Vec<Left>>>,
@@ -583,6 +588,7 @@ fn main() {
                 last: Mutex::default(),
                 hearing_then: Mutex::default(),
                 between: Mutex::default(),
+                speeds: Mutex::new(speeds_file().map(|file| speeds::read(&file)).unwrap_or_default()),
                 left: Mutex::default(),
                 ollama_waiting: Mutex::default(),
                 fetching: Mutex::new(false),
@@ -3172,8 +3178,11 @@ fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<
     let shell = app.state::<Shell>();
     // What says it is being written goes first, the meeting freed last: nothing started in
     // between is left without its model, nor the tray's entry greyed off.
-    shell.minutes_by.lock().unwrap().take();
+    let by = shell.minutes_by.lock().unwrap().take();
     shell.minutes_host.lock().unwrap().take();
+    if failed.is_none() {
+        measured(&shell, Step::Minutes, folder, by.map(|(model, _, since)| (model, since)));
+    }
     if let Some((why, cause)) = failed {
         let why = if why.trim().is_empty() {
             "kitokey-summary stopped without saying why".to_string()
@@ -3287,6 +3296,9 @@ struct Makings {
     ollama_recommended: &'static str,
     /// What the user last cancelled of a meeting, by its name: `transcript` or `minutes` (D92).
     stopped: HashMap<String, &'static str>,
+    /// The minutes left of a meeting's making, by its name, from the speeds measured here: none
+    /// measured for one of its steps, or thirty seconds or less, none (D92).
+    left: HashMap<String, u64>,
 }
 
 #[derive(serde::Serialize)]
@@ -3356,6 +3368,7 @@ fn makings(shell: State<'_, Shell>) -> Makings {
     let writing = shell.writing_minutes.lock().unwrap().clone();
     let by = shell.minutes_by.lock().unwrap().clone();
     let settings = shell.settings();
+    let left = time_left(&shell, &settings);
     let (transcripts_waiting, model_needed) = {
         let waiting = shell.waiting.lock().unwrap();
         let names = waiting.iter().map(|(folder, ..)| named(folder)).collect();
@@ -3430,7 +3443,80 @@ fn makings(shell: State<'_, Shell>) -> Makings {
             .iter()
             .map(|(folder, what)| (named(folder), *what))
             .collect(),
+        left,
     }
+}
+
+/// Where the speeds measured here are kept: beside the settings (D92).
+fn speeds_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("speeds.json"))
+}
+
+/// A step written, measured: the seconds it took for each second of its meeting's audio, kept for its
+/// model — nothing of the meeting (D92). Unwritten, the speed stays for this run alone.
+fn measured(shell: &Shell, step: Step, folder: &Path, by: Option<(String, Instant)>) {
+    let (Some((model, since)), Some(audio)) = (by, sessions::length(folder)) else {
+        return;
+    };
+    let mut kept = shell.speeds.lock().unwrap();
+    kept.measured(step, &model, since.elapsed().as_secs_f64(), audio);
+    if let Some(file) = speeds_file()
+        && let Err(error) = speeds::write(&file, &kept)
+    {
+        tracing::info!(detail = %error, "shell.speeds_unwritten");
+    }
+}
+
+/// A step still ahead of a meeting: which, by what model, and the seconds it has run, if begun.
+type Ahead = (Step, String, Option<f64>);
+
+/// The minutes left of each meeting being made, from its length and the speeds measured here: its
+/// step running less what it has run, and its summary when one follows (D92). One step with no speed
+/// kept, or the model of its summary not known yet — a confidential meeting's is chosen as it starts —:
+/// no number, never half of one.
+fn time_left(shell: &Shell, settings: &Settings) -> HashMap<String, u64> {
+    let kept = shell.speeds.lock().unwrap().clone();
+    let next = |folder: &Path| {
+        if confidential::marked(folder) {
+            return None;
+        }
+        let listed = settings::whisper_models(&models_folder(), settings);
+        meeting_models::applied(settings, &meeting_models::read(folder), &listed)
+            .settings
+            .minutes_model
+    };
+    let mut making: Vec<(PathBuf, Option<Vec<Ahead>>)> = Vec::new();
+    let hearing = shell.hearing.lock().unwrap().clone();
+    let hearing_by = shell.hearing_by.lock().unwrap().clone();
+    let then = *shell.hearing_then.lock().unwrap();
+    if let (Some(folder), Some((model, since))) = (hearing, hearing_by) {
+        let heard = (Step::Transcript, model, Some(since.elapsed().as_secs_f64()));
+        let steps = if then {
+            next(&folder).map(|minutes| vec![heard, (Step::Minutes, minutes, None)])
+        } else {
+            Some(vec![heard])
+        };
+        making.push((folder, steps));
+    }
+    let between: Vec<PathBuf> = shell.between.lock().unwrap().iter().cloned().collect();
+    for folder in between {
+        let steps = next(&folder).map(|minutes| vec![(Step::Minutes, minutes, None)]);
+        making.push((folder, steps));
+    }
+    let writing = shell.writing_minutes.lock().unwrap().clone();
+    let minutes_by = shell.minutes_by.lock().unwrap().clone();
+    if let (Some(folder), Some((model, _, since))) = (writing, minutes_by) {
+        making.push((folder, Some(vec![(Step::Minutes, model, Some(since.elapsed().as_secs_f64()))])));
+    }
+    making
+        .into_iter()
+        .filter_map(|(folder, steps)| {
+            let steps = steps?;
+            let steps: Vec<(Step, &str, Option<f64>)> = steps.iter().map(|(step, model, ran)| (*step, model.as_str(), *ran)).collect();
+            let minutes = speeds::said(kept.left(&steps, sessions::length(&folder)?)?)?;
+            Some((named(&folder), minutes))
+        })
+        .collect()
 }
 
 /// Minutes made again with a model, asked before the user agreed to send them.
@@ -4070,8 +4156,11 @@ enum Heard {
 /// said stopped when its own token was cancelled.
 fn heard(shell: &Shell, folder: &Path, made: &Made, cancelled: bool) -> Heard {
     shell.hearing.lock().unwrap().take();
-    shell.hearing_by.lock().unwrap().take();
+    let by = shell.hearing_by.lock().unwrap().take();
     shell.hearing_host.lock().unwrap().take();
+    if matches!(made, Made::Written(_)) {
+        measured(shell, Step::Transcript, folder, by);
+    }
     let here = shell.heard_here.lock().unwrap().remove(folder);
     // Written all the same, as it was cancelled: written it is — never a whole one thrown away.
     let cancelled = cancelled && !matches!(made, Made::Written(_));
