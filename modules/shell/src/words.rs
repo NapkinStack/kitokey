@@ -742,6 +742,9 @@ pub struct Window {
     pub on_computer: &'static str,
     pub redo_transcript_title: &'static str,
     pub redo_transcript_note: &'static str,
+    /// Shows: the transcript's redo panel, under its note: the summary is not made again with it (the
+    /// decider, 2026-11-18). When: the meeting has a summary. At most: no limit. Placeholders: none.
+    pub redo_keeps_minutes: &'static str,
     /// What a meeting lacks, offered on its page; what is said once asked; where a step ran.
     pub make_minutes: &'static str,
     pub make_transcript: &'static str,
@@ -893,7 +896,10 @@ pub struct Window {
     pub context_making: &'static str,
     pub context_unfinished: &'static str,
     pub context_changed: [&'static str; 2],
-    pub context_redo: &'static str,
+    /// Shows: a meeting's context card, the button under `context_changed`, naming what it starts (D93):
+    /// the transcript, then the summary where there is one. When: the context changed after they were
+    /// made; the first without a summary, the second with one. At most: about 45 characters. Placeholders: none.
+    pub context_redo: [&'static str; 2],
     /// The language a meeting is spoken in (D65).
     pub language_label: &'static str,
     pub language_default: &'static str,
@@ -1212,6 +1218,7 @@ pub fn window(language: Language) -> Window {
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript is kept until the new one is whole, then goes to the trash; if the new one fails, the current comes back.",
+            redo_keeps_minutes: "The current summary is kept; write it again afterwards if needed.",
             make_minutes: "Write the minutes",
             make_transcript: "Write the transcript",
             minutes_making: "Writing the minutes",
@@ -1342,7 +1349,7 @@ pub fn window(language: Language) -> Window {
                 "The transcript was made with another context.",
                 "The transcript and the minutes were made with another context.",
             ],
-            context_redo: "Redo with this context",
+            context_redo: ["Write the transcript again", "Write the transcript and the summary again"],
             language_label: "Spoken language",
             language_default: "As in Settings",
             language_detected: "Detected by the transcription",
@@ -1654,6 +1661,7 @@ pub fn window(language: Language) -> Window {
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle est gardée tant que la nouvelle n’est pas entière, puis part à la corbeille\u{202f}; si la nouvelle échoue, l’actuelle revient.",
+            redo_keeps_minutes: "Le compte rendu actuel est gardé\u{202f}; refaites-le ensuite si besoin.",
             make_minutes: "Faire le compte rendu",
             make_transcript: "Faire la transcription",
             minutes_making: "Rédaction du compte rendu",
@@ -1784,7 +1792,7 @@ pub fn window(language: Language) -> Window {
                 "La transcription a été faite avec un autre contexte.",
                 "La transcription et le compte rendu ont été faits avec un autre contexte.",
             ],
-            context_redo: "Refaire avec ce contexte",
+            context_redo: ["Refaire la transcription", "Refaire la transcription et le compte rendu"],
             language_label: "Langue parlée",
             language_default: "Celle des Réglages",
             language_detected: "Détectée par la transcription",

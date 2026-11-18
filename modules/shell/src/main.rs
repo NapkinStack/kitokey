@@ -285,8 +285,8 @@ impl Shell {
 }
 
 /// How a transcript is made again: with the Whisper model a *Refaire…* picked, this time only;
-/// or by whoever the settings name to hear, its minutes after it — *Refaire avec ce contexte*
-/// (D59).
+/// or by whoever the settings name to hear, its minutes after it — *Refaire la transcription et le
+/// compte rendu* (D59, D93).
 #[derive(Clone, PartialEq)]
 enum Again {
     Model(PathBuf),
@@ -2014,7 +2014,7 @@ fn confidential_set(app: AppHandle, shell: State<'_, Shell>, name: String, on: b
 #[derive(serde::Serialize)]
 struct ContextShown {
     text: String,
-    /// Its transcript or minutes were made with another: *Refaire avec ce contexte* is offered.
+    /// Its transcript or minutes were made with another: *Refaire la transcription et le compte rendu* is offered.
     changed: bool,
 }
 
@@ -2123,8 +2123,8 @@ fn next_context_kept(shell: State<'_, Shell>, text: String) -> Result<(), Told> 
     Ok(())
 }
 
-/// *Refaire avec ce contexte* (D59): the transcript made again by whoever the settings name to
-/// hear, then the minutes by whoever they name to write — each kept in place until the new one
+/// *Refaire la transcription et le compte rendu* (D59, D93): the transcript made again by whoever the
+/// settings name to hear, then the minutes by whoever they name to write — each kept in place until the new one
 /// is whole, put back if it is not.
 #[tauri::command]
 fn context_redo(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {

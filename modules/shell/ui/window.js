@@ -1023,7 +1023,8 @@ function contextCard(session, { context, transcript, minutes }, words, settings,
   said.setAttribute("role", "status");
   const changed = element("div", "context-changed");
   changed.id = "context-changed";
-  const redo = element("button", "open", words.context_redo);
+  // It names what it starts (D93): the transcript, and the summary after it where there is one.
+  const redo = element("button", "open", words.context_redo[minutes.state === "present" ? 1 : 0]);
   redo.type = "button";
   redo.id = "context-redo";
   redo.addEventListener("click", async () => {
@@ -1424,8 +1425,14 @@ function redoPanel(offered, session, words, button) {
     window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }), "minutes", words.redo_minutes_do);
 }
 
-function redoTranscriptPanel(offered, session, words, button, corrected) {
+function redoTranscriptPanel(offered, session, words, button, corrected, summarised) {
   const notes = [element("p", "says", words.redo_transcript_note)];
+  // Made again, the transcript alone: the summary there is kept, said so (the decider, 2026-11-18).
+  if (summarised) {
+    const kept = element("p", "says", words.redo_keeps_minutes);
+    kept.id = "redo-keeps-minutes";
+    notes.push(kept);
+  }
   // Made again, the transcript is another file: a person's corrections are not in it (ADR-0014).
   if (corrected) {
     const lost = element("p", "note warn", words.redo_loses_corrections);
@@ -1653,7 +1660,7 @@ function tookAndCost(read, words) {
   return said;
 }
 
-function transcriptCard(read, words, session) {
+function transcriptCard(read, words, session, summarised) {
   const card = element("aside", "card transcript");
   card.setAttribute("aria-label", words.transcript_title);
   const top = element("div", "top");
@@ -1690,7 +1697,7 @@ function transcriptCard(read, words, session) {
       return null;
     });
     if (offered === null) return;
-    const panel = redoTranscriptPanel(offered, session, words, redo, read.segments.some((segment) => segment.edited));
+    const panel = redoTranscriptPanel(offered, session, words, redo, read.segments.some((segment) => segment.edited), summarised);
     redo.replaceWith(panel);
     panel.querySelector("button:enabled").focus();
   });
@@ -2157,7 +2164,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   drawing.append(relief(said, total, words));
   drawn.append(drawing, legend, playerBar(session, listened, total, words, drawing));
   const columns = element("div", "columns");
-  columns.append(minutesCard(minutes, words, session, transcript), transcriptCard(transcript, words, session));
+  columns.append(minutesCard(minutes, words, session, transcript), transcriptCard(transcript, words, session, minutes.state === "present"));
   // Shown again when the window comes forward: a search in progress in this meeting is kept.
   const searching = page.dataset.name === nameOf(session) ? (document.getElementById("search")?.value ?? "") : "";
   // A name being typed is kept the same way, with its refusal and where the caret was (D70).
