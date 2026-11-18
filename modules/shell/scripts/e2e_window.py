@@ -5527,6 +5527,180 @@ def focus_kept(now: dt.datetime) -> None:
     slow.shutdown()
 
 
+def focus_swept(now: dt.datetime) -> None:
+    """BY. #944, D101 swept: in Settings, every enabled control a user can change — a list, a box, a radio
+    group, a field —, changed by the keyboard and then by a click, in French and then in English, keeps the
+    focus on it (a radio: on the one now checked) and the page where it was, once saved and every drawing
+    after it over. The controls are read from the page as drawn, after each change — never a list written
+    here —, the disclosures opened first. A field is changed by the keyboard alone: a click changes none."""
+    print("BY. Settings swept: each control changed by the keyboard and by a click, in both languages, keeps the focus and the page where it was (#944, D101)")
+    meetings = WORK / "focus-swept"
+    session(meetings / "2026-10-29_10-00", now - dt.timedelta(days=1), 30, {"local.wav": 4000})
+    # This computer's Whisper models, as BS writes them: two, so that the list offers a choice.
+    models = WORK / "data" / "kitokey" / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    for name in ("ggml-large-v3-turbo-q8_0.bin", "ggml-small.bin"):
+        if not (models / name).exists():
+            (models / name).write_bytes(b"x" * 1000)
+
+    # Ollama's stand-in: two models, so that the minutes' model on this computer can be changed.
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            try:
+                self.send_response(200)
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                pass
+
+        def log_message(self, *_):
+            pass
+
+    tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
+    threading.Thread(target=tags.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{tags.server_address[1]}"
+    # Where the focus is and how far the page is scrolled, as BS reads them.
+    where = ("const a = document.activeElement;"
+             " return [!a || a === document.body ? 'body' : a.id || ('no id: ' + a.tagName.toLowerCase() + '.' + a.className), Math.round(scrollY)]")
+    # Every control of Settings a user can change now: shown, enabled, with an id (BS holds that each has one).
+    listing = ("return [...document.querySelectorAll('#settings select, #settings input')].filter((c) => c.id && c.getClientRects().length"
+               " && !c.disabled && c.getAttribute('aria-disabled') !== 'true' && !c.readOnly"
+               " && !['button', 'hidden', 'file', 'submit', 'reset', 'image'].includes(c.type))"
+               ".map((c) => ({id: c.id, kind: c.tagName === 'SELECT' ? 'list' : c.type === 'checkbox' ? 'box' : c.type === 'radio' ? 'radio' : 'field',"
+               " group: c.type === 'radio' ? (c.name || c.id) : null, options: c.tagName === 'SELECT' ? c.options.length : 0,"
+               " index: c.tagName === 'SELECT' ? c.selectedIndex : -1}))")
+    # A radio group's radios, shown: which is checked, which are not.
+    radios = ("return [...document.querySelectorAll('#settings input[type=radio]')].filter((r) => (r.name || r.id) === arguments[0]"
+              " && r.getClientRects().length && !r.disabled).map((r) => [r.id, r.checked])")
+    # Any change to the page — a drawing by `refresh()` or by any other path — restarts the quiet; and each
+    # move of the focus, for the FAIL's detail.
+    watch = ("if (!window.__swept) { window.__swept = true; window.__quiet = performance.now();"
+             " new MutationObserver(() => { window.__quiet = performance.now(); }).observe(document.body,"
+             " {childList: true, subtree: true, attributes: true, characterData: true});"
+             " window.__moves = [];"
+             " document.addEventListener('focusin', (e) => window.__moves.push(e.target.id || e.target.tagName.toLowerCase()), true);"
+             " document.addEventListener('focusout', (e) => { if (!e.relatedTarget) window.__moves.push('left ' + (e.target.id || e.target.tagName.toLowerCase())); }, true); }")
+    opened = ("let n = 0; for (const b of document.querySelectorAll('#settings button[aria-expanded=false]'))"
+              " if (b.getClientRects().length && !b.disabled) { b.click(); n++; } return n")
+
+    def settle(browser) -> bool:
+        """Once the change has had time to be saved, every drawing it brings over: the page still for 1.2 s."""
+        time.sleep(0.8)
+        return wait_for(browser, lambda b: b.execute_script("return performance.now() - window.__quiet") > 1200, 8)
+
+    def click(browser, element_id: str) -> None:
+        """A real click on the control, or on its label where the control itself is drawn as a switch."""
+        control = browser.find_element(By.ID, element_id)
+        try:
+            ActionChains(browser).click(control).perform()
+        except (ElementNotInteractableException, WebDriverException):
+            ActionChains(browser).click(browser.execute_script("return arguments[0].closest('label') || arguments[0]", control)).perform()
+
+    def act(browser, control: dict, mouse: bool) -> str | None:
+        """The control changed by a key or a click; the id the focus should be on after, None when it cannot change."""
+        cid, kind = control["id"], control["kind"]
+        if kind == "radio":
+            group = browser.execute_script(radios, control["group"])
+            if len(group) < 2:
+                return None
+            checked = next((rid for rid, on in group if on), group[0][0])
+            if mouse:
+                other = next(rid for rid, on in group if rid != checked)
+                browser.execute_script("document.activeElement?.blur()")
+                click(browser, other)
+                return other
+            browser.execute_script("document.getElementById(arguments[0]).focus()", checked)
+            ActionChains(browser).send_keys(Keys.ARROW_DOWN).perform()
+            return "radio"
+        if kind == "list":
+            if control["options"] < 2:
+                return None
+            other = control["index"] - 1 if control["index"] == control["options"] - 1 else control["index"] + 1
+            if mouse:
+                browser.execute_script("document.activeElement?.blur()")
+                Select(browser.find_element(By.ID, cid)).select_by_index(other)
+            else:
+                browser.execute_script("document.getElementById(arguments[0]).focus()", cid)
+                ActionChains(browser).send_keys(Keys.ARROW_UP if other < control["index"] else Keys.ARROW_DOWN).perform()
+            return cid
+        if kind == "box":
+            if mouse:
+                browser.execute_script("document.activeElement?.blur()")
+                click(browser, cid)
+            else:
+                browser.execute_script("document.getElementById(arguments[0]).focus()", cid)
+                ActionChains(browser).send_keys(Keys.SPACE).perform()
+            return cid
+        # A field: a character typed, taken back once read.
+        if mouse:
+            return None
+        browser.execute_script("document.getElementById(arguments[0]).focus()", cid)
+        ActionChains(browser).send_keys("1").perform()
+        return cid
+
+    try:
+        for language in ("fr_FR.UTF-8", "en_US.UTF-8"):
+            short = language[:2]
+            window = Window(meetings, language, f'after = "nothing"\nreminder = false\nmodel = "{models / "ggml-small.bin"}"\n'
+                            f'minutes_provider = "{base}/v1"\nminutes_model = "qwen3:14b"\ndeveloper = true\n', ollama=base)
+            window.env.update(KITOKEY_MODEL_PUBLISHED="http://127.0.0.1:9/model.bin 300000 " + "0" * 64)
+            with window as browser:
+                browser.set_window_size(1100, 700)
+                browser.execute_script("location.hash = '#/settings'")
+                if not wait_for(browser, lambda b: b.execute_script(listing), 10):
+                    check(f"{short}: Settings drawn, its controls to be swept (#944)", False, browser.execute_script(where))
+                    continue
+                browser.execute_script(watch)
+                for _ in range(3):
+                    if browser.execute_script(opened) == 0:
+                        break
+                    settle(browser)
+                for mouse in (False, True):
+                    how = "a click" if mouse else "the keyboard"
+                    done: set[str] = set()
+                    swept = 0
+                    while swept < 60:
+                        todo = [c for c in browser.execute_script(listing) if (c["group"] or c["id"]) not in done]
+                        if not todo:
+                            break
+                        # From the page's end: the logs' level is met while the developer mode still shows it, the
+                        # mode turned after it — off by the keyboard, on again by a click, which shows it anew.
+                        control = todo[-1]
+                        key = control["group"] or control["id"]
+                        done.add(key)
+                        if mouse and control["kind"] == "field":
+                            continue
+                        browser.execute_script("document.getElementById(arguments[0]).scrollIntoView({block: 'center'}); window.__moves = []", control["id"])
+                        time.sleep(0.4)
+                        before = browser.execute_script(where)
+                        try:
+                            expected = act(browser, control, mouse)
+                        except WebDriverException as why:
+                            check(f"{short}, {how}: #{key} ({control['kind']}) changed (#944)", False, str(why).splitlines()[0])
+                            continue
+                        if expected is None:
+                            continue
+                        swept += 1
+                        quiet = settle(browser)
+                        after = browser.execute_script(where)
+                        if expected == "radio":
+                            expected = next((rid for rid, on in browser.execute_script(radios, key) if on), "a radio of " + key)
+                        check(f"{short}, {how}: #{key} ({control['kind']}) changed, the focus kept on #{expected}, the page where it was (#944, D101)",
+                              after[0] == expected and abs(after[1] - before[1]) <= 1,
+                              {"before": before, "after": after, "still": quiet, "focus moves": browser.execute_script("return window.__moves")})
+                        if control["kind"] == "field":
+                            browser.execute_script("document.getElementById(arguments[0])?.focus()", control["id"])
+                            ActionChains(browser).send_keys(Keys.BACK_SPACE).perform()
+                            browser.execute_script("document.activeElement?.blur()")
+                            settle(browser)
+                    check(f"{short}, {how}: Settings swept, Kitokey's language, the logs' level and the transcription's model among the controls changed (#944)",
+                          {"app-language", "log-level", "model"} <= done, sorted(done))
+    finally:
+        tags.shutdown()
+
+
 def bar_opened(now: dt.datetime) -> None:
     """BA. The bar opened (D90, board 6): at rest, the microphone, « Vérifier le son » — D88's panel in
     the bar — and « Avancé » closed; recording, the context, the microphone recorded, « Confidentielle »
@@ -11417,6 +11591,7 @@ def main() -> int:
     settings_narrow_without_model(now)
     appearance_chosen(now)
     focus_kept(now)
+    focus_swept(now)
     meeting_trashed(now)
     sound_checked(now)
     bar_window(now)
