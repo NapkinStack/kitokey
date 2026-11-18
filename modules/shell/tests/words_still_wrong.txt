@@ -98,7 +98,6 @@ lexicon window.no_minutes[0] "No minutes yet." « minutes »
 lexicon window.no_player[0] "Its audio was freed: the meeting can no longer be listened to. Its transcript and minutes stay." « minutes »
 lexicon window.offered_ollama_good[0] "For the minutes, on this computer, through Ollama" « minutes »
 lexicon window.service_tested[0] "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit." « segment »
-lexicon window.weight_described[0] "The audio takes {}; the transcripts and minutes, {}." « minutes »
 lexicon window.welcome_connected[1] "The minutes are written by an online service; the transcription stays on this computer." « minutes »
 lexicon window.welcome_ollama_lacks[0] "Ollama does not hold {} yet: the minutes wait for it. Settings fetch it in one click." « minutes »
 lexicon window.welcome_ollama_silent[0] "Ollama does not answer on this computer: the minutes wait for it. It is free, at ollama.com." « minutes »
