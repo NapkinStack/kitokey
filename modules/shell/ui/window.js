@@ -4814,28 +4814,25 @@ document.addEventListener("focusin", (event) => {
   if (placesPending.size === 0 || !(event.target instanceof Element) || !event.target.closest("#meeting, #settings")) return;
   for (const place of placesPending) Object.assign(place, placeOf());
 }, true);
-// The window's own focus gone — a list's menu, which GTK draws as a window of its own, or another
-// window —: where the user was, kept for the drawing its return asks (#944). The control the focus left
-// for nowhere, read as it leaves: by then the page's focus is already on nothing.
-let leftLast = null;
-let awayPlace = null;
+// A list's menu is a window of its own (GTK): opening it takes the window's focus away, closing it gives
+// it back — no coming back to the window, nothing to draw anew. Drawn then, the list is replaced under the
+// choice being made, before its change: the choice not yet saved lost, the focus with it (#944). The menu
+// opening: the window's focus going while a list has the page's, or a moment after a list left it for nowhere.
+let listLeft = 0;
+let inMenu = false;
 document.addEventListener("focusout", (event) => {
-  const left = event.target;
-  if (event.relatedTarget !== null || !(left instanceof Element) || !left.id || !left.closest("#meeting, #settings")) return;
-  leftLast = { place: placeOf(left), at: Date.now() };
+  if (event.relatedTarget === null && event.target instanceof HTMLSelectElement) listLeft = Date.now();
 }, true);
 window.addEventListener("blur", () => {
-  const here = placeOf();
-  awayPlace = here.id === null && leftLast && Date.now() - leftLast.at < 1000 ? leftLast.place : here;
+  inMenu = document.activeElement instanceof HTMLSelectElement || Date.now() - listLeft < 1000;
 });
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
-// `given`: the control to read the place of, rather than the one focused or just changed.
-function placeOf(given = null) {
+function placeOf() {
   const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [] };
   const at = document.activeElement;
   const focused = at && at !== document.body && at.id && at.closest("#meeting, #settings") ? at : null;
   const changed = changedLast && Date.now() - changedLast.at < 5000 ? document.getElementById(changedLast.id) : null;
-  const control = given ?? focused ?? changed;
+  const control = focused ?? changed;
   if (!control) return place;
   place.id = control.id;
   // Its boxes with an id, nearest first: where a control the change removed was.
@@ -4864,14 +4861,11 @@ function placeBack(place) {
 }
 
 // `again`: the list's address drawn once more after a page gone — never more than once.
-// `away`: where the user was as the window lost its focus — given back when the page itself knows of no
-// control now, as on its return from a list's menu (#944).
 // Whoever asked: a drawing still the current one that fails says so; one superseded answers for
 // nothing. The failure goes on to `page_failed`, with its stack.
-async function refresh(again = false, away = null) {
+async function refresh(again = false) {
   const mine = ++drawing;
   const place = placeOf();
-  if (place.id === null && away?.id && away.address === place.address) Object.assign(place, { id: away.id, near: away.near });
   placesPending.add(place);
   try {
     const drawn = await draw(mine, again);
@@ -5182,10 +5176,10 @@ window.addEventListener("focus", () => {
   const choosing = !document.getElementById("welcome").hidden
     || document.querySelector("#settings:not([hidden]) #minutes-unsaved:not([hidden])")
     || [...document.querySelectorAll("#settings:not([hidden]) .fields input")].some((input) => input.value !== input.defaultValue);
-  // Drawn anew where the user was as the window left: its focus is on nothing yet (#944).
-  const away = awayPlace;
-  awayPlace = null;
-  if (!choosing) refresh(false, away);
+  // Back from a list's menu, not from elsewhere: nothing drawn anew (#944).
+  const menu = inMenu;
+  inMenu = false;
+  if (!choosing && !menu) refresh();
 });
 window.addEventListener("hashchange", () => {
   // Another address: the page still shown, or its agreement, acts on its own meeting: no press and
