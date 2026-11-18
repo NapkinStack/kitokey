@@ -7412,16 +7412,20 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "minutes-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
             choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
-            radio_before = browser.find_element(By.ID, "transcription-online")
+            # The radio as drawn before the save, marked: a node drawn anew carries no mark. (A WebElement of the old
+            # node passed back to the page would be stale once it is replaced, and never compare.)
+            browser.execute_script("document.getElementById('transcription-online').dataset.beforeSave = 'yes'")
             press(browser, "minutes-online-save")
             saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
             check("a service set up in Settings, its key kept, a model saved", saved, window.file.read_text())
             # Settings drawn anew by the save before the next click (#930): the file is written 13 to 18 ms
             # before that drawing ends, and a click resolved meanwhile — on the radio that drawing replaces —
             # can land, once placeBack has scrolled the page back, on whatever is then at its point.
-            anew = "const r = document.getElementById('transcription-online'); return !!r && r !== arguments[0]"
-            drawn = wait_for(browser, lambda b: b.execute_script(anew, radio_before), 5)
-            check("Settings drawn anew by the save before the next click (#930)", drawn)
+            anew = "const r = document.getElementById('transcription-online'); return !!r && r.dataset.beforeSave !== 'yes'"
+            drawn = wait_for(browser, lambda b: b.execute_script(anew), 5)
+            check("Settings drawn anew by the save before the next click (#930)", drawn,
+                  browser.execute_script("const r = document.getElementById('transcription-online');"
+                                         " return r ? {marked: r.dataset.beforeSave || null, checked: r.checked} : 'absent'"))
             # A service that transcribes, set up as BG guides it: its key kept under the transcription's account.
             press(browser, "transcription-online")
             taken = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-online").is_selected(), 3)
