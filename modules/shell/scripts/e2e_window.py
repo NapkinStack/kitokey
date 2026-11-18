@@ -5741,6 +5741,45 @@ def focus_swept(now: dt.datetime) -> None:
                             settle(browser)
                     check(f"{short}, {how}: Settings swept, Kitokey's language, the logs' level and the transcription's model among the controls changed (#944)",
                           {"app-language", "log-level", "model"} <= done, sorted(done))
+                # The window's return, drawn anew or not, read on a mark a drawing would take away: what tells a
+                # list's menu from a real coming back (ines's survivors Q1, Q3, Q4 on #951).
+                marked = ("const m = document.getElementById(arguments[0]); if (m) m.dataset.probe = 'kept';"
+                          " return !!m")
+                kept_mark = lambda b, cid: b.execute_script("return document.getElementById(arguments[0])?.dataset.probe === 'kept'", cid)
+                away = "window.dispatchEvent(new FocusEvent('blur'))"
+                back = "window.dispatchEvent(new FocusEvent('focus'))"
+                settle(browser)
+                # Q4: the menu open while the list keeps the page's focus — no s.blur(): its return draws nothing,
+                # the list left as it is under the choice.
+                browser.execute_script(marked, "meetings-language")
+                browser.execute_script("const s = document.getElementById('meetings-language'); s.focus(); " + away
+                                       + "; s.selectedIndex = s.selectedIndex === s.options.length - 1 ? 0 : s.selectedIndex + 1; " + back)
+                time.sleep(1.5)
+                menu_kept = kept_mark(browser, "meetings-language")
+                browser.execute_script("document.getElementById('meetings-language').dispatchEvent(new Event('change', {bubbles: true}))")
+                settle(browser)
+                check(f"{short}: a list's menu opened while the list keeps the page's focus — back from it, nothing drawn anew (#944, Q4)",
+                      menu_kept, browser.execute_script(where))
+                # Q1: a list left for another control, then the window left and come back to within a second: no menu,
+                # a real return — drawn anew.
+                time.sleep(1.2)
+                browser.execute_script(marked, "reminder")
+                browser.execute_script("document.getElementById('meetings-language').focus(); document.getElementById('reminder').focus(); "
+                                       + away + "; " + back)
+                time.sleep(1.5)
+                check(f"{short}: a list left for another control, then the window left and come back to: drawn anew (#944, Q1)",
+                      not kept_mark(browser, "reminder"), browser.execute_script(where))
+                settle(browser)
+                # Q3: a menu, then later a real return without one: drawn anew — the menu read once, not for good.
+                time.sleep(1.2)
+                browser.execute_script("const s = document.getElementById('meetings-language'); s.focus(); s.blur(); " + away + "; " + back)
+                time.sleep(1.5)
+                browser.execute_script(marked, "reminder")
+                browser.execute_script("document.getElementById('reminder').focus(); " + away + "; " + back)
+                time.sleep(1.5)
+                check(f"{short}: after a list's menu, a real return to the window: drawn anew (#944, Q3)",
+                      not kept_mark(browser, "reminder"), browser.execute_script(where))
+                settle(browser)
     finally:
         tags.shutdown()
 
