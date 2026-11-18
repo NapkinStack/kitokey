@@ -768,6 +768,18 @@ pub struct Window {
     /// What a meeting lacks, offered on its page; what is said once asked; where a step ran.
     pub make_minutes: &'static str,
     pub make_transcript: &'static str,
+    /// Shows: a meeting's page, the button beside the summary's list of models, its transcript whole and
+    /// no summary yet (D93): « Faire le compte rendu avec Qwen3 14b ». When: a model is chosen there or
+    /// named by Settings; else `make_minutes`. At most: no limit. Placeholders: {} the model, as people say it.
+    pub make_minutes_with: &'static str,
+    /// Shows: a meeting's page, above the button that makes the summary again, the model that made the
+    /// one shown (D93). When: another model is chosen in its line. At most: no limit. Placeholders: {}
+    /// the model, as its line says it.
+    pub minutes_made_with: &'static str,
+    /// Shows: a meeting's page, above the button that makes the transcript again, the model that made
+    /// the one shown (D93). When: another model is chosen in its line. At most: no limit.
+    /// Placeholders: {} the model, as its line says it.
+    pub transcript_made_with: &'static str,
     /// What is made in the background, said on the pages (D25): the minutes being written (by,
     /// for how long), waiting their turn ({} before), waiting for the user's agreement to send them
     /// ({} the host) with the way to give it, not written ({} the reason); on a list's row.
@@ -1261,6 +1273,9 @@ pub fn window(language: Language) -> Window {
             redo_keeps_minutes: "The current summary is kept; write it again afterwards if needed.",
             make_minutes: "Write the minutes",
             make_transcript: "Write the transcript",
+            make_minutes_with: "Write the summary with {}",
+            minutes_made_with: "This summary was written with {}.",
+            transcript_made_with: "This transcript was made with {}.",
             minutes_making: "Writing the minutes",
             minutes_waiting: "Waiting its turn — {} before it",
             minutes_awaiting: "Waiting for your agreement to send it to {}",
@@ -1713,6 +1728,9 @@ pub fn window(language: Language) -> Window {
             redo_keeps_minutes: "Le compte rendu actuel est gardé\u{202f}; refaites-le ensuite si besoin.",
             make_minutes: "Faire le compte rendu",
             make_transcript: "Faire la transcription",
+            make_minutes_with: "Faire le compte rendu avec {}",
+            minutes_made_with: "Ce compte rendu a été fait avec {}.",
+            transcript_made_with: "Cette transcription a été faite avec {}.",
             minutes_making: "Rédaction du compte rendu",
             minutes_waiting: "En file d’attente · {} avant",
             minutes_awaiting: "En attente de votre accord pour l’envoyer à {}",
