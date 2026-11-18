@@ -5101,6 +5101,75 @@ def bar_after_stop(now: dt.datetime) -> None:
                 (WORK / "fail-minutes").unlink(missing_ok=True)
 
 
+def page_one_bar(now: dt.datetime) -> None:
+    """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
+    shows one bar across both steps — the transcript, then its summary —, naming the step, never moving back:
+    a step done stays full; the step said once by a polite live region; « Annuler » in it; gone once made. The
+    cards say no making of their own meanwhile. In French light, in English dark."""
+    print("BX. a meeting's page while it is made: one bar across both steps, the step named, never moving back, Annuler in it (D92)")
+    model = WORK / "one-bar-model.bin"
+    model.write_bytes(b"\0" * 16)
+    settings = (f'after = "minutes"\nreminder = false\nmodel = "{model}"\n'
+                'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n')
+    bar = ("const m = document.getElementById('making'); if (!m || !m.getClientRects().length) return null;"
+           " const s = document.getElementById('making-step'), c = document.getElementById('making-cancel');"
+           " return {step: s ? s.textContent : null, live: s ? s.getAttribute('aria-live') : null,"
+           " segments: [...m.querySelectorAll('.segment')].map(g => g.dataset.state),"
+           " cancel: !!c && m.contains(c) && c.getClientRects().length > 0,"
+           " cards: [...document.querySelectorAll('.making-state.making')].filter(e => e.getClientRects().length).length}")
+    gates = [WORK / "gate-hearing", WORK / "gate-minutes"]
+    for language, short, theme, hearing, writing in (
+        ("fr_FR.UTF-8", "fr", "light", "Transcription en cours", "Rédaction du compte rendu"),
+        ("en_US.UTF-8", "en", "dark", "Writing the transcript", "Writing the minutes"),
+    ):
+        meetings = WORK / f"one-bar-{short}"
+        meeting = meetings / "2026-10-18_12-00"
+        session(meeting, now - dt.timedelta(hours=1), 1, {"local.wav": 1000})
+        window = Window(meetings, language, settings)
+        if theme == "dark":
+            window.env.update(GTK_THEME="Adwaita:dark")
+        with window as browser:
+            for gate in gates:
+                gate.touch()
+            try:
+                browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+                wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
+                browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", meeting.name)
+                first = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == hearing, 10)
+                got = browser.execute_script(bar)
+                check(f"{short}: while its transcript is made, the page shows one bar across both steps, the transcript running, the summary next,"
+                      " the step named in a polite live region, « Annuler » in it, no card's line of its own (D92)",
+                      first and got["segments"] == ["running", "next"] and got["live"] == "polite" and got["cancel"] and got["cards"] == 0, got)
+                shot_themed(browser, f"d92-page-bar-{short}-{theme}", theme)
+                # From here, every state the bar shows, sampled, and every text its live region takes.
+                browser.execute_script("window.barSeen = []; window.barSaid = []; const s = document.getElementById('making-step');"
+                                       " new MutationObserver(() => window.barSaid.push(s.textContent)).observe(s, {childList: true, characterData: true, subtree: true});"
+                                       " window.barTick = setInterval(() => { const m = document.getElementById('making');"
+                                       "   window.barSeen.push(m && m.getClientRects().length ? [...m.querySelectorAll('.segment')].map(g => g.dataset.state).join() : 'gone'); }, 50)")
+                gates[0].unlink()
+                second = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == writing, 15)
+                got = browser.execute_script(bar)
+                check(f"{short}: then its summary: the same bar, the transcript's part full, the summary's running, « Annuler » in it (D92)",
+                      second and got["segments"] == ["done", "running"] and got["cancel"] and got["cards"] == 0, got)
+                gates[1].unlink()
+                gone = wait_for(browser, lambda b: b.execute_script(bar) is None and (meeting / "minutes.md").is_file(), 15)
+                time.sleep(0.3)
+                seen = browser.execute_script("clearInterval(window.barTick); return window.barSeen")
+                # Never back: running, then done, for each part; the bar gone only at the end, once.
+                order = {"next": 0, "running": 1, "done": 2}
+                shown = [s for s in seen if s != "gone"]
+                parts = [[order[p] for p in s.split(",")] for s in shown]
+                forward = all(b >= a for x, y in zip(parts, parts[1:]) for a, b in zip(x, y))
+                first_gone = seen.index("gone") if "gone" in seen else len(seen)
+                ended = bool(shown) and all(s == "gone" for s in seen[first_gone:])
+                check(f"{short}: made, the bar is gone; it never moved back, nor went away between the two steps, the step said once each (D92)",
+                      gone and forward and ended and browser.execute_script("return window.barSaid") == [writing],
+                      [gone, sorted(set(seen)), browser.execute_script("return window.barSaid")])
+            finally:
+                for gate in gates:
+                    gate.unlink(missing_ok=True)
+
+
 def meeting_trashed(now: dt.datetime) -> None:
     """BT. D100: a meeting moved to the trash from its own page — beside the button that opens its folder,
     a question in place, « Annuler » focused first, what it holds and that the system's trash restores it;
@@ -11401,6 +11470,7 @@ def main() -> int:
     bar_opened(now)
     bar_language(now)
     bar_after_stop(now)
+    page_one_bar(now)
     recording_found(now)
     recording_found_not_forgotten(now)
     context_before_start(now)
