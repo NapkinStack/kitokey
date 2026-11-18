@@ -6821,17 +6821,19 @@ def redo_choice_starts_nothing(now: dt.datetime) -> None:
                   alone == "Refaire le compte rendu", alone)
             press(browser, "redo-panel-cancel")
         # Ollama slow to list its models: Refaire… reads them, and the window answers meanwhile (#927).
+        # Timed from here, not in the page: the driver reaches the page through the window's own
+        # thread, so a page script cannot start while that thread is held — nor a user's click.
         with Window(meetings, "fr_FR.UTF-8", named, ollama=base) as browser:
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
             late.set()
             try:
                 press(browser, "redo-minutes")
-                answered = browser.execute_async_script(
-                    "const done = arguments[arguments.length - 1]; const asked = performance.now();"
-                    " window.__TAURI__.core.invoke('header').then(() => done(performance.now() - asked), () => done(null))")
+                asked = time.monotonic()
+                browser.execute_script("return document.title")
+                answered = time.monotonic() - asked
                 check("Refaire… pressed while Ollama is slow to list its models: the window answers meanwhile, within a second (#927)",
-                      answered is not None and answered < 1000, answered)
+                      answered < 1, f"{answered:.2f} s")
                 wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 10)
             finally:
                 late.clear()
