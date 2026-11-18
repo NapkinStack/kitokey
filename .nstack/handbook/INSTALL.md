@@ -162,6 +162,7 @@ Settings → Rules → Rulesets → on the main branch (private repository: Team
 - [ ] Main branch cannot be deleted
 - [ ] Main branch history cannot be rewritten: no force push
 - [ ] The most recent push approved by someone other than its pusher (approval: agent)
+- [ ] Branches up to date before merging: the checks judged what will land, main included
 
 GitHub offers a check to require only once it has run: open a first pull request, then
 select them.
@@ -287,12 +288,16 @@ and 2 when nothing read is missing but something could not be read.
 `nstack doctor` is also where a project learns that a newer version of NapkinStack is
 published: one line, with its notes and the way to take it — information, never a gap. The
 registry is asked one other question: `nstack update` says when the version it lays is not
-on PyPI yet, since the project's CI installs it from there and stays red until it is.
+on PyPI yet, since the project's CI installs it from there and stays red until it is. Minutes
+after a release, PyPI's index may not list it yet: `install-engine.sh` asks again for about two
+minutes and a half, said, before it fails.
 
 `nstack doctor` reads the token from `GH_TOKEN`, otherwise `GITHUB_TOKEN`: a fine-grained
 token, limited to the repository, with the **Administration: read** permission — and
 **Actions: read**, to be told of a workflow failing run after run on the default branch, which
-no required check shows. Without a token, the GitHub part stays "not verified", never compliant.
+no required check shows — and, on a private repository, **Contents: read**, to read GitHub's own
+validation of the code owners file: an owner GitHub does not know, such as an organisation named
+alone, leaves the paths it names with no owner. Without a token, the GitHub part stays "not verified", never compliant.
 
 ---
 
@@ -328,7 +333,7 @@ nstack plan          # what needs a person first; then the discovery, the charte
 nstack claim D<n> --session <s> --person @<you>   # takes a deliverable before its first change; nstack unclaim gives it back
 nstack deliver D<n> --held '#<pr>' --session <s>   # records a merged deliverable delivered; --write-states at the closure
 nstack agent add <name> · nstack agent run <name> -- <command>   # an agent's own App and clone; add is a person's
-nstack board [--dry-run]   # the cycles shown on GitHub as milestones and issues — CI runs it on every merge
+nstack board [--dry-run]   # the cycles shown on GitHub as milestones and issues — CI runs it on every merge; --dry-run previews a proposed cycle
 nstack skills        # generates the Claude Code skills from the playbooks
 nstack doctor        # the workstation and the forge's settings, read-only
 nstack settings      # the calls that would bring the forge's settings to the checklist; --apply: yours makes them
@@ -344,6 +349,7 @@ nstack pr-check --body-file <file> [--labels a,b]   # test sheet and cycle, as C
                                                     # with a token and one open pull request at the head, its own labels are read
 nstack attest --body-file <file> [--labels a,b]     # the CI's checks run here, recorded on the commit; labels as pr-check takes them
                                                     # module checks kept while what they read is unchanged, 7 days at most (--again runs them)
+nstack attest --void <commit> --reason "<why>"     # a record known unsound: never kept from again, the head attested again
 nstack modules --changed-since <base>   # the modules with a file changed, as CI lists them
 nstack modules --changed-since <base> --with-contract-sides   # ... and both sides of a changed contract
 nstack compat [module] --base <base>    # a contract version consumed or stable: the merged proof
