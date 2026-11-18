@@ -3277,6 +3277,73 @@ def models_advanced(now: dt.datetime) -> None:
         tags.shutdown()
 
 
+def advanced_latest_answer(now: dt.datetime) -> None:
+    """BF. « Avancé » in the bar: an ask's answer come after a later ask's never draws over it (#815).
+    The ask made as a recording starts is held in the page until « Avancé » is opened, then answered
+    as #815's was — Ollama past models_offered's 2 s, none of its models —: come last, other than the
+    opening's, it would close « Avancé » under the user."""
+    print("BF. the bar's « Avancé » opened while the start's ask is held: its answer, come last, never closes it (#815)")
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            try:
+                self.send_response(200)
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                pass
+
+        def log_message(self, *_):
+            pass
+
+    tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
+    threading.Thread(target=tags.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{tags.server_address[1]}"
+    named = f'after = "transcript"\nreminder = false\nminutes_provider = "{base}/v1"\nminutes_model = "qwen3:14b"\n'
+    meetings = WORK / "advanced-latest"
+    meetings.mkdir()
+    opened = "const p = document.getElementById('small-advanced-panel'); return p !== null && p.hidden === false"
+    try:
+        with Window(meetings, "fr_FR.UTF-8", named, ollama=base, small=True) as browser:
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+            press(browser, "small-more")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "small-advanced") and b.find_element(By.ID, "small-advanced").is_displayed(), 5)
+            # The start's ask for the recording's meeting held in the page, answered once « Avancé » is open, and
+            # as #815's was: Ollama past the shell's 2 s, so none of its models — an older answer, other than the
+            # opening's, come last. Not the ask made as the start clears the bar (`name` null): its answer, for
+            # no meeting, is dropped by the later ask's meeting whatever its order.
+            browser.execute_script(
+                "const real = window.__TAURI__.core; window.held = []; window.armed = true;"
+                " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {"
+                "   if (asked === 'models_offered' && window.armed && rest[0] && rest[0].name) { window.armed = false; window.heldFor = rest[0].name;"
+                "     return new Promise((ok, no) => window.held.push(() => real.invoke(asked, ...rest).then((a) => ok({ ...a, ollama: [] }), no))); }"
+                "   return real.invoke(asked, ...rest); } };"
+                " window.restoreCore = () => { window.__TAURI__.core = real; };")
+            press(browser, "small-record")
+            started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+            held = wait_for(browser, lambda b: b.execute_script("return window.held.length") == 1, 5)
+            if not browser.execute_script("return document.getElementById('small-options').hidden === false"):
+                press(browser, "small-more")
+            press(browser, "small-advanced")
+            shown = wait_for(browser, lambda b: b.execute_script(opened), 5)
+            check("recording: « Avancé » opened while the start's ask for its meeting is held", started and held and shown,
+                  [started, held, shown, browser.execute_script("return window.heldFor")])
+            # The start's answer let through, after the opening's: « Avancé » stays open.
+            browser.execute_script("window.held[0]()")
+            closed = wait_for(browser, lambda b: not b.execute_script(opened), 2)
+            check("the start's answer, come after the one asked on opening and other than it: « Avancé » stays open, as the user left it (#815)",
+                  not closed and browser.execute_script("return document.getElementById('small-advanced').getAttribute('aria-expanded')") == "true",
+                  browser.execute_script("const t = document.getElementById('small-advanced'); const p = document.getElementById('small-advanced-panel');"
+                                         " return {expanded: t?.getAttribute('aria-expanded'), hidden: p?.hidden}"))
+            browser.execute_script("window.restoreCore()")
+            press(browser, "small-stop")
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+    finally:
+        tags.shutdown()
+
+
 def minutes_copied(now: dt.datetime) -> None:
     """AJ. A meeting's minutes copied in one click, ready to paste where the user writes (D45)."""
     print("AJ. the minutes copied in one click: their Markdown, titled as the page names them, « Copié » said in place (D45)")
@@ -10802,6 +10869,7 @@ def main() -> int:
     own_models(now)
     cancelled_at_once(now)
     models_advanced(now)
+    advanced_latest_answer(now)
     meeting_named(now)
     word_after_a_gap(now)
     minutes_checked(now)
