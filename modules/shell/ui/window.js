@@ -4713,6 +4713,8 @@ async function refresh(again = false) {
   placesPending.add(place);
   try {
     const drawn = await draw(mine, again);
+    // Followed no more: the focus `placeBack` gives is its own, never a move of the user's.
+    placesPending.delete(place);
     if (mine === drawing) {
       placeBack(place);
       drawnAddress = location.hash;
