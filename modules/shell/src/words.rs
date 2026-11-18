@@ -745,6 +745,10 @@ pub struct Window {
     /// What a meeting lacks, offered on its page; what is said once asked; where a step ran.
     pub make_minutes: &'static str,
     pub make_transcript: &'static str,
+    /// Shows: a meeting's page, the button beside the summary's list of models, its transcript whole and
+    /// no summary yet (D93): « Faire le compte rendu avec Qwen3 14b ». When: a model is chosen there or
+    /// named by Settings; else `make_minutes`. At most: no limit. Placeholders: {} the model, as people say it.
+    pub make_minutes_with: &'static str,
     /// What is made in the background, said on the pages (D25): the minutes being written (by,
     /// for how long), waiting their turn ({} before), waiting for the user's agreement to send them
     /// ({} the host) with the way to give it, not written ({} the reason); on a list's row.
@@ -1214,6 +1218,7 @@ pub fn window(language: Language) -> Window {
             redo_transcript_note: "The current transcript is kept until the new one is whole, then goes to the trash; if the new one fails, the current comes back.",
             make_minutes: "Write the minutes",
             make_transcript: "Write the transcript",
+            make_minutes_with: "Write the summary with {}",
             minutes_making: "Writing the minutes",
             minutes_waiting: "Waiting its turn — {} before it",
             minutes_awaiting: "Waiting for your agreement to send it to {}",
@@ -1656,6 +1661,7 @@ pub fn window(language: Language) -> Window {
             redo_transcript_note: "La transcription actuelle est gardée tant que la nouvelle n’est pas entière, puis part à la corbeille\u{202f}; si la nouvelle échoue, l’actuelle revient.",
             make_minutes: "Faire le compte rendu",
             make_transcript: "Faire la transcription",
+            make_minutes_with: "Faire le compte rendu avec {}",
             minutes_making: "Rédaction du compte rendu",
             minutes_waiting: "En file d’attente · {} avant",
             minutes_awaiting: "En attente de votre accord pour l’envoyer à {}",

@@ -1152,6 +1152,15 @@ function relief(segments, total, words) {
   return svg;
 }
 
+// A provider's host, as a model's line names it: `https://openrouter.ai/api/v1` is openrouter.ai.
+function via(provider) {
+  try {
+    return new URL(provider).host;
+  } catch {
+    return provider;
+  }
+}
+
 // What a meeting lacks, offered on its page and made on the user's word: once asked, said so.
 function offer(card, label, id, command, session, words) {
   const button = element("button", "primary", label);
@@ -1169,6 +1178,7 @@ function offer(card, label, id, command, session, words) {
     }
   });
   card.append(button);
+  return button;
 }
 
 // « Avancé » (D91, board 6), closed by default: the meeting's own models — the transcription's and the
@@ -1191,13 +1201,6 @@ function modelsAdvanced(words, prefix, offered, chosen) {
   };
   toggle.addEventListener("click", () => unfold(toggle.getAttribute("aria-expanded") !== "true"));
   unfold(false);
-  const via = (provider) => {
-    try {
-      return new URL(provider).host;
-    } catch {
-      return provider;
-    }
-  };
   const here = (provider) => provider === offered.ollama_address;
   const writerSaid = (provider, model) => `${modelSaid(model)}${here(provider) ? ` — ${words.on_computer}` : fill(words.written_via, via(provider))}`;
   // Who hears and who writes as Settings name them: what « Celui des Réglages » means.
@@ -1436,7 +1439,137 @@ function redoTranscriptPanel(offered, session, words, button, corrected) {
     window.__TAURI__.core.invoke("transcript_redo_own", { name: nameOf(session) }), "transcription", words.redo_transcript_do);
 }
 
-function minutesCard(read, words, session, transcript) {
+// D93, criterion 5: what a meeting's page offers to make it by — models_offered's answer, read once a
+// drawing, by the first line that offers a choice, and shared by its two lines, which keep the
+// meeting's own choice whole between them.
+function pageModels(session) {
+  const page = { name: nameOf(session), own: null, asked: null };
+  page.offered = () => (page.asked ??= window.__TAURI__.core.invoke("models_offered", { name: page.name }).then((offered) => {
+    page.own = { transcription: offered.chosen.transcription ?? null, minutes: offered.chosen.minutes ?? null };
+    return offered;
+  }));
+  return page;
+}
+
+// A step's choice as one value, whatever order its fields came in.
+function modelValue(step, chosen) {
+  if (step === "minutes") return JSON.stringify({ provider: chosen.provider, model: chosen.model });
+  if (chosen.engine === "service") return JSON.stringify({ engine: "service", provider: chosen.provider, model: chosen.model });
+  return JSON.stringify(chosen.engine === "whisper" ? { engine: "whisper", model: chosen.model } : { engine: chosen.engine });
+}
+
+// A version's line, its model's name a list in place (D93): the sentence around it as written.
+const IN_LINE = "\u{E000}";
+function lineWith(said, pick) {
+  const line = element("p", "maker");
+  const [before, after] = said.split(IN_LINE);
+  line.append(before);
+  if (after !== undefined) line.append(pick, after);
+  return line;
+}
+
+// D93, criterion 5: a step's model, a list on the page itself — the one that made the version shown
+// (`version`: what its line says of it, and which offered model it is), or for a step waiting, the
+// one it will be made by. The same models as « Avancé » but Settings' entry (D91): a confidential
+// meeting is offered none of a service. A choice starts nothing: kept as the meeting's own; `go`
+// starts the making, naming it — for a version, shown (`box`) only while another model is chosen.
+function modelOnPage(page, words, step, version, go, doing, fallback, box = go) {
+  const pick = element("select", "page-model");
+  pick.id = `page-${step}-model`;
+  pick.setAttribute("aria-label", step === "minutes" ? words.models_minutes : words.models_transcription);
+  // Until the models are read: the version's own alone.
+  const first = element("option", "", version ? version.said : words.models_none);
+  first.value = "";
+  pick.append(first);
+  const said = element("p", "note warn");
+  said.setAttribute("role", "status");
+  said.hidden = true;
+  let made = "";
+  let kept = "";
+  const saidOf = (offered, value) => {
+    const chosen = JSON.parse(value);
+    if (step === "minutes") return modelSaid(chosen.model) + (chosen.provider === offered.ollama_address ? "" : fill(words.written_via, via(chosen.provider)));
+    if (chosen.engine === "service") return `${chosen.model}${fill(words.written_via, via(chosen.provider))}`;
+    return chosen.engine === "whisper" ? spoken(chosen.model) : "SpeechAnalyzer";
+  };
+  const name = () => {
+    const chosen = pick.value ? JSON.parse(pick.value) : null;
+    const model = chosen && (chosen.engine === "whisper" ? spoken(chosen.model) : chosen.engine === "speechanalyzer" ? "SpeechAnalyzer" : modelSaid(chosen.model));
+    go.textContent = model ? fill(doing, model) : fallback;
+    if (version) box.hidden = pick.value === made;
+    pick.title = pick.options[pick.selectedIndex]?.textContent ?? "";
+  };
+  if (version) box.hidden = true;
+  page.offered().then((offered) => {
+    const values = [];
+    if (step === "minutes") {
+      values.push(...offered.ollama.map((model) => ({ provider: offered.ollama_address, model })));
+      if (offered.minutes_provider && offered.minutes_model) values.push({ provider: offered.minutes_provider, model: offered.minutes_model });
+    } else {
+      values.push(...offered.whisper.map((model) => ({ engine: "whisper", model })));
+      if (offered.apple) values.push({ engine: "speechanalyzer" });
+      if (offered.service) values.push({ engine: "service", provider: offered.service[0], model: offered.service[1] });
+    }
+    // The meeting's own, offered or not — unless gone, Settings' then standing in, said by the page (D91).
+    const own = offered.chosen[step] && !offered.gone.includes(step) ? modelValue(step, offered.chosen[step]) : "";
+    const options = [...new Set([...values.map((value) => modelValue(step, value)), ...(own ? [own] : [])])];
+    made = version ? (options.find((value) => version.is(JSON.parse(value), offered)) ?? "") : "";
+    const settings = !version && offered.minutes_provider && offered.minutes_model ? modelValue("minutes", { provider: offered.minutes_provider, model: offered.minutes_model }) : "";
+    kept = own || made || settings;
+    // The version's model no longer offered stays first, as its line says it: never silently another.
+    const placeholder = version ? !made : !kept;
+    if (!placeholder) first.remove();
+    for (const value of options) {
+      const option = element("option", "", saidOf(offered, value));
+      option.value = value;
+      pick.append(option);
+    }
+    pick.value = kept;
+    name();
+  }, (why) => {
+    said.textContent = fill(words.models_not_read, why);
+    said.hidden = false;
+  });
+  pick.addEventListener("change", async () => {
+    if (!page.own) return;
+    const chosen = { ...page.own, [step]: pick.value ? JSON.parse(pick.value) : null };
+    try {
+      await window.__TAURI__.core.invoke("meeting_models_chosen", { name: page.name, chosen });
+      page.own = chosen;
+      kept = pick.value;
+      said.hidden = true;
+    } catch (why) {
+      pick.value = kept;
+      said.textContent = fill(words.models_not_kept, why);
+      said.hidden = false;
+    }
+    name();
+  });
+  name();
+  return [pick, said];
+}
+
+// The one button beside a version's list that starts its making again with the model chosen (D93).
+function startsOnPage(id, words, command) {
+  const go = element("button", "primary");
+  go.type = "button";
+  go.id = id;
+  go.addEventListener("click", async () => {
+    waiting(go, true);
+    try {
+      await command();
+      // Asked: its state is said where it is made (D25).
+      (go.closest(".page-redo") ?? go).hidden = true;
+      readMakings();
+    } catch (why) {
+      go.replaceWith(element("p", "note warn", fill(words.not_saved, why)));
+    }
+    waiting(go, false);
+  });
+  return go;
+}
+
+function minutesCard(read, words, session, transcript, onPage) {
   const card = element("article", "card minutes");
   // Its title, and Refaire… beside it: the state below them never sits under a button.
   const top = element("div", "top");
@@ -1453,7 +1586,10 @@ function minutesCard(read, words, session, transcript) {
   if (read.state !== "present") {
     card.append(element("p", "none", read.state === "absent" ? words.no_minutes : words.unreadable));
     if (read.state === "absent" && transcript.state === "present" && transcript.complete) {
-      offer(card, words.make_minutes, "make-minutes", "minutes_asked", session, words);
+      const ask = offer(card, words.make_minutes, "make-minutes", "minutes_asked", session, words);
+      // The model it will be made by, a choice beside it, which the button names (D93).
+      const [pick, said] = modelOnPage(onPage, words, "minutes", null, ask, words.make_minutes_with, words.make_minutes);
+      ask.before(lineWith(IN_LINE, pick), said);
     }
     return card;
   }
@@ -1493,11 +1629,19 @@ function minutesCard(read, words, session, transcript) {
   // known is left unsaid.
   const when = madeOn(words, read.made);
   const by = read.model ? modelSaid(read.model) + (read.provider ? fill(words.written_via, read.provider) : "") : "";
-  let maker = when
-    ? fill(words.minutes_of, when) + (by ? ` · ${by}` : "")
-    : fill(words.written_by, read.model ? modelSaid(read.model) : "—") + (read.provider ? fill(words.written_via, read.provider) : "");
-  maker += tookAndCost(read, words);
-  card.append(element("p", "maker", maker));
+  // Its model a list in its place (D93, criterion 5); none named, the line alone.
+  const maker = (when
+    ? fill(words.minutes_of, when) + (by ? ` · ${IN_LINE}` : "")
+    : read.model ? fill(words.written_by, IN_LINE) : fill(words.written_by, "—") + (read.provider ? fill(words.written_via, read.provider) : "")) + tookAndCost(read, words);
+  if (by) {
+    const go = startsOnPage("page-minutes-do", words, () =>
+      window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }));
+    // The version's model: the one its line names, made here unless a host says otherwise.
+    const version = { said: by, is: (chosen, offered) => chosen.model === read.model
+      && (read.provider && read.provider !== "local" ? via(chosen.provider) === read.provider : chosen.provider === offered.ollama_address) };
+    const [pick, said] = modelOnPage(onPage, words, "minutes", version, go, words.redo_minutes_do, words.redo_title);
+    card.append(lineWith(maker, pick), said, go);
+  } else card.append(element("p", "maker", maker));
   // The transcript corrected after they were written (D62): said, and made again only on a click.
   const corrected = transcript.state === "present" ? Math.max(0, ...transcript.segments.map((segment) => Date.parse(segment.edited ?? "") || 0)) : 0;
   if (corrected > (Date.parse(read.made ?? "") || 0)) {
@@ -1653,7 +1797,7 @@ function tookAndCost(read, words) {
   return said;
 }
 
-function transcriptCard(read, words, session) {
+function transcriptCard(read, words, session, onPage) {
   const card = element("aside", "card transcript");
   card.setAttribute("aria-label", words.transcript_title);
   const top = element("div", "top");
@@ -1704,12 +1848,23 @@ function transcriptCard(read, words, session) {
   // a transcript that does not say it, its model alone, as before.
   const when = madeOn(words, read.made);
   const by = service ? (read.model || "—") + fill(words.written_via, read.engine) : read.model ? spoken(read.model) : read.engine || "";
+  // Its model a list in its place once it is whole (D93, criterion 5); none named, the line alone.
+  const choice = by && read.complete;
   const heardSaid = when
-    ? fill(words.transcribed_on, when) + (by ? ` · ${by}` : "")
-    : service
-      ? fill(words.written_by, read.model || "—") + fill(words.written_via, read.engine)
-      : fill(words.heard_by, read.model ? spoken(read.model) : read.engine || "—");
-  heard.append(element("p", "maker", heardSaid + tookAndCost(read, words)));
+    ? fill(words.transcribed_on, when) + (by ? ` · ${choice ? IN_LINE : by}` : "")
+    : fill(service ? words.written_by : words.heard_by, choice ? IN_LINE : by || "—");
+  if (choice) {
+    const go = startsOnPage("page-transcription-do", words, () => window.__TAURI__.core.invoke("transcript_redo_own", { name: nameOf(session) }));
+    const box = element("div", "page-redo");
+    box.append(go);
+    // Made again, the transcript is another file: a person's corrections are not in it (ADR-0014).
+    if (read.segments.some((segment) => segment.edited)) box.append(element("p", "note warn", words.redo_loses_corrections));
+    const version = { said: by, is: (chosen) => read.engine === "SpeechAnalyzer" ? chosen.engine === "speechanalyzer"
+      : service ? chosen.engine === "service" && chosen.model === read.model && via(chosen.provider) === read.engine
+      : chosen.engine === "whisper" && chosen.model === read.model };
+    const [pick, said] = modelOnPage(onPage, words, "transcription", version, go, words.redo_transcript_do, words.redo_transcript_title, box);
+    heard.append(lineWith(heardSaid + tookAndCost(read, words), pick), said, box);
+  } else heard.append(element("p", "maker", heardSaid + tookAndCost(read, words)));
   card.append(heard);
   if (!read.complete) card.append(element("p", "note", words.being_made));
   if (read.unread > 0) card.append(element("p", "note", fill(words.unread, read.unread)));
@@ -2157,7 +2312,9 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   drawing.append(relief(said, total, words));
   drawn.append(drawing, legend, playerBar(session, listened, total, words, drawing));
   const columns = element("div", "columns");
-  columns.append(minutesCard(minutes, words, session, transcript), transcriptCard(transcript, words, session));
+  // The models each line offers, read once for both (D93).
+  const onPage = pageModels(session);
+  columns.append(minutesCard(minutes, words, session, transcript, onPage), transcriptCard(transcript, words, session, onPage));
   // Shown again when the window comes forward: a search in progress in this meeting is kept.
   const searching = page.dataset.name === nameOf(session) ? (document.getElementById("search")?.value ?? "") : "";
   // A name being typed is kept the same way, with its refusal and where the caret was (D70).

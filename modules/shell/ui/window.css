@@ -272,6 +272,13 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 .corrected-since .note { margin: 0; }
 .maker { font: 12.5px ui-monospace, monospace; color: var(--soft); overflow-wrap: anywhere; }
 .minutes > .primary, .transcript > .primary { align-self: flex-start; }
+/* A version's model, a list in its line (D93): the line's own size, a long name cut at the card's width,
+   said whole in its tooltip; the button that makes it again under the line. */
+.maker .page-model { min-height: 0; max-width: 100%; padding: 0 4px; border-radius: 6px; font: inherit; text-overflow: ellipsis; vertical-align: baseline; }
+.made > .maker { min-width: 0; }
+.made > .note { flex-basis: 100%; }
+.made > .page-redo { flex-basis: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.minutes > .primary, .page-redo .primary { max-width: 100%; padding-block: 6px; overflow-wrap: anywhere; text-align: start; }
 
 /* Refaire… (D11's sixth board): the model, a choice each, the note, the gesture. */
 .minutes { position: relative; }
