@@ -449,7 +449,8 @@ function transcriptState(name) {
   return null;
 }
 
-// The card whose « Annuler » was pressed: once it says stopped, the focus goes to what makes it again.
+// The card whose « Annuler » was pressed, and its meeting: once it says stopped and offers to make it
+// again, the focus goes there — kept until then, the offer drawn only when the page is drawn anew.
 let cancelledFrom = null;
 
 // A refused « Annuler », said for the line `of` (D92): an alert, which a screen reader says as it
@@ -468,7 +469,7 @@ function cancelButton(said, id) {
   if (id) cancel.id = id;
   cancel.addEventListener("click", async () => {
     waiting(cancel, true);
-    cancelledFrom = said.id;
+    cancelledFrom = { id: said.id, name: said.dataset.name };
     // A refusal said before was the last gesture's: this one says its own.
     document.querySelector(`.note[data-refused="${said.id}"]`)?.remove();
     const ended = await window.__TAURI__.core.invoke("making_cancelled", { name: said.dataset.name }).then(() => true, (why) => {
@@ -520,8 +521,10 @@ function paintState(said, shown, of) {
     const stopped = element("span", "what", of.stopped);
     stopped.id = "making-stopped";
     said.replaceChildren(stopped);
-    if (cancelledFrom === said.id && offered && !offered.hidden) offered.focus();
-    cancelledFrom = null;
+    if (cancelledFrom?.id === said.id && cancelledFrom.name === said.dataset.name && offered && !offered.hidden) {
+      offered.focus();
+      cancelledFrom = null;
+    }
   } else if (shown.kind === "model") {
     if (shown.coming) said.replaceChildren(element("span", "what", words.transcript_model_coming));
     else said.replaceChildren(element("span", "what", words.transcript_model_needed), modelFetch(shown.busy));
@@ -2155,6 +2158,18 @@ function trashQuestion(session, transcript, minutes, words, trash) {
 }
 
 // After a drawing of the list: the focus a meeting gone to the trash asked for (D100).
+// A making cancelled, its card saying it stopped: the page drawn anew offers to make it again, and the
+// focus goes there once the drawing has given back its own place (D92, D101).
+function cancelledFocused() {
+  if (cancelledFrom === null) return;
+  const said = document.getElementById(cancelledFrom.id);
+  if (!said || said.dataset.name !== cancelledFrom.name || !said.classList.contains("stopped")) return;
+  const offered = document.getElementById(said.id === "minutes-state" ? "make-minutes" : "make-transcript");
+  if (!offered || offered.hidden) return;
+  offered.focus();
+  cancelledFrom = null;
+}
+
 function trashedFocused() {
   if (trashedFocus === null || !(location.hash === "" || location.hash === "#/")) return;
   const to = trashedFocus;
@@ -4928,6 +4943,7 @@ async function refresh(again = false) {
       placeBack(place);
       drawnAddress = location.hash;
       trashedFocused();
+      cancelledFocused();
     }
     return drawn;
   } catch (why) {
