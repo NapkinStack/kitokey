@@ -105,6 +105,8 @@ fn key() -> Result<Option<String>, Refused> {
 }
 
 fn summarise(folder: &Path, address: &str, model: &str) -> Result<(), Refused> {
+    // The making's start, for how long it took (D97): the minutes are written right after.
+    let began = Instant::now();
     // The folder's name, never its path: the path says whose meetings and where.
     let named = folder
         .file_name()
@@ -173,6 +175,7 @@ fn summarise(folder: &Path, address: &str, model: &str) -> Result<(), Refused> {
             model,
             context: context.as_deref(),
             cost: cost.clone().ok().flatten(),
+            made_in: Some(began.elapsed().as_secs_f64()),
             segments: &segments,
         };
         match minutes(&answer, &made) {
