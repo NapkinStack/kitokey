@@ -262,11 +262,23 @@ let languageRefused = null;
 // transcript heard in it. Written at once by `save`; refused, said, the choice put back. The same
 // row in the bar's options (D99), its ids its own. `held`: the meeting whose page it is, its refusal said
 // again on each drawing of that page (#841); the bar's, none.
+// A list put back by script after a refusal: WebKit's select still holds the refused value as the
+// last one it fired `change` for, so that value chosen again fires none (#843). A fresh copy holds
+// none: it takes the list's place, its value and the focus, and the caller listens to it again.
+function putBack(pick, value) {
+  const fresh = pick.cloneNode(true);
+  const focused = document.activeElement === pick;
+  pick.replaceWith(fresh);
+  fresh.value = value;
+  if (focused) fresh.focus();
+  return fresh;
+}
+
 function languageRow(save, language, languages, words, settled, apple, system, id = "meeting-language", saidId = "language-said", held = null) {
   // A setting of the meeting's row (D89): its icon, its name, its list.
   const row = element("label", "setting language");
   row.htmlFor = id;
-  const pick = element("select");
+  let pick = element("select");
   pick.id = id;
   const add = (value, text) => {
     const option = element("option", "", text);
@@ -288,18 +300,20 @@ function languageRow(save, language, languages, words, settled, apple, system, i
   said.setAttribute("role", "status");
   said.textContent = held !== null && languageRefused?.name === held ? languageRefused.said : "";
   let kept = pick.value;
-  pick.addEventListener("change", async () => {
+  const changed = async () => {
     try {
       await save(pick.value || null);
       kept = pick.value;
       if (held !== null) languageRefused = null;
       said.textContent = "";
     } catch (why) {
-      pick.value = kept;
+      pick = putBack(pick, kept);
+      pick.addEventListener("change", changed);
       said.textContent = fill(words.language_not_saved, why);
       if (held !== null) languageRefused = { name: held, said: said.textContent };
     }
-  });
+  };
+  pick.addEventListener("change", changed);
   // Its value and a chevron, as board 4 draws the list: the system's own box not drawn.
   const chevron = icon("chevron-down");
   chevron.classList.add("chevron");
@@ -1277,8 +1291,8 @@ function modelsAdvanced(words, prefix, offered, chosen) {
     whole.hidden = !cut;
   };
   const gone = new Set(offered.gone);
-  const [hearRow, hearPick] = list(`${prefix}-transcription-model`, words.models_transcription, hearing, ownHear, gone.has("transcription"));
-  const [writeRow, writePick] = list(`${prefix}-minutes-model`, words.models_minutes, writing, ownWrite, gone.has("minutes"));
+  let [hearRow, hearPick] = list(`${prefix}-transcription-model`, words.models_transcription, hearing, ownHear, gone.has("transcription"));
+  let [writeRow, writePick] = list(`${prefix}-minutes-model`, words.models_minutes, writing, ownWrite, gone.has("minutes"));
   const said = element("p", "note warn");
   said.id = `${prefix}-models-said`;
   said.setAttribute("role", "status");
@@ -1302,7 +1316,12 @@ function modelsAdvanced(words, prefix, offered, chosen) {
       said.textContent = "";
       said.hidden = true;
     } catch (why) {
-      [hearPick.value, writePick.value] = kept;
+      hearPick = putBack(hearPick, kept[0]);
+      writePick = putBack(writePick, kept[1]);
+      for (const pick of [hearPick, writePick]) {
+        pick.addEventListener("change", changed);
+        sized.observe(pick);
+      }
       said.textContent = fill(words.models_not_kept, why);
       said.hidden = false;
     }
@@ -1354,7 +1373,7 @@ function modelsAdvanced(words, prefix, offered, chosen) {
     if (!heard) return null;
     return heard.engine === "speechanalyzer" ? "SpeechAnalyzer" : heard.engine === "service" ? modelSaid(heard.model) : spoken(heard.model);
   };
-  return { box, toggle, panel, models, unfold, services, named, picks: [hearPick, writePick] };
+  return { box, toggle, panel, models, unfold, services, named, get picks() { return [hearPick, writePick]; } };
 }
 
 // A panel of *Refaire…* closes on *Annuler* or Escape: nothing changed, the focus back on *Refaire…* (D68).

@@ -2268,10 +2268,10 @@ def meeting_language(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         check("the page left and come back to: the refusal no longer said", sentence(browser) == "", sentence(browser))
-        # Saved: another language than the one refused — the same one chosen again after its refusal
-        # put the list back is not a change the page is sure to hear (6cc1b8e's red, #842).
+        # Saved: the very language just refused, chosen again — the list put back must not keep it
+        # from being heard as a change (#843).
         browser.execute_script(refusing)
-        choose(browser, "meeting-language", "de")
+        choose(browser, "meeting-language", "fr")
         wait_for(browser, lambda b: "refused 1" in sentence(b), 5)
         browser.execute_script("window.restore()")
         choose(browser, "meeting-language", "fr")
@@ -2281,7 +2281,7 @@ def meeting_language(now: dt.datetime) -> None:
             language = (heard / "language").read_text(errors="replace")
         except OSError as why:
             language = repr(why)
-        check("refused, then a choice saved: no refusal said, after a redraw too", saved and sentence(browser) == "",
+        check("refused, then the same language chosen again: saved, no refusal said, after a redraw too (#843)", saved and sentence(browser) == "",
               {"saved": saved, "language": language, "list": value(), "said": sentence(browser)})
         choose(browser, "meeting-language", "")
         wait_for(browser, lambda b: not (heard / "language").exists(), 5)
@@ -3011,6 +3011,24 @@ def models_advanced(now: dt.datetime) -> None:
                              and b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] == LONG_SAID + " — sur cet ordinateur", 5)
             check("fr, the bar: « Avancé » closed and opened again, the long name chosen still said whole under its list",
                   again, browser.execute_script(LONG_SHOWN, "small-minutes-model"))
+            # Refused (the shell's refusal stood in for): said, the list put back; the very model refused,
+            # chosen again once the shell takes it, must be heard as a change and kept (#843).
+            hear = "return document.getElementById('small-transcription-model').value"
+            before_refusal = browser.execute_script(hear)
+            browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                   " asked === 'next_models_kept' ? Promise.reject('refused 1') : real.invoke(asked, ...rest) };"
+                                   " window.restore = () => { window.__TAURI__.core = real; };")
+            Select(browser.find_element(By.ID, "small-transcription-model")).select_by_visible_text("Whisper tiny adv")
+            models_said = "const s = document.getElementById('small-models-said'); return s && !s.hidden ? s.textContent : ''"
+            refused = wait_for(browser, lambda b: "refused 1" in b.execute_script(models_said), 5)
+            check("the bar, « Avancé »: a model refused is said, its list put back",
+                  refused and browser.execute_script(hear) == before_refusal, [browser.execute_script(models_said), browser.execute_script(hear)])
+            browser.execute_script("window.restore()")
+            Select(browser.find_element(By.ID, "small-transcription-model")).select_by_visible_text("Whisper tiny adv")
+            heard_again = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
+                                   .get("transcription") == {"engine": "whisper", "model": tiny.name} and b.execute_script(models_said) == "", 5)
+            check("the bar, « Avancé »: the model just refused, chosen again, is kept and nothing is said (#843)",
+                  heard_again, [browser.execute_script(models_said), browser.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")])
             Select(browser.find_element(By.ID, "small-transcription-model")).select_by_visible_text("Whisper tiny adv")
             Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
             kept = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
