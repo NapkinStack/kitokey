@@ -388,8 +388,6 @@ pub struct Window {
     pub weight: &'static str,
     /// The same, for one meeting.
     pub weight_one: &'static str,
-    /// A picture of the two weights, for whoever does not see it.
-    pub weight_described: &'static str,
     pub this_week: &'static str,
     pub last_week: &'static str,
     /// Earlier in the current month: the month's name.
@@ -404,8 +402,11 @@ pub struct Window {
     pub audio_weighs: &'static str,
     pub recording: &'static str,
     pub interrupted: &'static str,
-    /// No session in the folder: the folder.
+    /// No session in the folder (#775): said without its path, which `none_folder` says under the action.
     pub none: &'static str,
+    /// Shows: the empty pane, a discreet line under its action (#775). When: no meeting in the folder.
+    /// At most: no limit, a path wraps. Placeholders: `{}`, the folder's whole path.
+    pub none_folder: &'static str,
     /// The sidebar's search (D61): what its field says, and none of the meetings holding what is typed.
     /// No meeting yet: what to do.
     pub none_do: &'static str,
@@ -672,6 +673,25 @@ pub struct Window {
     pub bar_context: &'static str,
     pub bar_context_clear: &'static str,
     pub bar_context_kept: &'static str,
+    /// The meeting last stopped and its transcript under way (D92). Shows: the bar at rest, under its
+    /// row, in a polite live region. When: after a stop, until the transcript ends. At most: about 60
+    /// characters. Placeholders: {} the meeting, as a sentence opens on it: « La réunion de 17:31 ».
+    pub bar_last_hearing: &'static str,
+    /// The same, its summary under way (D92). Shows: the bar at rest, under its row. When: the
+    /// transcript ended, the summary being written. At most: about 60 characters. Placeholders: {} the meeting.
+    pub bar_last_summary: &'static str,
+    /// The same, made (D92). Shows: the bar at rest, under its row, `bar_last_open` beside it. When: its
+    /// last step written. At most: about 60 characters. Placeholders: {} the meeting.
+    pub bar_last_ready: &'static str,
+    /// The same, cancelled from its page (D92). Shows: the bar at rest, `bar_last_open` beside it. When:
+    /// a step stopped by « Annuler ». At most: about 60 characters. Placeholders: {} the meeting.
+    pub bar_last_stopped: &'static str,
+    /// The same, a step failed (D92). Shows: the bar at rest, `bar_last_open` beside it. When: its last
+    /// step failed. At most: no limit. Placeholders: {} the meeting, then {} the cause as its page says it.
+    pub bar_last_failed: &'static str,
+    /// The button beside the meeting last stopped (D92). Shows: the bar at rest. When: the meeting
+    /// ready, stopped or failed; a press opens its page. At most: 12 characters. Placeholders: none.
+    pub bar_last_open: &'static str,
     /// « Avancé » (D90, board 6; D91), closed by default, in the bar opened and in *Refaire…*: the
     /// meeting's own models, Settings' choice first, said as such — what it holds said on it.
     pub bar_advanced: &'static str,
@@ -762,6 +782,12 @@ pub struct Window {
     pub chip_awaiting: &'static str,
     pub chip_transcribing: &'static str,
     pub chip_failed: &'static str,
+    /// Shows: a meeting's chip, in the list and on its page (#772). When: its minutes are kept and the
+    /// last Refaire… of them failed. At most: one line. Placeholders: none.
+    pub chip_redo_failed: &'static str,
+    /// Shows: a meeting's page, the minutes' state, before the cause when there is one (#772). When:
+    /// its minutes are kept and the last Refaire… of them failed. At most: no limit. Placeholders: none.
+    pub minutes_redo_failed: &'static str,
     /// The same for the transcript: being made (by, for how long), not made ({} the reason).
     pub transcript_making: &'static str,
     pub transcript_not_made: &'static str,
@@ -877,6 +903,10 @@ pub struct Window {
     pub welcome_fetch_from: &'static str,
     pub welcome_done: &'static str,
     pub welcome_later: &'static str,
+    /// The welcome's « Later » when the transcription's model is still to be downloaded, saying what it
+    /// leaves waiting (#781). Shows: the welcome's last screen, a link-styled button. When: the model is
+    /// not on this computer and the welcome offers to download it. At most: about 50 characters. Placeholders: none.
+    pub welcome_later_waits: &'static str,
     pub welcome_choose: &'static str,
     pub welcome_again: [&'static str; 2],
     /// A meeting's context (D59): the small window's disclosure, closed then open; the field's
@@ -963,7 +993,6 @@ pub fn window(language: Language) -> Window {
             meetings: "Meetings",
             weight: "{} meetings",
             weight_one: "{} meeting",
-            weight_described: "The audio takes {}; the transcripts and minutes, {}.",
             this_week: "This week",
             last_week: "Last week",
             earlier_in: "Earlier in {}",
@@ -975,7 +1004,8 @@ pub fn window(language: Language) -> Window {
             audio_weighs: "audio {}",
             recording: "Recording now",
             interrupted: "Interrupted",
-            none: "No meeting in {} yet.",
+            none: "No meeting yet.",
+            none_folder: "Meetings are saved in {}.",
             none_do: "Start a recording: its button, its shortcut, or the tray’s icon.",
             list_unread: "The meetings in {} cannot be read.",
             list_unread_do: "Check that this folder’s disk is connected and that you may read it, then try again.",
@@ -1168,6 +1198,12 @@ pub fn window(language: Language) -> Window {
             bar_context: "Meeting context",
             bar_context_clear: "Clear the context",
             bar_context_kept: "Kept for the next recording, until you clear it.",
+            bar_last_hearing: "{}: transcribing",
+            bar_last_summary: "{}: summary being written",
+            bar_last_ready: "{}: ready",
+            bar_last_stopped: "{}: stopped",
+            bar_last_failed: "{}: {}",
+            bar_last_open: "Open",
             bar_advanced: "Advanced — models",
             models_transcription: "Transcription model",
             models_minutes: "Minutes model",
@@ -1236,6 +1272,8 @@ pub fn window(language: Language) -> Window {
             chip_awaiting: "Your agreement",
             chip_transcribing: "Transcript…",
             chip_failed: "Minutes not written",
+            chip_redo_failed: "Redo failed",
+            minutes_redo_failed: "The last redo failed. The summary shown is the one before it.",
             transcript_making: "Writing the transcript",
             transcript_not_made: "The transcript was not written. The recording is untouched.",
             chip_transcript_failed: "Transcript not written",
@@ -1332,6 +1370,7 @@ pub fn window(language: Language) -> Window {
             welcome_fetch_from: "From {}, checked before it is used.",
             welcome_done: "Finish",
             welcome_later: "Later",
+            welcome_later_waits: "Later — your meetings will wait for the model",
             welcome_choose: "Choose my service",
             welcome_again: [
                 "Set up again",
@@ -1403,7 +1442,6 @@ pub fn window(language: Language) -> Window {
             meetings: "Réunions",
             weight: "{} réunions",
             weight_one: "{} réunion",
-            weight_described: "L’audio occupe {}\u{202f}; les transcriptions et les comptes rendus, {}.",
             this_week: "Cette semaine",
             last_week: "La semaine dernière",
             earlier_in: "Plus tôt en {}",
@@ -1415,7 +1453,8 @@ pub fn window(language: Language) -> Window {
             audio_weighs: "audio {}",
             recording: "Enregistrement en cours",
             interrupted: "Interrompu",
-            none: "Aucune réunion dans {} pour l’instant.",
+            none: "Aucune réunion pour l’instant.",
+            none_folder: "Les réunions sont enregistrées dans {}.",
             none_do: "Démarrez un enregistrement\u{a0}: son bouton, son raccourci, ou l’icône de la barre système.",
             list_unread: "Les réunions de {} ne peuvent pas être lues.",
             list_unread_do: "Vérifiez que le disque de ce dossier est branché et que vous pouvez le lire, puis réessayez.",
@@ -1611,6 +1650,12 @@ pub fn window(language: Language) -> Window {
             bar_context: "Contexte de la réunion",
             bar_context_clear: "Effacer le contexte",
             bar_context_kept: "Gardé pour le prochain enregistrement, jusqu’à ce que vous l’effaciez.",
+            bar_last_hearing: "{}\u{a0}: transcription en cours",
+            bar_last_summary: "{}\u{a0}: compte rendu en cours",
+            bar_last_ready: "{}\u{a0}: prête",
+            bar_last_stopped: "{}\u{a0}: arrêtée",
+            bar_last_failed: "{}\u{a0}: {}",
+            bar_last_open: "Ouvrir",
             bar_advanced: "Avancé — modèles",
             models_transcription: "Modèle de transcription",
             models_minutes: "Modèle du compte rendu",
@@ -1679,6 +1724,8 @@ pub fn window(language: Language) -> Window {
             chip_awaiting: "Accord requis",
             chip_transcribing: "Transcription…",
             chip_failed: "Compte rendu non fait",
+            chip_redo_failed: "Refaire échoué",
+            minutes_redo_failed: "Le dernier Refaire a échoué. Le compte rendu affiché est le précédent.",
             transcript_making: "Transcription en cours",
             transcript_not_made: "La transcription n’a pas été faite. L’enregistrement est intact.",
             chip_transcript_failed: "Transcription non faite",
@@ -1775,6 +1822,7 @@ pub fn window(language: Language) -> Window {
             welcome_fetch_from: "Depuis {}, vérifié avant d’être utilisé.",
             welcome_done: "Terminer",
             welcome_later: "Plus tard",
+            welcome_later_waits: "Plus tard — vos réunions attendront le modèle",
             welcome_choose: "Choisir mon service",
             welcome_again: [
                 "Refaire le réglage",

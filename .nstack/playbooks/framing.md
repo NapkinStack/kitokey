@@ -52,6 +52,7 @@ subject at a time, asking only what you cannot infer:
 | Risks | What could make it fail, or cause harm? | The risks, and the criticality they imply — what a failure of each module would cost, which the decider settles and `.nstack/handbook/05-workflow.md` §7 prices |
 | Vocabulary | The domain's words, and what each one means | The vocabulary |
 | Not this project | What it will deliberately not do | Out of scope |
+| Outside the team | What has already been asked of, promised to, or received from someone outside the team — a client, a vendor, a partner — by any channel? When the discovery asked it, only what changed since; otherwise, in full | Nothing in the charter: each answer is an entry of the project's log issue (`06-decisions.md` §9) |
 
 A domain that moves money, handles personal data or acts on someone's behalf raises the
 criticality of the modules concerned, and `security.md` applies from the first cycle — to
@@ -110,7 +111,9 @@ on.
    module — has none (`module: null`): no merge carries it, so `nstack deliver` has nothing to read. Propose a new module only against the tree of
    `.nstack/handbook/02-modules.md` §3: one module is often enough to start.
 5. **Appetite** — ask the decider how many weeks they **want** to spend, not how long it
-   will take. When the deliverables do not fit, cut the scope; never stretch the appetite.
+   will take — in days for a cycle shorter than a week, such as an engagement whose date an outside
+   party sets (`appetite_days`), never rounded up to a week nobody agreed to. When the deliverables
+   do not fit, cut the scope; never stretch the appetite.
 6. **Out of scope and later** — out of scope is not done even if time remains; *later* holds
    the candidates for the next framing.
 
@@ -120,10 +123,16 @@ Write `docs/project/cycles/NN-<slug>.md` from `.nstack/forms/cycle.md`, with
 ## 3. Hand over to the decider
 
 A cycle's *What needs a person* holds what only a person can do, each with its literal gesture: fill it
-while framing, and keep it true. It is what `nstack plan` opens with.
+while framing, and keep it true. It is what `nstack plan` opens with. A request to someone outside
+the team starts from the log issue's entries, and from the decider's answer to what has been asked,
+promised or received outside since the last one — every cycle, not only the first: nothing already
+asked is asked again, nothing is asked more broadly than before without saying why, and each new
+request becomes an entry. One still awaiting a reply that a deliverable needs is a dependency with a date.
 
 Present the charter, the cycle, the open questions, what went to *later*, and what you are
-unsure of. The decider amends; the framer sets `status: accepted` — on the charter, then on the
+unsure of — the cycle also as the board will show it: `nstack board --dry-run` previews the
+milestone and the issues its acceptance would create, and what it would collide with, and makes
+none; put the lines under *On acceptance of cycle …* in the framing pull request's description. The decider amends; the framer sets `status: accepted` — on the charter, then on the
 cycle — in a pull request the decider approves, and that approval is their gesture; accepted after `start`, the cycle's `start` and `end`
 move in the same pull request. **The next cycle, accepted while one runs**, stays `proposed` — one
 accepted cycle at a time (C5) — and gains `accepted_on: <the day of the word>`: `nstack plan` stops asking
