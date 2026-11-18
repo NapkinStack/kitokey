@@ -7259,14 +7259,14 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
 
 
 def models_on_the_page(now: dt.datetime) -> None:
-    """BV. D93, criterion 5: on a meeting's page, each version's model is a list in its line itself — no redo
+    """BW. D93, criterion 5: on a meeting's page, each version's model is a list in its line itself — no redo
     panel opened —, showing the model that made it; a model chosen there starts nothing and is kept as the
     meeting's own, in its `models.json`; one button beside it starts the making and names it, gone again once
     the version's own model is chosen back, and above it, while another is chosen, the model that made the
     version shown. The line is drawn before Ollama answers, and its models read once a page's opening, not at
     each drawing. A summary waiting for its model — the transcript whole, none written — offers its list beside
     « Faire le compte rendu », which names it. A meeting said confidential is offered no service (D91)."""
-    print("BV. each version's model a choice in its own line: kept for the meeting, nothing started, the button beside it naming the making (D93)")
+    print("BW. each version's model a choice in its own line: kept for the meeting, nothing started, the button beside it naming the making (D93)")
     # Answered late once `late` is set, as BO's: within models_offered's 2 s, or its answer would hold none of Ollama's models.
     late = threading.Event()
 
