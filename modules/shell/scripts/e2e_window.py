@@ -11044,8 +11044,11 @@ def main() -> int:
         (WORK / "slow-minutes").touch()
         browser.find_element(By.ID, "make-minutes").click()
         state = lambda b: b.find_element(By.ID, "minutes-state").text if b.find_elements(By.ID, "minutes-state") else ""
-        shown = wait_for(browser, lambda b: "Rédaction du compte rendu" in state(b), 3)
-        said = state(browser)
+        # Being made: said by the page's one bar, the step and what makes it, its card silent (D92, #938).
+        bar = ("const m = document.getElementById('making'); return m && m.getClientRects().length"
+               " ? `${document.getElementById('making-step').textContent} · ${m.querySelector('.by').textContent}` : ''")
+        shown = wait_for(browser, lambda b: "Rédaction du compte rendu" in b.execute_script(bar), 3)
+        said = browser.execute_script(bar)
         check("while they are written, the page says so — what, by which model, for how long", shown and "Qwen3 14b" in said and "0:0" in said, said)
         # Asked meanwhile for another meeting: it waits its turn, said on its page and in the list.
         browser.execute_script("location.hash = '#/meeting/2026-10-18_14-00'")
@@ -11369,10 +11372,13 @@ def main() -> int:
         paths = [browser.execute_script("return window.__TAURI__.core.invoke('settings_shown').then(s => s.model)")]
         redo_pick(browser, "redo-transcript-panel", "transcription", 1)
         browser.find_element(By.ID, "redo-transcript-do").click()
-        making_ = wait_for(browser, lambda b: "Transcription en cours" in heard_state(b), 3)
+        # Being made: said by the page's one bar, the step and what makes it, its card silent (D92, #938).
+        bar = ("const m = document.getElementById('making'); return m && m.getClientRects().length"
+               " ? `${document.getElementById('making-step').textContent} · ${m.querySelector('.by').textContent}` : ''")
+        making_ = wait_for(browser, lambda b: "Transcription en cours" in b.execute_script(bar), 3)
         shot(browser, "7-transcript-making")
-        check("while it is made, its card says so — what, by which model, for how long",
-              making_ and "Whisper small · 0:0" in heard_state(browser) and not browser.find_elements(By.ID, "transcript-again"), heard_state(browser))
+        check("while it is made, the page's bar says so — what, by which model, for how long (D92)",
+              making_ and "Whisper small · 0:0" in browser.execute_script(bar) and not browser.find_elements(By.ID, "transcript-again"), browser.execute_script(bar))
         browser.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: '2026-10-18_11-00', model: arguments[0]})", paths[0])
         lined = lambda b: b.execute_async_script("window.__TAURI__.core.invoke('makings').then(m => arguments[arguments.length - 1](m.transcripts_waiting))")
         queued = wait_for(browser, lambda b: lined(b) == ["2026-10-18_11-00"], 3)
