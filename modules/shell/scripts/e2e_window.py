@@ -2528,7 +2528,7 @@ echo '{{"available":true,"installed":true,"supported":true}}'
             browser.switch_to.window([h for h in browser.window_handles if h != main][0])
             wait_for(browser, lambda b: b.find_elements(By.ID, "small-record"), 5)
             small = [browser.find_element(By.ID, "small-record").get_attribute("aria-label"), browser.execute_script("return document.documentElement.lang")]
-            check("the bar speaks it", small == ["Start a recording", "en"], small)
+            check("the bar speaks it", small == ["Start recording", "en"], small)
             try:
                 browser.find_element(By.ID, "small-full").click()
             except NoSuchWindowException:
@@ -7728,7 +7728,7 @@ def two_panes(now: dt.datetime) -> None:
         unseen = [name for _, seen_, name in stops if not seen_]
         # The pane's stops in one run: none of the sidebar's between them — past the last, the page starts again.
         last = len(places) - 1 - places[::-1].index("pane") if "pane" in places else 0
-        check("in English, the keyboard reaches the sidebar first, then the pane's stops in one run", english == ["Start a recording", ["Hide sidebar", "Hide sidebar (Ctrl+B)"], ["Show the sidebar", "Show the sidebar (Ctrl+B)"],
+        check("in English, the keyboard reaches the sidebar first, then the pane's stops in one run", english == ["Start recording", ["Hide sidebar", "Hide sidebar (Ctrl+B)"], ["Show sidebar", "Show sidebar (Ctrl+B)"],
                                                                                                          ["Free up space", "Free up space"], ["Recording bar", "Recording bar"], ["Settings", "Settings"]]
               and places[0] == "side" and "pane" in places and set(places[places.index("pane"):last + 1]) == {"pane"} and "other" not in places,
               (english, places))
@@ -7748,10 +7748,10 @@ def two_panes(now: dt.datetime) -> None:
         check("no meeting yet: the pane says what to do, and offers the recording", said and browser.execute_script(
             "return document.getElementById('pane').contains(document.getElementById('none'))")
               and browser.find_element(By.ID, "none-do").text == "To begin, click Start recording, press the keyboard shortcut, or use the Kitokey icon."
-              and browser.find_element(By.ID, "empty-record").text == "Start a recording", browser.find_element(By.ID, "none").text)
+              and browser.find_element(By.ID, "empty-record").text == "Start recording", browser.find_element(By.ID, "none").text)
         # D89: the shortcut, gone from under the sidebar's button, is said here, where nothing was recorded yet.
         keys = browser.execute_script("const k = document.getElementById('empty-keys'); return [!!k && k.offsetParent !== null, k && k.textContent, document.getElementById('record').title]")
-        check("no meeting: the shortcut said beside what to do, and in the button's tooltip (D89)", keys[0] and keys[1] and keys[2] == f"Start a recording ({keys[1]})", keys)
+        check("no meeting: the shortcut said beside what to do, and in the button's tooltip (D89)", keys[0] and keys[1] and keys[2] == f"Start recording ({keys[1]})", keys)
         # One primary action, the header's (#775): the pane's start is a secondary one, the folder a discreet line under it.
         primaries = browser.execute_script("return [...document.querySelectorAll('button.primary')].filter(b => b.offsetParent !== null).map(b => b.id)")
         under = browser.execute_script("const r = document.getElementById('empty-record').getBoundingClientRect(), f = document.getElementById('empty-folder');"
@@ -11317,7 +11317,7 @@ def main() -> int:
         check("the transcript follows the stop: the bar's options say so", wait_for(browser, lambda b: note.is_displayed(), 3) and "transcript" in note.text, note.text)
         browser.find_element(By.ID, "small-stop").click()
         rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 5)
-        check("opened from the full window during a recording, it too comes back to rest, in English", rest and browser.find_element(By.ID, "small-record").get_attribute("aria-label") == "Start a recording")
+        check("opened from the full window during a recording, it too comes back to rest, in English", rest and browser.find_element(By.ID, "small-record").get_attribute("aria-label") == "Start recording")
         # Its transcript follows the stop: the bar at rest is its row of 44 and D92's one line alone under it, saying
         # that meeting (#939), as context_before_start reads it.
         rest_alone = ("const lines = [...document.querySelectorAll('#small .bar-lines > *')].filter(e => e.id !== 'small-last' && e.getClientRects().length);"
