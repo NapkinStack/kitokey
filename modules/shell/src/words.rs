@@ -637,6 +637,8 @@ pub struct Window {
     /// The one button that starts, naming the making and its model as chosen (D96): « Refaire le
     /// compte rendu avec Claude Sonnet 4.5 ». `{}`: the model, as people say it.
     pub redo_minutes_do: &'static str,
+    /// The transcript's one button that starts, naming its model as chosen (D96): « Refaire la
+    /// transcription avec Whisper Large V3 Turbo ». `{}`: the model, as people say it.
     pub redo_transcript_do: &'static str,
     pub on_computer: &'static str,
     pub redo_transcript_title: &'static str,
