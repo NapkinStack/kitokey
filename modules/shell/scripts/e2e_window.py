@@ -148,7 +148,8 @@ if [ "$1" = listen ]; then
   # a copy of pw-cat, told to record — its name no longer says it.
   mkdir -p "$here/own"; [ -x "$here/own/kitokey-capture" ] || cp "$(command -v pw-cat)" "$here/own/kitokey-capture"
   "$here/own/kitokey-capture" --record --target kitokey_e2e_check_mic "$here/listen.wav" & held=$!
-  ended() { kill "$held" 2>/dev/null; wait "$held" 2>/dev/null; date +%s.%N > "$here/listen-ended"; exit 0; }
+  # Written whole, then renamed over: a scenario that sees the file reads its time, never an empty one (#891).
+  ended() { kill "$held" 2>/dev/null; wait "$held" 2>/dev/null; date +%s.%N > "$here/listen-ended.part"; mv "$here/listen-ended.part" "$here/listen-ended"; exit 0; }
   trap ended TERM INT
   headset=false; [ -e "$here/listen-headset" ] && headset=true
   echo '{"event":"device","source":"me","device":"Kitokey e2e mic","headset":'$headset'}'
@@ -276,6 +277,14 @@ def choose(browser, element_id: str, value: str) -> None:
         except StaleElementReferenceException:
             time.sleep(0.2)
     Select(browser.find_element(By.ID, element_id)).select_by_value(value)
+
+
+def typed(browser, element_id: str, text: str) -> None:
+    """Text typed in a field of the page once it is drawn, shown and enabled — a choice just made
+    draws its fields anew, and one not yet there cannot take the focus (#901)."""
+    ready = lambda b: any(f.is_displayed() and f.is_enabled() for f in b.find_elements(By.ID, element_id))
+    wait_for(browser, ready, 10)
+    browser.find_element(By.ID, element_id).send_keys(text)
 
 
 def press(browser, element_id: str) -> None:
@@ -6676,7 +6685,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "minutes-online")
             wait_for(browser, lambda b: b.execute_script(options, "minutes-service"), 5)
             choose(browser, "minutes-service", "0")
-            browser.find_element(By.ID, "minutes-key").send_keys(good)
+            typed(browser, "minutes-key", good)
             press(browser, "minutes-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
             choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
@@ -6687,7 +6696,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "transcription-online")
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            browser.find_element(By.ID, "transcription-key").send_keys(heard)
+            typed(browser, "transcription-key", heard)
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
             choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
