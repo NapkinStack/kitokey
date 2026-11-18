@@ -11072,7 +11072,7 @@ def main() -> int:
         browser.execute_script("location.hash = '#/free'")
         held = wait_for(browser, lambda b: [r.text for r in b.find_elements(By.CSS_SELECTOR, "#free .freeable.busy")], 3)
         busy = [r.text for r in browser.find_elements(By.CSS_SELECTOR, "#free .freeable.busy")]
-        check("while its minutes are written, the meeting is busy on the page that frees space", held and "compte rendu" in " ".join(busy), busy)
+        check("while its minutes are written, the meeting is busy on the page that frees space", held and "en cours de traitement" in " ".join(busy), busy)
         # Elsewhere when they are written — the settings, being changed —: that page is left alone.
         browser.execute_script("location.hash = '#/settings'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "minutes"), 5)
