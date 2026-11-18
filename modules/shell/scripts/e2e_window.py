@@ -6244,8 +6244,16 @@ def redo_choice_starts_nothing(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
             press(browser, "redo-minutes")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+            # The one button that starts names the making and the model, as chosen (D96, criterion 2).
+            go = lambda b: b.find_element(By.ID, "redo-do").text
+            named = go(browser)
+            check("on the page: the button that starts names the making and its model — Settings' at first (D96)",
+                  named == "Refaire le compte rendu avec Qwen3 14b", named)
             redo_pick(browser, "redo-panel", "minutes", 1)
             picked = browser.execute_script("const p = document.getElementById('redo-panel-minutes-model'); return p ? p.value : ''")
+            renamed = wait_for(browser, lambda b: go(b) == "Refaire le compte rendu avec Mistral 7b", 3)
+            check("on the page: another model chosen, the button names it — nothing started (D96)",
+                  renamed and browser.execute_script(idle) and untouched(), go(browser))
             # Past the page's own reading, a second and a half: drawn again, the panel would be gone.
             time.sleep(3)
             kept = browser.execute_script("const p = document.getElementById('redo-panel-minutes-model'); return p ? p.value : null")
@@ -6420,6 +6428,9 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "redo-transcript")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
             hearing = redo_offered(browser, "redo-transcript-panel", "transcription")
+            named = browser.find_element(By.ID, "redo-transcript-do").text
+            check("Refaire the transcript: the button that starts names the making and its model, as people say it (D96)",
+                  named == "Refaire la transcription avec Whisper Large V3 Turbo", named)
             wait_for(browser, lambda b: b.execute_script(grouped, "redo-transcript-panel-transcription-model"), 10)
             groups = browser.execute_script(grouped, "redo-transcript-panel-transcription-model")
             service = [models for label, models in (groups or []) if label == "OpenRouter"]
