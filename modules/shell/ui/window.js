@@ -678,6 +678,10 @@ function paintMakings() {
     });
   }
   paintContext();
+  // A meeting's steps both ended — its page shown or not —: its summary made again alone later is one part.
+  for (const name of barChained) {
+    if (transcriptState(name)?.kind !== "making" && !makings?.between.includes(name) && minutesState(name)?.kind !== "making") barChained.delete(name);
+  }
   paintBar();
 }
 
@@ -698,7 +702,6 @@ function barOf(name) {
   const chained = between || barChained.has(name);
   if (minutes?.kind === "making") return { step: "minutes", parts: chained ? ["done", "running"] : ["running"], shown: minutes };
   if (between) return { step: "minutes", parts: ["done", "running"], shown: null };
-  barChained.delete(name);
   return null;
 }
 

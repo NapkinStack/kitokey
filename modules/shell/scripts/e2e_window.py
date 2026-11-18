@@ -5113,11 +5113,13 @@ def page_one_bar(now: dt.datetime) -> None:
                 'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n')
     bar = ("const m = document.getElementById('making'); if (!m || !m.getClientRects().length) return null;"
            " const s = document.getElementById('making-step'), c = document.getElementById('making-cancel');"
-           " return {step: s ? s.textContent : null, live: s ? s.getAttribute('aria-live') : null,"
+           " return {step: s ? s.textContent : null, live: s ? s.getAttribute('aria-live') : null, by: m.querySelector('.by').textContent,"
            " segments: [...m.querySelectorAll('.segment')].map(g => g.dataset.state),"
            " cancel: !!c && m.contains(c) && c.getClientRects().length > 0,"
            " cards: [...document.querySelectorAll('.making-state.making')].filter(e => e.getClientRects().length).length}")
     gates = [WORK / "gate-hearing", WORK / "gate-minutes"]
+    # What makes the step and for how long, as the cards said it: « model · m:ss ».
+    timed = re.compile(r"\S.* · \d+:\d\d$")
     for language, short, theme, hearing, writing in (
         ("fr_FR.UTF-8", "fr", "light", "Transcription en cours", "Rédaction du compte rendu"),
         ("en_US.UTF-8", "en", "dark", "Writing the transcript", "Writing the minutes"),
@@ -5139,7 +5141,8 @@ def page_one_bar(now: dt.datetime) -> None:
                 got = browser.execute_script(bar)
                 check(f"{short}: while its transcript is made, the page shows one bar across both steps, the transcript running, the summary next,"
                       " the step named in a polite live region, « Annuler » in it, no card's line of its own (D92)",
-                      first and got["segments"] == ["running", "next"] and got["live"] == "polite" and got["cancel"] and got["cards"] == 0, got)
+                      first and got["segments"] == ["running", "next"] and got["live"] == "polite" and got["cancel"] and got["cards"] == 0
+                      and bool(timed.match(got["by"])), got)
                 shot_themed(browser, f"d92-page-bar-{short}-{theme}", theme)
                 # From here, every state the bar shows, sampled, and every text its live region takes.
                 browser.execute_script("window.barSeen = []; window.barSaid = []; const s = document.getElementById('making-step');"
@@ -5150,7 +5153,7 @@ def page_one_bar(now: dt.datetime) -> None:
                 second = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == writing, 15)
                 got = browser.execute_script(bar)
                 check(f"{short}: then its summary: the same bar, the transcript's part full, the summary's running, « Annuler » in it (D92)",
-                      second and got["segments"] == ["done", "running"] and got["cancel"] and got["cards"] == 0, got)
+                      second and got["segments"] == ["done", "running"] and got["cancel"] and got["cards"] == 0 and bool(timed.match(got["by"])), got)
                 gates[1].unlink()
                 gone = wait_for(browser, lambda b: b.execute_script(bar) is None and (meeting / "minutes.md").is_file(), 15)
                 time.sleep(0.3)
@@ -5165,9 +5168,35 @@ def page_one_bar(now: dt.datetime) -> None:
                 check(f"{short}: made, the bar is gone; it never moved back, nor went away between the two steps, the step said once each (D92)",
                       gone and forward and ended and browser.execute_script("return window.barSaid") == [writing],
                       [gone, sorted(set(seen)), browser.execute_script("return window.barSaid")])
+                # Its summary made again alone, later, on the same page: one part, the summary's.
+                gates[1].touch()
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: null, model: null})", meeting.name)
+                alone = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == writing, 10)
+                got = browser.execute_script(bar)
+                gates[1].unlink()
+                done = wait_for(browser, lambda b: b.execute_script(bar) is None, 15)
+                check(f"{short}: its summary made again alone: one part, running, then gone (D92)", alone and got["segments"] == ["running"] and done, got)
             finally:
                 for gate in gates:
                     gate.unlink(missing_ok=True)
+    # No summary following its transcript: one part, the transcript's.
+    meetings = WORK / "one-bar-alone"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 1, {"local.wav": 1000})
+    with Window(meetings, "fr_FR.UTF-8", f'after = "transcript"\nreminder = false\nmodel = "{model}"\n') as browser:
+        gates[0].touch()
+        try:
+            browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+            wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", meeting.name)
+            heard = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == "Transcription en cours", 10)
+            got = browser.execute_script(bar)
+            gates[0].unlink()
+            done = wait_for(browser, lambda b: b.execute_script(bar) is None and (meeting / "transcript.jsonl").is_file(), 15)
+            check("fr: a transcript with no summary following: one part, running, then gone (D92)",
+                  heard and got["segments"] == ["running"] and done and not (meeting / "minutes.md").exists(), got)
+        finally:
+            gates[0].unlink(missing_ok=True)
 
 
 def meeting_trashed(now: dt.datetime) -> None:
