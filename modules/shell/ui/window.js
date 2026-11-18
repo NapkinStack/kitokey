@@ -451,7 +451,8 @@ function transcriptState(name) {
   return null;
 }
 
-// The card whose « Annuler » was pressed: once it says stopped, the focus goes to what makes it again.
+// The card whose « Annuler » was pressed, and its meeting: once it says stopped and offers to make it
+// again, the focus goes there — kept until then, the offer drawn only when the page is drawn anew.
 let cancelledFrom = null;
 
 // A refused « Annuler », said for the line `of` (D92): an alert, which a screen reader says as it
@@ -470,7 +471,7 @@ function cancelButton(said, id) {
   if (id) cancel.id = id;
   cancel.addEventListener("click", async () => {
     waiting(cancel, true);
-    cancelledFrom = said.id;
+    cancelledFrom = { id: said.id, name: said.dataset.name };
     // A refusal said before was the last gesture's: this one says its own.
     document.querySelector(`.note[data-refused="${said.id}"]`)?.remove();
     const ended = await window.__TAURI__.core.invoke("making_cancelled", { name: said.dataset.name }).then(() => true, (why) => {
@@ -512,16 +513,20 @@ function paintState(said, shown, of) {
   }
   said.dataset.key = key;
   if (shown === null) return said.replaceChildren();
+  // Being made: said by the page's one bar across both steps, not by its card (D92, `paintBar`).
   if (shown.kind === "making") {
-    said.replaceChildren(element("span", "what", of.making), element("span", "by", `${by} · ${minutes}`), element("span", "making-bar"), cancelButton(said, "making-cancel"));
+    said.hidden = true;
+    said.replaceChildren();
   } else if (shown.kind === "waiting") {
     said.replaceChildren(element("span", "what", fill(words.minutes_waiting, shown.before)), cancelButton(said));
   } else if (shown.kind === "stopped") {
     const stopped = element("span", "what", of.stopped);
     stopped.id = "making-stopped";
     said.replaceChildren(stopped);
-    if (cancelledFrom === said.id && offered && !offered.hidden) offered.focus();
-    cancelledFrom = null;
+    if (cancelledFrom?.id === said.id && cancelledFrom.name === said.dataset.name && offered && !offered.hidden) {
+      offered.focus();
+      cancelledFrom = null;
+    }
   } else if (shown.kind === "model") {
     if (shown.coming) said.replaceChildren(element("span", "what", words.transcript_model_coming));
     else said.replaceChildren(element("span", "what", words.transcript_model_needed), modelFetch(shown.busy));
@@ -678,6 +683,58 @@ function paintMakings() {
     });
   }
   paintContext();
+  // A meeting's steps both ended — its page shown or not —: its summary made again alone later is one part.
+  for (const name of barChained) {
+    if (transcriptState(name)?.kind !== "making" && !makings?.between.includes(name) && minutesState(name)?.kind !== "making") barChained.delete(name);
+  }
+  paintBar();
+}
+
+// A meeting's page while it is made (D92): one bar across both steps — its transcript, then its summary
+// when one follows —, naming the step and what makes it, each part full once done and never moving back,
+// « Annuler » in it for the step running. Between the two steps, the summary's part is said running.
+const barChained = new Set();
+
+function barOf(name) {
+  if (makings === null) return null;
+  const heard = transcriptState(name);
+  const minutes = minutesState(name);
+  if (heard?.kind === "making") {
+    if (heard.then) barChained.add(name);
+    return { step: "transcript", parts: heard.then ? ["running", "next"] : ["running"], shown: heard };
+  }
+  const between = makings.between.includes(name);
+  const chained = between || barChained.has(name);
+  if (minutes?.kind === "making") return { step: "minutes", parts: chained ? ["done", "running"] : ["running"], shown: minutes };
+  if (between) return { step: "minutes", parts: ["done", "running"], shown: null };
+  return null;
+}
+
+function paintBar() {
+  const bar = document.getElementById("making");
+  if (!bar || document.getElementById("meeting").hidden) return;
+  const state = barOf(bar.dataset.name);
+  bar.hidden = state === null;
+  if (state === null) return;
+  // The step said by a polite live region: its text changes only when the step does.
+  const step = document.getElementById("making-step");
+  const said = state.step === "transcript" ? words.transcript_making : words.minutes_making;
+  if (step.textContent !== said) step.textContent = said;
+  const shown = state.shown;
+  const by = shown === null ? "" : shown.host === undefined ? spoken(shown.model) : `${modelSaid(shown.model)} · ${shown.host}`;
+  const time = shown === null ? "" : `${Math.floor(shown.seconds / 60)}:${String(shown.seconds % 60).padStart(2, "0")}`;
+  bar.querySelector(".by").textContent = by ? `${by} · ${time}` : "";
+  const parts = bar.querySelector(".segments");
+  if (parts.childElementCount !== state.parts.length) parts.replaceChildren(...state.parts.map(() => element("span", "segment")));
+  state.parts.forEach((part, at) => { parts.children[at].dataset.state = part; });
+  // « Annuler » for the step running, its card's: cancelled, said there, as before (D92, criterion 4).
+  const card = document.getElementById(state.step === "transcript" ? "transcript-state" : "minutes-state");
+  const holder = bar.querySelector(".cancel");
+  if (shown === null || !card) holder.replaceChildren();
+  else if (holder.dataset.for !== state.step || !holder.firstChild) {
+    holder.dataset.for = state.step;
+    holder.replaceChildren(cancelButton(card, "making-cancel"));
+  }
 }
 
 // *Réessayer*: fails only when the meeting is gone, said there (D67); a later failure is on this page.
@@ -771,7 +828,14 @@ async function readMakings() {
   const moved = opened && makings
     && ((String(makings.made[opened] ?? 0) !== drawn("minutes-state") && minutesState(opened)?.kind !== "making")
       || (String(makings.transcripts_made[opened] ?? 0) !== drawn("transcript-state") && transcriptState(opened)?.kind !== "making"));
-  if (moved && !busy) refresh();
+  // A first transcript cancelled, its page drawn while it was made: no offer to make it again until
+  // the page is drawn anew, which nothing made asks for — drawn once more, then (D92).
+  const unoffered = cancelledFrom && !cancelledFrom.drawn && cancelledFrom.id === "transcript-state" && cancelledFrom.name === opened
+    && transcriptState(opened)?.kind === "stopped" && !document.getElementById("make-transcript");
+  if ((moved || unoffered) && !busy) {
+    if (unoffered) cancelledFrom.drawn = true;
+    refresh();
+  }
   paintMakings();
 }
 
@@ -2289,6 +2353,18 @@ function trashQuestion(session, transcript, minutes, words, trash) {
 }
 
 // After a drawing of the list: the focus a meeting gone to the trash asked for (D100).
+// A making cancelled, its card saying it stopped: the page drawn anew offers to make it again, and the
+// focus goes there once the drawing has given back its own place (D92, D101).
+function cancelledFocused() {
+  if (cancelledFrom === null) return;
+  const said = document.getElementById(cancelledFrom.id);
+  if (!said || said.dataset.name !== cancelledFrom.name || !said.classList.contains("stopped")) return;
+  const offered = document.getElementById(said.id === "minutes-state" ? "make-minutes" : "make-transcript");
+  if (!offered || offered.hidden) return;
+  offered.focus();
+  cancelledFrom = null;
+}
+
 function trashedFocused() {
   if (trashedFocus === null || !(location.hash === "" || location.hash === "#/")) return;
   const to = trashedFocus;
@@ -2392,7 +2468,20 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   gone.hidden = models_gone.length === 0;
   const settings = contextCard(session, { context, transcript, minutes }, words, [spoken, secret], [left, secretSaid, spokenSaid, secretDescribed, gone]);
   // The trash's question in its own card, under the head, as wide as the page's cards (D100).
-  page.replaceChildren(head, ask, settings, drawn, columns);
+  // Its making, one bar across both steps under its head (D92), painted with the makings.
+  const making = element("section", "card making");
+  making.id = "making";
+  making.dataset.name = nameOf(session);
+  making.hidden = true;
+  // The same meeting drawn again — its transcript written, say —: its step's live region is the same
+  // node, never one said anew, and the bar is painted before anything can show it missing.
+  const step = (same && document.getElementById("making-step")) || element("span", "what");
+  step.id = "making-step";
+  step.setAttribute("aria-live", "polite");
+  const cancel = element("span", "cancel");
+  making.append(step, element("span", "by"), cancel, element("div", "segments"));
+  page.replaceChildren(head, making, ask, settings, drawn, columns);
+  paintBar();
   // The line being said, marked while it plays; the page stays where the user left it (D26, the
   // decider, 2026-10-24: following the line was intrusive).
   if (player?.name === nameOf(session)) {
@@ -5051,6 +5140,7 @@ async function refresh(again = false) {
       placeBack(place);
       drawnAddress = location.hash;
       trashedFocused();
+      cancelledFocused();
     }
     return drawn;
   } catch (why) {
