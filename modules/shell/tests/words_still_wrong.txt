@@ -1,15 +1,4 @@
 apostrophe audio_trashed "The system's trash did not take it."
-apostrophe window.key_kept[0] "A key is kept in the system's keyring; a new one replaces it."
-apostrophe window.key_not_kept[0] "The choice is saved, but the key was not kept in the system's keyring: {}"
-apostrophe window.sessions_folder[1] "New meetings are written here. Those already recorded stay where they were: the window and the audio's keeping follow this folder."
-apostrophe window.shortcut_where[0] "The desktop grants it: it changes in the desktop's keyboard settings."
-apostrophe window.speech_failed[0] "Apple's model was not downloaded. Try again later; Whisper still hears."
-apostrophe window.speech_fetch[0] "Download Apple's model (macOS fetches it from Apple)"
-apostrophe window.speech_fetching[0] "macOS is downloading Apple's model…"
-apostrophe window.speech_missing[0] "Apple's model is not on this Mac yet"
-apostrophe window.speech_option[0] "Apple's SpeechAnalyzer, on this Mac"
-apostrophe window.test_sends[0] "Test sends {} one sentence of Kitokey's, nothing of a meeting."
-apostrophe window.where_online[0] "Online — the transcript's text is sent"
 lexicon announcement "I’m recording this meeting to write up its minutes. Tell me if you’d rather I didn’t." « minutes »
 lexicon audio_trashed "The audio of 1 meeting kept more than {} is in the trash; its transcript and minutes stay." « minutes »
 lexicon audio_trashed "The audio of {meetings} meetings kept more than {} is in the trash; their transcripts and minutes stay." « minutes »
@@ -62,8 +51,6 @@ lexicon minutes "The minutes were not written" « minutes »
 lexicon minutes "«\u{a0}{address}\u{a0}» n’est pas l’adresse d’un fournisseur\u{a0}: choisissez qui écrit le compte rendu dans les réglages de Kitokey." « fournisseur »
 lexicon minutes "“{address}” is not a provider’s address: choose who writes the minutes in Kitokey’s settings." « provider »
 lexicon pulled "{model} is in Ollama: it is offered first for the minutes." « minutes »
-lexicon window.after_minutes[0] "Write the transcript, then the minutes" « minutes »
-lexicon window.after_minutes[1] "Each follows the other; a notification says when the minutes are ready." « minutes »
 lexicon window.agree_eyebrow[0] "Before the first minutes online" « minutes »
 lexicon window.agree_lead[0] "To write the minutes, Kitokey sends the transcript to the service you chose. Here is exactly what leaves." « minutes »
 lexicon window.agree_local[0] "Write the minutes on this computer instead" « minutes »
@@ -78,31 +65,18 @@ lexicon window.corrected_since[0] "The transcript was corrected after these minu
 lexicon window.free_audio[1] "The minutes and the transcript still read. The audio is nearly all the weight." « minutes »
 lexicon window.free_busy[0] "being recorded, transcribed or its minutes written" « minutes »
 lexicon window.free_whole[1] "The audio, the transcript and the minutes: nothing of the meeting is left." « minutes »
-lexicon window.keep_audio[1] "After that, the audio goes to the trash; the transcript and minutes stay." « minutes »
-lexicon window.key_kept[0] "A key is kept in the system's keyring; a new one replaces it." « keyring »
-lexicon window.key_not_kept[0] "The choice is saved, but the key was not kept in the system's keyring: {}" « keyring »
 lexicon window.make_minutes[0] "Write the minutes" « minutes »
 lexicon window.minutes[0] "Minutes" « minutes »
 lexicon window.minutes_making[0] "Writing the minutes" « minutes »
 lexicon window.minutes_not_copied[0] "The minutes could not be copied." « minutes »
 lexicon window.minutes_not_made[0] "The minutes were not written. The transcript is untouched." « minutes »
-lexicon window.minutes_step[0] "Minutes" « minutes »
 lexicon window.minutes_stopped[0] "Minutes stopped. You can start them again, with another model if you like." « minutes »
 lexicon window.minutes_title[0] "Minutes" « minutes »
-lexicon window.minutes_unsaved[0] "Not saved yet — the minutes are still written by {}." « minutes »
-lexicon window.minutes_unsaved_none[0] "Not saved yet — no minutes are written until it is." « minutes »
 lexicon window.models_gone_minutes[0] "The minutes model chosen for this meeting goes through a service Settings do not name: Settings’ stands in." « minutes »
 lexicon window.models_minutes[0] "Minutes model" « minutes »
-lexicon window.models_note[0] "The models “on this computer” are those Kitokey finds installed. A key is kept in your system’s keyring, never in a file. Nothing leaves this computer without your agreement: a transcription service you name receives your meetings’ sound and their context, a service that writes the minutes their text and context only." « keyring »
 lexicon window.no_minutes[0] "No minutes yet." « minutes »
 lexicon window.no_player[0] "Its audio was freed: the meeting can no longer be listened to. Its transcript and minutes stay." « minutes »
-lexicon window.offered_ollama_good[0] "For the minutes, on this computer, through Ollama" « minutes »
-lexicon window.service_tested[0] "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit." « segment »
-lexicon window.welcome_connected[1] "The minutes are written by an online service; the transcription stays on this computer." « minutes »
-lexicon window.welcome_ollama_lacks[0] "Ollama does not hold {} yet: the minutes wait for it. Settings fetch it in one click." « minutes »
 lexicon window.welcome_ollama_silent[0] "Ollama does not answer on this computer: the minutes wait for it. It is free, at ollama.com." « minutes »
-lexicon window.welcome_rows[1] "Minutes" « minutes »
-lexicon window.welcome_writer[0] "Who writes the minutes?" « minutes »
 limit window.chip_failed[0] "Compte rendu non fait"
 limit window.chip_failed[0] "Minutes not written"
 limit window.chip_transcript_failed[0] "Transcript not written"

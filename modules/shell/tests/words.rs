@@ -1764,9 +1764,9 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
         (french.undated, "Date inconnue"),
         (french.chip_awaiting, "Accord requis"),
         (french.minutes_waiting, "En file d’attente · {} avant"),
-        (french.minutes_unsaved, "Modification non enregistrée\u{a0}: {} reste utilisé."),
-        (french.test_sends, "Le test envoie une courte phrase à {} — rien de vos réunions."),
-        (french.test_answered, "Ça marche\u{a0}: le modèle répond."),
+        (french.minutes_unsaved, "Non enregistré\u{a0}: {} reste utilisé."),
+        (french.test_sends, "Le test envoie une courte phrase à {}, rien de vos réunions."),
+        (french.test_answered, "Ça fonctionne\u{a0}: le modèle répond."),
         (
             french.developer[1],
             "Affiche le détail technique sous chaque erreur, pour aider au diagnostic.",
@@ -1786,10 +1786,13 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
         (french.time_passage, "Voir le passage de {}"),
         (french.bar_more, "Plus d’options"),
         (french.shortcut_none, "Aucun raccourci défini"),
-        (french.shortcut_where, "Il se modifie dans les réglages clavier du système."),
+        (
+            french.shortcut_where,
+            "Vous pouvez le modifier dans les réglages clavier du système.",
+        ),
         (
             french.ollama_silent,
-            "Ollama ne répond pas ou n’a aucun modèle\u{a0}: lancez Ollama, puis téléchargez un modèle.",
+            "Ollama ne répond pas ou n’a aucun modèle. Lancez Ollama, puis téléchargez un modèle.",
         ),
         (french.key, "Clé d’API"),
         (french.agree_local_write, "Rédiger sur cet ordinateur"),
@@ -1814,7 +1817,7 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
 fn the_review_s_english_sentences_are_rewritten() {
     let english = words::window(Language::English);
     assert_eq!(english.interrupted, "Interrupted");
-    assert_eq!(english.keep_not_days, "{} is not a number of days: from 1 to 36,500");
+    assert_eq!(english.keep_not_days, "“{}” isn’t a valid number of days (1 to 36,500)");
 }
 
 /// *Transcript* is the English word: French says *Transcription*, feminine, everywhere (D47).
