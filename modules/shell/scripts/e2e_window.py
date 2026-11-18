@@ -5594,10 +5594,14 @@ def focus_swept(now: dt.datetime) -> None:
         time.sleep(5)
         return wait_for(browser, lambda b: b.execute_script("return performance.now() - window.__quiet") > 1200, 8)
 
-    def click(browser, element_id: str) -> None:
-        """A click as WebKitGTK gives it to a box or a radio: the value turned, its click, input and change sent,
-        the focus given to none — the driver's own click focuses it, which hid the decider's #autostart (#944)."""
-        browser.execute_script("document.activeElement?.blur(); document.getElementById(arguments[0]).click()", element_id)
+    def click(browser, element_id: str, elsewhere: bool = False) -> None:
+        """A click as WebKit gives it to a box or a radio: the value turned, its click, input and change sent,
+        the focus given to none — the driver's own click focuses it, which hid the decider's #autostart (#944).
+        Moved from nothing, or (`elsewhere`) from another control the focus stays on: Settings' first list."""
+        browser.execute_script("const [id, elsewhere] = arguments; const c = document.getElementById(id);"
+                               " if (elsewhere) [...document.querySelectorAll('#settings select:not([disabled])')].find((s) => s !== c"
+                               " && s.getClientRects().length)?.focus({preventScroll: true}); else document.activeElement?.blur(); c.click()",
+                               element_id, elsewhere)
 
     # A list chosen by the mouse opens GTK's own menu, a window of its own, which the driver never opens: the
     # list focused by the click, then left for the menu — the focus nowhere in the page, Kitokey's window
@@ -5609,7 +5613,7 @@ def focus_swept(now: dt.datetime) -> None:
             " if (changeFirst) { changed(); window.dispatchEvent(new FocusEvent('focus')); }"
             " else { window.dispatchEvent(new FocusEvent('focus')); setTimeout(changed, 500); }")
 
-    def act(browser, control: dict, mouse: bool, change_first: bool = False) -> str | None:
+    def act(browser, control: dict, mouse: bool, change_first: bool = False, elsewhere: bool = False) -> str | None:
         """The control changed by a key or a click; the id the focus should be on after, None when it cannot change."""
         cid, kind = control["id"], control["kind"]
         if kind == "radio":
@@ -5619,8 +5623,7 @@ def focus_swept(now: dt.datetime) -> None:
             checked = next((rid for rid, on in group if on), group[0][0])
             if mouse:
                 other = next(rid for rid, on in group if rid != checked)
-                browser.execute_script("document.activeElement?.blur()")
-                click(browser, other)
+                click(browser, other, elsewhere)
                 return other
             browser.execute_script("document.getElementById(arguments[0]).focus()", checked)
             ActionChains(browser).send_keys(Keys.ARROW_DOWN).perform()
@@ -5637,8 +5640,7 @@ def focus_swept(now: dt.datetime) -> None:
             return cid
         if kind == "box":
             if mouse:
-                browser.execute_script("document.activeElement?.blur()")
-                click(browser, cid)
+                click(browser, cid, elsewhere)
             else:
                 browser.execute_script("document.getElementById(arguments[0]).focus()", cid)
                 ActionChains(browser).send_keys(Keys.SPACE).perform()
@@ -5667,9 +5669,13 @@ def focus_swept(now: dt.datetime) -> None:
                     if browser.execute_script(opened) == 0:
                         break
                     settle(browser)
-                for how in ("the keyboard", "a click, the window's focus back before the change", "a click, the change before the window's focus"):
+                for how in ("the keyboard", "a click, the window's focus back before the change", "a click, the change before the window's focus",
+                            "a click, another control keeping the focus"):
                     mouse = how != "the keyboard"
                     change_first = how.endswith("window's focus")
+                    # The decider's #autostart: the focus « remonte, mais pas tout en haut » — a click in WebKit moves
+                    # no focus, and the one left on a control above stays there (#944).
+                    elsewhere = how.endswith("keeping the focus")
                     done: set[str] = set()
                     swept = 0
                     while swept < 60:
@@ -5681,7 +5687,8 @@ def focus_swept(now: dt.datetime) -> None:
                         control = todo[-1]
                         key = control["group"] or control["id"]
                         done.add(key)
-                        if mouse and control["kind"] == "field" or change_first and control["kind"] != "list":
+                        if mouse and control["kind"] == "field" or change_first and control["kind"] != "list" \
+                                or elsewhere and control["kind"] not in ("box", "radio"):
                             continue
                         browser.execute_script("document.getElementById(arguments[0]).scrollIntoView({block: 'center'}); window.__moves = []; window.__drawn = 0", control["id"])
                         time.sleep(0.4)
@@ -5696,7 +5703,7 @@ def focus_swept(now: dt.datetime) -> None:
                         else:
                             wanted = None
                         try:
-                            expected = act(browser, control, mouse, change_first)
+                            expected = act(browser, control, mouse, change_first, elsewhere)
                         except WebDriverException as why:
                             check(f"{short}, {how}: #{key} ({control['kind']}) changed (#944)", False, str(why).splitlines()[0])
                             continue
