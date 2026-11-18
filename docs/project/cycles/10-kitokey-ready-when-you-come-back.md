@@ -313,6 +313,19 @@ rapidement dans le même cycle », its end unchanged.
   (#781); unreadable settings never make the meetings look lost
   (#770); the polish of the 0.2.4 pass (#775).
 - A meeting named by its title, given or proposed by the summary (#504).
+- **Summary structures** (the decider, 2026-11-18): « suivant ses réunions un utilisateur peut avoir besoin d'une
+  "structure" de compte rendu différente […] lui en proposer des classiques mais aussi lui permettre d'en créer
+  d'autres, de les modifier, les supprimer ». The market already answers which ones: Granola, Fireflies, Otter,
+  tl;dv and Zoom ship built-in structures by meeting type (general, 1:1, stand-up, sales or client call,
+  brainstorm) and custom ones, chosen per meeting with a default, a change of structure making the summary
+  again ([Granola](https://docs.granola.ai/help-center/taking-notes/customise-notes-with-templates),
+  [Fireflies](https://guide.fireflies.ai/articles/7796555530-how-to-create-and-manage-custom-summary-templates),
+  [tl;dv](https://intercom.help/tldv/en/articles/9670088-meeting-templates)). What it costs here: `minutes/v4`
+  holds exactly three sections found by their place, so free structures are a `minutes/v5` through
+  expand/contract over contracts, summary and shell. Framer's proposal for cycle 11, not decided: a structure is a
+  name and sections (a title, one line saying what goes in it); built-in ones kept intact and duplicated to adapt;
+  the user's own created, edited and deleted in Settings; chosen as a default, per meeting in « Avancé » and in
+  Refaire. Proposed no-gos: no editable system prompt, no choice by calendar, no sharing.
 - **macOS**: D38, D39, D42, D58 on a Mac, ADR-0012's reading, notarisation, FLAC in WKWebView — moved from
   cycle 09's *Later*.
 - Fluent in place of `words.rs` at a third language or a translator who does not write Rust (the copy
