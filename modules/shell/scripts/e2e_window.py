@@ -823,7 +823,7 @@ def model_offered(now: dt.datetime) -> None:
         time.sleep(3.5)
         check("in Settings too, the offer is not drawn again while nothing changes", not staleness_of(button)(browser))
         browser.find_element(By.ID, "model-fetch").click()
-        coming = wait_for(browser, lambda b: "En cours de téléchargement" in b.execute_script(said) and not b.find_elements(By.ID, "model-fetch"), 3)
+        coming = wait_for(browser, lambda b: "Téléchargement en cours" in b.execute_script(said) and not b.find_elements(By.ID, "model-fetch"), 3)
         check("once clicked, it is said coming, and not offered again", coming, browser.execute_script(said))
         again = wait_for(browser, lambda b: b.find_elements(By.ID, "model-fetch"), 15)
         check("a file that is not the published one: nothing kept, offered again", again and not fetched.exists() and asked != [], asked)
@@ -867,7 +867,7 @@ def model_offered(now: dt.datetime) -> None:
     named.env.update(XDG_DATA_HOME=str(WORK / "data-named"), KITOKEY_MODEL_PUBLISHED=window.env["KITOKEY_MODEL_PUBLISHED"])
     with named as browser:
         browser.find_element(By.ID, "settings-link").click()
-        drawn = wait_for(browser, lambda b: "Pas sur cet ordinateur" in b.execute_script(said))
+        drawn = wait_for(browser, lambda b: "Introuvable sur cet ordinateur" in b.execute_script(said))
         time.sleep(1)
         check("a model the user named is not offered: theirs", drawn and not browser.find_elements(By.ID, "model-fetch")
               and "proposé" not in browser.execute_script(said), browser.execute_script(said))
@@ -1036,7 +1036,7 @@ def list_refreshed(now: dt.datetime) -> None:
                                         ("its signature none", shipped, b"<html>")]:
             refusal = read_again(what, list_, signature_)
             check(f"a list {what}: refused, said, the models shipped still offered",
-                  "n’a pas pu être mise à jour" in refusal and "restent proposés" in refusal
+                  "Impossible d’actualiser la liste" in refusal and "restent disponibles" in refusal
                   and asked == ["/models.json", "/models.json.minisig"]
                   and browser.find_elements(By.CSS_SELECTOR, '[data-offered="ggml-small-q8_0.bin"]'), (refusal, asked))
         taken = read_again("the decider's", shipped, signature)
@@ -1135,12 +1135,12 @@ def service_named(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_element(By.ID, "transcription-provider").is_displayed(), 3)
         browser.find_element(By.ID, "transcription-provider").send_keys("hears.example/v1")
         browser.find_element(By.ID, "transcription-own-save").click()
-        bad = wait_for(browser, lambda b: "l’adresse commence par https://" in b.execute_script(said), 5)
+        bad = wait_for(browser, lambda b: "l’adresse doit commencer par https://" in b.execute_script(said), 5)
         browser.find_element(By.ID, "transcription-provider").clear()
         browser.find_element(By.ID, "transcription-provider").send_keys("https://localhost.hears.example/v1")
         browser.find_element(By.ID, "transcription-model").send_keys("whisper-1")
         browser.find_element(By.ID, "transcription-own-save").click()
-        elsewhere = wait_for(browser, lambda b: "acceptez d’abord" in b.execute_script(said), 5)
+        elsewhere = wait_for(browser, lambda b: "cochez d’abord" in b.execute_script(said), 5)
         check("an address that is none, or a host that only starts as this computer's, is said and not saved",
               bad and elsewhere and "transcription_provider" not in window.file.read_text(), browser.execute_script(said))
         browser.find_element(By.ID, "transcription-provider").clear()
@@ -1150,7 +1150,7 @@ def service_named(now: dt.datetime) -> None:
         browser.find_element(By.ID, "transcription-model").send_keys("whisper-1")
         agreement = browser.find_element(By.ID, "transcription-own-agreed").find_element(By.XPATH, "..").text
         browser.find_element(By.ID, "transcription-own-save").click()
-        refused = wait_for(browser, lambda b: "acceptez d’abord" in b.execute_script(said), 5)
+        refused = wait_for(browser, lambda b: "cochez d’abord" in b.execute_script(said), 5)
         check("a host elsewhere is not saved before the user agreed, the host named in the agreement",
               refused and "hears.example" in agreement and "transcription_provider" not in window.file.read_text(), (agreement, browser.execute_script(said)))
         # Agreed: saved, and who hears is that service.
@@ -1162,7 +1162,7 @@ def service_named(now: dt.datetime) -> None:
         # Saved, the model no longer needed: Settings are drawn anew at the next reading of the makings,
         # perhaps between finding the button and clicking it. Clicked in the page, as it is now.
         browser.execute_script("document.getElementById('transcription-test').click()")
-        tested = wait_for(browser, lambda b: b.execute_script(said).startswith("Il entend, avec les temps de chaque segment"), 10)
+        tested = wait_for(browser, lambda b: b.execute_script(said).startswith("Ça fonctionne\u00a0: un extrait audio de test a été transcrit"), 10)
         check("Tester says in one sentence what the service answered: it hears, with each segment's times", tested, browser.execute_script(said))
         # The page drawn anew under a slow answer, as a model come or the window back do: nothing lost, no second ask.
         browser.execute_script("const real = window.__TAURI__.core; window.answer = null; window.asked = 0; window.answered = 0; window.held = window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => { if (asked !== 'transcription_tested') return real.invoke(asked, ...rest); window.asked += 1; return new Promise((resolve) => { window.answer = () => real.invoke(asked, ...rest).then((told) => { resolve(told); setTimeout(() => { window.answered += 1; }); }); }); } }; window.restore = () => { window.__TAURI__.core = real; };")
@@ -1172,11 +1172,11 @@ def service_named(now: dt.datetime) -> None:
         drawn = wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && document.getElementById('transcription-said') !== null"), 5)
         check("drawn anew while it asks: Tester stays disabled", drawn and browser.execute_script("const t = document.getElementById('transcription-test'); return t.disabled || t.getAttribute('aria-disabled') === 'true'"))
         browser.execute_script("window.answer()")
-        kept = wait_for(browser, lambda b: b.execute_script(said).startswith("Il entend, avec les temps de chaque segment"), 10)
+        kept = wait_for(browser, lambda b: b.execute_script(said).startswith("Ça fonctionne\u00a0: un extrait audio de test a été transcrit"), 10)
         check("drawn anew while it asks: the answer is said on the page as it is", kept and not browser.execute_script("const t = document.getElementById('transcription-test'); return t.disabled || t.getAttribute('aria-disabled') === 'true'") and browser.execute_script("return window.asked") == 1, browser.execute_script(said))
         browser.execute_script("window.restore(); window.__old = document.getElementById('transcription-said'); refresh()")
         wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && document.getElementById('transcription-said') !== null"), 5)
-        hears = "Il entend, avec les temps de chaque segment"
+        hears = "Ça fonctionne\u00a0: un extrait audio de test a été transcrit"
         # Waiting, said by aria-disabled — never `disabled`, which lets the focus go (#886).
         testing = "const t = document.getElementById('transcription-test'); return t.disabled || t.getAttribute('aria-disabled') === 'true'"
         check("drawn anew after it answered: the answer stays", browser.execute_script(said).startswith(hears), browser.execute_script(said))
@@ -1234,7 +1234,7 @@ def service_named(now: dt.datetime) -> None:
         named = wait_for(browser, lambda b: "Écrit par whisper-large-v3, via api.groq.com" in makers(b), 5)
         check("a meeting a service heard names the service, never this computer", named and not any("sur cet ordinateur" in m for m in makers(browser)), makers(browser))
         browser.execute_script("location.hash = '#/settings'")
-        note = wait_for(browser, lambda b: "reçoit le son de vos réunions" in b.find_element(By.ID, "settings").text, 5)
+        note = wait_for(browser, lambda b: "reçoit le son et le contexte de vos réunions" in b.find_element(By.ID, "settings").text, 5)
         check("Settings say a transcription service receives the meetings' sound", note and "L’audio ne quitte jamais" not in browser.find_element(By.ID, "settings").text)
         check("another address and back: the last answer is gone", browser.execute_script(said) == "", browser.execute_script(said))
         # Offered by name, as the minutes' services are (D63).
@@ -1280,7 +1280,7 @@ def service_named(now: dt.datetime) -> None:
               saved and 'transcription_model = "vendor/scribe"' in text and "sk-stand-in" not in text, text)
         (WORK / "hearing-key").unlink(missing_ok=True)
         press(browser, "transcription-test")
-        tested = wait_for(browser, lambda b: b.execute_script(said).startswith("Il entend, avec les temps de chaque segment"), 10)
+        tested = wait_for(browser, lambda b: b.execute_script(said).startswith("Ça fonctionne\u00a0: un extrait audio de test a été transcrit"), 10)
         check("Tester, on the service chosen from the list, says it hears with each segment's times — the key the keyring kept given to it",
               tested and (WORK / "hearing-key").exists() and (WORK / "hearing-key").read_text() == "sk-stand-in-not-a-key", browser.execute_script(said))
         # Each cause its own sentence (D72); the raw text never, outside developer mode.
@@ -1726,7 +1726,7 @@ def ollama_pulled(now: dt.datetime) -> None:
             browser.find_element(By.ID, "settings-link").click()
             listed = wait_for(browser, lambda b: "Télécharger" in b.execute_script(row))
             said = browser.execute_script(row)
-            check("qwen3:8b is offered for the minutes, its size and what it is good for said", listed and "qwen3:8b" in said and "5 Go" in said and "comptes rendus" in said, said)
+            check("qwen3:8b is offered for the minutes, its size and what it is good for said", listed and "qwen3:8b" in said and "5 Go" in said and "compte rendu" in said, said)
             check("nothing is fetched before a click", pulls == [], pulls)
             # A Whisper model coming: the pull waits — its row greyed, and asked all the same, Ollama is not.
             browser.execute_script("document.querySelector('[data-offered=\"ggml-small-q8_0.bin\"] button').click()")
@@ -1789,7 +1789,7 @@ def first_run(now: dt.datetime) -> None:
         shot_themed(browser, name, "light" if "light" in name.split("-") else "dark")
 
     def until_question(browser) -> bool:
-        return wait_for(browser, lambda b: "Vos réunions parlent-elles" in b.execute_script(welcome) or "Do your meetings" in b.execute_script(welcome), 10)
+        return wait_for(browser, lambda b: "Vos réunions abordent-elles" in b.execute_script(welcome) or "Do your meetings" in b.execute_script(welcome), 10)
 
     # 1. Skipped: everything on this computer, the meetings opened.
     window = started("skip")
@@ -2186,7 +2186,7 @@ def first_run(now: dt.datetime) -> None:
             check("saved private before it is fetched: the minutes by the Ollama answering, qwen3:8b",
                   f'minutes_provider = "{ollama}/v1"' in text and 'minutes_model = "qwen3:8b"' in text, text)
             press(browser, "settings-link")
-            coming = wait_for(browser, lambda b: "En cours de téléchargement" in b.execute_script(state), 5)
+            coming = wait_for(browser, lambda b: "Téléchargement en cours" in b.execute_script(state), 5)
             # Refaire le réglage answered while it comes: the model come, the page read again
             # meanwhile, the answer stays the user's.
             press(browser, "welcome-again")
@@ -4823,7 +4823,7 @@ def settings_narrow_without_model(now: dt.datetime) -> None:
             said = browser.execute_script(
                 "const p = document.getElementById('model'); return [p.title, p.options[p.selectedIndex]?.text ?? null,"
                 " document.querySelector('#model-state .says')?.textContent ?? null]")
-            whole = {"fr": "pas encore sur cet ordinateur", "en": "not on this computer yet"}[short]
+            whole = {"fr": "pas encore téléchargé", "en": "not downloaded yet"}[short]
             check(f"{short}, 420 px, no model on this computer: the choice whole as the list's tooltip, the state said under it (#868)",
                   said[0] == said[1] and said[0] and said[0].endswith(whole) and said[2] and whole.split()[0] in said[2].lower(), said)
             browser.execute_script("document.getElementById('model').scrollIntoView({block: 'center'})")
@@ -10630,7 +10630,7 @@ def main() -> int:
         shot(browser, "4-settings-online")
         check(
             "the key is kept, said so, and never shown back nor written in the settings",
-            kept.get_attribute("value") == "" and kept.get_attribute("placeholder").startswith("Une clé est gardée") and "sk-scenario" not in text,
+            kept.get_attribute("value") == "" and kept.get_attribute("placeholder").startswith("Clé enregistrée") and "sk-scenario" not in text,
             kept.get_attribute("placeholder"),
         )
         # Each cause its own sentence (D72).

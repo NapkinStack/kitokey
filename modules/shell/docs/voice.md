@@ -100,3 +100,14 @@ comment, the placeholders, the apostrophe, the limits, the refused words, a noti
 with what is still wrong today, a number or a list that only shrinks as the rewrite goes, one pull
 request an area (D94). The rest of this page — the tone, the gesture after the error, the terms a
 test cannot tell apart — is the review's.
+
+## Changing a sentence
+
+A sentence changed in `words.rs` changes every test that reads it — `tests/words.rs`, and the window's e2e
+(`scripts/e2e_window.py`), which waits for the sentences the window shows. Before a pull request, the e2e is
+searched from its own string literals, not from the sentence: each literal read as Python reads it — a
+` ` or a ` ` is the character itself —, then kept when it is part of the old sentence and not of the new
+one. A search for the whole sentence misses a check written with escapes, and one that tests a fragment
+(« absent », « n’a pas pu être gardé »); #950's first run failed 34 checks so. A check that fails on the new
+sentence says the old one's meaning: when the new sentence drops it — where a download comes from, where a
+meeting's words go (R7) —, the sentence is wrong, not the check.
