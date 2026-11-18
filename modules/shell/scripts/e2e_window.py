@@ -278,6 +278,14 @@ def choose(browser, element_id: str, value: str) -> None:
     Select(browser.find_element(By.ID, element_id)).select_by_value(value)
 
 
+def typed(browser, element_id: str, text: str) -> None:
+    """Text typed in a field of the page once it is drawn, shown and enabled — a choice just made
+    draws its fields anew, and one not yet there cannot take the focus (#901)."""
+    ready = lambda b: any(f.is_displayed() and f.is_enabled() for f in b.find_elements(By.ID, element_id))
+    wait_for(browser, ready, 10)
+    browser.find_element(By.ID, element_id).send_keys(text)
+
+
 def press(browser, element_id: str) -> None:
     """A click on the page as it is: drawn again under the driver, the element is found afresh;
     found before it can be clicked — shown, laid out — it is clicked a moment later (#510)."""
@@ -4555,6 +4563,53 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def appearance_chosen(now: dt.datetime) -> None:
+    """BP. D98: Settings' « Général » offers the appearance — « Système », « Clair », « Sombre » —; chosen,
+    the window takes it at once, the other one than the system says — the system light, then dark —; kept across starts, the bar
+    taking it too; « Système » by default, following the system as before."""
+    print("BP. Settings: the appearance System, Light or Dark, taken at once, kept across starts, the bar too (D98)")
+    ground = "return getComputedStyle(document.documentElement).getPropertyValue('--ground').trim().toUpperCase()"
+    grounds = {"light": "#F2F4F7", "dark": "#15171C"}
+    # Each choice against the system: « Sombre » while it is light, « Clair » while it is dark.
+    for wanted in ("light", "dark"):
+        taping = WORK / f"appearance-{wanted}"
+        taping.mkdir()
+        window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\n')
+        # The system's look asked of GTK, as a desktop asks it: WebKitGTK's prefers-color-scheme follows it.
+        window.env.update(GTK_THEME="Adwaita:dark" if wanted == "dark" else "Adwaita")
+        with window as browser:
+            browser.execute_script("location.hash = '#/settings'")
+            offered = wait_for(browser, lambda b: b.find_elements(By.ID, "appearance"), 10)
+            system = "dark" if browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches") else "light"
+            other = "light" if system == "dark" else "dark"
+            check(f"the system {wanted}: the window says so before any choice (D98)", system == wanted, system)
+            pick = browser.find_elements(By.ID, "appearance")
+            choices = [(o.get_attribute("value"), o.text) for o in Select(pick[0]).options] if pick else []
+            check(f"the system {wanted}: « Général » offers the appearance, « Système » chosen by default (D98)",
+                  offered and choices == [("system", "Système"), ("light", "Clair"), ("dark", "Sombre")]
+                  and Select(pick[0]).first_selected_option.get_attribute("value") == "system"
+                  and browser.execute_script(ground) == grounds[system], (choices, browser.execute_script(ground)))
+            if pick:
+                Select(pick[0]).select_by_value(other)
+            taken = wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
+            check(f"the system {wanted}: « {'Clair' if other == 'light' else 'Sombre'} » chosen while the system says the other: the window takes it at once, kept (D98)",
+                  taken and f'appearance = "{other}"' in window.file.read_text(), (browser.execute_script(ground), window.file.read_text()))
+            shot(browser, f"d98-settings-{other}")
+            if pick:
+                Select(browser.find_element(By.ID, "appearance")).select_by_value("system")
+            back = wait_for(browser, lambda b: b.execute_script(ground) == grounds[system], 3)
+            check(f"the system {wanted}: « Système » chosen again: the system's appearance followed, as before (D98)", back, browser.execute_script(ground))
+            if pick:
+                Select(browser.find_element(By.ID, "appearance")).select_by_value(other)
+            wait_for(browser, lambda b: b.execute_script(ground) == grounds[other], 3)
+        # Started again, the bar alone: it takes the appearance kept.
+        window.file.write_text(window.file.read_text().replace('window = "full"\n', ""))
+        with window as browser:
+            bar = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.execute_script(ground) == grounds[other], 10)
+            check(f"the system {wanted}: started again, the bar takes the appearance kept, not the system's (D98)", bar, browser.execute_script(ground))
+            shot(browser, f"d98-bar-{other}")
+
+
 def bar_language(now: dt.datetime) -> None:
     """BR. D99: the bar's options offer the meeting's language — at rest the next meeting's, recording
     the one in progress' —, the meeting's page's list (D65, D89), « Celle des Réglages » first, and its
@@ -6542,7 +6597,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "minutes-online")
             wait_for(browser, lambda b: b.execute_script(options, "minutes-service"), 5)
             choose(browser, "minutes-service", "0")
-            browser.find_element(By.ID, "minutes-key").send_keys(good)
+            typed(browser, "minutes-key", good)
             press(browser, "minutes-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
             choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
@@ -6553,7 +6608,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "transcription-online")
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            browser.find_element(By.ID, "transcription-key").send_keys(heard)
+            typed(browser, "transcription-key", heard)
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
             choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
@@ -10722,6 +10777,7 @@ def main() -> int:
     redo_choice_starts_nothing(now)
     redo_offers_the_services_models(now)
     settings_folded(now)
+    appearance_chosen(now)
     focus_kept(now)
     meeting_trashed(now)
     sound_checked(now)
