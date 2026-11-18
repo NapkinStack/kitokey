@@ -48,9 +48,6 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .weight { padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; }
 .total strong { font-size: 26px; letter-spacing: -0.02em; }
 .total span, .legend { color: var(--soft); }
-.split { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--raised); }
-.split .audio { background: var(--accent); }
-.split .text { background: var(--ok); }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; }
 .legend li { display: flex; align-items: center; gap: 7px; }
 .none { color: var(--soft); }
@@ -560,6 +557,9 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .empty .card { max-width: 480px; padding: 22px 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .empty .none { margin: 0; color: var(--ink); font-weight: 600; }
 .empty .says { margin: 0; }
+.empty .folder { margin: 0; color: var(--soft); font-size: 12.5px; overflow-wrap: anywhere; }
+/* Waiting for what it needs, the transcript says that alone (#775): not also that there is none. */
+#transcript-state:not([hidden]) ~ .none { display: none; }
 /* Too low for the list to hold between the gesture and the foot: the sidebar scrolls with the page. */
 @media (max-width: 839px), (max-height: 559px) {
   .sidebar { position: static; height: auto; min-height: 100vh; }

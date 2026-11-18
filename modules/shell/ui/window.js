@@ -621,15 +621,19 @@ function paintMakings() {
     chip_.hidden = state === null;
     if (state === null) continue;
     if (minutes && chip_.dataset.first === "true") chipsMaking.add(chip_.dataset.name);
+    // Minutes kept, a redo of them failed (#772): said as the redo's failure, never as none made.
+    const kept = chip_.dataset.first === "false";
     chip_.textContent = minutes
-      ? { making: words.chip_making, waiting: words.chip_waiting, ollama: words.chip_waiting, awaiting: words.chip_awaiting, failed: words.chip_failed }[state.kind]
+      ? { making: words.chip_making, waiting: words.chip_waiting, ollama: words.chip_waiting, awaiting: words.chip_awaiting, failed: kept ? words.chip_redo_failed : words.chip_failed }[state.kind]
       : { making: words.chip_transcribing, waiting: words.chip_waiting, model: words.chip_waiting, failed: words.chip_transcript_failed }[state.kind];
     chip_.classList.toggle("failed", state.kind === "failed");
   }
   const minutes = document.getElementById("minutes-state");
   if (minutes) {
     paintState(minutes, minutesState(minutes.dataset.name), {
-      offer: "make-minutes", again: "minutes-again", ask: "minutes_again", making: words.minutes_making, not_made: words.minutes_not_made, stopped: words.minutes_stopped,
+      offer: "make-minutes", again: "minutes-again", ask: "minutes_again", making: words.minutes_making, stopped: words.minutes_stopped,
+      // The minutes kept (#772): the redo failed, the ones shown are those before it.
+      not_made: minutes.dataset.kept === "true" ? words.minutes_redo_failed : words.minutes_not_made,
     });
   }
   // No line corrected while the transcript is made or waits to be (D62): its pencils hidden.
@@ -881,7 +885,10 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   const weight = document.getElementById("weight");
   weight.hidden = sessions.length === 0;
   // A folder that cannot be read is no empty list: said, and tried again (D67).
-  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folder) : fill(words.none, folder);
+  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folder) : words.none;
+  // Where Kitokey looks, said under the action, never in the sentence (#775): a path is no title.
+  document.getElementById("empty-folder").textContent = unreadable ? "" : fill(words.none_folder, folder);
+  document.getElementById("empty-folder").hidden = unreadable;
   document.getElementById("none-do").textContent = unreadable ? words.list_unread_do : words.none_do;
   document.getElementById("empty-record").textContent = words.record_start;
   document.getElementById("empty-record").hidden = recording || unreadable;
@@ -893,13 +900,6 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   document.getElementById("total").textContent = size(audio + text, words);
   const taken = sessions.length === 1 ? words.weight_one : words.weight;
   document.getElementById("taken").textContent = fill(taken, sessions.length);
-  const share = audio + text > 0 ? (100 * audio) / (audio + text) : 0;
-  document.getElementById("bar-audio").style.width = `${share}%`;
-  document.getElementById("bar-text").style.width = `${100 - share}%`;
-  // Its two parts said in words, to the pointer as to a screen reader: no legend under it (board 4).
-  const described = fill(words.weight_described, size(audio, words), size(text, words));
-  document.getElementById("bar").setAttribute("aria-label", described);
-  document.getElementById("bar").title = described;
 
   const now = new Date();
   const groups = document.getElementById("groups");
@@ -1438,6 +1438,7 @@ function minutesCard(read, words, session, transcript) {
   const state = element("p", "making-state");
   state.id = "minutes-state";
   state.dataset.name = nameOf(session);
+  state.dataset.kept = String(read.state === "present");
   state.dataset.made = String(makings?.made[nameOf(session)] ?? 0);
   state.setAttribute("role", "status");
   state.hidden = true;

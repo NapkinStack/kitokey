@@ -313,8 +313,6 @@ pub struct Window {
     pub weight: &'static str,
     /// The same, for one meeting.
     pub weight_one: &'static str,
-    /// A picture of the two weights, for whoever does not see it.
-    pub weight_described: &'static str,
     pub this_week: &'static str,
     pub last_week: &'static str,
     /// Earlier in the current month: the month's name.
@@ -329,8 +327,11 @@ pub struct Window {
     pub audio_weighs: &'static str,
     pub recording: &'static str,
     pub interrupted: &'static str,
-    /// No session in the folder: the folder.
+    /// No session in the folder (#775): said without its path, which `none_folder` says under the action.
     pub none: &'static str,
+    /// Shows: the empty pane, a discreet line under its action (#775). When: no meeting in the folder.
+    /// At most: no limit, a path wraps. Placeholders: `{}`, the folder's whole path.
+    pub none_folder: &'static str,
     /// The sidebar's search (D61): what its field says, and none of the meetings holding what is typed.
     /// No meeting yet: what to do.
     pub none_do: &'static str,
@@ -680,6 +681,12 @@ pub struct Window {
     pub chip_awaiting: &'static str,
     pub chip_transcribing: &'static str,
     pub chip_failed: &'static str,
+    /// Shows: a meeting's chip, in the list and on its page (#772). When: its minutes are kept and the
+    /// last Refaire… of them failed. At most: one line. Placeholders: none.
+    pub chip_redo_failed: &'static str,
+    /// Shows: a meeting's page, the minutes' state, before the cause when there is one (#772). When:
+    /// its minutes are kept and the last Refaire… of them failed. At most: no limit. Placeholders: none.
+    pub minutes_redo_failed: &'static str,
     /// The same for the transcript: being made (by, for how long), not made ({} the reason).
     pub transcript_making: &'static str,
     pub transcript_not_made: &'static str,
@@ -874,7 +881,6 @@ pub fn window(language: Language) -> Window {
             meetings: "Meetings",
             weight: "{} meetings",
             weight_one: "{} meeting",
-            weight_described: "The audio takes {}; the transcripts and minutes, {}.",
             this_week: "This week",
             last_week: "Last week",
             earlier_in: "Earlier in {}",
@@ -886,7 +892,8 @@ pub fn window(language: Language) -> Window {
             audio_weighs: "audio {}",
             recording: "Recording now",
             interrupted: "Interrupted",
-            none: "No meeting in {} yet.",
+            none: "No meeting yet.",
+            none_folder: "Meetings are saved in {}.",
             none_do: "Start a recording: its button, its shortcut, or the tray’s icon.",
             list_unread: "The meetings in {} cannot be read.",
             list_unread_do: "Check that this folder’s disk is connected and that you may read it, then try again.",
@@ -1145,6 +1152,8 @@ pub fn window(language: Language) -> Window {
             chip_awaiting: "Your agreement",
             chip_transcribing: "Transcript…",
             chip_failed: "Minutes not written",
+            chip_redo_failed: "Redo failed",
+            minutes_redo_failed: "The last redo failed. The summary shown is the one before it.",
             transcript_making: "Writing the transcript",
             transcript_not_made: "The transcript was not written. The recording is untouched.",
             chip_transcript_failed: "Transcript not written",
@@ -1312,7 +1321,6 @@ pub fn window(language: Language) -> Window {
             meetings: "Réunions",
             weight: "{} réunions",
             weight_one: "{} réunion",
-            weight_described: "L’audio occupe {}\u{202f}; les transcriptions et les comptes rendus, {}.",
             this_week: "Cette semaine",
             last_week: "La semaine dernière",
             earlier_in: "Plus tôt en {}",
@@ -1324,7 +1332,8 @@ pub fn window(language: Language) -> Window {
             audio_weighs: "audio {}",
             recording: "Enregistrement en cours",
             interrupted: "Interrompu",
-            none: "Aucune réunion dans {} pour l’instant.",
+            none: "Aucune réunion pour l’instant.",
+            none_folder: "Les réunions sont enregistrées dans {}.",
             none_do: "Démarrez un enregistrement\u{a0}: son bouton, son raccourci, ou l’icône de la barre système.",
             list_unread: "Les réunions de {} ne peuvent pas être lues.",
             list_unread_do: "Vérifiez que le disque de ce dossier est branché et que vous pouvez le lire, puis réessayez.",
@@ -1586,6 +1595,8 @@ pub fn window(language: Language) -> Window {
             chip_awaiting: "Accord requis",
             chip_transcribing: "Transcription…",
             chip_failed: "Compte rendu non fait",
+            chip_redo_failed: "Refaire échoué",
+            minutes_redo_failed: "Le dernier Refaire a échoué. Le compte rendu affiché est le précédent.",
             transcript_making: "Transcription en cours",
             transcript_not_made: "La transcription n’a pas été faite. L’enregistrement est intact.",
             chip_transcript_failed: "Transcription non faite",
