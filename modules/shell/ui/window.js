@@ -1469,8 +1469,8 @@ function modelValue(step, chosen) {
 
 // A version's line, its model's name a list in place (D93): the sentence around it as written.
 const IN_LINE = "\u{E000}";
-function lineWith(said, pick) {
-  const line = element("p", "maker");
+function lineWith(said, pick, kind = "maker") {
+  const line = element("p", kind);
   const [before, after] = said.split(IN_LINE);
   line.append(before);
   if (after !== undefined) line.append(pick, after);
@@ -1599,7 +1599,7 @@ function minutesCard(read, words, session, transcript, onPage) {
       const ask = offer(card, words.make_minutes, "make-minutes", "minutes_asked", session, words);
       // The model it will be made by, a choice beside it, which the button names (D93).
       const [pick, said] = modelOnPage(onPage, words, "minutes", null, ask, words.make_minutes_with, words.make_minutes);
-      ask.before(lineWith(IN_LINE, pick), said);
+      ask.before(lineWith(IN_LINE, pick, "make-with"), said);
     }
     return card;
   }

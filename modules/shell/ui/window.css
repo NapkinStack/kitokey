@@ -125,7 +125,7 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .minutes .body, .transcript .lines { max-width: 75ch; }
 .minutes, .transcript { flex: 1 1 380px; min-width: 0; padding: 22px 24px; display: flex; flex-direction: column; gap: 10px; }
 .label { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--soft); }
-.maker, .note { margin: 0; color: var(--soft); font-size: 13px; }
+.maker, .make-with, .note { margin: 0; color: var(--soft); font-size: 13px; }
 .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .minutes-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .minutes-actions:has(> .redo) { flex-basis: 100%; }
@@ -270,11 +270,11 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 .lines .correcting { width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
 .corrected-since { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 8px; }
 .corrected-since .note { margin: 0; }
-.maker { font: 12.5px ui-monospace, monospace; color: var(--soft); overflow-wrap: anywhere; }
+.maker, .make-with { font: 12.5px ui-monospace, monospace; color: var(--soft); overflow-wrap: anywhere; }
 .minutes > .primary, .transcript > .primary { align-self: flex-start; }
 /* A version's model, a list in its line (D93): the line's own size, a long name cut at the card's width,
    said whole in its tooltip; under the line, which model made the version, then the button that makes it again. */
-.maker .page-model { min-height: 0; max-width: 100%; padding: 0 4px; border-radius: 6px; font: inherit; text-overflow: ellipsis; vertical-align: baseline; }
+.maker .page-model, .make-with .page-model { min-height: 0; max-width: 100%; padding: 0 4px; border-radius: 6px; font: inherit; text-overflow: ellipsis; vertical-align: baseline; }
 .made > .maker { min-width: 0; }
 .made > .note { flex-basis: 100%; }
 .page-redo { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
