@@ -897,8 +897,9 @@ pub struct Window {
     pub context_unfinished: &'static str,
     pub context_changed: [&'static str; 2],
     /// Shows: a meeting's context card, the button under `context_changed`, naming what it starts (D93):
-    /// the transcript, then the summary where there is one. When: the context changed after they were
-    /// made; the first without a summary, the second with one. At most: about 45 characters. Placeholders: none.
+    /// the transcript, then the summary when one follows it. When: the context changed after they were
+    /// made; the second where the meeting has a summary or Settings make one after a transcript, else the
+    /// first. At most: about 45 characters. Placeholders: none.
     pub context_redo: [&'static str; 2],
     /// The language a meeting is spoken in (D65).
     pub language_label: &'static str,
@@ -929,6 +930,9 @@ pub struct Window {
     pub correction_empty: &'static str,
     pub correction_failed: &'static str,
     pub corrected_since: &'static str,
+    /// Shows: the summary's card, the button beside `corrected_since`, naming what it starts (D93).
+    /// When: the transcript was corrected after the summary was written. At most: about 45 characters.
+    /// Placeholders: none.
     pub redo_corrections: &'static str,
     /// The minutes copied in one click, said in place (D45).
     pub copy_minutes: &'static str,
@@ -1376,7 +1380,7 @@ pub fn window(language: Language) -> Window {
             correction_empty: "A line is not left empty: Escape leaves it as it was.",
             correction_failed: "The correction was not saved: {}",
             corrected_since: "The transcript was corrected after these minutes were written.",
-            redo_corrections: "Redo with the corrections",
+            redo_corrections: "Write the summary again with the corrections",
             copy_minutes: "Copy the minutes",
             minutes_copied: "Copied",
             minutes_not_copied: "The minutes could not be copied.",
@@ -1819,7 +1823,7 @@ pub fn window(language: Language) -> Window {
             correction_empty: "Une ligne ne reste pas vide\u{a0}: Échap la laisse comme elle était.",
             correction_failed: "La correction n’a pas été enregistrée\u{a0}: {}",
             corrected_since: "La transcription a été corrigée après ce compte rendu.",
-            redo_corrections: "Refaire avec les corrections",
+            redo_corrections: "Refaire le compte rendu avec les corrections",
             copy_minutes: "Copier le compte rendu",
             minutes_copied: "Copié",
             minutes_not_copied: "Le compte rendu n’a pas pu être copié.",

@@ -166,7 +166,7 @@ file beside it and only once the folder holds `session.json`; 400 characters at 
 characters; another script than Latin or Cyrillic is said, Whisper keeping only the last 224
 tokens. The transcript and the minutes read it as they start: the field is closed while either is
 made, or a transcript is left unfinished. Changed after they were made, its button — *Refaire la
-transcription*, *et le compte rendu* where there are minutes (D93) — makes the transcript again with
+transcription*, *et le compte rendu* where minutes follow, the meeting having some or the settings making them (D93) — makes the transcript again with
 whoever the settings name to hear, then the minutes with whoever they name to write — each kept in
 place until the new one is whole, put back if it is not. Changed, the context starts nothing by itself.
 

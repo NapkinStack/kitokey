@@ -2014,8 +2014,16 @@ fn confidential_set(app: AppHandle, shell: State<'_, Shell>, name: String, on: b
 #[derive(serde::Serialize)]
 struct ContextShown {
     text: String,
-    /// Its transcript or minutes were made with another: *Refaire la transcription et le compte rendu* is offered.
+    /// Its transcript or minutes were made with another: *Refaire la transcription* is offered.
     changed: bool,
+    /// Made again with it, its minutes follow the transcript: its button names them too (D93).
+    minutes_after: bool,
+}
+
+/// Whether a transcript made again with the context brings minutes after it: when the meeting has
+/// some, or the settings make them (D59) — what *Refaire la transcription* names (D93).
+fn minutes_after(folder: &Path, after: After) -> bool {
+    folder.join("minutes.md").is_file() || after == After::Minutes
 }
 
 fn context_of(shell: &Shell, folder: &Path) -> ContextShown {
@@ -2024,6 +2032,7 @@ fn context_of(shell: &Shell, folder: &Path) -> ContextShown {
     let minutes = minutes::minutes(folder, words::window(shell.language()).minutes_sections);
     ContextShown {
         changed: context::changed(text.as_deref(), &transcript, &minutes),
+        minutes_after: minutes_after(folder, shell.settings().after),
         text: text.unwrap_or_default(),
     }
 }
@@ -4126,7 +4135,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         return Err((Failure::ModelAbsent, "no model on this computer".to_string()));
     }
     // Made again with the context: its minutes too, when it had some or the settings make them.
-    let minutes_after = again == Again::Settings && (folder.join("minutes.md").is_file() || settings.after == After::Minutes);
+    let minutes_after = again == Again::Settings && minutes_after(&folder, settings.after);
     // Set aside under a name of its own, never written over; put back if the new one is not made.
     let current = folder.join("transcript.jsonl");
     let previous = match sessions::set_aside(&current, true) {
