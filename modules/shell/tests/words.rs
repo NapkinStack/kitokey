@@ -1006,7 +1006,7 @@ fn the_context_s_words_are_said_in_both_languages_french_typeset_as_french() {
     let english = words::window(Language::English);
     // The field's name, as D59's criterion says it.
     assert_eq!(french.context_label, "De quoi parle la réunion\u{202f}? Qui y participe\u{202f}?");
-    assert_eq!(english.context_label, "What is the meeting about? Who takes part?");
+    assert_eq!(english.context_label, "What’s the meeting about? Who’s attending?");
     assert_eq!(french.context_redo, "Refaire avec ce contexte");
     for sentence in [
         french.context_label,
@@ -1031,7 +1031,8 @@ fn the_context_s_words_are_said_in_both_languages_french_typeset_as_french() {
         assert_eq!(most.matches("{}").count(), 1);
         assert!(left.iter().all(|left| left.matches("{}").count() == 1));
     }
-    assert!(french.context_script.contains("Whisper") && english.context_script.contains("Whisper"));
+    // What a script Whisper does not take whole may do to the context, said without the engine's name (R2).
+    assert!(french.context_script.contains("tronqué") && english.context_script.contains("cut short"));
 }
 
 #[test]
@@ -1175,7 +1176,7 @@ fn the_literals_of_each_language_are_read_as_the_file_arranges_them() {
     // Inès: a name in an English example.
     assert_eq!(
         accented,
-        ["E.g. the Q4 budget with Inès Durand and the purchasing team"],
+        ["E.g. Q4 budget with Inès Durand and the purchasing team"],
         "French read as English"
     );
     // An `expect`'s words, for the developer: no sentence the user reads.
@@ -1757,13 +1758,13 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
         (french.transcript_title, "Transcription"),
         (french.chip_transcribing, "Transcription…"),
         (french.heard_by, "Transcrit par {}, sur cet ordinateur"),
-        (french.remote_described, "À distance — le son de l’ordinateur"),
-        (french.no_match, "Aucun passage ne correspond."),
-        (french.search, "Rechercher dans la transcription"),
+        (french.remote_described, "Les autres — le son de l’appel"),
+        (french.no_match, "Aucun résultat."),
+        (french.search, "Rechercher dans le texte"),
         (french.interrupted, "Interrompu"),
         (french.undated, "Date inconnue"),
         (french.chip_awaiting, "Accord requis"),
-        (french.minutes_waiting, "En file d’attente · {} avant"),
+        (french.minutes_waiting, "En attente · {} avant"),
         (french.minutes_unsaved, "Modification non enregistrée\u{a0}: {} reste utilisé."),
         (french.test_sends, "Le test envoie une courte phrase à {} — rien de vos réunions."),
         (french.test_answered, "Ça marche\u{a0}: le modèle répond."),
@@ -1773,7 +1774,7 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
         ),
         (french.log_level[1], "S’applique au prochain lancement de Kitokey."),
         (french.playback, "Position de lecture"),
-        (french.not_playable, "Cette version de Kitokey ne peut pas lire cet audio."),
+        (french.not_playable, "Cet audio ne peut pas être lu dans Kitokey."),
         (
             french.not_played,
             "Lecture impossible ici. Ouvrez le dossier pour l’écouter avec un autre lecteur.",
@@ -1782,8 +1783,8 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
             french.no_player,
             "L’audio a été supprimé pour faire de la place. La transcription et le compte rendu restent.",
         ),
-        (french.time_listen, "Écouter depuis {}"),
-        (french.time_passage, "Voir le passage de {}"),
+        (french.time_listen, "Écouter à partir de {}"),
+        (french.time_passage, "Voir le passage à {}"),
         (french.bar_more, "Plus d’options"),
         (french.shortcut_none, "Aucun raccourci défini"),
         (french.shortcut_where, "Il se modifie dans les réglages clavier du système."),
@@ -1792,7 +1793,7 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
             "Ollama ne répond pas ou n’a aucun modèle\u{a0}: lancez Ollama, puis téléchargez un modèle.",
         ),
         (french.key, "Clé d’API"),
-        (french.agree_local_write, "Rédiger sur cet ordinateur"),
+        (french.agree_local_write, "Rédiger ici"),
     ] {
         assert_eq!(said, wanted);
     }
