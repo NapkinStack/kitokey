@@ -260,8 +260,9 @@ let languageRefused = null;
 
 // The language a meeting is spoken in (D65): the settings' own, or one of its own — its next
 // transcript heard in it. Written at once by `save`; refused, said, the choice put back. The same
-// row in the bar's options (D99), its ids its own.
-function languageRow(save, language, languages, words, settled, apple, system, id = "meeting-language", saidId = "language-said") {
+// row in the bar's options (D99), its ids its own. `held`: the meeting whose page it is, its refusal said
+// again on each drawing of that page (#841); the bar's, none.
+function languageRow(save, language, languages, words, settled, apple, system, id = "meeting-language", saidId = "language-said", held = null) {
   // A setting of the meeting's row (D89): its icon, its name, its list.
   const row = element("label", "setting language");
   row.htmlFor = id;
@@ -285,18 +286,19 @@ function languageRow(save, language, languages, words, settled, apple, system, i
   const said = element("p", "says");
   said.id = saidId;
   said.setAttribute("role", "status");
-  said.textContent = languageRefused?.name === nameOf(session) ? languageRefused.said : "";
+  said.textContent = held !== null && languageRefused?.name === held ? languageRefused.said : "";
   let kept = pick.value;
   pick.addEventListener("change", async () => {
     try {
       await save(pick.value || null);
       kept = pick.value;
-      languageRefused = null;
+      if (held !== null) languageRefused = null;
       said.textContent = "";
     } catch (why) {
       pick.value = kept;
-      languageRefused = { name: nameOf(session), said: fill(words.language_not_saved, why) };
-      said.textContent = languageRefused.said;
+      const refused = fill(words.language_not_saved, why);
+      if (held !== null) languageRefused = { name: held, said: refused };
+      said.textContent = refused;
     }
   });
   // Its value and a chevron, as board 4 draws the list: the system's own box not drawn.
@@ -2132,7 +2134,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const [secret, left, secretSaid, secretDescribed] = confidentialCard(session, confidential, words);
   const [spoken, spokenSaid] = languageRow(
     (chosen) => window.__TAURI__.core.invoke("language_set", { name: nameOf(session), language: chosen }),
-    language, languages, words, meeting_language, apple, system_language,
+    language, languages, words, meeting_language, apple, system_language, "meeting-language", "language-said", nameOf(session),
   );
   // A model the meeting chose and cannot have now (D91): Settings' stands in, said, as Auto for a microphone.
   const gone = element("p", "note warn");
