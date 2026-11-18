@@ -5428,6 +5428,51 @@ def page_estimate(now: dt.datetime) -> None:
               read is not None and sorted(read) == ["minutes", "transcript"] and list(read["transcript"]) == [model.name]
               and list(read["minutes"]) == ["mistral"] and all(number(v) for step in read.values() for v in step.values())
               and anew and meeting.name not in speeds.read_text(), [read, before])
+    # A step that fails is never measured, nor kept; a confidential meeting's summary is written by the
+    # model chosen as it starts, so no number is said for it before (#955, ines' E1, E2, E3).
+    meetings = WORK / "estimate-failed"
+    secret, failing, written = (meetings / name for name in ("2026-10-18_12-00", "2026-10-18_13-00", "2026-10-18_14-00"))
+    for folder in (secret, failing, written):
+        session(folder, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+    (secret / "confidential").touch()
+    (written / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"estimate-model","language":"fr","context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+    window = Window(meetings, "fr_FR.UTF-8", settings)
+    speeds = window.file.parent / "speeds.json"
+    speeds.write_text(measured)
+    kept = lambda: json.loads(speeds.read_text())
+    idle = "return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null && m.transcripts_waiting.length === 0)"
+    with window as browser:
+        try:
+            gates[0].touch()
+            browser.execute_script(f"location.hash = '#/meeting/{secret.name}'")
+            wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", secret.name)
+            heard = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == "Transcription en cours", 10)
+            time.sleep(2)
+            got = browser.execute_script(bar)
+            check("fr, a confidential meeting: while its transcript is made, its summary's model not known yet: no number left (D92)",
+                  heard and got is not None and got["left"] == "", got)
+            gates[0].unlink()
+            wait_for(browser, lambda b: b.execute_script(idle), 15)
+            before = kept()
+            (WORK / "fail-hearing").touch()
+            browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", failing.name)
+            failed = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('makings').then(m => arguments[0] in m.transcripts_failed)", failing.name), 15)
+            check("fr, a transcript that fails: not measured, the speed kept before left as it was (D92)",
+                  failed and kept()["transcript"] == before["transcript"], [failed, before, kept()])
+            (WORK / "fail-hearing").unlink()
+            (WORK / "fail-minutes").touch()
+            browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", written.name)
+            failed = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('makings').then(m => arguments[0] in m.failed)", written.name), 15)
+            check("fr, a summary that fails: not measured, the speed kept before left as it was (D92)",
+                  failed and kept()["minutes"] == before["minutes"], [failed, before, kept()])
+        finally:
+            for gate in gates:
+                gate.unlink(missing_ok=True)
+            (WORK / "fail-hearing").unlink(missing_ok=True)
+            (WORK / "fail-minutes").unlink(missing_ok=True)
 
 
 def meeting_trashed(now: dt.datetime) -> None:
