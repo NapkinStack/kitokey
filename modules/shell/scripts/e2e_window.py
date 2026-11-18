@@ -279,12 +279,20 @@ def choose(browser, element_id: str, value: str) -> None:
     Select(browser.find_element(By.ID, element_id)).select_by_value(value)
 
 
-def typed(browser, element_id: str, text: str) -> None:
+def typed(browser, element_id: str, text: str) -> bool:
     """Text typed in a field of the page once it is drawn, shown and enabled — a choice just made
-    draws its fields anew, and one not yet there cannot take the focus (#901)."""
+    draws its fields anew, and one not yet there cannot take the focus (#901). A field that never
+    comes is a FAIL naming it and what was there — absent, hidden or disabled —, nothing typed, never
+    an exception that stops the shard (#907): False, for its caller to stop where nothing could hold."""
     ready = lambda b: any(f.is_displayed() and f.is_enabled() for f in b.find_elements(By.ID, element_id))
-    wait_for(browser, ready, 10)
+    if not wait_for(browser, ready, 10):
+        seen = browser.execute_script(
+            "const f = document.getElementById(arguments[0]);"
+            " return f ? {shown: f.getClientRects().length > 0, disabled: f.disabled} : 'absent'", element_id)
+        check(f"the field « {element_id} » comes, shown and enabled, to be typed in", False, seen)
+        return False
     browser.find_element(By.ID, element_id).send_keys(text)
+    return True
 
 
 def press(browser, element_id: str) -> None:
@@ -6531,7 +6539,8 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "minutes-online")
             wait_for(browser, lambda b: b.execute_script(options, "minutes-service"), 5)
             choose(browser, "minutes-service", "0")
-            typed(browser, "minutes-key", good)
+            if not typed(browser, "minutes-key", good):
+                return
             press(browser, "minutes-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
             choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
@@ -6542,7 +6551,8 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "transcription-online")
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            typed(browser, "transcription-key", heard)
+            if not typed(browser, "transcription-key", heard):
+                return
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
             choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
