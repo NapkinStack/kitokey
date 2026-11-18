@@ -88,7 +88,11 @@ pub fn fetch(address: &str, key: Option<&str>) -> Result<Vec<Listed>, String> {
 /// again — an HTTP error, a body cut while read, a timeout (#869).
 fn answered(agent: &ureq::Agent, address: &str, limit: usize, again: bool) -> Result<String, String> {
     let mut answer = match agent.get(address).call() {
-        Err(ureq::Error::Io(_)) if again => agent.get(address).call(),
+        Err(ureq::Error::Io(error)) if again => {
+            // Said, so that a retry that works never hides a network that cuts (operations, OPS1).
+            tracing::info!(detail = %error, "shell.registry_asked_again");
+            agent.get(address).call()
+        }
         first => first,
     }
     .map_err(|error| format!("could not be read ({error})"))?;
