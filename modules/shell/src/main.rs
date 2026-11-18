@@ -4416,12 +4416,22 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
     *running = Some(transcription);
     *shell.transcript_token.lock().unwrap() = Some(cancel.clone());
     hearing(&shell, &folder, &hearer);
+    // Its summary follows, as the settings say now: the page's one bar has two parts (D92).
+    *shell.hearing_then.lock().unwrap() = settings.after == settings::After::Minutes;
     transcribing(app, true);
     let heard_folder = folder;
     let app = app.clone();
     std::thread::spawn(move || {
         let made = made.recv().unwrap_or(Made::Failed(String::new()));
         let shell = app.state::<Shell>();
+        // The minutes follow, when the settings say so — as they are now. Written, they do: between
+        // the two steps before the transcript is said ended (D92).
+        let follows = matches!(made, Made::Written(_))
+            && !cancel.cancelled()
+            && shell.reread().is_ok_and(|settings| settings.after == settings::After::Minutes);
+        if follows {
+            shell.between.lock().unwrap().insert(heard_folder.clone());
+        }
         let mut running = shell.transcription.lock().unwrap();
         running.take();
         shell.transcript_token.lock().unwrap().take();
@@ -4439,6 +4449,7 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
         // Ended for its meeting said confidential: made again here, first in line; cancelled,
         // nothing told, nothing made after it.
         if here != Heard::Ended {
+            shell.between.lock().unwrap().remove(&heard_folder);
             return transcribe_next(&app);
         }
         // Written all the same after « Annuler »: kept, being whole, but nothing follows it — no
@@ -4449,9 +4460,9 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
         let notice = words::made(&made, shell.language());
         match made {
             Made::Written(folder) => {
-                // The minutes follow, when the settings say so — as they are now; then their
+                // The minutes follow, when the settings said so as it ended; then their
                 // notification alone says the meeting is made (D44, D92).
-                if shell.reread().is_ok_and(|settings| settings.after == settings::After::Minutes) {
+                if follows {
                     make_minutes(&app, folder);
                 } else {
                     tell_made(&app, &notice, &folder, true);
