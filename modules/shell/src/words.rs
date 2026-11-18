@@ -661,18 +661,18 @@ pub struct Window {
     /// its name. When: the model is on this computer. At most: one line. Placeholders: {} its size.
     pub installed: &'static str,
     /// Another number of days, typed; and what is said of one that is none.
-    /// Shows: Settings, « Général », that list's last choice, then the field it opens. When:
-    /// always. At most: one line. Placeholders: none.
+    /// Shows: Settings, « Après un enregistrement », that list's last choice, then the field it
+    /// opens. When: always. At most: one line. Placeholders: none.
     pub keep_other: &'static str,
-    /// Shows: Settings, « Général », under that field. When: what is typed is no number of days the
-    /// file allows. At most: no limit. Placeholders: {} what was typed.
+    /// Shows: Settings, « Après un enregistrement », under that field. When: what is typed is no
+    /// number of days the file allows. At most: no limit. Placeholders: {} what was typed.
     pub keep_not_days: &'static str,
     /// The engine that hears, shipped with Kitokey; and the user's home, as a folder is said.
     /// Shows: Settings, « Modèles », the transcription's step, a tag beside Whisper, built into
     /// Kitokey. When: always. At most: one line. Placeholders: none.
     pub builtin: &'static str,
-    /// Shows: Settings, « Général », the folder's path, in place of the user's home. When: the
-    /// folder is in it. At most: one line. Placeholders: none.
+    /// Shows: Settings, « Après un enregistrement », the folder's path, in place of the user's
+    /// home. When: the folder is in it. At most: one line. Placeholders: none.
     pub home: &'static str,
     /// Shows: Settings, « Modèles », the transcription's step, its label. When: always. At most:
     /// one line. Placeholders: none.
@@ -701,8 +701,8 @@ pub struct Window {
     /// Windows' settings, or by a policy (D84). When: on Windows, the switch held. At most: no
     /// limit. Placeholders: none.
     pub autostart_held: [&'static str; 2],
-    /// Shows: Settings, « Général », a list: its name, then its line under it. When: always. At
-    /// most: one line for the name, the line wraps. Placeholders: none.
+    /// Shows: Settings, « Après un enregistrement », a list: its name, then its line under it.
+    /// When: always. At most: one line for the name, the line wraps. Placeholders: none.
     pub keep_audio: [&'static str; 2],
     /// The settings' last group: Kitokey itself, as GNOME's preferences name it (D95).
     /// Shows: Settings, as a heading. When: always. At most: no limit. Placeholders: none.
@@ -767,11 +767,11 @@ pub struct Window {
     pub diagnostic_empty: &'static str,
     pub diagnostic_not_copied: &'static str,
     /// The folder the sessions go to, and the button that opens the system's dialog for it.
-    /// Shows: Settings, « Général », a row: its name, then its line under it. When: always. At
-    /// most: one line for the name, the line wraps. Placeholders: none.
+    /// Shows: Settings, « Après un enregistrement », a row: its name, then its line under it. When:
+    /// always. At most: one line for the name, the line wraps. Placeholders: none.
     pub sessions_folder: [&'static str; 2],
-    /// Shows: Settings, « Général », the folder's button: the system's dialog. When: always. At
-    /// most: one line. Placeholders: none.
+    /// Shows: Settings, « Après un enregistrement », the folder's button: the system's dialog.
+    /// When: always. At most: one line. Placeholders: none.
     pub choose: &'static str,
     /// The recording bar, its icon in the sidebar's foot (D89), what it says (D90).
     pub small: &'static str,
@@ -1022,12 +1022,12 @@ pub struct Window {
     /// Shows: Settings, « Modèles », the summary's step, beside « Tester », said by the shell.
     /// When: the model did not answer. At most: no limit. Placeholders: {} the failure's sentence.
     pub test_failed: &'static str,
-    /// Shows: Settings, « Général », that list's first choice. When: always. At most: one line.
-    /// Placeholders: none.
+    /// Shows: Settings, « Après un enregistrement », that list's first choice. When: always. At
+    /// most: one line. Placeholders: none.
     pub keep_always: &'static str,
     /// A number of days the audio is kept.
-    /// Shows: Settings, « Général », that list's choices. When: always. At most: one line.
-    /// Placeholders: {} a number of days.
+    /// Shows: Settings, « Après un enregistrement », that list's choices. When: always. At most:
+    /// one line. Placeholders: {} a number of days.
     pub keep_days: &'static str,
     /// The settings file could not be read: why.
     /// A change could not be saved: why.
@@ -1103,7 +1103,7 @@ pub struct Window {
     /// most: one line. Placeholders: none.
     pub welcome_skip: &'static str,
     /// Shows: the first run's assistant (D58), a link under its first step. When: opened again from
-    /// Settings, « Modèles ». At most: one line. Placeholders: none.
+    /// Settings, « Général ». At most: one line. Placeholders: none.
     pub welcome_cancel: &'static str,
     /// Shows: the first run's assistant (D58), its button to the next step. When: its first two
     /// steps. At most: one line. Placeholders: none.
@@ -1176,7 +1176,7 @@ pub struct Window {
     /// Shows: the first run's assistant (D58), its last step's button: to Settings' summary choice.
     /// When: a service writes the summary. At most: one line. Placeholders: none.
     pub welcome_choose: &'static str,
-    /// Shows: Settings, « Modèles », the row that opens the first run's assistant (D58) again: its
+    /// Shows: Settings, « Général », the row that opens the first run's assistant (D58) again: its
     /// name, then its line under it. When: always. At most: one line for the name, the line wraps.
     /// Placeholders: none.
     pub welcome_again: [&'static str; 2],
