@@ -1827,6 +1827,13 @@ def first_run(now: dt.datetime) -> None:
               shown and "Vos réunions ne quittent pas cet ordinateur." in said and "Transcription" in said and "Whisper large v3 turbo" in said
               and "Compte rendu" in said and "Qwen3 8b" in said and "Rappel" in said and "ggml" not in said, said)
         check("Ollama not answering: the minutes wait for it, with ollama.com", "ollama.com" in said, said)
+        # #781: Ollama asked again from where it is said missing; « Plus tard » says what it leaves waiting.
+        again = browser.execute_script("const b = document.getElementById('welcome-ollama-again');"
+                                       " return b ? [b.tagName, b.textContent, b.closest('.welcome-wait')?.textContent.includes('ollama.com') ?? false] : null")
+        check("Ollama not answering: « Réessayer » beside ollama.com, a button (#781)", again == ["BUTTON", "Réessayer", True], again)
+        later = browser.find_element(By.ID, "welcome-later").text
+        check("the model missing: « Plus tard » says the meetings will wait for it (#781)",
+              later == "Plus tard — vos réunions attendront le modèle", later)
         check("the model missing: offered with its size and host",
               "Télécharger le modèle (874 Mo)" in said.replace(" Mo", " Mo") and "Depuis huggingface.co, vérifié avant d’être utilisé." in said, said)
         check("nothing is saved before the last screen", "minutes_provider" not in window.file.read_text(), window.file.read_text())
@@ -1836,6 +1843,57 @@ def first_run(now: dt.datetime) -> None:
         check("Plus tard: saved private, the meetings opened, the model left unfetched",
               listed and 'minutes_model = "qwen3:8b"' in window.file.read_text() and not (WORK / "data-welcome-private" / "kitokey" / "models").exists(),
               window.file.read_text())
+
+    # 2b. Ollama started while the summary shows (#781): « Réessayer » asks it again, the summary said anew.
+    class Late(http.server.BaseHTTPRequestHandler):
+        up = False
+
+        def do_GET(self):
+            body = json.dumps({"models": []}).encode()
+            try:
+                self.send_response(200 if Late.up else 503)
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                pass
+
+        def log_message(self, *_):
+            pass
+
+    late = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Late)
+    threading.Thread(target=late.serve_forever, daemon=True).start()
+    try:
+        window = started("ollama-late", ollama=f"http://127.0.0.1:{late.server_address[1]}")
+        with window as browser:
+            until_question(browser)
+            press(browser, "welcome-next")
+            silent = wait_for(browser, lambda b: "ollama.com" in b.execute_script(summary), 5)
+            # The ask itself refused: logged with its kind, never silent (D29), the summary as it was.
+            browser.execute_script(
+                "const t = window.__TAURI__, core = t.core; window.logged = [];"
+                " const refusing = Object.assign(Object.create(Object.getPrototypeOf(core)), core, { invoke: (asked, rest, options) => {"
+                "   if (asked === 'page_failed') { window.logged.push(rest); return Promise.resolve(null); }"
+                "   if (asked === 'minutes_shown') return Promise.reject(Object.assign(new Error('refused'), { name: 'ScenarioY' }));"
+                "   return core.invoke(asked, rest, options); } });"
+                " const put = (top) => { try { window.__TAURI__ = top; } catch (x) {}"
+                "   if (window.__TAURI__ !== top) Object.defineProperty(window, '__TAURI__', { configurable: true, writable: true, value: top }); };"
+                " put(Object.assign({}, t, { core: refusing })); window.restoreCore = () => put(t);")
+            press(browser, "welcome-ollama-again")
+            logged = wait_for(browser, lambda b: b.execute_script("return window.logged.length") > 0, 5)
+            kept = wait_for(browser, lambda b: "ollama.com" in b.execute_script(summary) and b.find_elements(By.ID, "welcome-ollama-again"), 5)
+            check("« Réessayer », the ask refused: logged with its kind, the summary as it was, « Réessayer » still offered (#781)",
+                  logged and kept and browser.execute_script("return window.logged")[0]["kind"] == "ScenarioY",
+                  [browser.execute_script("return window.logged"), browser.execute_script(summary)])
+            browser.execute_script("window.restoreCore()")
+            Late.up = True
+            press(browser, "welcome-ollama-again")
+            answered = wait_for(browser, lambda b: "Ollama n’a pas encore qwen3:8b" in b.execute_script(summary), 5)
+            said = browser.execute_script(summary)
+            check("Ollama started, then « Réessayer »: the summary says it answers, without its model — no ollama.com, no Réessayer (#781)",
+                  silent and answered and "ollama.com" not in said and not browser.find_elements(By.ID, "welcome-ollama-again"), said)
+    finally:
+        late.shutdown()
 
     # 3. Rarely, then a service: connected, chosen in Settings.
     window = started("service")
@@ -1936,6 +1994,9 @@ def first_run(now: dt.datetime) -> None:
         press(browser, "welcome-next")
         wait_for(browser, lambda b: "Private mode" in b.execute_script(summary), 5)
         check("Next with nothing chosen is private", "Private mode" in browser.execute_script(summary), browser.execute_script(summary))
+        english = [browser.find_element(By.ID, i).text for i in ("welcome-later", "welcome-ollama-again")]
+        check("in English: « Later » says what waits, « Try again » beside ollama.com (#781)",
+              english == ["Later — your meetings will wait for the model", "Try again"], english)
         seen(browser, "d58-3-summary-private-dark")
         press(browser, "welcome-back")
         until_question(browser)
@@ -1989,6 +2050,8 @@ def first_run(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_element(By.ID, "welcome-go").text != "", 2)
         done = browser.find_element(By.ID, "welcome-go").text
         check("the model here: Terminer, no fetch offered", done == "Terminer" and "Télécharger" not in said, (done, said))
+        later = browser.find_element(By.ID, "welcome-later").text
+        check("the model here: « Plus tard » alone, nothing said to wait for it (#781)", later == "Plus tard", later)
         browser.set_window_size(420, 400)
         time.sleep(0.5)
         check("its last screen, private, at the smallest size: nothing overflows sideways", done == "Terminer" and wide(browser))

@@ -4483,7 +4483,9 @@ let focusLanguage = false;
 async function showWelcome(again, words) {
   const page = document.getElementById("welcome");
   const { invoke } = window.__TAURI__.core;
-  const [shown, minutes] = await Promise.all([invoke("settings_shown"), invoke("minutes_shown")]);
+  const [shown, minutesFirst] = await Promise.all([invoke("settings_shown"), invoke("minutes_shown")]);
+  // Asked again by « Réessayer » when Ollama does not answer (#781).
+  let minutes = minutesFirst;
   // Apple's SpeechAnalyzer, asked aside: only the summary needs it.
   const speech = invoke("speech_shown").catch(() => null);
   const local = !minutes.provider || minutes.provider_local;
@@ -4620,10 +4622,25 @@ async function showWelcome(again, words) {
     fact(reminder, shown.reminder ? words.welcome_reminder_on : words.welcome_reminder_off);
     made.append(mode, facts);
     // The minutes wait for Ollama: said, with where it comes from — Kitokey never installs it.
-    if (!online && !minutes.ollama_answers) made.append(element("p", "says welcome-wait", words.welcome_ollama_silent));
-    else if (!online && !minutes.ollama.includes(ollamaModel)) made.append(element("p", "says welcome-wait", fill(words.welcome_ollama_lacks, ollamaModel)));
+    if (!online && !minutes.ollama_answers) {
+      // Asked again on a click, as a meeting's page does: Ollama started meanwhile, the summary said anew (#781).
+      const again = button("welcome-ollama-again", "open", words.try_again, async () => {
+        waiting(again, true);
+        // Read at the click, as the pages read it, not the `invoke` the welcome took at its start.
+        minutes = await window.__TAURI__.core.invoke("minutes_shown").catch((why) => {
+          pageFailed(why);
+          return minutes;
+        });
+        await draw();
+      });
+      const wait = element("p", "says welcome-wait", words.welcome_ollama_silent);
+      wait.append(" ", again);
+      made.append(wait);
+    } else if (!online && !minutes.ollama.includes(ollamaModel)) made.append(element("p", "says welcome-wait", fill(words.welcome_ollama_lacks, ollamaModel)));
     const actions = element("div", "welcome-actions");
-    const later = button("welcome-later", "link", words.welcome_later, async () => {
+    // The model still to fetch: « Plus tard » says the meetings will wait for it (#781).
+    const waits = (engine === "speechanalyzer" && status?.offered && !status.installed) || (engine === "whisper" && fetchable);
+    const later = button("welcome-later", "link", waits ? words.welcome_later_waits : words.welcome_later, async () => {
       if (await save()) done();
     });
     let primary;
