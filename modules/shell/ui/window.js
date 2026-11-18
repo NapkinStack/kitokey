@@ -5107,7 +5107,7 @@ window.addEventListener("blur", () => {
 });
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
 function placeOf() {
-  const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [] };
+  const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [], before: [] };
   const at = document.activeElement;
   const focused = at && at !== document.body && at.id && at.closest("#meeting, #settings") ? at : null;
   const changed = changedLast && Date.now() - changedLast.at < 5000 ? document.getElementById(changedLast.id) : null;
@@ -5116,10 +5116,16 @@ function placeOf() {
   place.id = control.id;
   // Its boxes with an id, nearest first: where a control the change removed was.
   for (let up = control.parentElement; up && up.id !== "meeting" && up.id !== "settings"; up = up.parentElement) if (up.id) place.near.push(up.id);
+  // The controls with an id before it in the page, nearest first: where the focus goes when it is gone and no
+  // box of its own is found (WAI-ARIA APG: content removed, the focus to its logical predecessor; #944).
+  const page = control.closest("#meeting, #settings");
+  const controls = page ? [...page.querySelectorAll(FOCUSABLE)].filter((one) => one.id) : [];
+  place.before = controls.slice(0, Math.max(controls.indexOf(control), 0)).slice(-3).reverse().map((one) => one.id);
   return place;
 }
 // Drawn again at the same address: the focus back on the same control — or, removed, on the first one
-// in the nearest box left that holds one —, the page where it was. A focus the user moved meanwhile stays.
+// in the nearest box left that holds one, else on the control before it —, the page where it was. A focus
+// the user moved meanwhile stays.
 function placeBack(place) {
   if (place.address === null || place.address !== location.hash) return;
   if (place.id !== null && (document.activeElement === null || document.activeElement === document.body)) {
@@ -5130,6 +5136,8 @@ function placeBack(place) {
       if (target) break;
       target = [...(document.getElementById(id)?.querySelectorAll(FOCUSABLE) ?? [])].find((control) => control.getClientRects().length) ?? null;
     }
+    // No box of its own holds one: the control before it in the page (« Garder … jours » gone, its list).
+    target ??= place.before.map((id) => document.getElementById(id)).find((one) => one?.getClientRects().length && !one.disabled) ?? null;
     // None left to take it: the nearest box still there, focused itself — never the page's start.
     target ??= place.near.map((id) => document.getElementById(id)).find((box) => box?.getClientRects().length) ?? null;
     // A box — the one focused before, drawn anew, too — takes the focus by script alone.
