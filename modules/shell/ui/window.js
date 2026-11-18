@@ -4665,6 +4665,13 @@ for (const type of ["change", "input"]) {
     if (clicked && (document.activeElement === null || document.activeElement === document.body)) changed.focus({ preventScroll: true });
   }, true);
 }
+// The places of the drawings under way: the user moving the focus meanwhile moves where each one gives it
+// back (#906) — read when the drawing began, a place the user has since left is no place to return to.
+const placesPending = new Set();
+document.addEventListener("focusin", (event) => {
+  if (placesPending.size === 0 || !(event.target instanceof Element) || !event.target.closest("#meeting, #settings")) return;
+  for (const place of placesPending) Object.assign(place, placeOf());
+}, true);
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
 function placeOf() {
   const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [] };
@@ -4705,8 +4712,11 @@ function placeBack(place) {
 async function refresh(again = false) {
   const mine = ++drawing;
   const place = placeOf();
+  placesPending.add(place);
   try {
     const drawn = await draw(mine, again);
+    // Followed no more: the focus `placeBack` gives is its own, never a move of the user's.
+    placesPending.delete(place);
     if (mine === drawing) {
       placeBack(place);
       drawnAddress = location.hash;
@@ -4727,6 +4737,8 @@ async function refresh(again = false) {
       }
     }
     throw why;
+  } finally {
+    placesPending.delete(place);
   }
 }
 
