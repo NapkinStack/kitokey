@@ -8,11 +8,26 @@ const MAIN: &str = include_str!("../src/main.rs");
 
 /// The body of `fn <name>(`, to its closing brace at the start of a line.
 fn body(name: &str) -> &'static str {
-    let start = MAIN
+    body_in(MAIN, name)
+}
+
+fn body_in<'a>(source: &'a str, name: &str) -> &'a str {
+    let start = source
         .find(&format!("\nfn {name}("))
         .unwrap_or_else(|| panic!("no fn {name} in main.rs"));
-    let end = MAIN[start..].find("\n}\n").expect("the function's end") + start;
-    &MAIN[start..end]
+    let end = source[start..]
+        .match_indices("\n}")
+        .map(|(at, _)| at + start)
+        .find(|&at| source[at + 2..].starts_with('\n') || source[at + 2..].starts_with("\r\n"))
+        .expect("the function's end");
+    &source[start..end]
+}
+
+/// Windows' checkout writes `\r\n` (CI, run 44217193636): a function ends there all the same.
+#[test]
+fn a_function_ends_at_its_brace_whatever_the_line_ends() {
+    let source = "use x;\r\n\r\nfn tell_made(a: u8) {\r\n    a;\r\n}\r\n\r\nfn other() {}\r\n";
+    assert_eq!(body_in(source, "tell_made"), "\nfn tell_made(a: u8) {\r\n    a;\r");
 }
 
 #[test]
