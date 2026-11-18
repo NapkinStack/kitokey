@@ -6246,9 +6246,9 @@ def redo_choice_starts_nothing(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
             # The one button that starts names the making and the model, as chosen (D96, criterion 2).
             go = lambda b: b.find_element(By.ID, "redo-do").text
-            named = go(browser)
+            said = go(browser)
             check("on the page: the button that starts names the making and its model — Settings' at first (D96)",
-                  named == "Refaire le compte rendu avec Qwen3 14b", named)
+                  said == "Refaire le compte rendu avec Qwen3 14b", said)
             redo_pick(browser, "redo-panel", "minutes", 1)
             picked = browser.execute_script("const p = document.getElementById('redo-panel-minutes-model'); return p ? p.value : ''")
             renamed = wait_for(browser, lambda b: go(b) == "Refaire le compte rendu avec Mistral 7b", 3)
