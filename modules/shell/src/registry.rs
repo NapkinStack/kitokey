@@ -70,9 +70,10 @@ pub fn fetch(address: &str, key: Option<&str>) -> Result<Vec<Listed>, String> {
         .max_redirects(0)
         .build()
         .into();
-    let text = answered(&agent, address, LIMIT).map_err(|why| format!("the list {why}"))?;
+    let text = answered(&agent, address, LIMIT, false).map_err(|why| format!("the list {why}"))?;
+    // Asked on the connection the list came by, which a network or a proxy may have cut (#869).
     let signature =
-        answered(&agent, &format!("{address}.minisig"), SIGNATURE_LIMIT).map_err(|why| format!("the list's signature {why}"))?;
+        answered(&agent, &format!("{address}.minisig"), SIGNATURE_LIMIT, true).map_err(|why| format!("the list's signature {why}"))?;
     // Nothing of the list is read before it is known to be the decider's.
     verify(&text, &signature, key)?;
     let listed = read(&text)?;
@@ -82,9 +83,15 @@ pub fn fetch(address: &str, key: Option<&str>) -> Result<Vec<Listed>, String> {
     Ok(listed)
 }
 
-/// The text `address` answers, read up to one byte over `limit`.
-fn answered(agent: &ureq::Agent, address: &str, limit: usize) -> Result<String, String> {
-    let mut answer = agent.get(address).call().map_err(|error| format!("could not be read ({error})"))?;
+/// The text `address` answers, read up to one byte over `limit`. With `again`, asked once more when
+/// the connection was cut before any answer came: a GET, nothing done twice. Nothing else is asked
+/// again — an HTTP error, a body cut while read, a timeout (#869).
+fn answered(agent: &ureq::Agent, address: &str, limit: usize, again: bool) -> Result<String, String> {
+    let mut answer = match agent.get(address).call() {
+        Err(ureq::Error::Io(_)) if again => agent.get(address).call(),
+        first => first,
+    }
+    .map_err(|error| format!("could not be read ({error})"))?;
     let status = answer.status().as_u16();
     if status != 200 {
         return Err(format!("could not be read (HTTP {status})"));
