@@ -29,6 +29,7 @@ pub mod sessions;
 pub mod settings;
 pub mod sound_check;
 pub mod speech;
+pub mod speeds;
 pub mod spoken;
 pub mod summarising;
 pub mod transcription;
