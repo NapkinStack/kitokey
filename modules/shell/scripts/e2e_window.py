@@ -5543,10 +5543,10 @@ def focus_swept(now: dt.datetime) -> None:
         if not (models / name).exists():
             (models / name).write_bytes(b"x" * 1000)
 
-    # Ollama's stand-in: two models, so that the minutes' model on this computer can be changed.
+    # Ollama's stand-in, as a computer that uses it holds it: several models (#944, the coordinator's lead 2).
     class Tags(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
-            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            body = json.dumps({"models": [{"name": name} for name in ("qwen3:14b", "mistral:7b", "llama3.2:3b", "gemma3:12b")]}).encode()
             try:
                 self.send_response(200)
                 self.send_header("content-length", str(len(body)))
@@ -5561,9 +5561,11 @@ def focus_swept(now: dt.datetime) -> None:
     tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
     threading.Thread(target=tags.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{tags.server_address[1]}"
-    # Where the focus is and how far the page is scrolled, as BS reads them.
+    # Where the focus is and how far the page is scrolled, as BS reads them; and how far it can be scrolled,
+    # which says whether a move is the page cut shorter under the window.
     where = ("const a = document.activeElement;"
-             " return [!a || a === document.body ? 'body' : a.id || ('no id: ' + a.tagName.toLowerCase() + '.' + a.className), Math.round(scrollY)]")
+             " return [!a || a === document.body ? 'body' : a.id || ('no id: ' + a.tagName.toLowerCase() + '.' + a.className), Math.round(scrollY),"
+             " Math.round(document.scrollingElement.scrollHeight - innerHeight)]")
     # Every control of Settings a user can change now: shown, enabled, with an id (BS holds that each has one).
     listing = ("return [...document.querySelectorAll('#settings select, #settings input')].filter((c) => c.id && c.getClientRects().length"
                " && !c.disabled && c.getAttribute('aria-disabled') !== 'true' && !c.readOnly"
@@ -5579,15 +5581,17 @@ def focus_swept(now: dt.datetime) -> None:
     watch = ("if (!window.__swept) { window.__swept = true; window.__quiet = performance.now();"
              " new MutationObserver(() => { window.__quiet = performance.now(); }).observe(document.body,"
              " {childList: true, subtree: true, attributes: true, characterData: true});"
-             " window.__moves = [];"
+             " window.__moves = []; window.__drawn = 0; const drawn = window.refresh;"
+             " window.refresh = async (...asked) => { window.__drawn++; return drawn(...asked); };"
              " document.addEventListener('focusin', (e) => window.__moves.push(e.target.id || e.target.tagName.toLowerCase()), true);"
              " document.addEventListener('focusout', (e) => { if (!e.relatedTarget) window.__moves.push('left ' + (e.target.id || e.target.tagName.toLowerCase())); }, true); }")
     opened = ("let n = 0; for (const b of document.querySelectorAll('#settings button[aria-expanded=false]'))"
               " if (b.getClientRects().length && !b.disabled) { b.click(); n++; } return n")
 
     def settle(browser) -> bool:
-        """Once the change has had time to be saved, every drawing it brings over: the page still for 1.2 s."""
-        time.sleep(0.8)
+        """Once the change has had time to be saved, every drawing it brings over: 5 s at least — the answers
+        a real Kitokey waits for come later than a stand-in's (#944, lead 1) —, then the page still for 1.2 s."""
+        time.sleep(5)
         return wait_for(browser, lambda b: b.execute_script("return performance.now() - window.__quiet") > 1200, 8)
 
     def click(browser, element_id: str) -> None:
@@ -5619,8 +5623,11 @@ def focus_swept(now: dt.datetime) -> None:
                 return None
             other = control["index"] - 1 if control["index"] == control["options"] - 1 else control["index"] + 1
             if mouse:
-                browser.execute_script("document.activeElement?.blur()")
+                # A list chosen by the mouse opens GTK's own menu, a window of its own: Kitokey's loses the
+                # system's focus and gets it back once it closes — which the driver's choice does not do.
+                browser.execute_script("document.activeElement?.blur(); window.dispatchEvent(new FocusEvent('blur'))")
                 Select(browser.find_element(By.ID, cid)).select_by_index(other)
+                browser.execute_script("window.dispatchEvent(new FocusEvent('focus'))")
             else:
                 browser.execute_script("document.getElementById(arguments[0]).focus()", cid)
                 ActionChains(browser).send_keys(Keys.ARROW_UP if other < control["index"] else Keys.ARROW_DOWN).perform()
@@ -5672,7 +5679,7 @@ def focus_swept(now: dt.datetime) -> None:
                         done.add(key)
                         if mouse and control["kind"] == "field":
                             continue
-                        browser.execute_script("document.getElementById(arguments[0]).scrollIntoView({block: 'center'}); window.__moves = []", control["id"])
+                        browser.execute_script("document.getElementById(arguments[0]).scrollIntoView({block: 'center'}); window.__moves = []; window.__drawn = 0", control["id"])
                         time.sleep(0.4)
                         before = browser.execute_script(where)
                         try:
@@ -5689,7 +5696,8 @@ def focus_swept(now: dt.datetime) -> None:
                             expected = next((rid for rid, on in browser.execute_script(radios, key) if on), "a radio of " + key)
                         check(f"{short}, {how}: #{key} ({control['kind']}) changed, the focus kept on #{expected}, the page where it was (#944, D101)",
                               after[0] == expected and abs(after[1] - before[1]) <= 1,
-                              {"before": before, "after": after, "still": quiet, "focus moves": browser.execute_script("return window.__moves")})
+                              {"before": before, "after": after, "still": quiet, "focus moves": browser.execute_script("return window.__moves"),
+                               "drawn": browser.execute_script("return window.__drawn")})
                         if control["kind"] == "field":
                             browser.execute_script("document.getElementById(arguments[0])?.focus()", control["id"])
                             ActionChains(browser).send_keys(Keys.BACK_SPACE).perform()
