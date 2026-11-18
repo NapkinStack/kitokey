@@ -5411,10 +5411,13 @@ def page_estimate(now: dt.datetime) -> None:
         except (OSError, ValueError):
             read = None
         number = lambda value: isinstance(value, (int, float)) and value >= 0
+        # Measured anew, not the speeds written before the run: each one another number than it was.
+        before = json.loads(kept) if kept is not None and kept.startswith("{\"") else {}
+        anew = read is not None and all(read.get(step, {}).get(name) != speed for step, speeds_ in before.items() for name, speed in speeds_.items())
         check(f"{case}: each step written is measured, kept beside the settings by step and model, nothing of the meeting (D92)",
               read is not None and sorted(read) == ["minutes", "transcript"] and list(read["transcript"]) == [model.name]
               and list(read["minutes"]) == ["mistral"] and all(number(v) for step in read.values() for v in step.values())
-              and meeting.name not in speeds.read_text(), read)
+              and anew and meeting.name not in speeds.read_text(), [read, before])
 
 
 def meeting_trashed(now: dt.datetime) -> None:
