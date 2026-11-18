@@ -296,9 +296,8 @@ function languageRow(save, language, languages, words, settled, apple, system, i
       said.textContent = "";
     } catch (why) {
       pick.value = kept;
-      const refused = fill(words.language_not_saved, why);
-      if (held !== null) languageRefused = { name: held, said: refused };
-      said.textContent = refused;
+      said.textContent = fill(words.language_not_saved, why);
+      if (held !== null) languageRefused = { name: held, said: said.textContent };
     }
   });
   // Its value and a chevron, as board 4 draws the list: the system's own box not drawn.
