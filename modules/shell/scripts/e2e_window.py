@@ -4893,6 +4893,12 @@ def bar_after_stop(now: dt.datetime) -> None:
         ActionChains(browser).send_keys(*pressed).perform()
         time.sleep(0.2)
 
+    def running(browser) -> bool:
+        """Recording, its time past 00:00:00: a second at least since the start, past the 500 ms in which the
+        shell takes a second press for the same one (`toggle_recording`)."""
+        return wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed()
+                        and b.find_element(By.CSS_SELECTOR, "#small .time").text not in ("", "00:00:00"), 10)
+
     def to(browser, target: str) -> bool:
         for _ in range(16):
             if browser.execute_script(focused) == target:
@@ -4926,7 +4932,7 @@ def bar_after_stop(now: dt.datetime) -> None:
             try:
                 # Started and stopped by the keyboard alone.
                 keys(browser, Keys.ENTER)
-                started = wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+                started = running(browser)
                 stopped = to(browser, "small-stop")
                 keys(browser, Keys.ENTER)
                 rest = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
@@ -4965,8 +4971,9 @@ def bar_after_stop(now: dt.datetime) -> None:
                 # is made: nothing said of it while that one records (D92).
                 (WORK / "fail-minutes").touch()
                 gates[0].touch()
-                record = lambda: (browser.execute_script("document.getElementById('small-record').focus()"), keys(browser, Keys.ENTER),
-                                  wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10))[2]
+                # Pressed 0.6 s after the gesture before at least: never inside the shell's 500 ms.
+                record = lambda: (time.sleep(0.6), browser.execute_script("document.getElementById('small-record').focus()"),
+                                  keys(browser, Keys.ENTER), running(browser))[3]
                 stop = lambda: (to(browser, "small-stop"), keys(browser, Keys.ENTER),
                                 wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10))[2]
                 held = record() and stop() and wait_for(browser, lambda b: b.execute_script(said) == hearing, 10)
