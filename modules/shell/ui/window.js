@@ -1502,7 +1502,7 @@ function lineWith(said, pick, kind = "maker") {
 // meeting is offered none of a service. A choice starts nothing: kept as the meeting's own; `go`
 // starts the making, naming it — for a version, shown (`box`) only while another model is chosen.
 function modelOnPage(page, words, step, version, go, doing, fallback, box = go) {
-  const pick = element("select", "page-model");
+  let pick = element("select", "page-model");
   pick.id = `page-${step}-model`;
   pick.setAttribute("aria-label", step === "minutes" ? words.models_minutes : words.models_transcription);
   // Until the models are read: the version's own alone.
@@ -1558,7 +1558,7 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
     said.textContent = fill(words.models_not_read, why);
     said.hidden = false;
   });
-  pick.addEventListener("change", async () => {
+  const changed = async () => {
     if (!page.own) return;
     const chosen = { ...page.own, [step]: pick.value ? JSON.parse(pick.value) : null };
     try {
@@ -1568,12 +1568,15 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
       kept = pick.value;
       said.hidden = true;
     } catch (why) {
-      pick.value = kept;
+      // Put back as #926 puts the others: a fresh list, so the very model refused can be chosen again (#843).
+      pick = putBack(pick, kept);
+      pick.addEventListener("change", changed);
       said.textContent = fill(words.models_not_kept, why);
       said.hidden = false;
     }
     name();
-  });
+  };
+  pick.addEventListener("change", changed);
   name();
   return [pick, said];
 }
