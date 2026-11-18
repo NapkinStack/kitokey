@@ -4488,6 +4488,46 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def settings_narrow_without_model(now: dt.datetime) -> None:
+    """BU. Settings at 420 px on a Kitokey with no model on this computer (#868): the guided step for the
+    transcription — its way, the model's state and its offer — inside its card, nothing spilling; « Avancé »
+    unfolds by a click where the user sees it. In French and in English."""
+    print("BU. Settings at 420 px with no model on this computer: the guided step inside its card, « Avancé » unfolds by a click — French and English (#868)")
+    # What spills, and the children past it: the box measured, then what goes beyond its right edge.
+    past = ("const out = []; for (const e of document.querySelectorAll('#settings *')) {"
+            " if (!e.getClientRects().length || ['INPUT', 'SELECT', 'TEXTAREA', 'OPTION'].includes(e.tagName) || e.scrollWidth <= e.clientWidth + 1) continue;"
+            " const r = e.getBoundingClientRect(); out.push([e.id || e.className || e.tagName, Math.round(r.width), e.scrollWidth,"
+            " [...e.children].filter(c => c.getBoundingClientRect().right > r.right + 0.5).map(c => [c.id || c.className || c.tagName, Math.round(c.getBoundingClientRect().width)])]) }"
+            " return out.slice(0, 8)")
+    for short, language in (("fr", "fr_FR.UTF-8"), ("en", "en_GB.UTF-8")):
+        sessions = WORK / f"narrow-none-{short}"
+        sessions.mkdir()
+        window = Window(sessions, language)
+        # A data folder of its own: no model on this computer, whatever another scenario left.
+        window.env["XDG_DATA_HOME"] = str(WORK / f"narrow-none-data-{short}")
+        with window as browser:
+            browser.set_window_size(420, 900)
+            browser.execute_script("location.hash = '#/settings'")
+            drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "transcription-on-computer")
+                             and b.find_element(By.ID, "transcription-on-computer").is_displayed(), 10)
+            missing = browser.execute_script("return document.getElementById('model-state')?.dataset.missing ?? null")
+            over = browser.execute_script(SETTINGS_OVERFLOW)
+            check(f"{short}, 420 px, no model on this computer: the guided step inside its card, nothing spilling (#868)",
+                  drawn and missing == "true" and over == [], {"missing": missing, "over": over, "past": browser.execute_script(past)})
+            shot(browser, f"868-settings-420-{short}")
+            # « Avancé » as a person reaches it: scrolled to, then clicked where it shows.
+            toggle = browser.find_element(By.ID, "general-advanced")
+            browser.execute_script("arguments[0].scrollIntoView({block: 'center'})", toggle)
+            try:
+                ActionChains(browser).click(toggle).perform()
+                clicked = None
+            except Exception as why:  # noqa: BLE001 — the check says what stopped the click
+                clicked = type(why).__name__
+            opened = wait_for(browser, lambda b: b.find_element(By.ID, "general-advanced").get_attribute("aria-expanded") == "true"
+                              and b.find_element(By.ID, "developer").is_displayed(), 5)
+            check(f"{short}, 420 px, no model on this computer: « Avancé » unfolds by a click (#868)", clicked is None and opened,
+                  {"click": clicked, "expanded": toggle.get_attribute("aria-expanded")})
+
 def appearance_chosen(now: dt.datetime) -> None:
     """BP. D98: Settings' « Général » offers the appearance — « Système », « Clair », « Sombre » —; chosen,
     the window takes it at once, the other one than the system says — the system light, then dark —; kept across starts, the bar
@@ -10702,6 +10742,7 @@ def main() -> int:
     redo_choice_starts_nothing(now)
     redo_offers_the_services_models(now)
     settings_folded(now)
+    settings_narrow_without_model(now)
     appearance_chosen(now)
     focus_kept(now)
     meeting_trashed(now)
