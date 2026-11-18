@@ -351,3 +351,41 @@ fn a_transcript_says_when_it_was_made_whole_only_as_its_complete_line_writes_it(
         assert_eq!(made(complete), serde_json::Value::Null, "{complete}");
     }
 }
+
+/// What the making of a transcript took (D97, `transcript/v1`'s optional `made_in`, `cost` and
+/// `currency`), as the window reads them off its `complete` line: a time a JSON number at least zero,
+/// a cost and its currency both or neither, as `minutes/v3` bounds them; else none, the transcript read.
+#[test]
+fn a_transcript_says_how_long_it_took_and_what_it_cost_only_as_its_complete_line_writes_them() {
+    let folder = tempfile::tempdir().unwrap();
+    let header = r#"{"type":"header","contract":"transcript/v1","engine":"openai","model":"whisper-1","language":null,"context":null}"#;
+    let took = |complete: &str| {
+        fs::write(folder.path().join("transcript.jsonl"), format!("{header}\n{complete}\n")).unwrap();
+        let Read::Present(transcript) = meeting::transcript(folder.path()) else {
+            panic!("not read")
+        };
+        let read = serde_json::to_value(&transcript).unwrap();
+        assert_eq!(read["complete"], true, "{complete}");
+        (read["made_in"].clone(), read["cost"].clone(), read["currency"].clone())
+    };
+    let none = serde_json::Value::Null;
+    assert_eq!(
+        took(r#"{"type":"complete","duration":1.0,"made_in":40.2,"cost":0.0021,"currency":"USD"}"#),
+        (40.2.into(), 0.0021.into(), "USD".into())
+    );
+    assert_eq!(
+        took(r#"{"type":"complete","duration":1.0,"made_in":0}"#),
+        (0.0.into(), none.clone(), none.clone())
+    );
+    for complete in [
+        r#"{"type":"complete","duration":1.0}"#,
+        r#"{"type":"complete","duration":1.0,"made_in":-1,"cost":0.1}"#,
+        r#"{"type":"complete","duration":1.0,"made_in":"40","currency":"USD"}"#,
+        r#"{"type":"complete","duration":1.0,"made_in":null,"cost":-0.1,"currency":"USD"}"#,
+        r#"{"type":"complete","duration":1.0,"cost":"0.1","currency":"USD"}"#,
+        r#"{"type":"complete","duration":1.0,"cost":0.1,"currency":"usd"}"#,
+        r#"{"type":"complete","duration":1.0,"cost":0.1,"currency":"USDT"}"#,
+    ] {
+        assert_eq!(took(complete), (none.clone(), none.clone(), none.clone()), "{complete}");
+    }
+}

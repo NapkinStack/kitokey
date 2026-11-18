@@ -48,6 +48,10 @@ provides:
     version: v3
     path: contracts/minutes/v3
     stability: experimental
+  - contract: minutes
+    version: v4
+    path: contracts/minutes/v4
+    stability: experimental
   - contract: summarising
     version: v1
     path: contracts/summarising/v1

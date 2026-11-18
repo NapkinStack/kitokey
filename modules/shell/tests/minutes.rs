@@ -505,3 +505,43 @@ fn a_session_listed_says_the_title_of_minutes_v3() {
     let listed = kitokey_shell::sessions::list(sessions.path(), None);
     assert_eq!(listed[0].title.as_deref(), Some("Un nom"));
 }
+
+/// Minutes of `minutes/v4` (D97): v3's, and how long the making took, `made_in`, a JSON number at
+/// least zero; anything else, or a version before v4, none — and the minutes still read.
+#[test]
+fn minutes_v4_read_as_v3_do_and_say_how_long_they_took() {
+    let fourth = |front: &str| third(front, "- a — b — c [12:31]", "- d").replace("minutes/v3", "minutes/v4");
+    let taken = present(&fourth("cost: 0.012\ncurrency: USD\nmade_in: 3.2\n"));
+    assert_eq!(
+        (taken.made_in, taken.cost, taken.currency.as_deref()),
+        (Some(3.2), Some(0.012), Some("USD"))
+    );
+    assert!(taken.body.contains("<time data-second=\"751\">12:31</time>"), "{}", taken.body);
+    for (made_in, read_as) in [("0", 0.0), ("-0", 0.0), ("40", 40.0), ("1.5e1", 15.0)] {
+        assert_eq!(
+            present(&fourth(&format!("made_in: {made_in}\n"))).made_in,
+            Some(read_as),
+            "{made_in}"
+        );
+    }
+    for front in [
+        "",
+        "made_in: -1\n",
+        "made_in: \"3.2\"\n",
+        "made_in: null\n",
+        "made_in: \n",
+        "made_in: .5\n",
+        "made_in: 3 s\n",
+        "made_in: NaN\n",
+        "made_in: 1e999\n",
+    ] {
+        assert_eq!(present(&fourth(front)).made_in, None, "{front}");
+    }
+    for version in ["minutes/v1", "minutes/v2", "minutes/v3"] {
+        assert_eq!(
+            present(&fourth("made_in: 3.2\n").replace("minutes/v4", version)).made_in,
+            None,
+            "{version}"
+        );
+    }
+}

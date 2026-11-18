@@ -29,6 +29,7 @@ fn made(context: Option<&'static str>) -> Made<'static> {
         model: "a-model",
         context,
         cost: None,
+        made_in: None,
         segments: &[],
     }
 }
@@ -151,7 +152,7 @@ fn the_minutes_say_what_made_them_and_hold_the_three_sections() {
     assert_eq!(
         front.lines().collect::<Vec<_>>(),
         [
-            "contract: minutes/v3",
+            "contract: minutes/v4",
             "made: 2026-10-13T15:12:40+02:00",
             "provider: \"local\"",
             "model: \"a-model\"",
@@ -270,6 +271,7 @@ fn the_front_matter_reads_back_whatever_the_context_and_the_model_hold() {
             model: "m:7b-\"q4\"\n# x: y",
             context: Some(hostile),
             cost: None,
+            made_in: None,
             segments: &[],
         },
     )
@@ -302,6 +304,7 @@ fn the_time_is_written_to_the_second_with_its_offset() {
             model: "m",
             context: None,
             cost: None,
+            made_in: None,
             segments: &[],
         };
         assert_eq!(minutes(ANSWER, &made).unwrap().as_str().lines().nth(2).unwrap(), written);
@@ -837,6 +840,7 @@ fn a_cost_goes_bare_after_the_title_with_its_currency() {
         &format!("# Un titre\n\n{ANSWER}"),
         &Made {
             cost: Some(priced()),
+            made_in: None,
             ..made(None)
         },
     )
@@ -865,6 +869,7 @@ fn a_cost_is_openrouters_as_it_reported_it_or_none_and_said_when_it_was_refused(
             ANSWER,
             &Made {
                 cost: cost.unwrap(),
+                made_in: None,
                 ..made(None)
             },
         )
@@ -942,4 +947,28 @@ fn a_cost_is_openrouters_as_it_reported_it_or_none_and_said_when_it_was_refused(
             .unwrap()
             .is_some()
     );
+}
+
+/// How long the making took (`minutes/v4`, D97): written bare after the rest of the front matter, to
+/// the hundredth, when measured; a measure out of the contract's bounds is not written.
+#[test]
+fn the_minutes_say_how_long_their_making_took_when_it_was_measured() {
+    let front = |made_in: Option<f64>| {
+        let written = minutes(ANSWER, &Made { made_in, ..made(None) }).unwrap();
+        let (front, _) = written.as_str().strip_prefix("---\n").unwrap().split_once("\n---\n\n").unwrap();
+        front.lines().map(str::to_string).collect::<Vec<_>>()
+    };
+    for (made_in, said) in [
+        (3.2, "made_in: 3.2"),
+        (40.0, "made_in: 40.0"),
+        (0.0, "made_in: 0.0"),
+        (1.234_567, "made_in: 1.23"),
+    ] {
+        let lines = front(Some(made_in));
+        assert_eq!(lines.first().map(String::as_str), Some("contract: minutes/v4"));
+        assert_eq!(lines.last().map(String::as_str), Some(said), "{made_in}");
+    }
+    for made_in in [None, Some(-1.0), Some(f64::NAN), Some(f64::INFINITY)] {
+        assert!(!front(made_in).iter().any(|line| line.starts_with("made_in")), "{made_in:?}");
+    }
 }
