@@ -1848,6 +1848,24 @@ def first_run(now: dt.datetime) -> None:
             until_question(browser)
             press(browser, "welcome-next")
             silent = wait_for(browser, lambda b: "ollama.com" in b.execute_script(summary), 5)
+            # The ask itself refused: logged with its kind, never silent (D29), the summary as it was. Refused
+            # beneath `core`, which the welcome holds from its start: every ask goes through the internals' invoke.
+            browser.execute_script(
+                "const inner = window.__TAURI_INTERNALS__, real = inner.invoke; window.logged = [];"
+                " const refusing = (asked, rest, options) => {"
+                "   if (asked === 'page_failed') { window.logged.push(rest); return Promise.resolve(null); }"
+                "   if (asked === 'minutes_shown') return Promise.reject(Object.assign(new Error('refused'), { name: 'ScenarioY' }));"
+                "   return real.call(inner, asked, rest, options); };"
+                " const put = (f) => { try { inner.invoke = f; } catch (x) {}"
+                "   if (inner.invoke !== f) Object.defineProperty(inner, 'invoke', { configurable: true, writable: true, value: f }); };"
+                " put(refusing); window.restoreCore = () => put(real);")
+            press(browser, "welcome-ollama-again")
+            logged = wait_for(browser, lambda b: b.execute_script("return window.logged.length") > 0, 5)
+            kept = wait_for(browser, lambda b: "ollama.com" in b.execute_script(summary) and b.find_elements(By.ID, "welcome-ollama-again"), 5)
+            check("« Réessayer », the ask refused: logged with its kind, the summary as it was, « Réessayer » still offered (#781)",
+                  logged and kept and browser.execute_script("return window.logged")[0]["kind"] == "ScenarioY",
+                  [browser.execute_script("return window.logged"), browser.execute_script(summary)])
+            browser.execute_script("window.restoreCore()")
             Late.up = True
             press(browser, "welcome-ollama-again")
             answered = wait_for(browser, lambda b: "Ollama n’a pas encore qwen3:8b" in b.execute_script(summary), 5)
@@ -2012,6 +2030,8 @@ def first_run(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_element(By.ID, "welcome-go").text != "", 2)
         done = browser.find_element(By.ID, "welcome-go").text
         check("the model here: Terminer, no fetch offered", done == "Terminer" and "Télécharger" not in said, (done, said))
+        later = browser.find_element(By.ID, "welcome-later").text
+        check("the model here: « Plus tard » alone, nothing said to wait for it (#781)", later == "Plus tard", later)
         browser.set_window_size(420, 400)
         time.sleep(0.5)
         check("its last screen, private, at the smallest size: nothing overflows sideways", done == "Terminer" and wide(browser))
