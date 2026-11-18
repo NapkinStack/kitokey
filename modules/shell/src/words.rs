@@ -650,11 +650,15 @@ pub struct Window {
     pub redo_title: &'static str,
     pub redo_with: &'static str,
     pub redo_note: &'static str,
-    /// The one button that starts, naming the making and its model as chosen (D96): « Refaire le
-    /// compte rendu avec Claude Sonnet 4.5 ». `{}`: the model, as people say it.
+    /// Shows: the summary's redo panel, its one button that starts, naming the making and its model
+    /// (D96): « Refaire le compte rendu avec Qwen3 14b ». When: a summary model is known, the meeting's,
+    /// the one chosen in « Avancé » or Settings'; else `redo_title`. At most: wraps inside the panel.
+    /// Placeholders: {} the model, as people say it.
     pub redo_minutes_do: &'static str,
-    /// The transcript's one button that starts, naming its model as chosen (D96): « Refaire la
-    /// transcription avec Whisper Large V3 Turbo ». `{}`: the model, as people say it.
+    /// Shows: the transcript's redo panel, its one button that starts, naming its model (D96):
+    /// « Refaire la transcription avec Whisper Large V3 Turbo ». When: a transcription model is known;
+    /// else `redo_transcript_title`. At most: wraps inside the panel. Placeholders: {} the model, as
+    /// people say it.
     pub redo_transcript_do: &'static str,
     pub on_computer: &'static str,
     pub redo_transcript_title: &'static str,
