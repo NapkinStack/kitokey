@@ -160,7 +160,9 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
    anywhere: a folder's path, a model's id, a host; never a label's words (#782). */
 #settings { max-width: 720px; width: 100%; margin-inline: auto; }
 #settings .path, #settings code, #offered .name { overflow-wrap: anywhere; }
-#settings select { max-width: 100%; min-width: 0; }
+/* A list's choice longer than its room — « choisi, pas encore téléchargé » at 420 px — cut by an ellipsis
+   inside the list, as a native list does, never spilling its row (#868). */
+#settings select { max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #settings .picks { flex-wrap: wrap; min-width: 0; max-width: 100%; }
 .general-advanced { display: flex; flex-direction: column; gap: 12px; }
 #settings .choices { display: flex; flex-direction: column; gap: 10px; }
