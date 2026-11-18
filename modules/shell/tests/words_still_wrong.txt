@@ -95,5 +95,4 @@ lexicon window.welcome_ollama_lacks[0] "Ollama does not hold {} yet: the minutes
 lexicon window.welcome_ollama_silent[0] "Ollama does not answer on this computer: the minutes wait for it. It is free, at ollama.com." « minutes »
 lexicon window.welcome_rows[1] "Minutes" « minutes »
 lexicon window.welcome_writer[0] "Who writes the minutes?" « minutes »
-limit window.chip_transcript_failed[0] "Transcription non faite"
 placeholders of: in both languages

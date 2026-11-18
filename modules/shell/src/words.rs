@@ -1731,7 +1731,7 @@ pub fn window(language: Language) -> Window {
             minutes_redo_failed: "Le dernier Refaire a échoué. Le compte rendu affiché est le précédent.",
             transcript_making: "Transcription en cours",
             transcript_not_made: "La transcription n’a pas été faite. L’enregistrement est intact.",
-            chip_transcript_failed: "Transcription non faite",
+            chip_transcript_failed: "Non transcrite",
             minutes_unsaved: "Modification non enregistrée\u{a0}: {} reste utilisé.",
             minutes_unsaved_none: "Pas encore enregistré — aucun compte rendu n’est fait tant que ce n’est pas le cas.",
             transcript_model_needed: "En attente du modèle Whisper.",
