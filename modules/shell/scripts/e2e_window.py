@@ -1280,6 +1280,9 @@ def service_named(now: dt.datetime) -> None:
                                         " return [t.getAttribute('aria-expanded'), !!s && s.getClientRects().length > 0]")
         check("drawn anew before « Enregistrer »: « Avancé » left folded as the user folded it, the service's « Enregistrer » offered (#948)",
               folded == ["false", True], folded)
+        # The key typed, not yet saved, still there to be saved with it (#948).
+        typed = browser.execute_script("return document.getElementById('transcription-key').value")
+        check("drawn anew before « Enregistrer »: the key typed still in its field", typed == "sk-stand-in-not-a-key", len(typed))
         # The stand-in is on this computer: no agreement asked, and it saves without one (#859); a host
         # elsewhere is agreed to above, under « Avancé ».
         asked = browser.execute_script("const a = document.getElementById('transcription-agreed'); return !!a && a.getClientRects().length > 0")
@@ -7320,11 +7323,12 @@ def unsaved_choice_kept(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.find_elements(By.ID, "minutes") and b.find_elements(By.ID, "reminder"), 10)
             Select(browser.find_element(By.ID, "minutes")).select_by_visible_text("Mistral 7b")
             unsaid = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-unsaved").is_displayed(), 3)
-            before = browser.find_element(By.ID, "minutes")
+            # The list as it is, marked in the page: a reference the driver holds is refused once it is gone.
+            browser.execute_script("window.__oldMinutes = document.getElementById('minutes')")
             # Another control, saved at once: the page is drawn anew from what the shell holds.
             browser.find_element(By.ID, "reminder").click()
             saved = wait_for(browser, lambda b: "reminder = true" in window.file.read_text(), 5)
-            redrawn = wait_for(browser, lambda b: not b.execute_script("return arguments[0].isConnected", before), 5)
+            redrawn = wait_for(browser, lambda b: b.execute_script("return !window.__oldMinutes.isConnected && !!document.getElementById('minutes')"), 5)
             time.sleep(1)
             got = browser.execute_script("const m = document.getElementById('minutes'), n = document.getElementById('minutes-unsaved');"
                                          " return {value: m ? m.value : null, note: !!n && n.getClientRects().length > 0}")
