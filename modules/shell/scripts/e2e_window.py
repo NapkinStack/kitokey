@@ -7240,6 +7240,16 @@ def models_on_the_page(now: dt.datetime) -> None:
             check("a meeting said confidential: the page's lists offer no service (D91)",
                   shown and not any("via" in said for said in got["minutes"]["offered"] + got["transcription"]["offered"])
                   and got["transcription"]["offered"] == ["Whisper page settings", "Whisper tiny page"], got)
+            # Said confidential while its page is open: the lists read again, the service gone — no reload,
+            # never the models read before it was (D91, the coordinator's « local only when confidential »).
+            browser.execute_script(f"location.hash = '#/meeting/{made.name}'")
+            served = wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == made.name
+                              and filled(b) and any("via" in said for said in b.execute_script(lists)["transcription"]["offered"]), 10)
+            ActionChains(browser).click(browser.find_element(By.ID, "confidential-switch")).perform()
+            local = wait_for(browser, lambda b: (made / "confidential").exists() and filled(b)
+                             and not any("via" in said for said in b.execute_script(lists)["transcription"]["offered"]), 10)
+            check("a page open, its meeting then said confidential: its lists offer the models here alone, the service gone (D91, D93)",
+                  served and local, ((made / "confidential").exists(), browser.execute_script(lists)))
     finally:
         tags.shutdown()
 
