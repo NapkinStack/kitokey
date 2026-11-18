@@ -5319,6 +5319,81 @@ def page_one_bar(now: dt.datetime) -> None:
             gates[0].unlink(missing_ok=True)
 
 
+def page_estimate(now: dt.datetime) -> None:
+    """BZ. D92, criterion 2's estimate: the page's bar says « environ N min » left, from the meeting's length
+    and the speed last measured on this machine for each step and model — never moving back. None measured,
+    one unreadable, or thirty seconds or less: the step alone, no number. A making written is measured,
+    kept beside the settings as numbers by step and model, nothing of the meeting."""
+    print("BZ. a meeting's page while it is made: « environ N min » left, from the speeds measured here (D92)")
+    model = WORK / "estimate-model.bin"
+    model.write_bytes(b"\0" * 16)
+    settings = (f'after = "minutes"\nreminder = false\nmodel = "{model}"\n'
+                'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n')
+    bar = ("const m = document.getElementById('making'); if (!m || !m.getClientRects().length) return null;"
+           " const l = m.querySelector('.left'); return {step: document.getElementById('making-step').textContent,"
+           " left: l && l.getClientRects().length ? l.textContent : ''}")
+    gates = [WORK / "gate-hearing", WORK / "gate-minutes"]
+    # Ten minutes of audio; each step at half a second a second: five minutes each.
+    measured = json.dumps({"transcript": {model.name: 0.5}, "minutes": {"mistral": 0.5}})
+    swift = json.dumps({"transcript": {model.name: 0.01}, "minutes": {"mistral": 0.01}})
+    for case, kept, language, hearing, writing, first, then in (
+        ("fr, measured", measured, "fr_FR.UTF-8", "Transcription en cours", "Rédaction du compte rendu", "environ 10 min", "environ 5 min"),
+        ("en, measured", measured, "en_US.UTF-8", "Writing the transcript", "Writing the minutes", "about 10 min", "about 5 min"),
+        ("fr, none measured", None, "fr_FR.UTF-8", "Transcription en cours", "Rédaction du compte rendu", "", ""),
+        ("fr, unreadable", "{ not json", "fr_FR.UTF-8", "Transcription en cours", "Rédaction du compte rendu", "", ""),
+        ("fr, thirty seconds or less", swift, "fr_FR.UTF-8", "Transcription en cours", "Rédaction du compte rendu", "", ""),
+    ):
+        meetings = WORK / f"estimate-{case.replace(', ', '-').replace(' ', '-')}"
+        meeting = meetings / "2026-10-18_12-00"
+        session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+        window = Window(meetings, language, settings)
+        speeds = window.file.parent / "speeds.json"
+        speeds.unlink(missing_ok=True)
+        if kept is not None:
+            speeds.write_text(kept)
+        with window as browser:
+            for gate in gates:
+                gate.touch()
+            try:
+                browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+                wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
+                browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", meeting.name)
+                heard = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == hearing, 10)
+                time.sleep(2)
+                got = browser.execute_script(bar)
+                check(f"{case}: while its transcript is made, its summary next: {first or 'no number'} left in the bar (D92)",
+                      heard and got is not None and got["left"] == first, got)
+                # Sampled from here to the end: what the bar says left never goes up.
+                browser.execute_script("window.leftSeen = []; window.leftTick = setInterval(() => { const m = document.getElementById('making');"
+                                       " const l = m && m.getClientRects().length ? m.querySelector('.left') : null;"
+                                       " window.leftSeen.push(l ? l.textContent : ''); }, 100)")
+                gates[0].unlink()
+                written = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == writing, 15)
+                time.sleep(2)
+                got = browser.execute_script(bar)
+                check(f"{case}: then its summary: {then or 'no number'} left (D92)", written and got is not None and got["left"] == then, got)
+                gates[1].unlink()
+                done = wait_for(browser, lambda b: b.execute_script(bar) is None, 15)
+                seen = browser.execute_script("clearInterval(window.leftTick); return window.leftSeen")
+                minutes = [int(re.sub(r"\D", "", text)) for text in seen if re.search(r"\d", text)]
+                check(f"{case}: what is left never goes up, and nothing else is said there (D92)",
+                      done and all(b <= a for a, b in zip(minutes, minutes[1:])) and all(text == "" or re.fullmatch(r"(environ|about) \d+ min", text) for text in seen),
+                      sorted(set(seen)))
+            finally:
+                for gate in gates:
+                    gate.unlink(missing_ok=True)
+        # Measured as it was made: numbers by step and model, read back whole; nothing of the meeting.
+        try:
+            read = json.loads(speeds.read_text())
+        except (OSError, ValueError):
+            read = None
+        number = lambda value: isinstance(value, (int, float)) and value >= 0
+        check(f"{case}: each step written is measured, kept beside the settings by step and model, nothing of the meeting (D92)",
+              read is not None and sorted(read) == ["minutes", "transcript"] and list(read["transcript"]) == [model.name]
+              and list(read["minutes"]) == ["mistral"] and all(number(v) for step in read.values() for v in step.values())
+              and meeting.name not in speeds.read_text(), read)
+
+
 def meeting_trashed(now: dt.datetime) -> None:
     """BT. D100: a meeting moved to the trash from its own page — beside the button that opens its folder,
     a question in place, « Annuler » focused first, what it holds and that the system's trash restores it;
@@ -11629,6 +11704,7 @@ def main() -> int:
     bar_language(now)
     bar_after_stop(now)
     page_one_bar(now)
+    page_estimate(now)
     recording_found(now)
     recording_found_not_forgotten(now)
     context_before_start(now)
