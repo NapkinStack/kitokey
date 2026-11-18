@@ -95,6 +95,10 @@ pub struct Transcript {
     covered: [i64; 2],
     last: [Option<i64>; 2],
     complete: bool,
+    /// Started by this step, not taken up from an earlier one (D97).
+    fresh: bool,
+    /// When the step that holds it began, if it said so (D97).
+    began: Option<std::time::Instant>,
 }
 
 /// Cuts the transcript at `length`. Through a handle of its own: Windows lets a file opened to
@@ -115,6 +119,8 @@ impl Transcript {
             covered: [0, 0],
             last: [None, None],
             complete: false,
+            fresh: true,
+            began: None,
         };
         transcript.add(&[making.header()])?;
         Ok(transcript)
@@ -143,6 +149,8 @@ impl Transcript {
             covered: [0, 0],
             last: [None, None],
             complete: false,
+            fresh: false,
+            began: None,
         };
         let mut lines = text.lines();
         match lines.next().map(serde_json::from_str::<Value>) {
@@ -293,13 +301,26 @@ impl Transcript {
         Ok(())
     }
 
+    /// The step that holds it began at `began`: the time it took is said if it makes the whole
+    /// transcript itself (D97).
+    pub fn since(mut self, began: std::time::Instant) -> Self {
+        self.began = Some(began);
+        self
+    }
+
     /// Says the whole session was heard, once: `duration` seconds of sound, and when — this
-    /// computer's time, its offset said, to the second.
+    /// computer's time, its offset said, to the second. Made whole by the step that started it,
+    /// it says how long that step took, to the hundredth (`made_in`); taken up from an earlier
+    /// step, as while a meeting is recorded, it says none (D97).
     pub fn complete(&mut self, duration: f64) -> io::Result<()> {
         let duration = hundredths(duration)?;
         if !self.complete {
             let made = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
-            self.add(&[json!({ "type": "complete", "duration": duration as f64 / 100.0, "made": made })])?;
+            let mut line = json!({ "type": "complete", "duration": duration as f64 / 100.0, "made": made });
+            if let (true, Some(began)) = (self.fresh, self.began) {
+                line["made_in"] = json!((began.elapsed().as_secs_f64() * 100.0).round() / 100.0);
+            }
+            self.add(&[line])?;
             self.complete = true;
         }
         Ok(())
