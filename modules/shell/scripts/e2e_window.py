@@ -4937,12 +4937,12 @@ def bar_after_stop(now: dt.datetime) -> None:
                 keys(browser, Keys.ENTER)
                 rest = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
                 heard = wait_for(browser, lambda b: b.execute_script(said) == hearing, 10)
-                region = browser.execute_script("const s = document.getElementById('small-last-said'); return s ? s.getAttribute('aria-live') : null")
+                region = browser.execute_script("const s = document.getElementById('small-last-live'); return s && s.textContent === arguments[0] ? s.getAttribute('aria-live') : null", hearing)
                 check(f"{short}: stopped by the keyboard, the bar at rest names the meeting and its transcript under way, in a polite live region (D92)",
                       started and stopped and rest and heard and region == "polite" and not browser.execute_script(shown),
                       [started, stopped, rest, browser.execute_script(said), region, browser.execute_script(shown)])
                 # Each stage said once: the live region's text is changed only when the stage changes.
-                browser.execute_script("window.saidLast = []; const s = document.getElementById('small-last-said');"
+                browser.execute_script("window.saidLast = []; const s = document.getElementById('small-last-live');"
                                        " new MutationObserver(() => window.saidLast.push(s.textContent)).observe(s, {childList: true, characterData: true, subtree: true})")
                 gates[0].unlink()
                 writing = wait_for(browser, lambda b: b.execute_script(said) == summary, 10)
@@ -4983,11 +4983,11 @@ def bar_after_stop(now: dt.datetime) -> None:
                 # is made: nothing said of it while that one records (D92).
                 (WORK / "fail-minutes").touch()
                 gates[0].touch()
-                # Pressed 0.6 s after the gesture before at least: never inside the shell's 500 ms.
-                record = lambda: (time.sleep(0.6), browser.execute_script("document.getElementById('small-record').focus()"),
-                                  keys(browser, Keys.ENTER), running(browser))[3]
-                stop = lambda: (to(browser, "small-stop"), keys(browser, Keys.ENTER),
-                                wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10))[2]
+                # Clicked — the keyboard's path is held above —, 0.6 s after the gesture before at least: never inside
+                # the shell's 500 ms.
+                record = lambda: (time.sleep(0.6), press(browser, "small-record"), running(browser))[2]
+                stop = lambda: (press(browser, "small-stop"),
+                                wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10))[1]
                 held = record() and stop() and wait_for(browser, lambda b: b.execute_script(said) == hearing, 10)
                 again = record()
                 time.sleep(3.5)  # two of the window's readings at least, the first meeting still being made
@@ -4999,8 +4999,13 @@ def bar_after_stop(now: dt.datetime) -> None:
                 gates[0].unlink()
                 ended = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.failed['2026-10-18_12-00'] !== undefined)"), 15)
                 failed = stop() and wait_for(browser, lambda b: b.execute_script(said) == meeting + not_made and b.execute_script(shown), 15)
-                check(f"{short}: its summary failing, the bar says so in one line, with the page's cause, « Ouvrir » beside it (D92)",
-                      ended and failed, [ended, browser.execute_script(said), browser.execute_script(shown)])
+                # One line, cut where the bar ends: the whole of it its tooltip, and what the live region says.
+                line = browser.execute_script("const s = document.getElementById('small-last-said'), l = document.getElementById('small-last');"
+                                              " return [s.getClientRects().length, Math.round(l.getBoundingClientRect().height), s.title,"
+                                              " document.getElementById('small-last-live').textContent]")
+                check(f"{short}: its summary failing, the bar says so in one line, the page's cause its tooltip and its live region's, « Ouvrir » beside it (D92)",
+                      ended and failed and line[0] == 1 and line[1] <= 20 and line[2] == line[3] == meeting + not_made,
+                      [ended, browser.execute_script(said), browser.execute_script(shown), line])
                 shot_themed(browser, f"d92-bar-failed-{short}-{theme}", theme)
             finally:
                 for gate in gates:
@@ -5830,14 +5835,19 @@ def context_before_start(now: dt.datetime) -> None:
         stop_from_small(browser)
         wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
         wait_for(None, lambda b: (meeting / "transcript.jsonl").is_file(), 15)
-        # Cleared by its ✕: nothing is kept for the next, the sentence gone, the bar 44 high, the focus in the field.
+        # Cleared by its ✕: nothing is kept for the next, the sentence gone, the bar its row of 44 and nothing under it
+        # but the meeting just stopped (D92's line), the focus in the field.
         browser.find_element(By.ID, "small-next-context").click()
         keys(browser, "Pour la suite")
         wait_for(browser, lambda b: kept(b) == "Pour la suite", 3)
         press(browser, "small-context-clear")
-        cleared = wait_for(browser, lambda b: kept(b) == "" and b.execute_script("return innerHeight") == 44, 3)
+        row_alone = ("const lines = [...document.querySelectorAll('#small .bar-lines > *')].filter(e => e.id !== 'small-last' && e.getClientRects().length);"
+                     " const p = document.getElementById('small'), l = document.getElementById('small-last');"
+                     " return lines.length === 0 && Math.round(document.querySelector('#small .bar-row').getBoundingClientRect().height) === 44"
+                     " && Math.abs(innerHeight - Math.ceil(p.getBoundingClientRect().height)) <= 1 && (l.hidden || l.getBoundingClientRect().height <= 20)")
+        cleared = wait_for(browser, lambda b: kept(b) == "" and b.execute_script(row_alone), 3)
         got = browser.execute_script(field)
-        check("fr light: cleared by its ✕, nothing is kept, nothing said, 44 high, the focus in the field",
+        check("fr light: cleared by its ✕, nothing is kept, nothing said of it, the row 44 high and D92's one line alone under it, the focus in the field",
               cleared and got["value"] == "" and not got["kept_shown"] and not got["clear"] and browser.execute_script(focused) == "small-next-context", [kept(browser), got])
         # Emptied by the keyboard too.
         keys(browser, "Encore")

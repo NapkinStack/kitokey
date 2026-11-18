@@ -4167,15 +4167,20 @@ function showSmall(words) {
   });
   live.append(opened, micNext, secret.row, note);
   live.hidden = true;
-  // At rest, the meeting last stopped and its stage (D92): a polite live region whose text changes
-  // only with the stage — never said again as the makings are read —; « Ouvrir » beside it once it
-  // is made, stopped or failed, never focused by itself. Between two steps, the stage said stays.
-  const lastLine = element("p", "says small-last unseen");
+  // At rest, the meeting last stopped and its stage (D92): one line under the row, cut by an ellipsis
+  // where it is longer than the bar, the whole of it its tooltip; « Ouvrir » beside it once it is made,
+  // stopped or failed, never focused by itself. Between two steps, the stage said stays. Said by a
+  // polite live region of its own, unseen and always in the page — a region there before its first
+  // words says them —, whose text changes only with the stage: never said again as the makings are read.
+  const lastLive = element("span", "unseen");
+  lastLive.id = "small-last-live";
+  lastLive.setAttribute("aria-live", "polite");
+  const lastLine = element("p", "says small-last");
   lastLine.id = "small-last";
+  lastLine.hidden = true;
   const lastSaid = element("span");
   lastSaid.id = "small-last-said";
-  lastSaid.setAttribute("aria-live", "polite");
-  const lastOpen = element("button", "open", words.bar_last_open);
+  const lastOpen = element("button", "link", words.bar_last_open);
   lastOpen.type = "button";
   lastOpen.id = "small-last-open";
   lastOpen.hidden = true;
@@ -4205,11 +4210,12 @@ function showSmall(words) {
     if (stage) lastShown = { name: last.name, text: fill(stage.said, last.said, stage.why ?? ""), open: !!stage.open };
     else if (!last || lastShown?.name !== last.name) lastShown = null;
     const text = lastShown?.text ?? "";
-    if (lastSaid.textContent !== text) lastSaid.textContent = text;
+    if (lastLive.textContent !== text) lastLive.textContent = text;
+    lastSaid.textContent = text;
+    lastSaid.title = text;
     lastOpen.hidden = !lastShown?.open;
     lastOpen.dataset.name = lastShown?.name ?? "";
-    // Empty, kept in the page unseen: a live region there before its first words says them.
-    lastLine.classList.toggle("unseen", text === "");
+    lastLine.hidden = text === "";
   };
   const lines = element("div", "bar-lines");
   lines.append(lastLine, keptNext, modelsKept, announce, ...checks.map((check) => check.sentence), unkeptSaid);
@@ -4224,7 +4230,7 @@ function showSmall(words) {
     event.preventDefault();
     unfoldOptions(false, options.contains(event.target));
   });
-  page.replaceChildren(row, lines, options);
+  page.replaceChildren(row, lines, options, lastLive);
 
   // The shortcut, in ●'s and ■'s tooltips, as the desktop grants it.
   const paintKeys = async () => {
