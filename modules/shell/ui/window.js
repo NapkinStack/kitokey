@@ -1467,8 +1467,7 @@ function minutesCard(read, words, session, transcript) {
   let maker = when
     ? fill(words.minutes_of, when) + (by ? ` · ${by}` : "")
     : fill(words.written_by, read.model ? modelSaid(read.model) : "—") + (read.provider ? fill(words.written_via, read.provider) : "");
-  // What the call cost, as the provider reported it (D51); the shell gives both or neither.
-  if (read.cost !== null) maker += ` · ${new Intl.NumberFormat(words.locale, { style: "currency", currency: read.currency, maximumSignificantDigits: 2 }).format(read.cost)}`;
+  maker += tookAndCost(read, words);
   card.append(element("p", "maker", maker));
   // The transcript corrected after they were written (D62): said, and made again only on a click.
   const corrected = transcript.state === "present" ? Math.max(0, ...transcript.segments.map((segment) => Date.parse(segment.edited ?? "") || 0)) : 0;
@@ -1609,6 +1608,22 @@ function madeOn(words, made) {
   return `${day} ${words.at} ${new Intl.DateTimeFormat(words.locale, { hour: "2-digit", minute: "2-digit" }).format(at)}`;
 }
 
+// What a version's making took, after its model (D97): how long, then what the service said it cost
+// (D51) — each only when its file says it; the shell gives a cost and its currency both or neither.
+// A time in whole seconds, at least one, then minutes and seconds, then hours and minutes:
+// "en 3 s", "en 2 min 05 s", "en 1 h 02 min".
+function tookAndCost(read, words) {
+  let said = "";
+  if (read.made_in !== null && read.made_in !== undefined) {
+    const s = Math.max(1, Math.round(read.made_in));
+    const two = (n) => String(n).padStart(2, "0");
+    const took = s < 60 ? `${s} s` : s < 3600 ? `${Math.floor(s / 60)} min ${two(s % 60)} s` : `${Math.floor(s / 3600)} h ${two(Math.floor(s / 60) % 60)} min`;
+    said += ` · ${fill(words.made_in, took)}`;
+  }
+  if (read.cost !== null && read.cost !== undefined) said += ` · ${new Intl.NumberFormat(words.locale, { style: "currency", currency: read.currency, maximumSignificantDigits: 2 }).format(read.cost)}`;
+  return said;
+}
+
 function transcriptCard(read, words, session) {
   const card = element("aside", "card transcript");
   card.setAttribute("aria-label", words.transcript_title);
@@ -1665,7 +1680,7 @@ function transcriptCard(read, words, session) {
     : service
       ? fill(words.written_by, read.model || "—") + fill(words.written_via, read.engine)
       : fill(words.heard_by, read.model ? spoken(read.model) : read.engine || "—");
-  heard.append(element("p", "maker", heardSaid));
+  heard.append(element("p", "maker", heardSaid + tookAndCost(read, words)));
   card.append(heard);
   if (!read.complete) card.append(element("p", "note", words.being_made));
   if (read.unread > 0) card.append(element("p", "note", fill(words.unread, read.unread)));
