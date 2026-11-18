@@ -7160,6 +7160,25 @@ def models_on_the_page(now: dt.datetime) -> None:
             check("the version's own model chosen back: nothing to make, the button and the sentence above it gone, nothing started",
                   back and browser.execute_script(lists)["minutes"]["was"] is None and browser.execute_script(idle) and untouched(),
                   (browser.execute_script(lists), own(made)))
+            # Refused (the shell's refusal stood in for): said, the list put back; the very model refused,
+            # chosen again once the shell takes it, heard as a change and kept (#843, as #926 for the others).
+            refusal = ("const s = document.getElementById('page-minutes-model'); const w = s && s.closest('p').nextElementSibling;"
+                       " return w && !w.hidden ? w.textContent : ''")
+            browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                   " asked === 'meeting_models_chosen' ? Promise.reject('refused 1') : real.invoke(asked, ...rest) };"
+                                   " window.restore = () => { window.__TAURI__.core = real; };")
+            pick(browser, "minutes", "Mistral 7b")
+            refused = wait_for(browser, lambda b: "refused 1" in b.execute_script(refusal), 5)
+            check("a model refused on the page: said, its list put back, nothing kept (D93)",
+                  refused and browser.execute_script(lists)["minutes"]["shown"] == "Qwen3 14b"
+                  and own(made) == {"minutes": {"provider": here, "model": "qwen3:14b"}}, (browser.execute_script(refusal), browser.execute_script(lists), own(made)))
+            browser.execute_script("window.restore()")
+            pick(browser, "minutes", "Mistral 7b")
+            again = wait_for(browser, lambda b: own(made) == {"minutes": {"provider": here, "model": "mistral:7b"}} and b.execute_script(refusal) == "", 5)
+            check("the model just refused, chosen again on the page: kept, nothing said (#843)",
+                  again, (browser.execute_script(refusal), own(made)))
+            pick(browser, "minutes", "Qwen3 14b")
+            wait_for(browser, lambda b: own(made) == {"minutes": {"provider": here, "model": "qwen3:14b"}}, 5)
             pick(browser, "transcription", "Whisper tiny page")
             heard_go = wait_for(browser, lambda b: b.execute_script(lists)["transcription"]["go"] == "Refaire la transcription avec Whisper tiny page"
                                 and own(made) == {"transcription": {"engine": "whisper", "model": "ggml-tiny-page.bin"},
