@@ -1,4 +1,4 @@
-//! One meeting's minutes (`contracts/minutes/v1`, `v2` and `v3`), as the window opens them: who wrote them, where
+//! One meeting's minutes (`contracts/minutes/v1`, `v2`, `v3` and `v4`), as the window opens them: who wrote them, where
 //! and when, from the front matter; and the body as written — rendered from its CommonMark by the
 //! reader their producer judged them with, not read into parts the window would guess at. Nothing
 //! here writes. Minutes without their front matter or their three sections are said unreadable.
@@ -24,6 +24,9 @@ pub struct Minutes {
     /// both or neither; out of the contract's bounds, neither, and the minutes still read.
     pub cost: Option<f64>,
     pub currency: Option<String>,
+    /// How long the making took, in seconds, as the front matter says it (`minutes/v4`, D97): a JSON
+    /// number at least zero; out of the contract's bounds, none, and the minutes still read.
+    pub made_in: Option<f64>,
     /// The three sections as HTML: their titles, paragraphs and lists as written. What the
     /// body holds as HTML is shown as text, and a link as its words: a page shows the minutes, it
     /// is never driven by them. A time ending an item of `minutes/v3` is the one mark made here,
@@ -77,6 +80,14 @@ fn priced(cost: Option<&str>, currency: Option<&str>) -> Option<(f64, String)> {
     let cost = serde_json::from_str::<f64>(cost?.trim()).ok().filter(|cost| *cost >= 0.0)?;
     let currency = value(currency?).filter(|code| code.len() == 3 && code.bytes().all(|c| c.is_ascii_uppercase()))?;
     Some((cost.abs(), currency))
+}
+
+/// How long the making took, as `minutes/v4` bounds it: a JSON number at least zero, written bare.
+fn taken(made_in: Option<&str>) -> Option<f64> {
+    serde_json::from_str::<f64>(made_in?.trim())
+        .ok()
+        .filter(|made_in| *made_in >= 0.0)
+        .map(f64::abs)
 }
 
 /// The second a time says, written as `minutes/v3` has it: `mm:ss`, minutes in two digits or more,
@@ -154,7 +165,7 @@ fn front_matter(text: &str) -> Option<(std::collections::HashMap<&str, &str>, &s
         fields.insert(key.trim(), written);
     }
     let contract = fields.get("contract").and_then(|written| value(written));
-    matches!(contract.as_deref(), Some("minutes/v1" | "minutes/v2" | "minutes/v3")).then_some((fields, body))
+    matches!(contract.as_deref(), Some("minutes/v1" | "minutes/v2" | "minutes/v3" | "minutes/v4")).then_some((fields, body))
 }
 
 /// The sections, each on a title of second level however it is written: what the producer judged
@@ -183,8 +194,9 @@ fn parse_minutes(text: &str, sections: [&str; 3]) -> Option<Minutes> {
     if sections_in(body) != 3 {
         return None;
     }
-    // What v3 adds: to the others a key they do not know, and their brackets' text.
-    let third = field("contract").as_deref() == Some("minutes/v3");
+    // What v3 adds, v4 keeps: to the others a key they do not know, and their brackets' text.
+    let fourth = field("contract").as_deref() == Some("minutes/v4");
+    let third = fourth || field("contract").as_deref() == Some("minutes/v3");
     let times = if third { times(body) } else { Vec::new() };
     let price = if third {
         priced(fields.get("cost").copied(), fields.get("currency").copied())
@@ -270,6 +282,7 @@ fn parse_minutes(text: &str, sections: [&str; 3]) -> Option<Minutes> {
         title: field("title").and_then(within),
         cost: price.as_ref().map(|(cost, _)| *cost),
         currency: price.map(|(_, currency)| currency),
+        made_in: if fourth { taken(fields.get("made_in").copied()) } else { None },
         body: html,
         markdown,
     })

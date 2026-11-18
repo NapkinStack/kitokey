@@ -416,6 +416,10 @@ pub struct Window {
     /// "Compte rendu du 13 nov. à 09:45 · Qwen3 8B" (D93). When: the summary says when it was made.
     /// At most: one line. Placeholders: {} the day and hour, in local time, without the year.
     pub minutes_of: &'static str,
+    /// Shows: a meeting's page, the line of its transcript and of its minutes, after the model — "en 3 s",
+    /// "in 31 min 52 s" (D97). When: the version says how long its making took. At most: one line.
+    /// Placeholders: `{}`, the time taken, its units the window's.
+    pub made_in: &'static str,
     pub here: &'static str,
     pub remote: &'static str,
     /// A voice told within a track: its label.
@@ -931,6 +935,7 @@ pub fn window(language: Language) -> Window {
             heard_by: "Written by {}, on this computer",
             transcribed_on: "Transcribed on {}",
             minutes_of: "Summary of {}",
+            made_in: "in {}",
             here: "Here",
             remote: "Remote",
             voice: "voice {}",
@@ -1369,6 +1374,7 @@ pub fn window(language: Language) -> Window {
             heard_by: "Transcrit par {}, sur cet ordinateur",
             transcribed_on: "Transcrit le {}",
             minutes_of: "Compte rendu du {}",
+            made_in: "en {}",
             here: "Ici",
             remote: "À distance",
             voice: "voix {}",
