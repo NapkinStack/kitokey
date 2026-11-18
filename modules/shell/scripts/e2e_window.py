@@ -1269,6 +1269,12 @@ def service_named(now: dt.datetime) -> None:
               models and listed == ["/api/v1/key", "/api/v1/models?output_modalities=transcription"] and not browser.find_element(By.ID, "transcription-provider").is_displayed(),
               (offered(browser, "transcription-models"), listed))
         Select(browser.find_element(By.ID, "transcription-models")).select_by_value("vendor/scribe")
+        # Drawn anew before « Enregistrer » — another control saved, say —: the model chosen stays chosen (#948).
+        browser.execute_script("window.__old = document.getElementById('transcription-models'); refresh()")
+        wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && !!document.getElementById('transcription-models')"), 5)
+        check("drawn anew before « Enregistrer »: the transcription model chosen in the service's list still chosen (#948)",
+              browser.execute_script("return document.getElementById('transcription-models').value") == "vendor/scribe",
+              browser.execute_script("return document.getElementById('transcription-models').value"))
         # The stand-in is on this computer: no agreement asked, and it saves without one (#859); a host
         # elsewhere is agreed to above, under « Avancé ».
         asked = browser.execute_script("const a = document.getElementById('transcription-agreed'); return !!a && a.getClientRects().length > 0")
@@ -1463,6 +1469,13 @@ def models_guided(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.execute_script(anew), 5)
         check("drawn again by itself: the models listed with the key still offered",
               browser.find_element(By.ID, "minutes-models").is_displayed() and browser.execute_script(options, "minutes-models") == offered, browser.execute_script(options, "minutes-models"))
+        # Another model chosen, then drawn anew before « Enregistrer »: it stays chosen (#948).
+        choose(browser, "minutes-models", "openai/gpt-4o-mini")
+        browser.execute_script("window.__old = document.getElementById('minutes-models'); refresh()")
+        wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && !!document.getElementById('minutes-models')"), 5)
+        check("drawn anew before « Enregistrer »: the summary's model chosen in the service's list still chosen (#948)",
+              browser.execute_script("return document.getElementById('minutes-models').value") == "openai/gpt-4o-mini",
+              browser.execute_script("return document.getElementById('minutes-models').value"))
         choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
         press(browser, "minutes-online-save")
         saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
