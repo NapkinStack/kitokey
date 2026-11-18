@@ -1762,7 +1762,7 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
         (french.no_match, "Aucun résultat."),
         (french.search, "Rechercher dans le texte"),
         (french.interrupted, "Interrompu"),
-        (french.undated, "Date inconnue"),
+        (french.undated, "Sans date"),
         (french.chip_awaiting, "Accord requis"),
         (french.minutes_waiting, "En attente · {} avant"),
         (french.minutes_unsaved, "Modification non enregistrée\u{a0}: {} reste utilisé."),
