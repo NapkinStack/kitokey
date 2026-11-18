@@ -7007,13 +7007,18 @@ def models_on_the_page(now: dt.datetime) -> None:
     """BV. D93, criterion 5: on a meeting's page, each version's model is a list in its line itself — no redo
     panel opened —, showing the model that made it; a model chosen there starts nothing and is kept as the
     meeting's own, in its `models.json`; one button beside it starts the making and names it, gone again once
-    the version's own model is chosen back. A summary waiting for its model — the transcript whole, none
-    written — offers its list beside « Faire le compte rendu », which names it. A meeting said confidential is
-    offered no service (D91)."""
+    the version's own model is chosen back, and above it, while another is chosen, the model that made the
+    version shown. The line is drawn before Ollama answers, and its models read once a page's opening, not at
+    each drawing. A summary waiting for its model — the transcript whole, none written — offers its list beside
+    « Faire le compte rendu », which names it. A meeting said confidential is offered no service (D91)."""
     print("BV. each version's model a choice in its own line: kept for the meeting, nothing started, the button beside it naming the making (D93)")
+    # Answered late once `late` is set, as BO's: within models_offered's 2 s, or its answer would hold none of Ollama's models.
+    late = threading.Event()
 
     class Tags(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
+            if late.is_set():
+                time.sleep(1.5)
             body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
             try:
                 self.send_response(200)
@@ -7060,7 +7065,8 @@ def models_on_the_page(now: dt.datetime) -> None:
     lists = ("const at = (step) => { const s = document.getElementById(`page-${step}-model`); const b = document.getElementById(`page-${step}-do`);"
              " return s ? {line: s.parentElement.classList.contains('maker'), shown: s.options[s.selectedIndex]?.textContent,"
              " offered: [...s.options].map(o => o.textContent), label: s.getAttribute('aria-label'), seen: s.getClientRects().length > 0,"
-             " go: b && b.getClientRects().length > 0 ? b.textContent : null} : null; };"
+             " go: b && b.getClientRects().length > 0 ? b.textContent : null, was: (() => { const w = document.getElementById(`page-${step}-was`);"
+             " return w && w.getClientRects().length > 0 && b && w.getBoundingClientRect().bottom <= b.getBoundingClientRect().top ? w.textContent : null; })()} : null; };"
              " return {minutes: at('minutes'), transcription: at('transcription'), panel: document.querySelector('#meeting .redo') !== null}")
     filled = lambda b: all(got and len(got["offered"]) > 1 for got in (b.execute_script(lists)["minutes"], b.execute_script(lists)["transcription"]))
     pick = lambda b, step, said: Select(b.find_element(By.ID, f"page-{step}-model")).select_by_visible_text(said)
@@ -7068,8 +7074,16 @@ def models_on_the_page(now: dt.datetime) -> None:
     window.env.update(XDG_DATA_HOME=str(data))
     try:
         with window as browser:
+            # Ollama slow: the line is drawn at once, its model named, the list's other models after.
+            late.set()
             browser.execute_script(f"location.hash = '#/meeting/{made.name}'")
+            early = wait_for(browser, lambda b: any(line.endswith(" · Qwen3 14b") for line in b.execute_script(LINES, "#meeting .minutes .maker"))
+                             and len(b.execute_script(lists)["minutes"]["offered"]) == 1, 1)
+            check("Ollama slow: the line is drawn within a second, the version's model named in it, before the list's other models (D93)",
+                  early, (browser.execute_script(LINES, "#meeting .maker"), browser.execute_script(lists)))
             shown = wait_for(browser, filled, 10)
+            late.clear()
+            check("Ollama answered: the list's other models come", shown, browser.execute_script(lists))
             got = browser.execute_script(lists)
             lines = browser.execute_script(LINES, "#meeting .maker")
             check("each version's line holds its model as a list, without opening Refaire…: the model that made it shown, named for a screen reader (D93)",
@@ -7081,6 +7095,14 @@ def models_on_the_page(now: dt.datetime) -> None:
                   and any(line.startswith("Transcrit le 18 oct. à ") and line.endswith(" · Whisper page settings") for line in lines), (got, lines))
             if not shown:
                 return
+            # Drawn again — refresh(), as a focus does —: the models already read are not asked again.
+            browser.execute_script("const real = window.__TAURI__.core; window.offeredAsked = 0; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {"
+                                   " if (asked === 'models_offered') window.offeredAsked += 1; return real.invoke(asked, ...rest); } };"
+                                   " window.restoreCore = () => { window.__TAURI__.core = real; }; document.getElementById('page-minutes-model').dataset.before = 'yes';")
+            browser.execute_async_script("const done = arguments[arguments.length - 1]; refresh().then(() => refresh()).then(() => done(true), () => done(false))")
+            again = wait_for(browser, lambda b: b.execute_script("const s = document.getElementById('page-minutes-model'); return s !== null && !s.dataset.before") and filled(b), 5)
+            asked = browser.execute_script("window.restoreCore(); return window.offeredAsked")
+            check("the page drawn again twice: its lists filled at once, models_offered not asked again", again and asked == 0, (again, asked))
             check("the lists offer D91's models: those here and the service Settings set; nothing to make yet, no button beside them",
                   got["minutes"]["offered"] == ["Qwen3 14b", "Mistral 7b"]
                   and got["transcription"]["offered"] == ["Whisper page settings", "Whisper tiny page", "whisper-1, via hears.example"]
@@ -7093,19 +7115,25 @@ def models_on_the_page(now: dt.datetime) -> None:
             go = wait_for(browser, lambda b: b.execute_script(lists)["minutes"]["go"] == "Refaire le compte rendu avec Mistral 7b", 3)
             check("chosen: one button beside it names what it does — « Refaire le compte rendu avec Mistral 7b »",
                   go and browser.execute_script(lists)["transcription"]["go"] is None, browser.execute_script(lists))
+            check("another model chosen: above the button, the page says the model that made the version shown — « Ce compte rendu a été fait avec Qwen3 14b. »",
+                  browser.execute_script(lists)["minutes"]["was"] == "Ce compte rendu a été fait avec Qwen3 14b.", browser.execute_script(lists))
             pick(browser, "minutes", "Qwen3 14b")
             back = wait_for(browser, lambda b: b.execute_script(lists)["minutes"]["go"] is None
                             and own(made) == {"minutes": {"provider": here, "model": "qwen3:14b"}}, 5)
-            check("the version's own model chosen back: nothing to make, the button gone, nothing started",
-                  back and browser.execute_script(idle) and untouched(), (browser.execute_script(lists), own(made)))
+            check("the version's own model chosen back: nothing to make, the button and the sentence above it gone, nothing started",
+                  back and browser.execute_script(lists)["minutes"]["was"] is None and browser.execute_script(idle) and untouched(),
+                  (browser.execute_script(lists), own(made)))
             pick(browser, "transcription", "Whisper tiny page")
             heard_go = wait_for(browser, lambda b: b.execute_script(lists)["transcription"]["go"] == "Refaire la transcription avec Whisper tiny page"
                                 and own(made) == {"transcription": {"engine": "whisper", "model": "ggml-tiny-page.bin"},
                                                   "minutes": {"provider": here, "model": "qwen3:14b"}}, 5)
             check("the transcript's model chosen on its line: kept beside the summary's, nothing heard, its button naming it",
                   heard_go and browser.execute_script(idle) and untouched(), (browser.execute_script(lists), own(made)))
+            check("the transcript's: above its button, « Cette transcription a été faite avec Whisper page settings. »",
+                  browser.execute_script(lists)["transcription"]["was"] == "Cette transcription a été faite avec Whisper page settings.", browser.execute_script(lists))
             pick(browser, "transcription", "Whisper page settings")
-            wait_for(browser, lambda b: b.execute_script(lists)["transcription"]["go"] is None, 3)
+            gone = wait_for(browser, lambda b: b.execute_script(lists)["transcription"]["go"] is None and b.execute_script(lists)["transcription"]["was"] is None, 3)
+            check("the transcript's own model chosen back: its button and the sentence above it gone", gone, browser.execute_script(lists))
             # At the window's narrowest: each list inside its card, the page never wider than the window.
             browser.set_window_size(420, 800)
             time.sleep(1.5)
