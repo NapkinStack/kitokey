@@ -5,7 +5,8 @@ name: Pull request
 # description or a label re-evaluates them on the same head commit. A review or a comment is a
 # person's hand on the pull request when they are its named verifier (T2), read at the next run:
 # never a trigger, since a review's failed run stays beside the later ones and blocks the merge,
-# and an attested record, pushed as notes, is no event that could replace it (D218, #394).
+# and an attested record, pushed as notes, is no event that could replace it (D218, #394): its
+# event is its own status, `nstack / local checks`, when a ruleset requires it (D221, #399).
 #
 # The description is untrusted input: it reaches nstack through env:, never a script.
 

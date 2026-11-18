@@ -295,6 +295,9 @@ commands:
 # Any other warning or error logged fails the run, and so does one declared and never logged
 # (scripts/e2e_logs.py); NapkinStack audits the same logs, in $NSTACK_EVIDENCE (M12).
 evidence:
+  # Its e2e brings its own session, sound server and ports, and reads nothing another run reads
+  # (D222): it neither waits on nor holds the machine's e2e lock.
+  sealed: true
   provoked:
     # The played recorder says the output has no device left (D31), at each of its starts: A, B, C, F, G, M, S;
     # and the window's Q, when it asks (D33).
@@ -375,6 +378,11 @@ evidence:
     - pattern: '"message":"shell\.command_failed"'
       level: warning
       scenario: AB
+    # The window's K starts once on a settings file broken by hand: settings.rs's sentence goes to
+    # the log, the user is told which setting and what to do (#783).
+    - pattern: '"message":"shell\.settings_unread"'
+      level: warning
+      scenario: K
     # A failure of the page's own, thrown then rejected; any other kind of the page's is not provoked.
     - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioI")'
       level: error

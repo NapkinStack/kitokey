@@ -338,11 +338,12 @@ nstack check [module]   # the module's commands.check; default: every module
 nstack test [module]    # commands.test, likewise
 nstack bootstrap [module]   # commands.bootstrap, when declared
 nstack run <module>     # local start, when commands.run is declared
-nstack e2e [module]     # end-to-end scenarios, when commands.e2e is declared — one run at a time on a machine
+nstack e2e [module]     # end-to-end scenarios, when commands.e2e is declared — one run at a time on a machine, unless sealed
 nstack clean [module]   # removes a module's build outputs, when commands.clean is declared
 nstack pr-check --body-file <file> [--labels a,b]   # test sheet and cycle, as CI reads them from the pull request
+                                                    # with a token and one open pull request at the head, its own labels are read
 nstack attest --body-file <file> [--labels a,b]     # the CI's checks run here, recorded on the commit; labels as pr-check takes them
-                                                    # a sheet filled since: the module checks this commit passed are kept (--again runs them)
+                                                    # module checks kept while what they read is unchanged, 7 days at most (--again runs them)
 nstack modules --changed-since <base>   # the modules with a file changed, as CI lists them
 nstack modules --changed-since <base> --with-contract-sides   # ... and both sides of a changed contract
 nstack compat [module] --base <base>    # a contract version consumed or stable: the merged proof
