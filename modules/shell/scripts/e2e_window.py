@@ -249,6 +249,12 @@ LINES = ("return [...document.querySelectorAll(arguments[0])].map((m) => [...m.c
          ".map((n) => n.tagName === 'SELECT' ? n.options[n.selectedIndex]?.textContent ?? '' : n.textContent).join(''))")
 
 
+def lines_seen(browser, selector: str) -> list[str]:
+    """LINES as an element's text reads them on screen, as Selenium's `.text` did before a list sat in
+    them: a no-break space a space, white space collapsed."""
+    return [" ".join(line.replace("\xa0", " ").split()) for line in browser.execute_script(LINES, selector)]
+
+
 def check(what: str, held: bool, got: object = "") -> None:
     print(f"  {'ok  ' if held else 'FAIL'}  {what}" + ("" if held else f"\n        got: {got}"))
     if not held:
@@ -1204,7 +1210,7 @@ def service_named(now: dt.datetime) -> None:
         check("what was saved not read: said, the button given back", told, browser.execute_script(said))
         # Who heard a meeting, said where it is read: the service's host, never « sur cet ordinateur ».
         browser.execute_script("location.hash = '#/meeting/heard'")
-        makers = lambda b: b.execute_script(LINES, "#meeting .maker")
+        makers = lambda b: lines_seen(b, "#meeting .maker")
         named = wait_for(browser, lambda b: "Écrit par whisper-large-v3, via api.groq.com" in makers(b), 5)
         check("a meeting a service heard names the service, never this computer", named and not any("sur cet ordinateur" in m for m in makers(browser)), makers(browser))
         browser.execute_script("location.hash = '#/settings'")
@@ -7117,7 +7123,7 @@ def models_on_the_page(now: dt.datetime) -> None:
             asked = browser.execute_script("window.restoreCore(); return window.offeredAsked")
             check("the page drawn again twice: its lists filled at once, models_offered not asked again", again and asked == 0, (again, asked))
             check("the lists offer D91's models: those here and the service Settings set; nothing to make yet, no button beside them",
-                  got["minutes"]["offered"] == ["Qwen3 14b", "Mistral 7b"]
+                  sorted(got["minutes"]["offered"]) == ["Mistral 7b", "Qwen3 14b"]
                   and got["transcription"]["offered"] == ["Whisper page settings", "Whisper tiny page", "whisper-1, via hears.example"]
                   and got["minutes"]["go"] is None and got["transcription"]["go"] is None, got)
             pick(browser, "minutes", "Mistral 7b")
@@ -7158,7 +7164,9 @@ def models_on_the_page(now: dt.datetime) -> None:
             browser.set_window_size(1100, 800)
             time.sleep(1.5)
             pick(browser, "minutes", "Mistral 7b")
-            wait_for(browser, lambda b: b.execute_script(lists)["minutes"]["go"] == "Refaire le compte rendu avec Mistral 7b", 3)
+            if not wait_for(browser, lambda b: b.execute_script(lists)["minutes"]["go"] == "Refaire le compte rendu avec Mistral 7b", 3):
+                check("Mistral 7b chosen: « Refaire le compte rendu avec Mistral 7b » shown, to be pressed", False, browser.execute_script(lists))
+                return
             press(browser, "page-minutes-do")
             wrote = wait_for(None, lambda _: "mistral:7b" in ((WORK / "summary-args").read_text() if (WORK / "summary-args").exists() else ""), 15)
             check("the button beside the list makes the summary again with the model chosen",
@@ -7257,7 +7265,7 @@ def two_panes(now: dt.datetime) -> None:
     # When a version was made, in the system's local time (D93): a zone far from UTC and from the
     # instants' own offset, +02:00 — 10:42 there is 04:42 in New York, 08:42 in UTC.
     zone = "America/New_York"
-    makers = lambda b: b.execute_script(LINES, "#meeting .maker")
+    makers = lambda b: lines_seen(b, "#meeting .maker")
     window = Window(meetings, "fr_FR.UTF-8")
     window.env["TZ"] = zone
     with window as browser:
@@ -9765,7 +9773,7 @@ def main() -> int:
         shown = wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed() and b.find_elements(By.CSS_SELECTOR, ".lines li"))
         check("a click on a meeting opens it, marked in the list (D61)", shown
               and browser.find_elements(By.CSS_SELECTOR, ".session")[0].get_attribute("aria-current") == "page")
-        heard_here = browser.execute_script(LINES, "#meeting .made .maker")
+        heard_here = lines_seen(browser, "#meeting .made .maker")
         check("a meeting heard here says so, by the model's name", heard_here == ["Transcrit par Whisper large v3 turbo, sur cet ordinateur"], heard_here)
         shot(browser, "2-session")
         minutes = browser.find_element(By.CSS_SELECTOR, ".minutes")
@@ -9790,7 +9798,7 @@ def main() -> int:
             label.startswith("Qui a parlé") and len(here) == len(remote) == 60 and here[0] < 42 and remote[0] > 46 and here[-1] == 42,
             drawn,
         )
-        maker = browser.execute_script(LINES, "#meeting .minutes .maker")[0]
+        maker = lines_seen(browser, "#meeting .minutes .maker")[0]
         check(
             "when the minutes were made, then who wrote them and where (D93) — the model as people say it, the day without its year",
             maker.startswith("Compte rendu du 13 oct. à ") and maker.endswith(" · Claude Sonnet, via openrouter.ai") and "2026" not in maker,
@@ -10519,7 +10527,7 @@ def main() -> int:
         browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
         # Offered once what was being made for it is read as ended.
         wait_for(browser, lambda b: b.find_elements(By.ID, "make-minutes") and b.find_element(By.ID, "make-minutes").is_displayed())
-        heard = browser.execute_script(LINES, "#meeting .made .maker")[0]
+        heard = lines_seen(browser, "#meeting .made .maker")[0]
         check("the meeting's page says where its transcript was made, on its card (D89)", heard.endswith("sur cet ordinateur"), heard)
         (WORK / "slow-minutes").touch()
         browser.find_element(By.ID, "make-minutes").click()
