@@ -247,6 +247,16 @@ return [s.left, s.right, left, right]"""
 MONTHS_FR = "janvier février mars avril mai juin juillet août septembre octobre novembre décembre".split()
 # The page's ground, as `ui/window.css` sets it in each theme.
 GROUND = {"light": "rgb(242, 244, 247)", "dark": "rgb(21, 23, 28)"}
+# The lines saying who made a version, as they read (D93): a model a list in its line is said by the
+# option chosen — an element's text would hold every option of the list.
+LINES = ("return [...document.querySelectorAll(arguments[0])].map((m) => [...m.childNodes]"
+         ".map((n) => n.tagName === 'SELECT' ? n.options[n.selectedIndex]?.textContent ?? '' : n.textContent).join(''))")
+
+
+def lines_seen(browser, selector: str) -> list[str]:
+    """LINES as an element's text reads them on screen, as Selenium's `.text` did before a list sat in
+    them: a no-break space a space, white space collapsed."""
+    return [" ".join(line.replace("\xa0", " ").split()) for line in browser.execute_script(LINES, selector)]
 
 
 def check(what: str, held: bool, got: object = "") -> None:
@@ -1220,7 +1230,7 @@ def service_named(now: dt.datetime) -> None:
         check("what was saved not read: said, the button given back", told, browser.execute_script(said))
         # Who heard a meeting, said where it is read: the service's host, never « sur cet ordinateur ».
         browser.execute_script("location.hash = '#/meeting/heard'")
-        makers = lambda b: [p.text for p in b.find_elements(By.CSS_SELECTOR, "#meeting .maker")]
+        makers = lambda b: lines_seen(b, "#meeting .maker")
         named = wait_for(browser, lambda b: "Écrit par whisper-large-v3, via api.groq.com" in makers(b), 5)
         check("a meeting a service heard names the service, never this computer", named and not any("sur cet ordinateur" in m for m in makers(browser)), makers(browser))
         browser.execute_script("location.hash = '#/settings'")
@@ -2716,7 +2726,7 @@ def own_models(now: dt.datetime) -> None:
         check("its choice shown, none gone", said == {"chosen": chosen, "gone": []}, said)
         # Its page says which models made its transcript and its minutes (criterion 3).
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-        makers = lambda b: b.execute_script("return [...document.querySelectorAll('.maker')].map(m => m.textContent)")
+        makers = lambda b: b.execute_script(LINES, ".maker")
         both = wait_for(browser, lambda b: len(makers(b)) >= 2, 10)
         texts = " | ".join(makers(browser)).lower()
         check("its page says the models that made its transcript and its minutes", both and "whisper tiny own" in texts and "mistral own" in texts, texts)
@@ -2798,7 +2808,7 @@ def cancelled_at_once(now: dt.datetime) -> None:
     window.env.update(XDG_DATA_HOME=str(data))
     sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
     idle = "return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)"
-    makers = lambda b: " | ".join(b.execute_script("return [...document.querySelectorAll('.maker')].map(m => m.textContent)")).lower()
+    makers = lambda b: " | ".join(b.execute_script(LINES, ".maker")).lower()
     steps = (
         ("the transcript", meeting / "transcript.jsonl", "hearing",
          lambda b, model: b.execute_script("return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", meeting.name, str(model)),
@@ -6424,7 +6434,7 @@ def minutes_checked(now: dt.datetime) -> None:
     open_ = lambda b, folder: (b.execute_script(f"location.hash = '#/meeting/{folder.name}'"), wait_for(
         b, lambda c: c.execute_script("return document.getElementById('meeting').dataset.name") == folder.name
         and c.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2"), 10))
-    maker = "return document.querySelector('#meeting .minutes .maker').textContent"
+    maker = "return " + LINES.removeprefix("return ").replace("arguments[0]", "'#meeting .minutes .maker'") + "[0]"
     links = "return [...document.querySelectorAll('#meeting .minutes button.line-time')]"
     labels = ("return [...document.querySelectorAll('#meeting .minutes button.line-time')].map(l => [l.textContent, l.getAttribute('aria-label')])")
     row_text = "return [...document.querySelectorAll('#meeting .minutes table.actions tbody tr')].map(r => [...r.cells].map(c => c.textContent.trim()))"
@@ -7568,6 +7578,221 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
         for server in servers:
             server.shutdown()
 
+
+def models_on_the_page(now: dt.datetime) -> None:
+    """BW. D93, criterion 5: on a meeting's page, each version's model is a list in its line itself — no redo
+    panel opened —, showing the model that made it; a model chosen there starts nothing and is kept as the
+    meeting's own, in its `models.json`; one button beside it starts the making and names it, gone again once
+    the version's own model is chosen back, and above it, while another is chosen, the model that made the
+    version shown. The line is drawn before Ollama answers, and its models read once a page's opening, not at
+    each drawing. A summary waiting for its model — the transcript whole, none written — offers its list beside
+    « Faire le compte rendu », which names it. A meeting said confidential is offered no service (D91)."""
+    print("BW. each version's model a choice in its own line: kept for the meeting, nothing started, the button beside it naming the making (D93)")
+    # Answered late once `late` is set, as BO's: within models_offered's 2 s, or its answer would hold none of Ollama's models.
+    late = threading.Event()
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if late.is_set():
+                time.sleep(1.5)
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            try:
+                self.send_response(200)
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                pass
+
+        def log_message(self, *_):
+            pass
+
+    tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
+    threading.Thread(target=tags.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{tags.server_address[1]}"
+    here = f"{base}/v1"
+    data = WORK / "data-page-models"
+    (data / "kitokey" / "models").mkdir(parents=True)
+    (data / "kitokey" / "models" / "ggml-tiny-page.bin").write_bytes(b"\0" * 16)
+    model = WORK / "ggml-page-settings.bin"
+    model.write_bytes(b"\0" * 16)
+    # Settings name a service that transcribes: offered on a meeting's page, never on a confidential one's.
+    named = (f'after = "nothing"\nreminder = false\nmodel = "{model}"\nminutes_provider = "{here}"\nminutes_model = "qwen3:14b"\n'
+             'transcription_provider = "https://hears.example/v1"\ntranscription_model = "whisper-1"\n')
+    meetings = WORK / "page-models"
+    made, waiting, secret = (meetings / name for name in ("2026-10-18_12-00", "2026-10-18_13-00", "2026-10-18_14-00"))
+    heard = ('{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"ggml-page-settings.bin","language":null,"context":null}\n'
+             '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n'
+             '{"type":"complete","duration":1.0,"made":"2026-10-18T12:30:00+02:00"}\n')
+    written = ("---\ncontract: minutes/v1\nmade: 2026-10-18T12:40:00+02:00\nmodel: qwen3:14b\ncontext: null\n---\n\n"
+               "## A\n\nLes minutes d'avant.\n\n## B\n\n## C\n")
+    for folder in (made, waiting, secret):
+        session(folder, now - dt.timedelta(hours=2), 3, {"local.wav": 1000})
+        (folder / "transcript.jsonl").write_text(heard)
+    for folder in (made, secret):
+        (folder / "minutes.md").write_text(written)
+    (secret / "confidential").write_bytes(b"")
+    (WORK / "summary-args").unlink(missing_ok=True)
+    (WORK / "hearing-args").unlink(missing_ok=True)
+    own = lambda folder: json.loads((folder / "models.json").read_text()) if (folder / "models.json").exists() else None
+    idle = "return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null)"
+    untouched = lambda: (made / "minutes.md").read_text() == written and not (WORK / "summary-args").exists() and not (WORK / "hearing-args").exists()
+    # Each list of the page: where it sits, what it shows and offers, how it is named; the button beside it.
+    lists = ("const at = (step) => { const s = document.getElementById(`page-${step}-model`); const b = document.getElementById(`page-${step}-do`);"
+             " return s ? {line: s.parentElement.classList.contains('maker'), shown: s.options[s.selectedIndex]?.textContent,"
+             " offered: [...s.options].map(o => o.textContent), label: s.getAttribute('aria-label'), seen: s.getClientRects().length > 0,"
+             " go: b && b.getClientRects().length > 0 ? b.textContent : null, was: (() => { const w = document.getElementById(`page-${step}-was`);"
+             " return w && w.getClientRects().length > 0 && b && w.getBoundingClientRect().bottom <= b.getBoundingClientRect().top ? w.textContent : null; })()} : null; };"
+             " return {minutes: at('minutes'), transcription: at('transcription'), panel: document.querySelector('#meeting .redo') !== null}")
+    filled = lambda b: all(got and len(got["offered"]) > 1 for got in (b.execute_script(lists)["minutes"], b.execute_script(lists)["transcription"]))
+    pick = lambda b, step, said: Select(b.find_element(By.ID, f"page-{step}-model")).select_by_visible_text(said)
+    window = Window(meetings, "fr_FR.UTF-8", named, ollama=base)
+    window.env.update(XDG_DATA_HOME=str(data))
+    try:
+        with window as browser:
+            # Ollama slow: the line is drawn at once, its model named, the list's other models after.
+            late.set()
+            browser.execute_script(f"location.hash = '#/meeting/{made.name}'")
+            early = wait_for(browser, lambda b: any(line.endswith(" · Qwen3 14b") for line in b.execute_script(LINES, "#meeting .minutes .maker"))
+                             and len(b.execute_script(lists)["minutes"]["offered"]) == 1, 1)
+            check("Ollama slow: the line is drawn within a second, the version's model named in it, before the list's other models (D93)",
+                  early, (browser.execute_script(LINES, "#meeting .maker"), browser.execute_script(lists)))
+            shown = wait_for(browser, filled, 10)
+            late.clear()
+            check("Ollama answered: the list's other models come", shown, browser.execute_script(lists))
+            got = browser.execute_script(lists)
+            lines = browser.execute_script(LINES, "#meeting .maker")
+            check("each version's line holds its model as a list, without opening Refaire…: the model that made it shown, named for a screen reader (D93)",
+                  shown and not got["panel"]
+                  and got["minutes"]["line"] and got["minutes"]["seen"] and got["minutes"]["shown"] == "Qwen3 14b" and got["minutes"]["label"] == "Modèle du compte rendu"
+                  and got["transcription"]["line"] and got["transcription"]["seen"] and got["transcription"]["shown"] == "Whisper page settings"
+                  and got["transcription"]["label"] == "Modèle de transcription"
+                  and any(line.startswith("Compte rendu du 18 oct. à ") and line.endswith(" · Qwen3 14b") for line in lines)
+                  and any(line.startswith("Transcrit le 18 oct. à ") and line.endswith(" · Whisper page settings") for line in lines), (got, lines))
+            if not shown:
+                return
+            # Drawn again — refresh(), as a focus does —: the models already read are not asked again.
+            browser.execute_script("const real = window.__TAURI__.core; window.offeredAsked = 0; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {"
+                                   " if (asked === 'models_offered') window.offeredAsked += 1; return real.invoke(asked, ...rest); } };"
+                                   " window.restoreCore = () => { window.__TAURI__.core = real; }; document.getElementById('page-minutes-model').dataset.before = 'yes';")
+            browser.execute_async_script("const done = arguments[arguments.length - 1]; refresh().then(() => refresh()).then(() => done(true), () => done(false))")
+            again = wait_for(browser, lambda b: b.execute_script("const s = document.getElementById('page-minutes-model'); return s !== null && !s.dataset.before") and filled(b), 5)
+            asked = browser.execute_script("window.restoreCore(); return window.offeredAsked")
+            check("the page drawn again twice: its lists filled at once, models_offered not asked again", again and asked == 0, (again, asked))
+            check("the lists offer D91's models: those here and the service Settings set; nothing to make yet, no button beside them",
+                  sorted(got["minutes"]["offered"]) == ["Mistral 7b", "Qwen3 14b"]
+                  and got["transcription"]["offered"] == ["Whisper page settings", "Whisper tiny page", "whisper-1, via hears.example"]
+                  and got["minutes"]["go"] is None and got["transcription"]["go"] is None, got)
+            pick(browser, "minutes", "Mistral 7b")
+            kept = wait_for(None, lambda _: own(made) == {"minutes": {"provider": here, "model": "mistral:7b"}}, 5)
+            time.sleep(1)
+            check("another model chosen on the page starts nothing: kept as the meeting's own, in its models.json (D93, D91)",
+                  kept and browser.execute_script(idle) and untouched() and not browser.execute_script(lists)["panel"], (own(made), untouched()))
+            go = wait_for(browser, lambda b: b.execute_script(lists)["minutes"]["go"] == "Refaire le compte rendu avec Mistral 7b", 3)
+            check("chosen: one button beside it names what it does — « Refaire le compte rendu avec Mistral 7b »",
+                  go and browser.execute_script(lists)["transcription"]["go"] is None, browser.execute_script(lists))
+            check("another model chosen: above the button, the page says the model that made the version shown — « Ce compte rendu a été fait avec Qwen3 14b. »",
+                  browser.execute_script(lists)["minutes"]["was"] == "Ce compte rendu a été fait avec Qwen3 14b.", browser.execute_script(lists))
+            pick(browser, "minutes", "Qwen3 14b")
+            back = wait_for(browser, lambda b: b.execute_script(lists)["minutes"]["go"] is None
+                            and own(made) == {"minutes": {"provider": here, "model": "qwen3:14b"}}, 5)
+            check("the version's own model chosen back: nothing to make, the button and the sentence above it gone, nothing started",
+                  back and browser.execute_script(lists)["minutes"]["was"] is None and browser.execute_script(idle) and untouched(),
+                  (browser.execute_script(lists), own(made)))
+            # Refused (the shell's refusal stood in for): said, the list put back; the very model refused,
+            # chosen again once the shell takes it, heard as a change and kept (#843, as #926 for the others).
+            refusal = ("const s = document.getElementById('page-minutes-model'); const w = s && s.closest('p').nextElementSibling;"
+                       " return w && !w.hidden ? w.textContent : ''")
+            browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) =>"
+                                   " asked === 'meeting_models_chosen' ? Promise.reject('refused 1') : real.invoke(asked, ...rest) };"
+                                   " window.restore = () => { window.__TAURI__.core = real; };")
+            pick(browser, "minutes", "Mistral 7b")
+            refused = wait_for(browser, lambda b: "refused 1" in b.execute_script(refusal), 5)
+            check("a model refused on the page: said, its list put back, nothing kept (D93)",
+                  refused and browser.execute_script(lists)["minutes"]["shown"] == "Qwen3 14b"
+                  and own(made) == {"minutes": {"provider": here, "model": "qwen3:14b"}}, (browser.execute_script(refusal), browser.execute_script(lists), own(made)))
+            browser.execute_script("window.restore()")
+            pick(browser, "minutes", "Mistral 7b")
+            again = wait_for(browser, lambda b: own(made) == {"minutes": {"provider": here, "model": "mistral:7b"}} and b.execute_script(refusal) == "", 5)
+            check("the model just refused, chosen again on the page: kept, nothing said (#843)",
+                  again, (browser.execute_script(refusal), own(made)))
+            pick(browser, "minutes", "Qwen3 14b")
+            wait_for(browser, lambda b: own(made) == {"minutes": {"provider": here, "model": "qwen3:14b"}}, 5)
+            pick(browser, "transcription", "Whisper tiny page")
+            heard_go = wait_for(browser, lambda b: b.execute_script(lists)["transcription"]["go"] == "Refaire la transcription avec Whisper tiny page"
+                                and own(made) == {"transcription": {"engine": "whisper", "model": "ggml-tiny-page.bin"},
+                                                  "minutes": {"provider": here, "model": "qwen3:14b"}}, 5)
+            check("the transcript's model chosen on its line: kept beside the summary's, nothing heard, its button naming it",
+                  heard_go and browser.execute_script(idle) and untouched(), (browser.execute_script(lists), own(made)))
+            check("the transcript's: above its button, « Cette transcription a été faite avec Whisper page settings. »",
+                  browser.execute_script(lists)["transcription"]["was"] == "Cette transcription a été faite avec Whisper page settings.", browser.execute_script(lists))
+            pick(browser, "transcription", "Whisper page settings")
+            gone = wait_for(browser, lambda b: b.execute_script(lists)["transcription"]["go"] is None and b.execute_script(lists)["transcription"]["was"] is None, 3)
+            check("the transcript's own model chosen back: its button and the sentence above it gone", gone, browser.execute_script(lists))
+            # At the window's narrowest: each list inside its card, the page never wider than the window.
+            browser.set_window_size(420, 800)
+            time.sleep(1.5)
+            fits = browser.execute_script(
+                "return ['minutes', 'transcription'].map((step) => { const s = document.getElementById(`page-${step}-model`);"
+                " if (!s) return null; const r = s.getBoundingClientRect(), c = s.closest('.card').getBoundingClientRect();"
+                " return r.left >= c.left && r.right <= c.right; }).concat(document.documentElement.scrollWidth <= innerWidth)")
+            check("at 420 px: each list inside its card, nothing wider than the window", fits == [True, True, True], fits)
+            browser.set_window_size(1100, 800)
+            time.sleep(1.5)
+            pick(browser, "minutes", "Mistral 7b")
+            if not wait_for(browser, lambda b: b.execute_script(lists)["minutes"]["go"] == "Refaire le compte rendu avec Mistral 7b", 3):
+                check("Mistral 7b chosen: « Refaire le compte rendu avec Mistral 7b » shown, to be pressed", False, browser.execute_script(lists))
+                return
+            press(browser, "page-minutes-do")
+            wrote = wait_for(None, lambda _: "mistral:7b" in ((WORK / "summary-args").read_text() if (WORK / "summary-args").exists() else ""), 15)
+            check("the button beside the list makes the summary again with the model chosen",
+                  wrote and "qwen3:14b" not in (WORK / "summary-args").read_text(), (WORK / "summary-args").read_text() if wrote else None)
+            wait_for(browser, lambda b: b.execute_script(idle), 15)
+            redrawn = wait_for(browser, lambda b: (b.execute_script(lists)["minutes"] or {}).get("shown") == "Mistral 7b"
+                               and b.execute_script(lists)["minutes"]["go"] is None
+                               and any(line.endswith("Mistral 7b") for line in b.execute_script(LINES, "#meeting .minutes .maker")), 10)
+            check("made again: its line says the new version's model, nothing left to make", redrawn,
+                  (browser.execute_script(lists), browser.execute_script(LINES, "#meeting .maker")))
+            # A summary waiting for its model: the list beside « Faire le compte rendu », which names it.
+            (WORK / "summary-args").unlink(missing_ok=True)
+            browser.execute_script(f"location.hash = '#/meeting/{waiting.name}'")
+            asked = lambda b: b.find_element(By.ID, "make-minutes").text if b.find_elements(By.ID, "make-minutes") else None
+            offered = wait_for(browser, lambda b: (b.execute_script(lists)["minutes"] or {}).get("shown") == "Qwen3 14b"
+                               and asked(b) == "Faire le compte rendu avec Qwen3 14b", 10)
+            check("a summary waiting: its list beside « Faire le compte rendu », Settings' model shown, the button naming it",
+                  offered and browser.execute_script(lists)["minutes"]["seen"], (browser.execute_script(lists), asked(browser)))
+            pick(browser, "minutes", "Mistral 7b")
+            kept = wait_for(browser, lambda b: asked(b) == "Faire le compte rendu avec Mistral 7b"
+                            and own(waiting) == {"minutes": {"provider": here, "model": "mistral:7b"}}, 5)
+            check("a summary waiting, another model chosen: kept for the meeting, nothing made, the button naming it",
+                  kept and browser.execute_script(idle) and not (waiting / "minutes.md").exists() and not (WORK / "summary-args").exists(),
+                  (asked(browser), own(waiting)))
+            press(browser, "make-minutes")
+            wrote = wait_for(None, lambda _: (waiting / "minutes.md").exists() and "mistral:7b" in (WORK / "summary-args").read_text(), 15)
+            check("« Faire le compte rendu avec Mistral 7b » makes it with that model", wrote,
+                  (WORK / "summary-args").read_text() if (WORK / "summary-args").exists() else None)
+            wait_for(browser, lambda b: b.execute_script(idle), 15)
+            # A meeting said confidential: its lists offer the models here alone — no service.
+            browser.execute_script(f"location.hash = '#/meeting/{secret.name}'")
+            shown = wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == secret.name and filled(b), 10)
+            got = browser.execute_script(lists)
+            check("a meeting said confidential: the page's lists offer no service (D91)",
+                  shown and not any("via" in said for said in got["minutes"]["offered"] + got["transcription"]["offered"])
+                  and got["transcription"]["offered"] == ["Whisper page settings", "Whisper tiny page"], got)
+            # Said confidential while its page is open: the lists read again, the service gone — no reload,
+            # never the models read before it was (D91, the coordinator's « local only when confidential »).
+            browser.execute_script(f"location.hash = '#/meeting/{made.name}'")
+            served = wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == made.name
+                              and filled(b) and any("via" in said for said in b.execute_script(lists)["transcription"]["offered"]), 10)
+            ActionChains(browser).click(browser.find_element(By.ID, "confidential-switch")).perform()
+            local = wait_for(browser, lambda b: (made / "confidential").exists() and filled(b)
+                             and not any("via" in said for said in b.execute_script(lists)["transcription"]["offered"]), 10)
+            check("a page open, its meeting then said confidential: its lists offer the models here alone, the service gone (D91, D93)",
+                  served and local, ((made / "confidential").exists(), browser.execute_script(lists)))
+    finally:
+        tags.shutdown()
+
+
 def two_panes(now: dt.datetime) -> None:
     """AD. The window in two panes: the meetings in a sidebar, the one chosen beside them (D61)."""
     print("AD. the window in two panes: the sidebar, the meeting chosen beside it, as wide as the window (D61)")
@@ -7626,7 +7851,7 @@ def two_panes(now: dt.datetime) -> None:
     # When a version was made, in the system's local time (D93): a zone far from UTC and from the
     # instants' own offset, +02:00 — 10:42 there is 04:42 in New York, 08:42 in UTC.
     zone = "America/New_York"
-    makers = lambda b: [p.text for p in b.find_elements(By.CSS_SELECTOR, "#meeting .maker")]
+    makers = lambda b: lines_seen(b, "#meeting .maker")
     window = Window(meetings, "fr_FR.UTF-8")
     window.env["TZ"] = zone
     with window as browser:
@@ -10138,7 +10363,7 @@ def main() -> int:
         shown = wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed() and b.find_elements(By.CSS_SELECTOR, ".lines li"))
         check("a click on a meeting opens it, marked in the list (D61)", shown
               and browser.find_elements(By.CSS_SELECTOR, ".session")[0].get_attribute("aria-current") == "page")
-        heard_here = [p.text for p in browser.find_elements(By.CSS_SELECTOR, "#meeting .made .maker")]
+        heard_here = lines_seen(browser, "#meeting .made .maker")
         check("a meeting heard here says so, by the model's name", heard_here == ["Transcrit par Whisper large v3 turbo, sur cet ordinateur"], heard_here)
         shot(browser, "2-session")
         minutes = browser.find_element(By.CSS_SELECTOR, ".minutes")
@@ -10163,7 +10388,7 @@ def main() -> int:
             label.startswith("Qui a parlé") and len(here) == len(remote) == 60 and here[0] < 42 and remote[0] > 46 and here[-1] == 42,
             drawn,
         )
-        maker = minutes.find_element(By.CSS_SELECTOR, ".maker").text
+        maker = lines_seen(browser, "#meeting .minutes .maker")[0]
         check(
             "when the minutes were made, then who wrote them and where (D93) — the model as people say it, the day without its year",
             maker.startswith("Compte rendu du 13 oct. à ") and maker.endswith(" · Claude Sonnet, via openrouter.ai") and "2026" not in maker,
@@ -10892,13 +11117,16 @@ def main() -> int:
         browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
         # Offered once what was being made for it is read as ended.
         wait_for(browser, lambda b: b.find_elements(By.ID, "make-minutes") and b.find_element(By.ID, "make-minutes").is_displayed())
-        heard = browser.find_element(By.CSS_SELECTOR, "#meeting .made .maker").text
+        heard = lines_seen(browser, "#meeting .made .maker")[0]
         check("the meeting's page says where its transcript was made, on its card (D89)", heard.endswith("sur cet ordinateur"), heard)
         (WORK / "slow-minutes").touch()
         browser.find_element(By.ID, "make-minutes").click()
         state = lambda b: b.find_element(By.ID, "minutes-state").text if b.find_elements(By.ID, "minutes-state") else ""
-        shown = wait_for(browser, lambda b: "Rédaction du compte rendu" in state(b), 3)
-        said = state(browser)
+        # Being made: said by the page's one bar, the step and what makes it, its card silent (D92, #938).
+        bar = ("const m = document.getElementById('making'); return m && m.getClientRects().length"
+               " ? `${document.getElementById('making-step').textContent} · ${m.querySelector('.by').textContent}` : ''")
+        shown = wait_for(browser, lambda b: "Rédaction du compte rendu" in b.execute_script(bar), 3)
+        said = browser.execute_script(bar)
         check("while they are written, the page says so — what, by which model, for how long", shown and "Qwen3 14b" in said and "0:0" in said, said)
         # Asked meanwhile for another meeting: it waits its turn, said on its page and in the list.
         browser.execute_script("location.hash = '#/meeting/2026-10-18_14-00'")
@@ -11201,7 +11429,7 @@ def main() -> int:
         shot(browser, "9-transcript-failed")
         check("what is not known of who wrote the minutes is left unsaid (#312)",
               "— · —" not in browser.find_element(By.ID, "meeting").text and "via —" not in browser.find_element(By.ID, "meeting").text,
-              [p.text for p in browser.find_elements(By.CSS_SELECTOR, "#meeting .maker")])
+              browser.execute_script(LINES, "#meeting .maker"))
         check("a transcript not made says so on its card in plain words, with a way to try again", unmade and "engine stopped" not in heard_state(browser), heard_state(browser))
         # Tried again as it was asked: made again with the meeting's own model, kept by the Refaire…, not resumed.
         # Made again — the one there set aside, then in the trash —, never resumed from it.
@@ -11222,10 +11450,13 @@ def main() -> int:
         paths = [browser.execute_script("return window.__TAURI__.core.invoke('settings_shown').then(s => s.model)")]
         redo_pick(browser, "redo-transcript-panel", "transcription", 1)
         browser.find_element(By.ID, "redo-transcript-do").click()
-        making_ = wait_for(browser, lambda b: "Transcription en cours" in heard_state(b), 3)
+        # Being made: said by the page's one bar, the step and what makes it, its card silent (D92, #938).
+        bar = ("const m = document.getElementById('making'); return m && m.getClientRects().length"
+               " ? `${document.getElementById('making-step').textContent} · ${m.querySelector('.by').textContent}` : ''")
+        making_ = wait_for(browser, lambda b: "Transcription en cours" in b.execute_script(bar), 3)
         shot(browser, "7-transcript-making")
-        check("while it is made, its card says so — what, by which model, for how long",
-              making_ and "Whisper small · 0:0" in heard_state(browser) and not browser.find_elements(By.ID, "transcript-again"), heard_state(browser))
+        check("while it is made, the page's bar says so — what, by which model, for how long (D92)",
+              making_ and "Whisper small · 0:0" in browser.execute_script(bar) and not browser.find_elements(By.ID, "transcript-again"), browser.execute_script(bar))
         browser.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: '2026-10-18_11-00', model: arguments[0]})", paths[0])
         lined = lambda b: b.execute_async_script("window.__TAURI__.core.invoke('makings').then(m => arguments[arguments.length - 1](m.transcripts_waiting))")
         queued = wait_for(browser, lambda b: lined(b) == ["2026-10-18_11-00"], 3)
@@ -11719,6 +11950,7 @@ def main() -> int:
     microphone_rollback(now)
     redo_choice_starts_nothing(now)
     redo_offers_the_services_models(now)
+    models_on_the_page(now)
     settings_folded(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
