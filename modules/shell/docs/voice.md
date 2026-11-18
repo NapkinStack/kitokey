@@ -118,3 +118,6 @@ A sentence with a placeholder is searched a second time, by each of its fixed pa
 (« Le réglage n’a pas été enregistré : {…} »), is no part of the old sentence alone, and the first search
 lets it through; #950 and P7 each had two. A check that reads `.text` reads a `\u00a0` as a space, a
 `\u202f` as itself: it waits for « « 0 » » with plain spaces.
+
+A hit of either search inside `main()` is read and settled one by one: a partial run never reaches
+`main()`, so a green partial says nothing of it (#950's attest failed so, on « compte rendu »).
