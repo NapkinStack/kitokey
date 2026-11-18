@@ -22,6 +22,26 @@ pub enum After {
     Minutes,
 }
 
+/// The windows' look (D98): the system's light or dark, or one chosen whatever the system says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Appearance {
+    System,
+    Light,
+    Dark,
+}
+
+impl Appearance {
+    /// As the settings file writes it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Appearance::System => "system",
+            Appearance::Light => "light",
+            Appearance::Dark => "dark",
+        }
+    }
+}
+
 /// How much the logs hold: the usual steps, or more for whoever looks into a failure (D29).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -130,6 +150,8 @@ pub struct Settings {
     pub welcomed: bool,
     /// The full window's sidebar folded by the user (D61): opened again as it was left.
     pub folded: bool,
+    /// Every window's look, the system's by default (D98).
+    pub appearance: Appearance,
     /// Where the user left the recording bar, in the screen's logical pixels (D90): it opens there
     /// again where the system lets an application place itself — Windows, macOS —, a screen holding
     /// it still; never written nor read on Linux, where GNOME chooses.
@@ -169,6 +191,7 @@ impl Default for Settings {
             log: Log::Info,
             welcomed: false,
             folded: false,
+            appearance: Appearance::System,
             bar_at: None,
             language: None,
             microphone: None,
@@ -243,37 +266,116 @@ struct Written {
     log: Option<Log>,
     welcomed: Option<bool>,
     folded: Option<bool>,
+    appearance: Option<Appearance>,
     bar_at: Option<[i32; 2]>,
     language: Option<String>,
     microphone: Option<String>,
     microphone_description: Option<String>,
 }
 
+/// What in a settings file Kitokey refuses, as the user is told it (#783): which setting, on which
+/// line. A key is one of the file's own (`KEYS`), never what the user typed in its place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refused {
+    /// The file is there and cannot be opened: its permissions, a folder in its place.
+    Unopened,
+    /// A line that is not a setting as TOML writes one, or a setting whose value is not of its kind.
+    Unparsed { line: usize, key: Option<&'static str> },
+    /// `sessions`: not a folder's whole path.
+    SessionsNotWhole { line: usize },
+    /// `model`: not a file's whole path.
+    ModelNotWhole { line: usize },
+    /// `keep_audio`: neither "always" nor a number of days from 1 to 36,500.
+    KeepAudio { line: usize },
+}
+
+/// A settings file refused: what the user is told, and the sentence the log and developer mode
+/// hold — which names the file by its whole path until `unnamed` is given it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unread {
+    pub refused: Refused,
+    pub detail: String,
+}
+
+impl std::fmt::Display for Unread {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.detail)
+    }
+}
+
+/// The keys a settings file may hold: those a refusal names.
+const KEYS: [&str; 26] = [
+    "reminder",
+    "sessions",
+    "transcript",
+    "after",
+    "model",
+    "engine",
+    "transcription_provider",
+    "transcription_model",
+    "transcription_agreed",
+    "minutes_provider",
+    "minutes_model",
+    "meeting_language",
+    "minutes_agreed",
+    "keep_audio",
+    "developer",
+    "offer",
+    "autostart",
+    "window",
+    "log",
+    "welcomed",
+    "folded",
+    "appearance",
+    "bar_at",
+    "language",
+    "microphone",
+    "microphone_description",
+];
+
 /// Reads the settings. No file is no choice made: the defaults. A file that cannot be read as
 /// settings is said in one sentence — which file, which line, and what in it — and nothing of
 /// it is used.
-pub fn read(path: &Path) -> Result<Settings, String> {
+pub fn read(path: &Path) -> Result<Settings, Unread> {
+    let unread = |refused, detail| Unread { refused, detail };
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Settings::default()),
-        Err(error) => return Err(format!("{} cannot be read ({error})", path.display())),
+        Err(error) => return Err(unread(Refused::Unopened, format!("{} cannot be read ({error})", path.display()))),
     };
     // The line a place of the file is on: one more than the line ends before it.
     let line = |at: usize| text[..at.min(text.len())].matches('\n').count() + 1;
+    // The key a line sets, when it is one of the file's own.
+    let key = |at: usize| {
+        let start = text[..at.min(text.len())].rfind('\n').map_or(0, |end| end + 1);
+        let (named, _) = text[start..].split_once('=')?;
+        // A key written in quotes, as TOML allows, is the same key.
+        let named = named.trim().trim_matches(|c| c == '"' || c == '\'');
+        KEYS.into_iter().find(|key| *key == named)
+    };
     let written: Written = toml::from_str(&text).map_err(|error| match error.span() {
-        Some(span) => format!("{}, line {}: {}", path.display(), line(span.start), error.message()),
-        None => format!("{}: {}", path.display(), error.message()),
+        Some(span) => unread(
+            Refused::Unparsed {
+                line: line(span.start),
+                key: key(span.start),
+            },
+            format!("{}, line {}: {}", path.display(), line(span.start), error.message()),
+        ),
+        None => unread(
+            Refused::Unparsed { line: 1, key: None },
+            format!("{}: {}", path.display(), error.message()),
+        ),
     })?;
     // A path written as people write it: from their home, with a tilde — or from the root.
-    let whole = |key: &str, what: &str, written: toml::Spanned<PathBuf>| {
+    let whole = |key: &str, what: &str, refused: fn(usize) -> Refused, written: toml::Spanned<PathBuf>| {
         let at = line(written.span().start);
         let named = from_home(written.into_inner());
         if named.is_absolute() {
             Ok(named)
         } else {
-            Err(format!(
-                "{}, line {at}: {key} is {what} whole path, from the root or from ~",
-                path.display()
+            Err(unread(
+                refused(at),
+                format!("{}, line {at}: {key} is {what} whole path, from the root or from ~", path.display()),
             ))
         }
     };
@@ -285,6 +387,7 @@ pub fn read(path: &Path) -> Result<Settings, String> {
     settings.window = written.window.unwrap_or(settings.window);
     settings.welcomed = written.welcomed.unwrap_or(settings.welcomed);
     settings.folded = written.folded.unwrap_or(settings.folded);
+    settings.appearance = written.appearance.unwrap_or(settings.appearance);
     settings.bar_at = written.bar_at;
     // One it does not speak, written by hand: the system's.
     settings.language = written.language.as_deref().and_then(Language::named);
@@ -310,18 +413,18 @@ pub fn read(path: &Path) -> Result<Settings, String> {
             toml::Value::String(always) if always == "always" => KeepAudio::Always,
             toml::Value::Integer(days) if (1..=36_500).contains(days) => KeepAudio::Days(*days as u32),
             _ => {
-                return Err(format!(
-                    "{}, line {at}: keep_audio is \"always\" or a number of days",
-                    path.display()
+                return Err(unread(
+                    Refused::KeepAudio { line: at },
+                    format!("{}, line {at}: keep_audio is \"always\" or a number of days", path.display()),
                 ));
             }
         };
     }
     if let Some(sessions) = written.sessions {
-        settings.sessions = whole("sessions", "the folder's", sessions)?;
+        settings.sessions = whole("sessions", "the folder's", |line| Refused::SessionsNotWhole { line }, sessions)?;
     }
     if let Some(model) = written.model {
-        settings.model = whole("model", "the file's", model)?;
+        settings.model = whole("model", "the file's", |line| Refused::ModelNotWhole { line }, model)?;
     }
     Ok(settings)
 }
@@ -345,7 +448,7 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     let refused = |why: String| io::Error::new(io::ErrorKind::InvalidData, why);
     // Through a link, the file it points to.
     let path = &fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    let before = read(path).map_err(refused)?;
+    let before = read(path).map_err(|why| refused(why.detail))?;
     let mut document = match fs::read_to_string(path) {
         Ok(text) => text.parse::<DocumentMut>().map_err(|error| refused(error.to_string()))?,
         Err(error) if error.kind() == io::ErrorKind::NotFound => DocumentMut::new(),
@@ -381,6 +484,9 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     }
     if settings.folded != before.folded {
         set(&mut document, "folded", Value::from(settings.folded));
+    }
+    if settings.appearance != before.appearance {
+        set(&mut document, "appearance", Value::from(settings.appearance.as_str()));
     }
     if let Some([x, y]) = settings.bar_at
         && settings.bar_at != before.bar_at
@@ -470,4 +576,57 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     written.and_then(|()| fs::rename(&draft, path)).inspect_err(|_| {
         let _ = fs::remove_file(&draft);
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `KEYS` names each of `Written`'s fields, and nothing else (#813): a setting added to the file
+    /// is named by a refusal. The pattern lists every field — one added or taken out fails to compile
+    /// here — and the names compared are the pattern's own.
+    #[test]
+    fn the_keys_a_refusal_names_are_the_files_fields() {
+        macro_rules! fields {
+            ($($field:ident),* $(,)?) => {{
+                #[allow(dead_code)]
+                fn every(written: Written) {
+                    let Written { $($field: _),* } = written;
+                }
+                [$(stringify!($field)),*]
+            }};
+        }
+        let mut fields = fields!(
+            reminder,
+            sessions,
+            transcript,
+            after,
+            model,
+            engine,
+            transcription_provider,
+            transcription_model,
+            transcription_agreed,
+            minutes_provider,
+            minutes_model,
+            meeting_language,
+            minutes_agreed,
+            keep_audio,
+            developer,
+            offer,
+            autostart,
+            window,
+            log,
+            welcomed,
+            folded,
+            appearance,
+            bar_at,
+            language,
+            microphone,
+            microphone_description,
+        );
+        let mut keys = KEYS;
+        fields.sort_unstable();
+        keys.sort_unstable();
+        assert_eq!(keys, fields);
+    }
 }

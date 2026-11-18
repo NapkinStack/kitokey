@@ -48,7 +48,7 @@ repos:
 
   # Workflow security. Offline, so local and CI results are identical.
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: c92afdf2c6ca336aaa8f39e2bd8d48f62dbd8e1f  # frozen: v1.31.1
+    rev: 06a39750ec31860bb44f2acf67182c40016cd1e7  # frozen: v1.32.0
     hooks:
       - id: zizmor
         # An empty token variable makes zizmor refuse its option before --offline counts (#327).
@@ -62,6 +62,16 @@ repos:
     hooks:
       - id: actionlint
         args: [-shellcheck=, -pyflakes=]
+
+  # The e2e scripts, run only by the coordinator's e2e: an undefined name or a loop variable
+  # overwritten is seen at commit, not after a run (72470a8). F and PLW2901 only, on the shell's
+  # and capture's scripts. The version contracts and platform lock.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 44b5042edab9382aba712eed4f9c7bab7a3d6a3e  # frozen: v0.17.0
+    hooks:
+      - id: ruff-check
+        args: [--isolated, --select, "F,PLW2901"]
+        files: ^modules/(shell|capture)/scripts/.*\.py$
 
   # At commit time: only scans the staged changes.
   - repo: https://github.com/gitleaks/gitleaks

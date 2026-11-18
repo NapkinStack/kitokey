@@ -21,6 +21,15 @@ pub struct Transcript {
     pub context: Option<String>,
     /// The `complete` line is there: the step finished.
     pub complete: bool,
+    /// When it was made whole, as its `complete` line says it (D93): RFC 3339 with its offset,
+    /// absent in one made before that was written — or written otherwise.
+    pub made: Option<String>,
+    /// How long its one step took, in seconds, and what the service said it cost, as its `complete`
+    /// line says them (D97): a time a number at least zero; a cost one too, with its currency's
+    /// three capital letters, both or neither — `minutes/v3`'s bounds. Else none.
+    pub made_in: Option<f64>,
+    pub cost: Option<f64>,
+    pub currency: Option<String>,
     pub segments: Vec<Segment>,
     /// Lines that were not lines of the contract, left out.
     pub unread: usize,
@@ -71,6 +80,10 @@ pub fn transcript(folder: &Path) -> Read<Transcript> {
         model: text_of(&header, "model"),
         context: text_of(&header, "context"),
         complete: false,
+        made: None,
+        made_in: None,
+        cost: None,
+        currency: None,
         segments: Vec::new(),
         unread: 0,
     };
@@ -85,7 +98,23 @@ pub fn transcript(folder: &Path) -> Read<Transcript> {
                 None => read.unread += 1,
             },
             Some("covered") => {}
-            Some("complete") => read.complete = true,
+            Some("complete") => {
+                read.complete = true;
+                // An instant the window can place in its day, or none: never a time made up.
+                read.made = text_of(&value, "made").filter(|made| chrono::DateTime::parse_from_rfc3339(made).is_ok());
+                let at_least_zero = |name: &str| {
+                    value
+                        .get(name)
+                        .and_then(serde_json::Value::as_f64)
+                        .filter(|n| *n >= 0.0)
+                        .map(f64::abs)
+                };
+                read.made_in = at_least_zero("made_in");
+                let currency = text_of(&value, "currency").filter(|code| code.len() == 3 && code.bytes().all(|c| c.is_ascii_uppercase()));
+                if let (Some(cost), Some(currency)) = (at_least_zero("cost"), currency) {
+                    (read.cost, read.currency) = (Some(cost), Some(currency));
+                }
+            }
             _ => read.unread += 1,
         }
     }

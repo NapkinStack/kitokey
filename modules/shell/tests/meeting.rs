@@ -318,3 +318,74 @@ fn a_version_3_wav_that_opens_and_is_no_track_is_no_track_its_flac_not_read_in_i
     fs::remove_file(root.join("local.wav")).unwrap();
     assert_eq!(meeting::tracks(root).len(), 1);
 }
+
+/// When the transcript was made whole (D93, `transcript/v1`'s optional `made`), as the window reads
+/// it: the `complete` line's instant, RFC 3339 with its offset; absent, or not such an instant, none —
+/// the page then says the model alone, never a time made up.
+#[test]
+fn a_transcript_says_when_it_was_made_whole_only_as_its_complete_line_writes_it() {
+    let folder = tempfile::tempdir().unwrap();
+    let header =
+        r#"{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"ggml-small","language":null,"context":null}"#;
+    let made = |complete: &str| {
+        fs::write(folder.path().join("transcript.jsonl"), format!("{header}\n{complete}\n")).unwrap();
+        let Read::Present(transcript) = meeting::transcript(folder.path()) else {
+            panic!("not read")
+        };
+        serde_json::to_value(&transcript).unwrap()["made"].clone()
+    };
+    assert_eq!(
+        made(r#"{"type":"complete","duration":1.0,"made":"2026-11-13T09:42:00+01:00"}"#),
+        "2026-11-13T09:42:00+01:00"
+    );
+    assert_eq!(
+        made(r#"{"type":"complete","duration":1.0,"made":"2026-11-13T08:42:00Z"}"#),
+        "2026-11-13T08:42:00Z"
+    );
+    for complete in [
+        r#"{"type":"complete","duration":1.0}"#,
+        r#"{"type":"complete","duration":1.0,"made":"2026-11-13T09:42:00"}"#,
+        r#"{"type":"complete","duration":1.0,"made":"yesterday"}"#,
+        r#"{"type":"complete","duration":1.0,"made":20261113}"#,
+    ] {
+        assert_eq!(made(complete), serde_json::Value::Null, "{complete}");
+    }
+}
+
+/// What the making of a transcript took (D97, `transcript/v1`'s optional `made_in`, `cost` and
+/// `currency`), as the window reads them off its `complete` line: a time a JSON number at least zero,
+/// a cost and its currency both or neither, as `minutes/v3` bounds them; else none, the transcript read.
+#[test]
+fn a_transcript_says_how_long_it_took_and_what_it_cost_only_as_its_complete_line_writes_them() {
+    let folder = tempfile::tempdir().unwrap();
+    let header = r#"{"type":"header","contract":"transcript/v1","engine":"openai","model":"whisper-1","language":null,"context":null}"#;
+    let took = |complete: &str| {
+        fs::write(folder.path().join("transcript.jsonl"), format!("{header}\n{complete}\n")).unwrap();
+        let Read::Present(transcript) = meeting::transcript(folder.path()) else {
+            panic!("not read")
+        };
+        let read = serde_json::to_value(&transcript).unwrap();
+        assert_eq!(read["complete"], true, "{complete}");
+        (read["made_in"].clone(), read["cost"].clone(), read["currency"].clone())
+    };
+    let none = serde_json::Value::Null;
+    assert_eq!(
+        took(r#"{"type":"complete","duration":1.0,"made_in":40.2,"cost":0.0021,"currency":"USD"}"#),
+        (40.2.into(), 0.0021.into(), "USD".into())
+    );
+    assert_eq!(
+        took(r#"{"type":"complete","duration":1.0,"made_in":0}"#),
+        (0.0.into(), none.clone(), none.clone())
+    );
+    for complete in [
+        r#"{"type":"complete","duration":1.0}"#,
+        r#"{"type":"complete","duration":1.0,"made_in":-1,"cost":0.1}"#,
+        r#"{"type":"complete","duration":1.0,"made_in":"40","currency":"USD"}"#,
+        r#"{"type":"complete","duration":1.0,"made_in":null,"cost":-0.1,"currency":"USD"}"#,
+        r#"{"type":"complete","duration":1.0,"cost":"0.1","currency":"USD"}"#,
+        r#"{"type":"complete","duration":1.0,"cost":0.1,"currency":"usd"}"#,
+        r#"{"type":"complete","duration":1.0,"cost":0.1,"currency":"USDT"}"#,
+    ] {
+        assert_eq!(took(complete), (none.clone(), none.clone(), none.clone()), "{complete}");
+    }
+}

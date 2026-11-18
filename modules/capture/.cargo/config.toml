@@ -1,0 +1,7 @@
+# libflac-sys builds libFLAC with CMake. libFLAC asks for CMake 3.12...3.31, so policy CMP0091 is
+# NEW: CMake picks the MSVC runtime from CMAKE_MSVC_RUNTIME_LIBRARY, by default the DLL's (/MD), and
+# not from the /MT cmake-rs passes in the flags. A program built with `+crt-static` (windows-app.yml)
+# then fails to link (`__imp_fread`, LNK2019). The toolchain file below sets the runtime the build
+# asks for; read by cmake-rs for this target only.
+[env]
+CMAKE_TOOLCHAIN_FILE_x86_64_pc_windows_msvc = { value = "cmake/msvc-runtime.cmake", relative = true }

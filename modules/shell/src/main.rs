@@ -38,11 +38,11 @@ use kitokey_shell::{
     minutes::{self, Minutes},
     model::{self, Published},
     named, player,
-    providers::{self, Online},
+    providers::{self, OnlineOffered},
     recording::{self, Recording, Said, Source},
     registry,
     sessions::{self, Listed},
-    settings::{self, After, Engine, KeepAudio, Log, Settings},
+    settings::{self, After, Appearance, Engine, KeepAudio, Log, Settings},
     sound_check, speech, spoken,
     summarising::{self, Summarising},
     transcription::{self, Hearer, Made, Transcription},
@@ -78,6 +78,9 @@ struct Shell {
     next_context: Mutex<String>,
     /// The models chosen in the bar at rest for the next recording (D91): its own once it starts.
     next_models: Mutex<meeting_models::Models>,
+    /// The language chosen in the bar at rest for the next meeting (D99), in `next_language_file`
+    /// too: its own once it starts, then none.
+    next_language: Mutex<Option<String>>,
     /// The menu's entry that starts and stops, relabelled as the recording goes.
     toggle: MenuItem<Wry>,
     /// The user asked to quit while a recording ran: it is stopped first, then Kitokey leaves.
@@ -214,10 +217,15 @@ impl Shell {
     /// Reads the settings file again — the user may have changed it by hand — and holds what it
     /// says; a file that cannot be read is said, by its name and not its path, and what was held
     /// stays.
-    fn reread(&self) -> Result<Settings, String> {
+    fn reread(&self) -> Result<Settings, settings::Unread> {
         let read = settings::file().map_or_else(
             || Ok(Settings::default()),
-            |file| settings::read(&file).map_err(|why| settings::unnamed(&why, &file)),
+            |file| {
+                settings::read(&file).map_err(|why| settings::Unread {
+                    detail: settings::unnamed(&why.detail, &file),
+                    ..why
+                })
+            },
         );
         if let Ok(settings) = &read {
             *self.settings.lock().unwrap() = settings.clone();
@@ -266,7 +274,7 @@ impl Shell {
 
     /// The settings read again for a command.
     fn read_or_told(&self) -> Result<Settings, Told> {
-        self.reread().map_err(|why| self.told(Failure::SettingsUnread, why))
+        self.reread().map_err(|why| self.told(Failure::SettingsUnread(why.refused), why))
     }
 
     /// The settings written for a command.
@@ -362,7 +370,7 @@ fn main() {
             speech_shown,
             transcription_saved,
             transcription_tested,
-            hearing_models,
+            transcription_models,
             speech_installed,
             ollama_pull_offered,
             header,
@@ -387,6 +395,8 @@ fn main() {
             next_context,
             next_context_kept,
             language_set,
+            bar_language,
+            next_language_kept,
             meeting_models_shown,
             meeting_models_chosen,
             models_offered,
@@ -406,6 +416,8 @@ fn main() {
             settings_saved,
             minutes_shown,
             minutes_saved,
+            minutes_models,
+            services_offered,
             minutes_tested,
             agreement_shown,
             agreed,
@@ -513,6 +525,7 @@ fn main() {
                 recorded: Mutex::new(None),
                 next_context: Mutex::new(next_file().map(|file| context::read_next(&file)).unwrap_or_default()),
                 next_models: Mutex::new(next_models_file().map(|file| meeting_models::read_next(&file)).unwrap_or_default()),
+                next_language: Mutex::new(next_language_file().and_then(|file| spoken::read_next(&file))),
                 toggle,
                 leaving: Mutex::new(false),
                 pressed: Mutex::new(None),
@@ -584,7 +597,11 @@ fn main() {
             let refused = licence::refused(&licence, &sessions, seconds_now());
             tracing::info!(licence = %answer, refused, "shell.licence_read");
             if let Err(why) = read {
-                tell(app.handle(), &words::trouble(&Trouble::Settings(why), language));
+                // The sentence of `settings.rs` to the log, by the file's name; the user is told which
+                // setting and what to do (#783).
+                let detail = settings::file().map_or_else(|| why.detail.clone(), |file| settings::unnamed(&why.detail, &file));
+                tracing::warn!(%detail, "shell.settings_unread");
+                tell(app.handle(), &words::trouble(&Trouble::Settings(why.refused), language));
             }
             // A recording a Kitokey ended before this one left running: shown, and stopped from here (#773).
             found(app.handle());
@@ -671,7 +688,7 @@ fn offer_recording(app: &AppHandle, application: String) {
                 tracing::info!("shell.offer_off");
                 let shell = app.state::<Shell>();
                 let _saving = shell.saving.lock().unwrap();
-                let saved = shell.reread().and_then(|mut settings| {
+                let saved = shell.reread().map_err(|why| why.detail).and_then(|mut settings| {
                     settings.offer = false;
                     let file = settings::file().ok_or("this system names no folder for settings")?;
                     settings::write(&file, &settings).map_err(|error| error.to_string())?;
@@ -731,7 +748,7 @@ fn show_welcome(app: &AppHandle) {
     let shell = app.state::<Shell>();
     {
         let _saving = shell.saving.lock().unwrap();
-        let written = shell.reread().and_then(|mut settings| {
+        let written = shell.reread().map_err(|why| why.detail).and_then(|mut settings| {
             settings.welcomed = true;
             let file = settings::file().ok_or("this system names no folder for settings")?;
             settings::write(&file, &settings).map_err(|error| error.to_string())?;
@@ -908,6 +925,8 @@ struct Listing {
     shortcut: Option<String>,
     /// The sidebar folded, as the user left it (D61).
     folded: bool,
+    /// Every window's look, as the settings hold it (D98): each window takes it when it draws.
+    appearance: Appearance,
     /// The meetings' folder is there and cannot be read (D67): `sessions` is empty for that reason.
     unreadable: bool,
     /// The settings file cannot be read (#770): never read since Kitokey started, the folder listed is
@@ -974,6 +993,7 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
             stopping: *shell.stopping.lock().unwrap(),
             shortcut: shell.shortcut.lock().unwrap().clone(),
             folded: shell.settings().folded,
+            appearance: shell.settings().appearance,
             unreadable: {
                 let folder = shell.settings().sessions.clone();
                 sessions::unreadable(&folder, folder == settings::Settings::default().sessions)
@@ -997,6 +1017,9 @@ struct Header {
     shortcut: Option<String>,
     /// The last start refused, the trial over (D83).
     refused: bool,
+    /// Every window's look (D98): asked by each window as it asks the rest, so that one chosen in
+    /// Settings reaches the bar too.
+    appearance: Appearance,
 }
 
 #[tauri::command]
@@ -1006,6 +1029,7 @@ fn header(shell: State<'_, Shell>) -> Header {
         stopping: *shell.stopping.lock().unwrap(),
         shortcut: shell.shortcut.lock().unwrap().clone(),
         refused: *shell.refused.lock().unwrap(),
+        appearance: shell.settings().appearance,
     }
 }
 
@@ -1648,6 +1672,61 @@ fn language_set(shell: State<'_, Shell>, name: String, language: Option<String>)
     Ok(())
 }
 
+/// The meeting's language as the bar's options offer it (D99): the one recording's own, or at rest
+/// the next meeting's, with what the meeting's page offers beside it (D65).
+#[derive(serde::Serialize)]
+struct BarLanguage {
+    language: Option<String>,
+    languages: Vec<(&'static str, &'static str)>,
+    meeting_language: Option<String>,
+    apple: bool,
+    system_language: &'static str,
+}
+
+#[tauri::command]
+fn bar_language(shell: State<'_, Shell>, name: Option<String>) -> Result<BarLanguage, Told> {
+    let language = match &name {
+        Some(name) => spoken::read(&session_folder(&shell, name)?),
+        None => shell.next_language.lock().unwrap().clone(),
+    };
+    Ok(BarLanguage {
+        language,
+        languages: spoken::OFFERED.to_vec(),
+        meeting_language: shell.settings().meeting_language,
+        apple: shell.settings().engine == Engine::SpeechAnalyzer,
+        system_language: shell.system.code(),
+    })
+}
+
+/// Where the language chosen at rest for the next meeting is, beside the settings (D99).
+fn next_language_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("next-language.txt"))
+}
+
+/// The bar's language at rest chosen (D99): kept for the next meeting, none being the settings'.
+/// Refused while a recording runs — that one's own is its meeting's —, and for a text that is not a
+/// code of ISO 639-1, what is kept staying as it is.
+#[tauri::command]
+fn next_language_kept(shell: State<'_, Shell>, language: Option<String>) -> Result<(), Told> {
+    let mut next = shell.next_language.lock().unwrap();
+    if shell.recording.lock().unwrap().is_some() {
+        return Err(shell.told(Failure::Busy, "a recording runs: its own language is its meeting's"));
+    }
+    let language = language.filter(|code| !code.trim().is_empty());
+    let file = next_language_file().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for settings"))?;
+    spoken::keep_next(&file, language.as_deref()).map_err(|error| {
+        let failure = if error.kind() == std::io::ErrorKind::InvalidInput {
+            Failure::Unexpected
+        } else {
+            Failure::MeetingFile
+        };
+        shell.told(failure, error)
+    })?;
+    *next = language.as_deref().and_then(spoken::code);
+    tracing::info!(language = next.as_deref().unwrap_or("none"), "shell.next_language_kept");
+    Ok(())
+}
+
 /// What a meeting chose for itself (D91), and the steps whose choice is gone: Settings' choice
 /// makes them, and the page says so.
 #[derive(serde::Serialize)]
@@ -1698,7 +1777,7 @@ fn models_offered(shell: State<'_, Shell>, name: Option<String>) -> Result<Model
     // Settings unreadable: offered from those in memory, and said — the panel still opens.
     let (settings, unreadable) = match shell.reread() {
         Ok(settings) => (settings, None),
-        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked, why))),
+        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked(why.refused), why))),
     };
     let (mut chosen, gone, confidential) = match &name {
         Some(name) => {
@@ -2336,7 +2415,6 @@ struct SettingsShown {
     /// host it is read again from on the user's gesture (D40).
     offered: Vec<Offered>,
     registry_host: String,
-    registry_waits: bool,
     /// The services that hear, offered by name (D63).
     hearing: Vec<providers::Hearing>,
     /// The language meetings are spoken in, none: detected; and those offered first (D65).
@@ -2346,6 +2424,8 @@ struct SettingsShown {
     language: Option<&'static str>,
     developer: bool,
     log: Log,
+    /// Every window's look (D98).
+    appearance: Appearance,
     unreadable: Option<Told>,
     /// What is left of the trial, said on a trial licence alone, read anew (D83).
     trial: Option<String>,
@@ -2383,7 +2463,7 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
     let (autostart, autostart_offered, autostart_held) = startup_shown();
     let (settings, unreadable) = match shell.reread() {
         Ok(settings) => (settings, None),
-        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked, why))),
+        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked(why.refused), why))),
     };
     let models = settings::whisper_models(&models_folder(), &settings)
         .into_iter()
@@ -2422,7 +2502,6 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
         transcription_agreed: settings.transcription_agreed.clone(),
         models,
         registry_host: registry::host(&registry_address()).to_owned(),
-        registry_waits: registry::PUBLIC_KEY.is_none(),
         hearing: providers::hearing(),
         meeting_language: settings.meeting_language.clone(),
         languages: spoken::OFFERED.to_vec(),
@@ -2440,6 +2519,7 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
         language: settings.language.map(Language::code),
         developer: settings.developer,
         log: settings.log,
+        appearance: settings.appearance,
         unreadable,
         trial,
     })
@@ -2465,6 +2545,8 @@ struct Change {
     folded: Option<bool>,
     /// The language Kitokey speaks (D64): `fr`, `en`, or empty for the system's.
     language: Option<String>,
+    /// Every window's look (D98).
+    appearance: Option<Appearance>,
 }
 
 /// Writes a change to the settings file, then holds it: the next recording follows it. Nothing
@@ -2518,6 +2600,9 @@ fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Re
     }
     if let Some(folded) = change.folded {
         settings.folded = folded;
+    }
+    if let Some(appearance) = change.appearance {
+        settings.appearance = appearance;
     }
     let spoken = settings.language;
     if let Some(language) = change.language {
@@ -2636,7 +2721,7 @@ struct MinutesShown {
     ollama_address: String,
     /// The local model recommended for the minutes, said so when Ollama holds it (#261).
     recommended: &'static str,
-    online: [Online; 3],
+    online: Vec<OnlineOffered>,
     provider: Option<String>,
     model: Option<String>,
     key_kept: bool,
@@ -2667,7 +2752,7 @@ async fn minutes_shown(shell: State<'_, Shell>) -> Result<MinutesShown, Told> {
         ollama: models.unwrap_or_default(),
         ollama_address: providers::ollama_address(&ollama()),
         recommended: providers::RECOMMENDED,
-        online: providers::ONLINE,
+        online: providers::online(),
         provider: settings.minutes_provider,
         model: settings.minutes_model,
         key_kept: kept,
@@ -2722,6 +2807,111 @@ async fn minutes_saved(
     Ok(not_kept)
 }
 
+/// A service set up for the summary, with every model it lists (D96).
+#[derive(serde::Serialize)]
+struct ServiceOffered {
+    /// As Settings name it: OpenRouter, OpenAI, Mistral.
+    name: &'static str,
+    address: String,
+    models: Vec<String>,
+}
+
+/// The services Refaire offers beyond Settings' own (D96): those that write the summary, those
+/// that transcribe.
+#[derive(serde::Serialize, Default)]
+struct ServicesOffered {
+    minutes: Vec<ServiceOffered>,
+    transcription: Vec<ServiceOffered>,
+}
+
+/// What Refaire offers beyond Settings' own (D96): each online service whose key is kept — the
+/// summary's under its host, the transcription's under its own account —, with every model it
+/// lists; one that does not answer is left out. A meeting said confidential is offered none
+/// (D60). Read off the window's thread: the keyring may ask the user first.
+#[tauri::command]
+async fn services_offered(shell: State<'_, Shell>, name: String) -> Result<ServicesOffered, Told> {
+    let folder = session_folder(&shell, &name)?;
+    if confidential::marked(&folder) {
+        return Ok(ServicesOffered::default());
+    }
+    tauri::async_runtime::spawn_blocking(|| {
+        let mut hearing: Vec<ServiceOffered> = Vec::new();
+        for service in providers::hearing() {
+            if hearing.iter().any(|known| known.address == service.address) {
+                continue;
+            }
+            let Some(host) = providers::host(&service.address) else {
+                continue;
+            };
+            let Some(key) = keys::key(&transcription::key_account(&host)).ok().flatten() else {
+                continue;
+            };
+            match providers::hearing_models(&service, Some(&key)) {
+                Ok(models) if !models.is_empty() => hearing.push(ServiceOffered {
+                    name: service.name,
+                    address: service.address.clone(),
+                    models,
+                }),
+                Ok(_) => {}
+                Err(cause) => tracing::warn!(cause = ?cause, "shell.services_unread"),
+            }
+        }
+        let mut offered: Vec<ServiceOffered> = Vec::new();
+        for service in providers::online() {
+            // One address once: a stand-in may answer for every service.
+            if offered.iter().any(|known| known.address == service.address) {
+                continue;
+            }
+            let Some(host) = providers::host(&service.address) else {
+                continue;
+            };
+            let Some(key) = keys::key(&host).ok().flatten() else {
+                continue;
+            };
+            match providers::service_models(&service.address, false, Some(&key)) {
+                Ok(models) if !models.is_empty() => offered.push(ServiceOffered {
+                    name: service.name,
+                    address: service.address,
+                    models,
+                }),
+                Ok(_) => {}
+                Err(cause) => tracing::warn!(cause = ?cause, "shell.services_unread"),
+            }
+        }
+        ServicesOffered {
+            minutes: offered,
+            transcription: hearing,
+        }
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))
+}
+
+/// A service's models for the summary, asked with the key the user typed — or the one kept for its
+/// host —: the key tested at once (D95). Only the ids come back; nothing is kept, the key never
+/// logged. Refused, the cause in the Tester's own sentence.
+#[tauri::command]
+async fn minutes_models(shell: State<'_, Shell>, provider: String, key: Option<String>) -> Result<Vec<String>, Told> {
+    let host = providers::host(provider.trim()).ok_or_else(|| shell.told(Failure::BadAddress, "no provider's address"))?;
+    let key_checked = providers::online()
+        .iter()
+        .any(|service| service.address == provider.trim() && service.key_checked);
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&host).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::service_models(provider.trim(), key_checked, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
+}
+
 /// Who hears, when a service does (D43): its address and model saved, the user's agreement to its
 /// host with them, its key kept in the keyring under the transcription's own account. A host on
 /// this computer needs no agreement. Nothing is sent here.
@@ -2771,23 +2961,30 @@ async fn transcription_saved(
     Ok(not_kept)
 }
 
-/// The transcription models a service that hears offers (D63): listed by the service where it
-/// lists them, else those it publishes. Nothing of a meeting is sent; no key is needed to list.
+/// A hearing service's models, asked with the key the user typed — or the one kept for its host
+/// under the transcription's account —: the key tested at once (D95), as the summary's is. Only the
+/// ids come back; nothing is kept, the key never logged. Refused, the cause in the Tester's sentence.
 #[tauri::command]
-async fn hearing_models(shell: State<'_, Shell>, index: usize) -> Result<Vec<String>, Told> {
+async fn transcription_models(shell: State<'_, Shell>, index: usize, key: Option<String>) -> Result<Vec<String>, Told> {
     let service = providers::hearing()
         .into_iter()
         .nth(index)
         .ok_or_else(|| shell.told(Failure::Unexpected, "no such service"))?;
-    let published = || service.models.iter().map(|model| model.to_string()).collect();
-    if !service.listed {
-        return Ok(published());
-    }
-    let address = service.address.clone();
-    let listed = tauri::async_runtime::spawn_blocking(move || providers::hearing_listed(&address))
-        .await
-        .map_err(|error| shell.told(Failure::Unexpected, error))?;
-    Ok(listed.unwrap_or_else(published))
+    let host = providers::host(&service.address).unwrap_or_default();
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&transcription::key_account(&host)).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::hearing_models(&service, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
 }
 
 /// *Tester* for who hears: `kitokey-transcription --test` sends a sound of its own to the service
@@ -3249,7 +3446,10 @@ fn write_minutes_from(
     let asked_again = chosen.clone();
     drop(writing);
     shell.minutes_tried.lock().unwrap().insert(folder.clone(), chosen.clone());
-    // Not started: said on the meeting's page as well as in a notification (D25).
+    // Not started: said on the meeting's page, and in a notification (D25) — the one that ends a
+    // meeting made after a stop, then, its transcript's own not told: its meeting named, and only
+    // where no window of Kitokey has the focus (D92).
+    let told = |notice: Notice| tell_made(app, &notice, &folder, false);
     let refused = |why: String| {
         shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
         shell.minutes_failed.lock().unwrap().insert(folder.clone(), (why, None, None));
@@ -3257,8 +3457,8 @@ fn write_minutes_from(
     let settings = match shell.reread() {
         Ok(settings) => settings,
         Err(why) => {
-            refused(why.clone());
-            return tell(app, &words::trouble(&Trouble::Settings(why), shell.language()));
+            refused(why.detail);
+            return told(words::trouble(&Trouble::Settings(why.refused), shell.language()));
         }
     };
     let named = settings.minutes_provider.clone().zip(settings.minutes_model.clone());
@@ -3287,7 +3487,7 @@ fn write_minutes_from(
                 let said = words::Minutes::OllamaWaits {
                     silent: wait == Wait::Silent,
                 };
-                return tell(app, &words::minutes(&said, shell.language()));
+                return told(words::minutes(&said, shell.language()));
             }
         }
     } else {
@@ -3300,19 +3500,19 @@ fn write_minutes_from(
             if from_line {
                 return;
             }
-            tell(app, &words::minutes(&words::Minutes::Unchosen, shell.language()));
+            told(words::minutes(&words::Minutes::Unchosen, shell.language()));
             return open_window_at(app, "#/settings");
         }
     };
     if !matches!(meeting::transcript(&folder), meeting::Read::Present(transcript) if transcript.complete) {
         refused("this meeting has no whole transcript".into());
-        return tell(app, &words::minutes(&words::Minutes::NoTranscript, shell.language()));
+        return told(words::minutes(&words::Minutes::NoTranscript, shell.language()));
     }
     let Some(host) = providers::host(&provider) else {
         let why = format!("{provider} is no provider's address");
         tracing::warn!(detail = %why, "shell.minutes_refused");
         refused(why);
-        return tell(app, &words::minutes(&words::Minutes::NoProvider(provider), shell.language()));
+        return told(words::minutes(&words::Minutes::NoProvider(provider), shell.language()));
     };
     if agreed_now != Some(host.as_str()) && !providers::local(&provider) && settings.minutes_agreed.as_deref() != Some(host.as_str()) {
         let mut awaiting = shell.awaiting.lock().unwrap();
@@ -3329,7 +3529,7 @@ fn write_minutes_from(
         if from_line {
             return;
         }
-        tell(app, &words::minutes(&words::Minutes::Waiting(host), shell.language()));
+        told(words::minutes(&words::Minutes::Waiting(host), shell.language()));
         let name = folder
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
@@ -3489,12 +3689,9 @@ fn write_minutes_from(
             summarising::Made::Written(_) => words::Minutes::Ready,
             summarising::Made::Failed(_, cause) => words::Minutes::failed_by(cause, again, own_model.as_deref(), shell.language()),
         };
-        // Ready, a click opens the meeting (D44); a failure is said as ever.
-        if written {
-            tell_opening(&app, &words::minutes(&said, shell.language()), folder.clone());
-        } else {
-            tell(&app, &words::minutes(&said, shell.language()));
-        }
+        // Ready, a click opens the meeting (D44); failed, it is said — once, naming the meeting,
+        // where no window of Kitokey has the focus (D92).
+        tell_made(&app, &words::minutes(&said, shell.language()), &folder, written);
     });
 }
 
@@ -3688,6 +3885,17 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>, found: b
                     }
                 }
                 Err(error) => tracing::error!(kind = ?error.kind(), "shell.models_not_taken"),
+            }
+            drop(next);
+            // The language chosen at rest, the meeting's own the same way (D99); then none for the next.
+            let mut next = shell.next_language.lock().unwrap();
+            match spoken::taken(folder, &mut next) {
+                Ok(()) => {
+                    if let Some(Err(error)) = next_language_file().map(|file| spoken::keep_next(&file, None)) {
+                        tracing::error!(kind = ?error.kind(), "shell.language_not_cleared");
+                    }
+                }
+                Err(error) => tracing::error!(kind = ?error.kind(), "shell.language_not_taken"),
             }
             drop(next);
             // Kept beside the settings while it runs: a Kitokey started again finds it (#773).
@@ -3891,7 +4099,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         return Ok(());
     }
     shell.transcripts_tried.lock().unwrap().insert(folder.clone(), Some(again.clone()));
-    let read = shell.reread().map_err(|why| (Failure::SettingsUnread, why))?;
+    let read = shell.reread().map_err(|why| (Failure::SettingsUnread(why.refused), why.detail))?;
     // The models this computer lists, as Settings name theirs: a Refaire… may pick Settings' own.
     let listed = settings::whisper_models(&models_folder(), &read);
     let settings = own(&read, &folder);
@@ -4004,10 +4212,12 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         if cancel.cancelled() {
             return transcribe_next(&app);
         }
-        // Made again and ready, its click opens the meeting as after a stop (D44).
+        // Made again and ready, its click opens the meeting as after a stop (D44); the minutes
+        // made after it, theirs alone says it (D92).
         match &made {
-            Made::Written(_) => tell_opening(&app, &words::made(&made, shell.language()), folder.clone()),
-            Made::Failed(_) => tell(&app, &words::made(&made, shell.language())),
+            Made::Written(_) if minutes_after => {}
+            Made::Written(_) => tell_made(&app, &words::made(&made, shell.language()), &folder, true),
+            Made::Failed(_) => tell_made(&app, &words::made(&made, shell.language()), &folder, false),
         }
         if let Some((name, not_put_back)) = kept_beside {
             tell(&app, &words::transcript_kept_beside(shell.language(), &name, not_put_back));
@@ -4107,8 +4317,9 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
                 .transcripts_failed
                 .lock()
                 .unwrap()
-                .insert(folder, format!("{} is no model on this computer", model.display()));
-            tell(app, &words::trouble(&trouble, shell.language()));
+                .insert(folder.clone(), format!("{} is no model on this computer", model.display()));
+            // The meeting's last step, failed: told as its end is (D92).
+            tell_made(app, &words::trouble(&trouble, shell.language()), &folder, false);
         }
         return;
     }
@@ -4124,9 +4335,9 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
     let (transcription, made) = match started {
         Ok(started) => started,
         Err(error) => {
-            shell.transcripts_failed.lock().unwrap().insert(folder, error.to_string());
-            tell(app, &words::trouble(&Trouble::NoTranscriber(error.to_string()), shell.language()));
-            return;
+            shell.transcripts_failed.lock().unwrap().insert(folder.clone(), error.to_string());
+            let notice = words::trouble(&Trouble::NoTranscriber(error.to_string()), shell.language());
+            return tell_made(app, &notice, &folder, false);
         }
     };
     // Held by its token: cancelled meanwhile, it is stopped at once (D92).
@@ -4168,14 +4379,14 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
         match made {
             Made::Written(folder) => {
                 // The minutes follow, when the settings say so — as they are now; then their
-                // notification alone says the meeting is made (D44).
+                // notification alone says the meeting is made (D44, D92).
                 if shell.reread().is_ok_and(|settings| settings.after == settings::After::Minutes) {
                     make_minutes(&app, folder);
                 } else {
-                    tell_opening(&app, &notice, folder.clone());
+                    tell_made(&app, &notice, &folder, true);
                 }
             }
-            Made::Failed(_) => tell(&app, &notice),
+            Made::Failed(_) => tell_made(&app, &notice, &heard_folder, false),
         }
         transcribe_next(&app);
     });
@@ -4532,6 +4743,49 @@ fn window_seen(app: &AppHandle) -> bool {
         .iter()
         .filter_map(|label| app.get_webview_window(label))
         .any(|window| window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false))
+}
+
+/// Whether a window of Kitokey has the focus, as the toolkit says: the user is in Kitokey (D92).
+fn window_focused(app: &AppHandle) -> bool {
+    ["main", "small"]
+        .iter()
+        .filter_map(|label| app.get_webview_window(label))
+        .any(|window| window.is_focused().unwrap_or(false))
+}
+
+/// A notice about a meeting, its meeting named first: its title, else when it was recorded (D92).
+fn of_meeting(app: &AppHandle, notice: &Notice, folder: &Path) -> Notice {
+    let language = app.state::<Shell>().language();
+    let name = folder.file_name().unwrap_or_default().to_string_lossy();
+    let title = named::read(folder).or_else(|| minutes::title(folder));
+    let started = chrono::NaiveDateTime::parse_from_str(&name, "%Y-%m-%d_%H-%M").ok();
+    let meeting = words::meeting(title.as_deref(), started, chrono::Local::now().date_naive(), language);
+    words::for_meeting(notice.clone(), &meeting, language)
+}
+
+/// The notification that ends a meeting's making — its last step written or failed, or the next
+/// one unable to start (D25) —: told naming the meeting, and only when no window of Kitokey has the
+/// focus, the window saying it there (D92). `opening`: its click opens the meeting (D44).
+/// The focus is asked on the main thread, where the toolkit answers at once; asked from here, its
+/// getter would wait for the main thread, which may be waiting for a lock this caller holds — the
+/// window frozen, nothing told (#824). Nothing here waits for the main thread: the notification
+/// is sent from a thread of its own once the focus is known.
+fn tell_made(app: &AppHandle, notice: &Notice, folder: &Path, opening: bool) {
+    let notice = of_meeting(app, notice, folder);
+    let (app, folder) = (app.clone(), folder.to_path_buf());
+    let _ = app.clone().run_on_main_thread(move || {
+        if window_focused(&app) {
+            tracing::info!("shell.made_not_told");
+            return;
+        }
+        std::thread::spawn(move || {
+            if opening {
+                tell_opening(&app, &notice, folder);
+            } else {
+                tell(&app, &notice);
+            }
+        });
+    });
 }
 
 /// Quits Kitokey. A recording in progress is stopped first, as the user would stop it: its
