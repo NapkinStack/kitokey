@@ -10473,7 +10473,7 @@ def main() -> int:
         # The services are no longer in this list: « Un service », a step of its own (D95, BG).
         check("the models on this computer are offered, by the names people say", names == ["Whisper large v3 turbo", "Whisper small"], names)
         ready = browser.find_element(By.ID, "model-state").text
-        check("the transcription model's state is said at the page's end", "Prêt" in ready and "sans réseau" in ready, ready)
+        check("the transcription model's state is said at the page's end", "Prêt" in ready and "hors connexion" in ready, ready)
         # Each change is saved, then the page is drawn again: the next acts on the new one.
         # The page drawn again under the driver — the window coming back to the front draws it anew,
         # the desktop being in use —: the gesture made again on the new one.
@@ -10575,7 +10575,7 @@ def main() -> int:
         refused = wait_for(browser, lambda b: b.find_element(By.ID, "not-saved").is_displayed(), 5)
         check(
             "a number that is no number of days is said, nothing saved",
-            refused and "0 n’est pas un nombre de jours" in browser.find_element(By.ID, "not-saved").text and "keep_audio = 45" in window.file.read_text(),
+            refused and "« 0 » n’est pas un nombre de jours" in browser.find_element(By.ID, "not-saved").text and "keep_audio = 45" in window.file.read_text(),  # U+00A0 read as a space
             browser.find_element(By.ID, "not-saved").text,
         )
         # The shortcut: the keys the desktop granted, or that it granted none; its keyboard
