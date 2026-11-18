@@ -2604,6 +2604,14 @@ function guidedWhere(path, words, way, locked) {
 // answer kept as the path's own, said on the page as it is now: drawn again meanwhile, or another
 // service chosen, the page says its own.
 function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySaid, modelsPick }, ask, shownSaved) {
+  // A key typed and not yet saved: kept across a drawing for its service, as the model chosen with it —
+  // in the page's memory alone, never written nor logged, forgotten with the choices at another
+  // address (#948).
+  const typed = guided[path].chosen.keys?.[servicePick.value];
+  if (typed) key.value = typed;
+  key.addEventListener("input", () => {
+    guided[path].chosen.keys = { ...guided[path].chosen.keys, [servicePick.value]: key.value };
+  });
   keyTest.addEventListener("click", async () => {
     waiting(keyTest, true);
     keySaid.textContent = words.testing;
