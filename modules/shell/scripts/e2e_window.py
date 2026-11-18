@@ -6008,6 +6008,25 @@ def focus_swept(now: dt.datetime) -> None:
                 check(f"{short}: after a list's menu, a real return to the window: drawn anew (#944, Q3)",
                       not kept_mark(browser, "reminder"), browser.execute_script(where))
                 settle(browser)
+                # P3 (ines, #951): a field left with the page's focus on nothing — « Garder … jours » typed, then Enter,
+                # which leaves it by itself — is found again by its change alone: once saved and drawn anew, the focus
+                # on it or, gone, on its list beside it; never the page's body (D101).
+                browser.execute_script("const k = document.getElementById('keep'); k.scrollIntoView({block: 'center'});"
+                                       " k.value = 'other'; k.dispatchEvent(new Event('change', {bubbles: true}))")
+                if wait_for(browser, lambda b: b.execute_script("const o = document.getElementById('keep-other');"
+                                                                " return !!o && !o.hidden && document.activeElement === o"), 5):
+                    browser.execute_script("document.getElementById('keep-other').value = ''")
+                    time.sleep(0.4)
+                    before = browser.execute_script(where)
+                    ActionChains(browser).send_keys("45", Keys.ENTER).perform()
+                    days = wait_for(None, lambda _: re.search(r"^keep_audio = 45$", window.file.read_text(), re.M) is not None, 5)
+                    settle(browser)
+                    after = browser.execute_script(where)
+                    check(f"{short}: « Garder … jours » typed and left by Enter: saved, the focus on it or its list, the page where it was (#944, P3)",
+                          days and after[0] in ("keep-other", "keep") and abs(after[1] - before[1]) <= 1,
+                          {"saved": days, "before": before, "after": after, "settings": [l for l in window.file.read_text().splitlines() if "keep" in l]})
+                else:
+                    check(f"{short}: « Garder … jours » shown and focused once « Autre » is chosen (#944, P3)", False, browser.execute_script(where))
     finally:
         tags.shutdown()
 
