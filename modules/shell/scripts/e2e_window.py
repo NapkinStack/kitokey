@@ -11093,8 +11093,15 @@ def main() -> int:
         browser.find_element(By.ID, "small-stop").click()
         rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 5)
         check("opened from the full window during a recording, it too comes back to rest, in English", rest and browser.find_element(By.ID, "small-record").get_attribute("aria-label") == "Start a recording")
-        back = wait_for(browser, lambda b: b.execute_script("return [innerWidth, innerHeight]") == [440, 44], 5)
-        check("at rest, in English, 440 × 44 again", back, browser.execute_script("return [innerWidth, innerHeight]"))
+        # Its transcript follows the stop: the bar at rest is its row of 44 and D92's one line alone under it, saying
+        # that meeting (#939), as context_before_start reads it.
+        rest_alone = ("const lines = [...document.querySelectorAll('#small .bar-lines > *')].filter(e => e.id !== 'small-last' && e.getClientRects().length);"
+                      " const p = document.getElementById('small'), l = document.getElementById('small-last');"
+                      " return innerWidth === 440 && lines.length === 0 && Math.round(document.querySelector('#small .bar-row').getBoundingClientRect().height) === 44"
+                      " && Math.abs(innerHeight - Math.ceil(p.getBoundingClientRect().height)) <= 1 && (l.hidden || l.getBoundingClientRect().height <= 20)")
+        back = wait_for(browser, lambda b: b.execute_script(rest_alone), 5)
+        check("at rest, in English, 440 wide again: its row of 44, and D92's one line alone under it (#939)", back,
+              browser.execute_script("return [innerWidth, innerHeight, document.getElementById('small-last')?.textContent]"))
 
     print("I. the window, in English; and a folder with no session")
     empty = WORK / "empty"
