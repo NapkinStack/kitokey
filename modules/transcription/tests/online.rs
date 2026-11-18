@@ -206,6 +206,7 @@ fn the_program_writes_the_transcript_from_the_service_its_host_in_the_header() {
     std::fs::write(folder.path().join("me.wav"), &audio).unwrap();
     // Both sides sound: each is heard by the service, and each segment goes to its own track.
     std::fs::write(folder.path().join("others.wav"), &audio).unwrap();
+    let ran = std::time::Instant::now();
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_kitokey-transcription"))
         .arg(folder.path())
         .args(["--provider", &address, "--model", "whisper-large-v3", "--language", "fr"])
@@ -237,6 +238,13 @@ fn the_program_writes_the_transcript_from_the_service_its_host_in_the_header() {
         );
     }
     assert!(transcript.lines().last().unwrap().contains("\"complete\""), "{transcript}");
+    // Made whole in this one run: it says how long the run took, never more than it did (D97).
+    let complete: serde_json::Value = serde_json::from_str(transcript.lines().last().unwrap()).unwrap();
+    let took = ran.elapsed().as_secs_f64();
+    assert!(
+        complete["made_in"].as_f64().is_some_and(|made_in| (0.0..=took).contains(&made_in)),
+        "{complete}, the run took {took} s"
+    );
 }
 
 #[test]
