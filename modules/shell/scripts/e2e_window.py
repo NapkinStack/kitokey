@@ -4514,6 +4514,14 @@ def settings_narrow_without_model(now: dt.datetime) -> None:
             over = browser.execute_script(SETTINGS_OVERFLOW)
             check(f"{short}, 420 px, no model on this computer: the guided step inside its card, nothing spilling (#868)",
                   drawn and missing == "true" and over == [], {"missing": missing, "over": over, "past": browser.execute_script(past)})
+            # The state cut in the list is never lost: the whole choice as its tooltip, and said under it.
+            said = browser.execute_script(
+                "const p = document.getElementById('model'); return [p.title, p.options[p.selectedIndex]?.text ?? null,"
+                " document.querySelector('#model-state .says')?.textContent ?? null]")
+            whole = {"fr": "pas encore sur cet ordinateur", "en": "not on this computer yet"}[short]
+            check(f"{short}, 420 px, no model on this computer: the choice whole as the list's tooltip, the state said under it (#868)",
+                  said[0] == said[1] and said[0] and said[0].endswith(whole) and said[2] and whole.split()[0] in said[2].lower(), said)
+            browser.execute_script("document.getElementById('model').scrollIntoView({block: 'center'})")
             shot(browser, f"868-settings-420-{short}")
             # « Avancé » as a person reaches it: scrolled to, then clicked where it shows.
             toggle = browser.find_element(By.ID, "general-advanced")
