@@ -61,11 +61,19 @@ fn the_minutes_are_written_from_the_transcript_the_context_and_the_providers_ans
     );
 
     let minutes = fs::read_to_string(folder.path().join("minutes.md")).unwrap();
-    assert!(minutes.starts_with("---\ncontract: minutes/v3\nmade: "), "{minutes}");
+    assert!(minutes.starts_with("---\ncontract: minutes/v4\nmade: "), "{minutes}");
     assert!(
-        minutes.contains("\nprovider: \"local\"\nmodel: \"a-model\"\ncontext: \"Quatre personnes, réunion d'organisation.\"\n---\n"),
+        minutes.contains("\nprovider: \"local\"\nmodel: \"a-model\"\ncontext: \"Quatre personnes, réunion d'organisation.\"\nmade_in: "),
         "{minutes}"
     );
+    // How long the making took, measured by the program (D97): a number at least zero, then the end of the front matter.
+    let made_in = minutes
+        .split("\nmade_in: ")
+        .nth(1)
+        .and_then(|rest| rest.split_once("\n---\n"))
+        .unwrap()
+        .0;
+    assert!(made_in.parse::<f64>().is_ok_and(|seconds| seconds >= 0.0), "{made_in}");
     assert!(minutes.ends_with(MINUTES) && !minutes.contains("a-key-for-the-test"));
     // Said before anything left, then once written; the key is in neither.
     let events: Vec<serde_json::Value> = out.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
