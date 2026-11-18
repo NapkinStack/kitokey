@@ -1,7 +1,7 @@
 ---
 goal: "<One sentence: the outcome of this cycle>"
 status: proposed          # proposed | accepted | closed | stopped — the decider accepts
-appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
+appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate — appetite_days: N instead, never both, for a cycle shorter than a week
 start: 2026-01-05         # YYYY-MM-DD
 end: 2026-01-19           # start + appetite: the first day the cycle is over — the circuit breaker
 # accepted_on: YYYY-MM-DD # accepted while another cycle runs: stays proposed, the running cycle's closure starts it; kept once accepted

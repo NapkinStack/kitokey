@@ -19,6 +19,9 @@ Once per person, before a first deliverable. Each step says where it is said in 
    pre-commit install               # once per clone
    ```
 
+   Run the first line again after each update of the project: before a push, the hook refuses
+   an engine behind the project's version, since its rules are not the project's.
+
 3. **Your agent's identity.** Any coding agent works: it reads `AGENTS.md` at the root and
    follows it. It works under an identity of its own — a GitHub App (`.nstack/handbook/INSTALL.md`,
    *the identity your agents work under*) — never with your credentials. Creating it and installing it on

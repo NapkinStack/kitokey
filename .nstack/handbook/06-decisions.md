@@ -308,7 +308,7 @@ Every important piece of information has one identifiable source, and only one.
 | A deliverable tried by a person | An acceptance issue: what to run and what was seen. It tracks the deliverable; the criteria stay in the cycle, its delivery in the record `nstack deliver` writes |
 | A deliverable's delivery | Its record (`nstack deliver`), read by `nstack plan`, written into the cycle at the closure |
 | Unplanned work | A typed issue: a defect, an architecture question, a debt, a request |
-| What the project must remember | One named issue, the project's log: what was tried, what it cost, what was refused |
+| What the project must remember | One named issue, the project's log — titled `Log`, opened by whoever writes its first entry; with no forge, `docs/project/log.md`: what was tried, what it cost, what was refused — and what was asked of, promised to, or received from someone outside the team, by any channel |
 | Real behaviour | Code and tests |
 | Quality rules | Versioned CI |
 | Infrastructure | Versioned configuration |

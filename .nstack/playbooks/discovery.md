@@ -39,6 +39,13 @@ messages. The idea file may be in one language and the framework's forms in anot
 notices until half the documents are in each. The answer is the project's first rule: one
 line of `docs/project/rules/always.md`, written now, with the idea file left as it was given.
 
+Ask, once, **what has already been asked of, promised to, or received from someone outside the
+team** — a client, a vendor, a partner — by mail, chat or meeting. A fresh session remembers none
+of it, and an outside party asked twice, or asked differently, pays for it in patience. Each answer
+is an entry of the project's log issue, opened now if there is none (`.nstack/handbook/06-decisions.md`
+§9): who, what, when, by which channel — never a secret or a credential, and nothing the outside
+party would not have public in a public repository's issue (`security.md`).
+
 ## 2. Research
 
 With the research tools of `.nstack/tooling-profile.md` — or, when that row is empty, the tools
