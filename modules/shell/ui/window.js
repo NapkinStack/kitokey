@@ -826,7 +826,14 @@ async function readMakings() {
   const moved = opened && makings
     && ((String(makings.made[opened] ?? 0) !== drawn("minutes-state") && minutesState(opened)?.kind !== "making")
       || (String(makings.transcripts_made[opened] ?? 0) !== drawn("transcript-state") && transcriptState(opened)?.kind !== "making"));
-  if (moved && !busy) refresh();
+  // A first transcript cancelled, its page drawn while it was made: no offer to make it again until
+  // the page is drawn anew, which nothing made asks for — drawn once more, then (D92).
+  const unoffered = cancelledFrom && !cancelledFrom.drawn && cancelledFrom.id === "transcript-state" && cancelledFrom.name === opened
+    && transcriptState(opened)?.kind === "stopped" && !document.getElementById("make-transcript");
+  if ((moved || unoffered) && !busy) {
+    if (unoffered) cancelledFrom.drawn = true;
+    refresh();
+  }
   paintMakings();
 }
 
