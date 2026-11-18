@@ -5144,6 +5144,20 @@ def page_one_bar(now: dt.datetime) -> None:
                       first and got["segments"] == ["running", "next"] and got["live"] == "polite" and got["cancel"] and got["cards"] == 0
                       and bool(timed.match(got["by"])), got)
                 shot_themed(browser, f"d92-page-bar-{short}-{theme}", theme)
+                # Between the two steps — its transcript written, its summary not yet in line — the shell says the
+                # meeting `between` them. That moment lasts a few milliseconds with no program to hold it open, so
+                # the page is given, for two of its readings, the makings as the shell says them then: the bar
+                # stays, on the summary's step, the transcript's part full (#938's m2).
+                browser.execute_script("const real = window.__TAURI__.core, name = arguments[0];"
+                                       " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'makings'"
+                                       "   ? real.invoke(asked, ...rest).then((m) => ({ ...m, transcript: null, between: [name] })) : real.invoke(asked, ...rest) };"
+                                       " window.restoreCore = () => { window.__TAURI__.core = real; };", meeting.name)
+                time.sleep(3.5)
+                got = browser.execute_script(bar)
+                browser.execute_script("window.restoreCore()")
+                check(f"{short}: between the two steps, as the shell says it, the bar stays: the summary's step, the transcript's part full (D92)",
+                      got is not None and got["step"] == writing and got["segments"] == ["done", "running"], got)
+                wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("step") == hearing, 5)
                 # From here, every state the bar shows, sampled, and every text its live region takes.
                 browser.execute_script("window.barSeen = []; window.barSaid = []; const s = document.getElementById('making-step');"
                                        " new MutationObserver(() => window.barSaid.push(s.textContent)).observe(s, {childList: true, characterData: true, subtree: true});"
