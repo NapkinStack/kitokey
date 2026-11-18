@@ -4884,6 +4884,8 @@ def bar_after_stop(now: dt.datetime) -> None:
     focused = "return document.activeElement ? document.activeElement.id : ''"
     said = "const s = document.getElementById('small-last-said'); return s && s.getClientRects().length ? s.textContent : ''"
     shown = "const b = document.getElementById('small-last-open'); return !!b && b.getClientRects().length > 0"
+    # Nothing to say: no line at all under the row, the bar its 44 px — never an empty band.
+    bare = "const l = document.getElementById('small-last'); return !!l && l.getClientRects().length === 0 && innerHeight === 44"
     model = WORK / "after-stop-model.bin"
     model.write_bytes(b"\0" * 16)
     settings = (f'after = "minutes"\nreminder = false\nmodel = "{model}"\n'
@@ -4925,8 +4927,9 @@ def bar_after_stop(now: dt.datetime) -> None:
         gates = [WORK / "gate-hearing", WORK / "gate-minutes"]
         with window as browser:
             wait_for(browser, lambda b: b.execute_script(focused) == "small-record", 10)
-            check(f"{short}: at rest before any recording, the bar says no meeting", browser.execute_script(said) == "" and not browser.execute_script(shown),
-                  browser.execute_script(said))
+            check(f"{short}: at rest before any recording, the bar says no meeting: no line under its row, 44 px high (D92)",
+                  browser.execute_script(said) == "" and not browser.execute_script(shown) and wait_for(browser, lambda b: b.execute_script(bare), 3),
+                  [browser.execute_script(said), browser.execute_script("return innerHeight")])
             for gate in gates:
                 gate.touch()
             try:
@@ -4977,8 +4980,9 @@ def bar_after_stop(now: dt.datetime) -> None:
                 wait_for(browser, lambda b: len(b.window_handles) == 2, 10)
                 browser.switch_to.window([h for h in browser.window_handles if h != main][0])
                 back = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
-                check(f"{short}: back in the bar, it says no meeting (D92)", back and browser.execute_script(said) == "" and not browser.execute_script(shown),
-                      browser.execute_script(said))
+                check(f"{short}: back in the bar, it says no meeting: no line under its row, 44 px high (D92)",
+                      back and browser.execute_script(said) == "" and not browser.execute_script(shown) and wait_for(browser, lambda b: b.execute_script(bare), 3),
+                      [browser.execute_script(said), browser.execute_script("return innerHeight")])
                 # Another meeting stopped, its transcript held — its page never opened —, and a recording started while it
                 # is made: nothing said of it while that one records (D92).
                 (WORK / "fail-minutes").touch()
