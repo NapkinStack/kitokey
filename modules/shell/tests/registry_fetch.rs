@@ -6,6 +6,7 @@ use std::{
     net::TcpListener,
     sync::{Arc, Mutex},
     thread,
+    time::Duration,
 };
 
 use kitokey_shell::registry;
@@ -293,16 +294,26 @@ fn a_list_signed_in_minisigns_legacy_form_is_refused() {
     assert!(registry::in_the_repository(FIXED_LIST, Some(LEGACY), Some(FIXED_KEY)).is_err());
 }
 
-/// Answers `list` signed by `key`, but cuts the first `cuts` connections its signature is asked on
-/// before any answer — as a network or a proxy cuts a connection (#869) —, then answers it.
-fn signature_cut(key: &TestKey, list: String, cuts: usize) -> Served {
-    let signature = key.signed(&list);
+/// How the signature is answered, once its cuts are spent.
+enum Signature {
+    Signed,
+    /// An HTTP status other than 200, with a body.
+    Status(u16),
+    /// No answer at all for this long, then the connection closed: past the agent's timeout.
+    Late(Duration),
+}
+
+/// Answers `list` signed by `key`, but cuts the first `list_cuts` connections the list is asked on and
+/// the first `cuts` its signature is asked on before any answer — as a network or a proxy cuts a
+/// connection (#869) —, then answers as `signature` says.
+fn served_cutting(key: &TestKey, list: String, list_cuts: usize, cuts: usize, signature: Signature) -> Served {
+    let signed = key.signed(&list);
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = format!("http://{}/models.json", listener.local_addr().unwrap());
     let asked = Arc::new(Mutex::new(Vec::new()));
     let noted = asked.clone();
     thread::spawn(move || {
-        let mut cut = 0;
+        let (mut list_cut, mut cut) = (0, 0);
         for stream in listener.incoming() {
             let mut stream = stream.unwrap();
             let mut lines = BufReader::new(stream.try_clone().unwrap()).lines();
@@ -314,18 +325,37 @@ fn signature_cut(key: &TestKey, list: String, cuts: usize) -> Served {
                 }
             }
             noted.lock().unwrap().push(path.clone());
-            if path.ends_with(".minisig") && cut < cuts {
+            let of_signature = path.ends_with(".minisig");
+            if of_signature && cut < cuts {
                 cut += 1;
-                drop(stream);
                 continue;
             }
-            let body = if path.ends_with(".minisig") { &signature } else { &list };
-            let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+            if !of_signature && list_cut < list_cuts {
+                list_cut += 1;
+                continue;
+            }
+            let (status, body) = match (of_signature, &signature) {
+                (false, _) | (true, Signature::Signed) => (200, if of_signature { signed.clone() } else { list.clone() }),
+                (true, Signature::Status(status)) => (*status, "Unavailable".to_owned()),
+                (true, Signature::Late(late)) => {
+                    thread::sleep(*late);
+                    continue;
+                }
+            };
+            let head = format!(
+                "HTTP/1.1 {status} Status\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
             let _ = stream.write_all(head.as_bytes());
             let _ = stream.write_all(body.as_bytes());
         }
     });
     Served { address, asked }
+}
+
+/// Answers `list` signed by `key`, but cuts the first `cuts` connections its signature is asked on.
+fn signature_cut(key: &TestKey, list: String, cuts: usize) -> Served {
+    served_cutting(key, list, 0, cuts, Signature::Signed)
 }
 
 #[test]
@@ -358,5 +388,33 @@ fn a_signature_answered_with_an_error_is_never_asked_again() {
     let served = served_with(200, with_another(), "", None);
     let why = registry::fetch(&served.address, Some(&key.public)).unwrap_err();
     assert!(why.contains("HTTP 404"), "{why}");
+    assert_eq!(*served.asked.lock().unwrap(), ["/models.json", "/models.json.minisig"]);
+}
+
+#[test]
+fn the_list_cut_before_any_answer_is_never_asked_again() {
+    let key = test_key();
+    let served = served_cutting(&key, with_another(), 1, 0, Signature::Signed);
+    let why = registry::fetch(&served.address, Some(&key.public)).unwrap_err();
+    assert!(why.starts_with("the list could not be read"), "{why}");
+    assert_eq!(*served.asked.lock().unwrap(), ["/models.json"]);
+}
+
+#[test]
+fn a_signature_answered_by_a_server_error_is_never_asked_again() {
+    let key = test_key();
+    let served = served_cutting(&key, with_another(), 0, 0, Signature::Status(503));
+    let why = registry::fetch(&served.address, Some(&key.public)).unwrap_err();
+    assert!(why.contains("HTTP 503"), "{why}");
+    assert_eq!(*served.asked.lock().unwrap(), ["/models.json", "/models.json.minisig"]);
+}
+
+/// The agent's answer timeout is 20 s: this test waits for it once, and twice would say it was asked again.
+#[test]
+fn a_signature_that_answers_past_its_timeout_is_never_asked_again() {
+    let key = test_key();
+    let served = served_cutting(&key, with_another(), 0, 0, Signature::Late(Duration::from_secs(25)));
+    let why = registry::fetch(&served.address, Some(&key.public)).unwrap_err();
+    assert!(why.starts_with("the list's signature could not be read"), "{why}");
     assert_eq!(*served.asked.lock().unwrap(), ["/models.json", "/models.json.minisig"]);
 }
