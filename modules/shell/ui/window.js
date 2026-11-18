@@ -1409,6 +1409,8 @@ function redoWith(offered, session, words, button, id, title, notes, again, step
       const own = { transcription: offered.chosen.transcription ?? null, minutes: offered.chosen.minutes ?? null };
       if (JSON.stringify(chosen) !== JSON.stringify(own)) {
         await window.__TAURI__.core.invoke("meeting_models_chosen", { name: nameOf(session), chosen });
+        // Another choice kept: the page's lists read it again (D93).
+        pageOffered = null;
       }
       await again();
       // Asked: the panel goes, the making is said where it is made (D25).
@@ -1440,14 +1442,21 @@ function redoTranscriptPanel(offered, session, words, button, corrected) {
 }
 
 // D93, criterion 5: what a meeting's page offers to make it by — models_offered's answer, read once a
-// drawing, by the first line that offers a choice, and shared by its two lines, which keep the
-// meeting's own choice whole between them.
+// page's opening by the first line that offers a choice, never at each drawing; shared by its two
+// lines, which keep the meeting's own choice whole between them. Dropped once another meeting is
+// shown, once it is said confidential or no longer (`at`), and once Refaire… keeps another choice.
+let pageOffered = null;
+
 function pageModels(session) {
-  const page = { name: nameOf(session), own: null, asked: null };
+  const at = `${nameOf(session)}\n${session.confidential}`;
+  if (pageOffered?.at === at) return pageOffered;
+  const page = { at, name: nameOf(session), own: null, gone: [], asked: null };
   page.offered = () => (page.asked ??= window.__TAURI__.core.invoke("models_offered", { name: page.name }).then((offered) => {
     page.own = { transcription: offered.chosen.transcription ?? null, minutes: offered.chosen.minutes ?? null };
+    page.gone = offered.gone;
     return offered;
   }));
+  pageOffered = page;
   return page;
 }
 
@@ -1511,7 +1520,7 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
       if (offered.service) values.push({ engine: "service", provider: offered.service[0], model: offered.service[1] });
     }
     // The meeting's own, offered or not — unless gone, Settings' then standing in, said by the page (D91).
-    const own = offered.chosen[step] && !offered.gone.includes(step) ? modelValue(step, offered.chosen[step]) : "";
+    const own = page.own[step] && !page.gone.includes(step) ? modelValue(step, page.own[step]) : "";
     const options = [...new Set([...values.map((value) => modelValue(step, value)), ...(own ? [own] : [])])];
     made = version ? (options.find((value) => version.is(JSON.parse(value), offered)) ?? "") : "";
     const settings = !version && offered.minutes_provider && offered.minutes_model ? modelValue("minutes", { provider: offered.minutes_provider, model: offered.minutes_model }) : "";
@@ -1536,6 +1545,7 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
     try {
       await window.__TAURI__.core.invoke("meeting_models_chosen", { name: page.name, chosen });
       page.own = chosen;
+      page.gone = page.gone.filter((gone) => gone !== step);
       kept = pick.value;
       said.hidden = true;
     } catch (why) {
@@ -1636,11 +1646,16 @@ function minutesCard(read, words, session, transcript, onPage) {
   if (by) {
     const go = startsOnPage("page-minutes-do", words, () =>
       window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }));
+    // Another model chosen: above its button, which made the summary shown — the line names the choice (D93).
+    const box = element("div", "page-redo");
+    const was = element("p", "says", fill(words.minutes_made_with, by));
+    was.id = "page-minutes-was";
+    box.append(was, go);
     // The version's model: the one its line names, made here unless a host says otherwise.
     const version = { said: by, is: (chosen, offered) => chosen.model === read.model
       && (read.provider && read.provider !== "local" ? via(chosen.provider) === read.provider : chosen.provider === offered.ollama_address) };
-    const [pick, said] = modelOnPage(onPage, words, "minutes", version, go, words.redo_minutes_do, words.redo_title);
-    card.append(lineWith(maker, pick), said, go);
+    const [pick, said] = modelOnPage(onPage, words, "minutes", version, go, words.redo_minutes_do, words.redo_title, box);
+    card.append(lineWith(maker, pick), said, box);
   } else card.append(element("p", "maker", maker));
   // The transcript corrected after they were written (D62): said, and made again only on a click.
   const corrected = transcript.state === "present" ? Math.max(0, ...transcript.segments.map((segment) => Date.parse(segment.edited ?? "") || 0)) : 0;
@@ -1856,7 +1871,9 @@ function transcriptCard(read, words, session, onPage) {
   if (choice) {
     const go = startsOnPage("page-transcription-do", words, () => window.__TAURI__.core.invoke("transcript_redo_own", { name: nameOf(session) }));
     const box = element("div", "page-redo");
-    box.append(go);
+    const was = element("p", "says", fill(words.transcript_made_with, by));
+    was.id = "page-transcription-was";
+    box.append(was, go);
     // Made again, the transcript is another file: a person's corrections are not in it (ADR-0014).
     if (read.segments.some((segment) => segment.edited)) box.append(element("p", "note warn", words.redo_loses_corrections));
     const version = { said: by, is: (chosen) => read.engine === "SpeechAnalyzer" ? chosen.engine === "speechanalyzer"
@@ -4978,6 +4995,8 @@ async function draw(mine, again) {
   const name = wanted ? decodeURIComponent(wanted[1]) : beside ? nameOf(listing.sessions[0]) : null;
   // A refused language is said until its meeting's own page is left (#841).
   if (languageRefused && !(wanted && decodeURIComponent(wanted[1]) === languageRefused.name)) languageRefused = null;
+  // Another meeting shown, or none: its models are read again when it is (D93).
+  if (pageOffered && pageOffered.name !== name) pageOffered = null;
   // Another page, or another meeting: what was played stops — and the list alone under 840 px.
   if (player && player.name !== name) {
     player.stop();
