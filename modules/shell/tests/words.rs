@@ -1017,6 +1017,9 @@ fn the_context_s_words_are_said_in_both_languages_french_typeset_as_french() {
         english.context_redo,
         ["Write the transcript again", "Write the transcript and the summary again"]
     );
+    // So does the summary's, made again with a transcript's corrections (D93).
+    assert_eq!(french.redo_corrections, "Refaire le compte rendu avec les corrections");
+    assert_eq!(english.redo_corrections, "Write the summary again with the corrections");
     // The transcript's redo panel says the summary there is kept (the decider, 2026-11-18).
     assert_eq!(
         french.redo_keeps_minutes,
