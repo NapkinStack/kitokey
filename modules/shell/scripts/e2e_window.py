@@ -148,7 +148,8 @@ if [ "$1" = listen ]; then
   # a copy of pw-cat, told to record — its name no longer says it.
   mkdir -p "$here/own"; [ -x "$here/own/kitokey-capture" ] || cp "$(command -v pw-cat)" "$here/own/kitokey-capture"
   "$here/own/kitokey-capture" --record --target kitokey_e2e_check_mic "$here/listen.wav" & held=$!
-  ended() { kill "$held" 2>/dev/null; wait "$held" 2>/dev/null; date +%s.%N > "$here/listen-ended"; exit 0; }
+  # Written whole, then renamed over: a scenario that sees the file reads its time, never an empty one (#891).
+  ended() { kill "$held" 2>/dev/null; wait "$held" 2>/dev/null; date +%s.%N > "$here/listen-ended.part"; mv "$here/listen-ended.part" "$here/listen-ended"; exit 0; }
   trap ended TERM INT
   headset=false; [ -e "$here/listen-headset" ] && headset=true
   echo '{"event":"device","source":"me","device":"Kitokey e2e mic","headset":'$headset'}'
@@ -276,6 +277,14 @@ def choose(browser, element_id: str, value: str) -> None:
         except StaleElementReferenceException:
             time.sleep(0.2)
     Select(browser.find_element(By.ID, element_id)).select_by_value(value)
+
+
+def typed(browser, element_id: str, text: str) -> None:
+    """Text typed in a field of the page once it is drawn, shown and enabled — a choice just made
+    draws its fields anew, and one not yet there cannot take the focus (#901)."""
+    ready = lambda b: any(f.is_displayed() and f.is_enabled() for f in b.find_elements(By.ID, element_id))
+    wait_for(browser, ready, 10)
+    browser.find_element(By.ID, element_id).send_keys(text)
 
 
 def press(browser, element_id: str) -> None:
@@ -4532,6 +4541,59 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def settings_narrow_without_model(now: dt.datetime) -> None:
+    """BU. Settings at 420 px on a Kitokey with no model on this computer (#868): the guided step for the
+    transcription — its way, the model's state and its offer — inside its card, nothing spilling; « Avancé »
+    unfolds by a click where the user sees it. In French and in English."""
+    print("BU. Settings at 420 px with no model on this computer: the guided step inside its card, « Avancé » unfolds by a click — French and English (#868)")
+    # What spills, and the children past it: the box measured, then what goes beyond its right edge.
+    past = ("const out = []; for (const e of document.querySelectorAll('#settings *')) {"
+            " if (!e.getClientRects().length || ['INPUT', 'SELECT', 'TEXTAREA', 'OPTION'].includes(e.tagName) || e.scrollWidth <= e.clientWidth + 1) continue;"
+            " const r = e.getBoundingClientRect(); out.push([e.id || e.className || e.tagName, Math.round(r.width), e.scrollWidth,"
+            " [...e.children].filter(c => c.getBoundingClientRect().right > r.right + 0.5).map(c => [c.id || c.className || c.tagName, Math.round(c.getBoundingClientRect().width)])]) }"
+            " return out.slice(0, 8)")
+    for short, language in (("fr", "fr_FR.UTF-8"), ("en", "en_GB.UTF-8")):
+        sessions = WORK / f"narrow-none-{short}"
+        sessions.mkdir()
+        window = Window(sessions, language)
+        # A data folder of its own: no model on this computer, whatever another scenario left.
+        window.env["XDG_DATA_HOME"] = str(WORK / f"narrow-none-data-{short}")
+        with window as browser:
+            browser.set_window_size(420, 900)
+            browser.execute_script("location.hash = '#/settings'")
+            drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "transcription-on-computer")
+                             and b.find_element(By.ID, "transcription-on-computer").is_displayed(), 10)
+            missing = browser.execute_script("return document.getElementById('model-state')?.dataset.missing ?? null")
+            over = browser.execute_script(SETTINGS_OVERFLOW)
+            # What the user sees of a spill: the page, or its pane, scrolled sideways (#868's bar under Settings).
+            sideways_ = browser.execute_script(
+                "return [document.scrollingElement, document.body, document.getElementById('pane'), document.getElementById('settings')]"
+                ".filter((e) => e && e.scrollWidth > e.clientWidth + 1).map((e) => [e.id || e.tagName, e.clientWidth, e.scrollWidth])")
+            check(f"{short}, 420 px, no model on this computer: nothing scrolls sideways, the guided step inside its card (#868)",
+                  drawn and missing == "true" and sideways_ == [] and over == [],
+                  {"missing": missing, "sideways": sideways_, "over": over, "past": browser.execute_script(past)})
+            # The state cut in the list is never lost: the whole choice as its tooltip, and said under it.
+            said = browser.execute_script(
+                "const p = document.getElementById('model'); return [p.title, p.options[p.selectedIndex]?.text ?? null,"
+                " document.querySelector('#model-state .says')?.textContent ?? null]")
+            whole = {"fr": "pas encore sur cet ordinateur", "en": "not on this computer yet"}[short]
+            check(f"{short}, 420 px, no model on this computer: the choice whole as the list's tooltip, the state said under it (#868)",
+                  said[0] == said[1] and said[0] and said[0].endswith(whole) and said[2] and whole.split()[0] in said[2].lower(), said)
+            browser.execute_script("document.getElementById('model').scrollIntoView({block: 'center'})")
+            shot(browser, f"868-settings-420-{short}")
+            # « Avancé » as a person reaches it: scrolled to, then clicked where it shows.
+            toggle = browser.find_element(By.ID, "general-advanced")
+            browser.execute_script("arguments[0].scrollIntoView({block: 'center'})", toggle)
+            try:
+                ActionChains(browser).click(toggle).perform()
+                clicked = None
+            except Exception as why:  # noqa: BLE001 — the check says what stopped the click
+                clicked = type(why).__name__
+            opened = wait_for(browser, lambda b: b.find_element(By.ID, "general-advanced").get_attribute("aria-expanded") == "true"
+                              and b.find_element(By.ID, "developer").is_displayed(), 5)
+            check(f"{short}, 420 px, no model on this computer: « Avancé » unfolds by a click (#868)", clicked is None and opened,
+                  {"click": clicked, "expanded": toggle.get_attribute("aria-expanded")})
+
 def appearance_chosen(now: dt.datetime) -> None:
     """BP. D98: Settings' « Général » offers the appearance — « Système », « Clair », « Sombre » —; chosen,
     the window takes it at once, the other one than the system says — the system light, then dark —; kept across starts, the bar
@@ -6566,7 +6628,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "minutes-online")
             wait_for(browser, lambda b: b.execute_script(options, "minutes-service"), 5)
             choose(browser, "minutes-service", "0")
-            browser.find_element(By.ID, "minutes-key").send_keys(good)
+            typed(browser, "minutes-key", good)
             press(browser, "minutes-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
             choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
@@ -6577,7 +6639,7 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "transcription-online")
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            browser.find_element(By.ID, "transcription-key").send_keys(heard)
+            typed(browser, "transcription-key", heard)
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
             choose(browser, "transcription-models", "openai/whisper-large-v3-turbo")
@@ -10746,6 +10808,7 @@ def main() -> int:
     redo_choice_starts_nothing(now)
     redo_offers_the_services_models(now)
     settings_folded(now)
+    settings_narrow_without_model(now)
     appearance_chosen(now)
     focus_kept(now)
     meeting_trashed(now)
