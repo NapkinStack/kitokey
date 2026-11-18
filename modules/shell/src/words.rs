@@ -673,6 +673,25 @@ pub struct Window {
     pub bar_context: &'static str,
     pub bar_context_clear: &'static str,
     pub bar_context_kept: &'static str,
+    /// The meeting last stopped and its transcript under way (D92). Shows: the bar at rest, under its
+    /// row, in a polite live region. When: after a stop, until the transcript ends. At most: about 60
+    /// characters. Placeholders: {} the meeting, as a sentence opens on it: « La réunion de 17:31 ».
+    pub bar_last_hearing: &'static str,
+    /// The same, its summary under way (D92). Shows: the bar at rest, under its row. When: the
+    /// transcript ended, the summary being written. At most: about 60 characters. Placeholders: {} the meeting.
+    pub bar_last_summary: &'static str,
+    /// The same, made (D92). Shows: the bar at rest, under its row, `bar_last_open` beside it. When: its
+    /// last step written. At most: about 60 characters. Placeholders: {} the meeting.
+    pub bar_last_ready: &'static str,
+    /// The same, cancelled from its page (D92). Shows: the bar at rest, `bar_last_open` beside it. When:
+    /// a step stopped by « Annuler ». At most: about 60 characters. Placeholders: {} the meeting.
+    pub bar_last_stopped: &'static str,
+    /// The same, a step failed (D92). Shows: the bar at rest, `bar_last_open` beside it. When: its last
+    /// step failed. At most: no limit. Placeholders: {} the meeting, then {} the cause as its page says it.
+    pub bar_last_failed: &'static str,
+    /// The button beside the meeting last stopped (D92). Shows: the bar at rest. When: the meeting
+    /// ready, stopped or failed; a press opens its page. At most: 12 characters. Placeholders: none.
+    pub bar_last_open: &'static str,
     /// « Avancé » (D90, board 6; D91), closed by default, in the bar opened and in *Refaire…*: the
     /// meeting's own models, Settings' choice first, said as such — what it holds said on it.
     pub bar_advanced: &'static str,
@@ -1169,6 +1188,12 @@ pub fn window(language: Language) -> Window {
             bar_context: "Meeting context",
             bar_context_clear: "Clear the context",
             bar_context_kept: "Kept for the next recording, until you clear it.",
+            bar_last_hearing: "{}: transcribing",
+            bar_last_summary: "{}: summary being written",
+            bar_last_ready: "{}: ready",
+            bar_last_stopped: "{}: stopped",
+            bar_last_failed: "{}: {}",
+            bar_last_open: "Open",
             bar_advanced: "Advanced — models",
             models_transcription: "Transcription model",
             models_minutes: "Minutes model",
@@ -1614,6 +1639,12 @@ pub fn window(language: Language) -> Window {
             bar_context: "Contexte de la réunion",
             bar_context_clear: "Effacer le contexte",
             bar_context_kept: "Gardé pour le prochain enregistrement, jusqu’à ce que vous l’effaciez.",
+            bar_last_hearing: "{}\u{a0}: transcription en cours",
+            bar_last_summary: "{}\u{a0}: compte rendu en cours",
+            bar_last_ready: "{}\u{a0}: prête",
+            bar_last_stopped: "{}\u{a0}: arrêtée",
+            bar_last_failed: "{}\u{a0}: {}",
+            bar_last_open: "Ouvrir",
             bar_advanced: "Avancé — modèles",
             models_transcription: "Modèle de transcription",
             models_minutes: "Modèle du compte rendu",

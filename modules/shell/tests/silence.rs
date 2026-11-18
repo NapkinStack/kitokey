@@ -20,6 +20,7 @@ const SILENT: &[(&str, usize, &str)] = &[
     ),
     ("makings", 2, "returns no `Result`: it cannot fail"),
     ("header", 2, "returns no `Result`: it cannot fail"),
+    ("meeting_seen", 1, "returns no `Result`: it cannot fail"),
     (
         "bar_fit",
         1,

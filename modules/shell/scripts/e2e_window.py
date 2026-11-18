@@ -59,6 +59,8 @@ if [ "$1" != --test ]; then
   provider=local
   case "$3" in http://127.0.0.1*|http://localhost*) ;; *) provider=$(python3 -c "$HOST" "$3"); [ -n "$STANDIN" ] && python3 -c "$SEND" "$STANDIN/write";; esac
   [ -e "$here/slow-minutes" ] && sleep 3
+  # Held until the scenario opens the gate (D92): the minutes then written as usual.
+  while [ -e "$here/gate-minutes" ]; do sleep 0.1; done
   # Held, as a model answering slowly (D92): its number and its child's — deaf to TERM — noted, then waits.
   if [ -e "$here/hold-minutes" ]; then
     echo '{"event": "sending", "host": "h", "model": "m", "characters": 1}'
@@ -102,6 +104,8 @@ if [ "$2" = --provider ]; then
   [ -n "$STANDIN" ] && python3 -c "$SEND" "$STANDIN/hear"
 fi
 [ -e "$(dirname "$0")/slow-hearing" ] && sleep 3
+# Held until the scenario opens the gate (D92): the transcript then made as usual.
+while [ -e "$(dirname "$0")/gate-hearing" ]; do sleep 0.1; done
 # Held, as a long meeting heard (D92): a transcript begun, its number and its child's — deaf to TERM — noted, then waits.
 if [ -e "$(dirname "$0")/hold-hearing" ]; then
   printf '{"type":"header","contract":"transcript/v1","engine":"%s","model":"%s","language":null,"context":null}\n' "$engine" "$model" > "$1/transcript.jsonl"
@@ -4954,6 +4958,149 @@ def bar_language(now: dt.datetime) -> None:
                   reached and got is not None and got[0] == "", got)
 
 
+def bar_after_stop(now: dt.datetime) -> None:
+    """BV. D92, criterion 1: a recording stopped from the bar, the bar at rest names its meeting and its
+    stage — the transcript, then the summary, then ready with « Ouvrir » to its page —, in a polite live
+    region that says each stage once; until its page is opened or another recording starts. A step that
+    fails is said there in one line, its cause as the page says it, with « Ouvrir ». By the keyboard alone,
+    in French and in English, light then dark."""
+    print("BV. after the stop, the bar names the meeting and its stage, ready with Ouvrir; a failure said with its cause (D92)")
+    focused = "return document.activeElement ? document.activeElement.id : ''"
+    said = "const s = document.getElementById('small-last-said'); return s && s.getClientRects().length ? s.textContent : ''"
+    shown = "const b = document.getElementById('small-last-open'); return !!b && b.getClientRects().length > 0"
+    # Nothing to say: no line at all under the row, the bar its 44 px — never an empty band.
+    bare = "const l = document.getElementById('small-last'); return !!l && l.getClientRects().length === 0 && innerHeight === 44"
+    model = WORK / "after-stop-model.bin"
+    model.write_bytes(b"\0" * 16)
+    settings = (f'after = "minutes"\nreminder = false\nmodel = "{model}"\n'
+                'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n')
+
+    def keys(browser, *pressed) -> None:
+        ActionChains(browser).send_keys(*pressed).perform()
+        time.sleep(0.2)
+
+    def running(browser) -> bool:
+        """Recording, its time past 00:00:00: a second at least since the start, past the 500 ms in which the
+        shell takes a second press for the same one (`toggle_recording`)."""
+        return wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed()
+                        and b.find_element(By.CSS_SELECTOR, "#small .time").text not in ("", "00:00:00"), 10)
+
+    def to(browser, target: str) -> bool:
+        for _ in range(16):
+            if browser.execute_script(focused) == target:
+                return True
+            keys(browser, Keys.TAB)
+        return browser.execute_script(focused) == target
+
+    for language, short, theme, meeting, stages, not_made in (
+        ("fr_FR.UTF-8", "fr", "light", "La réunion du 18 oct. à 12:00",
+         (" : transcription en cours", " : compte rendu en cours", " : prête"),
+         " : Le compte rendu n’a pas été fait. La transcription est intacte. Le modèle n’a pas écrit de compte rendu :"
+         " réessayez, ou choisissez un autre modèle dans les réglages de Kitokey."),
+        ("en_US.UTF-8", "en", "dark", "The meeting of Oct 18 at 12:00 PM",
+         (": transcribing", ": summary being written", ": ready"),
+         ": The minutes were not written. The transcript is untouched. The model did not write minutes: try again, or choose another"
+         " model in Kitokey’s settings."),
+    ):
+        hearing, summary, ready = (meeting + stage for stage in stages)
+        meetings = WORK / f"after-stop-{short}"
+        meetings.mkdir()
+        window = Window(meetings, language, settings, small=True)
+        if theme == "dark":
+            window.env.update(GTK_THEME="Adwaita:dark")
+        gates = [WORK / "gate-hearing", WORK / "gate-minutes"]
+        with window as browser:
+            wait_for(browser, lambda b: b.execute_script(focused) == "small-record", 10)
+            check(f"{short}: at rest before any recording, the bar says no meeting: no line under its row, 44 px high (D92)",
+                  browser.execute_script(said) == "" and not browser.execute_script(shown) and wait_for(browser, lambda b: b.execute_script(bare), 3),
+                  [browser.execute_script(said), browser.execute_script("return innerHeight")])
+            for gate in gates:
+                gate.touch()
+            try:
+                # Started and stopped by the keyboard alone.
+                keys(browser, Keys.ENTER)
+                started = running(browser)
+                stopped = to(browser, "small-stop")
+                keys(browser, Keys.ENTER)
+                rest = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+                heard = wait_for(browser, lambda b: b.execute_script(said) == hearing, 10)
+                region = browser.execute_script("const s = document.getElementById('small-last-live'); return s && s.textContent === arguments[0] ? s.getAttribute('aria-live') : null", hearing)
+                check(f"{short}: stopped by the keyboard, the bar at rest names the meeting and its transcript under way, in a polite live region (D92)",
+                      started and stopped and rest and heard and region == "polite" and not browser.execute_script(shown),
+                      [started, stopped, rest, browser.execute_script(said), region, browser.execute_script(shown)])
+                # Each stage said once: the live region's text is changed only when the stage changes.
+                browser.execute_script("window.saidLast = []; const s = document.getElementById('small-last-live');"
+                                       " new MutationObserver(() => window.saidLast.push(s.textContent)).observe(s, {childList: true, characterData: true, subtree: true})")
+                gates[0].unlink()
+                writing = wait_for(browser, lambda b: b.execute_script(said) == summary, 10)
+                check(f"{short}: then the summary under way (D92)", writing, browser.execute_script(said))
+                gates[1].unlink()
+                done = wait_for(browser, lambda b: b.execute_script(said) == ready and b.execute_script(shown), 10)
+                time.sleep(3.5)  # two of the window's readings at least: nothing said again
+                check(f"{short}: then ready, « Ouvrir » beside it, each stage said once, the focus left where it was (D92)",
+                      done and browser.execute_script("return window.saidLast") == [summary, ready]
+                      and browser.execute_script(focused) != "small-last-open",
+                      [browser.execute_script(said), browser.execute_script("return window.saidLast"), browser.execute_script(focused)])
+                shot_themed(browser, f"d92-bar-ready-{short}-{theme}", theme)
+                # « Ouvrir » by the keyboard: the full window opens on its page, in the bar's place (one window, D35),
+                # and the shell no longer says the meeting; then back to the bar, as a person goes back.
+                small = browser.current_window_handle
+                reached = to(browser, "small-last-open")
+                try:
+                    keys(browser, Keys.ENTER)
+                except NoSuchWindowException:
+                    pass  # the bar goes with the press, sometimes before the driver has answered it
+                replaced = wait_for(browser, lambda b: len(b.window_handles) == 1 and b.window_handles != [small], 10)
+                browser.switch_to.window(browser.window_handles[0])
+                paged = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/meeting/2026-10-18_12-00"
+                                 and b.find_element(By.ID, "meeting").is_displayed(), 10)
+                forgotten = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('header').then(h => h.last === null)"), 5)
+                check(f"{short}: « Ouvrir » by the keyboard opens its page in the full window, and the meeting is said no more (D92)",
+                      reached and replaced and paged and forgotten,
+                      [reached, browser.window_handles, browser.execute_script("return location.hash"),
+                       browser.execute_script("return window.__TAURI__.core.invoke('header').then(h => h.last)")])
+                main = browser.current_window_handle
+                press(browser, "small-link")
+                wait_for(browser, lambda b: len(b.window_handles) == 2, 10)
+                browser.switch_to.window([h for h in browser.window_handles if h != main][0])
+                back = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+                check(f"{short}: back in the bar, it says no meeting: no line under its row, 44 px high (D92)",
+                      back and browser.execute_script(said) == "" and not browser.execute_script(shown) and wait_for(browser, lambda b: b.execute_script(bare), 3),
+                      [browser.execute_script(said), browser.execute_script("return innerHeight")])
+                # Another meeting stopped, its transcript held — its page never opened —, and a recording started while it
+                # is made: nothing said of it while that one records (D92).
+                (WORK / "fail-minutes").touch()
+                gates[0].touch()
+                # Clicked — the keyboard's path is held above —, 0.6 s after the gesture before at least: never inside
+                # the shell's 500 ms.
+                record = lambda: (time.sleep(0.6), press(browser, "small-record"), running(browser))[2]
+                stop = lambda: (press(browser, "small-stop"),
+                                wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10))[1]
+                held = record() and stop() and wait_for(browser, lambda b: b.execute_script(said) == hearing, 10)
+                again = record()
+                time.sleep(3.5)  # two of the window's readings at least, the first meeting still being made
+                quiet = browser.execute_script(said) == "" and not browser.execute_script(shown)
+                check(f"{short}: a meeting stopped and still made, its page not opened: another recording started, nothing said of it while it records (D92)",
+                      held and again and quiet, [held, again, browser.execute_script(said)])
+                # The first one ends meanwhile, its summary failing; the one recording stopped, its summary failing too:
+                # said in one line, the page's sentence and its cause, « Ouvrir » beside it.
+                gates[0].unlink()
+                ended = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.failed['2026-10-18_12-00'] !== undefined)"), 15)
+                failed = stop() and wait_for(browser, lambda b: b.execute_script(said) == meeting + not_made and b.execute_script(shown), 15)
+                # One line, cut where the bar ends: the whole of it its tooltip, and what the live region says.
+                line = browser.execute_script("const s = document.getElementById('small-last-said'), l = document.getElementById('small-last');"
+                                              " return [s.getClientRects().length, Math.round(l.getBoundingClientRect().height), s.title,"
+                                              " document.getElementById('small-last-live').textContent]")
+                check(f"{short}: its summary failing, the bar says so in one line, the page's cause its tooltip and its live region's, « Ouvrir » beside it (D92)",
+                      ended and failed and line[0] == 1 and line[1] <= 20 and line[2] == line[3] == meeting + not_made,
+                      [ended, browser.execute_script(said), browser.execute_script(shown), line])
+                shot_themed(browser, f"d92-bar-failed-{short}-{theme}", theme)
+            finally:
+                for gate in gates:
+                    gate.unlink(missing_ok=True)
+                (WORK / "fail-minutes").unlink(missing_ok=True)
+
+
 def meeting_trashed(now: dt.datetime) -> None:
     """BT. D100: a meeting moved to the trash from its own page — beside the button that opens its folder,
     a question in place, « Annuler » focused first, what it holds and that the system's trash restores it;
@@ -5776,14 +5923,19 @@ def context_before_start(now: dt.datetime) -> None:
         stop_from_small(browser)
         wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
         wait_for(None, lambda b: (meeting / "transcript.jsonl").is_file(), 15)
-        # Cleared by its ✕: nothing is kept for the next, the sentence gone, the bar 44 high, the focus in the field.
+        # Cleared by its ✕: nothing is kept for the next, the sentence gone, the bar its row of 44 and nothing under it
+        # but the meeting just stopped (D92's line), the focus in the field.
         browser.find_element(By.ID, "small-next-context").click()
         keys(browser, "Pour la suite")
         wait_for(browser, lambda b: kept(b) == "Pour la suite", 3)
         press(browser, "small-context-clear")
-        cleared = wait_for(browser, lambda b: kept(b) == "" and b.execute_script("return innerHeight") == 44, 3)
+        row_alone = ("const lines = [...document.querySelectorAll('#small .bar-lines > *')].filter(e => e.id !== 'small-last' && e.getClientRects().length);"
+                     " const p = document.getElementById('small'), l = document.getElementById('small-last');"
+                     " return lines.length === 0 && Math.round(document.querySelector('#small .bar-row').getBoundingClientRect().height) === 44"
+                     " && Math.abs(innerHeight - Math.ceil(p.getBoundingClientRect().height)) <= 1 && (l.hidden || l.getBoundingClientRect().height <= 20)")
+        cleared = wait_for(browser, lambda b: kept(b) == "" and b.execute_script(row_alone), 3)
         got = browser.execute_script(field)
-        check("fr light: cleared by its ✕, nothing is kept, nothing said, 44 high, the focus in the field",
+        check("fr light: cleared by its ✕, nothing is kept, nothing said of it, the row 44 high and D92's one line alone under it, the focus in the field",
               cleared and got["value"] == "" and not got["kept_shown"] and not got["clear"] and browser.execute_script(focused) == "small-next-context", [kept(browser), got])
         # Emptied by the keyboard too.
         keys(browser, "Encore")
@@ -11248,6 +11400,7 @@ def main() -> int:
     bar_window(now)
     bar_opened(now)
     bar_language(now)
+    bar_after_stop(now)
     recording_found(now)
     recording_found_not_forgotten(now)
     context_before_start(now)
