@@ -5595,12 +5595,9 @@ def focus_swept(now: dt.datetime) -> None:
         return wait_for(browser, lambda b: b.execute_script("return performance.now() - window.__quiet") > 1200, 8)
 
     def click(browser, element_id: str) -> None:
-        """A real click on the control, or on its label where the control itself is drawn as a switch."""
-        control = browser.find_element(By.ID, element_id)
-        try:
-            ActionChains(browser).click(control).perform()
-        except (ElementNotInteractableException, WebDriverException):
-            ActionChains(browser).click(browser.execute_script("return arguments[0].closest('label') || arguments[0]", control)).perform()
+        """A click as WebKitGTK gives it to a box or a radio: the value turned, its click, input and change sent,
+        the focus given to none — the driver's own click focuses it, which hid the decider's #autostart (#944)."""
+        browser.execute_script("document.activeElement?.blur(); document.getElementById(arguments[0]).click()", element_id)
 
     # A list chosen by the mouse opens GTK's own menu, a window of its own, which the driver never opens: the
     # list focused by the click, then left for the menu — the focus nowhere in the page, Kitokey's window
@@ -5689,6 +5686,15 @@ def focus_swept(now: dt.datetime) -> None:
                         browser.execute_script("document.getElementById(arguments[0]).scrollIntoView({block: 'center'}); window.__moves = []; window.__drawn = 0", control["id"])
                         time.sleep(0.4)
                         before = browser.execute_script(where)
+                        # What the change is to leave, read from the page drawn again — what was saved: never a
+                        # focus kept over a choice lost (the coordinator, #944).
+                        if control["kind"] == "list" and control["options"] > 1:
+                            at = control["index"] - 1 if control["index"] == control["options"] - 1 else control["index"] + 1
+                            wanted = browser.execute_script("return document.getElementById(arguments[0]).options[arguments[1]].value", control["id"], at)
+                        elif control["kind"] == "box":
+                            wanted = not browser.execute_script("return document.getElementById(arguments[0]).checked", control["id"])
+                        else:
+                            wanted = None
                         try:
                             expected = act(browser, control, mouse, change_first)
                         except WebDriverException as why:
@@ -5704,10 +5710,13 @@ def focus_swept(now: dt.datetime) -> None:
                         # The page cut shorter under the window by the change itself (the developer mode turned off, the
                         # logs' rows gone): the browser brings it to its new end — as far as it can still be, no further.
                         cut = before[1] > after[2] and abs(after[1] - after[2]) <= 1
-                        check(f"{short}, {how}: #{key} ({control['kind']}) changed, the focus kept on #{expected}, the page where it was (#944, D101)",
-                              after[0] == expected and (abs(after[1] - before[1]) <= 1 or cut),
+                        shown = browser.execute_script("const c = document.getElementById(arguments[0]);"
+                                                       " return !c ? null : c.type === 'checkbox' ? c.checked : c.value", control["id"])
+                        kept = wanted is None or shown == wanted
+                        check(f"{short}, {how}: #{key} ({control['kind']}) changed and the choice kept, the focus on #{expected}, the page where it was (#944, D101)",
+                              after[0] == expected and (abs(after[1] - before[1]) <= 1 or cut) and kept,
                               {"before": before, "after": after, "still": quiet, "focus moves": browser.execute_script("return window.__moves"),
-                               "drawn": browser.execute_script("return window.__drawn")})
+                               "drawn": browser.execute_script("return window.__drawn"), "chosen": wanted, "shown": shown})
                         if control["kind"] == "field":
                             browser.execute_script("document.getElementById(arguments[0])?.focus()", control["id"])
                             ActionChains(browser).send_keys(Keys.BACK_SPACE).perform()
