@@ -3017,6 +3017,29 @@ def cancelled_at_once(now: dt.datetime) -> None:
             monitor.terminate()
             (WORK / "hold-hearing").unlink(missing_ok=True)
             (WORK / "hold-hearing-finish").unlink(missing_ok=True)
+        # Made again with its context, its summary following, and written all the same after « Annuler »: the
+        # same by the redo's own path — no summary said to come, none made (#938, ines' mutant J).
+        held.unlink(missing_ok=True)
+        (WORK / "summary-args").unlink(missing_ok=True)
+        (WORK / "hold-hearing").touch()
+        (WORK / "hold-hearing-finish").touch()
+        try:
+            browser.execute_script("window.__TAURI__.core.invoke('context_redo', {name: arguments[0]})", finished.name)
+            running = wait_for(browser, lambda b: held.exists(), 15)
+            offered = running and wait_for(browser, lambda b: b.execute_script("const c = document.getElementById('making-cancel'); return !!c && c.getClientRects().length > 0"), 10)
+            if offered:
+                press(browser, "making-cancel")
+            ended = offered and wait_for(browser, lambda b: b.execute_script(idle), 3)
+            whole = (finished / "transcript.jsonl").read_text() if (finished / "transcript.jsonl").exists() else ""
+            time.sleep(3)
+            barred = browser.execute_script("const m = document.getElementById('making'); return window.__TAURI__.core.invoke('makings')"
+                                            ".then((k) => ({ bar: !!m && m.getClientRects().length > 0, between: k.between }))")
+            check("made again with its context, written all the same after « Annuler »: no summary said to come — no bar, nothing between the two steps —, none made",
+                  ended and '"type":"complete"' in whole and not barred["bar"] and finished.name not in barred["between"]
+                  and not (WORK / "summary-args").exists() and not (finished / "minutes.md").exists(), [offered, ended, barred])
+        finally:
+            (WORK / "hold-hearing").unlink(missing_ok=True)
+            (WORK / "hold-hearing-finish").unlink(missing_ok=True)
 
 
 LONG = "hf.co/unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF:UD-Q4_K_XL-very-long-name"
