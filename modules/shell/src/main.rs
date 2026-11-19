@@ -161,7 +161,7 @@ struct Shell {
     /// model is needed and not there.
     menu: Menu<Wry>,
     download: MenuItem<Wry>,
-    /// The menu's « Afficher la barre », in it only while the bar is hidden (D90).
+    /// The menu's « Afficher la barre d’enregistrement », in it only while the bar is hidden (D90).
     show_bar: MenuItem<Wry>,
     /// When the bar was last moved: its place is kept once it stays still (D90).
     bar_moved: Mutex<Option<Instant>>,
@@ -840,7 +840,7 @@ fn on_a_screen(app: &AppHandle, x: i32, y: i32) -> bool {
     })
 }
 
-/// The tray's « Afficher la barre »: in its menu while the bar is hidden, after the recording's
+/// The tray's « Afficher la barre d’enregistrement »: in its menu while the bar is hidden, after the recording's
 /// entry, as board 8 sets it.
 fn bar_shown(app: &AppHandle, shown: bool) {
     let shell = app.state::<Shell>();
@@ -1609,7 +1609,7 @@ fn bar_drag(window: tauri::WebviewWindow) {
 }
 
 /// « Masquer la barre » (D90): hidden, a recording going on; it comes back on the user's gesture
-/// alone — the tray's « Afficher la barre » or « Ouvrir Kitokey » —, never by itself.
+/// alone — the tray's « Afficher la barre d’enregistrement » or « Ouvrir Kitokey » —, never by itself.
 #[tauri::command]
 fn bar_hide(app: AppHandle, window: tauri::WebviewWindow) {
     if window.label() == "small" {

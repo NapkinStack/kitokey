@@ -20,7 +20,7 @@ worried — a recording that stops, an error.
 | R6 | **One voice, a tone that adapts.** Calm, clear, reassuring. In an error or a worry, reassure first — what goes on, what is not lost —, then the gesture. No humour in an error. | "The recording goes on; nothing is lost." / « L’enregistrement continue, rien n’est perdu. » | Mailchimp |
 | R7 | **Privacy is said precisely**: what leaves, to whom, what stays. Never vague, never played down. | "The text of “Weekly sync” is about to leave your computer" / « Le texte de « Point hebdo » va quitter votre ordinateur » | The product's promise: nothing crosses the network without an agreement |
 | R8 | **Sentence case everywhere in English** — titles, buttons, menus —, as Google, Material and Windows do; French never capitalises a title. | "Models to download" / « Modèles à télécharger » | Google style; GNOME HIG prefers title case, a deviation taken for one case on three systems |
-| R9 | **One thing, one name, everywhere.** A notification that cites a menu entry cites it word for word. | "Transcribe the last recording" in the menu and in the notification / « Transcrire le dernier enregistrement » dans les deux | GNOME HIG; Apple HIG |
+| R9 | **One thing, one name, everywhere.** A notification that cites a menu entry cites it word for word. | "Transcribe last recording" in the menu and in the notification / « Transcrire le dernier enregistrement » dans les deux | GNOME HIG; Apple HIG |
 | R10 | **Accessibility.** An `aria-label` or a tooltip names the action, not the icon. A status reads on its own, without what surrounds it. | "Hide the sidebar" / « Masquer la barre latérale » | Mailchimp, *Writing for accessibility*; Apple HIG |
 
 ## French

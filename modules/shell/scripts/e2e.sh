@@ -170,7 +170,7 @@ chmod +x "$work/kitokey-transcription"
 
 scenario A "in French: start from the menu, the reminder, a silent source, stop"
 start fr_FR.UTF-8 "transcript = false" "$work/kitokey-capture"
-check is "$(labels)" "Ouvrir Kitokey|Démarrer un enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Kitokey"
+check is "$(labels)" "Ouvrir Kitokey|Démarrer un enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu du dernier enregistrement|Quitter Kitokey"
 # A window is a web view, a process of WebKit's under Kitokey: none before the user asks.
 check is "$(windows)" 0
 # Started with the user's session from its first start, in the tray alone (D32).
@@ -190,7 +190,7 @@ check test "$(windows)" -ge 1
 click 4                                           # no session yet: said, nothing heard
 check is "$(titles 'Aucun enregistrement à transcrire')" 1
 click 3
-check is "$(labels)" "Ouvrir Kitokey|Arrêter l’enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Kitokey"
+check is "$(labels)" "Ouvrir Kitokey|Arrêter l’enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu du dernier enregistrement|Quitter Kitokey"
 check is "$(cat "$work/sessions/given")" "record $work/sessions"
 check is "$(titles 'Enregistrement en cours')" 1
 check is "$(titles 'Aucun son de la réunion')" 1
@@ -201,7 +201,7 @@ check grep -q 'Votre micro reste enregistré' "$work/notified"
 check is "$(titles 'Le son de la réunion est de nouveau enregistré')" 1
 click 3
 check is "$(cat "$work/sessions/told")" "stop"
-check is "$(labels)" "Ouvrir Kitokey|Démarrer un enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Kitokey"
+check is "$(labels)" "Ouvrir Kitokey|Démarrer un enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu du dernier enregistrement|Quitter Kitokey"
 # The window opened above is seen: the stop is not told, the window says it (D44); with none
 # seen, it is told with its length (M, below).
 check is "$(titles 'Enregistrement arrêté')" 0
@@ -216,7 +216,7 @@ check is "$(kill -0 "$app" 2>/dev/null && echo running || echo gone)" "gone"
 
 scenario C "in English, the reminder switched off; Kitokey killed while recording"
 start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/kitokey-capture"
-check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe last recording|Write summary of last recording|Quit Kitokey"
 click 3
 check is "$(titles 'Recording')" 0
 recorder=$(pgrep -P "$app" -f kitokey-capture || true)
@@ -229,7 +229,7 @@ scenario D "no recorder, or one that ends before it starts: said, and the menu s
 start en_GB.UTF-8 "transcript = false" "$work/nowhere"
 click 3
 check is "$(titles 'Kitokey cannot record')" 1
-check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe last recording|Write summary of last recording|Quit Kitokey"
 click 6
 printf '#!/bin/sh\necho "kitokey-capture: no source could be opened: nothing to record" >&2\nexit 1\n' > "$work/refuses"; chmod +x "$work/refuses"
 start en_GB.UTF-8 "transcript = false" "$work/refuses"
@@ -248,7 +248,7 @@ busctl --user call "$bus" "$menu" com.canonical.dbusmenu Event isvu 3 clicked s 
 click 3
 check is "$(wc -l < "$work/sessions/starts")" 1
 check is "$(windows)" 0                           # both presses on the recording's entry
-check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe last recording|Write summary of last recording|Quit Kitokey"
 click 6
 check is "$(cat "$work/sessions/told")" "stop"
 check is "$(kill -0 "$app" 2>/dev/null && echo waiting || echo gone)" "waiting"
@@ -267,8 +267,8 @@ check is "$(titles 'Transcript ready')" 1
 check test -s "$work/sessions/2026-10-13_14-05/transcript.jsonl"
 echo '{}' > "$work/sessions/2026-10-13_14-05/session.json"; touch "$work/sessions/fail-once"
 click 4; sleep 1
-check is "$(titles 'The transcript was not made')" 1
-check grep -q 'tries again from where it stopped.' "$work/notified"
+check is "$(titles 'Transcription failed')" 1
+check grep -q 'to resume where it stopped.' "$work/notified"
 check is "$(grep -c 'engine stopped' "$work/notified")" 0
 click 4; sleep 1
 check is "$(titles 'Transcript ready')" 2
@@ -323,7 +323,7 @@ start en_GB.UTF-8 "reminder = false" "$work/numbering"
 before=$(wc -l < "$work/sessions/heard")
 click 3; click 3; sleep 1; click 3; click 3; sleep 1    # two sessions, both waiting for the model
 check is "$(titles 'The transcription model is needed')" 2
-check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Download the model (0 MB, 127.0.0.1:$port)|Write the minutes of the last recording|Quit Kitokey"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe last recording|Download the model (0 MB, 127.0.0.1:$port)|Write summary of last recording|Quit Kitokey"
 check is "$(grep -c 'GET' "$work/server")" 0      # nothing fetched before the click
 # Served first is not the published file: refused, nothing in place, and the entry tries again.
 click "$(entry Download)"; sleep 7
@@ -344,7 +344,7 @@ check is "$(wc -l < "$work/sessions/heard")" "$((before + 3))"
 # No level chosen, none is named: the programs log at their usual one.
 check is "$(tail -3 "$work/sessions/log-level" | sort -u)" "unset"
 check is "$(tail -3 "$work/sessions/heard" | grep -o '2026-10-17_09-0[0-9]' | paste -sd' ')" "2026-10-17_09-01 2026-10-17_09-02 2026-10-17_09-03"   # in the order stopped
-check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe last recording|Write summary of last recording|Quit Kitokey"
 click 6
 published=""
 
@@ -359,7 +359,7 @@ mkdir -p "$work/data"; : > "$work/data/Trash"
 start fr_FR.UTF-8 "keep_audio = 1" "$work/kitokey-capture"
 sleep 3
 check test -e "$old/local.wav" -a -e "$old/derived/local.wav"
-check is "$(titles 'L’audio n’a pas été entièrement mis à la corbeille')" 1
+check is "$(titles 'Audio pas entièrement mis à la corbeille')" 1
 check grep -q "rien n.a .t. supprim" "$work/notified"
 check test -z "$(grep -E 'trash. operation|FileSystem|Os \{' "$work/notified")"
 click 6
@@ -370,7 +370,7 @@ check test ! -e "$old/local.wav" -a ! -e "$old/derived/local.wav"
 check test -s "$old/transcript.jsonl" -a -s "$old/session.json"
 # The system's trash — here the scenario's own, its data folder being the scenario's.
 check test -n "$(find "$work/data/Trash/files" -name 'local*.wav' 2>/dev/null)"
-check is "$(titles 'Audio mis à la corbeille')" 1
+check is "$(titles 'Audio déplacé dans la corbeille')" 1
 click 6
 
 scenario M "the minutes from the tray: on this computer at once; online only once agreed, nothing sent before"
@@ -576,19 +576,19 @@ kill -TERM "$app"; wait "$app" 2>/dev/null || true; app=""
 check test ! -e "$work/sessions/told"          # the recorder was not told to stop
 check kill -0 "$recorder"                       # and it records on
 start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"" "$work/orphaned"; sleep 1
-check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe last recording|Write summary of last recording|Quit Kitokey"
 check test ! -e "$work/sessions/given"         # no second recording was started
 found=$(cat "$work"/state/kitokey/logs/shell.*.jsonl 2>/dev/null | grep '"message":"shell.recording_found"' | grep -o '"seconds":[0-9.]*' | tail -1 | cut -d: -f2 || true)
 check test "${found%.*}" -ge 90 2>/dev/null      # its length counted from the session's start
 # Started again while it shows the recording found: the running one keeps it, nothing started anew.
 again
-check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe last recording|Write summary of last recording|Quit Kitokey"
 check test ! -e "$work/sessions/given"
 click 3; sleep 1
 check is "$(cat "$work/sessions/told")" "signal"
 check is "$(kill -0 "$recorder" 2>/dev/null && echo recording || echo ended)" "ended"
 check grep -q '"stopped"' "$work/sessions/2026-11-13_09-00/session.json"
-check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe last recording|Write summary of last recording|Quit Kitokey"
 check is "$(tail -1 "$work/sessions/heard")" "$work/sessions/2026-11-13_09-00 --model $work/model.bin"
 check test ! -e "$work/config/kitokey/recording.json"   # nothing kept once it ended
 click 6
@@ -600,7 +600,7 @@ recorder=$(cat "$work/sessions/recorder")
 kill -KILL "$app"; wait "$app" 2>/dev/null || true; app=""
 check kill -0 "$recorder"
 start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"; sleep 1
-check is "$(labels)" "Open Kitokey|Stop recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(labels)" "Open Kitokey|Stop recording|Transcribe last recording|Write summary of last recording|Quit Kitokey"
 check test ! -e "$work/sessions/given"
 click 6
 check is "$(cat "$work/sessions/told")" "signal"
@@ -609,7 +609,7 @@ check grep -q '"stopped"' "$work/sessions/2026-11-13_09-00/session.json"
 check test ! -e "$work/config/kitokey/recording.json"
 # Started once more: nothing is left to find.
 start en_GB.UTF-8 "reminder = false\ntranscript = false" "$work/orphaned"; sleep 1
-check is "$(labels)" "Open Kitokey|Start recording|Transcribe the last recording|Write the minutes of the last recording|Quit Kitokey"
+check is "$(labels)" "Open Kitokey|Start recording|Transcribe last recording|Write summary of last recording|Quit Kitokey"
 check test ! -e "$work/sessions/given"
 click 6
 rm -rf "$work/sessions/2026-11-13_09-00" "$work/sessions/recorder"

@@ -359,13 +359,13 @@ fn a_transcript_is_said_ready_or_not_with_how_to_have_it_again() {
         assert!(!words::minutes(&Minutes::Ready, Language::English).body.contains("Click"));
     }
     assert!(!ready(Language::French).body.contains("dossier"));
-    // Failed: the recording untouched, the menu's entry — never what the program said.
+    // Failed: the recording safe, the menu's entry by its name — never what the program said.
     let failed = words::made(
         &Made::Failed("kitokey-transcription: the model cannot be loaded".into()),
         Language::English,
     );
     assert!(
-        failed.body.contains("untouched") && failed.body.contains("Transcribe the last recording"),
+        failed.body.contains("safe") && failed.body.contains(words::menu(Language::English).transcribe),
         "{}",
         failed.body
     );
@@ -430,43 +430,42 @@ fn audio_sent_to_the_trash_is_said_with_its_counts_and_a_refusal_never_claims_to
     };
     assert_eq!(
         said(Language::English, Ok((1, 1))),
-        "Audio moved to the trash | The audio of 1 meeting kept more than 1 day is in the trash; \
-         its transcript and minutes stay."
+        "Audio moved to trash | The audio of 1 meeting older than 1 day is in the trash; its transcript and summary remain."
     );
     assert_eq!(
         said(Language::English, Ok((3, 30))),
-        "Audio moved to the trash | The audio of 3 meetings kept more than 30 days is in the trash; \
-         their transcripts and minutes stay."
+        "Audio moved to trash | The audio of 3 meetings older than 30 days is in the trash; \
+         their transcripts and summaries remain."
     );
     assert_eq!(
         said(Language::French, Ok((1, 1))),
-        "Audio mis à la corbeille | L’audio d’une réunion gardé plus d’un jour est dans la corbeille\u{202f}; \
+        "Audio déplacé dans la corbeille | L’audio d’une réunion de plus d’un jour est dans la corbeille\u{202f}; \
          sa transcription et son compte rendu restent."
     );
     assert_eq!(
         said(Language::French, Ok((3, 30))),
-        "Audio mis à la corbeille | L’audio de 3 réunions gardé plus de 30 jours est dans la \
-         corbeille\u{202f}; leurs transcriptions et leurs comptes rendus restent."
+        "Audio déplacé dans la corbeille | L’audio de 3 réunions de plus de 30 jours est dans la \
+         corbeille\u{202f}; leurs transcriptions et comptes rendus restent."
     );
     // The trash may have taken some before it refused: what is said holds either way, in the
     // user's language, without the system's own wording.
     assert_eq!(
         said(Language::English, Err(Refusal::NotAllowed)),
-        "The audio was not all moved to the trash | The trash refused access. What was not moved \
-         stays where it was; nothing was deleted."
+        "Some audio couldn’t be moved to the trash | The trash refused access. The rest is untouched — \
+         nothing was deleted."
     );
     assert_eq!(
         said(Language::French, Err(Refusal::NoSpace)),
-        "L’audio n’a pas été entièrement mis à la corbeille | La corbeille n’a plus de place. Ce \
-         qui n’a pas été déplacé reste à sa place\u{202f}; rien n’a été supprimé."
+        "Audio pas entièrement mis à la corbeille | La corbeille est pleine. Le reste est intact\u{a0}: \
+         rien n’a été supprimé."
     );
     assert_eq!(
         said(Language::French, Err(Refusal::Other)),
-        "L’audio n’a pas été entièrement mis à la corbeille | La corbeille du système ne l’a pas \
-         pris. Ce qui n’a pas été déplacé reste à sa place\u{202f}; rien n’a été supprimé."
+        "Audio pas entièrement mis à la corbeille | La corbeille du système a refusé ces fichiers. Le reste \
+         est intact\u{a0}: rien n’a été supprimé."
     );
-    assert!(said(Language::English, Err(Refusal::NoSpace)).contains("The trash has no room left."));
-    assert!(said(Language::English, Err(Refusal::Other)).contains("The system's trash did not take it."));
+    assert!(said(Language::English, Err(Refusal::NoSpace)).contains("The trash is full."));
+    assert!(said(Language::English, Err(Refusal::Other)).contains("The system trash refused these files."));
     assert!(said(Language::French, Err(Refusal::NotAllowed)).contains("La corbeille a refusé l’accès."));
 }
 
@@ -534,11 +533,11 @@ fn the_minutes_are_said_ready_waiting_or_not_made_with_what_to_do() {
     }
     assert_eq!(
         words::minutes(&Minutes::RedoFailed(None), Language::French).title,
-        "Le compte rendu n’a pas été refait"
+        "Le compte rendu n’a pas pu être refait"
     );
     assert_eq!(
         words::minutes(&Minutes::Waiting("openrouter.ai".into()), Language::French).body,
-        "Rien n’est envoyé à openrouter.ai avant votre accord, dans la fenêtre de Kitokey."
+        "Rien n’est envoyé à openrouter.ai sans votre accord. Donnez-le dans la fenêtre de Kitokey."
     );
 }
 
@@ -1806,7 +1805,7 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
     );
     let menu = words::menu(Language::French);
     assert_eq!(menu.start, french.record_start);
-    assert_eq!(menu.minutes, "Rédiger le compte rendu de la dernière réunion");
+    assert_eq!(menu.minutes, "Rédiger le compte rendu du dernier enregistrement");
     assert_eq!(
         words::minutes(&words::Minutes::Unchosen, Language::French).title,
         "Aucun modèle choisi pour les comptes rendus"
@@ -2108,20 +2107,20 @@ fn what_is_left_of_the_trial_is_said_in_days_and_in_meetings_each_in_its_number(
         (
             14,
             10,
-            "14 days and 10 meetings left; the trial ends once both are used up.",
-            "Il reste 14 jours et 10 réunions\u{202f}; l’essai prend fin une fois les deux épuisés.",
+            "14 days and 10 meetings left. The trial ends when both run out.",
+            "Il reste 14 jours et 10 réunions\u{202f}; l’essai se termine quand les deux sont épuisés.",
         ),
         (
             1,
             1,
-            "1 day and 1 meeting left; the trial ends once both are used up.",
-            "Il reste 1 jour et 1 réunion\u{202f}; l’essai prend fin une fois les deux épuisés.",
+            "1 day and 1 meeting left. The trial ends when both run out.",
+            "Il reste 1 jour et 1 réunion\u{202f}; l’essai se termine quand les deux sont épuisés.",
         ),
         (
             2,
             2,
-            "2 days and 2 meetings left; the trial ends once both are used up.",
-            "Il reste 2 jours et 2 réunions\u{202f}; l’essai prend fin une fois les deux épuisés.",
+            "2 days and 2 meetings left. The trial ends when both run out.",
+            "Il reste 2 jours et 2 réunions\u{202f}; l’essai se termine quand les deux sont épuisés.",
         ),
         // Ten meetings made, days left: the days alone.
         (4, 0, "4 days left.", "Il reste 4 jours."),
@@ -2387,9 +2386,9 @@ fn a_settings_file_refused_says_which_setting_and_what_to_do_in_both_languages()
 
 // The voice guide (`docs/voice.md`, D94): a notification's title, read whole as it is sent.
 
-/// The titles over 50 characters today, put right with the notifications' sentences (D94): a list
-/// that only shrinks.
-const TITLES_TOO_LONG: [&str; 1] = ["Les réglages de Wholeheard n’ont pas tous été repris"];
+/// The titles over 50 characters: none since the notifications' sentences were rewritten (D94),
+/// and a list that only shrinks.
+const TITLES_TOO_LONG: [&str; 0] = [];
 
 /// The functions of `words.rs` that return a notification, each read below: one added there fails
 /// the title's test until it is named here — and read in `every_notice`, which the review checks.
