@@ -3836,7 +3836,7 @@ def announced(now: dt.datetime) -> None:
         browser.execute_script("document.getElementById('small-announce-copy').click()")
         wait_for(browser, lambda b: b.execute_script("return window.copied_for_test"), 3)
         text = browser.execute_script("return window.copied_for_test")
-        check("a meeting said in English: the announcement in English, the window in French", text == "I’m recording this meeting to write up its minutes. Tell me if you’d rather I didn’t.", text)
+        check("a meeting said in English: the announcement in English, the window in French", text == "I’m recording this meeting to write a summary. Let me know if you’d rather I didn’t.", text)
         # Its own language file comes before the settings', as a meeting's own word does.
         folder = next(p for p in speaking.iterdir() if (p / "session.json").exists())
         (folder / "language").write_text("fr\n")
@@ -3887,11 +3887,11 @@ def heard_checked(now: dt.datetime) -> None:
         check(f"{what}: nothing overflows or is cut, at {got['size']}", holds(got) and got["size"][0] == 440, got)
     expected = {
         "fr_FR.UTF-8": ("fr", "Votre micro", "Le son de la réunion",
-                        "Rien n’en arrive\u00a0: vérifiez qu’il n’est pas coupé sur l’appareil lui-même, et qu’il est prêt.",
-                        "La réunion\u00a0: rien depuis 2\u00a0min — l’enregistrement continue.", "Votre micro n’est pas enregistré pour l’instant."),
-        "en_US.UTF-8": ("en", "Your microphone", "The meeting’s sound",
-                        "Nothing comes from it: check it is not muted on the device itself, and that it is ready.",
-                        "The meeting: nothing for 2 min — the recording goes on.", "Your microphone isn’t being recorded right now."),
+                        "Aucun signal\u00a0: vérifiez que le micro n’est pas coupé sur l’appareil et qu’il est allumé.",
+                        "La réunion\u00a0: rien depuis 2\u00a0min — enregistrement en cours.", "Votre micro n’est pas enregistré pour l’instant."),
+        "en_US.UTF-8": ("en", "Your microphone", "Meeting audio",
+                        "No signal: check the microphone isn’t muted on the device and that it’s switched on.",
+                        "Meeting: silent for 2 min — still recording.", "Your microphone isn’t being recorded right now."),
     }
     for language, (short, me, others, nothing, silent, waiting) in expected.items():
         for theme in ("light", "dark"):
