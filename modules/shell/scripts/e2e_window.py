@@ -7600,7 +7600,7 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
     nothing asks or saves with it there; back to the service, the key typed for it is back. Saved, it
     is no longer kept in the page (#963). Values never printed: what is checked says only whether."""
     print("CB. Settings: a key typed for a service never leaves for another service or another host (#964)")
-    zero, hears = "sk-typed-for-zero", "sk-hears-for-zero"
+    zero, hears, own = "sk-typed-for-zero", "sk-hears-for-zero", "sk-typed-for-b"
     asked = []
 
     # Two stand-ins, two hosts (their ports): A stands in for every service, B is an address of one's own.
@@ -7660,6 +7660,14 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
             wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
             browser.execute_script(address_to, "minutes-address", b)
             other = browser.execute_script(value, "minutes-key", "")
+            # A key typed for B, « Avancé » unfolded: « Vérifier la clé » asks the service, with the service's key alone (#964).
+            browser.find_element(By.ID, "minutes-key").send_keys(own)
+            del asked[:]
+            press(browser, "minutes-key-test")
+            heard = wait_for(browser, lambda b_: len(asked) > 0, 10)
+            check("the summary's « Avancé » on another host, a key typed for it: « Vérifier la clé » sends the service nothing typed for that host (#964)",
+                  heard and not any(key == own for _, key in asked) and browser.execute_script(sent, "minutes_models", zero)[-1:] == [True],
+                  [heard, [key == own for _, key in asked]])
             browser.execute_script(address_to, "minutes-address", "")
             back = browser.execute_script(value, "minutes-key", zero)
             browser.execute_script(address_to, "minutes-address", a.replace("/api/v1", "/v1"))
@@ -7707,6 +7715,13 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
             wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-provider").is_displayed(), 3)
             browser.execute_script(address_to, "transcription-provider", b)
             other = browser.execute_script(value, "transcription-key", "")
+            browser.find_element(By.ID, "transcription-key").send_keys(own)
+            del asked[:]
+            press(browser, "transcription-key-test")
+            heard = wait_for(browser, lambda b_: len(asked) > 0, 10)
+            check("the transcription's « Avancé » on another host, a key typed for it: « Vérifier la clé » sends the service nothing typed for that host (#964)",
+                  heard and not any(key == own for _, key in asked) and browser.execute_script(sent, "transcription_models", hears)[-1:] == [True],
+                  [heard, [key == own for _, key in asked]])
             browser.find_element(By.ID, "transcription-model").send_keys("whisper-1")
             browser.execute_script("document.getElementById('transcription-own-save').click()")
             saved = wait_for(browser, lambda b_: f'transcription_provider = "{b}"' in window.file.read_text(), 5)
