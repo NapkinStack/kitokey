@@ -7697,11 +7697,15 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
             # Saved for the service: no longer kept in the page; the field says a key is kept (#963).
             press(browser, "minutes-key-test")
             listed = wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-models").is_displayed(), 10)
-            # Unfolded again on B, a key typed for B: the service's « Enregistrer », still offered above, saves
-            # the service's key alone (#964).
+            # Unfolded again on B, a key typed for B: the service's « Enregistrer » is not offered there (#968);
+            # folded, it saves the service's key alone (#964).
             press(browser, "minutes-advanced")
             wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
             browser.find_element(By.ID, "minutes-key").send_keys(own)
+            offered = browser.execute_script("const s = document.getElementById('minutes-online-save'); return s.getClientRects().length > 0")
+            check("the summary's « Avancé » unfolded on another host: the service's « Enregistrer » not offered (#968)", not offered)
+            press(browser, "minutes-advanced")
+            wait_for(browser, lambda b_: not b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
             browser.execute_script("window.__old = document.getElementById('minutes-key')")
             press(browser, "minutes-online-save")
             wait_for(browser, lambda b_: f'minutes_provider = "{a}"' in window.file.read_text(), 5)

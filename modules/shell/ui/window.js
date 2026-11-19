@@ -2845,12 +2845,20 @@ function minutesRow(minutes, words, locked) {
   const onlineSave = button("minutes-online-save", words.save, true);
   const service = () => minutes.online[Number(servicePick.value)];
   chosenKeeps("minutes", modelsPick, () => servicePick.value);
+  // One « Enregistrer » at a time, as the transcription's (#860): the service's, « Avancé » folded;
+  // unfolded, its own (#968).
+  let listedShown = false;
+  const paintSave = () => {
+    onlineSave.hidden = !listedShown || (guided.minutes.advanced ?? own);
+  };
   // The models listed with its key, the one saved chosen.
   const shownListed = (models) => {
     modelsPick.replaceChildren();
     for (const id of models) option(modelsPick, id, modelSaid(id));
     chosenKept("minutes", modelsPick, servicePick.value, minutes.model);
-    modelsWrap.hidden = onlineSave.hidden = models.length === 0;
+    modelsWrap.hidden = models.length === 0;
+    listedShown = models.length > 0;
+    paintSave();
   };
   // This service's last answer, said again; else the model saved with it — the others come with its key.
   const shownSaved = () => {
@@ -2861,7 +2869,9 @@ function minutesRow(minutes, words, locked) {
     if (answer?.models) return shownListed(answer.models);
     modelsPick.replaceChildren();
     if (saved) option(modelsPick, minutes.model, modelSaid(minutes.model));
-    modelsWrap.hidden = onlineSave.hidden = !saved;
+    modelsWrap.hidden = !saved;
+    listedShown = !!saved;
+    paintSave();
   };
   shownSaved();
   servicePick.addEventListener("change", () => {
@@ -2885,7 +2895,10 @@ function minutesRow(minutes, words, locked) {
   onlineSave.addEventListener("click", () => save(service().address, modelsPick.value, keyed.typed(serviceKeyId()), serviceKeyId()));
   ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, keyed.typed(keyNow()), keyNow()));
   const [toggle, advanced] = guidedAdvanced("minutes", words, own, [addressWrap, modelWrap, ownSave]);
-  toggle.addEventListener("click", keyed.shown);
+  toggle.addEventListener("click", () => {
+    paintSave();
+    keyed.shown();
+  });
   const away = element("div", "fields");
   away.append(serviceWrap, keyWrap, keyTest, keySaid, modelsWrap, onlineSave, toggle, advanced);
   const here = element("div", "fields");
