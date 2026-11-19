@@ -153,13 +153,15 @@ default branch red together — one starts reading what the other starts providi
 ruleset merges a branch only once it carries the default branch: what the checks judged is what
 lands. Three habits keep that from costing the team:
 
-- **update at the last moment**: only the pull request about to merge — approved, green — takes
+- **update at the last moment**: only the pull request about to merge — reviewed, green — takes
   the default branch in; the others wait their turn untouched. One update per merge, not one per
-  open pull request each time another merges;
+  open pull request each time another merges. Where stale approvals are dismissed (G13), the
+  approval comes after that update, not before it;
 - **update by merging the default branch in, never by a rebase**: a rebase rewrites what was
   approved; a merge adds one commit that brings the default branch, which the approver reads as
   that, and `pr-check`'s R1 counts as covered when it carries nothing of its own. Where stale
-  approvals are dismissed (G13), the forge may still ask the approval again after an update: the
+  approvals are dismissed (G13), GitHub asks the approval again after an update — measured: a
+  merge of the default branch whose tree equalled the approved head's still dismissed it —; the
   approver then reads only what the default branch brought. Where an agent approves, the update is
   the last push, and another identity than its pusher's approves it (G21). The squash keeps the
   default branch's history one commit per pull request;
@@ -340,10 +342,11 @@ the change, and the stricter applies:
     attested, it stands when nothing its modules read moved since its run: the records of its
     commit and of the head hold the same `inputs` digest — the modules run, those they consume
     from or assemble, the files outside the modules, `contracts/` and `platform/` included, the
-    engine and the person — and the run is at
-    most 7 days old, the default branch moved by 20 commits at most. A module that reads something
-    it does not declare is the risk: declare it in `consumes`, and the default branch's own
-    `Module checks` run catches what was missed;
+    project's records (`docs/project/`, `docs/adr/`, `docs/pdr/`) left out, the engine and the
+    person — and the run is at most 7 days old, the default branch moved by 20 commits at most. A
+    module that reads something it does not declare is the risk: declare it in `consumes` — a
+    record cannot be declared: a check never reads one —, and the default branch's own `Module
+    checks` run catches what was missed once it runs that module;
   - one **explored** by hand keeps the commit its evidence was produced on, and the verifier
     adds a **`Confirmed`** column on the head commit saying **what moved since and why it leaves
     the result standing**. Reading three fixes is not the same work as driving six scenarios
@@ -380,7 +383,9 @@ request check reads the sheet in CI: missing, unfilled, without evidence, verifi
 head and not confirmed on it, failed. Where checks are attested, each record also keeps the sheet's
 rows as it read them, and the check compares the description with them: an **explored** row whose
 Commit cell moved and whose evidence did not was never explored again, and fails — evidence names
-its run (a link to that screenshot, video or trace), so a new run brings a new one. A row a record
+its run (a link to that screenshot, video or trace), so a new run brings a new one. The commit it
+moved from is the one the first record holding that evidence names: putting it back and confirming
+the head passes, even after a record held the moved cell. A row a record
 held and the sheet no longer shows is said. A rebase or a squash drops the records of the commits
 it rewrites, and what they read with them. The approver decides on the sheet; where the project answers
 `approval: agent`, the approver of a `prototype` or `standard` module may be the verifier itself,

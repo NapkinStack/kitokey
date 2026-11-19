@@ -84,7 +84,7 @@ An agent speaking to a person uses these words, and explains one the first time 
 | **ADR · PDR** | A record of a technical decision (architecture) or a product decision, kept for whoever comes later | `docs/adr/`, `docs/pdr/` | "A PDR says why the export was dropped." |
 | **Kernel** | The short instructions every agent session reads first | `AGENTS.md` at the root | "The kernel says: never verify your own work." |
 | **Playbook** | Instructions an agent loads for one kind of task | `.nstack/playbooks/` | "The verification playbook." |
-| **Skill** | A playbook as the agent's tool loads it, generated from it | `.claude/skills/`, `nstack skills` | "The skills are regenerated, never edited." |
+| **Skill** | A playbook as the agent's tool loads it, generated from it | `.claude/skills/`, `.agents/skills/`, `nstack skills` | "The skills are regenerated, never edited." |
 | **Handbook** | The framework's manual, kept in the project | `.nstack/handbook/` | "07-governance.md says when the forge cannot guard." |
 | **Form** | A blank page to copy and fill — a charter, a cycle, an ADR | `.nstack/forms/` | "The cycle form, copied at framing." |
 | **Seat** | A file whose content is the project's own; an update never writes into it | `README.md`, the decision indexes | "The README is a seat: the update leaves it." |

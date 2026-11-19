@@ -80,6 +80,7 @@ reads the log files the run wrote there:
   | Ports | each server binds port 0 itself and reports the port it got; never a fixed number, nor one picked and released before the server binds it |
   | Files: build output, temporary files, sockets, state, configuration | everything it writes goes under a folder of its own run — the build tool's output folder set per run (`CARGO_TARGET_DIR`, not `build-dir`), `TMPDIR`, `HOME` and `XDG_*_HOME` pointed there —, never a fixed path |
   | Processes | its teardown stops what it started — a process group it created (`setsid`, `start_new_session`), or the PIDs it recorded for a daemon that detaches — never by name or executable path |
+  | Per-user kernel limits: file watchers (inotify instances and watches), process count | its run closes what it opens, and as many runs as the machine takes at once stay under the user's limits (`fs.inotify.max_user_instances`, `fs.inotify.max_user_watches`, `ulimit -u`, which counts threads too); a limit run out fails at once, naming it — no folder of its own run isolates these |
   | Timings, whatever the load | it passes with the machine busy; a run that waits for a quiet machine is the opposite of sealed |
 
   The lock keeps unsealed runs apart, not sealed ones: a run that needs a quiet machine cannot get

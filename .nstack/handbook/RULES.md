@@ -35,7 +35,7 @@ a family, a number a rule; a retired rule's number is never reused.
 | `M9` | A module missing a file of its envelope | `02-modules.md` §4 |
 | `M10` | A module that does not say whether a user sees it | `05-workflow.md` §7 |
 | `M11` | `assembles` naming no module of the project, the module itself, or releases that wait for each other | `09-platform.md` §2 |
-| `M12` | An `evidence` declaration that checks nothing: an unknown key; a pattern that is not text, does not compile or matches an empty line; no level or no scenario; `levels` without a group named `level` | `.nstack/playbooks/tests.md` §1 |
+| `M12` | An `evidence` declaration that checks nothing: an unknown key; a pattern that is not text, does not compile or matches an empty line; no level or no scenario; `levels` without a group named `level`; a `sealed` that is not true or false | `.nstack/playbooks/tests.md` §1 |
 | `M13` | On `approval: agent`, a path a human must approve — a module neither `prototype` nor `standard`, the project's rules, its records, its answers — that the code owners file ends on no owner, or a default owner | `07-governance.md` §7 |
 
 ## B — the boundaries between modules
@@ -56,10 +56,10 @@ a family, a number a rule; a retired rule's number is never reused.
 
 | Code | Refuses | Why |
 |---|---|---|
-| `S1` | A playbook with no entry in the skills configuration | `INSTALL.md`, "Claude Code skills" |
-| `S2` | An entry pointing at a playbook that does not exist | `INSTALL.md`, "Claude Code skills" |
-| `S3` | Generated skills that no longer match their playbooks | `INSTALL.md`, "Claude Code skills" |
-| `S4` | A skill whose name or description breaks the skills specification | `INSTALL.md`, "Claude Code skills" |
+| `S1` | A playbook with no entry in the skills configuration | `INSTALL.md`, "Agent skills" |
+| `S2` | An entry pointing at a playbook that does not exist | `INSTALL.md`, "Agent skills" |
+| `S3` | Generated skills that no longer match their playbooks | `INSTALL.md`, "Agent skills" |
+| `S4` | A skill whose name or description breaks the skills specification | `INSTALL.md`, "Agent skills" |
 
 ## C — the discovery, the charter and the cycles
 
@@ -113,11 +113,12 @@ in git; elsewhere a record is shown, and the forge's CI judges.
 ## R — the approvals a pull request carries
 
 On GitHub, read from the pull request by `nstack pr-check` on the forge's run. Where the forge
-dismisses stale approvals on push, it never has one to say.
+dismisses stale approvals on push, R1 never has one to say; R2 reads any repository.
 
 | Code | Refuses | Why |
 |---|---|---|
 | `R1` | *(warning)* An approval given on an earlier commit than the head, when commits other than the base branch's followed it — a merge that carries content of its own included —: the approver has not read them. A review starts no run, so it is said, as an annotation on the check, never failed. Unread, it is said | `07-governance.md` §7 |
+| `R2` | *(warning)* Every approval is Copilot's code review: GitHub counts it toward the required approvals where the repository allows it — a setting its API does not show —, yet it ran no test sheet and names no session. Said, never failed | `07-governance.md` §7 |
 
 ## K — the cycle a change belongs to
 
@@ -130,7 +131,7 @@ it has no cycle, K1 to K3 and K5 say nothing there, and every other rule applies
 | `K2` | Delivery work from the cycle's end date — its first day over: the circuit breaker | `.nstack/handbook/project.md` |
 | `K3` | Delivery work that names no ready or in-progress deliverable | `.nstack/handbook/project.md` |
 | `K4` | The out-of-cycle label with no justification | `.nstack/handbook/project.md` |
-| `K5` | Delivery work for a deliverable someone else holds — from none of the hold's sessions, nor its person's account | `.nstack/handbook/project.md`, *Who holds a deliverable* |
+| `K5` | Delivery work for a deliverable someone else holds — from none of the hold's sessions (a merge counts), nor its person's account | `.nstack/handbook/project.md`, *Who holds a deliverable* |
 
 ## V — a contract version someone relies on
 
@@ -159,7 +160,7 @@ it has no cycle, K1 to K3 and K5 say nothing there, and every other rule applies
 
 ## G — the forge's settings
 
-The twenty-one lines of GitHub's checklist, in its order (`INSTALL.md`, on GitHub). Read on
+The twenty-two lines of GitHub's checklist (`INSTALL.md`, on GitHub). Read on
 GitHub only: off it, `doctor` lists what the forge should refuse, reads none of it, and says the
 repository *unguarded*; `W1` does not run.
 
