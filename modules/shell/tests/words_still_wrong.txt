@@ -51,22 +51,5 @@ lexicon minutes "The minutes were not written" « minutes »
 lexicon minutes "«\u{a0}{address}\u{a0}» n’est pas l’adresse d’un fournisseur\u{a0}: choisissez qui écrit le compte rendu dans les réglages de Kitokey." « fournisseur »
 lexicon minutes "“{address}” is not a provider’s address: choose who writes the minutes in Kitokey’s settings." « provider »
 lexicon pulled "{model} is in Ollama: it is offered first for the minutes." « minutes »
-lexicon window.agree_eyebrow[0] "Before the first minutes online" « minutes »
-lexicon window.agree_lead[0] "To write the minutes, Kitokey sends the transcript to the service you chose. Here is exactly what leaves." « minutes »
-lexicon window.agree_local[0] "Write the minutes on this computer instead" « minutes »
-lexicon window.confidential_ollama_empty[0] "Ollama holds no model on this computer: the minutes wait for it." « minutes »
-lexicon window.context_changed[1] "The transcript and the minutes were made with another context." « minutes »
-lexicon window.context_making[0] "The context cannot change while the transcript or the minutes are being made." « minutes »
-lexicon window.context_why[0] "The transcription hears it as the first words said: names are spelt as here. The minutes use it to give each action to the right person." « minutes »
-lexicon window.copy_minutes[0] "Copy the minutes" « minutes »
-lexicon window.corrected_since[0] "The transcript was corrected after these minutes were written." « minutes »
-lexicon window.make_minutes[0] "Write the minutes" « minutes »
-lexicon window.minutes_making[0] "Writing the minutes" « minutes »
-lexicon window.minutes_not_copied[0] "The minutes could not be copied." « minutes »
-lexicon window.minutes_not_made[0] "The minutes were not written. The transcript is untouched." « minutes »
 lexicon window.minutes_stopped[0] "Minutes stopped. You can start them again, with another model if you like." « minutes »
-lexicon window.minutes_title[0] "Minutes" « minutes »
-lexicon window.no_minutes[0] "No minutes yet." « minutes »
-lexicon window.no_player[0] "Its audio was freed: the meeting can no longer be listened to. Its transcript and minutes stay." « minutes »
-lexicon window.welcome_ollama_silent[0] "Ollama does not answer on this computer: the minutes wait for it. It is free, at ollama.com." « minutes »
 placeholders of: in both languages
