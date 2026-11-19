@@ -5683,6 +5683,22 @@ def focus_kept(now: dt.datetime) -> None:
             check("Settings, a drawing under way as the focus moves by Tab: once drawn, the focus where the user moved it, not back on the one left (#906)",
                   ended and moved[0] not in ("reminder", "body") and after[0] == moved[0],
                   {"moved to": moved, "after": after, "trace": traced(browser)})
+            # The same, the focus moved out of the page — to the sidebar's search, which no drawing of Settings
+            # replaces, and which the page's focus listener does not follow: still, once drawn, it stays where the
+            # user put it, never taken back to Settings (ines's P5 on #951, D101).
+            browser.execute_script("const r = document.getElementById('reminder'); r.scrollIntoView({block: 'center'}); r.focus();")
+            time.sleep(0.4)
+            browser.execute_script("window.__hold = new Promise((r) => { window.__release = r; }); window.__drawnAgain = false;"
+                                   " refresh().then(() => { window.__drawnAgain = true; })")
+            time.sleep(0.3)
+            browser.execute_script("document.getElementById('find').focus()")
+            moved = browser.execute_script("const a = document.activeElement; return a ? a.id : null")
+            browser.execute_script("window.__release(); window.__hold = null")
+            ended = wait_for(browser, lambda b: b.execute_script("return window.__drawnAgain"), 5)
+            time.sleep(0.5)
+            after = browser.execute_script(where)
+            check("Settings, a drawing under way as the focus moves to the sidebar's search: once drawn, the focus still there, not taken back (#951, D101)",
+                  ended and moved == "find" and after[0] == "find", {"moved to": moved, "after": after, "trace": traced(browser)})
             kept(browser, "Settings, what is kept of the audio chosen by the arrows", "keep",
                  lambda b: keys(b, Keys.ARROW_DOWN), lambda: "keep" in settings())
             if browser.execute_script("const p = document.getElementById('general-advanced-panel'); return !!p && p.hidden"):
