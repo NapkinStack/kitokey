@@ -399,7 +399,8 @@ began=$(date +%s.%N)                                     # the reader gone: the 
 sleep 1; pw-play "$work/others-a.wav"                    # 8 s of the others
 sleep 2
 ended=$(date +%s.%N)
-kill -TERM "$recorder"; left_as=0; wait "$recorder" || left_as=$?
+check kill -0 "$recorder"                                # still recording when the logout's TERM comes
+kill -TERM "$recorder" 2>/dev/null || true; left_as=0; wait "$recorder" || left_as=$?
 kill "$mic_player" 2>/dev/null || true
 folder=$(ls -d "$work"/v3-term/*/ | head -1)
 sed 's/^/    /' "$work/e3.events" "$work/e3.errors" >> .evidence/e2e.txt
