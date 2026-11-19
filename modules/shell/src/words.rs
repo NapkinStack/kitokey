@@ -2110,7 +2110,7 @@ pub fn window(language: Language) -> Window {
             ],
             context_redo: "Refaire avec ce contexte",
             language_label: "Langue parlée",
-            language_default: "Comme dans les Réglages",
+            language_default: "Celle des Réglages",
             language_detected: "Détectée par la transcription",
             meetings_language: "Langue des réunions",
             language_not_saved: "Langue non enregistrée\u{a0}: {}",

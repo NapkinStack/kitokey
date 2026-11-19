@@ -2301,7 +2301,7 @@ def meeting_language(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         own = Select(browser.find_element(By.ID, "meeting-language"))
         check("a meeting's page offers its own language, the settings' by default — the language they name said",
-              own.first_selected_option.text == "Comme dans les Réglages — English" and not (heard / "language").exists(), own.first_selected_option.text)
+              own.first_selected_option.text == "Celle des Réglages — English" and not (heard / "language").exists(), own.first_selected_option.text)
         choose(browser, "meeting-language", "de")
         written = wait_for(browser, lambda b: (heard / "language").exists() and (heard / "language").read_text() == "de\n", 5)
         check("chosen on its page, the meeting's language file holds its code alone", written)
@@ -2356,7 +2356,7 @@ def meeting_language(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         # By script, in one step: the page may be drawn again between finding the list and reading it.
         said = browser.execute_script("const p = document.getElementById('meeting-language'); return p.options[p.selectedIndex].text")
-        check("the settings detecting it, the page says « détectée »", said == "Comme dans les Réglages — détectée", said)
+        check("the settings detecting it, the page says « détectée »", said == "Celle des Réglages — détectée", said)
         # Refused on its page (the shell's refusal stood in for, each refusal its own words): said, and
         # still said once the page is drawn again; a second refusal says its own; a choice saved says
         # none; gone once the page is left (#841, the rule of #655's fix).
@@ -2413,7 +2413,7 @@ def meeting_language(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         offered = [o.text for o in Select(browser.find_element(By.ID, "meeting-language")).options]
         check("SpeechAnalyzer hearing: the page says the system's language, never « détectée », and offers French and English alone",
-              offered == ["Comme dans les Réglages — Français", "Français", "English"], offered)
+              offered == ["Celle des Réglages — Français", "Français", "English"], offered)
     with window as browser:
         press(browser, "settings-link")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meetings-language"), 10)
@@ -5024,7 +5024,7 @@ def bar_language(now: dt.datetime) -> None:
         keys(browser, Keys.ENTER)
         return wait_for(browser, lambda b: not b.execute_script("return document.getElementById('small-options').hidden"), 3)
     for language, (short, settled, first, refused) in {
-        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Comme dans les Réglages — Deutsch", "Langue non enregistrée : "),
+        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Celle des Réglages — Deutsch", "Langue non enregistrée : "),
         "en_US.UTF-8": ("en", "", "Same as Settings — detected", "Language not saved: "),
     }.items():
         taping = WORK / f"bar-language-{short}"
@@ -10572,7 +10572,7 @@ def main() -> int:
         # Speech in the first sixtieth of the meeting, on each side: here rises above the middle, remote falls below.
         check(
             "who spoke is drawn over the meeting, here above and remote below",
-            label.startswith("Qui a parlé") and len(here) == len(remote) == 60 and here[0] < 42 and remote[0] > 46 and here[-1] == 42,
+            label.startswith("Temps de parole") and len(here) == len(remote) == 60 and here[0] < 42 and remote[0] > 46 and here[-1] == 42,
             drawn,
         )
         maker = lines_seen(browser, "#meeting .minutes .maker")[0]
@@ -10700,7 +10700,7 @@ def main() -> int:
         chips = browser.find_element(By.CSS_SELECTOR, "#meeting .meeting-head").text
         check("minutes that cannot be read claim nothing in the header: their card says them (D89)", "Compte rendu" not in chips, chips)
         being = [p.text for p in browser.find_elements(By.CSS_SELECTOR, ".transcript .note")]
-        check("a transcript without its end says it is being written", being == ["Transcription en cours : la suite arrive."], being)
+        check("a transcript without its end says it is being written", being == ["Transcription en cours : la suite arrive."], being)  # U+00A0 read as a space
 
         browser.execute_script("location.hash = '#/meeting/' + encodeURIComponent('gone')")
         listed = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/")
