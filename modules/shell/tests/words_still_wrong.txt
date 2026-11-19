@@ -10,7 +10,6 @@ apostrophe window.speech_missing[0] "Apple's model is not on this Mac yet"
 apostrophe window.speech_option[0] "Apple's SpeechAnalyzer, on this Mac"
 apostrophe window.test_sends[0] "Test sends {} one sentence of Kitokey's, nothing of a meeting."
 apostrophe window.where_online[0] "Online — the transcript's text is sent"
-lexicon announcement "I’m recording this meeting to write up its minutes. Tell me if you’d rather I didn’t." « minutes »
 lexicon audio_trashed "The audio of 1 meeting kept more than {} is in the trash; its transcript and minutes stay." « minutes »
 lexicon audio_trashed "The audio of {meetings} meetings kept more than {} is in the trash; their transcripts and minutes stay." « minutes »
 lexicon cause "Ce modèle ne donne pas les temps de ce qu’il entend\u{a0}: choisissez-en un qui donne ceux de chaque segment dans les réglages de Kitokey." « segment »

@@ -188,46 +188,43 @@ pub fn of(said: &Said, reminder: bool, language: Language) -> Option<Notice> {
         (Said::Heard(_) | Said::Level(..) | Said::MicrophoneBack, _) => return None,
         // The microphone is named, so that one other than the call's shows at once.
         (Said::Started(_, microphone, _), English) => {
-            let named = microphone
-                .as_ref()
-                .map(|name| format!("Microphone recorded: {name}. "))
-                .unwrap_or_default();
+            let named = microphone.as_ref().map(|name| format!("Microphone: {name}. ")).unwrap_or_default();
             return notice(
                 "Recording",
-                format!("{named}Tell the participants that this meeting is being recorded."),
+                format!("{named}Remember to tell participants this meeting is being recorded."),
             );
         }
         (Said::Started(_, microphone, _), French) => {
-            let named = microphone
-                .as_ref()
-                .map(|name| format!("Micro enregistré\u{a0}: {name}. "))
-                .unwrap_or_default();
+            let named = microphone.as_ref().map(|name| format!("Micro\u{a0}: {name}. ")).unwrap_or_default();
             return notice(
                 "Enregistrement en cours",
-                format!("{named}Prévenez les participants que cette réunion est enregistrée."),
+                format!("{named}Pensez à prévenir les participants que la réunion est enregistrée."),
             );
         }
         (Said::Unavailable(Source::Me, _), English) => {
-            ("Your microphone is not recorded for now", "The meeting’s sound is still recorded.")
+            ("Your microphone isn’t being recorded", "The meeting audio is still being recorded.")
         }
         (Said::Unavailable(Source::Me, _), French) => (
-            "Votre micro n’est pas enregistré pour l’instant",
-            "Le son de la réunion est toujours enregistré.",
+            "Votre micro n’est pas enregistré",
+            "Le son de la réunion, lui, est bien enregistré.",
         ),
         (Said::MicrophoneGone, English) => (
-            "The microphone you chose is not there",
-            "Your microphone is recorded as on Auto for now, and the one you chose as soon as it is back.",
+            "Chosen microphone not found",
+            "Kitokey is using the default microphone and will switch back as soon as yours is reconnected.",
         ),
         (Said::MicrophoneGone, French) => (
-            "Le micro choisi n’est pas là",
-            "Votre micro est enregistré comme sur Auto pour l’instant, et celui choisi dès qu’il revient.",
+            "Micro choisi introuvable",
+            "Kitokey utilise le micro par défaut et reprendra le vôtre dès qu’il sera rebranché.",
         ),
-        (Said::Unavailable(Source::Others, _), English) => ("The meeting’s sound is not recorded", "Your microphone is still recorded."),
-        (Said::Unavailable(Source::Others, _), French) => {
-            ("Le son de la réunion n’est pas enregistré", "Votre micro est toujours enregistré.")
+        (Said::Unavailable(Source::Others, _), English) => {
+            ("Meeting audio isn’t being recorded", "Your microphone is still being recorded.")
         }
+        (Said::Unavailable(Source::Others, _), French) => (
+            "Le son de la réunion n’est pas enregistré",
+            "Votre micro, lui, est bien enregistré.",
+        ),
         // The device recorded changed (D31): what is recorded now is named.
-        (Said::Moved(Source::Me, Some(name)), English) => return notice("Microphone changed", format!("Now recorded: {name}.")),
+        (Said::Moved(Source::Me, Some(name)), English) => return notice("Microphone changed", format!("Now recording from {name}.")),
         (Said::Moved(Source::Me, Some(name)), French) => return notice("Micro changé", format!("Enregistré maintenant\u{a0}: {name}.")),
         (Said::Moved(Source::Others, Some(name)), English) => {
             return notice("Sound output changed", format!("The meeting’s sound is now recorded from {name}."));
@@ -238,50 +235,41 @@ pub fn of(said: &Said, reminder: bool, language: Language) -> Option<Notice> {
                 format!("Le son de la réunion est maintenant enregistré depuis {name}."),
             );
         }
-        (Said::Moved(Source::Me, None), English) => (
-            "Microphone changed",
-            "Your microphone is still recorded, from the one your computer uses now.",
-        ),
+        (Said::Moved(Source::Me, None), English) => ("Microphone changed", "Now recording from your computer’s current microphone."),
         (Said::Moved(Source::Me, None), French) => (
             "Micro changé",
-            "Votre micro est toujours enregistré, depuis celui qu’utilise maintenant votre ordinateur.",
+            "Kitokey enregistre désormais le micro utilisé par votre ordinateur.",
         ),
         (Said::Moved(Source::Others, None), English) => (
             "Sound output changed",
-            "The meeting’s sound is still recorded, from the output your computer uses now.",
+            "Meeting audio is now recorded from your computer’s current output.",
         ),
         (Said::Moved(Source::Others, None), French) => (
             "Sortie audio changée",
-            "Le son de la réunion est toujours enregistré, depuis la sortie qu’utilise maintenant votre ordinateur.",
+            "Le son de la réunion est désormais enregistré depuis la sortie actuelle de votre ordinateur.",
         ),
         // None left: that side, and nothing of the other, which may have none either. Of the
         // microphone, never why: the system took it away, or a call let go of it (D66).
-        (Said::Lost(Source::Me), English) => ("Your microphone is not recorded for now", "The recording goes on."),
-        (Said::Lost(Source::Me), French) => ("Votre micro n’est pas enregistré pour l’instant", "L’enregistrement continue."),
+        (Said::Lost(Source::Me), English) => ("Your microphone isn’t being recorded", "Recording continues."),
+        (Said::Lost(Source::Me), French) => ("Votre micro n’est pas enregistré", "L’enregistrement continue."),
         (Said::Lost(Source::Others), English) => (
-            "The meeting’s sound is not recorded for now",
-            "Your computer has no sound output left. An output plugged in is recorded at once; the recording goes on.",
+            "Meeting audio is no longer being recorded",
+            "Your computer has no audio output. Plug one in to resume; recording continues.",
         ),
         (Said::Lost(Source::Others), French) => (
-            "Le son de la réunion n’est plus enregistré pour l’instant",
-            "Votre ordinateur n’a plus de sortie audio. Une sortie branchée est enregistrée aussitôt\u{202f}; l’enregistrement continue.",
+            "Le son de la réunion n’est plus enregistré",
+            "Votre ordinateur n’a plus de sortie audio. Branchez-en une pour reprendre\u{202f}; l’enregistrement continue.",
         ),
         (Said::Nothing, _) => return sends_nothing(None, language),
-        (Said::Silent(Source::Me), English) => (
-            "No sound from your microphone",
-            "Nothing was heard for ten seconds. The recording goes on.",
-        ),
-        (Said::Silent(Source::Me), French) => (
-            "Votre micro ne capte aucun son",
-            "Rien n’a été entendu depuis dix secondes. L’enregistrement continue.",
-        ),
+        (Said::Silent(Source::Me), English) => ("No sound from your microphone", "Nothing for 10 seconds. Recording continues."),
+        (Said::Silent(Source::Me), French) => ("Aucun son de votre micro", "Rien depuis 10 secondes. L’enregistrement continue."),
         (Said::Silent(Source::Others), English) => (
             "No sound from the meeting",
-            "Nothing was heard for ten seconds: is the call playing on this device? The recording goes on.",
+            "Nothing for 10 seconds — is the call playing on this computer? Recording continues.",
         ),
         (Said::Silent(Source::Others), French) => (
-            "Aucun son venant de la réunion",
-            "Rien n’a été entendu depuis dix secondes\u{a0}: l’appel passe-t-il par cet appareil\u{202f}? L’enregistrement continue.",
+            "Aucun son de la réunion",
+            "Rien depuis 10 secondes\u{a0}: l’appel passe-t-il bien par cet ordinateur\u{202f}? L’enregistrement continue.",
         ),
         (Said::Stopped(_, seconds), English) => return notice("Recording stopped", format!("{} recorded.", length(*seconds))),
         (Said::Stopped(_, seconds), French) => {
@@ -295,17 +283,20 @@ pub fn of(said: &Said, reminder: bool, language: Language) -> Option<Notice> {
             return notice("Enregistrement arrêté", format!("{said} {agreed}."));
         }
         (Said::Failed(why), English) if detail(why).is_empty() => (
-            "The recording stopped by itself",
-            "The program that records ended without saying why. What was recorded is in the session’s folder.",
+            "Recording stopped unexpectedly",
+            "Something went wrong. Everything recorded so far is saved in the meeting’s folder.",
         ),
         (Said::Failed(why), French) if detail(why).is_empty() => (
-            "L’enregistrement s’est arrêté tout seul",
-            "Le programme d’enregistrement s’est terminé sans dire pourquoi. Ce qui a été enregistré est gardé dans le dossier de la réunion.",
+            "L’enregistrement s’est arrêté",
+            "Une erreur inattendue l’a interrompu. Ce qui a été enregistré est conservé dans le dossier de la réunion.",
         ),
-        (Said::Failed(_), English) => ("The recording stopped by itself", "What was recorded is in the session’s folder."),
+        (Said::Failed(_), English) => (
+            "Recording stopped unexpectedly",
+            "Everything recorded so far is saved in the meeting’s folder.",
+        ),
         (Said::Failed(_), French) => (
-            "L’enregistrement s’est arrêté tout seul",
-            "Ce qui a été enregistré est gardé dans le dossier de la réunion.",
+            "L’enregistrement s’est arrêté",
+            "Ce qui a été enregistré est conservé dans le dossier de la réunion.",
         ),
     };
     notice(title, body.to_string())
@@ -1446,11 +1437,11 @@ pub fn window(language: Language) -> Window {
             choose: "Choose…",
             small: "The recording bar",
             small_mic: "Your microphone",
-            small_meeting: "The meeting’s sound",
+            small_meeting: "Meeting audio",
             small_note: "Once stopped, the transcript writes itself. You will be told.",
-            bar_silent_me: "Your microphone: nothing for 2 min — the recording goes on.",
-            bar_silent_others: "The meeting: nothing for 2 min — the recording goes on.",
-            small_nothing: "Nothing comes from it: check it is not muted on the device itself, and that it is ready.",
+            bar_silent_me: "Your microphone: silent for 2 min — still recording.",
+            bar_silent_others: "Meeting: silent for 2 min — still recording.",
+            small_nothing: "No signal: check the microphone isn’t muted on the device and that it’s switched on.",
             small_waiting_me: "Your microphone is not recorded for now.",
             small_waiting_others: "The meeting’s sound is not recorded for now.",
             small_announce: "Tell the participants this meeting is being recorded.",
@@ -1901,9 +1892,9 @@ pub fn window(language: Language) -> Window {
             small: "La barre d’enregistrement",
             small_mic: "Votre micro",
             small_meeting: "Le son de la réunion",
-            bar_silent_me: "Votre micro\u{a0}: rien depuis 2\u{a0}min — l’enregistrement continue.",
-            bar_silent_others: "La réunion\u{a0}: rien depuis 2\u{a0}min — l’enregistrement continue.",
-            small_nothing: "Rien n’en arrive\u{a0}: vérifiez qu’il n’est pas coupé sur l’appareil lui-même, et qu’il est prêt.",
+            bar_silent_me: "Votre micro\u{a0}: rien depuis 2\u{a0}min — enregistrement en cours.",
+            bar_silent_others: "La réunion\u{a0}: rien depuis 2\u{a0}min — enregistrement en cours.",
+            small_nothing: "Aucun signal\u{a0}: vérifiez que le micro n’est pas coupé sur l’appareil et qu’il est allumé.",
             small_waiting_me: "Votre micro n’est pas enregistré pour l’instant.",
             small_waiting_others: "Son de la réunion non enregistré pour l’instant.",
             small_note: "À l’arrêt, la transcription s’écrit toute seule. Vous serez prévenu.",
@@ -3048,17 +3039,17 @@ impl Sides {
 fn sends_nothing(name: Option<&str>, language: Language) -> Option<Notice> {
     let body = match (name, language) {
         (Some(name), Language::English) => format!(
-            "Nothing at all has come from {name} for ten seconds, not even a room’s faint noise: check it is not muted on the device itself, and that it is ready. The recording goes on."
+            "No signal from {name} for 10 seconds, not even background noise. Check it isn’t muted on the device and that it’s switched on. Recording continues."
         ),
-        (None, Language::English) => "Nothing at all has come from your microphone for ten seconds, not even a room’s faint noise: check it is not muted on the device itself, and that it is ready. The recording goes on.".to_string(),
+        (None, Language::English) => "No signal from your microphone for 10 seconds, not even background noise. Check it isn’t muted on the device and that it’s switched on. Recording continues.".to_string(),
         (Some(name), Language::French) => format!(
-            "Rien du tout n’arrive du micro {name} depuis dix secondes, pas même le léger bruit d’une pièce\u{a0}: vérifiez qu’il n’est pas coupé sur l’appareil lui-même, et qu’il est prêt. L’enregistrement continue."
+            "Aucun signal du micro {name} depuis 10 secondes, pas même un bruit de fond. Vérifiez qu’il n’est pas coupé sur l’appareil et qu’il est allumé. L’enregistrement continue."
         ),
-        (None, Language::French) => "Rien du tout n’arrive de votre micro depuis dix secondes, pas même le léger bruit d’une pièce\u{a0}: vérifiez qu’il n’est pas coupé sur l’appareil lui-même, et qu’il est prêt. L’enregistrement continue.".to_string(),
+        (None, Language::French) => "Aucun signal de votre micro depuis 10 secondes, pas même un bruit de fond. Vérifiez qu’il n’est pas coupé sur l’appareil et qu’il est allumé. L’enregistrement continue.".to_string(),
     };
     let title = match language {
-        Language::English => "Your microphone sends nothing",
-        Language::French => "Votre micro ne transmet rien",
+        Language::English => "Your microphone isn’t sending any signal",
+        Language::French => "Votre micro ne transmet aucun signal",
     };
     notice(title, body)
 }
@@ -3066,18 +3057,18 @@ fn sends_nothing(name: Option<&str>, language: Language) -> Option<Notice> {
 /// A side with no device left while the other is still recorded.
 fn lost_beside(source: Source, language: Language) -> Notice {
     let (title, body) = match (source, language) {
-        (Source::Me, Language::English) => ("Your microphone is not recorded for now", "The meeting’s sound is still recorded."),
+        (Source::Me, Language::English) => ("Your microphone isn’t being recorded", "The meeting audio is still being recorded."),
         (Source::Me, Language::French) => (
-            "Votre micro n’est pas enregistré pour l’instant",
-            "Le son de la réunion est toujours enregistré.",
+            "Votre micro n’est pas enregistré",
+            "Le son de la réunion, lui, est bien enregistré.",
         ),
         (Source::Others, Language::English) => (
-            "The meeting’s sound is not recorded for now",
-            "Your computer has no sound output left. Your microphone is still recorded, and an output plugged in is recorded at once.",
+            "Meeting audio is no longer being recorded",
+            "Your computer has no audio output. Your microphone is still recorded; plug in an output to resume.",
         ),
         (Source::Others, Language::French) => (
-            "Le son de la réunion n’est plus enregistré pour l’instant",
-            "Votre ordinateur n’a plus de sortie audio. Votre micro est toujours enregistré, et une sortie branchée est enregistrée aussitôt.",
+            "Le son de la réunion n’est plus enregistré",
+            "Votre ordinateur n’a plus de sortie audio. Votre micro reste enregistré\u{202f}; branchez une sortie pour reprendre.",
         ),
     };
     Notice {
@@ -3090,14 +3081,12 @@ fn lost_beside(source: Source, language: Language) -> Notice {
 pub fn back(name: Option<&str>, language: Language) -> Notice {
     let (title, body) = match language {
         Language::English => (
-            "The meeting’s sound is recorded again",
-            name.map_or("From the output your computer uses now.".into(), |name| format!("From {name}.")),
+            "Meeting audio is being recorded again",
+            name.map_or("From the current audio output.".into(), |name| format!("From {name}.")),
         ),
         Language::French => (
             "Le son de la réunion est de nouveau enregistré",
-            name.map_or("Depuis la sortie qu’utilise maintenant votre ordinateur.".into(), |name| {
-                format!("Depuis {name}.")
-            }),
+            name.map_or("Depuis la sortie audio actuelle.".into(), |name| format!("Depuis {name}.")),
         ),
     };
     Notice { title: title.into(), body }
@@ -3127,8 +3116,8 @@ pub fn offer(application: &str, language: Language) -> (Notice, [&'static str; 3
 /// Said after a recording's stop when its transcript is made next, without another gesture.
 pub fn follows(language: Language) -> &'static str {
     match language {
-        Language::English => "The transcript follows.",
-        Language::French => "La transcription suit.",
+        Language::English => "Transcribing now.",
+        Language::French => "Transcription en cours.",
     }
 }
 
@@ -3389,6 +3378,6 @@ pub fn announcement(meeting: Option<&str>, window: Language) -> &'static str {
         Language::French => {
             "J’enregistre cette réunion pour en faire le compte rendu. Dites-le-moi si vous préférez que je ne le fasse pas."
         }
-        Language::English => "I’m recording this meeting to write up its minutes. Tell me if you’d rather I didn’t.",
+        Language::English => "I’m recording this meeting to write a summary. Let me know if you’d rather I didn’t.",
     }
 }
