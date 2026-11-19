@@ -383,6 +383,32 @@ done
 check test "$again_as" = 0 -a ! -s "$work/e2-again.errors"
 check test -z "$(ls "$(ls -d "$work"/kept-again/*/ | head -1)" | grep '\.part$')"
 
+say "E3. a logout during a recording: its reader gone, a first termination signal (#978)"
+# What a session's end does to a recording its Kitokey has left (#961, recording/v1): the reader takes
+# `started` and leaves, the sound goes on, then one SIGTERM. Asked nothing, as Kitokey records: the
+# program ends well, the session says stopped, and each track is final — kept as FLAC, or its WAV with
+# its true lengths — and as long as the time recorded, its note in it.
+pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
+sleep 0.5
+mkfifo "$work/e3.pipe"
+# Its input closed too, as its Kitokey's is once gone: that stops nothing (recording/v1).
+KITOKEY_TRACE=e2e-e3 "$bin" record "$work/v3-term" < /dev/null > "$work/e3.pipe" 2> "$work/e3.errors" &
+recorder=$!
+head -n 1 "$work/e3.pipe" > "$work/e3.events"
+began=$(date +%s.%N)                                     # the reader gone: the scenario's own clock
+sleep 1; pw-play "$work/others-a.wav"                    # 8 s of the others
+sleep 2
+ended=$(date +%s.%N)
+check kill -0 "$recorder"                                # still recording when the logout's TERM comes
+kill -TERM "$recorder" 2>/dev/null || true; left_as=0; wait "$recorder" || left_as=$?
+kill "$mic_player" 2>/dev/null || true
+folder=$(ls -d "$work"/v3-term/*/ | head -1)
+sed 's/^/    /' "$work/e3.events" "$work/e3.errors" >> .evidence/e2e.txt
+check test "$left_as" = 0 -a ! -s "$work/e3.errors"
+# As long as the scenario recorded, by its own clock — never shorter, stopped at its reader's leaving.
+check measure2 stopped "$folder" 440 880 "$(python3 -c "print($ended - $began)")"
+check test -z "$(ls "$folder" | grep '\.part$')"
+
 say "F. each source as delivered: a recording killed"
 pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
 sleep 0.5
