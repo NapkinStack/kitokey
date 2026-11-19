@@ -3,7 +3,8 @@
 How Kitokey speaks to its users, in English and in French. Every sentence it says is in
 [`src/words.rs`](../src/words.rs) (`AGENTS.md`); this page is what a sentence there is written
 to. It comes from the copy review of 2026-11-13 (D94, cycle 10): its principles, its lexicon and
-its templates. Each example is given in both languages, English first.
+its templates. The review itself, every sentence with its three rewrites, is
+[`docs/project/reviews/2026-11-13-copy.md`](../../../docs/project/reviews/2026-11-13-copy.md). Each example is given in both languages, English first.
 
 The reader is not technical. They are often busy, sometimes in the middle of a call, sometimes
 worried — a recording that stops, an error.
@@ -100,3 +101,24 @@ comment, the placeholders, the apostrophe, the limits, the refused words, a noti
 with what is still wrong today, a number or a list that only shrinks as the rewrite goes, one pull
 request an area (D94). The rest of this page — the tone, the gesture after the error, the terms a
 test cannot tell apart — is the review's.
+
+## Changing a sentence
+
+A sentence changed in `words.rs` changes every test that reads it — `tests/words.rs`, and the window's e2e
+(`scripts/e2e_window.py`), which waits for the sentences the window shows. Before a pull request, the e2e is
+searched from its own string literals, not from the sentence: each literal read as Python reads it — a
+`\u00a0` or a `\u202f` is the character itself —, then kept when it is part of the old sentence and not of the new
+one. A search for the whole sentence misses a check written with escapes, and one that tests a fragment
+(« absent », « n’a pas pu être gardé »); #950's first run failed 34 checks so. A check that fails on the new
+sentence says the old one's meaning: when the new sentence drops it — where a download comes from, where a
+meeting's words go (R7) —, the sentence is wrong, not the check.
+
+A sentence with a placeholder is searched a second time, by each of its fixed parts, in the whole e2e —
+`main()` included, which only the attest runs. A check that glues a value to a part both sentences share
+(« 0 n’est pas un nombre de jours »), or composes the sentence with its reason in an f-string
+(« Le réglage n’a pas été enregistré : {…} »), is no part of the old sentence alone, and the first search
+lets it through; #950 and P7 each had two. A check that reads `.text` reads a `\u00a0` as a space, a
+`\u202f` as itself: it waits for « « 0 » » with plain spaces.
+
+A hit of either search inside `main()` is read and settled one by one: a partial run never reaches
+`main()`, so a green partial says nothing of it (#950's attest failed so, on « compte rendu »).
