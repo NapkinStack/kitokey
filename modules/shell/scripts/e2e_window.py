@@ -1841,7 +1841,7 @@ def ollama_pulled(now: dt.datetime) -> None:
                 far = wait_for(browser, lambda b: "%" in b.execute_script(row), 5)
                 check(f"{way}: how far is said while Ollama fetches it, nothing else offered meanwhile", far and browser.execute_script(offers) == 0, browser.execute_script(row))
                 again = wait_for(browser, lambda b: "Télécharger" in b.execute_script(row), 15)
-                check(f"{way}: said, and offered again", again and "n’a pas été téléchargé" in notified.read_text(), notified.read_text()[-300:])
+                check(f"{way}: said, and offered again", again and "Échec du téléchargement du modèle" in notified.read_text(), notified.read_text()[-300:])
             browser.execute_script(pull)
             here = wait_for(browser, lambda b: "Sur cet ordinateur" in b.execute_script(row), 20)
             check("whole: on this computer, Ollama asked for qwen3:8b", here and pulls[-1].get("model") == "qwen3:8b", (browser.execute_script(row), pulls))
