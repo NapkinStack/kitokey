@@ -173,6 +173,7 @@ printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","tr
 # As recording/v1 says, where the scenario asks it (`faithful-recorder`, CC): its reader gone, it goes on
 # (#773); its input closed stops nothing; a termination signal stops it as `stop` does — `session.json` says
 # `stopped`, and it ends well. Unasked, it dies with its reader, as every other scenario has it (s961b2).
+# Not everywhere yet: AZ leaves a recording behind that its next window, faithfully, finds (#981, D104).
 faithful=false
 if [ -e "$2/faithful-recorder" ]; then
   faithful=true
