@@ -204,6 +204,8 @@ echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'
 )
 RECORDER.chmod(0o755)
 FAILED = []
+# The scenario being played, named by `timed`: what a window that leaves its Kitokey running says it of (#960).
+PLAYING = None
 # What Tester says of each cause its program names (D72), as `src/words.rs` says it in French.
 TEST_CAUSES = [
     ("provider.refused_key", "Le fournisseur a refusé la clé\u00a0: saisissez-la de nouveau dans les réglages de Kitokey."),
@@ -642,6 +644,25 @@ class Window:
                     os.kill(pid, signal.SIGTERM)
                 except ProcessLookupError:
                     pass
+            # Gone within a bound, its single-instance name released (#960): a Kitokey that does not end
+            # on SIGTERM holds that name, and every later start of the shard hands over to it and raises
+            # « no session in a minute ». Still there: said, by the scenario that left it, then killed.
+            until = time.monotonic() + 10
+            while (instances() or single_instance_held()) and time.monotonic() < until:
+                time.sleep(0.2)
+            left = instances()
+            if left or single_instance_held():
+                check(f"{PLAYING or 'a window outside a scenario'} left Kitokey {left} running 10 s after SIGTERM:"
+                      " ended by SIGKILL (#960)", False, {"processes": left, "single-instance name held": single_instance_held()})
+                for pid in left:
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                # Gone before the next start: a process killed holds its name until it has ended.
+                until = time.monotonic() + 5
+                while (instances() or single_instance_held()) and time.monotonic() < until:
+                    time.sleep(0.1)
 
 
 def asking_less_motion(window: Window) -> Window:
@@ -10114,7 +10135,9 @@ def timed(scenario):
     raises is a FAIL named by it and by what it raised, its traceback under it, and the run goes on
     to the next: never a shard cut short, the checks after it hidden as « NOT RUN » (#949)."""
     def played(*args, **kwargs):
+        global PLAYING
         began = time.monotonic()
+        PLAYING = scenario.__name__
         try:
             return scenario(*args, **kwargs)
         except Exception as why:
@@ -10124,6 +10147,7 @@ def timed(scenario):
             FAILED.append(what)
             return None
         finally:
+            PLAYING = None
             print(f"    ({scenario.__name__}: {time.monotonic() - began:.1f} s)")
     return played
 
