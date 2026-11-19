@@ -8442,6 +8442,37 @@ def ends_on_sigterm(now: dt.datetime) -> None:
     finally:
         hold.unlink(missing_ok=True)
 
+    # A transcript being made: the hearing stand-in held running, its child deaf to TERM — the transcription's
+    # group, waited for as the summary's is (ines's I1, I2 on #982).
+    data = WORK / "data-ends-on-sigterm"
+    models = data / "kitokey" / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    tiny = models / "ggml-tiny-a.bin"
+    tiny.write_bytes(b"\0" * 16)
+    held_h, child_h, hold_h = WORK / "held-hearing", WORK / "held-hearing-child", WORK / "hold-hearing"
+    held_h.unlink(missing_ok=True)
+    child_h.unlink(missing_ok=True)
+
+    def hearing(browser) -> list[int]:
+        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-state"), 10)
+        browser.execute_script("return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})",
+                               meeting.name, str(tiny))
+        running = wait_for(None, lambda _: held_h.exists() and child_h.exists() and child_h.read_text().strip() != "", 15)
+        check("a transcript being made, held running by the stand-in", running)
+        if not running:
+            return []
+        pids = [int(held_h.read_text()), int(child_h.read_text())]
+        return ended_on_sigterm("a transcript being made") + pids
+
+    hold_h.touch()
+    try:
+        heard = Window(meetings, "fr_FR.UTF-8", settings + f'model = "{tiny}"\n')
+        heard.env.update(XDG_DATA_HOME=str(data))
+        ended(heard, hearing)
+    finally:
+        hold_h.unlink(missing_ok=True)
+
     # « Vérifier le son » open: Kitokey listening, its capture program under it.
     def checking(browser) -> list[int]:
         browser.execute_script("location.hash = '#/settings'")
