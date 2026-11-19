@@ -170,12 +170,28 @@ fi
 printf '%s\\n' "$*" > "$here/recorder-args"
 folder="$2/2026-10-18_12-00"; mkdir -p "$folder"
 printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","tracks":{}}' > "$folder/session.json"
+# As recording/v1 says, where the scenario asks it (`faithful-recorder`, CC): its reader gone, it goes on
+# (#773); its input closed stops nothing; a termination signal stops it as `stop` does — `session.json` says
+# `stopped`, and it ends well. Unasked, it dies with its reader, as every other scenario has it (s961b2).
+# Not everywhere yet: AZ leaves a recording behind that its next window, faithfully, finds (#981, D104).
+faithful=false
+if [ -e "$2/faithful-recorder" ]; then
+  faithful=true
+  trap '' PIPE
+  echo $$ > "$here/recorder-pid"
+  stopped() { printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"; echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'; exit 0; }
+  trap stopped TERM INT
+fi
 me='"Mic"'
 # No microphone to open, when the scenario says so (D49).
 if [ -e "$2/waiting-me" ]; then echo '{"event":"unavailable","source":"me","reason":"none"}'; me='"unavailable"'; fi
 echo '{"event":"started","folder":"'"$folder"'","sources":{"me":'"$me"',"others":"Speaker"}}'
 n=0
-while ! read -t 0.1 line; do
+while :; do
+  read -t 0.1 line; got=$?
+  # A line — `stop` — ends it; faithful, its input closed (1) stops nothing: it waits, as the real one records on.
+  [ "$got" = 0 ] && break
+  [ "$got" = 1 ] && $faithful && sleep 0.1
   n=$((n + 1))
   # Levels at silence as long as the scenario says so; what capture says of a silence, when it does (D49).
   if [ -e "$2/hush" ]; then echo '{"event":"level","source":"me","level":0}'; echo '{"event":"level","source":"others","level":0}'
@@ -8487,6 +8503,216 @@ def models_on_the_page(now: dt.datetime) -> None:
         tags.shutdown()
 
 
+def ends_on_sigterm(now: dt.datetime) -> None:
+    """CC. #961: Kitokey ends on SIGTERM — a session's logout, a shutdown — within two seconds, whatever it is
+    making: its processes ended with it, as « Annuler » ends a making (D92, its child deaf to TERM too), and its
+    single-instance name released, so that the next start opens. Once while a summary is made, held running by
+    the stand-in; once while « Vérifier le son » listens. SIGTERM goes to this session's Kitokey alone; whatever
+    is left is killed after, red or green."""
+    print("CC. SIGTERM ends Kitokey within two seconds, its processes with it, while a summary is made or the sound checked (#961)")
+    meetings = WORK / "ends-on-sigterm"
+    meeting = meetings / "2026-10-30_10-00"
+    session(meeting, now - dt.timedelta(days=1), 1, {"local.wav": 1000})
+    (meeting / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+    local = "http://localhost:11434/v1"
+    settings = f'reminder = false\nafter = "nothing"\nminutes_provider = "{local}"\nminutes_model = "writer-a"\n'
+
+    def alive(pid: int) -> bool:
+        try:
+            return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
+        except (OSError, IndexError):
+            return False
+
+    def descendants(root: int) -> list[int]:
+        """Every process under `root`, by its parent, as /proc says it now."""
+        parents = {}
+        for process in Path("/proc").iterdir():
+            if process.name.isdigit():
+                try:
+                    parents[int(process.name)] = int((process / "stat").read_text().rsplit(")", 1)[1].split()[1])
+                except (OSError, IndexError, ValueError):
+                    pass
+        found, layer = [], [root]
+        while layer:
+            layer = [pid for pid, parent in parents.items() if parent in layer]
+            found += layer
+        return found
+
+    def state(pid: int) -> dict:
+        """What a process that does not end says of itself: its signals blocked, ignored, caught; each thread's
+        state and where it waits."""
+        try:
+            status = {line.split(":", 1)[0]: line.split(":", 1)[1].strip() for line in Path(f"/proc/{pid}/status").read_text().splitlines()
+                      if line.split(":", 1)[0] in ("State", "Threads", "SigBlk", "SigIgn", "SigCgt", "ShdPnd", "SigPnd")}
+            threads = {}
+            for task in Path(f"/proc/{pid}/task").iterdir():
+                try:
+                    name = (task / "comm").read_text().strip()
+                    threads[f"{task.name} {name}"] = [(task / "stat").read_text().rsplit(")", 1)[1].split()[0], (task / "wchan").read_text().strip()]
+                except OSError:
+                    pass
+            return {"status": status, "threads": threads}
+        except OSError:
+            return {}
+
+    def ended_on_sigterm(what: str) -> list[int]:
+        """SIGTERM to this session's Kitokey; within two seconds, it and everything under it gone, its name released."""
+        ours = instances()
+        under = [pid for kitokey in ours for pid in descendants(kitokey)]
+        before = {pid: state(pid) for pid in ours}
+        sent = time.monotonic()
+        for pid in ours:
+            os.kill(pid, signal.SIGTERM)
+        gone = wait_for(None, lambda _: not any(alive(pid) for pid in ours + under) and not single_instance_held(), 2)
+        check(f"{what}: SIGTERM ends Kitokey within 2 s, its processes with it, its single-instance name released (#961)",
+              bool(ours) and gone,
+              {"took": round(time.monotonic() - sent, 1), "Kitokey": ours, "Kitokey left": [pid for pid in ours if alive(pid)],
+               "its processes": under, "left": [pid for pid in under if alive(pid)], "name held": single_instance_held(),
+               "at SIGTERM": before, "now": {pid: state(pid) for pid in ours if alive(pid)}})
+        return ours + under
+
+    def ended(window: Window, play) -> None:
+        """`play` with the window, then the window's own end tolerating a Kitokey already gone; what is left, killed."""
+        left: list[int] = []
+        try:
+            with window as browser:
+                left = play(browser)
+        except WebDriverException:
+            pass
+        finally:
+            for pid in left:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+
+    # A summary being made: the stand-in held running, its child deaf to TERM (D92's « Annuler » case).
+    held, child, hold = WORK / "held-minutes", WORK / "held-minutes-child", WORK / "hold-minutes"
+    held.unlink(missing_ok=True)
+    child.unlink(missing_ok=True)
+
+    def making(browser) -> list[int]:
+        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-state"), 10)
+        browser.execute_script("return window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: arguments[1], model: arguments[2]})",
+                               meeting.name, local, "writer-a")
+        running = wait_for(None, lambda _: held.exists() and child.exists() and child.read_text().strip() != "", 15)
+        check("a summary being made, held running by the stand-in", running)
+        if not running:
+            return []
+        pids = [int(held.read_text()), int(child.read_text())]
+        return ended_on_sigterm("a summary being made") + pids
+
+    hold.touch()
+    try:
+        ended(Window(meetings, "fr_FR.UTF-8", settings), making)
+    finally:
+        hold.unlink(missing_ok=True)
+
+    # A transcript being made: the hearing stand-in held running, its child deaf to TERM — the transcription's
+    # group, waited for as the summary's is (ines's I1, I2 on #982).
+    data = WORK / "data-ends-on-sigterm"
+    models = data / "kitokey" / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    tiny = models / "ggml-tiny-a.bin"
+    tiny.write_bytes(b"\0" * 16)
+    held_h, child_h, hold_h = WORK / "held-hearing", WORK / "held-hearing-child", WORK / "hold-hearing"
+    held_h.unlink(missing_ok=True)
+    child_h.unlink(missing_ok=True)
+
+    def hearing(browser) -> list[int]:
+        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-state"), 10)
+        browser.execute_script("return window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})",
+                               meeting.name, str(tiny))
+        running = wait_for(None, lambda _: held_h.exists() and child_h.exists() and child_h.read_text().strip() != "", 15)
+        check("a transcript being made, held running by the stand-in", running)
+        if not running:
+            return []
+        pids = [int(held_h.read_text()), int(child_h.read_text())]
+        return ended_on_sigterm("a transcript being made") + pids
+
+    hold_h.touch()
+    try:
+        heard = Window(meetings, "fr_FR.UTF-8", settings + f'model = "{tiny}"\n')
+        heard.env.update(XDG_DATA_HOME=str(data))
+        ended(heard, hearing)
+    finally:
+        hold_h.unlink(missing_ok=True)
+
+    # « Vérifier le son » open: Kitokey listening, its capture program under it.
+    def checking(browser) -> list[int]:
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "check-sound-open"), 10)
+        press(browser, "check-sound-open")
+        listening = wait_for(browser, lambda b: b.execute_script("const d = document.getElementById('check-sound'); return !!d && d.open")
+                             and any(descendants(pid) for pid in instances()), 10)
+        check("« Vérifier le son » open, Kitokey listening", listening)
+        if not listening:
+            return []
+        return ended_on_sigterm("« Vérifier le son » open")
+
+    ended(Window(meetings, "fr_FR.UTF-8", settings), checking)
+
+    # A recording under way, SIGTERM to Kitokey alone: Kitokey leaves, the recording goes on — « A recording never
+    # stops because the shell did » (`AGENTS.md`; recording/v1: its input closed stops nothing) —, and the next
+    # start finds it, its ■ stopping it well (#773). A logout's SIGTERM to the recorder too is recording/v1's own.
+    taping = WORK / "ends-on-sigterm-recording"
+    taping.mkdir(exist_ok=True)
+    # The recorder's stand-in as recording/v1 has the program, here alone.
+    (taping / "faithful-recorder").touch()
+    pid_file = WORK / "recorder-pid"
+    pid_file.unlink(missing_ok=True)
+    recorded = taping / "2026-10-18_12-00" / "session.json"
+    recorder: list[int] = []
+
+    def recording(browser) -> list[int]:
+        wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+        press(browser, "small-record")
+        started = wait_for(browser, lambda b: pid_file.exists() and pid_file.read_text().strip() != ""
+                           and b.find_element(By.ID, "small-stop").is_displayed(), 10)
+        check("a recording under way, from the bar", started)
+        if not started:
+            return []
+        recorder.append(int(pid_file.read_text()))
+        ours = instances()
+        under = [pid for kitokey in ours for pid in descendants(kitokey) if pid not in recorder]
+        sent = time.monotonic()
+        for pid in ours:
+            os.kill(pid, signal.SIGTERM)
+        gone = wait_for(None, lambda _: not any(alive(pid) for pid in ours + under) and not single_instance_held(), 2)
+        time.sleep(0.5)
+        check("a recording under way: SIGTERM ends Kitokey within 2 s, its name released, the recording going on (#961, #773)",
+              bool(ours) and gone and alive(recorder[0]) and "stopped" not in recorded.read_text(),
+              {"took": round(time.monotonic() - sent, 1), "Kitokey left": [pid for pid in ours if alive(pid)],
+               "left": [pid for pid in under if alive(pid)], "name held": single_instance_held(),
+               "recorder": recorder[0], "recording": alive(recorder[0]), "session": recorded.read_text()})
+        return ours + under
+
+    def found(browser) -> list[int]:
+        shown = wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
+        check("the next start finds the recording going on: the bar shows ■ (#773)", shown)
+        if shown:
+            press(browser, "small-stop")
+            done = wait_for(None, lambda _: not alive(recorder[0]) and "stopped" in recorded.read_text(), 5)
+            check("its ■ stops it well: the recorder gone, its session said stopped (#773, recording/v1)", done,
+                  {"recording": alive(recorder[0]), "session": recorded.read_text()})
+        return []
+
+    try:
+        ended(Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True), recording)
+        if recorder and alive(recorder[0]):
+            ended(Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True), found)
+    finally:
+        for pid in recorder:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
 def two_panes(now: dt.datetime) -> None:
     """AD. The window in two panes: the meetings in a sidebar, the one chosen beside them (D61)."""
     print("AD. the window in two panes: the sidebar, the meeting chosen beside it, as wide as the window (D61)")
@@ -12665,6 +12891,7 @@ def main() -> int:
     focus_swept(now)
     meeting_trashed(now)
     sound_checked(now)
+    ends_on_sigterm(now)
     bar_window(now)
     bar_opened(now)
     bar_language(now)

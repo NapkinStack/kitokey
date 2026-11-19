@@ -625,6 +625,7 @@ fn main() {
             found(app.handle());
             shortcut(app.handle());
             offers(app.handle());
+            ends_on_sigterm(app.handle());
             // The audio kept longer than the settings say goes to the trash, now and every hour.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -654,6 +655,73 @@ fn main() {
         }
     });
 }
+
+/// SIGTERM — the session ending, the system shutting down — ends Kitokey as « Annuler » ends a making
+/// (D92): what is being made stopped, its program's group with it, then Kitokey leaves, within two
+/// seconds, its single-instance name released (#961). Unhandled, SIGTERM ended Kitokey alone, and a
+/// making's group, its own (`process_group`), lived on, orphaned. A recording is left as it is: its
+/// program is the session's, never stopped because the shell was.
+#[cfg(unix)]
+fn ends_on_sigterm(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut terminated = match signal(SignalKind::terminate()) {
+            Ok(terminated) => terminated,
+            Err(error) => {
+                tracing::warn!(detail = %error, "shell.sigterm_unheard");
+                return;
+            }
+        };
+        terminated.recv().await;
+        tracing::info!("shell.terminated");
+        let shell = app.state::<Shell>();
+        let tokens: Vec<Cancel> = [&shell.transcript_token, &shell.minutes_token]
+            .into_iter()
+            .filter_map(|slot| slot.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone())
+            .chain(
+                [&shell.promoted_transcript, &shell.promoted_minutes]
+                    .into_iter()
+                    .filter_map(|slot| {
+                        slot.lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .as_ref()
+                            .map(|(_, token)| token.clone())
+                    }),
+            )
+            .collect();
+        // The groups being made, read before they are cancelled. A token stops its program on a thread
+        // of its own — TERM, a second's grace, KILL — and returns at once: Kitokey waits for those groups
+        // to be empty, within 1.8 s, or what was deaf to TERM outlives it (s961g2).
+        let groups: Vec<i32> = [
+            shell
+                .transcription
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_ref()
+                .and_then(Transcription::group),
+            shell
+                .minuting
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_ref()
+                .and_then(Summarising::group),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        tokens.iter().for_each(Cancel::cancel);
+        let until = Instant::now() + Duration::from_millis(1800);
+        // SAFETY: signal 0 sends nothing: it asks whether a group still holds a process.
+        while Instant::now() < until && groups.iter().any(|&group| unsafe { libc::kill(-group, 0) } == 0) {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        app.exit(0);
+    });
+}
+
+#[cfg(not(unix))]
+fn ends_on_sigterm(_: &AppHandle) {}
 
 /// Another application taking a microphone — a call starting — is offered to be recorded, by a
 /// notification naming it: never a window (D17), never while recording, never with offers off;
