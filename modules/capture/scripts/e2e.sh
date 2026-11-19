@@ -391,17 +391,21 @@ say "E3. a logout during a recording: its reader gone, a first termination signa
 pw-play --target kitokey_e2e_mic "$work/me.wav" & mic_player=$!
 sleep 0.5
 mkfifo "$work/e3.pipe"
-KITOKEY_TRACE=e2e-e3 "$bin" record "$work/v3-term" > "$work/e3.pipe" 2> "$work/e3.errors" &
+# Its input closed too, as its Kitokey's is once gone: that stops nothing (recording/v1).
+KITOKEY_TRACE=e2e-e3 "$bin" record "$work/v3-term" < /dev/null > "$work/e3.pipe" 2> "$work/e3.errors" &
 recorder=$!
 head -n 1 "$work/e3.pipe" > "$work/e3.events"
+began=$(date +%s.%N)                                     # the reader gone: the scenario's own clock
 sleep 1; pw-play "$work/others-a.wav"                    # 8 s of the others
 sleep 2
+ended=$(date +%s.%N)
 kill -TERM "$recorder"; left_as=0; wait "$recorder" || left_as=$?
 kill "$mic_player" 2>/dev/null || true
 folder=$(ls -d "$work"/v3-term/*/ | head -1)
 sed 's/^/    /' "$work/e3.events" "$work/e3.errors" >> .evidence/e2e.txt
 check test "$left_as" = 0 -a ! -s "$work/e3.errors"
-check measure2 stopped "$folder" 440 880
+# As long as the scenario recorded, by its own clock — never shorter, stopped at its reader's leaving.
+check measure2 stopped "$folder" 440 880 "$(python3 -c "print($ended - $began)")"
 check test -z "$(ls "$folder" | grep '\.part$')"
 
 say "F. each source as delivered: a recording killed"
