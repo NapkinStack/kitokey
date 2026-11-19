@@ -492,6 +492,12 @@ def main(what, folder, *args):
             assert one["kept"] or (one["said"] == one["bytes"] and one["riff"] == one["file"] - 8), f"{one['name']}: its header does not carry its true length"
             assert abs(pitch(one) - note) < 20, f"{one['name']} holds a note at {pitch(one):.0f} Hz, not {note:.0f}"
             assert abs(one["frames"] / one["rate"] - lasted) <= 2.5, f"{one['name']} holds {one['frames'] / one['rate']:.1f} s for {lasted:.0f} s recorded"
+            # The scenario's own clock, where it gives one: what the program says of itself is not enough
+            # to tell a recording that stopped early, its session whole all the same (lina, #983).
+            if len(args) > 2:
+                recorded = float(args[2])
+                assert abs(one["frames"] / one["rate"] - recorded) <= 1.5, (
+                    f"{one['name']} holds {one['frames'] / one['rate']:.1f} s where the scenario recorded {recorded:.1f} s")
         assert not os.path.exists(os.path.join(folder, "me.wav")), "a file of the first version beside the tracks"
     elif what == "stopped-source":
         # The remote source was stopped for several seconds: the capture wrote zeros and said which.

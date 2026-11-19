@@ -1,14 +1,3 @@
-apostrophe window.key_kept[0] "A key is kept in the system's keyring; a new one replaces it."
-apostrophe window.key_not_kept[0] "The choice is saved, but the key was not kept in the system's keyring: {}"
-apostrophe window.sessions_folder[1] "New meetings are written here. Those already recorded stay where they were: the window and the audio's keeping follow this folder."
-apostrophe window.shortcut_where[0] "The desktop grants it: it changes in the desktop's keyboard settings."
-apostrophe window.speech_failed[0] "Apple's model was not downloaded. Try again later; Whisper still hears."
-apostrophe window.speech_fetch[0] "Download Apple's model (macOS fetches it from Apple)"
-apostrophe window.speech_fetching[0] "macOS is downloading Apple's model…"
-apostrophe window.speech_missing[0] "Apple's model is not on this Mac yet"
-apostrophe window.speech_option[0] "Apple's SpeechAnalyzer, on this Mac"
-apostrophe window.test_sends[0] "Test sends {} one sentence of Kitokey's, nothing of a meeting."
-apostrophe window.where_online[0] "Online — the transcript's text is sent"
 lexicon cause "Ce modèle ne donne pas les temps de ce qu’il entend\u{a0}: choisissez-en un qui donne ceux de chaque segment dans les réglages de Kitokey." « segment »
 lexicon cause "Le fournisseur a refusé faute de crédit\u{a0}: ajoutez du crédit chez lui, puis réessayez." « fournisseur »
 lexicon cause "Le fournisseur a refusé la clé\u{a0}: saisissez-la de nouveau dans les réglages de Kitokey." « fournisseur »
@@ -38,20 +27,5 @@ lexicon cause_own "Le fournisseur répond qu’il est en panne\u{a0}: réessayez
 lexicon cause_own "The provider answers that it is failing: try again later. On this computer, {}, chosen for this meeting, may be too large for the memory: choose a smaller one in Redo…\u{a0}› Advanced." « provider »
 lexicon cause_own "The provider does not know {}, chosen for this meeting: choose another in Redo…\u{a0}› Advanced." « provider »
 lexicon cause_own "{}, chosen for this meeting, did not write minutes: try again, or choose another model in Redo…\u{a0}› Advanced." « minutes »
-lexicon window.after_minutes[0] "Write the transcript, then the minutes" « minutes »
-lexicon window.after_minutes[1] "Each follows the other; a notification says when the minutes are ready." « minutes »
-lexicon window.keep_audio[1] "After that, the audio goes to the trash; the transcript and minutes stay." « minutes »
-lexicon window.key_kept[0] "A key is kept in the system's keyring; a new one replaces it." « keyring »
-lexicon window.key_not_kept[0] "The choice is saved, but the key was not kept in the system's keyring: {}" « keyring »
-lexicon window.minutes_step[0] "Minutes" « minutes »
 lexicon window.minutes_stopped[0] "Minutes stopped. You can start them again, with another model if you like." « minutes »
-lexicon window.minutes_unsaved[0] "Not saved yet — the minutes are still written by {}." « minutes »
-lexicon window.minutes_unsaved_none[0] "Not saved yet — no minutes are written until it is." « minutes »
-lexicon window.models_note[0] "The models “on this computer” are those Kitokey finds installed. A key is kept in your system’s keyring, never in a file. Nothing leaves this computer without your agreement: a transcription service you name receives your meetings’ sound and their context, a service that writes the minutes their text and context only." « keyring »
-lexicon window.offered_ollama_good[0] "For the minutes, on this computer, through Ollama" « minutes »
-lexicon window.service_tested[0] "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit." « segment »
-lexicon window.welcome_connected[1] "The minutes are written by an online service; the transcription stays on this computer." « minutes »
-lexicon window.welcome_ollama_lacks[0] "Ollama does not hold {} yet: the minutes wait for it. Settings fetch it in one click." « minutes »
-lexicon window.welcome_rows[1] "Minutes" « minutes »
-lexicon window.welcome_writer[0] "Who writes the minutes?" « minutes »
 placeholders of: in both languages

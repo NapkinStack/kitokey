@@ -416,11 +416,15 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .card.making { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .card.making .what { font-weight: 600; }
 .card.making .by { flex: 1 1 auto; color: var(--soft); font-size: 14px; }
+.card.making .left { color: var(--ink); font-size: 14px; white-space: nowrap; }
 .card.making .segments { display: flex; gap: 4px; flex-basis: 100%; }
-.card.making .segment { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+/* Each part at 3:1 at least against the card, the step to come too (WCAG 2.2 SC 1.4.11, #954): --edge, as the controls' border. */
+.card.making .segment { flex: 1; height: 4px; border-radius: 2px; background: var(--edge); }
 .card.making .segment[data-state="done"] { background: var(--accent); }
-.card.making .segment[data-state="running"] { background: linear-gradient(90deg, transparent, var(--accent), transparent) 0 0 / 40% 100% no-repeat, var(--line); animation: travel 1.4s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .card.making .segment[data-state="running"] { animation: none; background: var(--accent); opacity: 0.5; } }
+.card.making .segment[data-state="running"] { background: linear-gradient(90deg, transparent, var(--accent), transparent) 0 0 / 40% 100% no-repeat, var(--edge); animation: travel 1.4s ease-in-out infinite; }
+/* Still, never dimmed, never a partial fill, which reads as progress: the whole part striped --accent on --edge, a
+   pattern a part done (solid --accent) does not have, each colour at 3:1 (WCAG 2.2 SC 2.3.3, 1.4.1, 1.4.11; #954). */
+@media (prefers-reduced-motion: reduce) { .card.making .segment[data-state="running"] { animation: none; background: repeating-linear-gradient(90deg, var(--accent) 0 6px, var(--edge) 6px 10px); } }
 
 /* The first run's assistant (D58's board): one card, centred, alone in the window; its answers
    are radio cards, the setting said in a tinted band, then plain rows. */
