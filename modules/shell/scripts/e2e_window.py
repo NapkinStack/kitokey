@@ -6047,6 +6047,12 @@ def focus_swept(now: dt.datetime) -> None:
                         browser.execute_script("document.getElementById(arguments[0]).scrollIntoView({block: 'center'}); window.__moves = []; window.__drawn = 0", control["id"])
                         time.sleep(0.4)
                         before = browser.execute_script(where)
+                        # Where the control is in the window: what « the page where it was » means to whoever uses it. A
+                        # change can redraw the page in another length — Kitokey's language, every sentence above in
+                        # the other one —, and WebKit keeps the control where it was by scrolling: its place, not the
+                        # page's scroll, is held (#974's probe: [334, 334] while the scroll moved by 10).
+                        top = "const c = document.getElementById(arguments[0]); return c ? Math.round(c.getBoundingClientRect().top) : null"
+                        top_before = browser.execute_script(top, control["id"])
                         # What the change is to leave, read from the page drawn again — what was saved: never a
                         # focus kept over a choice lost (the coordinator, #944).
                         if control["kind"] == "list" and control["options"] > 1:
@@ -6071,12 +6077,15 @@ def focus_swept(now: dt.datetime) -> None:
                         # The page cut shorter under the window by the change itself (the developer mode turned off, the
                         # logs' rows gone): the browser brings it to its new end — as far as it can still be, no further.
                         cut = before[1] > after[2] and abs(after[1] - after[2]) <= 1
+                        top_after = browser.execute_script(top, control["id"])
+                        placed = top_before is not None and top_after is not None and abs(top_after - top_before) <= 1
                         shown = browser.execute_script("const c = document.getElementById(arguments[0]);"
                                                        " return !c ? null : c.type === 'checkbox' ? c.checked : c.value", control["id"])
                         kept = wanted is None or shown == wanted
                         check(f"{short}, {how}: #{key} ({control['kind']}) changed and the choice kept, the focus on #{expected}, the page where it was (#944, D101)",
-                              after[0] == expected and (abs(after[1] - before[1]) <= 1 or cut) and kept,
-                              {"before": before, "after": after, "still": quiet, "focus moves": browser.execute_script("return window.__moves"),
+                              after[0] == expected and (placed or cut) and kept,
+                              {"before": before, "after": after, "control's top before, after": [top_before, top_after], "still": quiet,
+                               "focus moves": browser.execute_script("return window.__moves"),
                                "drawn": browser.execute_script("return window.__drawn"), "chosen": wanted, "shown": shown})
                         if control["kind"] == "field":
                             browser.execute_script("document.getElementById(arguments[0])?.focus()", control["id"])
