@@ -1,5 +1,4 @@
 apostrophe audio_trashed "The system's trash did not take it."
-lexicon announcement "I’m recording this meeting to write up its minutes. Tell me if you’d rather I didn’t." « minutes »
 lexicon audio_trashed "The audio of 1 meeting kept more than {} is in the trash; its transcript and minutes stay." « minutes »
 lexicon audio_trashed "The audio of {meetings} meetings kept more than {} is in the trash; their transcripts and minutes stay." « minutes »
 lexicon cause "Ce modèle ne donne pas les temps de ce qu’il entend\u{a0}: choisissez-en un qui donne ceux de chaque segment dans les réglages de Kitokey." « segment »

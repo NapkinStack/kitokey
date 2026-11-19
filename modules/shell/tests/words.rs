@@ -37,14 +37,14 @@ fn the_reminder_is_a_setting_and_a_source_that_comes_back_calls_for_no_word() {
         told(&started, true, Language::English),
         (
             "Recording".into(),
-            "Tell the participants that this meeting is being recorded.".into()
+            "Remember to tell participants this meeting is being recorded.".into()
         )
     );
     assert_eq!(
         told(&started, true, Language::French),
         (
             "Enregistrement en cours".into(),
-            "Prévenez les participants que cette réunion est enregistrée.".into()
+            "Pensez à prévenir les participants que la réunion est enregistrée.".into()
         )
     );
 }
@@ -54,11 +54,11 @@ fn the_recording_names_the_microphone_it_records() {
     let started = Said::Started(PathBuf::from("/s"), Some("Headset Mic".into()), None);
     assert_eq!(
         told(&started, true, Language::English).1,
-        "Microphone recorded: Headset Mic. Tell the participants that this meeting is being recorded."
+        "Microphone: Headset Mic. Remember to tell participants this meeting is being recorded."
     );
     assert_eq!(
         told(&started, true, Language::French).1,
-        "Micro enregistré\u{a0}: Headset Mic. Prévenez les participants que cette réunion est enregistrée."
+        "Micro\u{a0}: Headset Mic. Pensez à prévenir les participants que la réunion est enregistrée."
     );
     for language in BOTH {
         assert_eq!(words::of(&started, false, language), None);
@@ -70,7 +70,7 @@ fn a_source_that_is_silent_or_refused_is_named_and_the_recording_is_said_to_go_o
     for (source, english, french) in [(Source::Me, "microphone", "micro"), (Source::Others, "meeting", "réunion")] {
         let (title, body) = told(&Said::Silent(source), false, Language::English);
         assert!(
-            title.contains(english) && body.ends_with("The recording goes on."),
+            title.contains(english) && body.ends_with("Recording continues."),
             "{title} — {body}"
         );
         let (title, body) = told(&Said::Silent(source), false, Language::French);
@@ -93,7 +93,7 @@ fn a_source_that_is_silent_or_refused_is_named_and_the_recording_is_said_to_go_o
                 _ => other,
             };
             assert!(
-                title.contains(named) && body.contains(other) && !body.contains('('),
+                title.to_lowercase().contains(named) && body.contains(other) && !body.contains('('),
                 "{title} — {body}"
             );
         }
@@ -103,13 +103,13 @@ fn a_source_that_is_silent_or_refused_is_named_and_the_recording_is_said_to_go_o
     assert_eq!(
         told(&refused, false, Language::English),
         (
-            "Your microphone is not recorded for now".into(),
-            "The meeting’s sound is still recorded.".into()
+            "Your microphone isn’t being recorded".into(),
+            "The meeting audio is still being recorded.".into()
         )
     );
     assert_eq!(
         told(&refused, false, Language::French).1,
-        "Le son de la réunion est toujours enregistré."
+        "Le son de la réunion, lui, est bien enregistré."
     );
 }
 
@@ -118,10 +118,10 @@ fn a_microphone_that_sends_nothing_is_told_from_one_that_hears_no_sound_and_name
     let mut sides = words::Sides::default();
     sides.told(&Said::Started("/s".into(), Some("Earbuds".into()), None), false, Language::French);
     let nothing = sides.told(&Said::Nothing, false, Language::French).unwrap();
-    assert_eq!(nothing.title, "Votre micro ne transmet rien");
+    assert_eq!(nothing.title, "Votre micro ne transmet aucun signal");
     assert!(
         nothing.body.contains("du micro Earbuds")
-            && nothing.body.contains("pièce\u{a0}: vérifiez")
+            && nothing.body.contains("pas même un bruit de fond. Vérifiez")
             && !nothing.body.contains('\'')
             && nothing.body.ends_with("L’enregistrement continue."),
         "{}",
@@ -132,7 +132,7 @@ fn a_microphone_that_sends_nothing_is_told_from_one_that_hears_no_sound_and_name
     sides.told(&Said::Moved(Source::Me, Some("Built-in Mic".into())), false, Language::English);
     let nothing = sides.told(&Said::Nothing, false, Language::English).unwrap();
     assert!(
-        nothing.title == "Your microphone sends nothing" && nothing.body.contains("Built-in Mic"),
+        nothing.title == "Your microphone isn’t sending any signal" && nothing.body.contains("Built-in Mic"),
         "{} — {}",
         nothing.title,
         nothing.body
@@ -143,7 +143,7 @@ fn a_microphone_that_sends_nothing_is_told_from_one_that_hears_no_sound_and_name
     // Named by nothing: the microphone, in so many words.
     let (title, body) = told(&Said::Nothing, false, Language::English);
     assert!(
-        title == "Your microphone sends nothing" && body.contains("your microphone"),
+        title == "Your microphone isn’t sending any signal" && body.contains("your microphone"),
         "{body}"
     );
 }
@@ -154,7 +154,7 @@ fn french_is_written_as_french_is_printed() {
     // starts a line on one.
     let silent = told(&Said::Silent(Source::Others), false, Language::French).1;
     assert!(
-        silent.contains("secondes\u{a0}: l’appel") && silent.contains("appareil\u{202f}?"),
+        silent.contains("secondes\u{a0}: l’appel") && silent.contains("ordinateur\u{202f}?"),
         "{silent}"
     );
     assert_eq!(
@@ -227,17 +227,17 @@ fn a_failure_never_says_what_the_program_said_of_it() {
         for language in BOTH {
             let body = said(sentence, language);
             assert!(
-                !body.contains('(') && (body.ends_with("session’s folder.") || body.ends_with("dossier de la réunion.")),
+                !body.contains('(') && (body.ends_with("meeting’s folder.") || body.ends_with("dossier de la réunion.")),
                 "{sentence:?}: {body}"
             );
         }
     }
-    // A program that said nothing — or its name and nothing — is said to have said nothing.
+    // A program that said nothing — or its name and nothing — is said as an unexpected error, never its words.
     for nothing in ["", "   ", "kitokey-capture:", " kitokey-capture: \t", "()"] {
         for language in BOTH {
             let body = said(nothing, language);
             assert!(
-                !body.contains('(') && (body.contains("without saying why") || body.contains("sans dire pourquoi")),
+                !body.contains('(') && (body.contains("Something went wrong") || body.contains("Une erreur inattendue")),
                 "{nothing:?}: {body}"
             );
         }
@@ -683,7 +683,7 @@ fn a_device_changed_says_what_is_recorded_now_one_gone_says_that_side_and_one_ba
             Said::Moved(Source::Me, mic.clone()),
             English,
             "Microphone changed",
-            "Now recorded: Headset Mic.",
+            "Now recording from Headset Mic.",
         ),
         (
             Said::Moved(Source::Me, mic.clone()),
@@ -707,51 +707,51 @@ fn a_device_changed_says_what_is_recorded_now_one_gone_says_that_side_and_one_ba
             Said::Moved(Source::Me, None),
             English,
             "Microphone changed",
-            "Your microphone is still recorded, from the one your computer uses now.",
+            "Now recording from your computer’s current microphone.",
         ),
         (
             Said::Moved(Source::Me, None),
             French,
             "Micro changé",
-            "Votre micro est toujours enregistré, depuis celui qu’utilise maintenant votre ordinateur.",
+            "Kitokey enregistre désormais le micro utilisé par votre ordinateur.",
         ),
         (
             Said::Moved(Source::Others, None),
             English,
             "Sound output changed",
-            "The meeting’s sound is still recorded, from the output your computer uses now.",
+            "Meeting audio is now recorded from your computer’s current output.",
         ),
         (
             Said::Moved(Source::Others, None),
             French,
             "Sortie audio changée",
-            "Le son de la réunion est toujours enregistré, depuis la sortie qu’utilise maintenant votre ordinateur.",
+            "Le son de la réunion est désormais enregistré depuis la sortie actuelle de votre ordinateur.",
         ),
         // None left: that side is not recorded for now — nothing said of the other, which may
         // have none either. The microphone: never why, a call may simply have let go (D66).
         (
             Said::Lost(Source::Me),
             English,
-            "Your microphone is not recorded for now",
-            "The recording goes on.",
+            "Your microphone isn’t being recorded",
+            "Recording continues.",
         ),
         (
             Said::Lost(Source::Me),
             French,
-            "Votre micro n’est pas enregistré pour l’instant",
+            "Votre micro n’est pas enregistré",
             "L’enregistrement continue.",
         ),
         (
             Said::Lost(Source::Others),
             English,
-            "The meeting’s sound is not recorded for now",
-            "Your computer has no sound output left. An output plugged in is recorded at once; the recording goes on.",
+            "Meeting audio is no longer being recorded",
+            "Your computer has no audio output. Plug one in to resume; recording continues.",
         ),
         (
             Said::Lost(Source::Others),
             French,
-            "Le son de la réunion n’est plus enregistré pour l’instant",
-            "Votre ordinateur n’a plus de sortie audio. Une sortie branchée est enregistrée aussitôt\u{202f}; l’enregistrement continue.",
+            "Le son de la réunion n’est plus enregistré",
+            "Votre ordinateur n’a plus de sortie audio. Branchez-en une pour reprendre\u{202f}; l’enregistrement continue.",
         ),
     ] {
         assert_eq!(
@@ -762,7 +762,7 @@ fn a_device_changed_says_what_is_recorded_now_one_gone_says_that_side_and_one_ba
     }
     // The meeting's sound back after none was left: recorded again, and said so.
     for (name, language, title, body) in [
-        (Some("Speaker"), English, "The meeting’s sound is recorded again", "From Speaker."),
+        (Some("Speaker"), English, "Meeting audio is being recorded again", "From Speaker."),
         (
             Some("Speaker"),
             French,
@@ -773,7 +773,7 @@ fn a_device_changed_says_what_is_recorded_now_one_gone_says_that_side_and_one_ba
             None,
             French,
             "Le son de la réunion est de nouveau enregistré",
-            "Depuis la sortie qu’utilise maintenant votre ordinateur.",
+            "Depuis la sortie audio actuelle.",
         ),
     ] {
         let Notice { title: got, body: said } = words::back(name, language);
@@ -793,12 +793,12 @@ fn what_the_devices_are_decides_what_is_said_of_one_gone_and_one_back() {
     let mut sides = Sides::default();
     assert_eq!(
         body(&mut sides, &lost, English).as_deref(),
-        Some("Your computer has no sound output left. Your microphone is still recorded, and an output plugged in is recorded at once.")
+        Some("Your computer has no audio output. Your microphone is still recorded; plug in an output to resume.")
     );
     // Back: recorded again; then a move like any other.
     assert_eq!(
         sides.told(&back, false, English).unwrap().title,
-        "The meeting’s sound is recorded again"
+        "Meeting audio is being recorded again"
     );
     assert_eq!(sides.told(&back, false, English).unwrap().title, "Sound output changed");
 
@@ -807,20 +807,20 @@ fn what_the_devices_are_decides_what_is_said_of_one_gone_and_one_back() {
     sides.told(&Said::Lost(Source::Me), false, French);
     assert_eq!(
         body(&mut sides, &lost, French).as_deref(),
-        Some("Votre ordinateur n’a plus de sortie audio. Une sortie branchée est enregistrée aussitôt\u{202f}; l’enregistrement continue.")
+        Some("Votre ordinateur n’a plus de sortie audio. Branchez-en une pour reprendre\u{202f}; l’enregistrement continue.")
     );
     // The microphone not opened at the start: the same.
     let mut sides = Sides::default();
     sides.told(&Said::Unavailable(Source::Me, String::new()), false, English);
     assert_eq!(
         body(&mut sides, &lost, English).as_deref(),
-        Some("Your computer has no sound output left. An output plugged in is recorded at once; the recording goes on.")
+        Some("Your computer has no audio output. Plug one in to resume; recording continues.")
     );
     // And the other way round, in French, the meeting's sound still recorded.
     let mut sides = Sides::default();
     assert_eq!(
         body(&mut sides, &Said::Lost(Source::Me), French).as_deref(),
-        Some("Le son de la réunion est toujours enregistré.")
+        Some("Le son de la réunion, lui, est bien enregistré.")
     );
 }
 
@@ -832,26 +832,26 @@ fn a_microphone_not_recorded_says_nothing_of_why_and_no_gesture() {
         (
             Said::Unavailable(Source::Me, "the call holds it".into()),
             English,
-            "Your microphone is not recorded for now",
-            "The meeting’s sound is still recorded.",
+            "Your microphone isn’t being recorded",
+            "The meeting audio is still being recorded.",
         ),
         (
             Said::Unavailable(Source::Me, "the call holds it".into()),
             French,
-            "Votre micro n’est pas enregistré pour l’instant",
-            "Le son de la réunion est toujours enregistré.",
+            "Votre micro n’est pas enregistré",
+            "Le son de la réunion, lui, est bien enregistré.",
         ),
         (
             Said::Lost(Source::Me),
             English,
-            "Your microphone is not recorded for now",
-            "The meeting’s sound is still recorded.",
+            "Your microphone isn’t being recorded",
+            "The meeting audio is still being recorded.",
         ),
         (
             Said::Lost(Source::Me),
             French,
-            "Votre micro n’est pas enregistré pour l’instant",
-            "Le son de la réunion est toujours enregistré.",
+            "Votre micro n’est pas enregistré",
+            "Le son de la réunion, lui, est bien enregistré.",
         ),
     ] {
         let notice = Sides::default().told(&said, false, language).unwrap();
@@ -866,7 +866,7 @@ fn a_microphone_going_is_said_once_a_recording_and_its_return_never() {
     let (lost, taken) = (Said::Lost(Source::Me), Said::Moved(Source::Me, Some("AirPods".into())));
     let waiting = Said::Unavailable(Source::Me, String::new());
     let title = |sides: &mut Sides, said: &Said| sides.told(said, false, French).map(|notice| notice.title);
-    let not_recorded = Some("Votre micro n’est pas enregistré pour l’instant");
+    let not_recorded = Some("Votre micro n’est pas enregistré");
 
     // It waited from the start: said once, however often a call comes.
     let mut sides = Sides::default();
@@ -890,12 +890,15 @@ fn a_microphone_going_is_said_once_a_recording_and_its_return_never() {
     assert_eq!(title(&mut sides, &taken), None);
     assert_eq!(title(&mut sides, &lost), None);
     let notice = Sides::default().told(&lost, false, English).unwrap();
-    assert_eq!(notice.title, "Your microphone is not recorded for now");
-    assert_eq!(notice.body, "The meeting’s sound is still recorded.");
+    assert_eq!(notice.title, "Your microphone isn’t being recorded");
+    assert_eq!(notice.body, "The meeting audio is still being recorded.");
 
     // Back, it is recorded: a microphone that sends nothing is told again.
     assert_eq!(title(&mut sides, &taken), None);
-    assert_eq!(title(&mut sides, &Said::Nothing).as_deref(), Some("Votre micro ne transmet rien"));
+    assert_eq!(
+        title(&mut sides, &Said::Nothing).as_deref(),
+        Some("Votre micro ne transmet aucun signal")
+    );
 
     // Neither side left: the meeting's sound is not said recorded, however the two went.
     for (others, me) in [
@@ -905,7 +908,7 @@ fn a_microphone_going_is_said_once_a_recording_and_its_return_never() {
         let mut sides = Sides::default();
         sides.told(&others, false, French);
         let notice = sides.told(&me, false, French).unwrap();
-        assert_eq!(notice.title, "Votre micro n’est pas enregistré pour l’instant");
+        assert_eq!(notice.title, "Votre micro n’est pas enregistré");
         assert_eq!(notice.body, "L’enregistrement continue.");
     }
 
@@ -1104,7 +1107,7 @@ fn every_french_word_of_the_window_is_typeset_as_french() {
 fn the_announcement_is_in_the_meetings_language_when_it_says_french_or_english_else_the_windows() {
     use kitokey_shell::words::{Language, announcement};
     let french = "J’enregistre cette réunion pour en faire le compte rendu. Dites-le-moi si vous préférez que je ne le fasse pas.";
-    let english = "I’m recording this meeting to write up its minutes. Tell me if you’d rather I didn’t.";
+    let english = "I’m recording this meeting to write a summary. Let me know if you’d rather I didn’t.";
     assert_eq!(announcement(Some("fr"), Language::English), french);
     assert_eq!(announcement(Some("en"), Language::French), english);
     assert_eq!(announcement(Some("de"), Language::French), french);
@@ -1715,15 +1718,15 @@ fn the_bar_says_a_silence_as_the_notifications_do() {
             Language::French,
             "Votre micro",
             "Le son de la réunion",
-            "pas coupé sur l’appareil lui-même, et qu’il est prêt",
-            "rien depuis 2\u{a0}min — l’enregistrement continue",
+            "n’est pas coupé sur l’appareil et qu’il est allumé",
+            "rien depuis 2\u{a0}min — enregistrement en cours",
         ),
         (
             Language::English,
             "Your microphone",
-            "The meeting’s sound",
-            "not muted on the device itself, and that it is ready",
-            "nothing for 2 min — the recording goes on",
+            "Meeting audio",
+            "isn’t muted on the device and that it’s switched on",
+            "silent for 2 min — still recording",
         ),
     ];
     for (language, me, others, gesture, silent) in cases {
@@ -1867,7 +1870,7 @@ fn a_stop_says_how_long_was_recorded_agreed_in_french_and_no_session_in_a_failur
     assert_eq!(stopped(5400.0), "1 h 30 enregistrées.");
     for why in ["", "gone"] {
         let failed = told(&Said::Failed(why.into()), false, Language::French).1;
-        assert!(failed.ends_with("est gardé dans le dossier de la réunion."), "{failed}");
+        assert!(failed.ends_with("est conservé dans le dossier de la réunion."), "{failed}");
     }
 }
 
@@ -2390,10 +2393,7 @@ fn a_settings_file_refused_says_which_setting_and_what_to_do_in_both_languages()
 
 /// The titles over 50 characters today, put right with the notifications' sentences (D94): a list
 /// that only shrinks.
-const TITLES_TOO_LONG: [&str; 2] = [
-    "Le son de la réunion n’est plus enregistré pour l’instant",
-    "Les réglages de Wholeheard n’ont pas tous été repris",
-];
+const TITLES_TOO_LONG: [&str; 1] = ["Les réglages de Wholeheard n’ont pas tous été repris"];
 
 /// The functions of `words.rs` that return a notification, each read below: one added there fails
 /// the title's test until it is named here — and read in `every_notice`, which the review checks.
