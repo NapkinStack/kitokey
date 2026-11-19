@@ -971,7 +971,6 @@ pub struct Window {
     /// Shows: a meeting's page, where its minutes are. When: the user cancelled its minutes.
     /// At most: no limit. Placeholders: none.
     pub minutes_stopped: &'static str,
-    pub ran_online: &'static str,
     /// The header's button, at rest and while a recording runs.
     /// Shows: the button that records: in the window's header, its tooltip too; in the empty
     /// window; in « Vérifier le son »; and the recording bar's, as its name for a screen reader.
@@ -1180,13 +1179,11 @@ pub struct Window {
     /// name, then its line under it. When: always. At most: one line for the name, the line wraps.
     /// Placeholders: none.
     pub welcome_again: [&'static str; 2],
-    /// A meeting's context (D59): the small window's disclosure, closed then open; the field's
+    /// A meeting's context (D59): its button's value while none is written; the field's
     /// label, its example and why it helps; its count ({} the most, {} what is left — one, then
     /// more); another script than Latin or Cyrillic; why it is closed; what changed, the
     /// transcript alone or with the minutes, and the gesture that makes them again.
     pub context_add: &'static str,
-    pub context_edit: &'static str,
-    pub context_open: &'static str,
     pub context_title: &'static str,
     pub context_label: &'static str,
     pub context_example: &'static str,
@@ -1559,7 +1556,6 @@ pub fn window(language: Language) -> Window {
             making_cancel_failed: "Kitokey could not cancel: {}",
             transcript_stopped: "Transcription stopped. You can start it again, with another model if you like.",
             minutes_stopped: "Minutes stopped. You can start them again, with another model if you like.",
-            ran_online: "online",
             record_start: "Start recording",
             record_stop: "Stop recording",
             agree_eyebrow: "Before the first minutes online",
@@ -1651,8 +1647,6 @@ pub fn window(language: Language) -> Window {
                 "The first start’s question, your current setting chosen; nothing changes before its last step.",
             ],
             context_add: "Add the context",
-            context_edit: "Edit the context",
-            context_open: "The meeting’s context",
             context_title: "Context",
             context_label: "What is the meeting about? Who takes part?",
             context_example: "E.g. the Q4 budget with Inès Durand and the purchasing team",
@@ -2013,7 +2007,6 @@ pub fn window(language: Language) -> Window {
             making_cancel_failed: "Kitokey n’a pas pu annuler\u{a0}: {}",
             transcript_stopped: "Transcription arrêtée. Vous pouvez la relancer, avec un autre modèle si besoin.",
             minutes_stopped: "Compte rendu arrêté. Vous pouvez le relancer, avec un autre modèle si besoin.",
-            ran_online: "en ligne",
             record_start: "Démarrer un enregistrement",
             record_stop: "Arrêter l’enregistrement",
             agree_eyebrow: "Avant le premier compte rendu en ligne",
@@ -2105,8 +2098,6 @@ pub fn window(language: Language) -> Window {
                 "La question du premier lancement, votre réglage actuel choisi\u{202f}; rien ne change avant la dernière étape.",
             ],
             context_add: "Ajouter le contexte",
-            context_edit: "Modifier le contexte",
-            context_open: "Contexte de la réunion",
             context_title: "Contexte",
             context_label: "De quoi parle la réunion\u{202f}? Qui y participe\u{202f}?",
             context_example: "Ex.\u{a0}: budget du T4 avec Inès Durand et l’équipe achats",
