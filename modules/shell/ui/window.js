@@ -724,6 +724,11 @@ function paintBar() {
   const by = shown === null ? "" : shown.host === undefined ? spoken(shown.model) : `${modelSaid(shown.model)} · ${shown.host}`;
   const time = shown === null ? "" : `${Math.floor(shown.seconds / 60)}:${String(shown.seconds % 60).padStart(2, "0")}`;
   bar.querySelector(".by").textContent = by ? `${by} · ${time}` : "";
+  // What is left, from the speeds measured here: none known, nothing said — never a number made up.
+  const minutesLeft = makings.left?.[bar.dataset.name];
+  const left = bar.querySelector(".left");
+  left.textContent = minutesLeft === undefined ? "" : fill(words.making_left, minutesLeft);
+  left.hidden = minutesLeft === undefined;
   const parts = bar.querySelector(".segments");
   if (parts.childElementCount !== state.parts.length) parts.replaceChildren(...state.parts.map(() => element("span", "segment")));
   state.parts.forEach((part, at) => { parts.children[at].dataset.state = part; });
@@ -2479,7 +2484,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   step.id = "making-step";
   step.setAttribute("aria-live", "polite");
   const cancel = element("span", "cancel");
-  making.append(step, element("span", "by"), cancel, element("div", "segments"));
+  making.append(step, element("span", "by"), element("span", "left"), cancel, element("div", "segments"));
   page.replaceChildren(head, making, ask, settings, drawn, columns);
   paintBar();
   // The line being said, marked while it plays; the page stays where the user left it (D26, the
@@ -2845,12 +2850,20 @@ function minutesRow(minutes, words, locked) {
   const onlineSave = button("minutes-online-save", words.save, true);
   const service = () => minutes.online[Number(servicePick.value)];
   chosenKeeps("minutes", modelsPick, () => servicePick.value);
+  // One « Enregistrer » at a time, as the transcription's (#860): the service's, « Avancé » folded;
+  // unfolded, its own (#968).
+  let listedShown = false;
+  const paintSave = () => {
+    onlineSave.hidden = !listedShown || (guided.minutes.advanced ?? own);
+  };
   // The models listed with its key, the one saved chosen.
   const shownListed = (models) => {
     modelsPick.replaceChildren();
     for (const id of models) option(modelsPick, id, modelSaid(id));
     chosenKept("minutes", modelsPick, servicePick.value, minutes.model);
-    modelsWrap.hidden = onlineSave.hidden = models.length === 0;
+    modelsWrap.hidden = models.length === 0;
+    listedShown = models.length > 0;
+    paintSave();
   };
   // This service's last answer, said again; else the model saved with it — the others come with its key.
   const shownSaved = () => {
@@ -2861,7 +2874,9 @@ function minutesRow(minutes, words, locked) {
     if (answer?.models) return shownListed(answer.models);
     modelsPick.replaceChildren();
     if (saved) option(modelsPick, minutes.model, modelSaid(minutes.model));
-    modelsWrap.hidden = onlineSave.hidden = !saved;
+    modelsWrap.hidden = !saved;
+    listedShown = !!saved;
+    paintSave();
   };
   shownSaved();
   servicePick.addEventListener("change", () => {
@@ -2885,7 +2900,10 @@ function minutesRow(minutes, words, locked) {
   onlineSave.addEventListener("click", () => save(service().address, modelsPick.value, keyed.typed(serviceKeyId()), serviceKeyId()));
   ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, keyed.typed(keyNow()), keyNow()));
   const [toggle, advanced] = guidedAdvanced("minutes", words, own, [addressWrap, modelWrap, ownSave]);
-  toggle.addEventListener("click", keyed.shown);
+  toggle.addEventListener("click", () => {
+    paintSave();
+    keyed.shown();
+  });
   const away = element("div", "fields");
   away.append(serviceWrap, keyWrap, keyTest, keySaid, modelsWrap, onlineSave, toggle, advanced);
   const here = element("div", "fields");
@@ -5150,10 +5168,12 @@ for (const type of ["change", "input"]) {
     if (!(changed instanceof Element) || !changed.id || !changed.closest("#meeting, #settings")) return;
     changedLast = { id: changed.id, at: Date.now() };
     // Changed by a click WebKit gave no focus to — a box, a radio, a list —: the control acted on has it,
-    // as a key would have given it. Never a field of text: its change comes as it is left, the focus
-    // passing by the page on its way elsewhere (meeting_renamed, « leaving the field keeps it »).
+    // as a key would have given it, wherever the focus was — on nothing, or left on another control, which
+    // a drawing would then give it back to (#944: the decider's #autostart). Never a field of text: its
+    // change comes as it is left, the focus passing by the page on its way elsewhere (meeting_renamed,
+    // « leaving the field keeps it »).
     const clicked = changed.matches("input[type=checkbox], input[type=radio], select");
-    if (clicked && (document.activeElement === null || document.activeElement === document.body)) changed.focus({ preventScroll: true });
+    if (clicked && document.activeElement !== changed) changed.focus({ preventScroll: true });
   }, true);
 }
 // The places of the drawings under way: the user moving the focus meanwhile moves where each one gives it
@@ -5163,9 +5183,21 @@ document.addEventListener("focusin", (event) => {
   if (placesPending.size === 0 || !(event.target instanceof Element) || !event.target.closest("#meeting, #settings")) return;
   for (const place of placesPending) Object.assign(place, placeOf());
 }, true);
+// A list's menu is a window of its own (GTK): opening it takes the window's focus away, closing it gives
+// it back — no coming back to the window, nothing to draw anew. Drawn then, the list is replaced under the
+// choice being made, before its change: the choice not yet saved lost, the focus with it (#944). The menu
+// opening: the window's focus going while a list has the page's, or a moment after a list left it for nowhere.
+let listLeft = 0;
+let inMenu = false;
+document.addEventListener("focusout", (event) => {
+  if (event.relatedTarget === null && event.target instanceof HTMLSelectElement) listLeft = Date.now();
+}, true);
+window.addEventListener("blur", () => {
+  inMenu = document.activeElement instanceof HTMLSelectElement || Date.now() - listLeft < 1000;
+});
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
 function placeOf() {
-  const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [] };
+  const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [], before: [] };
   const at = document.activeElement;
   const focused = at && at !== document.body && at.id && at.closest("#meeting, #settings") ? at : null;
   const changed = changedLast && Date.now() - changedLast.at < 5000 ? document.getElementById(changedLast.id) : null;
@@ -5174,10 +5206,16 @@ function placeOf() {
   place.id = control.id;
   // Its boxes with an id, nearest first: where a control the change removed was.
   for (let up = control.parentElement; up && up.id !== "meeting" && up.id !== "settings"; up = up.parentElement) if (up.id) place.near.push(up.id);
+  // The controls with an id before it in the page, nearest first: where the focus goes when it is gone and no
+  // box of its own is found (WAI-ARIA APG: content removed, the focus to its logical predecessor; #944).
+  const page = control.closest("#meeting, #settings");
+  const controls = page ? [...page.querySelectorAll(FOCUSABLE)].filter((one) => one.id) : [];
+  place.before = controls.slice(0, Math.max(controls.indexOf(control), 0)).slice(-3).reverse().map((one) => one.id);
   return place;
 }
 // Drawn again at the same address: the focus back on the same control — or, removed, on the first one
-// in the nearest box left that holds one —, the page where it was. A focus the user moved meanwhile stays.
+// in the nearest box left that holds one, else on the control before it —, the page where it was. A focus
+// the user moved meanwhile stays.
 function placeBack(place) {
   if (place.address === null || place.address !== location.hash) return;
   if (place.id !== null && (document.activeElement === null || document.activeElement === document.body)) {
@@ -5188,6 +5226,8 @@ function placeBack(place) {
       if (target) break;
       target = [...(document.getElementById(id)?.querySelectorAll(FOCUSABLE) ?? [])].find((control) => control.getClientRects().length) ?? null;
     }
+    // No box of its own holds one: the control before it in the page (« Garder … jours » gone, its list).
+    target ??= place.before.map((id) => document.getElementById(id)).find((one) => one?.getClientRects().length && !one.disabled) ?? null;
     // None left to take it: the nearest box still there, focused itself — never the page's start.
     target ??= place.near.map((id) => document.getElementById(id)).find((box) => box?.getClientRects().length) ?? null;
     // A box — the one focused before, drawn anew, too — takes the focus by script alone.
@@ -5516,7 +5556,10 @@ window.addEventListener("focus", () => {
   const choosing = !document.getElementById("welcome").hidden
     || document.querySelector("#settings:not([hidden]) #minutes-unsaved:not([hidden])")
     || [...document.querySelectorAll("#settings:not([hidden]) .fields input")].some((input) => input.value !== input.defaultValue);
-  if (!choosing) refresh();
+  // Back from a list's menu, not from elsewhere: nothing drawn anew (#944).
+  const menu = inMenu;
+  inMenu = false;
+  if (!choosing && !menu) refresh();
 });
 window.addEventListener("hashchange", () => {
   // Another address: the page still shown, or its agreement, acts on its own meeting: no press and
