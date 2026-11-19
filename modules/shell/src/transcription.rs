@@ -252,7 +252,7 @@ impl Transcription {
 
 /// How long a program told to stop is given before it is killed, with what it started: the two
 /// seconds « Annuler » promises hold it, the shell's waiting a tenth of a second at a time (D92).
-const GRACE: Duration = Duration::from_secs(1);
+pub const GRACE: Duration = Duration::from_secs(1);
 
 /// Stops a program that leads a group of its own, and whatever it started: TERM to the group, a
 /// second's grace, then KILL to what is left of it. The group is taken while its leader runs, its

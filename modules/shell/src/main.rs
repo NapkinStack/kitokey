@@ -670,7 +670,6 @@ fn ends_on_sigterm(app: &AppHandle) {
         terminated.recv().await;
         tracing::info!("shell.terminated");
         let shell = app.state::<Shell>();
-        // Cancelled from a thread of its own: a token stops its program within its grace, blocking.
         let tokens: Vec<Cancel> = [&shell.transcript_token, &shell.minutes_token]
             .into_iter()
             .filter_map(|slot| slot.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone())
@@ -685,7 +684,13 @@ fn ends_on_sigterm(app: &AppHandle) {
                     }),
             )
             .collect();
-        let _ = tauri::async_runtime::spawn_blocking(move || tokens.iter().for_each(Cancel::cancel)).await;
+        // A token stops its program on a thread of its own, which KILLs what is left after its grace:
+        // that grace waited, then Kitokey leaves — or what was deaf to TERM outlives it (s961g2).
+        let making = !tokens.is_empty();
+        tokens.iter().for_each(Cancel::cancel);
+        if making {
+            tokio::time::sleep(transcription::GRACE + Duration::from_millis(200)).await;
+        }
         app.exit(0);
     });
 }
