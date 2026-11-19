@@ -909,7 +909,7 @@ def models_listed(now: dt.datetime) -> None:
         said = (browser.execute_script(turbo_row), browser.execute_script(small_row))
         check("Settings list Whisper large v3 turbo and Whisper small, each with its size, its host and what it is good for",
               listed and "Whisper large v3 turbo" in said[0] and "200 ko" in said[0] and "Recommandé" in said[0]
-              and "Whisper small" in said[1] and "ordinateur modeste" in said[1]
+              and "Whisper small" in said[1] and "ordinateur plus ancien" in said[1]
               and all(at.split("/")[2] in line for line in said), said)
         check("each not on this computer is offered", "Télécharger" in said[0] and "Télécharger" in said[1], said)
         check("nothing is fetched before a click", asked == [], asked)
@@ -950,7 +950,7 @@ def models_listed(now: dt.datetime) -> None:
             monitor.terminate()
             monitor.wait(timeout=10)
         check("its notice says to choose it, never that a transcript begins",
-              told and "La transcription est en cours" not in notified.read_text() and not heard.exists(), notified.read_text()[-400:])
+              told and "La transcription démarre" not in notified.read_text() and not heard.exists(), notified.read_text()[-400:])
         names = [o.text for o in browser.find_elements(By.CSS_SELECTOR, "#model option")]
         check("it is offered among the models to choose", any(name.startswith("Whisper small") for name in names), names)
         check("the choice stays the user's", "ggml-small" not in window.file.read_text()
@@ -1285,7 +1285,7 @@ def service_named(now: dt.datetime) -> None:
             code.write_text("provider.of_a_later_version")
             tester_click(browser, "transcription-test", "a service, a code unknown")
             unknown = wait_for(browser, lambda b: b.execute_script(said).startswith("Le modèle ne répond pas"), 10)
-            check("a code unknown is read as no code: today's sentence", unknown and "vérifiez son adresse, son nom et sa clé" in browser.execute_script(said), browser.execute_script(said))
+            check("a code unknown is read as no code: today's sentence", unknown and "vérifiez l’adresse, le nom du modèle et la clé" in browser.execute_script(said), browser.execute_script(said))
         finally:
             code.unlink(missing_ok=True)
         browser.execute_script("location.hash = '#/'")
@@ -2167,7 +2167,7 @@ def first_run(now: dt.datetime) -> None:
                 check(f"{way}: the click fetches it, the window at the meetings while it comes",
                       away and not fetched.exists() and "Le modèle" not in notified.read_text()[mark:], (asked, notified.read_text()[mark:]))
                 if way != "whole":
-                    told = wait_for(browser, lambda b: "Le modèle n’a pas été téléchargé" in notified.read_text()[mark:], 15)
+                    told = wait_for(browser, lambda b: "Échec du téléchargement du modèle" in notified.read_text()[mark:], 15)
                     check(f"{way}: said as Settings say it, the model not put in its place", told and not fetched.exists(), notified.read_text()[mark:][-300:])
             text = window.file.read_text()
             check("saved private before it is fetched: the minutes by the Ollama answering, qwen3:8b",
@@ -7153,7 +7153,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             recorded = stopped(browser)
             missing = one_told(browser, mark, lambda t: "member=Notify" in t)
             check("no model: one notification, what to do, naming the meeting",
-                  recorded and missing and not focused(browser) and "le modèle manque" in told(mark)
+                  recorded and missing and not focused(browser) and "modèle manquant" in told(mark)
                   and "Placez le modèle Whisper" in told(mark) and names(told(mark)), why(browser, recorded, missing, mark))
             window.file.write_text(written)
             elsewhere(browser)
@@ -7164,7 +7164,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             HEARING.chmod(0o755)
             check("its transcription program cannot start: one notification, what to do, naming the meeting",
                   recorded and unstarted and not focused(browser) and "Kitokey ne peut pas transcrire" in told(mark)
-                  and "réinstaller Kitokey" in told(mark) and names(told(mark)), why(browser, recorded, unstarted, mark))
+                  and "réinstallez Kitokey" in told(mark) and names(told(mark)), why(browser, recorded, unstarted, mark))
 
             # 5. Its minutes not started — nobody named to write them: the transcript's end is the last
             # step's, one notification still, D25's, saying what to do and naming the meeting (D25, D92).
@@ -8094,7 +8094,7 @@ def transcript_corrected(now: dt.datetime) -> None:
             "return window.__TAURI__.core.invoke('transcript_corrected', {name: arguments[0], track: 'local', start: 0.4, text: 'x'}).then(() => 'kept', (why) => String(why))",
             unfinished.name)
         check("a transcript not complete offers no line to correct, and a correction asked is refused, the file as it was",
-              browser.execute_script(pencils) == 0 and refused == "sa transcription n’est pas complète\u00a0: refaites-la d’abord." and (unfinished / "transcript.jsonl").read_text() == before.replace('{"type":"complete","duration":3.0}\n', ""),
+              browser.execute_script(pencils) == 0 and refused == "sa transcription est incomplète. Refaites-la d’abord." and (unfinished / "transcript.jsonl").read_text() == before.replace('{"type":"complete","duration":3.0}\n', ""),
               (browser.execute_script(pencils), refused))
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .lines .edit"), 10)
@@ -8187,7 +8187,7 @@ def transcript_corrected(now: dt.datetime) -> None:
                 heard.name)
             hidden = wait_for(browser, lambda b: b.execute_script(pencils) == 0, 3)
             check("while the minutes are written, no line is corrected: refused, its pencils hidden",
-                  writing and "en cours d’enregistrement ou de préparation" in asked and hidden and "Le budget de Jiri" in (heard / "transcript.jsonl").read_text(), (writing, asked))
+                  writing and "en cours de traitement" in asked and hidden and "Le budget de Jiri" in (heard / "transcript.jsonl").read_text(), (writing, asked))
         finally:
             (WORK / "slow-minutes").unlink()
         remade = wait_for(browser, lambda b: (heard / "minutes.md").read_text() != minutes, 10)
@@ -8208,7 +8208,7 @@ def transcript_corrected(now: dt.datetime) -> None:
                 heard.name)
         finally:
             (WORK / "slow-hearing").unlink()
-        check("a correction asked while the transcript is made again is refused", "en cours d’enregistrement ou de préparation" in refused, refused)
+        check("a correction asked while the transcript is made again is refused", "en cours de traitement" in refused, refused)
         # Its end waited for: the transcript set aside meanwhile, then the new one in its place.
         def remade() -> bool:
             try:
@@ -10636,8 +10636,8 @@ def main() -> int:
         # Which setting, on which line, and what to do (#783) — never settings.rs's own sentence.
         # WebDriver's `.text` reads U+00A0 as a space.
         which = lambda line: f"Ligne {line} : « keep_audio » vaut « always » ou un nombre de jours, de 1 à 36\u202f500. Corrigez-le."  # noqa: E731
-        refused = f"Le réglage n’a pas été enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
-        locked_said = f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which(len(lines))}"
+        refused = f"Le réglage n’a pas été enregistré : le fichier de réglages est illisible. {which(len(lines))}"
+        locked_said = f"Le fichier de réglages est illisible : Kitokey n’y touchera pas tant qu’il n’est pas corrigé. {which(len(lines))}"
         unreadable = lambda: browser.find_element(By.ID, "settings-unreadable").text  # noqa: E731
         window.file.write_text(broken)
         changed(lambda: browser.find_element(By.ID, "reminder").click())
@@ -10654,8 +10654,8 @@ def main() -> int:
         window.file.write_text("\n".join(lines) + "\n")
         raw = f'settings.toml, line {len(lines)}: keep_audio is "always" or a number of days'
         # The file's line has moved with developer mode written: the sentences name the new one.
-        refused = f"Le réglage n’a pas été enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
-        locked_said = f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which(len(lines))}"
+        refused = f"Le réglage n’a pas été enregistré : le fichier de réglages est illisible. {which(len(lines))}"
+        locked_said = f"Le fichier de réglages est illisible : Kitokey n’y touchera pas tant qu’il n’est pas corrigé. {which(len(lines))}"
         changed(lambda: browser.find_element(By.ID, "reminder").click())
         said = not_saved()
         check("developer mode on, the raw text is under the sentence of the command that failed, without its path", said == f"{refused}\n{raw}", said)
@@ -10897,7 +10897,7 @@ def main() -> int:
         check(
             "a model that does not answer is said in one sentence; the key goes by the environment, never the arguments",
             refused
-            and said.endswith("vérifiez son adresse, son nom et sa clé, puis réessayez.")
+            and said.endswith("vérifiez l’adresse, le nom du modèle et la clé, puis réessayez.")
             and "openrouter.ai" not in said
             and (WORK / "summary-key").read_text() == "sk-scenario"
             and "sk-scenario" not in (WORK / "summary-args").read_text(),
@@ -10926,7 +10926,7 @@ def main() -> int:
         warned = browser.find_element(By.CSS_SELECTOR, "#settings .warn").text
         locked = browser.execute_script("return [...document.querySelectorAll('#settings input, #settings select')].every(e => e.disabled)")
         which = "Ligne 3 : « keep_audio » vaut « always » ou un nombre de jours, de 1 à 36\u202f500. Corrigez-le."  # U+00A0 read as a space
-        check("a settings file that cannot be read is said so, which setting and what to do, and nothing can be changed", warned == f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which}" and locked, warned)
+        check("a settings file that cannot be read is said so, which setting and what to do, and nothing can be changed", warned == f"Le fichier de réglages est illisible : Kitokey n’y touchera pas tant qu’il n’est pas corrigé. {which}" and locked, warned)
         check("it is left as it was", window.file.read_text() == f'sessions = "{broken}"\nwelcomed = true\nkeep_audio = 0\n')
         # The shell itself refuses, not only the page.
         refused = browser.execute_async_script(
