@@ -451,7 +451,8 @@ function transcriptState(name) {
   return null;
 }
 
-// The card whose « Annuler » was pressed: once it says stopped, the focus goes to what makes it again.
+// The card whose « Annuler » was pressed, and its meeting: once it says stopped and offers to make it
+// again, the focus goes there — kept until then, the offer drawn only when the page is drawn anew.
 let cancelledFrom = null;
 
 // A refused « Annuler », said for the line `of` (D92): an alert, which a screen reader says as it
@@ -470,7 +471,7 @@ function cancelButton(said, id) {
   if (id) cancel.id = id;
   cancel.addEventListener("click", async () => {
     waiting(cancel, true);
-    cancelledFrom = said.id;
+    cancelledFrom = { id: said.id, name: said.dataset.name };
     // A refusal said before was the last gesture's: this one says its own.
     document.querySelector(`.note[data-refused="${said.id}"]`)?.remove();
     const ended = await window.__TAURI__.core.invoke("making_cancelled", { name: said.dataset.name }).then(() => true, (why) => {
@@ -512,16 +513,20 @@ function paintState(said, shown, of) {
   }
   said.dataset.key = key;
   if (shown === null) return said.replaceChildren();
+  // Being made: said by the page's one bar across both steps, not by its card (D92, `paintBar`).
   if (shown.kind === "making") {
-    said.replaceChildren(element("span", "what", of.making), element("span", "by", `${by} · ${minutes}`), element("span", "making-bar"), cancelButton(said, "making-cancel"));
+    said.hidden = true;
+    said.replaceChildren();
   } else if (shown.kind === "waiting") {
     said.replaceChildren(element("span", "what", fill(words.minutes_waiting, shown.before)), cancelButton(said));
   } else if (shown.kind === "stopped") {
     const stopped = element("span", "what", of.stopped);
     stopped.id = "making-stopped";
     said.replaceChildren(stopped);
-    if (cancelledFrom === said.id && offered && !offered.hidden) offered.focus();
-    cancelledFrom = null;
+    if (cancelledFrom?.id === said.id && cancelledFrom.name === said.dataset.name && offered && !offered.hidden) {
+      offered.focus();
+      cancelledFrom = null;
+    }
   } else if (shown.kind === "model") {
     if (shown.coming) said.replaceChildren(element("span", "what", words.transcript_model_coming));
     else said.replaceChildren(element("span", "what", words.transcript_model_needed), modelFetch(shown.busy));
@@ -678,6 +683,58 @@ function paintMakings() {
     });
   }
   paintContext();
+  // A meeting's steps both ended — its page shown or not —: its summary made again alone later is one part.
+  for (const name of barChained) {
+    if (transcriptState(name)?.kind !== "making" && !makings?.between.includes(name) && minutesState(name)?.kind !== "making") barChained.delete(name);
+  }
+  paintBar();
+}
+
+// A meeting's page while it is made (D92): one bar across both steps — its transcript, then its summary
+// when one follows —, naming the step and what makes it, each part full once done and never moving back,
+// « Annuler » in it for the step running. Between the two steps, the summary's part is said running.
+const barChained = new Set();
+
+function barOf(name) {
+  if (makings === null) return null;
+  const heard = transcriptState(name);
+  const minutes = minutesState(name);
+  if (heard?.kind === "making") {
+    if (heard.then) barChained.add(name);
+    return { step: "transcript", parts: heard.then ? ["running", "next"] : ["running"], shown: heard };
+  }
+  const between = makings.between.includes(name);
+  const chained = between || barChained.has(name);
+  if (minutes?.kind === "making") return { step: "minutes", parts: chained ? ["done", "running"] : ["running"], shown: minutes };
+  if (between) return { step: "minutes", parts: ["done", "running"], shown: null };
+  return null;
+}
+
+function paintBar() {
+  const bar = document.getElementById("making");
+  if (!bar || document.getElementById("meeting").hidden) return;
+  const state = barOf(bar.dataset.name);
+  bar.hidden = state === null;
+  if (state === null) return;
+  // The step said by a polite live region: its text changes only when the step does.
+  const step = document.getElementById("making-step");
+  const said = state.step === "transcript" ? words.transcript_making : words.minutes_making;
+  if (step.textContent !== said) step.textContent = said;
+  const shown = state.shown;
+  const by = shown === null ? "" : shown.host === undefined ? spoken(shown.model) : `${modelSaid(shown.model)} · ${shown.host}`;
+  const time = shown === null ? "" : `${Math.floor(shown.seconds / 60)}:${String(shown.seconds % 60).padStart(2, "0")}`;
+  bar.querySelector(".by").textContent = by ? `${by} · ${time}` : "";
+  const parts = bar.querySelector(".segments");
+  if (parts.childElementCount !== state.parts.length) parts.replaceChildren(...state.parts.map(() => element("span", "segment")));
+  state.parts.forEach((part, at) => { parts.children[at].dataset.state = part; });
+  // « Annuler » for the step running, its card's: cancelled, said there, as before (D92, criterion 4).
+  const card = document.getElementById(state.step === "transcript" ? "transcript-state" : "minutes-state");
+  const holder = bar.querySelector(".cancel");
+  if (shown === null || !card) holder.replaceChildren();
+  else if (holder.dataset.for !== state.step || !holder.firstChild) {
+    holder.dataset.for = state.step;
+    holder.replaceChildren(cancelButton(card, "making-cancel"));
+  }
 }
 
 // *Réessayer*: fails only when the meeting is gone, said there (D67); a later failure is on this page.
@@ -771,7 +828,14 @@ async function readMakings() {
   const moved = opened && makings
     && ((String(makings.made[opened] ?? 0) !== drawn("minutes-state") && minutesState(opened)?.kind !== "making")
       || (String(makings.transcripts_made[opened] ?? 0) !== drawn("transcript-state") && transcriptState(opened)?.kind !== "making"));
-  if (moved && !busy) refresh();
+  // A first transcript cancelled, its page drawn while it was made: no offer to make it again until
+  // the page is drawn anew, which nothing made asks for — drawn once more, then (D92).
+  const unoffered = cancelledFrom && !cancelledFrom.drawn && cancelledFrom.id === "transcript-state" && cancelledFrom.name === opened
+    && transcriptState(opened)?.kind === "stopped" && !document.getElementById("make-transcript");
+  if ((moved || unoffered) && !busy) {
+    if (unoffered) cancelledFrom.drawn = true;
+    refresh();
+  }
   paintMakings();
 }
 
@@ -2289,6 +2353,18 @@ function trashQuestion(session, transcript, minutes, words, trash) {
 }
 
 // After a drawing of the list: the focus a meeting gone to the trash asked for (D100).
+// A making cancelled, its card saying it stopped: the page drawn anew offers to make it again, and the
+// focus goes there once the drawing has given back its own place (D92, D101).
+function cancelledFocused() {
+  if (cancelledFrom === null) return;
+  const said = document.getElementById(cancelledFrom.id);
+  if (!said || said.dataset.name !== cancelledFrom.name || !said.classList.contains("stopped")) return;
+  const offered = document.getElementById(said.id === "minutes-state" ? "make-minutes" : "make-transcript");
+  if (!offered || offered.hidden) return;
+  offered.focus();
+  cancelledFrom = null;
+}
+
 function trashedFocused() {
   if (trashedFocus === null || !(location.hash === "" || location.hash === "#/")) return;
   const to = trashedFocus;
@@ -2392,7 +2468,20 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   gone.hidden = models_gone.length === 0;
   const settings = contextCard(session, { context, transcript, minutes }, words, [spoken, secret], [left, secretSaid, spokenSaid, secretDescribed, gone]);
   // The trash's question in its own card, under the head, as wide as the page's cards (D100).
-  page.replaceChildren(head, ask, settings, drawn, columns);
+  // Its making, one bar across both steps under its head (D92), painted with the makings.
+  const making = element("section", "card making");
+  making.id = "making";
+  making.dataset.name = nameOf(session);
+  making.hidden = true;
+  // The same meeting drawn again — its transcript written, say —: its step's live region is the same
+  // node, never one said anew, and the bar is painted before anything can show it missing.
+  const step = (same && document.getElementById("making-step")) || element("span", "what");
+  step.id = "making-step";
+  step.setAttribute("aria-live", "polite");
+  const cancel = element("span", "cancel");
+  making.append(step, element("span", "by"), cancel, element("div", "segments"));
+  page.replaceChildren(head, making, ask, settings, drawn, columns);
+  paintBar();
   // The line being said, marked while it plays; the page stays where the user left it (D26, the
   // decider, 2026-10-24: following the line was intrusive).
   if (player?.name === nameOf(session)) {
@@ -2545,7 +2634,7 @@ let offeredOpen = false;
 // not yet saved: kept while Settings are drawn again by a model come or the window's width, until
 // the user acts (ux.md: an error stays until corrected). Another address forgets these two.
 const guided = {};
-for (const path of ["minutes", "transcription"]) guided[path] = { advanced: false, answers: new Map(), chosen: {} };
+for (const path of ["minutes", "transcription"]) guided[path] = { advanced: null, answers: new Map(), chosen: {} };
 
 // The guided path's pieces (D95), the same for the transcription and the summary.
 function guidedField(id, text, type, value, locked) {
@@ -2603,7 +2692,29 @@ function guidedWhere(path, words, way, locked) {
 // « Vérifier la clé »: the service's models asked with the key typed — or the one kept —, its
 // answer kept as the path's own, said on the page as it is now: drawn again meanwhile, or another
 // service chosen, the page says its own.
-function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySaid, modelsPick }, ask, shownSaved) {
+// `keyFor()`: what the key field is for now — the service chosen, or under « Avancé » an address on
+// another host (`keyFor`'s `host:…`). Returns the key typed for one of them, and what to call when the
+// address changes.
+function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySaid, modelsPick }, ask, shownSaved, keyFor) {
+  // A key typed and not yet saved: kept across a drawing for what it was typed for, as the model chosen
+  // with it — in the page's memory alone, never written nor logged, forgotten with the choices at
+  // another address (#948). A key leaves only for the host it was typed for: another service or
+  // another host shows its own, or none (#964; OWASP ASVS, a secret sent to its recipient alone).
+  const keys = () => guided[path].chosen.keys ?? {};
+  const shown = () => {
+    key.value = keys()[keyFor()] ?? "";
+  };
+  shown();
+  key.addEventListener("input", () => {
+    guided[path].chosen.keys = { ...keys(), [keyFor()]: key.value };
+  });
+  servicePick.addEventListener("change", shown);
+  const typed = (id) => (id === keyFor() ? key.value : keys()[id]) || null;
+  // Saved: no longer needed in the page; the field says a key is kept (#964).
+  const forget = (id) => {
+    const { [id]: _, ...rest } = keys();
+    guided[path].chosen.keys = rest;
+  };
   keyTest.addEventListener("click", async () => {
     waiting(keyTest, true);
     keySaid.textContent = words.testing;
@@ -2611,7 +2722,7 @@ function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySa
     let models = null;
     let said = "";
     try {
-      models = await ask(asked, key.value || null);
+      models = await ask(asked, typed(`service:${asked}`));
     } catch (why) {
       said = why;
     }
@@ -2623,6 +2734,20 @@ function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySa
     shownSaved();
     if (models !== null) modelsPick.focus();
   });
+  return { shown, typed, forget };
+}
+
+// What a key is kept for: the service chosen, or an address of one's own on another host (#964).
+function keyHost(address) {
+  try {
+    return new URL(address).host;
+  } catch {
+    return address;
+  }
+}
+function keyFor(address, serviceAddress, index) {
+  const own = address.trim();
+  return own && keyHost(own) !== keyHost(serviceAddress) ? `host:${keyHost(own)}` : `service:${index}`;
 }
 
 // « Avancé », folded unless the path keeps it unfolded or `own` is saved: what it holds hidden.
@@ -2642,8 +2767,24 @@ function guidedAdvanced(path, words, own, contents) {
     panel.hidden = !now;
   };
   toggle.addEventListener("click", () => unfold(!guided[path].advanced));
-  unfold(guided[path].advanced || own);
+  // Folded or unfolded by the user, kept across a drawing; else unfolded when what is saved is of its own (#948).
+  unfold(guided[path].advanced ?? own);
   return [toggle, panel];
+}
+
+// A model chosen in a list that waits for « Enregistrer », not yet saved: kept across a drawing, as the
+// way and the service above it are — Settings are drawn anew from what is saved whenever another
+// control is (#948). `key`: which list of the step, read as it changes; else the one saved.
+function chosenKept(path, list, key, saved) {
+  const values = [...list.options].map((option) => option.value);
+  const pending = guided[path].chosen.models?.[key];
+  const kept = values.includes(pending) ? pending : values.includes(saved) ? saved : null;
+  if (kept !== null) list.value = kept;
+}
+function chosenKeeps(path, list, key) {
+  list.addEventListener("change", () => {
+    guided[path].chosen.models = { ...guided[path].chosen.models, [key()]: list.value };
+  });
 }
 
 function minutesRow(minutes, words, locked) {
@@ -2663,7 +2804,7 @@ function minutesRow(minutes, words, locked) {
   const option = guidedOption;
   const button = (id, text, primary) => guidedButton(id, text, primary, locked);
   // Saved or not, the page is drawn again from what the shell holds; a failure stays said.
-  const save = async (provider, model, key) => {
+  const save = async (provider, model, key, keyId) => {
     let failed = null;
     try {
       const notKept = await window.__TAURI__.core.invoke("minutes_saved", { provider, model, key });
@@ -2671,6 +2812,7 @@ function minutesRow(minutes, words, locked) {
     } catch (why) {
       failed = fill(words.not_saved, why);
     }
+    if (failed === null && keyId) keyed.forget(keyId);
     notSaved = failed;
     await refresh();
     savedSaid(failed === null);
@@ -2684,7 +2826,8 @@ function minutesRow(minutes, words, locked) {
   // On this computer: Ollama's models, each said as people say it.
   const [hereWrap, herePick] = listed("minutes", words.model_name);
   for (const name of minutes.ollama) option(herePick, name, name === minutes.recommended ? fill(words.model_recommended, modelSaid(name)) : modelSaid(name));
-  if (savedHere && minutes.ollama.includes(minutes.model)) herePick.value = minutes.model;
+  chosenKept("minutes", herePick, "here", savedHere ? minutes.model : null);
+  chosenKeeps("minutes", herePick, () => "here");
   const hereSave = button("minutes-save", words.save, false);
   hereSave.addEventListener("click", () => save(minutes.ollama_address, herePick.value, null));
   herePick.addEventListener("change", () => (unsaved.hidden = savedHere && herePick.value === minutes.model));
@@ -2701,11 +2844,12 @@ function minutesRow(minutes, words, locked) {
   const [modelsWrap, modelsPick] = listed("minutes-models", words.model_name);
   const onlineSave = button("minutes-online-save", words.save, true);
   const service = () => minutes.online[Number(servicePick.value)];
+  chosenKeeps("minutes", modelsPick, () => servicePick.value);
   // The models listed with its key, the one saved chosen.
   const shownListed = (models) => {
     modelsPick.replaceChildren();
     for (const id of models) option(modelsPick, id, modelSaid(id));
-    if (models.includes(minutes.model)) modelsPick.value = minutes.model;
+    chosenKept("minutes", modelsPick, servicePick.value, minutes.model);
     modelsWrap.hidden = onlineSave.hidden = models.length === 0;
   };
   // This service's last answer, said again; else the model saved with it — the others come with its key.
@@ -2725,9 +2869,6 @@ function minutesRow(minutes, words, locked) {
     shownSaved();
     address.placeholder = service().address;
   });
-  guidedKeyTested("minutes", words, locked, { servicePick, key, keyTest, keySaid, modelsPick },
-    (index, typed) => window.__TAURI__.core.invoke("minutes_models", { provider: minutes.online[Number(index)].address, key: typed }), shownSaved);
-  onlineSave.addEventListener("click", () => save(service().address, modelsPick.value, key.value || null));
   // « Avancé »: an address of one's own, OpenAI's way of asking, its model named by hand.
   const [addressWrap, address] = field("minutes-address", words.address, "url", own ? minutes.provider : "");
   const [modelWrap, model] = field("minutes-model", words.model_name, "text", own ? minutes.model : "");
@@ -2735,8 +2876,16 @@ function minutesRow(minutes, words, locked) {
   // Its address left empty: the service chosen above, with a model it does not list — a new release,
   // an id of its own — named by hand.
   address.placeholder = service().address;
-  ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, key.value || null));
+  // « Avancé » folded, its address is not what the key is typed for: the service's is (#963).
+  const keyNow = () => keyFor((guided.minutes.advanced ?? own) ? address.value : "", service().address, servicePick.value);
+  const keyed = guidedKeyTested("minutes", words, locked, { servicePick, key, keyTest, keySaid, modelsPick },
+    (index, typed) => window.__TAURI__.core.invoke("minutes_models", { provider: minutes.online[Number(index)].address, key: typed }), shownSaved, keyNow);
+  address.addEventListener("input", keyed.shown);
+  const serviceKeyId = () => `service:${servicePick.value}`;
+  onlineSave.addEventListener("click", () => save(service().address, modelsPick.value, keyed.typed(serviceKeyId()), serviceKeyId()));
+  ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, keyed.typed(keyNow()), keyNow()));
   const [toggle, advanced] = guidedAdvanced("minutes", words, own, [addressWrap, modelWrap, ownSave]);
+  toggle.addEventListener("click", keyed.shown);
   const away = element("div", "fields");
   away.append(serviceWrap, keyWrap, keyTest, keySaid, modelsWrap, onlineSave, toggle, advanced);
   const here = element("div", "fields");
@@ -3040,6 +3189,7 @@ function showSettings(shown, minutes, words) {
   keySaid.id = "transcription-key-said";
   keySaid.setAttribute("role", "status");
   const [modelsWrap, serviceModels] = guidedList("transcription-models", words.service_model, locked);
+  chosenKeeps("transcription", serviceModels, () => servicePick.value);
   const [agreeWrap, agreeBox, agreeHost, agreeShown] = agreement("transcription-agreed");
   const saveService = guidedButton("transcription-save", words.service_save, true, locked);
   // One « Enregistrer » and one agreement at a time (#860): the service's, « Avancé » folded; unfolded,
@@ -3054,7 +3204,7 @@ function showSettings(shown, minutes, words) {
   const shownListed = (models) => {
     serviceModels.replaceChildren();
     for (const id of models) guidedOption(serviceModels, id, modelSaid(id));
-    if (models.includes(shown.transcription_model)) serviceModels.value = shown.transcription_model;
+    chosenKept("transcription", serviceModels, servicePick.value, shown.transcription_model);
     modelsWrap.hidden = models.length === 0;
     listedShown = models.length > 0;
     paintSaves();
@@ -3073,8 +3223,6 @@ function showSettings(shown, minutes, words) {
     paintSaves();
   };
   shownSaved();
-  guidedKeyTested("transcription", words, locked, { servicePick, key: serviceKey, keyTest, keySaid, modelsPick: serviceModels },
-    (index, typed) => window.__TAURI__.core.invoke("transcription_models", { index: Number(index), key: typed }), shownSaved);
   // « Avancé »: an address of one's own, OpenAI's way of asking, its model named by hand.
   const [addressWrap, address] = guidedField("transcription-provider", words.service_address, "url", own ? shown.transcription_provider : "", locked);
   const [modelWrap, serviceModel] = guidedField("transcription-model", words.service_model, "text", own ? shown.transcription_model : "", locked);
@@ -3087,13 +3235,21 @@ function showSettings(shown, minutes, words) {
     ownAgreeHost(hostOf(ownAddress()));
   };
   standsIn();
+  // « Avancé » folded, its address is not what the key is typed for: the service's is (#963).
+  const keyNow = () => keyFor((guided.transcription.advanced ?? own) ? address.value : "", hearing().address, servicePick.value);
+  const keyed = guidedKeyTested("transcription", words, locked, { servicePick, key: serviceKey, keyTest, keySaid, modelsPick: serviceModels },
+    (index, typed) => window.__TAURI__.core.invoke("transcription_models", { index: Number(index), key: typed }), shownSaved, keyNow);
   address.addEventListener("input", () => {
     ownAgreeHost(hostOf(ownAddress()));
     ownAgreeBox.checked = false;
+    keyed.shown();
   });
   const ownSave = guidedButton("transcription-own-save", words.service_save, false, locked);
   const [hearToggle, hearAdvanced] = guidedAdvanced("transcription", words, own, [addressWrap, modelWrap, ownAgreeWrap, ownSave]);
-  hearToggle.addEventListener("click", paintSaves);
+  hearToggle.addEventListener("click", () => {
+    paintSaves();
+    keyed.shown();
+  });
   paintSaves();
   // What « Avancé »'s « Enregistrer » saves: its model typed, or else — its address left empty, the
   // service chosen above — the model chosen in that service's list (#860).
@@ -3101,7 +3257,7 @@ function showSettings(shown, minutes, words) {
   const serviceSaid = element("p", "says");
   serviceSaid.id = "transcription-said";
   serviceSaid.setAttribute("role", "status");
-  const saveHearing = async (provider, model, key, box, addressField, modelField) => {
+  const saveHearing = async (provider, model, key, keyId, box, addressField, modelField) => {
     const { invoke } = window.__TAURI__.core;
     if (!/^https?:$/.test((() => { try { return new URL(provider.trim()).protocol; } catch { return ""; } })()) || !hostOf(provider.trim())) {
       serviceSaid.textContent = words.service_address_bad;
@@ -3117,16 +3273,21 @@ function showSettings(shown, minutes, words) {
     }
     const saved = await invoke("transcription_saved", {
       provider, model, key: key || null, agreed: box.checked,
-    }).then((notKept) => (notKept !== null ? fill(words.key_not_kept, notKept)
+    }).then((notKept) => {
+      if (notKept !== null) return fill(words.key_not_kept, notKept);
+      // Saved: the key no longer kept in the page (#964).
+      keyed.forget(keyId);
       // This computer's: said so, never as an address and a port (#775).
-      : isHere(hostOf(provider)) ? words.service_saved_here : fill(words.service_saved, hostOf(provider))), (why) => fill(words.not_saved, why));
+      return isHere(hostOf(provider)) ? words.service_saved_here : fill(words.service_saved, hostOf(provider));
+    }, (why) => fill(words.not_saved, why));
     // A Tester still asking stays: its answer comes after this, the button its own.
     serviceAnswer ??= { said: "", asking: false };
     serviceAnswer.said = saved;
     serviceSaid.textContent = saved;
   };
-  saveService.addEventListener("click", () => saveHearing(hearing().address, serviceModels.value, serviceKey.value, agreeBox, null, serviceModels));
-  ownSave.addEventListener("click", () => saveHearing(ownAddress(), ownModel(), serviceKey.value, ownAgreeBox, address, serviceModel));
+  const serviceKeyId = () => `service:${servicePick.value}`;
+  saveService.addEventListener("click", () => saveHearing(hearing().address, serviceModels.value, keyed.typed(serviceKeyId()), serviceKeyId(), agreeBox, null, serviceModels));
+  ownSave.addEventListener("click", () => saveHearing(ownAddress(), ownModel(), keyed.typed(keyNow()), keyNow(), ownAgreeBox, address, serviceModel));
   const testService = element("button", "open", words.service_test);
   testService.type = "button";
   testService.id = "transcription-test";
@@ -4989,10 +5150,12 @@ for (const type of ["change", "input"]) {
     if (!(changed instanceof Element) || !changed.id || !changed.closest("#meeting, #settings")) return;
     changedLast = { id: changed.id, at: Date.now() };
     // Changed by a click WebKit gave no focus to — a box, a radio, a list —: the control acted on has it,
-    // as a key would have given it. Never a field of text: its change comes as it is left, the focus
-    // passing by the page on its way elsewhere (meeting_renamed, « leaving the field keeps it »).
+    // as a key would have given it, wherever the focus was — on nothing, or left on another control, which
+    // a drawing would then give it back to (#944: the decider's #autostart). Never a field of text: its
+    // change comes as it is left, the focus passing by the page on its way elsewhere (meeting_renamed,
+    // « leaving the field keeps it »).
     const clicked = changed.matches("input[type=checkbox], input[type=radio], select");
-    if (clicked && (document.activeElement === null || document.activeElement === document.body)) changed.focus({ preventScroll: true });
+    if (clicked && document.activeElement !== changed) changed.focus({ preventScroll: true });
   }, true);
 }
 // The places of the drawings under way: the user moving the focus meanwhile moves where each one gives it
@@ -5002,9 +5165,21 @@ document.addEventListener("focusin", (event) => {
   if (placesPending.size === 0 || !(event.target instanceof Element) || !event.target.closest("#meeting, #settings")) return;
   for (const place of placesPending) Object.assign(place, placeOf());
 }, true);
+// A list's menu is a window of its own (GTK): opening it takes the window's focus away, closing it gives
+// it back — no coming back to the window, nothing to draw anew. Drawn then, the list is replaced under the
+// choice being made, before its change: the choice not yet saved lost, the focus with it (#944). The menu
+// opening: the window's focus going while a list has the page's, or a moment after a list left it for nowhere.
+let listLeft = 0;
+let inMenu = false;
+document.addEventListener("focusout", (event) => {
+  if (event.relatedTarget === null && event.target instanceof HTMLSelectElement) listLeft = Date.now();
+}, true);
+window.addEventListener("blur", () => {
+  inMenu = document.activeElement instanceof HTMLSelectElement || Date.now() - listLeft < 1000;
+});
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
 function placeOf() {
-  const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [] };
+  const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [], before: [] };
   const at = document.activeElement;
   const focused = at && at !== document.body && at.id && at.closest("#meeting, #settings") ? at : null;
   const changed = changedLast && Date.now() - changedLast.at < 5000 ? document.getElementById(changedLast.id) : null;
@@ -5013,10 +5188,16 @@ function placeOf() {
   place.id = control.id;
   // Its boxes with an id, nearest first: where a control the change removed was.
   for (let up = control.parentElement; up && up.id !== "meeting" && up.id !== "settings"; up = up.parentElement) if (up.id) place.near.push(up.id);
+  // The controls with an id before it in the page, nearest first: where the focus goes when it is gone and no
+  // box of its own is found (WAI-ARIA APG: content removed, the focus to its logical predecessor; #944).
+  const page = control.closest("#meeting, #settings");
+  const controls = page ? [...page.querySelectorAll(FOCUSABLE)].filter((one) => one.id) : [];
+  place.before = controls.slice(0, Math.max(controls.indexOf(control), 0)).slice(-3).reverse().map((one) => one.id);
   return place;
 }
 // Drawn again at the same address: the focus back on the same control — or, removed, on the first one
-// in the nearest box left that holds one —, the page where it was. A focus the user moved meanwhile stays.
+// in the nearest box left that holds one, else on the control before it —, the page where it was. A focus
+// the user moved meanwhile stays.
 function placeBack(place) {
   if (place.address === null || place.address !== location.hash) return;
   if (place.id !== null && (document.activeElement === null || document.activeElement === document.body)) {
@@ -5027,6 +5208,8 @@ function placeBack(place) {
       if (target) break;
       target = [...(document.getElementById(id)?.querySelectorAll(FOCUSABLE) ?? [])].find((control) => control.getClientRects().length) ?? null;
     }
+    // No box of its own holds one: the control before it in the page (« Garder … jours » gone, its list).
+    target ??= place.before.map((id) => document.getElementById(id)).find((one) => one?.getClientRects().length && !one.disabled) ?? null;
     // None left to take it: the nearest box still there, focused itself — never the page's start.
     target ??= place.near.map((id) => document.getElementById(id)).find((box) => box?.getClientRects().length) ?? null;
     // A box — the one focused before, drawn anew, too — takes the focus by script alone.
@@ -5051,6 +5234,7 @@ async function refresh(again = false) {
       placeBack(place);
       drawnAddress = location.hash;
       trashedFocused();
+      cancelledFocused();
     }
     return drawn;
   } catch (why) {
@@ -5354,7 +5538,10 @@ window.addEventListener("focus", () => {
   const choosing = !document.getElementById("welcome").hidden
     || document.querySelector("#settings:not([hidden]) #minutes-unsaved:not([hidden])")
     || [...document.querySelectorAll("#settings:not([hidden]) .fields input")].some((input) => input.value !== input.defaultValue);
-  if (!choosing) refresh();
+  // Back from a list's menu, not from elsewhere: nothing drawn anew (#944).
+  const menu = inMenu;
+  inMenu = false;
+  if (!choosing && !menu) refresh();
 });
 window.addEventListener("hashchange", () => {
   // Another address: the page still shown, or its agreement, acts on its own meeting: no press and
@@ -5366,6 +5553,7 @@ window.addEventListener("hashchange", () => {
   for (const path of Object.values(guided)) {
     path.answers = new Map();
     path.chosen = {};
+    path.advanced = null;
   }
   if (nameRefused) paneSays(nameRefused);
   nameRefused = null;
