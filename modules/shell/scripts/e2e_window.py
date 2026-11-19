@@ -1795,6 +1795,25 @@ def ollama_pulled(now: dt.datetime) -> None:
     server.shutdown()
 
 
+
+def first_read_said(browser, ids, expected, got) -> None:
+    """#965: the assistant's buttons read empty twice in 30 attests, a cause not established — not the card's
+    fade, a probe holding it at opacity 0 read them all the same. A first read other than expected is said, with
+    the page's state just after and a second read a second later: the next one names its cause. The check's verdict
+    is left as it was: this only says."""
+    if got == expected:
+        return
+    state = ("const w = document.getElementById('welcome'), c = document.querySelector('.welcome');"
+             " const r = c ? c.getBoundingClientRect() : null;"
+             " return {welcome_hidden: w ? w.hidden : 'absent', card: r ? [Math.round(r.width), Math.round(r.height)] : 'absent',"
+             " opacity: c ? getComputedStyle(c).opacity : null, display: c ? getComputedStyle(c).display : null,"
+             " buttons: arguments[0].map((id) => { const b = document.getElementById(id); return b ? [b.isConnected, b.textContent,"
+             " b.getClientRects().length] : 'absent'; })}")
+    now = browser.execute_script(state, list(ids))
+    time.sleep(1)
+    later = [browser.find_element(By.ID, i).text for i in ids]
+    print(f"  #965  first read {got}, a second later {later}; the page just after the first read: {now}")
+
 def first_run(now: dt.datetime) -> None:
     """Y. The first start (D58): the full window opens on one question, then the setting said plainly."""
     print("Y. the first start: one question, the setting said plainly, private by default (D58)")
@@ -1894,9 +1913,8 @@ def first_run(now: dt.datetime) -> None:
         again = browser.execute_script("const b = document.getElementById('welcome-ollama-again');"
                                        " return b ? [b.tagName, b.textContent, b.closest('.welcome-wait')?.textContent.includes('ollama.com') ?? false] : null")
         check("Ollama not answering: « Réessayer » beside ollama.com, a button (#781)", again == ["BUTTON", "Réessayer", True], again)
-        # The same read once the card has arrived (#965).
-        wait_for(browser, lambda b: b.find_element(By.ID, "welcome-later").text != "", 2)
         later = browser.find_element(By.ID, "welcome-later").text
+        first_read_said(browser, ("welcome-later",), ["Plus tard — vos réunions attendront le modèle"], [later])
         check("the model missing: « Plus tard » says the meetings will wait for it (#781)",
               later == "Plus tard — vos réunions attendront le modèle", later)
         check("the model missing: offered with its size and host",
@@ -2059,14 +2077,10 @@ def first_run(now: dt.datetime) -> None:
         press(browser, "welcome-next")
         wait_for(browser, lambda b: "Private mode" in b.execute_script(summary), 5)
         check("Next with nothing chosen is private", "Private mode" in browser.execute_script(summary), browser.execute_script(summary))
-        # Read once the card has arrived (#965): it enters by `arrive` from opacity 0, and WebDriver's `.text` is ''
-        # for what it judges not displayed — the summary's innerText, which ignores opacity, is there before it.
-        later = ["Later — your meetings will wait for the model", "Try again"]
-        buttons = lambda b: [b.find_element(By.ID, i).text for i in ("welcome-later", "welcome-ollama-again")]
-        wait_for(browser, lambda b: buttons(b) == later, 5)
-        english = buttons(browser)
+        english = [browser.find_element(By.ID, i).text for i in ("welcome-later", "welcome-ollama-again")]
+        first_read_said(browser, ("welcome-later", "welcome-ollama-again"), ["Later — your meetings will wait for the model", "Try again"], english)
         check("in English: « Later » says what waits, « Try again » beside ollama.com (#781)",
-              english == later, english)
+              english == ["Later — your meetings will wait for the model", "Try again"], english)
         seen(browser, "d58-3-summary-private-dark")
         press(browser, "welcome-back")
         until_question(browser)
