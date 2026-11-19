@@ -170,12 +170,17 @@ fi
 printf '%s\\n' "$*" > "$here/recorder-args"
 folder="$2/2026-10-18_12-00"; mkdir -p "$folder"
 printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","tracks":{}}' > "$folder/session.json"
-# As recording/v1 says: its reader gone, it goes on (#773); its input closed stops nothing; a termination
-# signal stops it as `stop` does — `session.json` says `stopped`, and it ends well.
-trap '' PIPE
-echo $$ > "$here/recorder-pid"
-stopped() { printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"; echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'; exit 0; }
-trap stopped TERM INT
+# As recording/v1 says, where the scenario asks it (`faithful-recorder`, CC): its reader gone, it goes on
+# (#773); its input closed stops nothing; a termination signal stops it as `stop` does — `session.json` says
+# `stopped`, and it ends well. Unasked, it dies with its reader, as every other scenario has it (s961b2).
+faithful=false
+if [ -e "$2/faithful-recorder" ]; then
+  faithful=true
+  trap '' PIPE
+  echo $$ > "$here/recorder-pid"
+  stopped() { printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"; echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'; exit 0; }
+  trap stopped TERM INT
+fi
 me='"Mic"'
 # No microphone to open, when the scenario says so (D49).
 if [ -e "$2/waiting-me" ]; then echo '{"event":"unavailable","source":"me","reason":"none"}'; me='"unavailable"'; fi
@@ -183,9 +188,9 @@ echo '{"event":"started","folder":"'"$folder"'","sources":{"me":'"$me"',"others"
 n=0
 while :; do
   read -t 0.1 line; got=$?
-  # A line — `stop` — ends it; its input closed (1) stops nothing: it waits, as the real one records on.
+  # A line — `stop` — ends it; faithful, its input closed (1) stops nothing: it waits, as the real one records on.
   [ "$got" = 0 ] && break
-  [ "$got" = 1 ] && sleep 0.1
+  [ "$got" = 1 ] && $faithful && sleep 0.1
   n=$((n + 1))
   # Levels at silence as long as the scenario says so; what capture says of a silence, when it does (D49).
   if [ -e "$2/hush" ]; then echo '{"event":"level","source":"me","level":0}'; echo '{"event":"level","source":"others","level":0}'
@@ -8455,6 +8460,8 @@ def ends_on_sigterm(now: dt.datetime) -> None:
     # start finds it, its ■ stopping it well (#773). A logout's SIGTERM to the recorder too is recording/v1's own.
     taping = WORK / "ends-on-sigterm-recording"
     taping.mkdir(exist_ok=True)
+    # The recorder's stand-in as recording/v1 has the program, here alone.
+    (taping / "faithful-recorder").touch()
     pid_file = WORK / "recorder-pid"
     pid_file.unlink(missing_ok=True)
     recorded = taping / "2026-10-18_12-00" / "session.json"
