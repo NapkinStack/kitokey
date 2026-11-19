@@ -2057,9 +2057,14 @@ def first_run(now: dt.datetime) -> None:
         press(browser, "welcome-next")
         wait_for(browser, lambda b: "Private mode" in b.execute_script(summary), 5)
         check("Next with nothing chosen is private", "Private mode" in browser.execute_script(summary), browser.execute_script(summary))
-        english = [browser.find_element(By.ID, i).text for i in ("welcome-later", "welcome-ollama-again")]
+        # Read once the card has arrived (#965): it enters by `arrive` from opacity 0, and WebDriver's `.text` is ''
+        # for what it judges not displayed — the summary's innerText, which ignores opacity, is there before it.
+        later = ["Later — your meetings will wait for the model", "Try again"]
+        buttons = lambda b: [b.find_element(By.ID, i).text for i in ("welcome-later", "welcome-ollama-again")]
+        wait_for(browser, lambda b: buttons(b) == later, 5)
+        english = buttons(browser)
         check("in English: « Later » says what waits, « Try again » beside ollama.com (#781)",
-              english == ["Later — your meetings will wait for the model", "Try again"], english)
+              english == later, english)
         seen(browser, "d58-3-summary-private-dark")
         press(browser, "welcome-back")
         until_question(browser)
