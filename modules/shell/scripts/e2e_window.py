@@ -851,7 +851,7 @@ def model_offered(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "make-transcript"))
         press(browser, "make-transcript")
         waits = "return document.getElementById('transcript-state')?.innerText || ''"
-        offered = wait_for(browser, lambda b: "En attente du modèle Whisper" in b.execute_script(waits) and b.find_elements(By.CSS_SELECTOR, "#transcript-state #model-fetch"))
+        offered = wait_for(browser, lambda b: "En attente du modèle de transcription" in b.execute_script(waits) and b.find_elements(By.CSS_SELECTOR, "#transcript-state #model-fetch"))
         check("a meeting waiting for the model offers it on its page", offered, browser.execute_script(waits))
         # Said once (#775): what it waits for, never « Pas encore de transcription » beside it.
         nones = browser.execute_script("return [...document.querySelectorAll('#meeting .transcript .none')].filter(e => e.offsetParent !== null).map(e => e.textContent)")
@@ -870,7 +870,7 @@ def model_offered(now: dt.datetime) -> None:
         time.sleep(3.5)
         check("the offer is not drawn again while nothing changes", not staleness_of(button)(browser))
         browser.find_element(By.ID, "model-fetch").click()
-        coming = wait_for(browser, lambda b: "en cours de téléchargement" in b.execute_script(waits) and not b.find_elements(By.ID, "model-fetch"), 3)
+        coming = wait_for(browser, lambda b: "téléchargement en cours" in b.execute_script(waits) and not b.find_elements(By.ID, "model-fetch"), 3)
         check("while it comes, the meeting says so and offers it no more", coming, browser.execute_script(waits))
         made = wait_for(browser, lambda b: heard.exists(), 15)
         check("fetched from the meeting, its transcript is made", made and fetched.read_bytes() == right)
@@ -9456,7 +9456,7 @@ def confidential_kept(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "make-transcript"), 10)
         press(browser, "make-transcript")
         waits = "return document.getElementById('transcript-state')?.innerText || ''"
-        offered = wait_for(browser, lambda b: "En attente du modèle Whisper" in b.execute_script(waits)
+        offered = wait_for(browser, lambda b: "En attente du modèle de transcription" in b.execute_script(waits)
                            and b.find_elements(By.CSS_SELECTOR, "#transcript-state #model-fetch"), 10)
         check("the Whisper model missing: said and offered as Settings offer it, the service named asked nothing",
               offered and counted == {"hear": 1, "write": 2}, (browser.execute_script(waits), counted, names(unmodelled / "kept")))
