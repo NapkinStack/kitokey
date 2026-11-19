@@ -1237,7 +1237,7 @@ const STILL_WRONG: &str = include_str!("words_still_wrong.txt");
 
 /// The sentences still without their comment, counted: 602 keys would be three review budgets.
 /// The number only goes down, as the list does.
-const WITHOUT_COMMENT: usize = 431;
+const WITHOUT_COMMENT: usize = 428;
 
 /// A sentence of `src/words.rs`, as the file arranges it.
 #[derive(Debug)]
@@ -1761,7 +1761,7 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
         (french.no_match, "Aucun passage ne correspond."),
         (french.search, "Rechercher dans la transcription"),
         (french.interrupted, "Interrompu"),
-        (french.undated, "Date inconnue"),
+        (french.undated, "Sans date"),
         (french.chip_awaiting, "Accord requis"),
         (french.minutes_waiting, "En file d’attente · {} avant"),
         (french.minutes_unsaved, "Modification non enregistrée\u{a0}: {} reste utilisé."),
@@ -2641,4 +2641,29 @@ fn a_notification_s_title_holds_50_characters() {
         wrong, TITLES_TOO_LONG,
         "a title over 50 characters, or one put right: take it from the list"
     );
+}
+
+/// Every sentence of the window is read by the code that shows it — the window's script, or the
+/// shell's own code —: one that nothing reads any more is removed, not kept unseen (D94).
+#[test]
+fn every_sentence_of_the_window_is_read_by_the_code() {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let mut code = std::fs::read_to_string(format!("{root}/ui/window.js")).unwrap();
+    for entry in std::fs::read_dir(format!("{root}/src")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|extension| extension == "rs") && !path.ends_with("words.rs") {
+            code += &std::fs::read_to_string(path).unwrap();
+        }
+    }
+    let read = |field: &str| {
+        code.match_indices(&format!(".{field}"))
+            .any(|(at, found)| !code[at + found.len()..].starts_with(|c: char| c.is_alphanumeric() || c == '_'))
+    };
+    let unread: std::collections::BTreeSet<String> = sentences()
+        .into_iter()
+        .filter(|sentence| sentence.function == "window")
+        .filter_map(|sentence| sentence.field.map(|(field, _)| field))
+        .filter(|field| !read(field))
+        .collect();
+    assert!(unread.is_empty(), "sentences no code reads: remove them\n{unread:?}");
 }
