@@ -1396,6 +1396,8 @@ def models_guided(now: dt.datetime) -> None:
     print("BJ. Settings: the summary set up in a few guided steps, a service's key tested at once (D95)")
     good, false = "sk-stand-in-good", "sk-stand-in-false"
     asked = []
+    # Set, the stand-in answers the good key with no model at all (ines' V5 of #971).
+    empty = []
 
     # The named services' stand-in (OpenRouter's routes): its key route, then its models — the false
     # key refused on both, as the services do (401).
@@ -1408,7 +1410,7 @@ def models_guided(now: dt.datetime) -> None:
             elif self.path.endswith("/key"):
                 status, body = 200, {"data": {"label": "stand-in"}}
             elif self.path.endswith("/models"):
-                status, body = 200, {"data": [{"id": "anthropic/claude-sonnet-4-5"}, {"id": "openai/gpt-4o-mini"}, {"id": "mistralai/mistral-7b-instruct:free"}]}
+                status, body = 200, {"data": [] if empty else [{"id": "anthropic/claude-sonnet-4-5"}, {"id": "openai/gpt-4o-mini"}, {"id": "mistralai/mistral-7b-instruct:free"}]}
             else:
                 status, body = 404, {}
             raw = json.dumps(body).encode()
@@ -1460,6 +1462,8 @@ def models_guided(now: dt.datetime) -> None:
               browser.execute_script(addresses) == [] and browser.find_element(By.ID, "minutes-advanced").get_attribute("aria-expanded") == "false",
               browser.execute_script(addresses))
         check("a service, before its key: no model offered", not browser.find_element(By.ID, "minutes-models").is_displayed())
+        # Nothing to save before a model is listed: its « Enregistrer » not offered (#968, ines' V4).
+        check("a service, before its key: its « Enregistrer » not offered, nothing to save", not browser.find_element(By.ID, "minutes-online-save").is_displayed())
         # A false key: refused at once, its cause said in a sentence, nothing of the service's own words (E4).
         choose(browser, "minutes-service", "0")
         browser.find_element(By.ID, "minutes-key").send_keys(false)
@@ -1475,6 +1479,18 @@ def models_guided(now: dt.datetime) -> None:
         browser.execute_script(drawn_again)
         wait_for(browser, lambda b: b.execute_script(anew), 5)
         check("drawn again by itself: the refusal still said, until the key is tried again", browser.execute_script(said) == TEST_CAUSES[0][1], browser.execute_script(said))
+        # A key taken by a service that lists no model: nothing to save, its « Enregistrer » not offered (#968, ines' V5).
+        empty.append(True)
+        key = browser.find_element(By.ID, "minutes-key")
+        key.clear()
+        key.send_keys(good)
+        del asked[:]
+        press(browser, "minutes-key-test")
+        answered = wait_for(browser, lambda b: ["/api/v1/models", good] in asked, 10)
+        time.sleep(1)
+        bare = [browser.find_element(By.ID, i).is_displayed() for i in ("minutes-models", "minutes-online-save")]
+        check("a key taken, no model listed by the service: no list, its « Enregistrer » not offered", answered and bare == [False, False], [answered, bare])
+        empty.clear()
         # The good one: taken, the service's models listed as people say them.
         key = browser.find_element(By.ID, "minutes-key")
         key.clear()
@@ -1513,6 +1529,10 @@ def models_guided(now: dt.datetime) -> None:
         press(browser, "minutes-advanced")
         unfolded = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-address").is_displayed(), 3)
         check("« Avancé » unfolded: an address of one's own, and a model named by hand", unfolded and browser.find_element(By.ID, "minutes-model").is_displayed())
+        # One « Enregistrer » at a time, as the transcription's (#860): unfolded, its own alone (#968).
+        saves = "return ['minutes-online-save', 'minutes-own-save'].map(id => { const s = document.getElementById(id); return !!s && s.getClientRects().length > 0; })"
+        check("« Avancé » unfolded: its own « Enregistrer » alone, the service's no longer offered (#968)",
+              browser.execute_script(saves) == [False, True], browser.execute_script(saves))
         shot_themed(browser, "d95-models-service-light", "light")
         shot_themed(browser, "d95-models-service-dark", "dark")
         # A model the service does not list — a new release, an id of its own —: typed by hand under
@@ -1531,6 +1551,7 @@ def models_guided(now: dt.datetime) -> None:
                           and b.find_element(By.ID, "minutes-service").get_attribute("value") == "0"
                           and b.execute_script(options, "minutes-models") == ["New Model"], 5)
         check("read again: that service, the model typed said as people say it", reread, browser.execute_script(options, "minutes-models"))
+        check("« Avancé » folded: the service's « Enregistrer » alone (#968)", browser.execute_script(saves) == [True, False], browser.execute_script(saves))
     for server in servers:
         server.shutdown()
 
@@ -7909,10 +7930,12 @@ def unsaved_choice_kept(now: dt.datetime) -> None:
     chosen, its note said, when another control is saved and the page drawn anew; « Enregistrer » then
     saves the one chosen, never the one before."""
     print("CA. Settings: a model chosen and not yet saved, kept when another control is saved (#948)")
+    # What the stand-in Ollama lists: a model it no longer has drops out of it (ines' N9).
+    listed = ["qwen3:14b", "mistral:7b"]
 
     class Tags(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
-            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            body = json.dumps({"models": [{"name": name} for name in listed]}).encode()
             self.send_response(200)
             self.send_header("content-length", str(len(body)))
             self.end_headers()
@@ -7947,6 +7970,16 @@ def unsaved_choice_kept(now: dt.datetime) -> None:
             browser.find_element(By.ID, "minutes-save").click()
             kept = wait_for(browser, lambda b: 'minutes_model = "mistral:7b"' in window.file.read_text(), 5)
             check("Settings: then « Enregistrer » saves the one chosen, never the one before (#948)", kept, window.file.read_text())
+            # Chosen, not saved, then gone from Ollama before the next drawing: the saved one shown, no note (#963, ines' N9).
+            wait_for(browser, lambda b_: b_.find_elements(By.ID, "minutes") and len(Select(b_.find_element(By.ID, "minutes")).options) == 2, 5)
+            choose(browser, "minutes", "qwen3:14b")
+            listed.remove("qwen3:14b")
+            browser.execute_script("window.__oldMinutes = document.getElementById('minutes'); refresh()")
+            wait_for(browser, lambda b_: b_.execute_script("return !window.__oldMinutes.isConnected && !!document.getElementById('minutes')"), 5)
+            gone = browser.execute_script("const m = document.getElementById('minutes'), n = document.getElementById('minutes-unsaved');"
+                                          " return {value: m ? m.value : null, note: !!n && n.getClientRects().length > 0}")
+            check("Settings: a model chosen and not saved, gone from Ollama at the next drawing: the saved one shown, its note gone (#963)",
+                  gone == {"value": "mistral:7b", "note": False}, gone)
     finally:
         tags.shutdown()
 
@@ -8051,11 +8084,15 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
             # Saved for the service: no longer kept in the page; the field says a key is kept (#963).
             press(browser, "minutes-key-test")
             listed = wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-models").is_displayed(), 10)
-            # Unfolded again on B, a key typed for B: the service's « Enregistrer », still offered above, saves
-            # the service's key alone (#964).
+            # Unfolded again on B, a key typed for B: the service's « Enregistrer » is not offered there (#968);
+            # folded, it saves the service's key alone (#964).
             press(browser, "minutes-advanced")
             wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
             browser.find_element(By.ID, "minutes-key").send_keys(own)
+            offered = browser.execute_script("const s = document.getElementById('minutes-online-save'); return s.getClientRects().length > 0")
+            check("the summary's « Avancé » unfolded on another host: the service's « Enregistrer » not offered (#968)", not offered)
+            press(browser, "minutes-advanced")
+            wait_for(browser, lambda b_: not b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
             browser.execute_script("window.__old = document.getElementById('minutes-key')")
             press(browser, "minutes-online-save")
             wait_for(browser, lambda b_: f'minutes_provider = "{a}"' in window.file.read_text(), 5)
