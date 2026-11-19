@@ -7660,7 +7660,8 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
                   [empty, heard, [key == zero for _, key in asked]])
             choose(browser, "minutes-service", "0")
             check("the summary: back to the first service, the key typed for it is back (#964)", browser.execute_script(value, "minutes-key", zero))
-            # (3) « Avancé »: an address of one's own on another host.
+            # (3) « Avancé »: an address of one's own on another host. Each sequence reads its own gestures alone.
+            browser.execute_script("window.keysSent = []")
             press(browser, "minutes-advanced")
             wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
             browser.execute_script(address_to, "minutes-address", b)
@@ -7671,7 +7672,7 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
             press(browser, "minutes-key-test")
             heard = wait_for(browser, lambda b_: len(asked) > 0, 10)
             check("the summary's « Avancé » on another host, a key typed for it: « Vérifier la clé » sends the service nothing typed for that host (#964)",
-                  heard and not any(key == own for _, key in asked) and browser.execute_script(sent, "minutes_models", zero)[-1:] == [True],
+                  heard and not any(key == own for _, key in asked) and browser.execute_script(sent, "minutes_models", own) == [False],
                   [heard, [key == own for _, key in asked]])
             browser.execute_script(address_to, "minutes-address", "")
             back = browser.execute_script(value, "minutes-key", zero)
@@ -7739,6 +7740,7 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
                   saved and forgotten and browser.execute_script(sent, "transcription_saved", hears) == [True] and hears not in window.file.read_text(),
                   [saved, forgotten])
             # Its « Avancé »: an address of one's own on another host, saved there: nothing typed for the service handed with it.
+            browser.execute_script("window.keysSent = []")
             press(browser, "transcription-advanced")
             wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-provider").is_displayed(), 3)
             browser.execute_script(address_to, "transcription-provider", b)
@@ -7748,13 +7750,13 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
             press(browser, "transcription-key-test")
             heard = wait_for(browser, lambda b_: len(asked) > 0, 10)
             check("the transcription's « Avancé » on another host, a key typed for it: « Vérifier la clé » sends the service nothing typed for that host (#964)",
-                  heard and not any(key == own for _, key in asked) and browser.execute_script(sent, "transcription_models", hears)[-1:] == [True],
+                  heard and not any(key == own for _, key in asked) and browser.execute_script(sent, "transcription_models", own) == [False],
                   [heard, [key == own for _, key in asked]])
             browser.find_element(By.ID, "transcription-model").send_keys("whisper-1")
             browser.execute_script("document.getElementById('transcription-own-save').click()")
             saved = wait_for(browser, lambda b_: f'transcription_provider = "{b}"' in window.file.read_text(), 5)
             check("the transcription's « Avancé », an address on another host: its key field empty, saved with no key typed for the service (#964)",
-                  other and saved and browser.execute_script(sent, "transcription_saved", hears)[-1:] == [False] and hears not in window.file.read_text(),
+                  other and saved and browser.execute_script(sent, "transcription_saved", hears) == [False] and hears not in window.file.read_text(),
                   [other, saved, browser.execute_script(sent, "transcription_saved", hears)])
     finally:
         for server in servers:
