@@ -193,11 +193,11 @@ click 3
 check is "$(labels)" "Ouvrir Kitokey|Arrêter l’enregistrement|Transcrire le dernier enregistrement|Rédiger le compte rendu de la dernière réunion|Quitter Kitokey"
 check is "$(cat "$work/sessions/given")" "record $work/sessions"
 check is "$(titles 'Enregistrement en cours')" 1
-check is "$(titles 'Aucun son venant de la réunion')" 1
+check is "$(titles 'Aucun son de la réunion')" 1
 check is "$(titles 'Micro changé')" 1
 check grep -q $'Enregistré maintenant\u00a0: Casque Mic' "$work/notified"
-check is "$(titles 'Le son de la réunion n’est plus enregistré pour l’instant')" 1
-check grep -q 'Votre micro est toujours enregistré, et une sortie branchée' "$work/notified"
+check is "$(titles 'Le son de la réunion n’est plus enregistré')" 1
+check grep -q 'Votre micro reste enregistré' "$work/notified"
 check is "$(titles 'Le son de la réunion est de nouveau enregistré')" 1
 click 3
 check is "$(cat "$work/sessions/told")" "stop"
@@ -206,7 +206,7 @@ check is "$(labels)" "Ouvrir Kitokey|Démarrer un enregistrement|Transcrire le d
 # seen, it is told with its length (M, below).
 check is "$(titles 'Enregistrement arrêté')" 0
 check test ! -e "$work/sessions/heard"
-check is "$(grep -c 'La transcription suit' "$work/notified")" 0
+check is "$(grep -c 'Transcription en cours.' "$work/notified")" 0
 
 scenario B "quit while recording: the recording is stopped first, then Kitokey leaves"
 click 3; rm -f "$work/sessions/told"
@@ -235,7 +235,7 @@ printf '#!/bin/sh\necho "kitokey-capture: no source could be opened: nothing to 
 start en_GB.UTF-8 "transcript = false" "$work/refuses"
 click 3
 check is "$(titles 'Kitokey cannot record')" 2
-check is "$(titles 'The recording stopped by itself')" 0
+check is "$(titles 'Recording stopped unexpectedly')" 0
 check grep -q 'Installing Kitokey again puts it back.' "$work/notified"
 # What the program said is the log's, never a notification's (D29).
 check is "$(grep -c 'nothing to record' "$work/notified")" 0
@@ -261,7 +261,7 @@ scenario F "the transcript follows the stop; a failed one is made again from the
 start en_GB.UTF-8 "reminder = false\nmodel = \"$work/model.bin\"\nlog = \"debug\"" "$work/kitokey-capture"
 click 3; click 3; sleep 1
 check is "$(head -1 "$work/sessions/log-level")" "debug"
-check grep -q '32 min recorded. The transcript follows.' "$work/notified"
+check grep -q '32 min recorded. Transcribing now.' "$work/notified"
 check is "$(cat "$work/sessions/heard")" "$work/sessions/2026-10-13_14-05 --model $work/model.bin"
 check is "$(titles 'Transcript ready')" 1
 check test -s "$work/sessions/2026-10-13_14-05/transcript.jsonl"
@@ -425,7 +425,7 @@ check test -s "$work/sessions/2026-10-13_14-05/minutes.md"
 check is "$(tail -1 "$work/summarised")" "$work/sessions/2026-10-13_14-05 --provider http://127.0.0.1:9/v1 --model mistral"
 check is "$(titles 'Compte rendu prêt')" 3
 check is "$(( $(titles 'Enregistrement en cours') - reminded ))/$(( $(titles 'Enregistrement arrêté') - ended ))/$(( $(titles 'Transcription prête') - heard ))" "1/1/0"
-check grep -Eq '[0-9] (s|min) enregistrées?\. La transcription suit\.' "$work/notified"
+check grep -Eq '[0-9] (s|min) enregistrées?\. Transcription en cours\.' "$work/notified"
 click 6
 
 scenario S "a call takes a microphone in another application: offered once, named; never while recording, nor with offers off (D30)"

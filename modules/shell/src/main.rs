@@ -43,7 +43,9 @@ use kitokey_shell::{
     registry,
     sessions::{self, Listed},
     settings::{self, After, Appearance, Engine, KeepAudio, Log, Settings},
-    sound_check, speech, spoken,
+    sound_check, speech,
+    speeds::{self, Speeds, Step},
+    spoken,
     summarising::{self, Summarising},
     transcription::{self, Hearer, Made, Transcription},
     trial,
@@ -187,6 +189,14 @@ struct Shell {
     /// The meeting last stopped, said by the bar at rest with its stage until its page is opened or
     /// another recording starts (D92); and whether its last step has ended, written or failed.
     last: Mutex<Option<(PathBuf, bool)>>,
+    /// Whether the transcript being made is followed by its summary: the page's one bar has two parts (D92).
+    hearing_then: Mutex<bool>,
+    /// Meetings whose transcript is written and whose summary follows, not yet in line: between the two
+    /// steps, the page's bar says the summary's (D92).
+    between: Mutex<std::collections::HashSet<PathBuf>>,
+    /// How fast this machine made each step, by model, as last measured: what the page's bar says is
+    /// left (D92). Kept beside the settings.
+    speeds: Mutex<Speeds>,
     /// What had left before a meeting was said confidential, and to which host: said on its page
     /// while it stays so, until Kitokey quits (D60).
     left: Mutex<HashMap<PathBuf, Vec<Left>>>,
@@ -576,6 +586,9 @@ fn main() {
                 promoted_minutes: Mutex::default(),
                 stopped: Mutex::default(),
                 last: Mutex::default(),
+                hearing_then: Mutex::default(),
+                between: Mutex::default(),
+                speeds: Mutex::new(speeds_file().map(|file| speeds::read(&file)).unwrap_or_default()),
                 left: Mutex::default(),
                 ollama_waiting: Mutex::default(),
                 fetching: Mutex::new(false),
@@ -612,6 +625,7 @@ fn main() {
             found(app.handle());
             shortcut(app.handle());
             offers(app.handle());
+            ends_on_sigterm(app.handle());
             // The audio kept longer than the settings say goes to the trash, now and every hour.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -641,6 +655,73 @@ fn main() {
         }
     });
 }
+
+/// SIGTERM — the session ending, the system shutting down — ends Kitokey as « Annuler » ends a making
+/// (D92): what is being made stopped, its program's group with it, then Kitokey leaves, within two
+/// seconds, its single-instance name released (#961). Unhandled, SIGTERM ended Kitokey alone, and a
+/// making's group, its own (`process_group`), lived on, orphaned. A recording is left as it is: its
+/// program is the session's, never stopped because the shell was.
+#[cfg(unix)]
+fn ends_on_sigterm(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut terminated = match signal(SignalKind::terminate()) {
+            Ok(terminated) => terminated,
+            Err(error) => {
+                tracing::warn!(detail = %error, "shell.sigterm_unheard");
+                return;
+            }
+        };
+        terminated.recv().await;
+        tracing::info!("shell.terminated");
+        let shell = app.state::<Shell>();
+        let tokens: Vec<Cancel> = [&shell.transcript_token, &shell.minutes_token]
+            .into_iter()
+            .filter_map(|slot| slot.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone())
+            .chain(
+                [&shell.promoted_transcript, &shell.promoted_minutes]
+                    .into_iter()
+                    .filter_map(|slot| {
+                        slot.lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .as_ref()
+                            .map(|(_, token)| token.clone())
+                    }),
+            )
+            .collect();
+        // The groups being made, read before they are cancelled. A token stops its program on a thread
+        // of its own — TERM, a second's grace, KILL — and returns at once: Kitokey waits for those groups
+        // to be empty, within 1.8 s, or what was deaf to TERM outlives it (s961g2).
+        let groups: Vec<i32> = [
+            shell
+                .transcription
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_ref()
+                .and_then(Transcription::group),
+            shell
+                .minuting
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_ref()
+                .and_then(Summarising::group),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        tokens.iter().for_each(Cancel::cancel);
+        let until = Instant::now() + Duration::from_millis(1800);
+        // SAFETY: signal 0 sends nothing: it asks whether a group still holds a process.
+        while Instant::now() < until && groups.iter().any(|&group| unsafe { libc::kill(-group, 0) } == 0) {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        app.exit(0);
+    });
+}
+
+#[cfg(not(unix))]
+fn ends_on_sigterm(_: &AppHandle) {}
 
 /// Another application taking a microphone — a call starting — is offered to be recorded, by a
 /// notification naming it: never a window (D17), never while recording, never with offers off;
@@ -1813,8 +1894,17 @@ struct ModelsOffered {
     unreadable: Option<Told>,
 }
 
+/// Read off the window's thread: Ollama asked for its models may take its two seconds, and a meeting's
+/// page asks it as it opens (D93) — never the window frozen meanwhile.
 #[tauri::command]
-fn models_offered(shell: State<'_, Shell>, name: Option<String>) -> Result<ModelsOffered, Told> {
+async fn models_offered(app: AppHandle, name: Option<String>) -> Result<ModelsOffered, Told> {
+    let reading = app.clone();
+    tauri::async_runtime::spawn_blocking(move || models_offered_now(&reading.state::<Shell>(), name))
+        .await
+        .map_err(|error| app.state::<Shell>().told(Failure::Unexpected, error))?
+}
+
+fn models_offered_now(shell: &Shell, name: Option<String>) -> Result<ModelsOffered, Told> {
     // Settings unreadable: offered from those in memory, and said — the panel still opens.
     let (settings, unreadable) = match shell.reread() {
         Ok(settings) => (settings, None),
@@ -1822,7 +1912,7 @@ fn models_offered(shell: State<'_, Shell>, name: Option<String>) -> Result<Model
     };
     let (mut chosen, gone, confidential) = match &name {
         Some(name) => {
-            let folder = session_folder(&shell, name)?;
+            let folder = session_folder(shell, name)?;
             (
                 meeting_models::read(&folder),
                 gone_of(&settings, &folder),
@@ -3165,8 +3255,11 @@ fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<
     let shell = app.state::<Shell>();
     // What says it is being written goes first, the meeting freed last: nothing started in
     // between is left without its model, nor the tray's entry greyed off.
-    shell.minutes_by.lock().unwrap().take();
+    let by = shell.minutes_by.lock().unwrap().take();
     shell.minutes_host.lock().unwrap().take();
+    if failed.is_none() {
+        measured(&shell, Step::Minutes, folder, by.map(|(model, _, since)| (model, since)));
+    }
     if let Some((why, cause)) = failed {
         let why = if why.trim().is_empty() {
             "kitokey-summary stopped without saying why".to_string()
@@ -3255,6 +3348,8 @@ struct Makings {
     minutes: Option<Making>,
     minutes_waiting: Vec<String>,
     transcript: Option<Hearing>,
+    /// Between their transcript and their summary, not yet in line (D92).
+    between: Vec<String>,
     transcripts_waiting: Vec<String>,
     /// The line waits for the default Whisper model, offered in the menu, or coming.
     model_needed: bool,
@@ -3278,6 +3373,9 @@ struct Makings {
     ollama_recommended: &'static str,
     /// What the user last cancelled of a meeting, by its name: `transcript` or `minutes` (D92).
     stopped: HashMap<String, &'static str>,
+    /// The minutes left of a meeting's making, by its name, from the speeds measured here: none
+    /// measured for one of its steps, or thirty seconds or less, none (D92).
+    left: HashMap<String, u64>,
 }
 
 #[derive(serde::Serialize)]
@@ -3292,6 +3390,8 @@ struct Hearing {
     name: String,
     model: String,
     seconds: u64,
+    /// Its summary follows it (D92).
+    then: bool,
 }
 
 #[derive(serde::Serialize)]
@@ -3327,9 +3427,25 @@ fn makings(shell: State<'_, Shell>) -> Makings {
             .collect();
         (failed, causes)
     };
+    // Read in the order a meeting goes through them — its transcript, between the two steps, its
+    // summary —, each set before the one before is cleared: a meeting made is never read in none (D92).
+    let transcript = shell
+        .hearing
+        .lock()
+        .unwrap()
+        .as_deref()
+        .zip(shell.hearing_by.lock().unwrap().clone())
+        .map(|(folder, (model, since))| Hearing {
+            name: named(folder),
+            model,
+            seconds: since.elapsed().as_secs(),
+            then: *shell.hearing_then.lock().unwrap(),
+        });
+    let between = shell.between.lock().unwrap().iter().map(|folder| named(folder)).collect();
     let writing = shell.writing_minutes.lock().unwrap().clone();
     let by = shell.minutes_by.lock().unwrap().clone();
     let settings = shell.settings();
+    let left = time_left(&shell, &settings);
     let (transcripts_waiting, model_needed) = {
         let waiting = shell.waiting.lock().unwrap();
         let names = waiting.iter().map(|(folder, ..)| named(folder)).collect();
@@ -3350,17 +3466,8 @@ fn makings(shell: State<'_, Shell>) -> Makings {
             .iter()
             .map(|queued| named(&queued.folder))
             .collect(),
-        transcript: shell
-            .hearing
-            .lock()
-            .unwrap()
-            .as_deref()
-            .zip(shell.hearing_by.lock().unwrap().clone())
-            .map(|(folder, (model, since))| Hearing {
-                name: named(folder),
-                model,
-                seconds: since.elapsed().as_secs(),
-            }),
+        transcript,
+        between,
         transcripts_waiting,
         model_needed,
         // The default model coming, not another: one fetch at a time, said as such (D37).
@@ -3413,7 +3520,80 @@ fn makings(shell: State<'_, Shell>) -> Makings {
             .iter()
             .map(|(folder, what)| (named(folder), *what))
             .collect(),
+        left,
     }
+}
+
+/// Where the speeds measured here are kept: beside the settings (D92).
+fn speeds_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("speeds.json"))
+}
+
+/// A step written, measured: the seconds it took for each second of its meeting's audio, kept for its
+/// model — nothing of the meeting (D92). Unwritten, the speed stays for this run alone.
+fn measured(shell: &Shell, step: Step, folder: &Path, by: Option<(String, Instant)>) {
+    let (Some((model, since)), Some(audio)) = (by, sessions::length(folder)) else {
+        return;
+    };
+    let mut kept = shell.speeds.lock().unwrap();
+    kept.measured(step, &model, since.elapsed().as_secs_f64(), audio);
+    if let Some(file) = speeds_file()
+        && let Err(error) = speeds::write(&file, &kept)
+    {
+        tracing::info!(detail = %error, "shell.speeds_unwritten");
+    }
+}
+
+/// A step still ahead of a meeting: which, by what model, and the seconds it has run, if begun.
+type Ahead = (Step, String, Option<f64>);
+
+/// The minutes left of each meeting being made, from its length and the speeds measured here: its
+/// step running less what it has run, and its summary when one follows (D92). One step with no speed
+/// kept, or the model of its summary not known yet — a confidential meeting's is chosen as it starts —:
+/// no number, never half of one.
+fn time_left(shell: &Shell, settings: &Settings) -> HashMap<String, u64> {
+    let kept = shell.speeds.lock().unwrap().clone();
+    let next = |folder: &Path| {
+        if confidential::marked(folder) {
+            return None;
+        }
+        let listed = settings::whisper_models(&models_folder(), settings);
+        meeting_models::applied(settings, &meeting_models::read(folder), &listed)
+            .settings
+            .minutes_model
+    };
+    let mut making: Vec<(PathBuf, Option<Vec<Ahead>>)> = Vec::new();
+    let hearing = shell.hearing.lock().unwrap().clone();
+    let hearing_by = shell.hearing_by.lock().unwrap().clone();
+    let then = *shell.hearing_then.lock().unwrap();
+    if let (Some(folder), Some((model, since))) = (hearing, hearing_by) {
+        let heard = (Step::Transcript, model, Some(since.elapsed().as_secs_f64()));
+        let steps = if then {
+            next(&folder).map(|minutes| vec![heard, (Step::Minutes, minutes, None)])
+        } else {
+            Some(vec![heard])
+        };
+        making.push((folder, steps));
+    }
+    let between: Vec<PathBuf> = shell.between.lock().unwrap().iter().cloned().collect();
+    for folder in between {
+        let steps = next(&folder).map(|minutes| vec![(Step::Minutes, minutes, None)]);
+        making.push((folder, steps));
+    }
+    let writing = shell.writing_minutes.lock().unwrap().clone();
+    let minutes_by = shell.minutes_by.lock().unwrap().clone();
+    if let (Some(folder), Some((model, _, since))) = (writing, minutes_by) {
+        making.push((folder, Some(vec![(Step::Minutes, model, Some(since.elapsed().as_secs_f64()))])));
+    }
+    making
+        .into_iter()
+        .filter_map(|(folder, steps)| {
+            let steps = steps?;
+            let steps: Vec<(Step, &str, Option<f64>)> = steps.iter().map(|(step, model, ran)| (*step, model.as_str(), *ran)).collect();
+            let minutes = speeds::said(kept.left(&steps, sessions::length(&folder)?)?)?;
+            Some((named(&folder), minutes))
+        })
+        .collect()
 }
 
 /// Minutes made again with a model, asked before the user agreed to send them.
@@ -3446,7 +3626,9 @@ fn look_again(app: &AppHandle) {
 /// The same, `agreed_now` naming the host the user just agreed to send this meeting to, once:
 /// the gate is passed only if that is still the host the settings name as it is read here.
 fn write_minutes(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>, chosen: Option<(String, String)>) {
-    write_minutes_from(app, folder, agreed_now, chosen, false, Cancel::default());
+    write_minutes_from(app, folder.clone(), agreed_now, chosen, false, Cancel::default());
+    // Its summary written, in line, or set aside: no longer between the two steps (D92).
+    app.state::<Shell>().between.lock().unwrap().remove(&folder);
 }
 
 /// `from_line`: taken from the line, where nobody asked just now — an agreement it needs is set
@@ -4051,8 +4233,11 @@ enum Heard {
 /// said stopped when its own token was cancelled.
 fn heard(shell: &Shell, folder: &Path, made: &Made, cancelled: bool) -> Heard {
     shell.hearing.lock().unwrap().take();
-    shell.hearing_by.lock().unwrap().take();
+    let by = shell.hearing_by.lock().unwrap().take();
     shell.hearing_host.lock().unwrap().take();
+    if matches!(made, Made::Written(_)) {
+        measured(shell, Step::Transcript, folder, by);
+    }
     let here = shell.heard_here.lock().unwrap().remove(folder);
     // Written all the same, as it was cancelled: written it is — never a whole one thrown away.
     let cancelled = cancelled && !matches!(made, Made::Written(_));
@@ -4210,12 +4395,18 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
     // whichever comes first takes it, the other finds nothing.
     *shell.redoing.lock().unwrap() = previous.clone().map(|previous| (current.clone(), previous));
     hearing(&shell, &folder, &hearer);
+    *shell.hearing_then.lock().unwrap() = minutes_after;
     drop(running);
     transcribing(app, true);
     let app = app.clone();
     std::thread::spawn(move || {
         let made = made.recv().unwrap_or(Made::Failed(String::new()));
         let shell = app.state::<Shell>();
+        // Written, its summary following: between the two steps before the transcript is said ended (D92).
+        let chained = minutes_after && matches!(made, Made::Written(_)) && !cancel.cancelled();
+        if chained {
+            shell.between.lock().unwrap().insert(folder.clone());
+        }
         // Ended and said so at once: none begun in between loses what it says of itself.
         let mut running = shell.transcription.lock().unwrap();
         running.take();
@@ -4247,6 +4438,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         // Ended for its meeting said confidential: made again here, first in line. Cancelled:
         // nothing told — the earlier one not put back excepted —, nothing made after it.
         if here != Heard::Ended {
+            shell.between.lock().unwrap().remove(&folder);
             if let (Heard::Cancelled, Some((name, not_put_back))) = (&here, kept_beside) {
                 tell(&app, &words::transcript_kept_beside(shell.language(), &name, not_put_back));
             }
@@ -4390,12 +4582,22 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
     *running = Some(transcription);
     *shell.transcript_token.lock().unwrap() = Some(cancel.clone());
     hearing(&shell, &folder, &hearer);
+    // Its summary follows, as the settings say now: the page's one bar has two parts (D92).
+    *shell.hearing_then.lock().unwrap() = settings.after == settings::After::Minutes;
     transcribing(app, true);
     let heard_folder = folder;
     let app = app.clone();
     std::thread::spawn(move || {
         let made = made.recv().unwrap_or(Made::Failed(String::new()));
         let shell = app.state::<Shell>();
+        // The minutes follow, when the settings say so — as they are now. Written, they do: between
+        // the two steps before the transcript is said ended (D92).
+        let follows = matches!(made, Made::Written(_))
+            && !cancel.cancelled()
+            && shell.reread().is_ok_and(|settings| settings.after == settings::After::Minutes);
+        if follows {
+            shell.between.lock().unwrap().insert(heard_folder.clone());
+        }
         let mut running = shell.transcription.lock().unwrap();
         running.take();
         shell.transcript_token.lock().unwrap().take();
@@ -4413,6 +4615,7 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
         // Ended for its meeting said confidential: made again here, first in line; cancelled,
         // nothing told, nothing made after it.
         if here != Heard::Ended {
+            shell.between.lock().unwrap().remove(&heard_folder);
             return transcribe_next(&app);
         }
         // Written all the same after « Annuler »: kept, being whole, but nothing follows it — no
@@ -4423,9 +4626,9 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
         let notice = words::made(&made, shell.language());
         match made {
             Made::Written(folder) => {
-                // The minutes follow, when the settings say so — as they are now; then their
+                // The minutes follow, when the settings said so as it ended; then their
                 // notification alone says the meeting is made (D44, D92).
-                if shell.reread().is_ok_and(|settings| settings.after == settings::After::Minutes) {
+                if follows {
                     make_minutes(&app, folder);
                 } else {
                     tell_made(&app, &notice, &folder, true);

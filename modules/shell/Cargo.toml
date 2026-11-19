@@ -23,7 +23,7 @@ hyper-util = { version = "0.1.21", features = ["tokio"] }
 http-body-util = "0.1.5"
 bytes = "1.12.1"
 futures-util = "0.3.34"
-tokio = { version = "1.53.2", features = ["rt", "net", "time", "fs", "io-util", "sync"] }
+tokio = { version = "1.53.2", features = ["rt", "net", "time", "fs", "io-util", "sync", "signal"] }
 getrandom = "0.3.4"
 sha2 = "0.10.9"
 sys-locale = "0.3.2"

@@ -188,46 +188,43 @@ pub fn of(said: &Said, reminder: bool, language: Language) -> Option<Notice> {
         (Said::Heard(_) | Said::Level(..) | Said::MicrophoneBack, _) => return None,
         // The microphone is named, so that one other than the call's shows at once.
         (Said::Started(_, microphone, _), English) => {
-            let named = microphone
-                .as_ref()
-                .map(|name| format!("Microphone recorded: {name}. "))
-                .unwrap_or_default();
+            let named = microphone.as_ref().map(|name| format!("Microphone: {name}. ")).unwrap_or_default();
             return notice(
                 "Recording",
-                format!("{named}Tell the participants that this meeting is being recorded."),
+                format!("{named}Remember to tell participants this meeting is being recorded."),
             );
         }
         (Said::Started(_, microphone, _), French) => {
-            let named = microphone
-                .as_ref()
-                .map(|name| format!("Micro enregistré\u{a0}: {name}. "))
-                .unwrap_or_default();
+            let named = microphone.as_ref().map(|name| format!("Micro\u{a0}: {name}. ")).unwrap_or_default();
             return notice(
                 "Enregistrement en cours",
-                format!("{named}Prévenez les participants que cette réunion est enregistrée."),
+                format!("{named}Pensez à prévenir les participants que la réunion est enregistrée."),
             );
         }
         (Said::Unavailable(Source::Me, _), English) => {
-            ("Your microphone is not recorded for now", "The meeting’s sound is still recorded.")
+            ("Your microphone isn’t being recorded", "The meeting audio is still being recorded.")
         }
         (Said::Unavailable(Source::Me, _), French) => (
-            "Votre micro n’est pas enregistré pour l’instant",
-            "Le son de la réunion est toujours enregistré.",
+            "Votre micro n’est pas enregistré",
+            "Le son de la réunion, lui, est bien enregistré.",
         ),
         (Said::MicrophoneGone, English) => (
-            "The microphone you chose is not there",
-            "Your microphone is recorded as on Auto for now, and the one you chose as soon as it is back.",
+            "Chosen microphone not found",
+            "Kitokey is using the default microphone and will switch back as soon as yours is reconnected.",
         ),
         (Said::MicrophoneGone, French) => (
-            "Le micro choisi n’est pas là",
-            "Votre micro est enregistré comme sur Auto pour l’instant, et celui choisi dès qu’il revient.",
+            "Micro choisi introuvable",
+            "Kitokey utilise le micro par défaut et reprendra le vôtre dès qu’il sera rebranché.",
         ),
-        (Said::Unavailable(Source::Others, _), English) => ("The meeting’s sound is not recorded", "Your microphone is still recorded."),
-        (Said::Unavailable(Source::Others, _), French) => {
-            ("Le son de la réunion n’est pas enregistré", "Votre micro est toujours enregistré.")
+        (Said::Unavailable(Source::Others, _), English) => {
+            ("Meeting audio isn’t being recorded", "Your microphone is still being recorded.")
         }
+        (Said::Unavailable(Source::Others, _), French) => (
+            "Le son de la réunion n’est pas enregistré",
+            "Votre micro, lui, est bien enregistré.",
+        ),
         // The device recorded changed (D31): what is recorded now is named.
-        (Said::Moved(Source::Me, Some(name)), English) => return notice("Microphone changed", format!("Now recorded: {name}.")),
+        (Said::Moved(Source::Me, Some(name)), English) => return notice("Microphone changed", format!("Now recording from {name}.")),
         (Said::Moved(Source::Me, Some(name)), French) => return notice("Micro changé", format!("Enregistré maintenant\u{a0}: {name}.")),
         (Said::Moved(Source::Others, Some(name)), English) => {
             return notice("Sound output changed", format!("The meeting’s sound is now recorded from {name}."));
@@ -238,50 +235,41 @@ pub fn of(said: &Said, reminder: bool, language: Language) -> Option<Notice> {
                 format!("Le son de la réunion est maintenant enregistré depuis {name}."),
             );
         }
-        (Said::Moved(Source::Me, None), English) => (
-            "Microphone changed",
-            "Your microphone is still recorded, from the one your computer uses now.",
-        ),
+        (Said::Moved(Source::Me, None), English) => ("Microphone changed", "Now recording from your computer’s current microphone."),
         (Said::Moved(Source::Me, None), French) => (
             "Micro changé",
-            "Votre micro est toujours enregistré, depuis celui qu’utilise maintenant votre ordinateur.",
+            "Kitokey enregistre désormais le micro utilisé par votre ordinateur.",
         ),
         (Said::Moved(Source::Others, None), English) => (
             "Sound output changed",
-            "The meeting’s sound is still recorded, from the output your computer uses now.",
+            "Meeting audio is now recorded from your computer’s current output.",
         ),
         (Said::Moved(Source::Others, None), French) => (
             "Sortie audio changée",
-            "Le son de la réunion est toujours enregistré, depuis la sortie qu’utilise maintenant votre ordinateur.",
+            "Le son de la réunion est désormais enregistré depuis la sortie actuelle de votre ordinateur.",
         ),
         // None left: that side, and nothing of the other, which may have none either. Of the
         // microphone, never why: the system took it away, or a call let go of it (D66).
-        (Said::Lost(Source::Me), English) => ("Your microphone is not recorded for now", "The recording goes on."),
-        (Said::Lost(Source::Me), French) => ("Votre micro n’est pas enregistré pour l’instant", "L’enregistrement continue."),
+        (Said::Lost(Source::Me), English) => ("Your microphone isn’t being recorded", "Recording continues."),
+        (Said::Lost(Source::Me), French) => ("Votre micro n’est pas enregistré", "L’enregistrement continue."),
         (Said::Lost(Source::Others), English) => (
-            "The meeting’s sound is not recorded for now",
-            "Your computer has no sound output left. An output plugged in is recorded at once; the recording goes on.",
+            "Meeting audio is no longer being recorded",
+            "Your computer has no audio output. Plug one in to resume; recording continues.",
         ),
         (Said::Lost(Source::Others), French) => (
-            "Le son de la réunion n’est plus enregistré pour l’instant",
-            "Votre ordinateur n’a plus de sortie audio. Une sortie branchée est enregistrée aussitôt\u{202f}; l’enregistrement continue.",
+            "Le son de la réunion n’est plus enregistré",
+            "Votre ordinateur n’a plus de sortie audio. Branchez-en une pour reprendre\u{202f}; l’enregistrement continue.",
         ),
         (Said::Nothing, _) => return sends_nothing(None, language),
-        (Said::Silent(Source::Me), English) => (
-            "No sound from your microphone",
-            "Nothing was heard for ten seconds. The recording goes on.",
-        ),
-        (Said::Silent(Source::Me), French) => (
-            "Votre micro ne capte aucun son",
-            "Rien n’a été entendu depuis dix secondes. L’enregistrement continue.",
-        ),
+        (Said::Silent(Source::Me), English) => ("No sound from your microphone", "Nothing for 10 seconds. Recording continues."),
+        (Said::Silent(Source::Me), French) => ("Aucun son de votre micro", "Rien depuis 10 secondes. L’enregistrement continue."),
         (Said::Silent(Source::Others), English) => (
             "No sound from the meeting",
-            "Nothing was heard for ten seconds: is the call playing on this device? The recording goes on.",
+            "Nothing for 10 seconds — is the call playing on this computer? Recording continues.",
         ),
         (Said::Silent(Source::Others), French) => (
-            "Aucun son venant de la réunion",
-            "Rien n’a été entendu depuis dix secondes\u{a0}: l’appel passe-t-il par cet appareil\u{202f}? L’enregistrement continue.",
+            "Aucun son de la réunion",
+            "Rien depuis 10 secondes\u{a0}: l’appel passe-t-il bien par cet ordinateur\u{202f}? L’enregistrement continue.",
         ),
         (Said::Stopped(_, seconds), English) => return notice("Recording stopped", format!("{} recorded.", length(*seconds))),
         (Said::Stopped(_, seconds), French) => {
@@ -295,17 +283,20 @@ pub fn of(said: &Said, reminder: bool, language: Language) -> Option<Notice> {
             return notice("Enregistrement arrêté", format!("{said} {agreed}."));
         }
         (Said::Failed(why), English) if detail(why).is_empty() => (
-            "The recording stopped by itself",
-            "The program that records ended without saying why. What was recorded is in the session’s folder.",
+            "Recording stopped unexpectedly",
+            "Something went wrong. Everything recorded so far is saved in the meeting’s folder.",
         ),
         (Said::Failed(why), French) if detail(why).is_empty() => (
-            "L’enregistrement s’est arrêté tout seul",
-            "Le programme d’enregistrement s’est terminé sans dire pourquoi. Ce qui a été enregistré est gardé dans le dossier de la réunion.",
+            "L’enregistrement s’est arrêté",
+            "Une erreur inattendue l’a interrompu. Ce qui a été enregistré est conservé dans le dossier de la réunion.",
         ),
-        (Said::Failed(_), English) => ("The recording stopped by itself", "What was recorded is in the session’s folder."),
+        (Said::Failed(_), English) => (
+            "Recording stopped unexpectedly",
+            "Everything recorded so far is saved in the meeting’s folder.",
+        ),
         (Said::Failed(_), French) => (
-            "L’enregistrement s’est arrêté tout seul",
-            "Ce qui a été enregistré est gardé dans le dossier de la réunion.",
+            "L’enregistrement s’est arrêté",
+            "Ce qui a été enregistré est conservé dans le dossier de la réunion.",
         ),
     };
     notice(title, body.to_string())
@@ -476,6 +467,8 @@ pub struct Window {
     /// recording stops. At most: about 24 characters. Placeholders: none.
     pub record_stopping: &'static str,
     pub redo_cancel: &'static str,
+    /// Shows: Settings, beside a setting just saved. When: for a moment after it is. At most: one
+    /// line. Placeholders: none.
     pub saved: &'static str,
     /// Shows: the recording bar, as a help line. When: the user wanted the meeting confidential
     /// from the bar, but it is not. At most: no limit. Placeholders: none.
@@ -488,6 +481,8 @@ pub struct Window {
     /// Placeholders: none.
     pub buy: &'static str,
     /// Settings on a trial licence (D83): the name of what they say is left of it (`trial_left`).
+    /// Shows: Settings, its first card, its label, beside what is left (`trial_left`). When: on a
+    /// trial licence (D83). At most: one line. Placeholders: none.
     pub trial: &'static str,
     /// Shows: the sidebar, as a field's placeholder. When: search field over the meeting list.
     /// At most: about 26 characters. Placeholders: none.
@@ -576,91 +571,204 @@ pub struct Window {
     /// Shows: the sidebar, as a name for a screen reader. When: icon link to Settings (tooltip) and
     /// Settings page title. At most: no limit. Placeholders: none.
     pub settings: &'static str,
+    /// Shows: Settings, « Après un enregistrement », its heading. When: always. At most: one line.
+    /// Placeholders: none.
     pub after_title: &'static str,
     /// Each choice of what follows a recording: its name, then what it does.
+    /// Shows: Settings, « Après un enregistrement », a choice: its name, then its line under it.
+    /// When: always. At most: one line each. Placeholders: none.
     pub after_nothing: [&'static str; 2],
+    /// Shows: Settings, « Après un enregistrement », a choice: its name, then its line under it.
+    /// When: always. At most: one line each. Placeholders: none.
     pub after_transcript: [&'static str; 2],
+    /// Shows: Settings, « Après un enregistrement », a choice: its name, then its line under it.
+    /// When: always. At most: one line each. Placeholders: none.
     pub after_minutes: [&'static str; 2],
+    /// Shows: Settings, « Modèles », its heading. When: always. At most: one line. Placeholders:
+    /// none.
     pub models_title: &'static str,
     /// What the models' card says under its title, and under its steps.
+    /// Shows: Settings, « Modèles », under its heading. When: always. At most: no limit.
+    /// Placeholders: none.
     pub models_intro: &'static str,
+    /// Shows: Settings, « Modèles », its last line: where a key is kept, what leaves the computer.
+    /// When: always. At most: no limit. Placeholders: none.
     pub models_note: &'static str,
     /// The transcription model's state, at the page's end.
+    /// Shows: Settings, « Modèles », the transcription's step, the label of the transcription
+    /// model's state, under its choice. When: Whisper hears. At most: one line. Placeholders: none.
     pub model_state: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a tag beside that state. When: the
+    /// model is on this computer. At most: one line. Placeholders: none.
     pub model_ready: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, that state. When: the model is on
+    /// this computer. At most: one line. Placeholders: {} its size.
     pub model_here: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, that state. When: the model chosen
+    /// is Kitokey's and not here yet. At most: one line. Placeholders: none.
     pub model_missing: &'static str,
     /// One the user named, not on this computer: theirs, nothing offered (D36).
+    /// Shows: Settings, « Modèles », the transcription's step, that state, as an error. When: a
+    /// model the user named is not on this computer (D36). At most: no limit. Placeholders: none.
     pub model_named_missing: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, that state. When: the model is being
+    /// downloaded. At most: one line. Placeholders: none.
     pub model_coming: &'static str,
     pub model_offer: &'static str,
     /// The short list of models to download (D37): its heading, the gesture, how far, and the
     /// model chosen that is not here yet, in the choice.
+    /// Shows: Settings, « Modèles », the heading of the folded list of models to download (D37),
+    /// and its name for a screen reader. When: always. At most: one line. Placeholders: none.
     pub offered_title: &'static str,
+    /// Shows: Settings, « Modèles », models to download, a model's button. When: it is not on this
+    /// computer. At most: one line. Placeholders: none.
     pub offered_fetch: &'static str,
+    /// Shows: Settings, « Modèles », models to download, in place of that button. When: the model
+    /// is being downloaded. At most: one line. Placeholders: {} how far, in percent.
     pub offered_far: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, the Whisper model chosen, in the
+    /// list. When: it is not on this computer yet (D37). At most: one line. Placeholders: {} the
+    /// model, as people say it.
     pub model_chosen_missing: &'static str,
     /// The minutes' model of the list, fetched by Ollama (D37): its size, what it is good for,
     /// and Ollama needed when none answers.
+    /// Shows: Settings, « Modèles », models to download, the summary's model's size. When: always.
+    /// At most: one line. Placeholders: none.
     pub offered_ollama_size: &'static str,
+    /// Shows: Settings, « Modèles », models to download, what the summary's model is good for.
+    /// When: always. At most: one line. Placeholders: none.
     pub offered_ollama_good: &'static str,
+    /// Shows: Settings, « Modèles », models to download, beside the summary's model. When: no
+    /// Ollama answers on this computer. At most: one line. Placeholders: none.
     pub offered_needs_ollama: &'static str,
     /// The list read again on the user's gesture (D40): the button, its host filled in; and
     /// what is said when it could not be.
+    /// Shows: Settings, « Modèles », models to download, a button: the list read again, its host
+    /// shown (D40). When: always. At most: one line. Placeholders: {} the host.
     pub offered_refresh: &'static str,
+    /// Shows: Settings, « Modèles », models to download, under that button. When: the list could
+    /// not be read again, or was not signed. At most: no limit. Placeholders: none.
     pub offered_refresh_failed: &'static str,
     /// Apple's SpeechAnalyzer among who hears, on a Mac with macOS 26 (D42): its name in the
     /// choice; its model not on the Mac yet; the gesture that has macOS fetch it, and from whom;
     /// while it comes; when it did not.
+    /// Shows: Settings, « Modèles », the transcription's step, and the first run's assistant (D58),
+    /// a choice of who hears. When: on a Mac with macOS 26 (D42). At most: one line. Placeholders:
+    /// none.
     pub speech_option: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, appended to Apple's SpeechAnalyzer
+    /// in the list. When: its model is not on the Mac yet. At most: one line. Placeholders: none.
     pub speech_missing: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, and the first run's assistant (D58),
+    /// a button. When: Apple's SpeechAnalyzer chosen, its model not on the Mac yet. At most: one
+    /// line. Placeholders: none.
     pub speech_fetch: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a status in place of that button.
+    /// When: macOS downloads Apple's model. At most: one line. Placeholders: none.
     pub speech_fetching: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, an error under the choice. When:
+    /// macOS did not download Apple's model. At most: no limit. Placeholders: none.
     pub speech_failed: &'static str,
     /// A service that hears (D43): its fields, the agreement before anything is sent to its host,
     /// the gestures, and what they say.
     pub service_option: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, folded « Avancé »: a field's label,
+    /// an address of one's own. When: a service hears. At most: one line. Placeholders: none.
     pub service_address: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a field's label, its list or «
+    /// Avancé »'s. When: a service hears. At most: one line. Placeholders: none.
     pub service_model: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a field's label. When: a service
+    /// hears. At most: one line. Placeholders: none.
     pub service_key: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a checkbox before anything is sent
+    /// (D43). When: a service hears whose host is not this computer. At most: no limit.
+    /// Placeholders: {} the host.
     pub service_agree: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, the button that saves the service.
+    /// When: a service hears. At most: one line. Placeholders: none.
     pub service_save: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a button. When: a service is saved.
+    /// At most: one line. Placeholders: none.
     pub service_test: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, under « Tester ». When: the service
+    /// transcribed Kitokey's own sound. At most: no limit. Placeholders: none.
     pub service_tested: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, under « Enregistrer ». When: the
+    /// service is saved. At most: no limit. Placeholders: {} the host, or this computer said so
+    /// (#775).
     pub service_saved: &'static str,
     /// Shows: Settings, « Transcription », under the service's form, once saved. When: the address saved is
     /// this computer's, where nothing leaves it (#775). At most: one line. Placeholders: none.
     pub service_saved_here: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, under « Enregistrer ». When: the
+    /// agreement is not ticked. At most: no limit. Placeholders: {} the host.
     pub service_agree_first: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, under « Enregistrer ». When: the
+    /// address typed is not an http(s) address. At most: no limit. Placeholders: none.
     pub service_address_bad: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, under « Enregistrer ». When: no
+    /// model is named. At most: no limit. Placeholders: none.
     pub service_model_named: &'static str,
     /// The model's name as people say it, and its size once installed.
+    /// Shows: Settings, « Modèles », the transcription's step, a Whisper model of the list, after
+    /// its name. When: the model is on this computer. At most: one line. Placeholders: {} its size.
     pub installed: &'static str,
     /// Another number of days, typed; and what is said of one that is none.
+    /// Shows: Settings, « Après un enregistrement », that list's last choice, then the field it
+    /// opens. When: always. At most: one line. Placeholders: none.
     pub keep_other: &'static str,
+    /// Shows: Settings, « Après un enregistrement », under that field. When: what is typed is no
+    /// number of days the file allows. At most: no limit. Placeholders: {} what was typed.
     pub keep_not_days: &'static str,
     /// The engine that hears, shipped with Kitokey; and the user's home, as a folder is said.
+    /// Shows: Settings, « Modèles », the transcription's step, a tag beside Whisper, built into
+    /// Kitokey. When: always. At most: one line. Placeholders: none.
     pub builtin: &'static str,
+    /// Shows: Settings, « Après un enregistrement », the folder's path, in place of the user's
+    /// home. When: the folder is in it. At most: one line. Placeholders: none.
     pub home: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, its label. When: always. At most:
+    /// one line. Placeholders: none.
     pub transcription: &'static str,
+    /// Shows: Settings, « Modèles », the line under a step's choice, and models to download. When:
+    /// a model of this computer is chosen. At most: one line. Placeholders: none.
     pub on_this_computer: &'static str,
+    /// Shows: Settings, « Général », a switch: its name, then its line under it. When: always. At
+    /// most: one line for the name, the line wraps. Placeholders: none.
     pub reminder: [&'static str; 2],
     /// When an application takes the microphone (D30): its name and line, as board 4 has them.
+    /// Shows: Settings, « Général », a list: its name, then its line under it (D30). When: always.
+    /// At most: one line for the name, the line wraps. Placeholders: none.
     pub offer: [&'static str; 2],
     /// Its two choices: offer to record, do nothing.
+    /// Shows: Settings, « Général », that list's two choices. When: always. At most: one line each.
+    /// Placeholders: none.
     pub offer_choices: [&'static str; 2],
     /// Started with the user's session (D32): its name and line.
+    /// Shows: Settings, « Général », a switch: its name, then its line under it (D32). When: the
+    /// system offers it. At most: one line for the name, the line wraps. Placeholders: none.
     pub autostart: [&'static str; 2],
     /// On Windows, the switch held (D84): by the user in Windows' Startup settings, where it is
     /// turned back on; by a policy.
+    /// Shows: Settings, « Général », that switch's line in place of its own: held by the user in
+    /// Windows' settings, or by a policy (D84). When: on Windows, the switch held. At most: no
+    /// limit. Placeholders: none.
     pub autostart_held: [&'static str; 2],
+    /// Shows: Settings, « Après un enregistrement », a list: its name, then its line under it.
+    /// When: always. At most: one line for the name, the line wraps. Placeholders: none.
     pub keep_audio: [&'static str; 2],
     /// The settings' last group: Kitokey itself, as GNOME's preferences name it (D95).
     /// Shows: Settings, as a heading. When: always. At most: no limit. Placeholders: none.
     pub general_title: &'static str,
     /// Folded at the bottom of « Général », and its one switch: what a program said of a failure,
     /// shown on the page under the sentence (D29).
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, its heading; and a step's «
+    /// Avancé » in Settings, « Modèles ». When: always. At most: one line. Placeholders: none.
     pub advanced_title: &'static str,
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, a switch: its name, then its
+    /// line under it (D29). When: always. At most: one line for the name, the line wraps.
+    /// Placeholders: none.
     pub developer: [&'static str; 2],
     /// Under a making not made, in developer mode: what its program said ({}).
     pub program_said: &'static str,
@@ -672,6 +780,8 @@ pub struct Window {
     pub actions_cells: [&'static str; 3],
     pub unsettled: &'static str,
     /// A model of this computer that holds the minutes' form, as Settings offer it ({}).
+    /// Shows: Settings, « Modèles », the summary's step, a model of this computer in the list.
+    /// When: it holds the summary's form. At most: one line. Placeholders: {} the model.
     pub model_recommended: &'static str,
     /// A meeting's player (D26): its button, both ways, and why a meeting has none.
     pub play: &'static str,
@@ -686,18 +796,36 @@ pub struct Window {
     pub not_played: &'static str,
     pub playback: &'static str,
     /// In developer mode: the logs' level, the logs' folder, a meeting's diagnostic copied.
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, a list: its name, then its
+    /// line under it. When: the developer mode is on. At most: one line for the name, the line
+    /// wraps. Placeholders: none.
     pub log_level: [&'static str; 2],
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, the logs' level, a choice.
+    /// When: the developer mode is on. At most: one line. Placeholders: none.
     pub log_info: &'static str,
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, the logs' level, a choice.
+    /// When: the developer mode is on. At most: one line. Placeholders: none.
     pub log_debug: &'static str,
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, a row: its name, then its
+    /// line under it. When: the developer mode is on. At most: one line for the name, the line
+    /// wraps. Placeholders: none.
     pub logs: [&'static str; 2],
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, the logs' row, a button.
+    /// When: the developer mode is on. At most: one line. Placeholders: none.
     pub open_logs: &'static str,
+    /// Shows: Settings, « Général », folded « Avancé » at its bottom, under that button. When: the
+    /// logs' folder could not be opened. At most: no limit. Placeholders: none.
     pub logs_not_opened: &'static str,
     pub copy_diagnostic: &'static str,
     pub diagnostic_copied: &'static str,
     pub diagnostic_empty: &'static str,
     pub diagnostic_not_copied: &'static str,
     /// The folder the sessions go to, and the button that opens the system's dialog for it.
+    /// Shows: Settings, « Après un enregistrement », a row: its name, then its line under it. When:
+    /// always. At most: one line for the name, the line wraps. Placeholders: none.
     pub sessions_folder: [&'static str; 2],
+    /// Shows: Settings, « Après un enregistrement », the folder's button: the system's dialog.
+    /// When: always. At most: one line. Placeholders: none.
     pub choose: &'static str,
     /// The recording bar, its icon in the sidebar's foot (D89), what it says (D90).
     /// Shows: the sidebar, as a name for a screen reader. When: icon button (tooltip): open the
@@ -857,7 +985,11 @@ pub struct Window {
     /// Placeholders: {} the model kept.
     pub bar_model_kept: &'static str,
     /// « Vérifier le son » (D88, board 7): its title, and its row in Settings.
+    /// Shows: « Vérifier le son » (D88), its title, opened from Settings, « Général » or the bar;
+    /// and its row there. When: always. At most: one line. Placeholders: none.
     pub check_sound: &'static str,
+    /// Shows: Settings, « Général », the line under « Vérifier le son », and the bar's. When:
+    /// always. At most: no limit. Placeholders: none.
     pub check_sound_says: &'static str,
     /// A source capture could not open; none named yet.
     /// Shows: « Vérifier le son », as a status. When: a source cannot be opened. At most: about 16
@@ -960,6 +1092,18 @@ pub struct Window {
     /// What a meeting lacks, offered on its page; what is said once asked; where a step ran.
     pub make_minutes: &'static str,
     pub make_transcript: &'static str,
+    /// Shows: a meeting's page, the button beside the summary's list of models, its transcript whole and
+    /// no summary yet (D93): « Faire le compte rendu avec Qwen3 14b ». When: a model is chosen there or
+    /// named by Settings; else `make_minutes`. At most: no limit. Placeholders: {} the model, as people say it.
+    pub make_minutes_with: &'static str,
+    /// Shows: a meeting's page, above the button that makes the summary again, the model that made the
+    /// one shown (D93). When: another model is chosen in its line. At most: no limit. Placeholders: {}
+    /// the model, as its line says it.
+    pub minutes_made_with: &'static str,
+    /// Shows: a meeting's page, above the button that makes the transcript again, the model that made
+    /// the one shown (D93). When: another model is chosen in its line. At most: no limit.
+    /// Placeholders: {} the model, as its line says it.
+    pub transcript_made_with: &'static str,
     /// What is made in the background, said on the pages (D25): the minutes being written (by,
     /// for how long), waiting their turn ({} before), waiting for the user's agreement to send them
     /// ({} the host) with the way to give it, not written ({} the reason); on a list's row.
@@ -997,10 +1141,18 @@ pub struct Window {
     /// Placeholders: none.
     pub chip_transcript_failed: &'static str,
     /// Who writes the minutes chosen on the settings' page, not yet saved: who still does ({}).
+    /// Shows: Settings, « Modèles », the summary's step, under « Enregistrer ». When: another
+    /// choice is made, not saved yet. At most: no limit. Placeholders: {} who writes it today.
     pub minutes_unsaved: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, under « Enregistrer ». When: a choice is
+    /// made, none saved yet. At most: no limit. Placeholders: none.
     pub minutes_unsaved_none: &'static str,
     /// A transcript waiting for the default Whisper model: offered in the menu, or coming.
+    /// Shows: a meeting's page, the transcript's card. When: the transcript waits for Kitokey's
+    /// Whisper model. At most: no limit. Placeholders: none.
     pub transcript_model_needed: &'static str,
+    /// Shows: a meeting's page, the transcript's card. When: the transcript waits for Kitokey's
+    /// Whisper model, being downloaded. At most: no limit. Placeholders: none.
     pub transcript_model_coming: &'static str,
     /// The button that ends what is being made of a meeting, or takes it out of the line (D92).
     /// Shows: a button on a meeting's page, beside what is being made. When: its transcript or minutes
@@ -1010,6 +1162,10 @@ pub struct Window {
     /// making's line, until the next gesture on it. When: the shell refused to end or take out the
     /// making. At most: no limit. Placeholders: {} why it was refused.
     pub making_cancel_failed: &'static str,
+    /// What is left of a meeting's making, in minutes, from the speeds measured here (D92). Shows: in a
+    /// meeting's page bar, after the step. When: both steps' speeds are known and more than thirty
+    /// seconds are left. At most: « about 100 min ». Placeholders: {} the minutes, rounded.
+    pub making_left: &'static str,
     /// Said on its page once the user cancelled its transcript, or its minutes: what was there stays.
     /// Shows: a meeting's page, where its transcript is. When: the user cancelled its transcript.
     /// At most: no limit. Placeholders: none.
@@ -1017,8 +1173,10 @@ pub struct Window {
     /// Shows: a meeting's page, where its minutes are. When: the user cancelled its minutes.
     /// At most: no limit. Placeholders: none.
     pub minutes_stopped: &'static str,
-    pub ran_online: &'static str,
     /// The header's button, at rest and while a recording runs.
+    /// Shows: the button that records: in the window's header, its tooltip too; in the empty
+    /// window; in « Vérifier le son »; and the recording bar's, as its name for a screen reader.
+    /// When: no recording runs. At most: one line. Placeholders: none.
     pub record_start: &'static str,
     /// Shows: the sidebar, as a button. When: stop recording. At most: about 24 characters.
     /// Placeholders: none.
@@ -1039,18 +1197,40 @@ pub struct Window {
     pub agree_local: &'static str,
     pub agree_local_write: &'static str,
     /// The global shortcut: its keys as granted, none granted, where it changes, the button there.
+    /// Shows: Settings, « Général », a row: its name, then its line under it. When: always. At
+    /// most: one line for the name, the line wraps. Placeholders: none.
     pub shortcut: [&'static str; 2],
+    /// Shows: Settings, « Général », the shortcut's keys, in their place. When: the desktop granted
+    /// none. At most: one line. Placeholders: none.
     pub shortcut_none: &'static str,
+    /// Shows: Settings, « Général », under the shortcut's keys. When: always. At most: no limit.
+    /// Placeholders: none.
     pub shortcut_where: &'static str,
+    /// Shows: Settings, « Général », a button: the desktop's keyboard settings. When: the desktop
+    /// has them. At most: one line. Placeholders: none.
     pub shortcut_open: &'static str,
     /// *Tester*: the button, what it sends and to whom, and what it found.
+    /// Shows: Settings, « Modèles », the summary's step, a button: the model asked one sentence.
+    /// When: a model is saved. At most: one line. Placeholders: none.
     pub test: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, beside « Tester » while it asks. When: the
+    /// model is a service's. At most: no limit. Placeholders: {} the host.
     pub test_sends: &'static str,
+    /// Shows: Settings, « Modèles », beside « Tester » or a key's test. When: while it asks. At
+    /// most: one line. Placeholders: none.
     pub testing: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, beside « Tester ». When: the model
+    /// answered. At most: one line. Placeholders: none.
     pub test_answered: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, beside « Tester », said by the shell.
+    /// When: the model did not answer. At most: no limit. Placeholders: {} the failure's sentence.
     pub test_failed: &'static str,
+    /// Shows: Settings, « Après un enregistrement », that list's first choice. When: always. At
+    /// most: one line. Placeholders: none.
     pub keep_always: &'static str,
     /// A number of days the audio is kept.
+    /// Shows: Settings, « Après un enregistrement », that list's choices. When: always. At most:
+    /// one line. Placeholders: {} a number of days.
     pub keep_days: &'static str,
     /// The settings file could not be read: why.
     /// A change could not be saved: why.
@@ -1058,72 +1238,158 @@ pub struct Window {
     /// Placeholders: {} failure sentence (lower-case start).
     pub not_saved: &'static str,
     /// Who writes the minutes was saved, but the keyring did not keep the key: why.
+    /// Shows: Settings, « Modèles », under « Enregistrer ». When: the choice was saved, the keyring
+    /// did not keep the key. At most: no limit. Placeholders: {} why.
     pub key_not_kept: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, its label. When: always. At most: one
+    /// line. Placeholders: none.
     pub minutes_step: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, folded « Avancé »: a field's label. When:
+    /// an address of one's own. At most: one line. Placeholders: none.
     pub address: &'static str,
+    /// Shows: Settings, « Modèles », a model's list or field, its label. When: a step's model is
+    /// chosen. At most: one line. Placeholders: none.
     pub model_name: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, a field's label. When: a service writes
+    /// it. At most: one line. Placeholders: none.
     pub key: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, the key field's placeholder. When: a key
+    /// is kept in the keyring. At most: one line. Placeholders: none.
     pub key_kept: &'static str,
     /// Settings, « Modèles », the summary's first step (D95): the choice beside « Sur cet ordinateur ».
+    /// Shows: Settings, « Modèles », the summary's step, its first choice, beside « Sur cet
+    /// ordinateur » (D95). When: always. At most: one line. Placeholders: none.
     pub where_service: &'static str,
     /// The label of the list of the services offered by name (D95).
+    /// Shows: Settings, « Modèles », the label of the list of services named, in the
+    /// transcription's and the summary's steps (D95). When: a service is chosen. At most: one line.
+    /// Placeholders: none.
     pub service_name: &'static str,
     /// The button that asks the service its models with the key typed: the key tested at once (D95).
+    /// Shows: Settings, « Modèles », the button beside a service's key: it asks the service its
+    /// models with that key (D95). When: a service is chosen. At most: one line. Placeholders:
+    /// none.
     pub key_test: &'static str,
+    /// Shows: Settings, « Modèles », the button that saves a step's choice. When: always. At most:
+    /// one line. Placeholders: none.
     pub save: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, the line under its choice. When: a service
+    /// writes the summary. At most: one line. Placeholders: none.
     pub where_online: &'static str,
     /// The model saved, which this computer's Ollama does not have ({} the model).
+    /// Shows: Settings, « Modèles », the summary's step, under its choice. When: the model saved is
+    /// not in Ollama. At most: no limit. Placeholders: {} the model.
     pub ollama_lacks: &'static str,
     /// This computer's Ollama, saved, not answering — or answering with no model.
+    /// Shows: Settings, « Modèles », the summary's step, under its choice. When: Ollama is saved
+    /// and does not answer, or has no model. At most: no limit. Placeholders: none.
     pub ollama_silent: &'static str,
     /// The first run's assistant (D58): its question, who writes the minutes, the setting said
     /// plainly, and its way back from Settings. Each answer is its name and its line.
+    /// Shows: the first run's assistant (D58), above its question. When: always. At most: one line.
+    /// Placeholders: none.
     pub welcome_title: &'static str,
+    /// Shows: the first run's assistant (D58), its first question, a heading. When: its first step.
+    /// At most: one line. Placeholders: none.
     pub welcome_question: &'static str,
+    /// Shows: the first run's assistant (D58), under its first question. When: its first step. At
+    /// most: no limit. Placeholders: none.
     pub welcome_examples: &'static str,
+    /// Shows: the first run's assistant (D58), an answer to its first question: its name, then its
+    /// line under it. When: its first step. At most: one line each. Placeholders: none.
     pub welcome_often: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), an answer to its first question: its name, then its
+    /// line under it. When: its first step. At most: one line each. Placeholders: none.
     pub welcome_rarely: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), an answer to its first question: its name, then its
+    /// line under it. When: its first step. At most: one line each. Placeholders: none.
     pub welcome_unsure: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), a link under its first step. When: the first run. At
+    /// most: one line. Placeholders: none.
     pub welcome_skip: &'static str,
+    /// Shows: the first run's assistant (D58), a link under its first step. When: opened again from
+    /// Settings, « Général ». At most: one line. Placeholders: none.
     pub welcome_cancel: &'static str,
+    /// Shows: the first run's assistant (D58), its button to the next step. When: its first two
+    /// steps. At most: one line. Placeholders: none.
     pub welcome_next: &'static str,
+    /// Shows: the first run's assistant (D58), its link to the step before. When: its second and
+    /// last steps. At most: one line. Placeholders: none.
     pub welcome_back: &'static str,
+    /// Shows: the first run's assistant (D58), its second question, a heading. When: its second
+    /// step, after « Rarement ou jamais ». At most: one line. Placeholders: none.
     pub welcome_writer: &'static str,
+    /// Shows: the first run's assistant (D58), an answer to its second question: its name, then its
+    /// line under it. When: its second step. At most: one line each. Placeholders: none.
     pub welcome_here: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), an answer to its second question: its name, then its
+    /// line under it. When: its second step. At most: one line each. Placeholders: none.
     pub welcome_service: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), its last step's heading: its name, then its line
+    /// under it. When: everything on this computer. At most: one line each. Placeholders: none.
     pub welcome_private: [&'static str; 2],
+    /// Shows: the first run's assistant (D58), its last step's heading: its name, then its line
+    /// under it. When: a service writes the summary. At most: one line each. Placeholders: none.
     pub welcome_connected: [&'static str; 2],
     /// The summary's rows: who transcribes, who writes the minutes, the reminder.
+    /// Shows: the first run's assistant (D58), its last step: the names of its three rows. When:
+    /// its last step. At most: one line each. Placeholders: none.
     pub welcome_rows: [&'static str; 3],
+    /// Shows: the first run's assistant (D58), a row's value; and Settings, « Modèles », the
+    /// summary's step, its first choice. When: a step is on this computer. At most: one line.
+    /// Placeholders: none.
     pub welcome_on_this_computer: &'static str,
     /// Online, no service chosen yet; one chosen already.
+    /// Shows: the first run's assistant (D58), the summary's row. When: a service is to be chosen.
+    /// At most: one line. Placeholders: none.
     pub welcome_online: &'static str,
+    /// Shows: the first run's assistant (D58), the summary's row. When: a service is chosen
+    /// already. At most: one line. Placeholders: none.
     pub welcome_online_chosen: &'static str,
     /// Ollama and its model ({} the model as people say it).
+    /// Shows: the first run's assistant (D58), the summary's row. When: Ollama writes it. At most:
+    /// one line. Placeholders: {} the model, as people say it.
     pub welcome_ollama_by: &'static str,
+    /// Shows: the first run's assistant (D58), the reminder's row. When: the reminder is on. At
+    /// most: one line. Placeholders: none.
     pub welcome_reminder_on: &'static str,
+    /// Shows: the first run's assistant (D58), the reminder's row. When: the reminder is off. At
+    /// most: one line. Placeholders: none.
     pub welcome_reminder_off: &'static str,
     pub welcome_ollama_silent: &'static str,
     /// Ollama answers without the model ({} the model).
+    /// Shows: the first run's assistant (D58), its last step, under its rows. When: Ollama answers
+    /// without the summary's model. At most: no limit. Placeholders: {} the model.
     pub welcome_ollama_lacks: &'static str,
     /// The model's download ({} its size), and where from ({} the host).
+    /// Shows: the first run's assistant (D58), its last step's button. When: Whisper's model is not
+    /// here yet. At most: one line. Placeholders: {} its size.
     pub welcome_fetch: &'static str,
+    /// Shows: the first run's assistant (D58), under that button. When: Whisper's model is not here
+    /// yet. At most: no limit. Placeholders: {} the host.
     pub welcome_fetch_from: &'static str,
+    /// Shows: the first run's assistant (D58), its last step's button. When: on this computer, no
+    /// model left to fetch. At most: one line. Placeholders: none.
     pub welcome_done: &'static str,
+    /// Shows: the first run's assistant (D58), its last step, a link. When: no model is left to
+    /// fetch (`welcome_later_waits` else). At most: one line. Placeholders: none.
     pub welcome_later: &'static str,
     /// The welcome's « Later » when the transcription's model is still to be downloaded, saying what it
     /// leaves waiting (#781). Shows: the welcome's last screen, a link-styled button. When: the model is
     /// not on this computer and the welcome offers to download it. At most: about 50 characters. Placeholders: none.
     pub welcome_later_waits: &'static str,
+    /// Shows: the first run's assistant (D58), its last step's button: to Settings' summary choice.
+    /// When: a service writes the summary. At most: one line. Placeholders: none.
     pub welcome_choose: &'static str,
+    /// Shows: Settings, « Général », the row that opens the first run's assistant (D58) again: its
+    /// name, then its line under it. When: always. At most: one line for the name, the line wraps.
+    /// Placeholders: none.
     pub welcome_again: [&'static str; 2],
-    /// A meeting's context (D59): the small window's disclosure, closed then open; the field's
+    /// A meeting's context (D59): its button's value while none is written; the field's
     /// label, its example and why it helps; its count ({} the most, {} what is left — one, then
     /// more); another script than Latin or Cyrillic; why it is closed; what changed, the
     /// transcript alone or with the minutes, and the gesture that makes them again.
     pub context_add: &'static str,
-    pub context_edit: &'static str,
-    pub context_open: &'static str,
     pub context_title: &'static str,
     pub context_label: &'static str,
     pub context_example: &'static str,
@@ -1138,7 +1404,11 @@ pub struct Window {
     /// The language a meeting is spoken in (D65).
     pub language_label: &'static str,
     pub language_default: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
+    /// first choice. When: Whisper or a service hears. At most: one line. Placeholders: none.
     pub language_detected: &'static str,
+    /// Shows: Settings, « Modèles », the transcription's step, a list's label. When: always. At
+    /// most: one line. Placeholders: none.
     pub meetings_language: &'static str,
     pub language_not_saved: &'static str,
     pub rename_meeting: &'static str,
@@ -1146,11 +1416,18 @@ pub struct Window {
     pub name_not_saved: &'static str,
     pub language_detected_short: &'static str,
     /// SpeechAnalyzer's language when the settings name none: the system's, never the app's (D64).
+    /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
+    /// first choice. When: Apple's SpeechAnalyzer hears (D64). At most: one line. Placeholders:
+    /// none.
     pub language_as_system: &'static str,
     /// A meeting's own language SpeechAnalyzer does not hear: the one it hears in, said (D65).
     pub language_heard_as: &'static str,
     /// The language Kitokey speaks (D64): its row in Settings, and the system's, its default.
+    /// Shows: Settings, « Général », a list: its name, then its line under it (D64). When: always.
+    /// At most: one line for the name, the line wraps. Placeholders: none.
     pub app_language: [&'static str; 2],
+    /// Shows: Settings, « Général », that list's first choice. When: always. At most: one line.
+    /// Placeholders: none.
     pub app_language_system: &'static str,
     /// Shows: Settings, « Général », the appearance's row (D98): its name, then what it changes. When:
     /// always. At most: one line each. Placeholders: none.
@@ -1192,48 +1469,48 @@ pub fn window(language: Language) -> Window {
         Language::English => Window {
             locale: "en",
             units: ["B", "kB", "MB", "GB"],
-            sections: "Sections",
+            sections: "Navigation",
             meetings: "Meetings",
             weight: "{} meetings",
             weight_one: "{} meeting",
             this_week: "This week",
             last_week: "Last week",
             earlier_in: "Earlier in {}",
-            undated: "Date unreadable",
-            minutes: "Minutes",
+            undated: "No date",
+            minutes: "Summary",
             transcript: "Transcript",
             audio: "Audio · {}",
             audio_freed: "Audio deleted",
             audio_weighs: "audio {}",
-            recording: "Recording now",
+            recording: "Recording",
             interrupted: "Interrupted",
             none: "No meeting yet.",
             none_folder: "Meetings are saved in {}.",
-            none_do: "Start a recording: its button, its shortcut, or the tray’s icon.",
-            list_unread: "The meetings in {} cannot be read.",
-            list_unread_do: "Check that this folder’s disk is connected and that you may read it, then try again.",
+            none_do: "To begin, click Start recording, press the keyboard shortcut, or use the Kitokey icon.",
+            list_unread: "Can’t read the meetings in {}.",
+            list_unread_do: "Make sure the drive is connected and you have access to this folder, then try again.",
             settings_banner: "Settings cannot be read: your meetings are not shown.",
             settings_banner_kept: "Settings cannot be read: the last ones read stay in use, and no change is saved until the file is fixed.",
-            again_refused: "It could not start again: {}",
-            fold_not_kept: "The sidebar will be back as it was at the next start: {}",
-            agreement_refused: "This meeting cannot be sent: {}",
-            meeting_not_opened: "This meeting could not be opened: {}",
-            page_not_shown: "This page could not be shown: try again.",
-            context_not_read: "The context could not be read again: {}",
+            again_refused: "Couldn’t try again: {}",
+            fold_not_kept: "The sidebar position won’t be remembered: {}",
+            agreement_refused: "Couldn’t send this meeting: {}",
+            meeting_not_opened: "Couldn’t open this meeting: {}",
+            page_not_shown: "Couldn’t show this page. Try again.",
+            context_not_read: "Couldn’t reload the context: {}",
             record_starting: "Starting…",
             record_stopping: "Stopping…",
             redo_cancel: "Cancel",
             saved: "Saved",
-            small_not_confidential: "This meeting is not confidential: open it to mark it.",
-            trial_over: "Your trial is over; your meetings stay yours, readable, playable and exportable.",
+            small_not_confidential: "This meeting isn’t confidential. Open it to mark it as confidential.",
+            trial_over: "Your trial has ended. Your meetings stay yours: you can still read, play and export them.",
             buy: "Buy Kitokey",
             trial: "Free trial",
-            find_meetings: "Search the meetings",
-            fold: "Fold the sidebar",
-            unfold: "Show the sidebar",
-            none_found: "No meeting holds these words.",
+            find_meetings: "Search meetings",
+            fold: "Hide sidebar",
+            unfold: "Show sidebar",
+            none_found: "No meetings found.",
             back: "Meetings",
-            open_folder: "Open the folder",
+            open_folder: "Open folder",
             trash_meeting: "Move to trash",
             trash_ask: "Move this meeting to the trash?",
             trash_holds: "It holds {}.",
@@ -1244,92 +1521,92 @@ pub fn window(language: Language) -> Window {
             trash_refused: "Not moved to the trash: {}",
             more_actions: "More actions",
             labelled: "{}:",
-            minutes_title: "Minutes",
+            minutes_title: "Summary",
             transcript_title: "Transcript",
-            search: "Search the meeting",
+            search: "Search the transcript",
             written_by: "Written by {}",
             written_via: ", via {}",
             at: "at",
-            heard_by: "Written by {}, on this computer",
+            heard_by: "Transcribed by {} on this computer",
             transcribed_on: "Transcribed on {}",
             minutes_of: "Summary of {}",
             made_in: "in {}",
-            here: "Here",
-            remote: "Remote",
+            here: "You",
+            remote: "Others",
             voice: "voice {}",
-            here_described: "Here — your microphone",
-            remote_described: "Remote — what the machine plays",
-            who_spoke: "Who spoke over the meeting: here above, remote below",
+            here_described: "You — your microphone",
+            remote_described: "Others — the call’s audio",
+            who_spoke: "Who spoke when: you on top, others below",
             no_transcript: "No transcript yet.",
-            no_minutes: "No minutes yet.",
-            being_made: "Being written — what is here is true all the same.",
-            unreadable: "This file cannot be read by this version of Kitokey.",
-            unread: "{} line(s) of the file could not be read and are left out.",
-            no_match: "Nothing said matches.",
+            no_minutes: "No summary yet.",
+            being_made: "Still transcribing — more is on its way.",
+            unreadable: "This version of Kitokey can’t read this file.",
+            unread: "{} unreadable line(s) skipped.",
+            no_match: "No results.",
             settings: "Settings",
             after_title: "After a recording",
-            after_nothing: ["Do nothing", "The audio is kept; you start what follows when you want."],
-            after_transcript: ["Write the transcript", "On this computer, with no network."],
+            after_nothing: ["Do nothing", "The audio is kept. Transcribe it whenever you like."],
+            after_transcript: ["Transcribe", "On this computer, offline."],
             after_minutes: [
-                "Write the transcript, then the minutes",
-                "Each follows the other; a notification says when the minutes are ready.",
+                "Transcribe, then summarize",
+                "One after the other. You’ll get a notification when the summary is ready.",
             ],
             models_title: "Models",
-            models_intro: "For each step, you choose who works: a model on this computer, an online service, or your own address.",
-            models_note: "The models “on this computer” are those Kitokey finds installed. A key is kept in your system’s keyring, never in a file. Nothing leaves this computer without your agreement: a transcription service you name receives your meetings’ sound and their context, a service that writes the minutes their text and context only.",
+            models_intro: "For each step, choose what does the work: a model on this computer, an online service, or your own server.",
+            models_note: "“On this computer” lists the models installed. API keys are stored in your system keychain, never in a file. Nothing leaves this computer without your consent: a transcription service receives your meetings’ audio and context; a summary service only their text and context.",
             model_state: "Transcription model",
             model_ready: "Ready",
-            model_here: "Installed · {} · runs on this computer, with no network",
-            model_missing: "Not on this computer yet.",
-            model_named_missing: "Not on this computer: put it back where it was, or choose another.",
-            model_coming: "Being downloaded.",
+            model_here: "Installed · {} · works offline",
+            model_missing: "Not downloaded yet.",
+            model_named_missing: "Not found on this computer. Put the file back or choose another model.",
+            model_coming: "Downloading…",
             model_offer: "Download the model ({}, {})",
             offered_title: "Models to download",
             offered_fetch: "Download",
-            offered_far: "Downloading… {} %",
-            model_chosen_missing: "{} — not on this computer yet",
+            offered_far: "Downloading… {}%",
+            model_chosen_missing: "{} — not downloaded yet",
             offered_ollama_size: "about 5 GB",
-            offered_ollama_good: "For the minutes, on this computer, through Ollama",
-            offered_needs_ollama: "Needs Ollama — install it from ollama.com",
-            offered_refresh: "Update the list ({})",
-            offered_refresh_failed: "The list could not be updated: the models above are still offered.",
-            speech_option: "Apple's SpeechAnalyzer, on this Mac",
-            speech_missing: "Apple's model is not on this Mac yet",
-            speech_fetch: "Download Apple's model (macOS fetches it from Apple)",
-            speech_fetching: "macOS is downloading Apple's model…",
-            speech_failed: "Apple's model was not downloaded. Try again later; Whisper still hears.",
+            offered_ollama_good: "For summaries, on this computer, with Ollama",
+            offered_needs_ollama: "Requires Ollama (free, at ollama.com)",
+            offered_refresh: "Refresh list ({})",
+            offered_refresh_failed: "Couldn’t refresh the list. The models above are still available.",
+            speech_option: "Apple SpeechAnalyzer, on this Mac",
+            speech_missing: "Apple’s model not downloaded yet",
+            speech_fetch: "Download Apple’s model (macOS fetches it from Apple)",
+            speech_fetching: "macOS is downloading Apple’s model…",
+            speech_failed: "Couldn’t download Apple’s model. Try again later; Whisper is still available.",
             service_option: "A service I name",
-            service_address: "Its address",
-            service_model: "Its model",
-            service_key: "Its key, if it asks for one",
-            service_agree: "I agree that my meetings’ sound is sent to {}",
+            service_address: "Service address",
+            service_model: "Model",
+            service_key: "API key (if required)",
+            service_agree: "I agree to send my meetings’ audio to {}",
             service_save: "Save",
             service_test: "Test",
-            service_tested: "It hears, with each segment’s times: a sound of Kitokey’s own was transcribed.",
-            service_saved: "Saved: {} hears your next meetings.",
+            service_tested: "It works: a test clip was transcribed with timestamps.",
+            service_saved: "Saved. {} will transcribe your next meetings.",
             service_saved_here: "Saved: this computer hears your next meetings.",
-            service_agree_first: "Nothing is saved: agree first that your meetings’ sound is sent to {}.",
-            service_address_bad: "Nothing is saved: the address starts with https:// or http://, then the service’s host — for example https://api.groq.com/openai/v1.",
-            service_model_named: "Nothing is saved: name the model the service hears with — for example whisper-large-v3.",
+            service_agree_first: "Not saved: first agree to send the audio to {}.",
+            service_address_bad: "Not saved: the address must start with https:// or http://, for example https://api.groq.com/openai/v1.",
+            service_model_named: "Not saved: enter the model name, for example whisper-large-v3.",
             installed: "installed, {}",
-            keep_other: "Another number of days…",
-            keep_not_days: "{} is not a number of days: from 1 to 36,500",
-            builtin: "built into Kitokey",
+            keep_other: "Other duration…",
+            keep_not_days: "“{}” isn’t a valid number of days (1 to 36,500)",
+            builtin: "built in",
             home: "Home folder",
             transcription: "Transcription",
-            on_this_computer: "On this computer — nothing leaves it",
+            on_this_computer: "On this computer — nothing is sent",
             reminder: [
-                "Remind me to tell the participants",
-                "At the start, a line reminds you to say the meeting is recorded.",
+                "Remind me to tell participants",
+                "When a recording starts, a reminder prompts you to announce it.",
             ],
             offer: [
-                "When an application takes the microphone",
-                "A call starting, most often. Kitokey never records without you knowing.",
+                "When an app uses the microphone",
+                "Usually a call starting. Kitokey never records without you knowing.",
             ],
             offer_choices: ["Offer to record", "Do nothing"],
             autostart: [
-                "Start Kitokey when you log in",
-                "In the tray, no window: a call is offered even after a restart.",
+                "Open Kitokey at login",
+                "Quietly, with no window — so Kitokey still offers to record your calls after a restart.",
             ],
             autostart_held: [
                 "Turned off in Windows: turn it back on in Settings › Apps › Startup.",
@@ -1337,70 +1614,64 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "General",
             advanced_title: "Advanced",
-            developer: [
-                "Developer mode",
-                "Under a failure, shows what Kitokey’s program said of it — for whoever looks into it.",
-            ],
-            program_said: "What the program said: {}",
+            developer: ["Developer mode", "Shows technical details under each error, to help troubleshoot."],
+            program_said: "Technical details: {}",
             minutes_sections: ["Highlights", "Actions", "Key points"],
-            actions_cells: ["Who", "What", "By when"],
+            actions_cells: ["Who", "What", "When"],
             unsettled: "not specified",
             model_recommended: "{} — recommended",
-            play: "Listen",
+            play: "Play",
             pause: "Pause",
-            time_listen: "Listen from {}",
-            time_passage: "See the passage at {}",
-            not_playable: "Its audio cannot be listened to here: it holds no track this version plays.",
-            not_played: "This meeting could not be played here. “Open the folder” shows its tracks, which another player reads.",
-            playback: "Where the meeting is played from",
-            no_player: "Its audio was freed: the meeting can no longer be listened to. Its transcript and minutes stay.",
-            log_level: ["Logs’ level", "Read at Kitokey’s next start, by it and its programs."],
-            log_info: "Usual",
+            time_listen: "Play from {}",
+            time_passage: "Go to {} in the transcript",
+            not_playable: "This audio can’t be played in Kitokey.",
+            not_played: "Can’t play this meeting here. Open the folder to listen in another player.",
+            playback: "Playback position",
+            no_player: "The audio was deleted to free up space. The transcript and summary remain.",
+            log_level: ["Log level", "Applies the next time Kitokey starts."],
+            log_info: "Normal",
             log_debug: "Detailed",
-            logs: [
-                "Logs",
-                "What Kitokey did, one file a day, kept fourteen days — never a word of a meeting.",
-            ],
-            open_logs: "Open the logs",
-            logs_not_opened: "The logs’ folder could not be opened.",
+            logs: ["Logs", "One file per day, kept 14 days. No meeting content."],
+            open_logs: "Open logs",
+            logs_not_opened: "Couldn’t open the logs folder.",
             copy_diagnostic: "Copy a diagnostic",
             diagnostic_copied: "Diagnostic copied",
-            diagnostic_empty: "Nothing logged for this meeting",
-            diagnostic_not_copied: "Diagnostic not copied",
+            diagnostic_empty: "No logs for this meeting",
+            diagnostic_not_copied: "Couldn’t copy",
             sessions_folder: [
                 "Meetings folder",
-                "New meetings are written here. Those already recorded stay where they were: the window and the audio's keeping follow this folder.",
+                "New meetings are saved here. Existing ones stay in the old folder: Kitokey only shows and cleans up this one.",
             ],
             choose: "Choose…",
-            small: "The recording bar",
+            small: "Recording bar",
             small_mic: "Your microphone",
-            small_meeting: "The meeting’s sound",
-            small_note: "Once stopped, the transcript writes itself. You will be told.",
-            bar_silent_me: "Your microphone: nothing for 2 min — the recording goes on.",
-            bar_silent_others: "The meeting: nothing for 2 min — the recording goes on.",
-            small_nothing: "Nothing comes from it: check it is not muted on the device itself, and that it is ready.",
-            small_waiting_me: "Your microphone is not recorded for now.",
-            small_waiting_others: "The meeting’s sound is not recorded for now.",
-            small_announce: "Tell the participants this meeting is being recorded.",
-            copy_announcement: "Copy the announcement",
-            announcement_not_copied: "Not copied.",
-            small_full: "The whole window",
+            small_meeting: "Meeting audio",
+            small_note: "When you stop, transcription starts on its own. You’ll get a notification.",
+            bar_silent_me: "Your microphone: silent for 2 min — still recording.",
+            bar_silent_others: "Meeting: silent for 2 min — still recording.",
+            small_nothing: "No signal: check the microphone isn’t muted on the device and that it’s switched on.",
+            small_waiting_me: "Your microphone isn’t being recorded right now.",
+            small_waiting_others: "Meeting audio isn’t being recorded right now.",
+            small_announce: "Let participants know this meeting is being recorded.",
+            copy_announcement: "Copy an announcement",
+            announcement_not_copied: "Couldn’t copy.",
+            small_full: "Open full window",
             bar_more: "More options",
             bar_less: "Fewer options",
-            bar_hide: "Hide the bar",
+            bar_hide: "Hide bar",
             small_microphone: "Microphone: {}",
-            small_microphones: "The microphone of the next recording",
+            small_microphones: "Microphone for the next recording",
             microphone_auto: "Auto",
-            microphone_auto_says: "The one your call holds, otherwise your computer’s.",
-            microphone_absent: "It is absent for now: Auto stands in.",
-            microphones_unread: "The list cannot be read for now: Auto still works. Open it again in a moment.",
-            microphone_not_kept: "Your choice of microphone could not be kept: choose it again.",
-            small_microphone_gone: "The microphone you chose is not there: Auto stands in.",
-            bar_microphone_recorded: "Recorded: {}. Changing it applies to the next recording.",
-            bar_microphone_next: "Changing it applies to the next recording.",
-            bar_context: "Meeting context",
-            bar_context_clear: "Clear the context",
-            bar_context_kept: "Kept for the next recording, until you clear it.",
+            microphone_auto_says: "The one your call uses, otherwise your computer’s.",
+            microphone_absent: "Unplugged for now — Auto takes over.",
+            microphones_unread: "Can’t list microphones right now. Auto still works — try again in a moment.",
+            microphone_not_kept: "Your microphone choice wasn’t saved. Choose it again.",
+            small_microphone_gone: "The microphone you chose is unplugged — Auto takes over.",
+            bar_microphone_recorded: "Recording from {}. Changes apply to the next recording.",
+            bar_microphone_next: "Changes apply to the next recording.",
+            bar_context: "Topic, participants…",
+            bar_context_clear: "Clear context",
+            bar_context_kept: "Kept for the next recording.",
             bar_last_hearing: "{}: transcribing",
             bar_last_summary: "{}: summary being written",
             bar_last_ready: "{}: ready",
@@ -1409,277 +1680,269 @@ pub fn window(language: Language) -> Window {
             bar_last_open: "Open",
             bar_advanced: "Advanced — models",
             models_transcription: "Transcription model",
-            models_minutes: "Minutes model",
-            models_settings: "Settings: {}",
+            models_minutes: "Summary model",
+            models_settings: "From Settings: {}",
             models_none: "no model chosen",
-            models_own_note: "For this meeting alone; Settings do not change.",
-            models_not_kept: "This choice could not be kept: {}",
-            models_not_read: "The models could not be read: {}",
-            models_gone_transcription: "The transcription model chosen for this meeting is no longer here: Settings’ stands in.",
-            models_gone_minutes: "The minutes model chosen for this meeting goes through a service Settings do not name: Settings’ stands in.",
-            models_unused_confidential: "The service chosen for this meeting is not used while it is confidential: it is made on this computer.",
-            bar_models_kept: "Models kept: {}",
-            bar_model_kept: "Model kept: {}",
+            models_own_note: "For this meeting only; Settings stay the same.",
+            models_not_kept: "Choice not saved: {}",
+            models_not_read: "Couldn’t load the models: {}",
+            models_gone_transcription: "The transcription model chosen for this meeting is no longer installed — the one in Settings will be used.",
+            models_gone_minutes: "The summary service chosen for this meeting is no longer set up — the one in Settings will be used.",
+            models_unused_confidential: "Confidential meeting: the online service isn’t used — everything stays on this computer.",
+            bar_models_kept: "Models: {}",
+            bar_model_kept: "Model: {}",
             check_sound: "Check the sound",
-            check_sound_says: "Your microphone and the meeting’s sound, before a recording.",
+            check_sound_says: "Test your microphone and meeting audio before recording.",
             check_unavailable: "Unavailable",
-            check_bluetooth: "While this panel is open, your Bluetooth headset switches to call quality; it comes back once it is closed.",
+            check_bluetooth: "While this panel is open, your Bluetooth headset switches to call mode (lower sound quality). It goes back to normal when you close it.",
             check_play: "Play a test sound",
-            check_heard: "Kitokey hears this computer’s sound.",
-            check_not_heard: "Kitokey did not hear the test sound. Check that the sound comes out of this computer and not another device, then play it again.",
-            check_call: "A call holds the microphone: no test sound, it would go into the call. Play a sound in the call and watch the meter.",
-            check_open_note: "The microphone stays open as long as this panel is.",
+            check_heard: "Kitokey can hear this computer’s sound.",
+            check_not_heard: "Kitokey didn’t hear the test sound. Make sure sound is playing from this computer, not another device, then try again.",
+            check_call: "A call is using the microphone, so no test sound — the call would hear it. Have someone speak in the call and watch the meter.",
+            check_open_note: "The microphone stays on while this panel is open.",
             check_close: "Close",
-            check_failed: "Kitokey cannot listen to your microphone or the meeting’s sound for now: close this panel and open it again.",
-            check_recording: "A recording is running: its meters are in the bar.",
-            free: "Free space",
+            check_failed: "Kitokey can’t listen to your microphone or the meeting audio right now. Close this panel and open it again.",
+            check_recording: "A recording is in progress — its meters are in the recording bar.",
+            free: "Free up space",
             free_what: "What do you want to remove?",
             free_audio: [
-                "The audio only",
-                "The minutes and the transcript still read. The audio is nearly all the weight.",
+                "Audio only",
+                "Summaries and transcripts stay readable. Audio takes up almost all the space.",
             ],
-            free_whole: [
-                "The whole meeting",
-                "The audio, the transcript and the minutes: nothing of the meeting is left.",
-            ],
-            free_heaviest: "Heaviest first",
-            free_older: "Tick those older than 30 days",
+            free_whole: ["Whole meeting", "Audio, transcript and summary — nothing is kept."],
+            free_heaviest: "Largest first",
+            free_older: "Select those older than 30 days",
             free_total: "freed · {} meetings",
             free_one: "freed · 1 meeting",
-            free_note: "Nothing is erased for good: everything goes to your system’s trash. To undo, restore from the trash.",
-            free_audio_note: "Without its audio, a meeting can no longer be transcribed again by a better engine.",
-            free_do_audio: "Move their audio to the trash",
-            free_do_whole: "Move these meetings to the trash",
-            free_busy: "being recorded, transcribed or its minutes written",
-            free_done: "Done: in the trash.",
+            free_note: "Nothing is deleted permanently: everything goes to the trash, where you can restore it.",
+            free_audio_note: "Without the audio, the meeting can’t be transcribed again, even with a better model.",
+            free_do_audio: "Move audio to trash",
+            free_do_whole: "Move meetings to trash",
+            free_busy: "in progress",
+            free_done: "Done — moved to the trash.",
             redo: "Redo…",
             redo_title: "Write the summary again",
-            redo_with: "Made again with this meeting’s models: “Advanced” to choose them.",
+            redo_with: "Uses this meeting’s models (choose them under “Advanced”).",
             redo_note: "The current summary stays in place until the new one is ready, then goes to the trash.",
             redo_minutes_do: "Write the summary again with {}",
             redo_transcript_do: "Write the transcript again with {}",
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
-            redo_transcript_note: "The current transcript is kept until the new one is whole, then goes to the trash; if the new one fails, the current comes back.",
-            make_minutes: "Write the minutes",
-            make_transcript: "Write the transcript",
-            minutes_making: "Writing the minutes",
-            minutes_waiting: "Waiting its turn — {} before it",
-            minutes_awaiting: "Waiting for your agreement to send it to {}",
-            agree_open: "Review and agree",
-            minutes_not_made: "The minutes were not written. The transcript is untouched.",
+            redo_transcript_note: "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept.",
+            make_minutes: "Write summary",
+            make_transcript: "Transcribe",
+            make_minutes_with: "Write summary with {}",
+            minutes_made_with: "This summary was written with {}.",
+            transcript_made_with: "This transcript was made with {}.",
+            minutes_making: "Writing summary",
+            minutes_waiting: "Queued · {} ahead",
+            minutes_awaiting: "Waiting for your OK to send to {}",
+            agree_open: "Review",
+            minutes_not_made: "The summary couldn’t be written. The transcript is unchanged.",
             try_again: "Try again",
-            chip_making: "Minutes…",
+            chip_making: "Summary…",
             chip_waiting: "Waiting",
-            chip_awaiting: "Your agreement",
+            chip_awaiting: "Needs OK",
             chip_transcribing: "Transcript…",
-            chip_failed: "Minutes not written",
+            chip_failed: "Summary failed",
             chip_redo_failed: "Redo failed",
             minutes_redo_failed: "The last redo failed. The summary shown is the one before it.",
-            transcript_making: "Writing the transcript",
-            transcript_not_made: "The transcript was not written. The recording is untouched.",
-            chip_transcript_failed: "Transcript not written",
-            minutes_unsaved: "Not saved yet — the minutes are still written by {}.",
-            minutes_unsaved_none: "Not saved yet — no minutes are written until it is.",
-            transcript_model_needed: "Waiting for the Whisper model.",
-            transcript_model_coming: "Waiting for the Whisper model, being downloaded.",
+            transcript_making: "Transcribing",
+            transcript_not_made: "The transcript couldn’t be made. The audio is safe.",
+            chip_transcript_failed: "Transcript failed",
+            minutes_unsaved: "Not saved — {} is still used.",
+            minutes_unsaved_none: "Not saved — no summaries will be written until you save.",
+            transcript_model_needed: "Waiting for the transcription model.",
+            transcript_model_coming: "Waiting for the transcription model (downloading).",
             making_cancel: "Cancel",
             making_cancel_failed: "Kitokey could not cancel: {}",
+            making_left: "about {} min",
             transcript_stopped: "Transcription stopped. You can start it again, with another model if you like.",
             minutes_stopped: "Minutes stopped. You can start them again, with another model if you like.",
-            ran_online: "online",
-            record_start: "Start a recording",
-            record_stop: "Stop the recording",
-            agree_eyebrow: "Before the first minutes online",
+            record_start: "Start recording",
+            record_stop: "Stop recording",
+            agree_eyebrow: "First online summary",
             agree_title: "The text of “{}” is about to leave your computer",
-            agree_lead: "To write the minutes, Kitokey sends the transcript to the service you chose. Here is exactly what leaves.",
-            agree_leaves: [
-                "Leaves: the transcript",
-                "The words spoken, on your side and remote — {} minutes, about {} words.",
-            ],
-            agree_context: ["Leaves: the context you attached", "About {} words."],
-            agree_stays: ["Stays here: the audio", "No sound is ever sent."],
+            agree_lead: "To write the summary, Kitokey sends the transcript to the service you chose. Here’s exactly what’s sent.",
+            agree_leaves: ["Sent: the transcript", "What everyone said — {} minutes, about {} words."],
+            agree_context: ["Sent: the context you added", "About {} words."],
+            agree_stays: ["Stays here: the audio", "No audio is ever sent."],
             agree_to: "Recipient",
             agree_model: "Model",
             agree_remember: "Don’t ask again for this service",
             agree_send: "Send the transcript",
             agree_not: "Don’t send",
-            agree_local: "Write the minutes on this computer instead",
+            agree_local: "Write it on this computer instead",
             agree_local_write: "Write here",
-            shortcut: ["Shortcut", "Starts and stops a recording, wherever you are."],
-            shortcut_none: "Not granted by the desktop",
-            shortcut_where: "The desktop grants it: it changes in the desktop's keyboard settings.",
+            shortcut: ["Keyboard shortcut", "Starts or stops a recording from anywhere."],
+            shortcut_none: "No shortcut set",
+            shortcut_where: "You can change it in your system’s keyboard settings.",
             shortcut_open: "Keyboard settings",
             test: "Test",
-            test_sends: "Test sends {} one sentence of Kitokey's, nothing of a meeting.",
+            test_sends: "The test sends a short sentence to {} — nothing from your meetings.",
             testing: "Testing…",
-            test_answered: "The model answers.",
-            test_failed: "The model does not answer: {}",
+            test_answered: "It works: the model responds.",
+            test_failed: "The model isn’t responding: {}",
             keep_audio: [
-                "Keep the audio",
-                "After that, the audio goes to the trash; the transcript and minutes stay.",
+                "Keep audio",
+                "After this, the audio goes to the trash; the transcript and summary stay.",
             ],
             keep_always: "Always",
             keep_days: "{} days",
-            not_saved: "The setting was not saved: {}",
-            key_not_kept: "The choice is saved, but the key was not kept in the system's keyring: {}",
-            minutes_step: "Minutes",
+            not_saved: "Not saved: {}",
+            key_not_kept: "Choice saved, but the key couldn’t be stored in your system keychain: {}",
+            minutes_step: "Summary",
             address: "Address (OpenAI-compatible)",
             model_name: "Model",
-            key: "Key",
-            key_kept: "A key is kept in the system's keyring; a new one replaces it.",
+            key: "API key",
+            key_kept: "Key saved — enter a new one to replace it",
             where_service: "A service",
             service_name: "Service",
             key_test: "Check the key",
             save: "Save",
-            where_online: "Online — the transcript's text is sent",
-            ollama_lacks: "Ollama, on this computer, has no model named {}: choose one in the list, or fetch it with Ollama.",
-            ollama_silent: "Ollama, on this computer, does not answer, or has no model: start it, or fetch a model with it.",
-            welcome_title: "Let’s set Kitokey up with one question.",
-            welcome_question: "Do your meetings discuss confidential matters?",
-            welcome_examples: "Clients, human resources, health, legal matters, unpublished figures…",
+            where_online: "Online — the transcript text is sent",
+            ollama_lacks: "Ollama has no model named {} on this computer. Pick one from the list or download it with Ollama.",
+            ollama_silent: "Ollama isn’t responding or has no models. Start Ollama, then download a model.",
+            welcome_title: "Let’s set up Kitokey with one question.",
+            welcome_question: "Do your meetings cover confidential topics?",
+            welcome_examples: "Clients, HR, health, legal, unpublished figures…",
             welcome_often: ["Yes, often", "Nothing must leave this computer."],
-            welcome_rarely: ["Rarely or never", "I can trust a service I choose with a meeting’s text."],
-            welcome_unsure: ["I don’t know", "Kitokey will choose the most discreet."],
-            welcome_skip: "Skip — everything on this computer",
+            welcome_rarely: ["Rarely or never", "I’m fine sending a meeting’s text to a service I choose."],
+            welcome_unsure: ["I’m not sure", "Kitokey will pick the most private option."],
+            welcome_skip: "Skip (keep everything on this computer)",
             welcome_cancel: "Cancel",
             welcome_next: "Next",
             welcome_back: "Back",
-            welcome_writer: "Who writes the minutes?",
-            welcome_here: [
-                "This computer",
-                "Nothing leaves it. It needs Ollama, which is free; a little slower.",
-            ],
+            welcome_writer: "Who writes the summary?",
+            welcome_here: ["This computer", "Nothing is sent. Requires Ollama (free); a bit slower."],
             welcome_service: [
                 "An online service",
-                "Faster and finer. The meeting’s text is sent to it, never its sound. You will choose it in Settings, and your agreement will be asked once before the first sending.",
+                "Faster and more accurate. Only the meeting’s text is sent, never the audio. You’ll pick the service in Settings, and you’ll be asked before the first send.",
             ],
-            welcome_private: ["Private mode", "Your meetings do not leave this computer."],
+            welcome_private: ["Private mode", "Your meetings never leave this computer."],
             welcome_connected: [
                 "Connected mode",
-                "The minutes are written by an online service; the transcription stays on this computer.",
+                "Summaries are written by an online service; transcription stays on this computer.",
             ],
-            welcome_rows: ["Transcription", "Minutes", "Reminder"],
+            welcome_rows: ["Transcription", "Summary", "Reminder"],
             welcome_on_this_computer: "On this computer",
-            welcome_online: "An online service, to choose now",
+            welcome_online: "An online service (to choose)",
             welcome_online_chosen: "An online service",
             welcome_ollama_by: "Ollama · {}",
-            welcome_reminder_on: "Tell the participants at the start of each meeting",
-            welcome_reminder_off: "Off — Settings turn it back on",
-            welcome_ollama_silent: "Ollama does not answer on this computer: the minutes wait for it. It is free, at ollama.com.",
-            welcome_ollama_lacks: "Ollama does not hold {} yet: the minutes wait for it. Settings fetch it in one click.",
+            welcome_reminder_on: "Remind me to tell participants at the start",
+            welcome_reminder_off: "Off (you can turn it on in Settings)",
+            welcome_ollama_silent: "Ollama isn’t responding on this computer, so the summary will wait. Ollama is free at ollama.com.",
+            welcome_ollama_lacks: "Ollama doesn’t have {} yet, so the summary will wait. Download it in one click in Settings.",
             welcome_fetch: "Download the model ({})",
-            welcome_fetch_from: "From {}, checked before it is used.",
+            welcome_fetch_from: "From {}, verified before use.",
             welcome_done: "Finish",
             welcome_later: "Later",
             welcome_later_waits: "Later — your meetings will wait for the model",
             welcome_choose: "Choose my service",
             welcome_again: [
-                "Set up again",
-                "The first start’s question, your current setting chosen; nothing changes before its last step.",
+                "Run setup again",
+                "Goes back through the first-launch questions with your current choices. Nothing changes until the last step.",
             ],
-            context_add: "Add the context",
-            context_edit: "Edit the context",
-            context_open: "The meeting’s context",
+            context_add: "Add context",
             context_title: "Context",
-            context_label: "What is the meeting about? Who takes part?",
-            context_example: "E.g. the Q4 budget with Inès Durand and the purchasing team",
-            context_why: "The transcription hears it as the first words said: names are spelt as here. The minutes use it to give each action to the right person.",
-            context_most: "{} characters at most",
+            context_label: "What’s the meeting about? Who’s attending?",
+            context_example: "E.g. Q4 budget with Inès Durand and the purchasing team",
+            context_why: "Helps the transcript spell names and terms correctly, and the summary assign each action to the right person.",
+            context_most: "{} characters max",
             context_left: ["{} left", "{} left"],
-            context_script: "In this script, Whisper may keep only its end, a service may refuse it.",
-            context_making: "The context cannot change while the transcript or the minutes are being made.",
-            context_unfinished: "The transcript is unfinished: finish it (Try again) before changing the context.",
+            context_script: "In this script, the context may be cut short or refused by some services.",
+            context_making: "You can’t edit the context while the transcript or summary is being made.",
+            context_unfinished: "The transcript isn’t finished. Click Try again to finish it before editing the context.",
             context_changed: [
-                "The transcript was made with another context.",
-                "The transcript and the minutes were made with another context.",
+                "The transcript was made with a different context.",
+                "The transcript and summary were made with a different context.",
             ],
             context_redo: "Redo with this context",
             language_label: "Spoken language",
-            language_default: "As in Settings",
-            language_detected: "Detected by the transcription",
-            meetings_language: "Language of the meetings",
-            language_not_saved: "The language was not saved: {}",
+            language_default: "Same as Settings",
+            language_detected: "Detect automatically",
+            meetings_language: "Meeting language",
+            language_not_saved: "Language not saved: {}",
             rename_meeting: "Rename this meeting",
             name_meeting: "Name this meeting",
-            name_not_saved: "The name was not saved: {}",
+            name_not_saved: "Name not saved: {}",
             language_detected_short: "detected",
-            language_as_system: "The system’s",
-            language_heard_as: "{} — SpeechAnalyzer hears {}",
+            language_as_system: "System language",
+            language_heard_as: "{} — SpeechAnalyzer transcribes in {}",
             app_language: [
-                "Language of Kitokey",
-                "Its window, its menu and its notifications; what the system draws itself keeps the system’s.",
+                "Kitokey language",
+                "Window, menu and notifications. System dialogs keep the system language.",
             ],
-            app_language_system: "The system’s language",
+            app_language_system: "System language",
             appearance: [
                 "Appearance",
                 "Every window of Kitokey, the bar too; System follows the system’s light or dark.",
             ],
             appearance_choices: ["System", "Light", "Dark"],
-            correct_line: "Correct the line at {}",
-            corrected: "corrected",
-            correction_empty: "A line is not left empty: Escape leaves it as it was.",
-            correction_failed: "The correction was not saved: {}",
-            corrected_since: "The transcript was corrected after these minutes were written.",
-            redo_corrections: "Redo with the corrections",
-            copy_minutes: "Copy the minutes",
+            correct_line: "Edit the line at {}",
+            corrected: "edited",
+            correction_empty: "A line can’t be empty. Press Escape to cancel.",
+            correction_failed: "Edit not saved: {}",
+            corrected_since: "The transcript was edited after this summary was written.",
+            redo_corrections: "Redo with edits",
+            copy_minutes: "Copy summary",
             minutes_copied: "Copied",
-            minutes_not_copied: "The minutes could not be copied.",
-            redo_loses_corrections: "Your corrections to this transcript will not be kept.",
-            context_not_saved: "The context could not be saved.",
+            minutes_not_copied: "Couldn’t copy the summary.",
+            redo_loses_corrections: "Your edits to this transcript will be lost.",
+            context_not_saved: "Couldn’t save the context.",
             confidential_name: "Confidential meeting",
             confidential_says: "Nothing leaves this computer",
             confidential_chip: "Confidential",
-            confidential_left: "Had already left before: {}.",
-            confidential_left_sound: "the sound, to {}",
-            confidential_left_transcript: "the transcript, to {}",
-            confidential_not_saved: "The meeting could not be said confidential: try again.",
-            confidential_ollama_empty: "Ollama holds no model on this computer: the minutes wait for it.",
+            confidential_left: "Already sent earlier: {}.",
+            confidential_left_sound: "the audio to {}",
+            confidential_left_transcript: "the transcript to {}",
+            confidential_not_saved: "Couldn’t mark the meeting as confidential. Try again.",
+            confidential_ollama_empty: "Ollama has no model on this computer, so the summary will wait.",
             confidential_fetch: "Download {}",
         },
         Language::French => Window {
             locale: "fr",
             units: ["o", "ko", "Mo", "Go"],
-            sections: "Rubriques",
+            sections: "Navigation",
             meetings: "Réunions",
             weight: "{} réunions",
             weight_one: "{} réunion",
             this_week: "Cette semaine",
             last_week: "La semaine dernière",
             earlier_in: "Plus tôt en {}",
-            undated: "Date inconnue",
+            undated: "Sans date",
             minutes: "Compte rendu",
             transcript: "Transcription",
             audio: "Audio · {}",
             audio_freed: "Audio supprimé",
             audio_weighs: "audio {}",
-            recording: "Enregistrement en cours",
+            recording: "Enregistrement",
             interrupted: "Interrompu",
             none: "Aucune réunion pour l’instant.",
             none_folder: "Les réunions sont enregistrées dans {}.",
-            none_do: "Démarrez un enregistrement\u{a0}: son bouton, son raccourci, ou l’icône de la barre système.",
-            list_unread: "Les réunions de {} ne peuvent pas être lues.",
-            list_unread_do: "Vérifiez que le disque de ce dossier est branché et que vous pouvez le lire, puis réessayez.",
+            none_do: "Pour commencer, cliquez sur Démarrer un enregistrement, utilisez le raccourci clavier ou l’icône Kitokey.",
+            list_unread: "Impossible de lire les réunions de {}.",
+            list_unread_do: "Vérifiez que le disque est branché et que vous avez accès à ce dossier, puis réessayez.",
             settings_banner: "Les réglages ne peuvent pas être lus\u{a0}: vos réunions ne sont pas affichées.",
             settings_banner_kept: "Les réglages ne peuvent pas être lus\u{a0}: les derniers lus restent en usage, et aucun changement n’est enregistré tant que le fichier n’est pas corrigé.",
-            again_refused: "Impossible de recommencer\u{a0}: {}",
-            fold_not_kept: "La barre latérale reviendra comme avant au prochain démarrage\u{a0}: {}",
-            agreement_refused: "Cette réunion ne peut pas être envoyée\u{a0}: {}",
-            meeting_not_opened: "Cette réunion n’a pas pu être ouverte\u{a0}: {}",
-            page_not_shown: "Cette page n’a pas pu être affichée\u{a0}: réessayez.",
-            context_not_read: "Le contexte n’a pas pu être relu\u{a0}: {}",
+            again_refused: "Impossible de relancer\u{a0}: {}",
+            fold_not_kept: "La position de la barre latérale ne sera pas mémorisée\u{a0}: {}",
+            agreement_refused: "Impossible d’envoyer cette réunion\u{a0}: {}",
+            meeting_not_opened: "Impossible d’ouvrir cette réunion\u{a0}: {}",
+            page_not_shown: "Impossible d’afficher cette page. Réessayez.",
+            context_not_read: "Impossible de relire le contexte\u{a0}: {}",
             record_starting: "Démarrage…",
             record_stopping: "Arrêt…",
             redo_cancel: "Annuler",
             saved: "Enregistré",
-            small_not_confidential: "Cette réunion n’est pas confidentielle\u{a0}: ouvrez-la pour la marquer.",
-            trial_over: "L’essai est terminé\u{202f}; vos réunions restent à vous, lisibles, jouables et exportables.",
+            small_not_confidential: "Cette réunion n’est pas confidentielle. Ouvrez-la pour la marquer comme telle.",
+            trial_over: "Votre essai est terminé. Vos réunions restent à vous\u{a0}: vous pouvez toujours les lire, les écouter et les exporter.",
             buy: "Acheter Kitokey",
             trial: "Essai gratuit",
-            find_meetings: "Chercher dans les réunions",
-            fold: "Replier la barre latérale",
+            find_meetings: "Rechercher",
+            fold: "Masquer la barre latérale",
             unfold: "Afficher la barre latérale",
-            none_found: "Aucune réunion ne contient ces mots.",
+            none_found: "Aucune réunion trouvée.",
             back: "Réunions",
             open_folder: "Ouvrir le dossier",
             trash_meeting: "Mettre à la corbeille",
@@ -1694,93 +1957,93 @@ pub fn window(language: Language) -> Window {
             labelled: "{}\u{a0}:",
             minutes_title: "Compte rendu",
             transcript_title: "Transcription",
-            search: "Rechercher dans la transcription",
-            written_by: "Écrit par {}",
+            search: "Rechercher dans le texte",
+            written_by: "Rédigé par {}",
             written_via: ", via {}",
             at: "à",
             heard_by: "Transcrit par {}, sur cet ordinateur",
             transcribed_on: "Transcrit le {}",
             minutes_of: "Compte rendu du {}",
             made_in: "en {}",
-            here: "Ici",
-            remote: "À distance",
+            here: "Vous",
+            remote: "Les autres",
             voice: "voix {}",
-            here_described: "Ici — votre micro",
-            remote_described: "À distance — le son de l’ordinateur",
-            who_spoke: "Qui a parlé au fil de la réunion\u{a0}: ici en haut, à distance en bas",
+            here_described: "Vous — votre micro",
+            remote_described: "Les autres — le son de l’appel",
+            who_spoke: "Temps de parole au fil de la réunion\u{a0}: vous en haut, les autres en bas",
             no_transcript: "Pas encore de transcription.",
             no_minutes: "Pas encore de compte rendu.",
-            being_made: "En cours d’écriture — ce qui est là est vrai quand même.",
-            unreadable: "Ce fichier ne peut pas être lu par cette version de Kitokey.",
-            unread: "{} ligne(s) du fichier n’ont pas pu être lues et sont laissées de côté.",
-            no_match: "Aucun passage ne correspond.",
+            being_made: "Transcription en cours\u{a0}: la suite arrive.",
+            unreadable: "Cette version de Kitokey ne sait pas lire ce fichier.",
+            unread: "{} ligne(s) illisible(s) ignorée(s).",
+            no_match: "Aucun résultat.",
             settings: "Réglages",
             after_title: "Après un enregistrement",
             after_nothing: [
                 "Ne rien faire",
-                "L’audio est gardé\u{202f}; vous lancez la suite quand vous voulez.",
+                "L’audio est conservé. Vous lancez la transcription quand vous voulez.",
             ],
-            after_transcript: ["Écrire la transcription", "Sur cet ordinateur, sans réseau."],
+            after_transcript: ["Transcrire", "Sur cet ordinateur, sans connexion."],
             after_minutes: [
-                "Écrire la transcription, puis le compte rendu",
-                "Tout s’enchaîne\u{202f}; une notification prévient quand le compte rendu est prêt.",
+                "Transcrire, puis rédiger le compte rendu",
+                "Tout s’enchaîne. Une notification vous prévient quand le compte rendu est prêt.",
             ],
             models_title: "Modèles",
-            models_intro: "Pour chaque étape, vous choisissez qui travaille\u{a0}: un modèle sur cet ordinateur, un service en ligne, ou votre propre adresse.",
-            models_note: "Les modèles «\u{a0}sur cet ordinateur\u{a0}» sont ceux que Kitokey trouve installés. Une clé est gardée dans le trousseau de votre système, jamais dans un fichier. Rien ne quitte cet ordinateur sans votre accord\u{a0}: un service de transcription que vous choisissez reçoit le son de vos réunions et leur contexte, un service de compte rendu leur texte et leur contexte seulement.",
+            models_intro: "Pour chaque étape, choisissez qui fait le travail\u{a0}: un modèle sur cet ordinateur, un service en ligne ou votre propre serveur.",
+            models_note: "«\u{a0}Sur cet ordinateur\u{a0}» liste les modèles installés. Les clés d’API sont rangées dans le trousseau du système, jamais dans un fichier. Rien ne quitte cet ordinateur sans votre accord\u{a0}: un service de transcription reçoit le son et le contexte de vos réunions\u{202f}; un service de compte rendu, seulement leur texte et leur contexte.",
             model_state: "Modèle de transcription",
             model_ready: "Prêt",
-            model_here: "Installé · {} · tourne sur cet ordinateur, sans réseau",
-            model_missing: "Pas encore sur cet ordinateur.",
-            model_named_missing: "Pas sur cet ordinateur\u{a0}: remettez-le à sa place, ou choisissez-en un autre.",
-            model_coming: "En cours de téléchargement.",
+            model_here: "Installé · {} · fonctionne hors connexion",
+            model_missing: "Pas encore téléchargé.",
+            model_named_missing: "Introuvable sur cet ordinateur. Remettez le fichier à sa place ou choisissez un autre modèle.",
+            model_coming: "Téléchargement en cours…",
             model_offer: "Télécharger le modèle ({}, {})",
             offered_title: "Modèles à télécharger",
             offered_fetch: "Télécharger",
-            offered_far: "Téléchargement… {} %",
-            model_chosen_missing: "{} — pas encore sur cet ordinateur",
+            offered_far: "Téléchargement… {}\u{202f}%",
+            model_chosen_missing: "{} — pas encore téléchargé",
             offered_ollama_size: "environ 5 Go",
-            offered_ollama_good: "Pour les comptes rendus, sur cet ordinateur, par Ollama",
-            offered_needs_ollama: "Nécessite Ollama, à installer depuis ollama.com",
-            offered_refresh: "Mettre à jour la liste ({})",
-            offered_refresh_failed: "La liste n’a pas pu être mise à jour\u{a0}: les modèles ci-dessus restent proposés.",
+            offered_ollama_good: "Pour le compte rendu, sur cet ordinateur, avec Ollama",
+            offered_needs_ollama: "Nécessite Ollama (gratuit, sur ollama.com)",
+            offered_refresh: "Actualiser la liste ({})",
+            offered_refresh_failed: "Impossible d’actualiser la liste. Les modèles ci-dessus restent disponibles.",
             speech_option: "SpeechAnalyzer d’Apple, sur ce Mac",
-            speech_missing: "le modèle d’Apple n’est pas encore sur ce Mac",
+            speech_missing: "modèle d’Apple pas encore téléchargé",
             speech_fetch: "Télécharger le modèle d’Apple (macOS le télécharge depuis Apple)",
             speech_fetching: "macOS télécharge le modèle d’Apple…",
-            speech_failed: "Le modèle d’Apple n’a pas été téléchargé. Réessayez plus tard\u{202f}; Whisper reste disponible.",
+            speech_failed: "Impossible de télécharger le modèle d’Apple. Réessayez plus tard\u{202f}; Whisper reste disponible.",
             service_option: "Un service que je choisis",
-            service_address: "Son adresse",
-            service_model: "Son modèle",
-            service_key: "Sa clé, s’il en demande une",
+            service_address: "Adresse du service",
+            service_model: "Modèle",
+            service_key: "Clé d’API (si demandée)",
             service_agree: "J’accepte que le son de mes réunions soit envoyé à {}",
             service_save: "Enregistrer",
             service_test: "Tester",
-            service_tested: "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit.",
+            service_tested: "Ça fonctionne\u{a0}: un extrait audio de test a été transcrit avec ses horodatages.",
             service_saved: "Enregistré\u{a0}: {} transcrira vos prochaines réunions.",
             service_saved_here: "Enregistré\u{a0}: cet ordinateur transcrira vos prochaines réunions.",
-            service_agree_first: "Rien n’est enregistré\u{a0}: acceptez d’abord que le son de vos réunions soit envoyé à {}.",
-            service_address_bad: "Rien n’est enregistré\u{a0}: l’adresse commence par https:// ou http://, puis l’hôte du service — par exemple https://api.groq.com/openai/v1.",
-            service_model_named: "Rien n’est enregistré\u{a0}: nommez le modèle avec lequel le service entend — par exemple whisper-large-v3.",
+            service_agree_first: "Non enregistré\u{a0}: cochez d’abord l’accord d’envoi du son à {}.",
+            service_address_bad: "Non enregistré\u{a0}: l’adresse doit commencer par https:// ou http://, par exemple https://api.groq.com/openai/v1.",
+            service_model_named: "Non enregistré\u{a0}: indiquez le nom du modèle, par exemple whisper-large-v3.",
             installed: "installé, {}",
-            keep_other: "Autre nombre de jours…",
-            keep_not_days: "{} n’est pas un nombre de jours\u{a0}: de 1 à 36 500",
-            builtin: "intégré à Kitokey",
+            keep_other: "Autre durée…",
+            keep_not_days: "«\u{a0}{}\u{a0}» n’est pas un nombre de jours valide (de 1 à 36 500)",
+            builtin: "intégré",
             home: "Dossier personnel",
             transcription: "Transcription",
-            on_this_computer: "Sur cet ordinateur — rien ne sort",
+            on_this_computer: "Sur cet ordinateur — rien n’est envoyé",
             reminder: [
-                "Rappeler de prévenir les participants",
-                "Au démarrage, une ligne rappelle de dire que la réunion est enregistrée.",
+                "Me rappeler de prévenir les participants",
+                "Au début de chaque enregistrement, un rappel vous invite à annoncer que la réunion est enregistrée.",
             ],
             offer: [
-                "Quand une application prend le micro",
-                "Un appel qui commence, le plus souvent. Kitokey n’enregistre jamais sans que vous le sachiez.",
+                "Quand une application utilise le micro",
+                "Le plus souvent, un appel qui commence. Kitokey n’enregistre jamais à votre insu.",
             ],
             offer_choices: ["Proposer d’enregistrer", "Ne rien faire"],
             autostart: [
                 "Lancer Kitokey à l’ouverture de session",
-                "Dans la barre système, sans fenêtre\u{a0}: un appel vous est proposé même après un redémarrage.",
+                "Discrètement, sans fenêtre\u{a0}: Kitokey vous propose d’enregistrer vos appels même après un redémarrage.",
             ],
             autostart_held: [
                 "Désactivé dans Windows\u{a0}: réactivez-le dans Paramètres › Applications › Démarrage.",
@@ -1792,66 +2055,63 @@ pub fn window(language: Language) -> Window {
                 "Mode développeur",
                 "Affiche le détail technique sous chaque erreur, pour aider au diagnostic.",
             ],
-            program_said: "Ce qu’a dit le programme\u{a0}: {}",
+            program_said: "Détail technique\u{a0}: {}",
             minutes_sections: ["Points saillants", "Actions", "Points clés"],
             actions_cells: ["Qui", "Quoi", "Pour quand"],
             unsettled: "non précisé",
             model_recommended: "{} — recommandé",
             play: "Écouter",
             pause: "Pause",
-            time_listen: "Écouter depuis {}",
-            time_passage: "Voir le passage de {}",
-            not_playable: "Cette version de Kitokey ne peut pas lire cet audio.",
+            time_listen: "Écouter à partir de {}",
+            time_passage: "Voir le passage à {}",
+            not_playable: "Cet audio ne peut pas être lu dans Kitokey.",
             not_played: "Lecture impossible ici. Ouvrez le dossier pour l’écouter avec un autre lecteur.",
             playback: "Position de lecture",
             no_player: "L’audio a été supprimé pour faire de la place. La transcription et le compte rendu restent.",
             log_level: ["Niveau des journaux", "S’applique au prochain lancement de Kitokey."],
-            log_info: "Habituel",
+            log_info: "Normal",
             log_debug: "Détaillé",
-            logs: [
-                "Journaux",
-                "Ce que Kitokey a fait, un fichier par jour, gardé quatorze jours — jamais un mot d’une réunion.",
-            ],
+            logs: ["Journaux", "Un fichier par jour, conservé 14 jours. Aucun contenu de réunion."],
             open_logs: "Ouvrir les journaux",
-            logs_not_opened: "Le dossier des journaux n’a pas pu être ouvert.",
+            logs_not_opened: "Impossible d’ouvrir le dossier des journaux.",
             copy_diagnostic: "Copier un diagnostic",
             diagnostic_copied: "Diagnostic copié",
-            diagnostic_empty: "Rien de journalisé pour cette réunion",
-            diagnostic_not_copied: "Diagnostic non copié",
+            diagnostic_empty: "Aucun journal pour cette réunion",
+            diagnostic_not_copied: "Copie impossible",
             sessions_folder: [
                 "Dossier des réunions",
-                "Les nouvelles réunions y sont écrites. Celles déjà enregistrées restent où elles étaient\u{a0}: la fenêtre et la garde de l’audio suivent ce dossier.",
+                "Les nouvelles réunions sont enregistrées ici. Les réunions existantes restent dans l’ancien dossier\u{a0}: Kitokey n’affiche et ne nettoie que celui-ci.",
             ],
             choose: "Choisir…",
-            small: "La barre d’enregistrement",
+            small: "Barre d’enregistrement",
             small_mic: "Votre micro",
             small_meeting: "Le son de la réunion",
-            bar_silent_me: "Votre micro\u{a0}: rien depuis 2\u{a0}min — l’enregistrement continue.",
-            bar_silent_others: "La réunion\u{a0}: rien depuis 2\u{a0}min — l’enregistrement continue.",
-            small_nothing: "Rien n’en arrive\u{a0}: vérifiez qu’il n’est pas coupé sur l’appareil lui-même, et qu’il est prêt.",
+            bar_silent_me: "Votre micro\u{a0}: rien depuis 2\u{a0}min — enregistrement en cours.",
+            bar_silent_others: "La réunion\u{a0}: rien depuis 2\u{a0}min — enregistrement en cours.",
+            small_nothing: "Aucun signal\u{a0}: vérifiez que le micro n’est pas coupé sur l’appareil et qu’il est allumé.",
             small_waiting_me: "Votre micro n’est pas enregistré pour l’instant.",
-            small_waiting_others: "Son de la réunion non enregistré pour l’instant.",
-            small_note: "À l’arrêt, la transcription s’écrit toute seule. Vous serez prévenu.",
+            small_waiting_others: "Le son de la réunion n’est pas enregistré pour l’instant.",
+            small_note: "À l’arrêt, la transcription démarre toute seule. Une notification vous préviendra.",
             small_announce: "Prévenez les participants que cette réunion est enregistrée.",
             copy_announcement: "Copier l’annonce",
-            announcement_not_copied: "Pas copiée.",
-            small_full: "Toute la fenêtre",
+            announcement_not_copied: "Non copiée.",
+            small_full: "Ouvrir la fenêtre complète",
             bar_more: "Plus d’options",
             bar_less: "Moins d’options",
             bar_hide: "Masquer la barre",
             small_microphone: "Micro\u{a0}: {}",
-            small_microphones: "Le micro du prochain enregistrement",
+            small_microphones: "Micro du prochain enregistrement",
             microphone_auto: "Auto",
-            microphone_auto_says: "Celui que tient votre appel, sinon celui de votre ordinateur.",
-            microphone_absent: "Il est absent pour l’instant\u{a0}: Auto le remplace.",
-            microphones_unread: "La liste ne peut pas être lue pour l’instant\u{a0}: Auto fonctionne toujours. Rouvrez-la dans un instant.",
-            microphone_not_kept: "Votre choix de micro n’a pas pu être gardé\u{a0}: choisissez-le de nouveau.",
-            small_microphone_gone: "Le micro choisi n’est pas là\u{a0}: Auto le remplace.",
-            bar_microphone_recorded: "Enregistré\u{a0}: {}. Le changer vaut pour le prochain enregistrement.",
-            bar_microphone_next: "Le changer vaut pour le prochain enregistrement.",
-            bar_context: "Contexte de la réunion",
+            microphone_auto_says: "Celui de votre appel, sinon celui de l’ordinateur.",
+            microphone_absent: "Débranché pour l’instant\u{a0}: Auto prend le relais.",
+            microphones_unread: "Liste des micros indisponible pour l’instant. Auto fonctionne\u{202f}; réessayez dans un instant.",
+            microphone_not_kept: "Votre choix de micro n’a pas été enregistré. Choisissez-le à nouveau.",
+            small_microphone_gone: "Le micro choisi est débranché\u{a0}: Auto prend le relais.",
+            bar_microphone_recorded: "Micro utilisé\u{a0}: {}. Un changement s’appliquera au prochain enregistrement.",
+            bar_microphone_next: "Un changement s’appliquera au prochain enregistrement.",
+            bar_context: "Sujet, participants…",
             bar_context_clear: "Effacer le contexte",
-            bar_context_kept: "Gardé pour le prochain enregistrement, jusqu’à ce que vous l’effaciez.",
+            bar_context_kept: "Conservé pour le prochain enregistrement.",
             bar_last_hearing: "{}\u{a0}: transcription en cours",
             bar_last_summary: "{}\u{a0}: compte rendu en cours",
             bar_last_ready: "{}\u{a0}: prête",
@@ -1861,186 +2121,190 @@ pub fn window(language: Language) -> Window {
             bar_advanced: "Avancé — modèles",
             models_transcription: "Modèle de transcription",
             models_minutes: "Modèle du compte rendu",
-            models_settings: "Réglages\u{a0}: {}",
+            models_settings: "Celui des Réglages\u{a0}: {}",
             models_none: "aucun modèle choisi",
-            models_own_note: "Pour cette réunion seule\u{202f}; les Réglages ne changent pas.",
-            models_not_kept: "Ce choix n’a pas pu être gardé\u{a0}: {}",
-            models_not_read: "Les modèles n’ont pas pu être lus\u{a0}: {}",
-            models_gone_transcription: "Le modèle de transcription choisi pour cette réunion n’est plus là\u{a0}: celui des Réglages le remplace.",
-            models_gone_minutes: "Le modèle du compte rendu choisi pour cette réunion passe par un service que les Réglages ne nomment pas\u{a0}: celui des Réglages le remplace.",
-            models_unused_confidential: "Le service choisi pour cette réunion n’est pas utilisé tant qu’elle est confidentielle\u{a0}: elle est faite sur cet ordinateur.",
-            bar_models_kept: "Modèles gardés\u{a0}: {}",
-            bar_model_kept: "Modèle gardé\u{a0}: {}",
+            models_own_note: "Pour cette réunion uniquement\u{202f}; les Réglages ne changent pas.",
+            models_not_kept: "Choix non enregistré\u{a0}: {}",
+            models_not_read: "Impossible de lire les modèles\u{a0}: {}",
+            models_gone_transcription: "Le modèle de transcription choisi pour cette réunion n’est plus installé\u{a0}: celui des Réglages sera utilisé.",
+            models_gone_minutes: "Le service choisi pour le compte rendu de cette réunion n’est plus configuré\u{a0}: celui des Réglages sera utilisé.",
+            models_unused_confidential: "Réunion confidentielle\u{a0}: le service en ligne choisi n’est pas utilisé, tout se fait sur cet ordinateur.",
+            bar_models_kept: "Modèles retenus\u{a0}: {}",
+            bar_model_kept: "Modèle retenu\u{a0}: {}",
             check_sound: "Vérifier le son",
-            check_sound_says: "Votre micro et le son de la réunion, avant un enregistrement.",
+            check_sound_says: "Testez votre micro et le son de la réunion avant d’enregistrer.",
             check_unavailable: "Indisponible",
-            check_bluetooth: "Tant que ce panneau est ouvert, votre casque Bluetooth passe en qualité d’appel\u{202f}; il revient à la fermeture.",
+            check_bluetooth: "Tant que ce panneau est ouvert, votre casque Bluetooth passe en mode appel (son de moindre qualité). Il revient à la normale à la fermeture.",
             check_play: "Jouer un son de test",
-            check_heard: "Kitokey entend le son de cet ordinateur.",
-            check_not_heard: "Kitokey n’a pas entendu le son de test. Vérifiez que le son sort de cet ordinateur et pas d’un autre appareil, puis rejouez-le.",
-            check_call: "Un appel tient le micro\u{a0}: pas de son de test, il partirait dans l’appel. Faites jouer un son dans l’appel et regardez la jauge.",
-            check_open_note: "Le micro reste ouvert tant que ce panneau l’est.",
+            check_heard: "Kitokey entend bien le son de cet ordinateur.",
+            check_not_heard: "Kitokey n’a pas entendu le son de test. Vérifiez que le son sort bien de cet ordinateur (et pas d’un autre appareil), puis réessayez.",
+            check_call: "Un appel utilise le micro\u{a0}: pas de son de test, il serait entendu dans l’appel. Faites parler quelqu’un dans l’appel et regardez la jauge.",
+            check_open_note: "Le micro reste actif tant que ce panneau est ouvert.",
             check_close: "Fermer",
-            check_failed: "Kitokey ne peut écouter ni votre micro ni le son de la réunion pour l’instant\u{a0}: fermez ce panneau et rouvrez-le.",
-            check_recording: "Un enregistrement est en cours\u{a0}: ses jauges sont dans la barre.",
+            check_failed: "Kitokey ne parvient pas à écouter votre micro ni le son de la réunion. Fermez ce panneau et rouvrez-le.",
+            check_recording: "Un enregistrement est en cours\u{a0}: ses jauges sont dans la barre d’enregistrement.",
             free: "Faire de la place",
-            free_what: "Que voulez-vous retirer\u{202f}?",
+            free_what: "Que voulez-vous supprimer\u{202f}?",
             free_audio: [
                 "L’audio seulement",
-                "Le compte rendu et la transcription restent lisibles. C’est l’audio qui pèse presque tout.",
+                "Le compte rendu et la transcription restent lisibles. L’audio représente presque tout l’espace.",
             ],
             free_whole: [
                 "La réunion entière",
-                "L’audio, la transcription et le compte rendu\u{a0}: il ne reste rien de la réunion.",
+                "Audio, transcription et compte rendu\u{a0}: rien n’est conservé.",
             ],
-            free_heaviest: "Les plus lourdes d’abord",
+            free_heaviest: "Les plus volumineuses d’abord",
             free_older: "Cocher celles de plus de 30 jours",
             free_total: "libérés · {} réunions",
             free_one: "libérés · 1 réunion",
-            free_note: "Rien n’est effacé pour de bon\u{a0}: tout part dans la corbeille de votre système. Pour annuler, restaurez depuis la corbeille.",
-            free_audio_note: "Sans son audio, une réunion ne pourra plus être transcrite à nouveau par un meilleur moteur.",
-            free_do_audio: "Mettre leur audio à la corbeille",
-            free_do_whole: "Mettre ces réunions à la corbeille",
-            free_busy: "en cours d’enregistrement, de transcription ou de rédaction du compte rendu",
-            free_done: "C’est fait\u{a0}: dans la corbeille.",
+            free_note: "Rien n’est supprimé définitivement\u{a0}: tout va dans la corbeille, d’où vous pouvez le restaurer.",
+            free_audio_note: "Sans l’audio, la réunion ne pourra plus être retranscrite, même avec un meilleur modèle.",
+            free_do_audio: "Mettre l’audio à la corbeille",
+            free_do_whole: "Mettre les réunions à la corbeille",
+            free_busy: "en cours de traitement",
+            free_done: "C’est fait\u{a0}: tout est dans la corbeille.",
             redo: "Refaire…",
             redo_title: "Refaire le compte rendu",
-            redo_with: "Refait avec les modèles de cette réunion\u{a0}: «\u{a0}Avancé\u{a0}» pour les choisir.",
+            redo_with: "Refait avec les modèles de cette réunion (à choisir dans «\u{a0}Avancé\u{a0}»).",
             redo_note: "Le compte rendu actuel reste en place tant que le nouveau n’est pas prêt, et se retrouve ensuite dans la corbeille.",
             redo_minutes_do: "Refaire le compte rendu avec {}",
             redo_transcript_do: "Refaire la transcription avec {}",
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
-            redo_transcript_note: "La transcription actuelle est gardée tant que la nouvelle n’est pas entière, puis part à la corbeille\u{202f}; si la nouvelle échoue, l’actuelle revient.",
-            make_minutes: "Faire le compte rendu",
-            make_transcript: "Faire la transcription",
+            redo_transcript_note: "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée.",
+            make_minutes: "Rédiger le compte rendu",
+            make_transcript: "Transcrire",
+            make_minutes_with: "Rédiger le compte rendu avec {}",
+            minutes_made_with: "Ce compte rendu a été fait avec {}.",
+            transcript_made_with: "Cette transcription a été faite avec {}.",
             minutes_making: "Rédaction du compte rendu",
-            minutes_waiting: "En file d’attente · {} avant",
-            minutes_awaiting: "En attente de votre accord pour l’envoyer à {}",
+            minutes_waiting: "En attente · {} avant",
+            minutes_awaiting: "En attente de votre accord pour l’envoi à {}",
             agree_open: "Voir et accepter",
-            minutes_not_made: "Le compte rendu n’a pas été fait. La transcription est intacte.",
+            minutes_not_made: "Le compte rendu n’a pas pu être rédigé. La transcription n’a pas changé.",
             try_again: "Réessayer",
             chip_making: "Compte rendu…",
             chip_waiting: "En attente",
             chip_awaiting: "Accord requis",
             chip_transcribing: "Transcription…",
-            chip_failed: "Compte rendu non fait",
+            chip_failed: "Échec compte rendu",
             chip_redo_failed: "Refaire échoué",
             minutes_redo_failed: "Le dernier Refaire a échoué. Le compte rendu affiché est le précédent.",
             transcript_making: "Transcription en cours",
-            transcript_not_made: "La transcription n’a pas été faite. L’enregistrement est intact.",
-            chip_transcript_failed: "Transcription non faite",
-            minutes_unsaved: "Modification non enregistrée\u{a0}: {} reste utilisé.",
-            minutes_unsaved_none: "Pas encore enregistré — aucun compte rendu n’est fait tant que ce n’est pas le cas.",
-            transcript_model_needed: "En attente du modèle Whisper.",
-            transcript_model_coming: "En attente du modèle Whisper, en cours de téléchargement.",
+            transcript_not_made: "La transcription n’a pas pu être faite. L’audio est intact.",
+            chip_transcript_failed: "Non transcrite",
+            minutes_unsaved: "Non enregistré\u{a0}: {} reste utilisé.",
+            minutes_unsaved_none: "Non enregistré\u{a0}: aucun compte rendu ne sera rédigé d’ici là.",
+            transcript_model_needed: "En attente du modèle de transcription.",
+            transcript_model_coming: "En attente du modèle de transcription (téléchargement en cours).",
             making_cancel: "Annuler",
             making_cancel_failed: "Kitokey n’a pas pu annuler\u{a0}: {}",
+            making_left: "environ {}\u{a0}min",
             transcript_stopped: "Transcription arrêtée. Vous pouvez la relancer, avec un autre modèle si besoin.",
             minutes_stopped: "Compte rendu arrêté. Vous pouvez le relancer, avec un autre modèle si besoin.",
-            ran_online: "en ligne",
             record_start: "Démarrer un enregistrement",
             record_stop: "Arrêter l’enregistrement",
-            agree_eyebrow: "Avant le premier compte rendu en ligne",
+            agree_eyebrow: "Premier compte rendu en ligne",
             agree_title: "Le texte de «\u{a0}{}\u{a0}» va quitter votre ordinateur",
-            agree_lead: "Pour écrire le compte rendu, Kitokey envoie la transcription au service que vous avez choisi. Voici exactement ce qui part.",
+            agree_lead: "Pour rédiger le compte rendu, Kitokey envoie la transcription au service que vous avez choisi. Voici exactement ce qui est envoyé.",
             agree_leaves: [
-                "Part\u{a0}: la transcription",
-                "Les mots prononcés, de votre côté et à distance — {} minutes, environ {} mots.",
+                "Envoyé\u{a0}: la transcription",
+                "Les paroles de tous les participants — {} minutes, environ {} mots.",
             ],
-            agree_context: ["Part\u{a0}: le contexte que vous avez joint", "Environ {} mots."],
-            agree_stays: ["Reste ici\u{a0}: l’audio", "Aucun son n’est envoyé, jamais."],
+            agree_context: ["Envoyé\u{a0}: le contexte que vous avez ajouté", "Environ {} mots."],
+            agree_stays: ["Reste ici\u{a0}: l’audio", "Aucun son n’est jamais envoyé."],
             agree_to: "Destinataire",
             agree_model: "Modèle",
             agree_remember: "Ne plus demander pour ce service",
             agree_send: "Envoyer la transcription",
             agree_not: "Ne pas envoyer",
-            agree_local: "Écrire plutôt le compte rendu sur cet ordinateur",
-            agree_local_write: "Rédiger sur cet ordinateur",
-            shortcut: ["Raccourci", "Démarre et arrête un enregistrement, où que vous soyez."],
+            agree_local: "Rédiger plutôt sur cet ordinateur",
+            agree_local_write: "Rédiger ici",
+            shortcut: ["Raccourci clavier", "Démarre ou arrête un enregistrement, où que vous soyez."],
             shortcut_none: "Aucun raccourci défini",
-            shortcut_where: "Il se modifie dans les réglages clavier du système.",
+            shortcut_where: "Vous pouvez le modifier dans les réglages clavier du système.",
             shortcut_open: "Réglages du clavier",
             test: "Tester",
-            test_sends: "Le test envoie une courte phrase à {} — rien de vos réunions.",
+            test_sends: "Le test envoie une courte phrase à {}, rien de vos réunions.",
             testing: "Test en cours…",
-            test_answered: "Ça marche\u{a0}: le modèle répond.",
+            test_answered: "Ça fonctionne\u{a0}: le modèle répond.",
             test_failed: "Le modèle ne répond pas\u{a0}: {}",
             keep_audio: [
-                "Garder l’audio",
-                "Passé ce délai, l’audio part à la corbeille\u{202f}; la transcription et le compte rendu restent.",
+                "Conserver l’audio",
+                "Passé ce délai, l’audio va à la corbeille\u{202f}; la transcription et le compte rendu restent.",
             ],
             keep_always: "Toujours",
             keep_days: "{} jours",
-            not_saved: "Le réglage n’a pas été enregistré\u{a0}: {}",
-            key_not_kept: "Le choix est enregistré, mais la clé n’a pas été gardée dans le trousseau du système\u{a0}: {}",
+            not_saved: "Non enregistré\u{a0}: {}",
+            key_not_kept: "Choix enregistré, mais la clé n’a pas pu être rangée dans le trousseau du système\u{a0}: {}",
             minutes_step: "Compte rendu",
             address: "Adresse (compatible OpenAI)",
             model_name: "Modèle",
             key: "Clé d’API",
-            key_kept: "Une clé est gardée dans le trousseau du système\u{202f}; une nouvelle la remplace.",
+            key_kept: "Clé enregistrée — saisissez-en une nouvelle pour la remplacer",
             where_service: "Un service",
             service_name: "Service",
             key_test: "Vérifier la clé",
             save: "Enregistrer",
             where_online: "En ligne — le texte de la transcription est envoyé",
-            ollama_lacks: "Ollama, sur cet ordinateur, n’a pas de modèle nommé {}\u{a0}: choisissez-en un dans la liste, ou téléchargez-le avec Ollama.",
-            ollama_silent: "Ollama ne répond pas ou n’a aucun modèle\u{a0}: lancez Ollama, puis téléchargez un modèle.",
-            welcome_title: "Réglons Kitokey en une question.",
-            welcome_question: "Vos réunions parlent-elles de sujets confidentiels\u{202f}?",
+            ollama_lacks: "Ollama n’a pas de modèle nommé {} sur cet ordinateur. Choisissez-en un dans la liste ou téléchargez-le avec Ollama.",
+            ollama_silent: "Ollama ne répond pas ou n’a aucun modèle. Lancez Ollama, puis téléchargez un modèle.",
+            welcome_title: "Configurons Kitokey en une question.",
+            welcome_question: "Vos réunions abordent-elles des sujets confidentiels\u{202f}?",
             welcome_examples: "Clients, ressources humaines, santé, juridique, chiffres non publiés…",
             welcome_often: ["Oui, souvent", "Rien ne doit quitter cet ordinateur."],
             welcome_rarely: [
                 "Rarement ou jamais",
-                "Je peux confier le texte d’une réunion à un service que je choisis.",
+                "Je peux confier le texte d’une réunion à un service de mon choix.",
             ],
-            welcome_unsure: ["Je ne sais pas", "Kitokey choisira le plus discret."],
-            welcome_skip: "Passer — tout sur cet ordinateur",
+            welcome_unsure: ["Je ne sais pas", "Kitokey choisira l’option la plus discrète."],
+            welcome_skip: "Passer (tout sur cet ordinateur)",
             welcome_cancel: "Annuler",
             welcome_next: "Suivant",
             welcome_back: "Retour",
-            welcome_writer: "Qui écrit le compte rendu\u{202f}?",
-            welcome_here: ["Cet ordinateur", "Rien ne sort. Il faut Ollama, gratuit\u{202f}; un peu plus lent."],
+            welcome_writer: "Qui rédige le compte rendu\u{202f}?",
+            welcome_here: [
+                "Cet ordinateur",
+                "Rien n’est envoyé. Nécessite Ollama (gratuit)\u{202f}; un peu plus lent.",
+            ],
             welcome_service: [
                 "Un service en ligne",
-                "Plus rapide et plus fin. Le texte de la réunion lui est envoyé, jamais le son. Vous le choisirez dans Réglages, et votre accord sera demandé une fois avant le premier envoi.",
+                "Plus rapide et plus précis. Seul le texte de la réunion est envoyé, jamais le son. Vous choisirez le service dans les Réglages\u{202f}; votre accord sera demandé avant le premier envoi.",
             ],
             welcome_private: ["Mode privé", "Vos réunions ne quittent pas cet ordinateur."],
             welcome_connected: [
                 "Mode connecté",
-                "Le compte rendu est écrit par un service en ligne\u{202f}; la transcription reste sur cet ordinateur.",
+                "Le compte rendu est rédigé par un service en ligne\u{202f}; la transcription reste sur cet ordinateur.",
             ],
             welcome_rows: ["Transcription", "Compte rendu", "Rappel"],
             welcome_on_this_computer: "Sur cet ordinateur",
-            welcome_online: "Un service en ligne, à choisir maintenant",
+            welcome_online: "Un service en ligne, à choisir",
             welcome_online_chosen: "Un service en ligne",
             welcome_ollama_by: "Ollama · {}",
             welcome_reminder_on: "Prévenir les participants au début de chaque réunion",
-            welcome_reminder_off: "Désactivé — Réglages le remettent",
-            welcome_ollama_silent: "Ollama ne répond pas sur cet ordinateur\u{a0}: le compte rendu l’attend. Il est gratuit, sur ollama.com.",
-            welcome_ollama_lacks: "Ollama n’a pas encore {}\u{a0}: le compte rendu l’attend. Réglages le téléchargent en un clic.",
+            welcome_reminder_off: "Désactivé (réactivable dans les Réglages)",
+            welcome_ollama_silent: "Ollama ne répond pas sur cet ordinateur\u{a0}: le compte rendu attendra. Ollama est gratuit, sur ollama.com.",
+            welcome_ollama_lacks: "Ollama n’a pas encore {}\u{a0}: le compte rendu attendra. Téléchargez-le en un clic dans les Réglages.",
             welcome_fetch: "Télécharger le modèle ({})",
-            welcome_fetch_from: "Depuis {}, vérifié avant d’être utilisé.",
+            welcome_fetch_from: "Depuis {}, vérifié avant utilisation.",
             welcome_done: "Terminer",
             welcome_later: "Plus tard",
             welcome_later_waits: "Plus tard — vos réunions attendront le modèle",
             welcome_choose: "Choisir mon service",
             welcome_again: [
-                "Refaire le réglage",
-                "La question du premier lancement, votre réglage actuel choisi\u{202f}; rien ne change avant la dernière étape.",
+                "Refaire la configuration",
+                "Reprend les questions du premier lancement, avec vos choix actuels. Rien ne change avant la dernière étape.",
             ],
-            context_add: "Ajouter le contexte",
-            context_edit: "Modifier le contexte",
-            context_open: "Contexte de la réunion",
+            context_add: "Ajouter un contexte",
             context_title: "Contexte",
             context_label: "De quoi parle la réunion\u{202f}? Qui y participe\u{202f}?",
             context_example: "Ex.\u{a0}: budget du T4 avec Inès Durand et l’équipe achats",
-            context_why: "La transcription l’entend comme les premiers mots\u{a0}: les noms y sont écrits comme ici. Le compte rendu s’en sert pour attribuer les actions.",
-            context_most: "{} caractères au plus",
+            context_why: "Aide la transcription à bien écrire les noms et les termes du métier, et le compte rendu à attribuer chaque action à la bonne personne.",
+            context_most: "{} caractères maximum",
             context_left: ["{} restant", "{} restants"],
-            context_script: "Dans cette écriture, Whisper peut n’en garder que la fin, un service le refuser.",
-            context_making: "Le contexte ne change pas pendant que la transcription ou le compte rendu se fait.",
-            context_unfinished: "La transcription n’est pas terminée\u{a0}: terminez-la (Réessayer) avant de changer le contexte.",
+            context_script: "Dans cet alphabet, le contexte peut être tronqué ou refusé par certains services.",
+            context_making: "Le contexte ne peut pas être modifié pendant la transcription ou la rédaction du compte rendu.",
+            context_unfinished: "La transcription n’est pas terminée. Cliquez sur Réessayer pour la finir avant de modifier le contexte.",
             context_changed: [
                 "La transcription a été faite avec un autre contexte.",
                 "La transcription et le compte rendu ont été faits avec un autre contexte.",
@@ -2048,18 +2312,18 @@ pub fn window(language: Language) -> Window {
             context_redo: "Refaire avec ce contexte",
             language_label: "Langue parlée",
             language_default: "Celle des Réglages",
-            language_detected: "Détectée par la transcription",
+            language_detected: "Détection automatique",
             meetings_language: "Langue des réunions",
-            language_not_saved: "La langue n’a pas été enregistrée\u{a0}: {}",
+            language_not_saved: "Langue non enregistrée\u{a0}: {}",
             rename_meeting: "Renommer cette réunion",
             name_meeting: "Nommer cette réunion",
-            name_not_saved: "Le nom n’a pas été enregistré\u{a0}: {}",
+            name_not_saved: "Nom non enregistré\u{a0}: {}",
             language_detected_short: "détectée",
             language_as_system: "Celle du système",
-            language_heard_as: "{} — SpeechAnalyzer entend {}",
+            language_heard_as: "{} — SpeechAnalyzer transcrit en {}",
             app_language: [
                 "Langue de Kitokey",
-                "Sa fenêtre, son menu et ses notifications\u{202f}; ce que le système dessine lui-même garde la sienne.",
+                "Fenêtre, menu et notifications. Les boîtes de dialogue du système gardent la langue du système.",
             ],
             app_language_system: "Langue du système",
             appearance: [
@@ -2067,25 +2331,25 @@ pub fn window(language: Language) -> Window {
                 "Toutes les fenêtres de Kitokey, la barre aussi\u{202f}; Système suit le clair ou le sombre du système.",
             ],
             appearance_choices: ["Système", "Clair", "Sombre"],
-            correct_line: "Corriger la ligne de {}",
+            correct_line: "Corriger la ligne à {}",
             corrected: "corrigé",
-            correction_empty: "Une ligne ne reste pas vide\u{a0}: Échap la laisse comme elle était.",
-            correction_failed: "La correction n’a pas été enregistrée\u{a0}: {}",
-            corrected_since: "La transcription a été corrigée après ce compte rendu.",
+            correction_empty: "Une ligne ne peut pas être vide. Appuyez sur Échap pour annuler.",
+            correction_failed: "Correction non enregistrée\u{a0}: {}",
+            corrected_since: "La transcription a été corrigée depuis la rédaction de ce compte rendu.",
             redo_corrections: "Refaire avec les corrections",
             copy_minutes: "Copier le compte rendu",
             minutes_copied: "Copié",
-            minutes_not_copied: "Le compte rendu n’a pas pu être copié.",
-            redo_loses_corrections: "Vos corrections de cette transcription ne seront pas gardées.",
-            context_not_saved: "Le contexte n’a pas pu être enregistré.",
+            minutes_not_copied: "Impossible de copier le compte rendu.",
+            redo_loses_corrections: "Vos corrections de cette transcription seront perdues.",
+            context_not_saved: "Impossible d’enregistrer le contexte.",
             confidential_name: "Réunion confidentielle",
             confidential_says: "Rien ne quitte cet ordinateur",
             confidential_chip: "Confidentielle",
-            confidential_left: "Déjà parti avant\u{a0}: {}.",
-            confidential_left_sound: "le son vers {}",
-            confidential_left_transcript: "la transcription vers {}",
-            confidential_not_saved: "La réunion n’a pas pu être marquée confidentielle\u{a0}: réessayez.",
-            confidential_ollama_empty: "Ollama n’a aucun modèle sur cet ordinateur\u{a0}: le compte rendu l’attend.",
+            confidential_left: "Déjà envoyé auparavant\u{a0}: {}.",
+            confidential_left_sound: "le son à {}",
+            confidential_left_transcript: "la transcription à {}",
+            confidential_not_saved: "Impossible de marquer la réunion comme confidentielle. Réessayez.",
+            confidential_ollama_empty: "Ollama n’a aucun modèle sur cet ordinateur\u{a0}: le compte rendu attendra.",
             confidential_fetch: "Télécharger {}",
         },
     }
@@ -2970,17 +3234,17 @@ impl Sides {
 fn sends_nothing(name: Option<&str>, language: Language) -> Option<Notice> {
     let body = match (name, language) {
         (Some(name), Language::English) => format!(
-            "Nothing at all has come from {name} for ten seconds, not even a room’s faint noise: check it is not muted on the device itself, and that it is ready. The recording goes on."
+            "No signal from {name} for 10 seconds, not even background noise. Check it isn’t muted on the device and that it’s switched on. Recording continues."
         ),
-        (None, Language::English) => "Nothing at all has come from your microphone for ten seconds, not even a room’s faint noise: check it is not muted on the device itself, and that it is ready. The recording goes on.".to_string(),
+        (None, Language::English) => "No signal from your microphone for 10 seconds, not even background noise. Check it isn’t muted on the device and that it’s switched on. Recording continues.".to_string(),
         (Some(name), Language::French) => format!(
-            "Rien du tout n’arrive du micro {name} depuis dix secondes, pas même le léger bruit d’une pièce\u{a0}: vérifiez qu’il n’est pas coupé sur l’appareil lui-même, et qu’il est prêt. L’enregistrement continue."
+            "Aucun signal du micro {name} depuis 10 secondes, pas même un bruit de fond. Vérifiez qu’il n’est pas coupé sur l’appareil et qu’il est allumé. L’enregistrement continue."
         ),
-        (None, Language::French) => "Rien du tout n’arrive de votre micro depuis dix secondes, pas même le léger bruit d’une pièce\u{a0}: vérifiez qu’il n’est pas coupé sur l’appareil lui-même, et qu’il est prêt. L’enregistrement continue.".to_string(),
+        (None, Language::French) => "Aucun signal de votre micro depuis 10 secondes, pas même un bruit de fond. Vérifiez qu’il n’est pas coupé sur l’appareil et qu’il est allumé. L’enregistrement continue.".to_string(),
     };
     let title = match language {
-        Language::English => "Your microphone sends nothing",
-        Language::French => "Votre micro ne transmet rien",
+        Language::English => "Your microphone isn’t sending any signal",
+        Language::French => "Votre micro ne transmet aucun signal",
     };
     notice(title, body)
 }
@@ -2988,18 +3252,18 @@ fn sends_nothing(name: Option<&str>, language: Language) -> Option<Notice> {
 /// A side with no device left while the other is still recorded.
 fn lost_beside(source: Source, language: Language) -> Notice {
     let (title, body) = match (source, language) {
-        (Source::Me, Language::English) => ("Your microphone is not recorded for now", "The meeting’s sound is still recorded."),
+        (Source::Me, Language::English) => ("Your microphone isn’t being recorded", "The meeting audio is still being recorded."),
         (Source::Me, Language::French) => (
-            "Votre micro n’est pas enregistré pour l’instant",
-            "Le son de la réunion est toujours enregistré.",
+            "Votre micro n’est pas enregistré",
+            "Le son de la réunion, lui, est bien enregistré.",
         ),
         (Source::Others, Language::English) => (
-            "The meeting’s sound is not recorded for now",
-            "Your computer has no sound output left. Your microphone is still recorded, and an output plugged in is recorded at once.",
+            "Meeting audio is no longer being recorded",
+            "Your computer has no audio output. Your microphone is still recorded; plug in an output to resume.",
         ),
         (Source::Others, Language::French) => (
-            "Le son de la réunion n’est plus enregistré pour l’instant",
-            "Votre ordinateur n’a plus de sortie audio. Votre micro est toujours enregistré, et une sortie branchée est enregistrée aussitôt.",
+            "Le son de la réunion n’est plus enregistré",
+            "Votre ordinateur n’a plus de sortie audio. Votre micro reste enregistré\u{202f}; branchez une sortie pour reprendre.",
         ),
     };
     Notice {
@@ -3012,14 +3276,12 @@ fn lost_beside(source: Source, language: Language) -> Notice {
 pub fn back(name: Option<&str>, language: Language) -> Notice {
     let (title, body) = match language {
         Language::English => (
-            "The meeting’s sound is recorded again",
-            name.map_or("From the output your computer uses now.".into(), |name| format!("From {name}.")),
+            "Meeting audio is being recorded again",
+            name.map_or("From the current audio output.".into(), |name| format!("From {name}.")),
         ),
         Language::French => (
             "Le son de la réunion est de nouveau enregistré",
-            name.map_or("Depuis la sortie qu’utilise maintenant votre ordinateur.".into(), |name| {
-                format!("Depuis {name}.")
-            }),
+            name.map_or("Depuis la sortie audio actuelle.".into(), |name| format!("Depuis {name}.")),
         ),
     };
     Notice { title: title.into(), body }
@@ -3049,8 +3311,8 @@ pub fn offer(application: &str, language: Language) -> (Notice, [&'static str; 3
 /// Said after a recording's stop when its transcript is made next, without another gesture.
 pub fn follows(language: Language) -> &'static str {
     match language {
-        Language::English => "The transcript follows.",
-        Language::French => "La transcription suit.",
+        Language::English => "Transcribing now.",
+        Language::French => "Transcription en cours.",
     }
 }
 
@@ -3311,6 +3573,6 @@ pub fn announcement(meeting: Option<&str>, window: Language) -> &'static str {
         Language::French => {
             "J’enregistre cette réunion pour en faire le compte rendu. Dites-le-moi si vous préférez que je ne le fasse pas."
         }
-        Language::English => "I’m recording this meeting to write up its minutes. Tell me if you’d rather I didn’t.",
+        Language::English => "I’m recording this meeting to write a summary. Let me know if you’d rather I didn’t.",
     }
 }
