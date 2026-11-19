@@ -2692,15 +2692,29 @@ function guidedWhere(path, words, way, locked) {
 // « Vérifier la clé »: the service's models asked with the key typed — or the one kept —, its
 // answer kept as the path's own, said on the page as it is now: drawn again meanwhile, or another
 // service chosen, the page says its own.
-function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySaid, modelsPick }, ask, shownSaved) {
-  // A key typed and not yet saved: kept across a drawing for its service, as the model chosen with it —
-  // in the page's memory alone, never written nor logged, forgotten with the choices at another
-  // address (#948).
-  const typed = guided[path].chosen.keys?.[servicePick.value];
-  if (typed) key.value = typed;
+// `keyFor()`: what the key field is for now — the service chosen, or under « Avancé » an address on
+// another host (`keyFor`'s `host:…`). Returns the key typed for one of them, and what to call when the
+// address changes.
+function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySaid, modelsPick }, ask, shownSaved, keyFor) {
+  // A key typed and not yet saved: kept across a drawing for what it was typed for, as the model chosen
+  // with it — in the page's memory alone, never written nor logged, forgotten with the choices at
+  // another address (#948). A key leaves only for the host it was typed for: another service or
+  // another host shows its own, or none (#964; OWASP ASVS, a secret sent to its recipient alone).
+  const keys = () => guided[path].chosen.keys ?? {};
+  const shown = () => {
+    key.value = keys()[keyFor()] ?? "";
+  };
+  shown();
   key.addEventListener("input", () => {
-    guided[path].chosen.keys = { ...guided[path].chosen.keys, [servicePick.value]: key.value };
+    guided[path].chosen.keys = { ...keys(), [keyFor()]: key.value };
   });
+  servicePick.addEventListener("change", shown);
+  const typed = (id) => (id === keyFor() ? key.value : keys()[id]) || null;
+  // Saved: no longer needed in the page; the field says a key is kept (#964).
+  const forget = (id) => {
+    const { [id]: _, ...rest } = keys();
+    guided[path].chosen.keys = rest;
+  };
   keyTest.addEventListener("click", async () => {
     waiting(keyTest, true);
     keySaid.textContent = words.testing;
@@ -2708,7 +2722,7 @@ function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySa
     let models = null;
     let said = "";
     try {
-      models = await ask(asked, key.value || null);
+      models = await ask(asked, typed(`service:${asked}`));
     } catch (why) {
       said = why;
     }
@@ -2720,6 +2734,20 @@ function guidedKeyTested(path, words, locked, { servicePick, key, keyTest, keySa
     shownSaved();
     if (models !== null) modelsPick.focus();
   });
+  return { shown, typed, forget };
+}
+
+// What a key is kept for: the service chosen, or an address of one's own on another host (#964).
+function keyHost(address) {
+  try {
+    return new URL(address).host;
+  } catch {
+    return address;
+  }
+}
+function keyFor(address, serviceAddress, index) {
+  const own = address.trim();
+  return own && keyHost(own) !== keyHost(serviceAddress) ? `host:${keyHost(own)}` : `service:${index}`;
 }
 
 // « Avancé », folded unless the path keeps it unfolded or `own` is saved: what it holds hidden.
@@ -2776,7 +2804,7 @@ function minutesRow(minutes, words, locked) {
   const option = guidedOption;
   const button = (id, text, primary) => guidedButton(id, text, primary, locked);
   // Saved or not, the page is drawn again from what the shell holds; a failure stays said.
-  const save = async (provider, model, key) => {
+  const save = async (provider, model, key, keyId) => {
     let failed = null;
     try {
       const notKept = await window.__TAURI__.core.invoke("minutes_saved", { provider, model, key });
@@ -2784,6 +2812,7 @@ function minutesRow(minutes, words, locked) {
     } catch (why) {
       failed = fill(words.not_saved, why);
     }
+    if (failed === null && keyId) keyed.forget(keyId);
     notSaved = failed;
     await refresh();
     savedSaid(failed === null);
@@ -2840,9 +2869,6 @@ function minutesRow(minutes, words, locked) {
     shownSaved();
     address.placeholder = service().address;
   });
-  guidedKeyTested("minutes", words, locked, { servicePick, key, keyTest, keySaid, modelsPick },
-    (index, typed) => window.__TAURI__.core.invoke("minutes_models", { provider: minutes.online[Number(index)].address, key: typed }), shownSaved);
-  onlineSave.addEventListener("click", () => save(service().address, modelsPick.value, key.value || null));
   // « Avancé »: an address of one's own, OpenAI's way of asking, its model named by hand.
   const [addressWrap, address] = field("minutes-address", words.address, "url", own ? minutes.provider : "");
   const [modelWrap, model] = field("minutes-model", words.model_name, "text", own ? minutes.model : "");
@@ -2850,7 +2876,13 @@ function minutesRow(minutes, words, locked) {
   // Its address left empty: the service chosen above, with a model it does not list — a new release,
   // an id of its own — named by hand.
   address.placeholder = service().address;
-  ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, key.value || null));
+  const keyNow = () => keyFor(address.value, service().address, servicePick.value);
+  const keyed = guidedKeyTested("minutes", words, locked, { servicePick, key, keyTest, keySaid, modelsPick },
+    (index, typed) => window.__TAURI__.core.invoke("minutes_models", { provider: minutes.online[Number(index)].address, key: typed }), shownSaved, keyNow);
+  address.addEventListener("input", keyed.shown);
+  const serviceKeyId = () => `service:${servicePick.value}`;
+  onlineSave.addEventListener("click", () => save(service().address, modelsPick.value, keyed.typed(serviceKeyId()), serviceKeyId()));
+  ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, keyed.typed(keyNow()), keyNow()));
   const [toggle, advanced] = guidedAdvanced("minutes", words, own, [addressWrap, modelWrap, ownSave]);
   const away = element("div", "fields");
   away.append(serviceWrap, keyWrap, keyTest, keySaid, modelsWrap, onlineSave, toggle, advanced);
@@ -3189,8 +3221,6 @@ function showSettings(shown, minutes, words) {
     paintSaves();
   };
   shownSaved();
-  guidedKeyTested("transcription", words, locked, { servicePick, key: serviceKey, keyTest, keySaid, modelsPick: serviceModels },
-    (index, typed) => window.__TAURI__.core.invoke("transcription_models", { index: Number(index), key: typed }), shownSaved);
   // « Avancé »: an address of one's own, OpenAI's way of asking, its model named by hand.
   const [addressWrap, address] = guidedField("transcription-provider", words.service_address, "url", own ? shown.transcription_provider : "", locked);
   const [modelWrap, serviceModel] = guidedField("transcription-model", words.service_model, "text", own ? shown.transcription_model : "", locked);
@@ -3203,9 +3233,13 @@ function showSettings(shown, minutes, words) {
     ownAgreeHost(hostOf(ownAddress()));
   };
   standsIn();
+  const keyNow = () => keyFor(address.value, hearing().address, servicePick.value);
+  const keyed = guidedKeyTested("transcription", words, locked, { servicePick, key: serviceKey, keyTest, keySaid, modelsPick: serviceModels },
+    (index, typed) => window.__TAURI__.core.invoke("transcription_models", { index: Number(index), key: typed }), shownSaved, keyNow);
   address.addEventListener("input", () => {
     ownAgreeHost(hostOf(ownAddress()));
     ownAgreeBox.checked = false;
+    keyed.shown();
   });
   const ownSave = guidedButton("transcription-own-save", words.service_save, false, locked);
   const [hearToggle, hearAdvanced] = guidedAdvanced("transcription", words, own, [addressWrap, modelWrap, ownAgreeWrap, ownSave]);
@@ -3217,7 +3251,7 @@ function showSettings(shown, minutes, words) {
   const serviceSaid = element("p", "says");
   serviceSaid.id = "transcription-said";
   serviceSaid.setAttribute("role", "status");
-  const saveHearing = async (provider, model, key, box, addressField, modelField) => {
+  const saveHearing = async (provider, model, key, keyId, box, addressField, modelField) => {
     const { invoke } = window.__TAURI__.core;
     if (!/^https?:$/.test((() => { try { return new URL(provider.trim()).protocol; } catch { return ""; } })()) || !hostOf(provider.trim())) {
       serviceSaid.textContent = words.service_address_bad;
@@ -3233,16 +3267,21 @@ function showSettings(shown, minutes, words) {
     }
     const saved = await invoke("transcription_saved", {
       provider, model, key: key || null, agreed: box.checked,
-    }).then((notKept) => (notKept !== null ? fill(words.key_not_kept, notKept)
+    }).then((notKept) => {
+      if (notKept !== null) return fill(words.key_not_kept, notKept);
+      // Saved: the key no longer kept in the page (#964).
+      keyed.forget(keyId);
       // This computer's: said so, never as an address and a port (#775).
-      : isHere(hostOf(provider)) ? words.service_saved_here : fill(words.service_saved, hostOf(provider))), (why) => fill(words.not_saved, why));
+      return isHere(hostOf(provider)) ? words.service_saved_here : fill(words.service_saved, hostOf(provider));
+    }, (why) => fill(words.not_saved, why));
     // A Tester still asking stays: its answer comes after this, the button its own.
     serviceAnswer ??= { said: "", asking: false };
     serviceAnswer.said = saved;
     serviceSaid.textContent = saved;
   };
-  saveService.addEventListener("click", () => saveHearing(hearing().address, serviceModels.value, serviceKey.value, agreeBox, null, serviceModels));
-  ownSave.addEventListener("click", () => saveHearing(ownAddress(), ownModel(), serviceKey.value, ownAgreeBox, address, serviceModel));
+  const serviceKeyId = () => `service:${servicePick.value}`;
+  saveService.addEventListener("click", () => saveHearing(hearing().address, serviceModels.value, keyed.typed(serviceKeyId()), serviceKeyId(), agreeBox, null, serviceModels));
+  ownSave.addEventListener("click", () => saveHearing(ownAddress(), ownModel(), keyed.typed(keyNow()), keyNow(), ownAgreeBox, address, serviceModel));
   const testService = element("button", "open", words.service_test);
   testService.type = "button";
   testService.id = "transcription-test";
