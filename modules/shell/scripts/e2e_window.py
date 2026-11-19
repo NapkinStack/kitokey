@@ -2568,8 +2568,8 @@ echo '{{"available":true,"installed":true,"supported":true}}'
     args = WORK / "hearing-args"
     told = lambda: args.read_text() if args.exists() else ""
     french = ["Ouvrir Kitokey", "Démarrer un enregistrement", "Transcrire le dernier enregistrement",
-              "Rédiger le compte rendu de la dernière réunion", "Quitter Kitokey"]
-    english = ["Open Kitokey", "Start recording", "Transcribe the last recording", "Write the minutes of the last recording", "Quit Kitokey"]
+              "Rédiger le compte rendu du dernier enregistrement", "Quitter Kitokey"]
+    english = ["Open Kitokey", "Start recording", "Transcribe last recording", "Write summary of last recording", "Quit Kitokey"]
     sections = lambda b: b.execute_script("return [document.getElementById('settings-link').getAttribute('aria-label'), document.documentElement.lang]")
     redo = lambda b: b.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", heard.name, str(model))
 
@@ -2783,7 +2783,7 @@ def confidential_every_way(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.execute_script(
                 "return window.__TAURI__.core.invoke('makings').then(m => m.minutes === null && m.minutes_waiting.length === 0)"), 15)
             writing.unlink(missing_ok=True)
-            clicked = tray_click("Rédiger le compte rendu de la dernière réunion")
+            clicked = tray_click("Rédiger le compte rendu du dernier enregistrement")
             written = wait_for(browser, lambda b: writing.exists(), 15)
             check("its minutes from the tray: Ollama here, no agreement asked, nothing sent",
                   clicked and written and f"--provider {base}/v1" in writing.read_text() and counted == {"hear": 0, "write": 0}
@@ -3528,12 +3528,12 @@ def models_advanced(now: dt.datetime) -> None:
                 press(browser, "redo-minutes")
                 wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
                 # Its end awaited with another application in front: told only then (D92).
-                away(browser, lambda: (press(browser, "redo-do"), wait_for(None, lambda b: "pas été refait" in notified.read_text(), 15)))
+                away(browser, lambda: (press(browser, "redo-do"), wait_for(None, lambda b: "pas pu être refait" in notified.read_text(), 15)))
                 failed = wait_for(browser, lambda b: "Le dernier Refaire a échoué" in b.execute_script(failure), 15)
                 told = browser.execute_script(failure)
                 check("the meeting's own minutes model fails: the page names it, and Refaire… › Avancé to choose another",
                       failed and "Mistral 7b" in told and "Refaire…\u00a0› Avancé" in told and "réglages" not in told, told)
-                heard_own = wait_for(None, lambda b: "pas été refait" in notified.read_text(), 10)
+                heard_own = wait_for(None, lambda b: "pas pu être refait" in notified.read_text(), 10)
                 since = len(notified.read_text())
                 said_own = notified.read_text()
                 check("and its notification says the same: the model named, Refaire… › Avancé, never Settings",
@@ -3549,12 +3549,12 @@ def models_advanced(now: dt.datetime) -> None:
                 wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
                 writing.unlink(missing_ok=True)
                 away(browser, lambda: (press(browser, "redo-do"),
-                                       wait_for(None, lambda b: "pas été refait" in notified.read_text()[since:], 15)))
+                                       wait_for(None, lambda b: "pas pu être refait" in notified.read_text()[since:], 15)))
                 failed = wait_for(browser, lambda b: "qwen3:14b" in read(writing) and "Le dernier Refaire a échoué" in b.execute_script(failure), 15)
                 told = browser.execute_script(failure)
                 check("Settings' minutes model fails: Settings' wording, no « Avancé »",
                       failed and "dans les réglages de Kitokey" in told and "Avancé" not in told, told)
-                heard_settings = wait_for(None, lambda b: "pas été refait" in notified.read_text()[since:], 10)
+                heard_settings = wait_for(None, lambda b: "pas pu être refait" in notified.read_text()[since:], 10)
                 said_settings = notified.read_text()[since:]
                 check("and its notification keeps Settings' wording",
                       heard_settings and "dans les réglages de Kitokey" in said_settings and "Avancé" not in said_settings, said_settings[-500:])
@@ -4598,7 +4598,7 @@ def sound_checked(now: dt.datetime) -> None:
 
 def bar_window(now: dt.datetime) -> None:
     """AY. The bar as a window (D90, board 8): no title bar, « Masquer la barre »; hidden during a
-    recording, it never comes back by itself — the tray's « Afficher la barre » brings it back."""
+    recording, it never comes back by itself — the tray's « Afficher la barre d’enregistrement » brings it back."""
     print("AY. the bar without a title bar; hidden while recording, it stays hidden whatever happens, the tray stops and brings it back (D90)")
     taping = WORK / "bar-hidden"
     taping.mkdir()
@@ -4607,15 +4607,15 @@ def bar_window(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_element(By.ID, "small-hide").is_displayed(), 8)
         got = browser.execute_script("const h = document.getElementById('small-hide'); return [h.getAttribute('aria-label'), h.title, h.getBoundingClientRect().height, h.textContent.trim(), outerHeight - innerHeight]")
         check("« Masquer la barre »: an icon of 28 px, named by its words; no title bar over the row", got[:4] == ["Masquer la barre", "Masquer la barre", 28, ""] and got[4] == 0, got)
-        check("shown, the tray offers no « Afficher la barre »", "Afficher la barre" not in tray_labels(), tray_labels())
+        check("shown, the tray offers no « Afficher la barre d’enregistrement »", "Afficher la barre d’enregistrement" not in tray_labels(), tray_labels())
         press(browser, "small-record")
         wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed() and tray_colour() == "red", 10)
         press(browser, "small-hide")
         gone = wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
         check("hidden during a recording: the bar goes, the recording goes on, the tray's icon red", gone and tray_colour() == "red", browser.execute_script(hidden))
         # After the recording's entry, as board 8 sets it.
-        check("the tray offers « Afficher la barre », after « Arrêter l’enregistrement »",
-              wait_for(None, lambda b: tray_labels()[1:3] == ["Arrêter l’enregistrement", "Afficher la barre"], 5), tray_labels())
+        check("the tray offers « Afficher la barre d’enregistrement », after « Arrêter l’enregistrement »",
+              wait_for(None, lambda b: tray_labels()[1:3] == ["Arrêter l’enregistrement", "Afficher la barre d’enregistrement"], 5), tray_labels())
         # Whatever happens but a gesture: a device changes, the microphone goes and comes back.
         (taping / "move").touch()
         (taping / "mic-gone").touch()
@@ -4628,10 +4628,10 @@ def bar_window(now: dt.datetime) -> None:
         stopped = wait_for(None, lambda b: tray_colour() == "blue", 15)
         time.sleep(1)
         check("stopped from the tray, as the shortcut stops: the bar does not come back by itself", stopped and browser.execute_script(hidden) == "hidden", browser.execute_script(hidden))
-        tray_click("Afficher la barre")
+        tray_click("Afficher la barre d’enregistrement")
         back = wait_for(browser, lambda b: b.execute_script(hidden) == "visible", 5)
-        check("« Afficher la barre » brings it back, at rest, and leaves the menu", back and browser.find_element(By.ID, "small-record").is_displayed()
-              and wait_for(None, lambda b: "Afficher la barre" not in tray_labels(), 5), tray_labels())
+        check("« Afficher la barre d’enregistrement » brings it back, at rest, and leaves the menu", back and browser.find_element(By.ID, "small-record").is_displayed()
+              and wait_for(None, lambda b: "Afficher la barre d’enregistrement" not in tray_labels(), 5), tray_labels())
         # At rest too: hidden, « Ouvrir Kitokey » opens the window left, the bar.
         press(browser, "small-hide")
         wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
@@ -4641,10 +4641,10 @@ def bar_window(now: dt.datetime) -> None:
         # does —: the tray offers no bar that is gone.
         press(browser, "small-hide")
         wait_for(browser, lambda b: b.execute_script(hidden) == "hidden", 5)
-        wait_for(None, lambda b: "Afficher la barre" in tray_labels(), 5)
+        wait_for(None, lambda b: "Afficher la barre d’enregistrement" in tray_labels(), 5)
         browser.execute_script("window.__TAURI__.core.invoke('full_window', {page: '#/settings'})")
-        check("hidden, then closed for the full window on a page: « Afficher la barre » leaves the menu",
-              wait_for(None, lambda b: "Afficher la barre" not in tray_labels(), 5), tray_labels())
+        check("hidden, then closed for the full window on a page: « Afficher la barre d’enregistrement » leaves the menu",
+              wait_for(None, lambda b: "Afficher la barre d’enregistrement" not in tray_labels(), 5), tray_labels())
 
 
 def recording_found(now: dt.datetime) -> None:
@@ -7806,7 +7806,7 @@ def meeting_told_once(now: dt.datetime) -> None:
             asked = one_told(browser, mark, lambda t: "member=Notify" in t)
             check("its minutes not started: one notification, what to do for them, naming the meeting — the transcript not told on its own",
                   recorded and asked and "Transcription prête" not in told(mark) and "Aucun modèle choisi" in told(mark)
-                  and "Choisissez-le dans les réglages" in told(mark) and names(told(mark)), why(browser, recorded, asked, mark))
+                  and "Choisissez-en un dans les Réglages" in told(mark) and names(told(mark)), why(browser, recorded, asked, mark))
 
             # 6. The same with Kitokey's window focused: nothing told, the window says it — Settings,
             # where the model is chosen.
@@ -11113,8 +11113,8 @@ def trial_left(now: dt.datetime) -> None:
         return browser.execute_script("const t = document.getElementById('trial-left');"
                                       " return t ? [t.querySelector('.name').textContent, t.querySelector('.says').textContent] : null")
 
-    both_fr = " ; l’essai prend fin une fois les deux épuisés."
-    both_en = "; the trial ends once both are used up."
+    both_fr = " ; l’essai se termine quand les deux sont épuisés."
+    both_en = ". The trial ends when both run out."
     licence.write_text("trial")
     window = Window(meetings, "fr_FR.UTF-8", 'reminder = false\nafter = "nothing"\n')
     window.env["KITOKEY_LICENCE"] = str(licence)
