@@ -194,6 +194,8 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   A check's rate is its FAILs on commits where it passed on another run, nothing changed, over its runs. The
   count and its command go in the sheet, so that anyone can count it again. Attests run one at a time on one
   machine: at least 30 after the last fix, or all of them to the cycle's end, is what the cycle can hold.
+- A check red in an attest is run again alone before anything is concluded, and that second run counts in the
+  metric.
 
 ### D105
 
@@ -249,6 +251,10 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   d'en créer d'autres, de les modifier, les supprimer ». The built-ins and the choice come first; creating,
   editing and deleting one's own is cycle 12's (*Later*). Proposed no-gos, from cycle 10: no editable system
   prompt, no choice by calendar, no sharing.
+- **The spike's threshold** *(framer, to confirm)*: with the model named in the sheet — the default local
+  summary model of Settings —, at least 4 of the 6 built-in structures yield every section either filled or said
+  empty, over the team's sample of 3 meetings; below that, the structures that fail are cut and the result
+  recorded — a refuted spike is a delivered one.
 - **The contract**: three pull requests, in order — `minutes/v5`'s page and schema, summary writing it, the
   shell reading v4 and v5. v4 is never removed in this cycle.
 
@@ -311,6 +317,8 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 - **The Store build's licence**: the convention is the Store's trial alone (PDR-0005's *Unlimited*), D83's
   own counter off in that build; the decider may keep D83's in it. Default: the Store's.
 - **The six built-in structures**: the market's common core; the decider may name others.
+- **D111's spike threshold**: 4 of the 6 structures, every section filled or said empty, over 3 meetings, with
+  Settings' default local model (D111's section). A word changes it.
 
 ## Closure
 
