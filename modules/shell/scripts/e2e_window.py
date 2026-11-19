@@ -170,12 +170,22 @@ fi
 printf '%s\\n' "$*" > "$here/recorder-args"
 folder="$2/2026-10-18_12-00"; mkdir -p "$folder"
 printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","tracks":{}}' > "$folder/session.json"
+# As recording/v1 says: its reader gone, it goes on (#773); its input closed stops nothing; a termination
+# signal stops it as `stop` does — `session.json` says `stopped`, and it ends well.
+trap '' PIPE
+echo $$ > "$here/recorder-pid"
+stopped() { printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"; echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'; exit 0; }
+trap stopped TERM INT
 me='"Mic"'
 # No microphone to open, when the scenario says so (D49).
 if [ -e "$2/waiting-me" ]; then echo '{"event":"unavailable","source":"me","reason":"none"}'; me='"unavailable"'; fi
 echo '{"event":"started","folder":"'"$folder"'","sources":{"me":'"$me"',"others":"Speaker"}}'
 n=0
-while ! read -t 0.1 line; do
+while :; do
+  read -t 0.1 line; got=$?
+  # A line — `stop` — ends it; its input closed (1) stops nothing: it waits, as the real one records on.
+  [ "$got" = 0 ] && break
+  [ "$got" = 1 ] && sleep 0.1
   n=$((n + 1))
   # Levels at silence as long as the scenario says so; what capture says of a silence, when it does (D49).
   if [ -e "$2/hush" ]; then echo '{"event":"level","source":"me","level":0}'; echo '{"event":"level","source":"others","level":0}'
@@ -8439,6 +8449,60 @@ def ends_on_sigterm(now: dt.datetime) -> None:
         return ended_on_sigterm("« Vérifier le son » open")
 
     ended(Window(meetings, "fr_FR.UTF-8", settings), checking)
+
+    # A recording under way, SIGTERM to Kitokey alone: Kitokey leaves, the recording goes on — « A recording never
+    # stops because the shell did » (`AGENTS.md`; recording/v1: its input closed stops nothing) —, and the next
+    # start finds it, its ■ stopping it well (#773). A logout's SIGTERM to the recorder too is recording/v1's own.
+    taping = WORK / "ends-on-sigterm-recording"
+    taping.mkdir(exist_ok=True)
+    pid_file = WORK / "recorder-pid"
+    pid_file.unlink(missing_ok=True)
+    recorded = taping / "2026-10-18_12-00" / "session.json"
+    recorder: list[int] = []
+
+    def recording(browser) -> list[int]:
+        wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+        press(browser, "small-record")
+        started = wait_for(browser, lambda b: pid_file.exists() and pid_file.read_text().strip() != ""
+                           and b.find_element(By.ID, "small-stop").is_displayed(), 10)
+        check("a recording under way, from the bar", started)
+        if not started:
+            return []
+        recorder.append(int(pid_file.read_text()))
+        ours = instances()
+        under = [pid for kitokey in ours for pid in descendants(kitokey) if pid not in recorder]
+        sent = time.monotonic()
+        for pid in ours:
+            os.kill(pid, signal.SIGTERM)
+        gone = wait_for(None, lambda _: not any(alive(pid) for pid in ours + under) and not single_instance_held(), 2)
+        time.sleep(0.5)
+        check("a recording under way: SIGTERM ends Kitokey within 2 s, its name released, the recording going on (#961, #773)",
+              bool(ours) and gone and alive(recorder[0]) and "stopped" not in recorded.read_text(),
+              {"took": round(time.monotonic() - sent, 1), "Kitokey left": [pid for pid in ours if alive(pid)],
+               "left": [pid for pid in under if alive(pid)], "name held": single_instance_held(),
+               "recorder": recorder[0], "recording": alive(recorder[0]), "session": recorded.read_text()})
+        return ours + under
+
+    def found(browser) -> list[int]:
+        shown = wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
+        check("the next start finds the recording going on: the bar shows ■ (#773)", shown)
+        if shown:
+            press(browser, "small-stop")
+            done = wait_for(None, lambda _: not alive(recorder[0]) and "stopped" in recorded.read_text(), 5)
+            check("its ■ stops it well: the recorder gone, its session said stopped (#773, recording/v1)", done,
+                  {"recording": alive(recorder[0]), "session": recorded.read_text()})
+        return []
+
+    try:
+        ended(Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True), recording)
+        if recorder and alive(recorder[0]):
+            ended(Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True), found)
+    finally:
+        for pid in recorder:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
 
 def two_panes(now: dt.datetime) -> None:
