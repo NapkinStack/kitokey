@@ -7731,7 +7731,9 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
                   saved and forgotten and browser.execute_script(sent, "transcription_saved", hears) == [True] and hears not in window.file.read_text(),
                   [saved, forgotten])
             # Its « Avancé »: an address of one's own on another host, saved there: nothing typed for the service handed with it.
+            # A key typed for the service again, not saved: the one that could leave for the other host (ines' S5).
             browser.execute_script("window.keysSent = []")
+            browser.find_element(By.ID, "transcription-key").send_keys(hears)
             press(browser, "transcription-advanced")
             wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-provider").is_displayed(), 3)
             browser.execute_script(address_to, "transcription-provider", b)
