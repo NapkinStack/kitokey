@@ -7727,6 +7727,17 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
             back = browser.execute_script(value, "transcription-key", hears)
             check("the transcription: a key typed for one service, another chosen: its field empty; back to the first, its key back (#964)",
                   empty and back, [empty, back])
+            # Saved for the service with its key, then drawn anew: no longer kept in the page (#963, ines' S7).
+            press(browser, "transcription-key-test")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-models").is_displayed(), 10)
+            press(browser, "transcription-save")
+            saved = wait_for(browser, lambda b_: f'transcription_provider = "{a}"' in window.file.read_text(), 5)
+            browser.execute_script("window.__old = document.getElementById('transcription-key'); refresh()")
+            wait_for(browser, lambda b_: b_.execute_script("return !window.__old.isConnected && !!document.getElementById('transcription-key')"), 5)
+            forgotten = browser.execute_script(value, "transcription-key", "")
+            check("the transcription, saved with its key: drawn anew, the key no longer in its field (#963)",
+                  saved and forgotten and browser.execute_script(sent, "transcription_saved", hears) == [True] and hears not in window.file.read_text(),
+                  [saved, forgotten])
             # Its « Avancé »: an address of one's own on another host, saved there: nothing typed for the service handed with it.
             press(browser, "transcription-advanced")
             wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-provider").is_displayed(), 3)
@@ -7743,7 +7754,7 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
             browser.execute_script("document.getElementById('transcription-own-save').click()")
             saved = wait_for(browser, lambda b_: f'transcription_provider = "{b}"' in window.file.read_text(), 5)
             check("the transcription's « Avancé », an address on another host: its key field empty, saved with no key typed for the service (#964)",
-                  other and saved and browser.execute_script(sent, "transcription_saved", hears) == [False] and hears not in window.file.read_text(),
+                  other and saved and browser.execute_script(sent, "transcription_saved", hears)[-1:] == [False] and hears not in window.file.read_text(),
                   [other, saved, browser.execute_script(sent, "transcription_saved", hears)])
     finally:
         for server in servers:
