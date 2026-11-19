@@ -5764,9 +5764,9 @@ def focus_kept(now: dt.datetime) -> None:
                       done and after[0] in ("minutes", "minutes-save") and abs(after[1] - before[1]) <= 1, {"saved": done, "before": before, "after": after})
             else:
                 check("Settings offer the minutes' model on this computer, to be chosen (D101)", False, browser.execute_script(where))
-            # Another page asked from Settings scrolled down: it opens at its start. The place kept for a drawing
-            # is Settings' own, given back only at Settings' address — never Settings' scroll carried to the
-            # meeting's page (ines's P6 on #951, D101).
+            # Another page asked from Settings scrolled down: it opens at its start (D101). Settings are emptied as
+            # they are left, before the drawing reads its place: this holds the behaviour, not the place's address
+            # — the narrow list below holds that.
             browser.execute_script("window.scrollTo(0, document.scrollingElement.scrollHeight)")
             time.sleep(0.4)
             down = browser.execute_script("return Math.round(scrollY)")
@@ -5775,7 +5775,7 @@ def focus_kept(now: dt.datetime) -> None:
                               and b.find_elements(By.ID, "meeting-language"), 10)
             time.sleep(1)
             top = browser.execute_script("return Math.round(scrollY)")
-            check("Settings scrolled down, then a meeting's page asked: it opens at its start, not at Settings' scroll (#951, D101)",
+            check("Settings scrolled down, then a meeting's page asked: it opens at its start (D101)",
                   down > 0 and opened and top == 0, {"Settings' scroll": down, "opened": opened, "the page's scroll": top})
     finally:
         tags.shutdown()
@@ -5825,6 +5825,32 @@ def focus_kept(now: dt.datetime) -> None:
         else:
             check("Settings offer « Télécharger le modèle », to be pressed (D101)", False, browser.execute_script(where))
     slow.shutdown()
+    # The place a drawing gives back is its own page's, at its own address: a list scrolled down — narrow, the list
+    # scrolls the page, and leaving it empties nothing — then a meeting asked: the meeting opens at its start, never
+    # at the list's scroll (ines's P6 on #951, D101).
+    listed = WORK / "focus-kept-list"
+    for day in range(16):
+        session(listed / f"2026-10-{day + 1:02d}_10-00", now - dt.timedelta(days=30 - day), 30, {"local.wav": 4000})
+    # The meeting asked, as long as BS's: a page taller than the window, or a scroll carried over would not show.
+    shutil.copy(folder / "transcript.jsonl", listed / "2026-10-01_10-00" / "transcript.jsonl")
+    narrow = Window(listed, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n')
+    with narrow as browser:
+        browser.set_window_size(420, 500)
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: len(b.find_elements(By.CSS_SELECTOR, "#list a.session")) >= 16, 10)
+        time.sleep(0.5)
+        browser.execute_script("window.scrollTo(0, document.scrollingElement.scrollHeight)")
+        time.sleep(0.4)
+        down = browser.execute_script("return [Math.round(scrollY), Math.round(document.scrollingElement.scrollHeight), innerHeight]")
+        first = "2026-10-01_10-00"
+        browser.execute_script(f"location.hash = '#/meeting/{first}'")
+        opened = wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == first
+                          and b.find_elements(By.ID, "meeting-language"), 10)
+        time.sleep(1)
+        top = browser.execute_script("return [Math.round(scrollY), Math.round(document.scrollingElement.scrollHeight)]")
+        check("narrow, the list scrolled down, then a meeting asked: it opens at its start, not at the list's scroll (#951, D101)",
+              down[0] > 0 and opened and top[1] > down[2] + down[0] and top[0] == 0,
+              {"the list's scroll, height, window": down, "opened": opened, "the page's scroll and height": top})
 
 
 def focus_swept(now: dt.datetime) -> None:
