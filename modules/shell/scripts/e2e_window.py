@@ -1513,6 +1513,10 @@ def models_guided(now: dt.datetime) -> None:
         press(browser, "minutes-advanced")
         unfolded = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-address").is_displayed(), 3)
         check("« Avancé » unfolded: an address of one's own, and a model named by hand", unfolded and browser.find_element(By.ID, "minutes-model").is_displayed())
+        # One « Enregistrer » at a time, as the transcription's (#860): unfolded, its own alone (#968).
+        saves = "return ['minutes-online-save', 'minutes-own-save'].map(id => { const s = document.getElementById(id); return !!s && s.getClientRects().length > 0; })"
+        check("« Avancé » unfolded: its own « Enregistrer » alone, the service's no longer offered (#968)",
+              browser.execute_script(saves) == [False, True], browser.execute_script(saves))
         shot_themed(browser, "d95-models-service-light", "light")
         shot_themed(browser, "d95-models-service-dark", "dark")
         # A model the service does not list — a new release, an id of its own —: typed by hand under
@@ -1531,6 +1535,7 @@ def models_guided(now: dt.datetime) -> None:
                           and b.find_element(By.ID, "minutes-service").get_attribute("value") == "0"
                           and b.execute_script(options, "minutes-models") == ["New Model"], 5)
         check("read again: that service, the model typed said as people say it", reread, browser.execute_script(options, "minutes-models"))
+        check("« Avancé » folded: the service's « Enregistrer » alone (#968)", browser.execute_script(saves) == [True, False], browser.execute_script(saves))
     for server in servers:
         server.shutdown()
 
