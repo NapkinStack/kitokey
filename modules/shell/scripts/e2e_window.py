@@ -7692,9 +7692,17 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
             # Saved for the service: no longer kept in the page; the field says a key is kept (#963).
             press(browser, "minutes-key-test")
             listed = wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-models").is_displayed(), 10)
+            # Unfolded again on B, a key typed for B: the service's « Enregistrer », still offered above, saves
+            # the service's key alone (#964).
+            press(browser, "minutes-advanced")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
+            browser.find_element(By.ID, "minutes-key").send_keys(own)
             browser.execute_script("window.__old = document.getElementById('minutes-key')")
             press(browser, "minutes-online-save")
             wait_for(browser, lambda b_: f'minutes_provider = "{a}"' in window.file.read_text(), 5)
+            handed = browser.execute_script(sent, "minutes_saved", zero)[-1:] == [True] and browser.execute_script(sent, "minutes_saved", own)[-1:] == [False]
+            check("the summary's service saved, « Avancé » unfolded on another host with a key typed for it: the service's key handed, nothing typed for that host (#964)",
+                  handed and own not in window.file.read_text(), handed)
             wait_for(browser, lambda b_: b_.execute_script("return !window.__old.isConnected && !!document.getElementById('minutes-key')"), 5)
             forgotten = browser.execute_script(value, "minutes-key", "")
             check("the summary, saved with its key: drawn anew, the key no longer in its field (#963)",
