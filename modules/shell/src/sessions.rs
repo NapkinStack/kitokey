@@ -93,6 +93,11 @@ pub fn folder(sessions: &Path, name: &str) -> Option<PathBuf> {
     folder.join("session.json").is_file().then_some(folder)
 }
 
+/// A stopped session's length, in seconds: none while it is recorded, or when it cannot be read.
+pub fn length(folder: &Path) -> Option<f64> {
+    read(folder, None)?.seconds
+}
+
 fn read(folder: &Path, recording: Option<&Path>) -> Option<Listed> {
     let text = fs::read_to_string(folder.join("session.json")).ok()?;
     let session: serde_json::Value = serde_json::from_str(&text).ok()?;
