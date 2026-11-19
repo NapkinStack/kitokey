@@ -5302,6 +5302,8 @@ def page_one_bar(now: dt.datetime) -> None:
                 seen = parts_contrast(browser.execute_script(BAR_COLOURS))
                 check(f"{short}, {theme}: each part of the bar, the step to come too, at 3:1 at least against the card, never dimmed (#954)",
                       [s for s, _, _ in seen] == ["running", "next"] and all(ratio >= 3 and opacity == 1 for _, ratio, opacity in seen), seen)
+                # Said in the run's output, for the test sheet: each part's lowest ratio, and its opacity.
+                print(f"        {short}, {theme}, measured: {seen}")
                 # Between the two steps — its transcript written, its summary not yet in line — the shell says the
                 # meeting `between` them. That moment lasts a few milliseconds with no program to hold it open, so
                 # the page is given, for two of its readings, the makings as the shell says them then: the bar
@@ -5399,6 +5401,7 @@ def page_one_bar(now: dt.datetime) -> None:
                 check(f"{short}, {theme}, less motion: the running part never dimmed, each colour at 3:1 at least, never one fill as a part done (#954)",
                       shown and still and all(ratio >= 3 and opacity == 1 for _, ratio, opacity in seen)
                       and running is not None and len({tuple(c) for c in running["colours"]}) > 1, [still, seen])
+                print(f"        {short}, {theme}, less motion, measured: {seen}")
                 shot_themed(browser, f"d92-page-bar-still-{short}-{theme}", theme)
             finally:
                 gates[0].unlink(missing_ok=True)
