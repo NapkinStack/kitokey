@@ -64,35 +64,18 @@ lexicon minutes "“{address}” is not a provider’s address: choose who write
 lexicon pulled "{model} is in Ollama: it is offered first for the minutes." « minutes »
 lexicon window.after_minutes[0] "Write the transcript, then the minutes" « minutes »
 lexicon window.after_minutes[1] "Each follows the other; a notification says when the minutes are ready." « minutes »
-lexicon window.agree_eyebrow[0] "Before the first minutes online" « minutes »
-lexicon window.agree_lead[0] "To write the minutes, Kitokey sends the transcript to the service you chose. Here is exactly what leaves." « minutes »
-lexicon window.agree_local[0] "Write the minutes on this computer instead" « minutes »
-lexicon window.confidential_ollama_empty[0] "Ollama holds no model on this computer: the minutes wait for it." « minutes »
-lexicon window.context_changed[1] "The transcript and the minutes were made with another context." « minutes »
-lexicon window.context_making[0] "The context cannot change while the transcript or the minutes are being made." « minutes »
-lexicon window.context_why[0] "The transcription hears it as the first words said: names are spelt as here. The minutes use it to give each action to the right person." « minutes »
-lexicon window.copy_minutes[0] "Copy the minutes" « minutes »
-lexicon window.corrected_since[0] "The transcript was corrected after these minutes were written." « minutes »
 lexicon window.keep_audio[1] "After that, the audio goes to the trash; the transcript and minutes stay." « minutes »
 lexicon window.key_kept[0] "A key is kept in the system's keyring; a new one replaces it." « keyring »
 lexicon window.key_not_kept[0] "The choice is saved, but the key was not kept in the system's keyring: {}" « keyring »
-lexicon window.make_minutes[0] "Write the minutes" « minutes »
-lexicon window.minutes_making[0] "Writing the minutes" « minutes »
-lexicon window.minutes_not_copied[0] "The minutes could not be copied." « minutes »
-lexicon window.minutes_not_made[0] "The minutes were not written. The transcript is untouched." « minutes »
 lexicon window.minutes_step[0] "Minutes" « minutes »
 lexicon window.minutes_stopped[0] "Minutes stopped. You can start them again, with another model if you like." « minutes »
-lexicon window.minutes_title[0] "Minutes" « minutes »
 lexicon window.minutes_unsaved[0] "Not saved yet — the minutes are still written by {}." « minutes »
 lexicon window.minutes_unsaved_none[0] "Not saved yet — no minutes are written until it is." « minutes »
 lexicon window.models_note[0] "The models “on this computer” are those Kitokey finds installed. A key is kept in your system’s keyring, never in a file. Nothing leaves this computer without your agreement: a transcription service you name receives your meetings’ sound and their context, a service that writes the minutes their text and context only." « keyring »
-lexicon window.no_minutes[0] "No minutes yet." « minutes »
-lexicon window.no_player[0] "Its audio was freed: the meeting can no longer be listened to. Its transcript and minutes stay." « minutes »
 lexicon window.offered_ollama_good[0] "For the minutes, on this computer, through Ollama" « minutes »
 lexicon window.service_tested[0] "Il entend, avec les temps de chaque segment\u{a0}: un son propre à Kitokey a été transcrit." « segment »
 lexicon window.welcome_connected[1] "The minutes are written by an online service; the transcription stays on this computer." « minutes »
 lexicon window.welcome_ollama_lacks[0] "Ollama does not hold {} yet: the minutes wait for it. Settings fetch it in one click." « minutes »
-lexicon window.welcome_ollama_silent[0] "Ollama does not answer on this computer: the minutes wait for it. It is free, at ollama.com." « minutes »
 lexicon window.welcome_rows[1] "Minutes" « minutes »
 lexicon window.welcome_writer[0] "Who writes the minutes?" « minutes »
 placeholders of: in both languages
