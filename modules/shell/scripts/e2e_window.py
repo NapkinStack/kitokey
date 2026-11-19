@@ -204,6 +204,8 @@ echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'
 )
 RECORDER.chmod(0o755)
 FAILED = []
+# The scenario being played, named by `timed`: what a window that leaves its Kitokey running says it of (#960).
+PLAYING = None
 # What Tester says of each cause its program names (D72), as `src/words.rs` says it in French.
 TEST_CAUSES = [
     ("provider.refused_key", "Le fournisseur a refusé la clé\u00a0: saisissez-la de nouveau dans les réglages de Kitokey."),
@@ -293,30 +295,17 @@ def choose(browser, element_id: str, value: str) -> None:
     Select(browser.find_element(By.ID, element_id)).select_by_value(value)
 
 
-def typed(browser, element_id: str, text: str, quarantined: str = "") -> bool:
+def typed(browser, element_id: str, text: str) -> bool:
     """Text typed in a field of the page once it is drawn, shown and enabled — a choice just made
     draws its fields anew, and one not yet there cannot take the focus (#901). A field that never
     comes is a FAIL naming it and what was there — absent, hidden or disabled —, nothing typed, never
-    an exception that stops the shard (#907): False, for its caller to stop where nothing could hold.
-    `quarantined`, the issue and the date it is taken back up: the same said as quarantined, not
-    failed (tests.md, *Flaky tests*), with what the page showed and a screenshot, for its cause."""
+    an exception that stops the shard (#907): False, for its caller to stop where nothing could hold."""
     ready = lambda b: any(f.is_displayed() and f.is_enabled() for f in b.find_elements(By.ID, element_id))
     if not wait_for(browser, ready, 10):
         seen = browser.execute_script(
             "const f = document.getElementById(arguments[0]);"
             " return f ? {shown: f.getClientRects().length > 0, disabled: f.disabled} : 'absent'", element_id)
-        what = f"the field « {element_id} » comes, shown and enabled, to be typed in"
-        if not quarantined:
-            check(what, False, seen)
-            return False
-        # What hides it: the choice of where, its block, and Settings drawn — read when it happens.
-        page = browser.execute_script(
-            "const r = (id) => { const e = document.getElementById(id); return e ? {checked: e.checked, disabled: e.disabled,"
-            " hidden: e.hidden, shown: e.getClientRects().length > 0} : 'absent'; };"
-            " return {online: r('transcription-online'), here: r('transcription-here'), away: r('transcription-away'),"
-            " settings: r('settings'), hash: location.hash}")
-        print(f"  QUARANTINED  {what} ({quarantined})\n        got: {seen}\n        page: {page}")
-        shot(browser, f"quarantined-{element_id}")
+        check(f"the field « {element_id} » comes, shown and enabled, to be typed in", False, seen)
         return False
     browser.find_element(By.ID, element_id).send_keys(text)
     return True
@@ -655,6 +644,29 @@ class Window:
                     os.kill(pid, signal.SIGTERM)
                 except ProcessLookupError:
                     pass
+            # Gone within a bound, its single-instance name released (#960): a Kitokey that does not end
+            # on SIGTERM holds that name, and every later start of the shard hands over to it and raises
+            # « no session in a minute ». Still there: said, by the scenario that left it, then killed.
+            asked = time.monotonic()
+            until = asked + 10
+            while (instances() or single_instance_held()) and time.monotonic() < until:
+                time.sleep(0.2)
+            left = instances()
+            # A slow end said, ended or not: what #961 and the stability measure read.
+            if time.monotonic() - asked > 1:
+                print(f"    (Kitokey's end after SIGTERM: {time.monotonic() - asked:.1f} s)")
+            if left or single_instance_held():
+                check(f"{PLAYING or 'a window outside a scenario'} left Kitokey {left} running 10 s after SIGTERM:"
+                      " ended by SIGKILL (#960)", False, {"processes": left, "single-instance name held": single_instance_held()})
+                for pid in left:
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                # Gone before the next start: a process killed holds its name until it has ended.
+                until = time.monotonic() + 5
+                while (instances() or single_instance_held()) and time.monotonic() < until:
+                    time.sleep(0.1)
 
 
 def asking_less_motion(window: Window) -> Window:
@@ -766,7 +778,7 @@ def week_of(day: dt.datetime) -> dt.datetime:
 def group(day: dt.datetime | None, now: dt.datetime) -> str:
     """The heading the page puts a session under, in French — the page's own rule, here."""
     if day is None:
-        return "Date inconnue"
+        return "Sans date"
     this_week = week_of(now)
     if day >= this_week:
         return "Cette semaine"
@@ -839,7 +851,7 @@ def model_offered(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "make-transcript"))
         press(browser, "make-transcript")
         waits = "return document.getElementById('transcript-state')?.innerText || ''"
-        offered = wait_for(browser, lambda b: "En attente du modèle Whisper" in b.execute_script(waits) and b.find_elements(By.CSS_SELECTOR, "#transcript-state #model-fetch"))
+        offered = wait_for(browser, lambda b: "En attente du modèle de transcription" in b.execute_script(waits) and b.find_elements(By.CSS_SELECTOR, "#transcript-state #model-fetch"))
         check("a meeting waiting for the model offers it on its page", offered, browser.execute_script(waits))
         # Said once (#775): what it waits for, never « Pas encore de transcription » beside it.
         nones = browser.execute_script("return [...document.querySelectorAll('#meeting .transcript .none')].filter(e => e.offsetParent !== null).map(e => e.textContent)")
@@ -858,7 +870,7 @@ def model_offered(now: dt.datetime) -> None:
         time.sleep(3.5)
         check("the offer is not drawn again while nothing changes", not staleness_of(button)(browser))
         browser.find_element(By.ID, "model-fetch").click()
-        coming = wait_for(browser, lambda b: "en cours de téléchargement" in b.execute_script(waits) and not b.find_elements(By.ID, "model-fetch"), 3)
+        coming = wait_for(browser, lambda b: "téléchargement en cours" in b.execute_script(waits) and not b.find_elements(By.ID, "model-fetch"), 3)
         check("while it comes, the meeting says so and offers it no more", coming, browser.execute_script(waits))
         made = wait_for(browser, lambda b: heard.exists(), 15)
         check("fetched from the meeting, its transcript is made", made and fetched.read_bytes() == right)
@@ -1231,7 +1243,7 @@ def service_named(now: dt.datetime) -> None:
         # Who heard a meeting, said where it is read: the service's host, never « sur cet ordinateur ».
         browser.execute_script("location.hash = '#/meeting/heard'")
         makers = lambda b: lines_seen(b, "#meeting .maker")
-        named = wait_for(browser, lambda b: "Écrit par whisper-large-v3, via api.groq.com" in makers(b), 5)
+        named = wait_for(browser, lambda b: "Rédigé par whisper-large-v3, via api.groq.com" in makers(b), 5)
         check("a meeting a service heard names the service, never this computer", named and not any("sur cet ordinateur" in m for m in makers(browser)), makers(browser))
         browser.execute_script("location.hash = '#/settings'")
         note = wait_for(browser, lambda b: "reçoit le son de vos réunions" in b.find_element(By.ID, "settings").text, 5)
@@ -1269,6 +1281,20 @@ def service_named(now: dt.datetime) -> None:
               models and listed == ["/api/v1/key", "/api/v1/models?output_modalities=transcription"] and not browser.find_element(By.ID, "transcription-provider").is_displayed(),
               (offered(browser, "transcription-models"), listed))
         Select(browser.find_element(By.ID, "transcription-models")).select_by_value("vendor/scribe")
+        # Drawn anew before « Enregistrer » — another control saved, say —: the model chosen stays chosen (#948).
+        browser.execute_script("window.__old = document.getElementById('transcription-models'); refresh()")
+        wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && !!document.getElementById('transcription-models')"), 5)
+        check("drawn anew before « Enregistrer »: the transcription model chosen in the service's list still chosen (#948)",
+              browser.execute_script("return document.getElementById('transcription-models').value") == "vendor/scribe",
+              browser.execute_script("return document.getElementById('transcription-models').value"))
+        # « Avancé », folded by the user above, stays folded: the service's « Enregistrer » still there to save it (#948).
+        folded = browser.execute_script("const t = document.getElementById('transcription-advanced'), s = document.getElementById('transcription-save');"
+                                        " return [t.getAttribute('aria-expanded'), !!s && s.getClientRects().length > 0]")
+        check("drawn anew before « Enregistrer »: « Avancé » left folded as the user folded it, the service's « Enregistrer » offered (#948)",
+              folded == ["false", True], folded)
+        # The key typed, not yet saved, still there to be saved with it (#948).
+        typed = browser.execute_script("return document.getElementById('transcription-key').value")
+        check("drawn anew before « Enregistrer »: the key typed still in its field", typed == "sk-stand-in-not-a-key", len(typed))
         # The stand-in is on this computer: no agreement asked, and it saves without one (#859); a host
         # elsewhere is agreed to above, under « Avancé ».
         asked = browser.execute_script("const a = document.getElementById('transcription-agreed'); return !!a && a.getClientRects().length > 0")
@@ -1463,6 +1489,13 @@ def models_guided(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.execute_script(anew), 5)
         check("drawn again by itself: the models listed with the key still offered",
               browser.find_element(By.ID, "minutes-models").is_displayed() and browser.execute_script(options, "minutes-models") == offered, browser.execute_script(options, "minutes-models"))
+        # Another model chosen, then drawn anew before « Enregistrer »: it stays chosen (#948).
+        choose(browser, "minutes-models", "openai/gpt-4o-mini")
+        browser.execute_script("window.__old = document.getElementById('minutes-models'); refresh()")
+        wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && !!document.getElementById('minutes-models')"), 5)
+        check("drawn anew before « Enregistrer »: the summary's model chosen in the service's list still chosen (#948)",
+              browser.execute_script("return document.getElementById('minutes-models').value") == "openai/gpt-4o-mini",
+              browser.execute_script("return document.getElementById('minutes-models').value"))
         choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
         press(browser, "minutes-online-save")
         saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
@@ -1762,6 +1795,25 @@ def ollama_pulled(now: dt.datetime) -> None:
     server.shutdown()
 
 
+
+def first_read_said(browser, ids, expected, got) -> None:
+    """#965: the assistant's buttons read empty twice in 30 attests. Measured (s965de): the card at opacity exactly 0,
+    its fade's first frame, where WebKitWebDriver's `.text` is '' though the text is there. A first read other than
+    expected is said, with the page's state just after and a second read a second later, so that a cause other than
+    that one would show; the check itself waits for the text, bounded, and judges what is then read."""
+    if got == expected:
+        return
+    state = ("const w = document.getElementById('welcome'), c = document.querySelector('.welcome');"
+             " const r = c ? c.getBoundingClientRect() : null;"
+             " return {welcome_hidden: w ? w.hidden : 'absent', card: r ? [Math.round(r.width), Math.round(r.height)] : 'absent',"
+             " opacity: c ? getComputedStyle(c).opacity : null, display: c ? getComputedStyle(c).display : null,"
+             " buttons: arguments[0].map((id) => { const b = document.getElementById(id); return b ? [b.isConnected, b.textContent,"
+             " b.getClientRects().length] : 'absent'; })}")
+    now = browser.execute_script(state, list(ids))
+    time.sleep(1)
+    later = [browser.find_element(By.ID, i).text for i in ids]
+    print(f"  #965  first read {got}, a second later {later}; the page just after the first read: {now}")
+
 def first_run(now: dt.datetime) -> None:
     """Y. The first start (D58): the full window opens on one question, then the setting said plainly."""
     print("Y. the first start: one question, the setting said plainly, private by default (D58)")
@@ -1861,6 +1913,10 @@ def first_run(now: dt.datetime) -> None:
         again = browser.execute_script("const b = document.getElementById('welcome-ollama-again');"
                                        " return b ? [b.tagName, b.textContent, b.closest('.welcome-wait')?.textContent.includes('ollama.com') ?? false] : null")
         check("Ollama not answering: « Réessayer » beside ollama.com, a button (#781)", again == ["BUTTON", "Réessayer", True], again)
+        first_read_said(browser, ("welcome-later",), ["Plus tard — vos réunions attendront le modèle"],
+                        [browser.find_element(By.ID, "welcome-later").text])
+        # Once the card is past its fade's first frame (#965).
+        wait_for(browser, lambda b: b.find_element(By.ID, "welcome-later").text != "", 5)
         later = browser.find_element(By.ID, "welcome-later").text
         check("the model missing: « Plus tard » says the meetings will wait for it (#781)",
               later == "Plus tard — vos réunions attendront le modèle", later)
@@ -2024,7 +2080,12 @@ def first_run(now: dt.datetime) -> None:
         press(browser, "welcome-next")
         wait_for(browser, lambda b: "Private mode" in b.execute_script(summary), 5)
         check("Next with nothing chosen is private", "Private mode" in browser.execute_script(summary), browser.execute_script(summary))
-        english = [browser.find_element(By.ID, i).text for i in ("welcome-later", "welcome-ollama-again")]
+        later_en = ["Later — your meetings will wait for the model", "Try again"]
+        buttons = lambda b: [b.find_element(By.ID, i).text for i in ("welcome-later", "welcome-ollama-again")]
+        first_read_said(browser, ("welcome-later", "welcome-ollama-again"), later_en, buttons(browser))
+        # Once the card is past its fade's first frame, where `.text` is '' (#965).
+        wait_for(browser, lambda b: buttons(b) == later_en, 5)
+        english = buttons(browser)
         check("in English: « Later » says what waits, « Try again » beside ollama.com (#781)",
               english == ["Later — your meetings will wait for the model", "Try again"], english)
         seen(browser, "d58-3-summary-private-dark")
@@ -2386,14 +2447,14 @@ def meeting_language(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "meetings-language"), 10)
         chosen = browser.execute_script("const p = document.getElementById('meetings-language'); return p.selectedIndex < 0 ? '' : p.options[p.selectedIndex].text")
         check("Settings too: the meetings' language SpeechAnalyzer does not hear stays chosen, said as heard",
-              chosen == "Deutsch — SpeechAnalyzer entend celle du système", chosen)
+              chosen == "Deutsch — SpeechAnalyzer transcrit en celle du système", chosen)
     # Its own language written while Whisper heard, one SpeechAnalyzer does not hear: said as heard.
     (heard / "language").write_text("de\n")
     with window as browser:
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         own = Select(browser.find_element(By.ID, "meeting-language")).first_selected_option.text
-        check("a meeting's own language SpeechAnalyzer does not hear: kept, said with the one it hears", own == "Deutsch — SpeechAnalyzer entend Français", own)
+        check("a meeting's own language SpeechAnalyzer does not hear: kept, said with the one it hears", own == "Deutsch — SpeechAnalyzer transcrit en Français", own)
     (heard / "language").unlink()
 
 
@@ -2528,7 +2589,7 @@ echo '{{"available":true,"installed":true,"supported":true}}'
             browser.switch_to.window([h for h in browser.window_handles if h != main][0])
             wait_for(browser, lambda b: b.find_elements(By.ID, "small-record"), 5)
             small = [browser.find_element(By.ID, "small-record").get_attribute("aria-label"), browser.execute_script("return document.documentElement.lang")]
-            check("the bar speaks it", small == ["Start a recording", "en"], small)
+            check("the bar speaks it", small == ["Start recording", "en"], small)
             try:
                 browser.find_element(By.ID, "small-full").click()
             except NoSuchWindowException:
@@ -3140,9 +3201,9 @@ def models_advanced(now: dt.datetime) -> None:
             opened = wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is False, 5)
             got = browser.execute_script(shown, "small")
             check("opened at rest: the transcription's models — Settings' first, short, then those installed and the service Settings set — and the minutes', Settings' never twice",
-                  opened and got["hear"] == ["Réglages\u00a0: Whisper adv settings", "Whisper tiny adv", "whisper-1, via hears.example"]
-                  and got["write"] == ["Réglages\u00a0: Qwen3 14b", LONG_SAID + " — sur cet ordinateur", "Mistral 7b — sur cet ordinateur"]
-                  and got["note"] == "Pour cette réunion seule ; les Réglages ne changent pas.", got)
+                  opened and got["hear"] == ["Celui des Réglages\u00a0: Whisper adv settings", "Whisper tiny adv", "whisper-1, via hears.example"]
+                  and got["write"] == ["Celui des Réglages\u00a0: Qwen3 14b", LONG_SAID + " — sur cet ordinateur", "Mistral 7b — sur cet ordinateur"]
+                  and got["note"] == "Pour cette réunion uniquement ; les Réglages ne changent pas.", got)
             # What « Avancé » holds said on it; the note before the lists; the lists at the board's 14 px, none cut.
             looks = browser.execute_script(
                 "const p = document.getElementById('small-advanced-panel'); const c = document.createElement('canvas').getContext('2d');"
@@ -3197,7 +3258,7 @@ def models_advanced(now: dt.datetime) -> None:
             next_models = window.file.parent / "next-models.json"
             check("chosen at rest: kept on disk beside the settings", next_models.exists(), sorted(p.name for p in window.file.parent.iterdir()))
             press(browser, "small-advanced")
-            keptSaid = "Modèles gardés : tiny adv · Mistral 7b"
+            keptSaid = "Modèles retenus : tiny adv · Mistral 7b"
             said = wait_for(browser, lambda b: b.execute_script(line) == keptSaid, 3)
             check("« Avancé » closed with a choice for the next recording: said under the row, naming them, as the context kept is", said, browser.execute_script(line))
             told = browser.execute_script("const k = document.getElementById('small-models-kept'); const c = document.getElementById('small-context-kept');"
@@ -3268,10 +3329,10 @@ def models_advanced(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
             # Stopped with « Avancé » open on that meeting's models: drawn again for the next recording,
             # closed, Settings' first — never left open on the meeting that ended (#766, P5).
-            rest = wait_for(browser, lambda b: b.execute_script(shown, "small")["heard"] == "Réglages : Whisper adv settings", 3)
+            rest = wait_for(browser, lambda b: b.execute_script(shown, "small")["heard"] == "Celui des Réglages : Whisper adv settings", 3)
             got = browser.execute_script(shown, "small")
             check("stopped by ■ with « Avancé » open: drawn again for the next recording, closed, Settings' first",
-                  rest and got["expanded"] == "false" and got["written"] == "Réglages : Qwen3 14b", got)
+                  rest and got["expanded"] == "false" and got["written"] == "Celui des Réglages : Qwen3 14b", got)
             none_kept = lambda b: b.execute_script("return window.__TAURI__.core.invoke('models_offered', {name: null}).then(o => o.chosen)")
             quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
             check("stopped by ■: no models kept for the next, and none said kept", quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
@@ -3286,7 +3347,7 @@ def models_advanced(now: dt.datetime) -> None:
             Select(browser.find_element(By.ID, "small-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
             wait_for(browser, lambda b: none_kept(b) != {}, 5)
             browser.execute_script("document.getElementById('small-advanced').click()")
-            said = wait_for(browser, lambda b: b.execute_script(line) == "Modèle gardé\u00a0: Mistral 7b", 3)
+            said = wait_for(browser, lambda b: b.execute_script(line) == "Modèle retenu\u00a0: Mistral 7b", 3)
             check("chosen again at rest, « Avancé » closed: said kept, naming the one", said, browser.execute_script(line))
             made = meetings / "2026-10-18_11-30"
             meeting.rename(made)
@@ -3306,10 +3367,10 @@ def models_advanced(now: dt.datetime) -> None:
                 check("recording from the tray: « Avancé » open on this meeting's models", ours, browser.execute_script(shown, "small"))
                 tray_click("Arrêter l’enregistrement")
                 wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
-                rest = wait_for(browser, lambda b: b.execute_script(shown, "small")["written"] == "Réglages\u00a0: Qwen3 14b", 3)
+                rest = wait_for(browser, lambda b: b.execute_script(shown, "small")["written"] == "Celui des Réglages\u00a0: Qwen3 14b", 3)
                 got = browser.execute_script(shown, "small")
                 check("stopped from the tray with « Avancé » open: drawn again for the next recording, closed, Settings' first",
-                      rest and got["expanded"] == "false" and got["heard"] == "Réglages\u00a0: Whisper adv settings", got)
+                      rest and got["expanded"] == "false" and got["heard"] == "Celui des Réglages\u00a0: Whisper adv settings", got)
                 quiet = wait_for(browser, lambda b: b.execute_script(line) is None, 3)
                 check("started and stopped from the tray's icon: no models kept for the next, and none said kept",
                       quiet and none_kept(browser) == {}, [browser.execute_script(line), none_kept(browser)])
@@ -3324,7 +3385,7 @@ def models_advanced(now: dt.datetime) -> None:
                       [none_kept(browser), browser.execute_script(line), next_models.exists()])
                 got = browser.execute_script(shown, "small")
                 check("started again: « Avancé » closed, Settings' first in both lists",
-                      got["expanded"] == "false" and got["heard"] == "Réglages\u00a0: Whisper adv settings" and got["written"] == "Réglages\u00a0: Qwen3 14b", got)
+                      got["expanded"] == "false" and got["heard"] == "Celui des Réglages\u00a0: Whisper adv settings" and got["written"] == "Celui des Réglages\u00a0: Qwen3 14b", got)
                 wait_for(None, lambda b: (meeting / "transcript.jsonl").exists(), 15)
                 wait_for(browser, lambda b: b.execute_script(idle), 15)
             finally:
@@ -3343,7 +3404,7 @@ def models_advanced(now: dt.datetime) -> None:
             got = browser.execute_script(shown, "redo-transcript-panel")
             check("Refaire… of the transcript: « Avancé » closed by default, the meeting's own model chosen in it",
                   got["expanded"] == "false" and got["hidden"] is True and got["heard"] == "Whisper tiny adv"
-                  and got["written"] == "Réglages\u00a0: Qwen3 14b", got)
+                  and got["written"] == "Celui des Réglages\u00a0: Qwen3 14b", got)
             # Annuler: nothing changed.
             press(browser, "redo-transcript-panel-advanced")
             Select(browser.find_element(By.ID, "redo-transcript-panel-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
@@ -3462,7 +3523,7 @@ def models_advanced(now: dt.datetime) -> None:
             got = browser.execute_script(shown, "redo-transcript-panel")
             full.file.write_text(kept_settings)
             check("Settings unreadable: Refaire… opens all the same, offering what was last read, and says it",
-                  opened and got["heard"] == "Réglages\u00a0: Whisper adv settings" and bool(got["said"]), got)
+                  opened and got["heard"] == "Celui des Réglages\u00a0: Whisper adv settings" and bool(got["said"]), got)
             if opened:
                 press(browser, "redo-transcript-panel-cancel")
             else:
@@ -3477,13 +3538,13 @@ def models_advanced(now: dt.datetime) -> None:
             said = wait_for(browser, lambda b: b.find_elements(By.ID, "models-gone") and b.find_element(By.ID, "models-gone").is_displayed(), 10)
             gone_said = browser.execute_script("return document.getElementById('models-gone')?.textContent")
             check("a model chosen for the meeting and gone: said on its page, Settings' standing in",
-                  said and gone_said == "Le modèle de transcription choisi pour cette réunion n’est plus là\u00a0: celui des Réglages le remplace.", gone_said)
+                  said and gone_said == "Le modèle de transcription choisi pour cette réunion n’est plus installé\u00a0: celui des Réglages sera utilisé.", gone_said)
             press(browser, "redo-transcript")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
             press(browser, "redo-transcript-panel-advanced")
             got = browser.execute_script(shown, "redo-transcript-panel")
-            check("and in « Avancé »: Settings' shown, the model gone said", got["heard"] == "Réglages\u00a0: Whisper adv settings"
-                  and "n’est plus là" in (got["said"] or ""), got)
+            check("and in « Avancé »: Settings' shown, the model gone said", got["heard"] == "Celui des Réglages\u00a0: Whisper adv settings"
+                  and "n’est plus installé" in (got["said"] or ""), got)
             press(browser, "redo-transcript-panel-cancel")
             # Confidential, Settings hearing and writing by services: « Avancé » names no service at all —
             # Settings' entry says who makes it here —; a service chosen is said unused, and refused.
@@ -3499,9 +3560,9 @@ def models_advanced(now: dt.datetime) -> None:
             got = browser.execute_script(shown, "redo-transcript-panel")
             check("confidential, Settings naming services: no entry names one — Settings' says Whisper and Ollama here",
                   got["hear"] and got["write"] and not any("via" in one for one in got["hear"] + got["write"])
-                  and got["hear"][0] == "Réglages\u00a0: Whisper adv settings" and got["write"][0].startswith("Réglages\u00a0: "), got)
+                  and got["hear"][0] == "Celui des Réglages\u00a0: Whisper adv settings" and got["write"][0].startswith("Celui des Réglages\u00a0: "), got)
             check("a service the confidential meeting chose: not shown chosen, said unused while confidential",
-                  got["heard"] == got["hear"][0] and "n’est pas utilisé tant qu’elle est confidentielle" in (got["said"] or ""), got)
+                  got["heard"] == got["hear"][0] and "le service en ligne choisi n’est pas utilisé" in (got["said"] or ""), got)
             press(browser, "redo-transcript-panel-cancel")
             refused = browser.execute_async_script(
                 "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: arguments[1]}).then(() => done('kept'), () => done('refused'))",
@@ -3516,7 +3577,7 @@ def models_advanced(now: dt.datetime) -> None:
             press(browser, "redo-transcript-panel-advanced")
             got = browser.execute_script(shown, "redo-transcript-panel")
             check("Settings naming no minutes model: their entry reads « Réglages : aucun modèle choisi »",
-                  (got["write"] or [None])[0] == "Réglages\u00a0: aucun modèle choisi", got)
+                  (got["write"] or [None])[0] == "Celui des Réglages\u00a0: aucun modèle choisi", got)
             press(browser, "redo-transcript-panel-cancel")
             full.file.write_text(kept_settings)
         # In English, the bar and Refaire…: the long name said whole as well.
@@ -3629,7 +3690,7 @@ def advanced_latest_answer(now: dt.datetime) -> None:
             browser.execute_script(toggled)
             answered = wait_for(browser, lambda b: b.execute_script("return window.answered || 0") > before and b.execute_script(opened), 5)
             browser.execute_script("window.held[1]()")
-            refused = wait_for(browser, lambda b: "Les modèles n’ont pas pu être lus" in b.execute_script(said), 2)
+            refused = wait_for(browser, lambda b: "Impossible de lire les modèles" in b.execute_script(said), 2)
             check("an older ask refused after a later one answered: « Avancé » shows the models, and nothing says they could not be read (#852)",
                   held and answered and not refused and browser.execute_script(opened),
                   {"held": held, "answered": answered, "said": browser.execute_script(said), "open": browser.execute_script(opened)})
@@ -3679,7 +3740,7 @@ def minutes_copied(now: dt.datetime) -> None:
         check("« Copié » said for a moment", gone, browser.execute_script(status))
         browser.execute_script(stand_in, True)
         press(browser, "copy-minutes")
-        refused = wait_for(browser, lambda b: b.execute_script(status) == "Le compte rendu n’a pas pu être copié.", 3)
+        refused = wait_for(browser, lambda b: b.execute_script(status) == "Impossible de copier le compte rendu.", 3)
         check("the clipboard refused: one sentence says so, the minutes as they were",
               refused and browser.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2"), browser.execute_script(status))
         for folder, why in ((none_, "without minutes"), (broken, "with minutes that do not read")):
@@ -3752,7 +3813,7 @@ def announced(now: dt.datetime) -> None:
         before = browser.execute_script(place)
         browser.execute_script("Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: () => Promise.reject(new Error('refused'))}})")
         browser.execute_script("document.getElementById('small-announce-copy').click()")
-        refused = wait_for(browser, lambda b: b.find_element(By.ID, "small-announce-copied").text == "Pas copiée.", 3)
+        refused = wait_for(browser, lambda b: b.find_element(By.ID, "small-announce-copied").text == "Non copiée.", 3)
         check("a clipboard refused: said of the announcement, Arrêter where it was", refused and browser.execute_script(place) == before, browser.find_element(By.ID, "small-announce-copied").text)
         stop_from_small(browser)
     quiet = WORK / "announcing-off"
@@ -3793,7 +3854,7 @@ def heard_checked(now: dt.datetime) -> None:
                         "La réunion\u00a0: rien depuis 2\u00a0min — l’enregistrement continue.", "Votre micro n’est pas enregistré pour l’instant."),
         "en_US.UTF-8": ("en", "Your microphone", "The meeting’s sound",
                         "Nothing comes from it: check it is not muted on the device itself, and that it is ready.",
-                        "The meeting: nothing for 2 min — the recording goes on.", "Your microphone is not recorded for now."),
+                        "The meeting: nothing for 2 min — the recording goes on.", "Your microphone isn’t being recorded right now."),
     }
     for language, (short, me, others, nothing, silent, waiting) in expected.items():
         for theme in ("light", "dark"):
@@ -3914,8 +3975,8 @@ def microphone_chosen(now: dt.datetime) -> None:
                 return
             keys(browser, Keys.TAB)
     for language, (short, auto, title, gone, waits) in {
-        "fr_FR.UTF-8": ("fr", "Micro\u00a0: Auto", "Micro\u00a0: Digital Microphone", "Le micro choisi n’est pas là\u00a0: Auto le remplace.", "Votre micro n’est pas enregistré pour l’instant."),
-        "en_US.UTF-8": ("en", "Microphone: Auto", "Microphone: Digital Microphone", "The microphone you chose is not there: Auto stands in.", "Your microphone is not recorded for now."),
+        "fr_FR.UTF-8": ("fr", "Micro\u00a0: Auto", "Micro\u00a0: Digital Microphone", "Le micro choisi est débranché\u00a0: Auto prend le relais.", "Votre micro n’est pas enregistré pour l’instant."),
+        "en_US.UTF-8": ("en", "Microphone: Auto", "Microphone: Digital Microphone", "The microphone you chose is unplugged — Auto takes over.", "Your microphone isn’t being recorded right now."),
     }.items():
         for theme in ("light", "dark"):
             listed.write_text(lines(*two))
@@ -4088,7 +4149,7 @@ def microphone_chosen(now: dt.datetime) -> None:
         wait_for(browser, lambda b: len(b.execute_script(choices)) == 4, 5)
         shown = browser.execute_script(choices)
         check("a choice no longer listed stays shown, checked, and says it is absent",
-              shown[-1][:2] == ["Casque parti", "gone_one"] and shown[-1][2] and "absent" in browser.execute_script("return [...document.querySelectorAll('#small-microphones .choice')].at(-1).textContent"), shown)
+              shown[-1][:2] == ["Casque parti", "gone_one"] and shown[-1][2] and "Débranché" in browser.execute_script("return [...document.querySelectorAll('#small-microphones .choice')].at(-1).textContent"), shown)
         # A new device, the list open and closed: nothing opens, nothing moves; it is there next time.
         keys(browser, Keys.ESCAPE)
         handles = len(browser.window_handles)
@@ -4128,7 +4189,7 @@ def microphone_chosen(now: dt.datetime) -> None:
             time.sleep(1.6)
             browser.find_elements(By.CSS_SELECTOR, "#small-microphones .choice")[2].click()
             check("a choice the settings cannot keep is said not kept",
-                  wait_for(browser, lambda b: "n’a pas pu être gardé" in b.execute_script(said), 5), browser.execute_script(said))
+                  wait_for(browser, lambda b: "n’a pas été enregistré" in b.execute_script(said), 5), browser.execute_script(said))
             named = browser.execute_script(state)["name"]
             check("the name shows the earlier choice again", "Digital Microphone" in named and "Ryzen" not in named, named)
             if not browser.execute_script(state)["panel"]:
@@ -4158,7 +4219,7 @@ def microphone_chosen(now: dt.datetime) -> None:
         drawn = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#small-microphones [role=status]") and b.execute_script(choices), 10)
         said = browser.execute_script("return document.querySelector('#small-microphones [role=status]')?.textContent ?? ''")
         shown = browser.execute_script(choices)
-        check("a list that cannot be read is said, Auto still offered", drawn and "Auto" in shown[0][0] and "ne peut pas être lue" in said,
+        check("a list that cannot be read is said, Auto still offered", drawn and "Auto" in shown[0][0] and "indisponible pour l’instant" in said,
               {"said": said, "options": shown, "state": browser.execute_script(state)})
         if drawn:
             fit(browser, "the list unread")
@@ -4246,7 +4307,7 @@ def sound_checked(now: dt.datetime) -> None:
             check("the microphone is open while the panel shows: a stream of Kitokey's", "Stream/Input/Audio" in kitokey_streams(window), kitokey_streams(window))
             said = dict(browser.execute_script(panel)["shown"])
             check("a Bluetooth headset's microphone: the panel says it, in one sentence",
-                  said.get("check-bluetooth") == "Tant que ce panneau est ouvert, votre casque Bluetooth passe en qualité d’appel\u202f; il revient à la fermeture.", said)
+                  said.get("check-bluetooth") == "Tant que ce panneau est ouvert, votre casque Bluetooth passe en mode appel (son de moindre qualité). Il revient à la normale à la fermeture.", said)
             check("the focus is inside the panel, a modal one", browser.execute_script(panel)["active"])
             for width, theme in ((1920, "light"), (1920, "dark"), (420, "light"), (420, "dark")):
                 browser.set_window_size(width, 760)
@@ -4258,11 +4319,11 @@ def sound_checked(now: dt.datetime) -> None:
             played, got = test_sound(window, browser, heard=False)
             check("« Jouer un son de test » plays on the run's output", played == {"kitokey_e2e_quiet"}, played)
             check("not heard on the meeting's side: said, and what to do",
-                  dict(got["shown"]).get("check-missed") == "Kitokey n’a pas entendu le son de test. Vérifiez que le son sort de cet ordinateur et pas d’un autre appareil, puis rejouez-le.", got)
+                  dict(got["shown"]).get("check-missed") == "Kitokey n’a pas entendu le son de test. Vérifiez que le son sort bien de cet ordinateur (et pas d’un autre appareil), puis réessayez.", got)
             gone = wait_for(browser, lambda b: "Stream/Output/Audio" not in kitokey_streams(window), 2)
             check("the test sound played, its stream is gone", gone, kitokey_streams(window))
             played, got = test_sound(window, browser, heard=True)
-            check("heard on the meeting's side: said", dict(got["shown"]).get("check-heard") == "Kitokey entend le son de cet ordinateur." and "check-missed" not in dict(got["shown"]), got)
+            check("heard on the meeting's side: said", dict(got["shown"]).get("check-heard") == "Kitokey entend bien le son de cet ordinateur." and "check-missed" not in dict(got["shown"]), got)
             shot_themed(browser, "check-sound-heard-light", "light")
             # A call holds a microphone: an application of its own, recording it.
             call = subprocess.Popen(["pw-record", "--target", "kitokey_e2e_check_mic", str(WORK / "call-check.wav")])
@@ -4270,7 +4331,7 @@ def sound_checked(now: dt.datetime) -> None:
                 held = wait_for(browser, lambda b: "check-call" in dict(b.execute_script(panel)["shown"]), 8)
                 got = browser.execute_script(panel)
                 check("a call holds a microphone: no test sound, the sentence of the board, alone — no headset's",
-                      held and got["play"] and dict(got["shown"]).get("check-call") == "Un appel tient le micro\u00a0: pas de son de test, il partirait dans l’appel. Faites jouer un son dans l’appel et regardez la jauge."
+                      held and got["play"] and dict(got["shown"]).get("check-call") == "Un appel utilise le micro\u00a0: pas de son de test, il serait entendu dans l’appel. Faites parler quelqu’un dans l’appel et regardez la jauge."
                       and "check-bluetooth" not in dict(got["shown"]), got)
                 shot_themed(browser, "check-sound-call-light", "light")
                 refused = browser.execute_script("return window.__TAURI__.core.invoke('sound_check_mark')")
@@ -4463,7 +4524,7 @@ def sound_checked(now: dt.datetime) -> None:
             check("in English: the panel's words; no headset, no Bluetooth sentence",
                   got and got["title"] == "Check the sound" and "check-bluetooth" not in dict(got["shown"]), got)
             note = browser.execute_script("return document.querySelector('#check-sound .check-note').textContent")
-            check("the microphone's note, in English", note == "The microphone stays open as long as this panel is.", note)
+            check("the microphone's note, in English", note == "The microphone stays on while this panel is open.", note)
             press(browser, "check-sound-close")
     finally:
         subprocess.run(["pactl", "unload-module", mic], capture_output=True)
@@ -4728,7 +4789,7 @@ def microphone_rollback(now: dt.datetime) -> None:
     name = "const b = document.getElementById('small-microphone'); return b ? b.textContent : ''"
     panel = "const p = document.getElementById('small-microphones'); return !!p && !p.hidden"
     said = "const s = document.getElementById('small-said'); return s && !s.hidden ? s.textContent : ''"
-    refused = "Votre choix de micro n’a pas pu être gardé"
+    refused = "Votre choix de micro n’a pas été enregistré"
     # Each choice's save held in the page, in the order made, until let through or refused.
     hold = ("const real = window.__TAURI__.core; window.saves = [];"
             " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'microphone_chosen'"
@@ -4991,8 +5052,8 @@ def bar_language(now: dt.datetime) -> None:
         keys(browser, Keys.ENTER)
         return wait_for(browser, lambda b: not b.execute_script("return document.getElementById('small-options').hidden"), 3)
     for language, (short, settled, first, refused) in {
-        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Celle des Réglages — Deutsch", "La langue n’a pas été enregistrée : "),
-        "en_US.UTF-8": ("en", "", "As in Settings — detected", "The language was not saved: "),
+        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Celle des Réglages — Deutsch", "Langue non enregistrée : "),
+        "en_US.UTF-8": ("en", "", "Same as Settings — detected", "Language not saved: "),
     }.items():
         taping = WORK / f"bar-language-{short}"
         taping.mkdir()
@@ -5090,11 +5151,11 @@ def bar_after_stop(now: dt.datetime) -> None:
     for language, short, theme, meeting, stages, not_made in (
         ("fr_FR.UTF-8", "fr", "light", "La réunion du 18 oct. à 12:00",
          (" : transcription en cours", " : compte rendu en cours", " : prête"),
-         " : Le compte rendu n’a pas été fait. La transcription est intacte. Le modèle n’a pas écrit de compte rendu :"
+         " : Le compte rendu n’a pas pu être rédigé. La transcription n’a pas changé. Le modèle n’a pas écrit de compte rendu :"
          " réessayez, ou choisissez un autre modèle dans les réglages de Kitokey."),
         ("en_US.UTF-8", "en", "dark", "The meeting of Oct 18 at 12:00 PM",
          (": transcribing", ": summary being written", ": ready"),
-         ": The minutes were not written. The transcript is untouched. The model did not write minutes: try again, or choose another"
+         ": The summary couldn’t be written. The transcript is unchanged. The model did not write minutes: try again, or choose another"
          " model in Kitokey’s settings."),
     ):
         hearing, summary, ready = (meeting + stage for stage in stages)
@@ -5217,7 +5278,7 @@ def page_one_bar(now: dt.datetime) -> None:
     timed = re.compile(r"\S.* · \d+:\d\d$")
     for language, short, theme, hearing, writing in (
         ("fr_FR.UTF-8", "fr", "light", "Transcription en cours", "Rédaction du compte rendu"),
-        ("en_US.UTF-8", "en", "dark", "Writing the transcript", "Writing the minutes"),
+        ("en_US.UTF-8", "en", "dark", "Transcribing", "Writing summary"),
     ):
         meetings = WORK / f"one-bar-{short}"
         meeting = meetings / "2026-10-18_12-00"
@@ -5950,10 +6011,10 @@ def bar_opened(now: dt.datetime) -> None:
         check(f"{what}: 440 wide, as tall as it shows, nothing overflows or is cut", holds(got), got)
     try:
         for language, (short, said) in {
-            "fr_FR.UTF-8": ("fr", {"check": "Vérifier le son", "advanced": "Avancé — modèles", "models": "Pour cette réunion seule\u202f; les Réglages ne changent pas.",
-                                   "settings": ["Modèle de transcription", "Modèle du compte rendu"], "recorded": "Enregistré : Mic. Le changer vaut pour le prochain enregistrement."}),
-            "en_US.UTF-8": ("en", {"check": "Check the sound", "advanced": "Advanced — models", "models": "For this meeting alone; Settings do not change.",
-                                   "settings": ["Transcription model", "Minutes model"], "recorded": "Recorded: Mic. Changing it applies to the next recording."}),
+            "fr_FR.UTF-8": ("fr", {"check": "Vérifier le son", "advanced": "Avancé — modèles", "models": "Pour cette réunion uniquement\u202f; les Réglages ne changent pas.",
+                                   "settings": ["Modèle de transcription", "Modèle du compte rendu"], "recorded": "Micro utilisé : Mic. Un changement s’appliquera au prochain enregistrement."}),
+            "en_US.UTF-8": ("en", {"check": "Check the sound", "advanced": "Advanced — models", "models": "For this meeting only; Settings stay the same.",
+                                   "settings": ["Transcription model", "Summary model"], "recorded": "Recording from Mic. Changes apply to the next recording."}),
         }.items():
             for theme in ("light", "dark"):
                 name = f"{short} {theme}"
@@ -6204,7 +6265,7 @@ def context_before_start(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44, 3)
         got = browser.execute_script(field)
         check("fr light: at rest, the context's field is in the row, empty, named, open; no ✕, no sentence, the bar 44 high",
-              got["in_row"] and got["shown"] and got["value"] == "" and got["placeholder"] == "Contexte de la réunion"
+              got["in_row"] and got["shown"] and got["value"] == "" and got["placeholder"] == "Sujet, participants…"
               and got["name"] == "De quoi parle la réunion ? Qui y participe ?" and not got["closed"]
               and not got["clear"] and not got["kept_shown"] and got["height"] == 44, got)
         if not got["shown"]:
@@ -6220,7 +6281,7 @@ def context_before_start(now: dt.datetime) -> None:
         got = browser.execute_script(field)
         check("fr light: typed at rest, the ✕ is offered, named, and under the row it is said kept for the next recording until cleared",
               got["value"] == said and got["clear"] and got["clear_name"] == "Effacer le contexte" and got["kept_shown"]
-              and got["kept"] == "Gardé pour le prochain enregistrement, jusqu’à ce que vous l’effaciez." and "small-context-kept" in got["described"], got)
+              and got["kept"] == "Conservé pour le prochain enregistrement." and "small-context-kept" in got["described"], got)
         held = wait_for(browser, lambda b: kept(b) == said, 3)
         check("fr light: typed at rest, the shell keeps it for the next recording; nothing is written anywhere yet",
               held and not any(meetings.iterdir()), [kept(browser), sorted(p.name for p in meetings.iterdir())])
@@ -6329,8 +6390,8 @@ def context_before_start(now: dt.datetime) -> None:
         keys(browser, typed)
         got = browser.execute_script(field)
         check("en dark: at rest, the row's field, its ✕, and the sentence kept for the next recording until cleared",
-              got["placeholder"] == "Meeting context" and got["name"] == "What is the meeting about? Who takes part?" and got["clear_name"] == "Clear the context"
-              and got["kept"] == "Kept for the next recording, until you clear it." and got["kept_shown"] and got["clear"] and not got["closed"], got)
+              got["placeholder"] == "Topic, participants…" and got["name"] == "What’s the meeting about? Who’s attending?" and got["clear_name"] == "Clear context"
+              and got["kept"] == "Kept for the next recording." and got["kept_shown"] and got["clear"] and not got["closed"], got)
         fit(browser, "en dark: at rest, a context kept")
         time.sleep(0.3)
         shot_themed(browser, "d91-context-rest-en-dark", "dark")
@@ -6497,8 +6558,8 @@ def minutes_checked(now: dt.datetime) -> None:
                  "const page = document.scrollingElement; return [page.scrollWidth - page.clientWidth, wide]")
 
     for language, short, cost, listen, passage, sections in (
-        ("fr_FR.UTF-8", "fr", "0,012 $US", "Écouter depuis", "Voir le passage de", ("Points saillants", "Actions", "Points clés")),
-        ("en_US.UTF-8", "en", "$0.012", "Listen from", "See the passage at", ("Highlights", "Actions", "Key points")),
+        ("fr_FR.UTF-8", "fr", "0,012 $US", "Écouter à partir de {}", "Voir le passage à {}", ("Points saillants", "Actions", "Points clés")),
+        ("en_US.UTF-8", "en", "$0.012", "Play from {}", "Go to {} in the transcript", ("Highlights", "Actions", "Key points")),
     ):
         with Window(meetings, language, "reminder = false\n") as browser:
             browser.set_window_size(1100, 800)
@@ -6524,7 +6585,7 @@ def minutes_checked(now: dt.datetime) -> None:
                   browser.execute_script("return document.querySelector('#meeting table.actions td.written button.line-time')?.textContent") == "01:50", got)
             got = browser.execute_script(labels)
             check(f"{short}: each time a link that says what it does; a time out of bounds stays the item's text",
-                  got == [[at, f"{listen} {at}"] for at in ("01:40", "01:50", "01:10")]
+                  got == [[at, listen.format(at)] for at in ("01:40", "01:50", "01:10")]
                   and "[12:75]" in browser.find_element(By.CSS_SELECTOR, "#meeting .minutes .body").text
                   and "[01:" not in browser.find_element(By.CSS_SELECTOR, "#meeting .minutes .body").text, got)
             told = browser.execute_script("return [...document.querySelectorAll('#meeting .minutes button.line-time')].map(l => l.title === l.getAttribute('aria-label') && l.title !== '')")
@@ -6598,7 +6659,7 @@ def minutes_checked(now: dt.datetime) -> None:
                 wait_for(browser, lambda b: b.find_elements(By.ID, "no-player") and b.find_elements(By.CSS_SELECTOR, "#meeting .lines li"), 10)
                 got = browser.execute_script(labels)
                 check(f"{short}: its audio {why}: a time brings its passage into view, and says that alone",
-                      got == [[at, f"{passage} {at}"] for at in ("01:40", "01:50", "01:10")], got)
+                      got == [[at, passage.format(at)] for at in ("01:40", "01:50", "01:10")], got)
                 browser.execute_script(away)
                 browser.execute_script(links)[0].click()
                 shown = wait_for(browser, lambda b: b.execute_script(in_view, 50), 3)
@@ -6955,7 +7016,7 @@ def renaming(now: dt.datetime) -> None:
         browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'title_saved' ? Promise.reject('REFUS') : real.invoke(asked, ...rest) }; window.restore = () => { window.__TAURI__.core = real; };")
         name(browser, "Refusé", Keys.ENTER)
         said = wait_for(browser, lambda b: b.find_elements(By.ID, "naming-said") and b.find_element(By.ID, "naming-said").is_displayed(), 5)
-        check("a name refused is said, in French", said and browser.find_element(By.ID, "naming-said").get_attribute("textContent") == "Le nom n’a pas été enregistré\u00a0: REFUS")
+        check("a name refused is said, in French", said and browser.find_element(By.ID, "naming-said").get_attribute("textContent") == "Nom non enregistré\u00a0: REFUS")
         check("refused: the field stays, what was typed in it", browser.find_element(By.ID, "naming").get_attribute("value") == "Refusé")
         # A reading of the page keeps the sentence with the field, and leaves the focus where it is.
         browser.execute_async_script("const done = arguments[arguments.length - 1]; document.getElementById('meeting').dataset.at = '#/other'; refresh().then(done)")
@@ -7548,16 +7609,28 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "minutes-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
             choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
+            # The radio as drawn before the save, marked: a node drawn anew carries no mark. (A WebElement of the old
+            # node passed back to the page would be stale once it is replaced, and never compare.)
+            browser.execute_script("document.getElementById('transcription-online').dataset.beforeSave = 'yes'")
             press(browser, "minutes-online-save")
             saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
             check("a service set up in Settings, its key kept, a model saved", saved, window.file.read_text())
+            # Settings drawn anew by the save before the next click (#930): the file is written 13 to 18 ms
+            # before that drawing ends, and a click resolved meanwhile — on the radio that drawing replaces —
+            # can land, once placeBack has scrolled the page back, on whatever is then at its point.
+            anew = "const r = document.getElementById('transcription-online'); return !!r && r.dataset.beforeSave !== 'yes'"
+            drawn = wait_for(browser, lambda b: b.execute_script(anew), 5)
+            check("Settings drawn anew by the save before the next click (#930)", drawn,
+                  browser.execute_script("const r = document.getElementById('transcription-online');"
+                                         " return r ? {marked: r.dataset.beforeSave || null, checked: r.checked} : 'absent'"))
             # A service that transcribes, set up as BG guides it: its key kept under the transcription's account.
             press(browser, "transcription-online")
+            taken = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-online").is_selected(), 3)
+            check("« Un service » chosen for the transcription: its radio checked (#930)", taken,
+                  browser.execute_script("const a = document.activeElement; return [a ? a.id || a.tagName : null, scrollY]"))
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            # Quarantined (#930): the field sometimes never shown, 3 of about 15 full runs; its cause not
-            # yet known. Nothing after it is checked then. Taken back up on 2026-11-25 at the latest.
-            if not typed(browser, "transcription-key", heard, quarantined="#930, taken back up by 2026-11-25"):
+            if not typed(browser, "transcription-key", heard):
                 return
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
@@ -7624,6 +7697,215 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             server.shutdown()
 
 
+def unsaved_choice_kept(now: dt.datetime) -> None:
+    """CA. #948: a model chosen in Settings and not yet saved — its list waits for « Enregistrer » — stays
+    chosen, its note said, when another control is saved and the page drawn anew; « Enregistrer » then
+    saves the one chosen, never the one before."""
+    print("CA. Settings: a model chosen and not yet saved, kept when another control is saved (#948)")
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            self.send_response(200)
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_):
+            pass
+
+    tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
+    threading.Thread(target=tags.serve_forever, daemon=True).start()
+    ollama = f"http://127.0.0.1:{tags.server_address[1]}"
+    meetings = WORK / "unsaved-choice"
+    meetings.mkdir(exist_ok=True)
+    window = Window(meetings, "fr_FR.UTF-8", f'reminder = false\nminutes_provider = "{ollama}/v1"\nminutes_model = "qwen3:14b"\n', ollama=ollama)
+    try:
+        with window as browser:
+            browser.find_element(By.ID, "settings-link").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "minutes") and b.find_elements(By.ID, "reminder"), 10)
+            Select(browser.find_element(By.ID, "minutes")).select_by_visible_text("Mistral 7b")
+            unsaid = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-unsaved").is_displayed(), 3)
+            # The list as it is, marked in the page: a reference the driver holds is refused once it is gone.
+            browser.execute_script("window.__oldMinutes = document.getElementById('minutes')")
+            # Another control, saved at once: the page is drawn anew from what the shell holds.
+            browser.find_element(By.ID, "reminder").click()
+            saved = wait_for(browser, lambda b: "reminder = true" in window.file.read_text(), 5)
+            redrawn = wait_for(browser, lambda b: b.execute_script("return !window.__oldMinutes.isConnected && !!document.getElementById('minutes')"), 5)
+            time.sleep(1)
+            got = browser.execute_script("const m = document.getElementById('minutes'), n = document.getElementById('minutes-unsaved');"
+                                         " return {value: m ? m.value : null, note: !!n && n.getClientRects().length > 0}")
+            check("Settings: a model chosen and not yet saved, another control saved meanwhile: still chosen, its note still said (#948)",
+                  unsaid and saved and redrawn and got["value"] == "mistral:7b" and got["note"], [unsaid, saved, redrawn, got])
+            browser.find_element(By.ID, "minutes-save").click()
+            kept = wait_for(browser, lambda b: 'minutes_model = "mistral:7b"' in window.file.read_text(), 5)
+            check("Settings: then « Enregistrer » saves the one chosen, never the one before (#948)", kept, window.file.read_text())
+    finally:
+        tags.shutdown()
+
+
+
+def key_kept_to_its_host(now: dt.datetime) -> None:
+    """CB. #964: a key typed in Settings leaves only for what it was typed for. Typed for a service,
+    another service chosen, or under « Avancé » an address on another host: its field is empty and
+    nothing asks or saves with it there; back to the service, the key typed for it is back. Saved, it
+    is no longer kept in the page (#963). Values never printed: what is checked says only whether."""
+    print("CB. Settings: a key typed for a service never leaves for another service or another host (#964)")
+    zero, hears, own = "sk-typed-for-zero", "sk-hears-for-zero", "sk-typed-for-b"
+    asked = []
+
+    # Two stand-ins, two hosts (their ports): A stands in for every service, B is an address of one's own.
+    def stand_in(name):
+        class Service(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                asked.append([name, (self.headers.get("authorization") or "").removeprefix("Bearer ")])
+                body = {"data": [{"id": "vendor/model"}]} if "models" in self.path else {"data": {"label": "stand-in"}}
+                raw = json.dumps(body).encode()
+                self.send_response(200)
+                self.send_header("content-length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+
+            def log_message(self, *_):
+                pass
+        return Service
+
+    servers = [http.server.ThreadingHTTPServer(("127.0.0.1", 0), stand_in(name)) for name in ("A", "B")]
+    for server in servers:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    a, b = (f"http://127.0.0.1:{server.server_address[1]}/api/v1" for server in servers)
+    meetings = WORK / "key-host"
+    meetings.mkdir(exist_ok=True)
+    window = Window(meetings, "fr_FR.UTF-8")
+    window.env.update(KITOKEY_ONLINE=a, KITOKEY_HEARING=a)
+    # Each key the page hands the shell, by the command that takes it: compared in the page, never printed.
+    spied = ("const real = window.__TAURI__.core; window.keysSent = [];"
+             " window.__TAURI__.core = { ...real, invoke: (cmd, args, ...rest) => {"
+             " if (['minutes_models', 'minutes_saved', 'transcription_models', 'transcription_saved'].includes(cmd)) window.keysSent.push([cmd, args?.key ?? null]);"
+             " return real.invoke(cmd, args, ...rest); } }")
+    sent = "return window.keysSent.filter(([cmd, key]) => cmd === arguments[0]).map(([cmd, key]) => key === arguments[1])"
+    value = "return document.getElementById(arguments[0]).value === arguments[1]"
+    address_to = "const a = document.getElementById(arguments[0]); a.value = arguments[1]; a.dispatchEvent(new Event('input'))"
+    try:
+        with window as browser:
+            browser.find_element(By.ID, "settings-link").click()
+            wait_for(browser, lambda b_: b_.find_elements(By.ID, "minutes-where") and b_.find_elements(By.ID, "transcription-online"), 10)
+            browser.execute_script(spied)
+            # (1) The summary: typed for service 0, service 1 chosen.
+            press(browser, "minutes-online")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-key").is_displayed(), 5)
+            choose(browser, "minutes-service", "0")
+            browser.find_element(By.ID, "minutes-key").send_keys(zero)
+            choose(browser, "minutes-service", "1")
+            empty = browser.execute_script(value, "minutes-key", "")
+            del asked[:]
+            press(browser, "minutes-key-test")
+            heard = wait_for(browser, lambda b_: len(asked) > 0, 10)
+            check("the summary: a key typed for one service, another chosen: its field empty, « Vérifier la clé » sends it nothing typed for the first (#964)",
+                  empty and heard and not any(key == zero for _, key in asked) and browser.execute_script(sent, "minutes_models", zero) == [False],
+                  [empty, heard, [key == zero for _, key in asked]])
+            choose(browser, "minutes-service", "0")
+            check("the summary: back to the first service, the key typed for it is back (#964)", browser.execute_script(value, "minutes-key", zero))
+            # (3) « Avancé »: an address of one's own on another host. Each sequence reads its own gestures alone.
+            browser.execute_script("window.keysSent = []")
+            press(browser, "minutes-advanced")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
+            browser.execute_script(address_to, "minutes-address", b)
+            other = browser.execute_script(value, "minutes-key", "")
+            # A key typed for B, « Avancé » unfolded: « Vérifier la clé » asks the service, with the service's key alone (#964).
+            browser.find_element(By.ID, "minutes-key").send_keys(own)
+            del asked[:]
+            press(browser, "minutes-key-test")
+            heard = wait_for(browser, lambda b_: len(asked) > 0, 10)
+            check("the summary's « Avancé » on another host, a key typed for it: « Vérifier la clé » sends the service nothing typed for that host (#964)",
+                  heard and not any(key == own for _, key in asked) and browser.execute_script(sent, "minutes_models", own) == [False],
+                  [heard, [key == own for _, key in asked]])
+            browser.execute_script(address_to, "minutes-address", "")
+            back = browser.execute_script(value, "minutes-key", zero)
+            browser.execute_script(address_to, "minutes-address", a.replace("/api/v1", "/v1"))
+            same = browser.execute_script(value, "minutes-key", zero)
+            check("the summary's « Avancé »: an address on another host, its key field empty; empty again, or on the service's host, the key typed for it back (#964)",
+                  other and back and same, [other, back, same])
+            browser.execute_script(address_to, "minutes-address", b)
+            browser.find_element(By.ID, "minutes-model").send_keys("vendor/model")
+            browser.execute_script("window.__old = document.getElementById('minutes-key'); document.getElementById('minutes-own-save').click()")
+            saved = wait_for(browser, lambda b_: f'minutes_provider = "{b}"' in window.file.read_text(), 5)
+            check("the summary's « Avancé », saved for another host: no key typed for the service handed with it (#964)",
+                  saved and browser.execute_script(sent, "minutes_saved", zero) == [False] and zero not in window.file.read_text(),
+                  [saved, browser.execute_script(sent, "minutes_saved", zero)])
+            # « Avancé » folded over the address saved on B: the field is the service's, its key back (#963).
+            wait_for(browser, lambda b_: b_.execute_script("return !window.__old.isConnected && !!document.getElementById('minutes-key')"), 5)
+            choose(browser, "minutes-service", "0")
+            press(browser, "minutes-advanced")
+            wait_for(browser, lambda b_: not b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
+            folded = browser.execute_script("return [document.getElementById('minutes-address').value === arguments[0], document.getElementById('minutes-key').value === arguments[1]]", b, zero)
+            check("the summary's « Avancé » folded over an address saved on another host: the key field is the service's, its key typed back (#963)",
+                  folded == [True, True], folded)
+            # Saved for the service: no longer kept in the page; the field says a key is kept (#963).
+            press(browser, "minutes-key-test")
+            listed = wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-models").is_displayed(), 10)
+            # Unfolded again on B, a key typed for B: the service's « Enregistrer », still offered above, saves
+            # the service's key alone (#964).
+            press(browser, "minutes-advanced")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
+            browser.find_element(By.ID, "minutes-key").send_keys(own)
+            browser.execute_script("window.__old = document.getElementById('minutes-key')")
+            press(browser, "minutes-online-save")
+            wait_for(browser, lambda b_: f'minutes_provider = "{a}"' in window.file.read_text(), 5)
+            handed = browser.execute_script(sent, "minutes_saved", zero)[-1:] == [True] and browser.execute_script(sent, "minutes_saved", own)[-1:] == [False]
+            check("the summary's service saved, « Avancé » unfolded on another host with a key typed for it: the service's key handed, nothing typed for that host (#964)",
+                  handed and own not in window.file.read_text(), handed)
+            wait_for(browser, lambda b_: b_.execute_script("return !window.__old.isConnected && !!document.getElementById('minutes-key')"), 5)
+            forgotten = browser.execute_script(value, "minutes-key", "")
+            check("the summary, saved with its key: drawn anew, the key no longer in its field (#963)",
+                  listed and forgotten and browser.execute_script(sent, "minutes_saved", zero)[-1:] == [True], [listed, forgotten])
+            # (2) The transcription: typed for service 0, service 1 chosen (OpenAI's own host: nothing asked of it here).
+            press(browser, "transcription-online")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-key").is_displayed(), 5)
+            choose(browser, "transcription-service", "0")
+            browser.find_element(By.ID, "transcription-key").send_keys(hears)
+            choose(browser, "transcription-service", "1")
+            empty = browser.execute_script(value, "transcription-key", "")
+            choose(browser, "transcription-service", "0")
+            back = browser.execute_script(value, "transcription-key", hears)
+            check("the transcription: a key typed for one service, another chosen: its field empty; back to the first, its key back (#964)",
+                  empty and back, [empty, back])
+            # Saved for the service with its key, then drawn anew: no longer kept in the page (#963, ines' S7).
+            press(browser, "transcription-key-test")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-models").is_displayed(), 10)
+            press(browser, "transcription-save")
+            saved = wait_for(browser, lambda b_: f'transcription_provider = "{a}"' in window.file.read_text(), 5)
+            browser.execute_script("window.__old = document.getElementById('transcription-key'); refresh()")
+            wait_for(browser, lambda b_: b_.execute_script("return !window.__old.isConnected && !!document.getElementById('transcription-key')"), 5)
+            forgotten = browser.execute_script(value, "transcription-key", "")
+            check("the transcription, saved with its key: drawn anew, the key no longer in its field (#963)",
+                  saved and forgotten and browser.execute_script(sent, "transcription_saved", hears) == [True] and hears not in window.file.read_text(),
+                  [saved, forgotten])
+            # Its « Avancé »: an address of one's own on another host, saved there: nothing typed for the service handed with it.
+            # A key typed for the service again, not saved: the one that could leave for the other host (ines' S5).
+            browser.execute_script("window.keysSent = []")
+            browser.find_element(By.ID, "transcription-key").send_keys(hears)
+            press(browser, "transcription-advanced")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-provider").is_displayed(), 3)
+            browser.execute_script(address_to, "transcription-provider", b)
+            other = browser.execute_script(value, "transcription-key", "")
+            browser.find_element(By.ID, "transcription-key").send_keys(own)
+            del asked[:]
+            press(browser, "transcription-key-test")
+            heard = wait_for(browser, lambda b_: len(asked) > 0, 10)
+            check("the transcription's « Avancé » on another host, a key typed for it: « Vérifier la clé » sends the service nothing typed for that host (#964)",
+                  heard and not any(key == own for _, key in asked) and browser.execute_script(sent, "transcription_models", own) == [False],
+                  [heard, [key == own for _, key in asked]])
+            browser.find_element(By.ID, "transcription-model").send_keys("whisper-1")
+            browser.execute_script("document.getElementById('transcription-own-save').click()")
+            saved = wait_for(browser, lambda b_: f'transcription_provider = "{b}"' in window.file.read_text(), 5)
+            check("the transcription's « Avancé », an address on another host: its key field empty, saved with no key typed for the service (#964)",
+                  other and saved and browser.execute_script(sent, "transcription_saved", hears) == [False] and hears not in window.file.read_text(),
+                  [other, saved, browser.execute_script(sent, "transcription_saved", hears)])
+    finally:
+        for server in servers:
+            server.shutdown()
+
 def models_on_the_page(now: dt.datetime) -> None:
     """BW. D93, criterion 5: on a meeting's page, each version's model is a list in its line itself — no redo
     panel opened —, showing the model that made it; a model chosen there starts nothing and is kept as the
@@ -7631,7 +7913,7 @@ def models_on_the_page(now: dt.datetime) -> None:
     the version's own model is chosen back, and above it, while another is chosen, the model that made the
     version shown. The line is drawn before Ollama answers, and its models read once a page's opening, not at
     each drawing. A summary waiting for its model — the transcript whole, none written — offers its list beside
-    « Faire le compte rendu », which names it. A meeting said confidential is offered no service (D91)."""
+    « Rédiger le compte rendu », which names it. A meeting said confidential is offered no service (D91)."""
     print("BW. each version's model a choice in its own line: kept for the meeting, nothing started, the button beside it naming the making (D93)")
     # Answered late once `late` is set, as BO's: within models_offered's 2 s, or its answer would hold none of Ollama's models.
     late = threading.Event()
@@ -7798,23 +8080,23 @@ def models_on_the_page(now: dt.datetime) -> None:
                                and any(line.endswith("Mistral 7b") for line in b.execute_script(LINES, "#meeting .minutes .maker")), 10)
             check("made again: its line says the new version's model, nothing left to make", redrawn,
                   (browser.execute_script(lists), browser.execute_script(LINES, "#meeting .maker")))
-            # A summary waiting for its model: the list beside « Faire le compte rendu », which names it.
+            # A summary waiting for its model: the list beside « Rédiger le compte rendu », which names it.
             (WORK / "summary-args").unlink(missing_ok=True)
             browser.execute_script(f"location.hash = '#/meeting/{waiting.name}'")
             asked = lambda b: b.find_element(By.ID, "make-minutes").text if b.find_elements(By.ID, "make-minutes") else None
             offered = wait_for(browser, lambda b: (b.execute_script(lists)["minutes"] or {}).get("shown") == "Qwen3 14b"
-                               and asked(b) == "Faire le compte rendu avec Qwen3 14b", 10)
-            check("a summary waiting: its list beside « Faire le compte rendu », Settings' model shown, the button naming it",
+                               and asked(b) == "Rédiger le compte rendu avec Qwen3 14b", 10)
+            check("a summary waiting: its list beside « Rédiger le compte rendu », Settings' model shown, the button naming it",
                   offered and browser.execute_script(lists)["minutes"]["seen"], (browser.execute_script(lists), asked(browser)))
             pick(browser, "minutes", "Mistral 7b")
-            kept = wait_for(browser, lambda b: asked(b) == "Faire le compte rendu avec Mistral 7b"
+            kept = wait_for(browser, lambda b: asked(b) == "Rédiger le compte rendu avec Mistral 7b"
                             and own(waiting) == {"minutes": {"provider": here, "model": "mistral:7b"}}, 5)
             check("a summary waiting, another model chosen: kept for the meeting, nothing made, the button naming it",
                   kept and browser.execute_script(idle) and not (waiting / "minutes.md").exists() and not (WORK / "summary-args").exists(),
                   (asked(browser), own(waiting)))
             press(browser, "make-minutes")
             wrote = wait_for(None, lambda _: (waiting / "minutes.md").exists() and "mistral:7b" in (WORK / "summary-args").read_text(), 15)
-            check("« Faire le compte rendu avec Mistral 7b » makes it with that model", wrote,
+            check("« Rédiger le compte rendu avec Mistral 7b » makes it with that model", wrote,
                   (WORK / "summary-args").read_text() if (WORK / "summary-args").exists() else None)
             wait_for(browser, lambda b: b.execute_script(idle), 15)
             # A meeting said confidential: its lists offer the models here alone — no service.
@@ -8079,8 +8361,8 @@ def two_panes(now: dt.datetime) -> None:
         unseen = [name for _, seen_, name in stops if not seen_]
         # The pane's stops in one run: none of the sidebar's between them — past the last, the page starts again.
         last = len(places) - 1 - places[::-1].index("pane") if "pane" in places else 0
-        check("in English, the keyboard reaches the sidebar first, then the pane's stops in one run", english == ["Start a recording", ["Fold the sidebar", "Fold the sidebar (Ctrl+B)"], ["Show the sidebar", "Show the sidebar (Ctrl+B)"],
-                                                                                                         ["Free space", "Free space"], ["The recording bar", "The recording bar"], ["Settings", "Settings"]]
+        check("in English, the keyboard reaches the sidebar first, then the pane's stops in one run", english == ["Start recording", ["Hide sidebar", "Hide sidebar (Ctrl+B)"], ["Show sidebar", "Show sidebar (Ctrl+B)"],
+                                                                                                         ["Free up space", "Free up space"], ["Recording bar", "Recording bar"], ["Settings", "Settings"]]
               and places[0] == "side" and "pane" in places and set(places[places.index("pane"):last + 1]) == {"pane"} and "other" not in places,
               (english, places))
         check("the focus is always seen", unseen == [], unseen)
@@ -8088,7 +8370,7 @@ def two_panes(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{names[-2]}'")
         alone = wait_for(browser, lambda b: shown(b) == names[-2] and makers(b), 10)
         check("a transcript that does not say when it was made: its model alone, no time (D93)",
-              alone and makers(browser) == ["Written by Whisper large v3 turbo, on this computer"], makers(browser))
+              alone and makers(browser) == ["Transcribed by Whisper large v3 turbo on this computer"], makers(browser))
         line = "Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo · in "
         times_taken(browser, {names[-3]: line + "2 min 05 s", names[-4]: line + "1 h 02 min", names[-5]: line + "1 s"})
 
@@ -8098,11 +8380,11 @@ def two_panes(now: dt.datetime) -> None:
         said = wait_for(browser, lambda b: b.find_element(By.ID, "none").is_displayed(), 10)
         check("no meeting yet: the pane says what to do, and offers the recording", said and browser.execute_script(
             "return document.getElementById('pane').contains(document.getElementById('none'))")
-              and browser.find_element(By.ID, "none-do").text == "Start a recording: its button, its shortcut, or the tray’s icon."
-              and browser.find_element(By.ID, "empty-record").text == "Start a recording", browser.find_element(By.ID, "none").text)
+              and browser.find_element(By.ID, "none-do").text == "To begin, click Start recording, press the keyboard shortcut, or use the Kitokey icon."
+              and browser.find_element(By.ID, "empty-record").text == "Start recording", browser.find_element(By.ID, "none").text)
         # D89: the shortcut, gone from under the sidebar's button, is said here, where nothing was recorded yet.
         keys = browser.execute_script("const k = document.getElementById('empty-keys'); return [!!k && k.offsetParent !== null, k && k.textContent, document.getElementById('record').title]")
-        check("no meeting: the shortcut said beside what to do, and in the button's tooltip (D89)", keys[0] and keys[1] and keys[2] == f"Start a recording ({keys[1]})", keys)
+        check("no meeting: the shortcut said beside what to do, and in the button's tooltip (D89)", keys[0] and keys[1] and keys[2] == f"Start recording ({keys[1]})", keys)
         # One primary action, the header's (#775): the pane's start is a secondary one, the folder a discreet line under it.
         primaries = browser.execute_script("return [...document.querySelectorAll('button.primary')].filter(b => b.offsetParent !== null).map(b => b.id)")
         under = browser.execute_script("const r = document.getElementById('empty-record').getBoundingClientRect(), f = document.getElementById('empty-folder');"
@@ -8130,7 +8412,7 @@ def sidebar_folded(now: dt.datetime) -> None:
         wait_for(browser, lambda b: shown(b, "meeting"), 10)
         fold = browser.find_element(By.ID, "fold")
         check("the sidebar's button to fold it, named with its shortcut", shown(browser, "fold") and not shown(browser, "unfold")
-              and fold.get_attribute("aria-label") == "Replier la barre latérale" and fold.get_attribute("title") == "Replier la barre latérale (Ctrl+B)",
+              and fold.get_attribute("aria-label") == "Masquer la barre latérale" and fold.get_attribute("title") == "Masquer la barre latérale (Ctrl+B)",
               (fold.get_attribute("aria-label"), fold.get_attribute("title")))
         press(browser, "fold")
         folded = wait_for(browser, lambda b: not shown(b, "sidebar"), 5)
@@ -8223,7 +8505,7 @@ def transcript_corrected(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .lines .edit"), 10)
         check("complete, each line has its pencil, named by the line's time", browser.execute_script(pencils) == 2
-              and browser.find_elements(By.CSS_SELECTOR, "#meeting .lines .edit")[1].get_attribute("aria-label") == "Corriger la ligne de 00:01")
+              and browser.find_elements(By.CSS_SELECTOR, "#meeting .lines .edit")[1].get_attribute("aria-label") == "Corriger la ligne à 00:01")
         check("before any correction, the minutes say nothing of one", not browser.find_elements(By.ID, "corrected-since"))
         # By the keyboard alone: Tab from the first line reaches its pencil; Enter opens the field.
         first = browser.find_element(By.CSS_SELECTOR, "#meeting .lines li")
@@ -8245,7 +8527,7 @@ def transcript_corrected(now: dt.datetime) -> None:
         wait_for(browser, lambda b: focused(b) == "correcting", 2)
         browser.execute_script("document.activeElement.select()")
         keys(browser, Keys.DELETE, Keys.ENTER)
-        said = wait_for(browser, lambda b: "ne reste pas vide" in b.find_element(By.ID, "correction-said").text, 2)
+        said = wait_for(browser, lambda b: "ne peut pas être vide" in b.find_element(By.ID, "correction-said").text, 2)
         check("a line left empty is refused, said, the field kept", said and focused(browser) == "correcting" and (heard / "transcript.jsonl").read_text() == before)
         keys(browser, "Bonjour à toutes, on commence — Γιώργος 🙂", Keys.ENTER)
         kept = wait_for(browser, lambda b: "toutes" in (heard / "transcript.jsonl").read_text(), 3)
@@ -8287,7 +8569,7 @@ def transcript_corrected(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         offered = wait_for(browser, lambda b: b.find_elements(By.ID, "corrected-since"), 10)
         check("the minutes written before it say the transcript was corrected since, and offer « Refaire avec les corrections »",
-              offered and "corrigée après ce compte rendu" in browser.find_element(By.ID, "corrected-since").text
+              offered and "corrigée depuis la rédaction de ce compte rendu" in browser.find_element(By.ID, "corrected-since").text
               and browser.find_element(By.ID, "redo-corrections").text == "Refaire avec les corrections")
         time.sleep(2)
         check("nothing is made again without that click", (heard / "minutes.md").read_text() == minutes)
@@ -8295,7 +8577,7 @@ def transcript_corrected(now: dt.datetime) -> None:
         press(browser, "redo-transcript")
         warned = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-loses-corrections"), 5)
         check("Refaire… of a corrected transcript says, before it starts, that its corrections will not be kept",
-              warned and "ne seront pas gardées" in browser.find_element(By.ID, "redo-loses-corrections").text)
+              warned and "seront perdues" in browser.find_element(By.ID, "redo-loses-corrections").text)
         browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
@@ -8438,7 +8720,7 @@ def press_on_the_page_left(now: dt.datetime) -> None:
             " return real.invoke(asked, ...rest); } }; window.restore = () => { window.__TAURI__.core = real; };")
     page_of = "return document.getElementById('meeting').hidden ? null : document.getElementById('minutes-state')?.dataset.name ?? null"
     said = "const p = document.getElementById('pane-said'); return p.hidden ? '' : p.textContent"
-    not_shown = "Cette page n’a pas pu être affichée : réessayez."
+    not_shown = "Impossible d’afficher cette page. Réessayez."
     # Anything of the pages left, sampled until the page asked for is drawn.
     watching = ("const target = arguments[0]; window.seen = 0; window.addEventListener('hashchange', () => { window.watch = setInterval(() => { const m = document.getElementById('meeting');"
                 " if (m.querySelector('#minutes-state')?.dataset.name === target) clearInterval(window.watch);"
@@ -8579,7 +8861,7 @@ def press_on_the_page_left(now: dt.datetime) -> None:
         browser.execute_script("window.restore()")
         browser.execute_script("location.hash = '#/meeting/gone'")
         wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/" and b.execute_script(page_of) is not None, 5)
-        check("then a meeting gone: its own sentence, said and kept, no retry", browser.execute_script(said).startswith("Cette réunion n’a pas pu être ouverte") and not browser.find_element(By.ID, "pane-again").is_displayed(), browser.execute_script(said))
+        check("then a meeting gone: its own sentence, said and kept, no retry", browser.execute_script(said).startswith("Impossible d’ouvrir cette réunion") and not browser.find_element(By.ID, "pane-again").is_displayed(), browser.execute_script(said))
         # A failure's row and link: nothing marked for a page no longer shown.
         at_page(browser, left)
         browser.execute_script(late, 1, 0)
@@ -8690,7 +8972,7 @@ def press_on_the_page_left(now: dt.datetime) -> None:
         check("a name that needs encoding, at its own address: the page kept, its field and the focus with it",
               same and written_so != f"#/meeting/{named_so}" and browser.execute_script("return window.__kept.isConnected && document.activeElement === window.__kept"), (written_so, browser.execute_script("return location.hash")))
     # What is agreed to names its meeting, as its page and the list do.
-    for language, says, sentence in (("fr_FR.UTF-8", "Le texte de « {} » va quitter votre ordinateur", not_shown), ("en_US.UTF-8", "The text of “{}” is about to leave your computer", "This page could not be shown: try again.")):
+    for language, says, sentence in (("fr_FR.UTF-8", "Le texte de « {} » va quitter votre ordinateur", not_shown), ("en_US.UTF-8", "The text of “{}” is about to leave your computer", "Couldn’t show this page. Try again.")):
         with Window(meetings, language, service) as browser:
             browser.set_window_size(1100, 800)
             for folder in (left, asked):
@@ -8780,10 +9062,10 @@ def context_written(now: dt.datetime) -> None:
         check("its count is said where a screen reader hears it, before a word is typed",
               browser.find_element(By.ID, "small-context-count").get_attribute("role") == "status"
               and area.get_attribute("aria-describedby") == "small-context-count"
-              and count(browser, "small-context") == "400 caractères au plus · 400 restants", count(browser, "small-context"))
+              and count(browser, "small-context") == "400 caractères maximum · 400 restants", count(browser, "small-context"))
         keys(browser, said)
         left = 400 - len(said)
-        counted = wait_for(browser, lambda b: count(b, "small-context") == f"400 caractères au plus · {left} restants", 2)
+        counted = wait_for(browser, lambda b: count(b, "small-context") == f"400 caractères maximum · {left} restants", 2)
         check("the count follows each character typed", counted, count(browser, "small-context"))
         kept = wait_for(browser, lambda b: (meeting / "context.txt").exists() and (meeting / "context.txt").read_text() == said, 3)
         check("what is typed is the meeting's context.txt, whole, as typed", kept, (meeting / "context.txt").read_text() if (meeting / "context.txt").exists() else None)
@@ -8794,7 +9076,7 @@ def context_written(now: dt.datetime) -> None:
         seen(browser, "d59-2-small-open-light")
         # Another script: said in the count, the window still whole.
         keys(browser, " Γιώργος Παπαδόπουλος.")
-        other = wait_for(browser, lambda b: "Dans cette écriture" in count(b, "small-context"), 2)
+        other = wait_for(browser, lambda b: "Dans cet alphabet" in count(b, "small-context"), 2)
         time.sleep(0.3)
         check("a Greek name is said: Whisper may keep only its end, a service may refuse it", other
               and count(browser, "small-context").startswith(f"{left - len(' Γιώργος Παπαδόπουλος.')} restants"), count(browser, "small-context"))
@@ -8802,7 +9084,7 @@ def context_written(now: dt.datetime) -> None:
         seen(browser, "d59-3-small-script-light")
         for _ in range(len(" Γιώργος Παπαδόπουλος.")):
             keys(browser, Keys.BACKSPACE)
-        back = wait_for(browser, lambda b: (meeting / "context.txt").read_text() == said and "Dans cette écriture" not in count(b, "small-context"), 3)
+        back = wait_for(browser, lambda b: (meeting / "context.txt").read_text() == said and "Dans cet alphabet" not in count(b, "small-context"), 3)
         check("taken out, the context is as it was, the script no longer said", back, (meeting / "context.txt").read_text())
         keys(browser, Keys.ESCAPE)
         closed = wait_for(browser, lambda b: focused(b) == "small-more", 2)
@@ -8843,7 +9125,7 @@ def context_written(now: dt.datetime) -> None:
             making = wait_for(browser, lambda b: b.find_element(By.ID, "context-text").get_attribute("readonly") is not None, 5)
             sentence = browser.find_element(By.ID, "context-said").text
             check("while it is made again, the field is closed, and says so",
-                  making and sentence == "Le contexte ne change pas pendant que la transcription ou le compte rendu se fait."
+                  making and sentence == "Le contexte ne peut pas être modifié pendant la transcription ou la rédaction du compte rendu."
                   and not browser.find_element(By.ID, "context-changed").is_displayed(), sentence)
             seen(browser, "d59-5-page-closed-light")
             browser.find_element(By.ID, "context-text").send_keys(" X")
@@ -8891,7 +9173,7 @@ def context_written(now: dt.datetime) -> None:
         cut = wait_for(browser, lambda b: len((meeting / "context.txt").read_text()) == 400, 3)
         check("a paste past 400 characters is cut to 400, in the field and the file",
               cut and len(browser.find_element(By.ID, "context-text").get_attribute("value")) == 400
-              and count(browser, "context-text") == "400 caractères au plus · 0 restant", count(browser, "context-text"))
+              and count(browser, "context-text") == "400 caractères maximum · 0 restant", count(browser, "context-text"))
         full_ = (meeting / "context.txt").read_text()
         browser.find_element(By.ID, "context-text").send_keys(Keys.END, "x")
         browser.find_element(By.ID, "context-text").send_keys(Keys.CONTROL, Keys.HOME)
@@ -8914,7 +9196,7 @@ def context_written(now: dt.datetime) -> None:
         # Read as written: WebDriver's text makes a no-break space a plain one.
         sentence = browser.execute_script("return document.getElementById('context-said').textContent") if closed else ""
         check("a transcript left unfinished closes the field, said with its way out",
-              sentence == "La transcription n’est pas terminée : terminez-la (Réessayer) avant de changer le contexte.", sentence)
+              sentence == "La transcription n’est pas terminée. Cliquez sur Réessayer pour la finir avant de modifier le contexte.", sentence)
 
     # In English, in the dark theme: the small window and a meeting's page.
     window, meeting = recording("en", "en_GB.UTF-8", dark=True)
@@ -8930,7 +9212,7 @@ def context_written(now: dt.datetime) -> None:
         wait_for(browser, lambda b: focused(b) == "small-context", 2)
         english = "Q4 budget with Inès Durand and Jiří Novák."
         keys(browser, english)
-        counted = wait_for(browser, lambda b: count(b, "small-context") == f"400 characters at most · {400 - len(english)} left", 2)
+        counted = wait_for(browser, lambda b: count(b, "small-context") == f"400 characters max · {400 - len(english)} left", 2)
         kept = wait_for(browser, lambda b: (meeting / "context.txt").exists() and (meeting / "context.txt").read_text() == english, 3)
         time.sleep(0.3)
         check("in English, counted, kept, and holding in its window", counted and kept and fits(browser)[0] <= fits(browser)[1],
@@ -9186,7 +9468,7 @@ def confidential_kept(now: dt.datetime) -> None:
         check("turned off, the settings choose again: the service named writes them", sent and counted["write"] == 1, counted)
         press(browser, "confidential-switch")
         again = wait_for(browser, lambda b: front(meeting, "provider") == "local", 10)
-        said = wait_for(browser, lambda b: b.execute_script(left) == "Déjà parti avant\u00a0: la transcription vers writes.example.", 5)
+        said = wait_for(browser, lambda b: b.execute_script(left) == "Déjà envoyé auparavant\u00a0: la transcription à writes.example.", 5)
         check("turned on after a service wrote them: written again here, nothing more sent",
               again and front(meeting, "model") == "qwen3:8b" and counted["write"] == 1, (front(meeting, "provider"), counted))
         check("and the page says what had left, to which host", said, browser.execute_script(left))
@@ -9206,7 +9488,7 @@ def confidential_kept(now: dt.datetime) -> None:
             remade = wait_for(browser, lambda b: front(heard / "live", "provider") == "local", 25)
             check("turned on while a service hears it: ended, heard here by Whisper, the minutes written here",
                   asked and remade and engine(heard / "live") == "whisper.cpp" and counted == {"hear": 1, "write": 1}, (engine(heard / "live"), counted))
-            said = wait_for(browser, lambda b: b.execute_script(left) == "Déjà parti avant\u00a0: le son vers hears.example.", 5)
+            said = wait_for(browser, lambda b: b.execute_script(left) == "Déjà envoyé auparavant\u00a0: le son à hears.example.", 5)
             check("the page says the sound had left, to which host", said, browser.execute_script(left))
             check("its end is no failure said", not browser.find_elements(By.ID, "transcript-again"))
     finally:
@@ -9306,7 +9588,7 @@ def confidential_kept(now: dt.datetime) -> None:
             here = wait_for(browser, lambda b: front(writing / "sent", "provider") == "local", 25)
             check("turned on while a service writes the minutes: ended, written here, nothing more sent",
                   asked and here and counted == {"hear": 1, "write": 2}, (front(writing / "sent", "provider"), counted))
-            said = wait_for(browser, lambda b: b.execute_script(left) == "Déjà parti avant\u00a0: la transcription vers writes.example.", 5)
+            said = wait_for(browser, lambda b: b.execute_script(left) == "Déjà envoyé auparavant\u00a0: la transcription à writes.example.", 5)
             check("the page says the transcript had left, to which host", said, browser.execute_script(left))
             check("its end is no failure said", not browser.find_elements(By.ID, "minutes-again"))
     finally:
@@ -9325,7 +9607,7 @@ def confidential_kept(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "make-transcript"), 10)
         press(browser, "make-transcript")
         waits = "return document.getElementById('transcript-state')?.innerText || ''"
-        offered = wait_for(browser, lambda b: "En attente du modèle Whisper" in b.execute_script(waits)
+        offered = wait_for(browser, lambda b: "En attente du modèle de transcription" in b.execute_script(waits)
                            and b.find_elements(By.CSS_SELECTOR, "#transcript-state #model-fetch"), 10)
         check("the Whisper model missing: said and offered as Settings offer it, the service named asked nothing",
               offered and counted == {"hear": 1, "write": 2}, (browser.execute_script(waits), counted, names(unmodelled / "kept")))
@@ -9351,12 +9633,12 @@ def nothing_silent(now: dt.datetime) -> None:
                 "const done = arguments[arguments.length - 1], said = document.createElement('p'), again = document.createElement('button');"
                 "said.dataset.name = 'gone'; askAgain({ ask: arguments[0] }, said, again).then(() => done(said.textContent));", ask)
             check(f"{ask} on a meeting gone says so, in French, never the command's raw text",
-                  said.startswith("Impossible de recommencer") and "n’est plus dans le dossier" in said, said)
+                  said.startswith("Impossible de relancer") and "n’est plus dans le dossier" in said, said)
         browser.execute_script(refuse, "agreement_shown")
         browser.execute_script("location.hash = '#/agree/2026-10-20_10-00'")
         refused = wait_for(browser, lambda b: shown(b, "pane-said"), 5)
         check("an agreement refused: said in the pane, back at the list", refused
-              and text(browser, "pane-said") == "Cette réunion ne peut pas être envoyée\u00a0: REFUS", text(browser, "pane-said"))
+              and text(browser, "pane-said") == "Impossible d’envoyer cette réunion\u00a0: REFUS", text(browser, "pane-said"))
         browser.execute_script("window.restore(); location.hash = '#/settings'")
         check("another address: the sentence goes", wait_for(browser, lambda b: not shown(b, "pane-said"), 5))
         browser.execute_script("location.hash = '#/'")
@@ -9364,7 +9646,7 @@ def nothing_silent(now: dt.datetime) -> None:
         press(browser, "fold")
         folded = wait_for(browser, lambda b: shown(b, "pane-said"), 5)
         check("the sidebar's fold not kept: said in the pane, the sidebar still as asked",
-              folded and text(browser, "pane-said") == "La barre latérale reviendra comme avant au prochain démarrage\u00a0: REFUS"
+              folded and text(browser, "pane-said") == "La position de la barre latérale ne sera pas mémorisée\u00a0: REFUS"
               and not shown(browser, "sidebar"), text(browser, "pane-said"))
         shot(browser, "d67-pane-said")
         browser.execute_script("window.restore()")
@@ -9388,7 +9670,7 @@ def nothing_silent(now: dt.datetime) -> None:
             browser.execute_script("window.dispatchEvent(new Event('focus'))")
             said = wait_for(browser, lambda b: shown(b, "empty-again"), 10)
             check("the meetings' folder unread: said, no recording offered as if it were empty, a way to try again",
-                  said and text(browser, "none") == f"Les réunions de {meetings} ne peuvent pas être lues."
+                  said and text(browser, "none") == f"Impossible de lire les réunions de {meetings}."
                   and text(browser, "none-do").startswith("Vérifiez que le disque")
                   and text(browser, "empty-again") == "Réessayer" and not shown(browser, "empty-record"), text(browser, "none"))
             browser.set_window_size(420, 400)
@@ -9421,7 +9703,7 @@ def nothing_silent(now: dt.datetime) -> None:
             said = wait_for(browser, lambda b: shown(b, "small-said"), 8)
             check("said, Arrêter stays where it is", browser.execute_script(top) == before)
             check("confidential refused in the small window: said, its lock off, never promising what is not so",
-                  said and "n’a pas pu être marquée confidentielle" in text(browser, "small-said")
+                  said and "Impossible de marquer la réunion comme confidentielle" in text(browser, "small-said")
                   and "on" not in browser.execute_script("return document.getElementById('small-confidential').closest('.confidential').className").split(),
                   text(browser, "small-said"))
         finally:
@@ -9494,8 +9776,8 @@ def nothing_silent(now: dt.datetime) -> None:
     # What the page reads and cannot: said where the eye is, in the user's language; asked by no gesture
     # or not, never only a line in the log (D67).
     for language, not_opened, not_read, unread, gone in (
-        ("fr_FR.UTF-8", "Cette réunion n’a pas pu être ouverte\u00a0: ", "Le contexte n’a pas pu être relu\u00a0: ", "Les réunions ne peuvent pas être lues", "n’est plus dans le dossier"),
-        ("en_US.UTF-8", "This meeting could not be opened: ", "The context could not be read again: ", "The meetings cannot be read", "is no longer in the meetings"),
+        ("fr_FR.UTF-8", "Impossible d’ouvrir cette réunion\u00a0: ", "Impossible de relire le contexte\u00a0: ", "Les réunions ne peuvent pas être lues", "n’est plus dans le dossier"),
+        ("en_US.UTF-8", "Couldn’t open this meeting: ", "Couldn’t reload the context: ", "The meetings cannot be read", "is no longer in the meetings"),
     ):
         context_file = meetings / "2026-10-20_10-00" / "context.txt"
         context_file.write_text("Budget 2026")
@@ -9604,14 +9886,14 @@ def nothing_silent(now: dt.datetime) -> None:
         # No meeting at all: the sentence alone comes first, the header and Démarrer still in sight.
         browser.execute_script("location.hash = '#/meeting/gone'")
         place = "const y = (id) => document.getElementById(id).getBoundingClientRect(); return [y('pane-said').top >= 0, y('pane-said').bottom <= y('record').top, y('record').bottom <= innerHeight, y('record').bottom <= y('empty-record').top]"
-        seen = wait_for(browser, lambda b: shown(b, "pane-said") and text(b, "pane-said").startswith("Cette réunion n’a pas pu être ouverte"), 5)
+        seen = wait_for(browser, lambda b: shown(b, "pane-said") and text(b, "pane-said").startswith("Impossible d’ouvrir cette réunion"), 5)
         check("no meeting, at 420 × 400: the sentence, then the header and Démarrer in sight, what to do under them",
               seen and browser.execute_script(place) == [True, True, True, True], browser.execute_script(place))
         browser.execute_script("location.hash = '#/settings'")
         wait_for(browser, lambda b: not shown(b, "pane-said"), 5)
         browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: shown(b, "none"), 5)
-        check("no meeting: what to do first, never only a path", said and text(browser, "none-do").startswith("Démarrez un enregistrement") and shown(browser, "empty-record"))
+        check("no meeting: what to do first, never only a path", said and text(browser, "none-do").startswith("Pour commencer, cliquez sur Démarrer un enregistrement") and shown(browser, "empty-record"))
         browser.execute_script("document.getElementById('empty').scrollIntoView()")
         for theme in ("light", "dark"):
             shot_themed(browser, f"d67-none-{theme}", theme)
@@ -9797,8 +10079,8 @@ def window_looks(now: dt.datetime) -> None:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
         small = browser.find_element(By.ID, "small-link")
-        check("La barre d’enregistrement: an icon, named for assistive technology and to the pointer (D89)", small.text == "" and small.get_attribute("aria-label") == "La barre d’enregistrement"
-              and small.get_attribute("title") == "La barre d’enregistrement" and small.find_elements(By.CSS_SELECTOR, "svg"), small.text)
+        check("La barre d’enregistrement: an icon, named for assistive technology and to the pointer (D89)", small.text == "" and small.get_attribute("aria-label") == "Barre d’enregistrement"
+              and small.get_attribute("title") == "Barre d’enregistrement" and small.find_elements(By.CSS_SELECTOR, "svg"), small.text)
         # D89: each secondary action of the sidebar an icon button, its tooltip and its name; every icon Lucide's, 16 or 20 px.
         secondary = browser.execute_script(
             "return ['fold', 'free-link', 'small-link', 'settings-link'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim() === '' && e.classList.contains('icon-button'),"
@@ -9982,8 +10264,8 @@ def trial_over(now: dt.datetime) -> None:
     licence = WORK / "licence"
     # As the page holds it: the driver's text turns a space that does not break into a plain one.
     text = lambda browser, element_id: browser.execute_script("return document.getElementById(arguments[0]).textContent", element_id)
-    over_fr = "L’essai est terminé\u202f; vos réunions restent à vous, lisibles, jouables et exportables."
-    over_en = "Your trial is over; your meetings stay yours, readable, playable and exportable."
+    over_fr = "Votre essai est terminé. Vos réunions restent à vous\u00a0: vous pouvez toujours les lire, les écouter et les exporter."
+    over_en = "Your trial has ended. Your meetings stay yours: you can still read, play and export them."
     # Begun 30 days ago, ten meetings made here since: over.
     meetings = WORK / "trial-over"
     day = now - dt.timedelta(days=30)
@@ -10238,7 +10520,9 @@ def timed(scenario):
     raises is a FAIL named by it and by what it raised, its traceback under it, and the run goes on
     to the next: never a shard cut short, the checks after it hidden as « NOT RUN » (#949)."""
     def played(*args, **kwargs):
+        global PLAYING
         began = time.monotonic()
+        PLAYING = scenario.__name__
         try:
             return scenario(*args, **kwargs)
         except Exception as why:
@@ -10248,6 +10532,7 @@ def timed(scenario):
             FAILED.append(what)
             return None
         finally:
+            PLAYING = None
             print(f"    ({scenario.__name__}: {time.monotonic() - began:.1f} s)")
     return played
 
@@ -10307,7 +10592,7 @@ def main() -> int:
         reverse=True,
     )
     expected = [(group(day.astimezone(), now), holds) for day, holds in expected]
-    expected.append(("Date inconnue", "Interrompu|Audio supprimé"))
+    expected.append(("Sans date", "Interrompu|Audio supprimé"))
 
     print("H. the window, in French: the meetings by week, what each holds and weighs")
     with Window(sessions, "fr_FR.UTF-8") as browser:
@@ -10315,7 +10600,7 @@ def main() -> int:
         lang = browser.execute_script("return document.documentElement.lang")
         check("the page says it is in French", lang == "fr", lang)
         sections = browser.find_element(By.TAG_NAME, "nav").get_attribute("aria-label")
-        check("its sections are named in French for a screen reader", sections == "Rubriques", sections)
+        check("its sections are named in French for a screen reader", sections == "Navigation", sections)
         listed = rows(browser)
         shot(browser, "1-sessions")
         granted = browser.find_element(By.ID, "record").get_attribute("title")
@@ -10438,7 +10723,7 @@ def main() -> int:
         # Speech in the first sixtieth of the meeting, on each side: here rises above the middle, remote falls below.
         check(
             "who spoke is drawn over the meeting, here above and remote below",
-            label.startswith("Qui a parlé") and len(here) == len(remote) == 60 and here[0] < 42 and remote[0] > 46 and here[-1] == 42,
+            label.startswith("Temps de parole") and len(here) == len(remote) == 60 and here[0] < 42 and remote[0] > 46 and here[-1] == 42,
             drawn,
         )
         maker = lines_seen(browser, "#meeting .minutes .maker")[0]
@@ -10463,9 +10748,9 @@ def main() -> int:
             "the transcript in the meeting's order, each line with its side and voice",
             said
             == [
-                "00:01 | Ici · voix 1 | Bonjour à tous, merci d’être là.",
-                "00:08 | À distance | Bonjour Claire, on peut commencer.",
-                "00:15 | Ici · voix 2 | La version de test sera prête le 12 novembre.",
+                "00:01 | Vous · voix 1 | Bonjour à tous, merci d’être là.",
+                "00:08 | Les autres | Bonjour Claire, on peut commencer.",
+                "00:15 | Vous · voix 2 | La version de test sera prête le 12 novembre.",
             ],
             said,
         )
@@ -10478,11 +10763,11 @@ def main() -> int:
         search.clear()
         search.send_keys("zzz")
         none = [p.text for p in browser.find_elements(By.CSS_SELECTOR, ".transcript .none") if p.is_displayed()]
-        check("a search that finds nothing says so", none == ["Aucun passage ne correspond."], none)
+        check("a search that finds nothing says so", none == ["Aucun résultat."], none)
         search.clear()
         search.send_keys("voix")
         none = [p.text for p in browser.find_elements(By.CSS_SELECTOR, ".transcript .none") if p.is_displayed()]
-        check("a search looks at what was said, not at who or when", none == ["Aucun passage ne correspond."], none)
+        check("a search looks at what was said, not at who or when", none == ["Aucun résultat."], none)
         check("the folder can be opened from the meeting", browser.find_element(By.ID, "open-folder").get_attribute("aria-label") == "Ouvrir le dossier")
         # D89: the meeting's header — its title at 18 px, its actions on its right; each card's actions icons, each with its tooltip and its name.
         head = browser.execute_script(
@@ -10562,11 +10847,11 @@ def main() -> int:
         kept = browser.execute_script("return document.getElementById('search') && document.getElementById('search').value")
         check("another meeting opens without the last one's search", not kept, kept)
         notes = [p.text for p in browser.find_elements(By.CSS_SELECTOR, "#meeting .none") if p.is_displayed()]
-        check("minutes that cannot be read are said so", notes == ["Ce fichier ne peut pas être lu par cette version de Kitokey."], notes)
+        check("minutes that cannot be read are said so", notes == ["Cette version de Kitokey ne sait pas lire ce fichier."], notes)
         chips = browser.find_element(By.CSS_SELECTOR, "#meeting .meeting-head").text
         check("minutes that cannot be read claim nothing in the header: their card says them (D89)", "Compte rendu" not in chips, chips)
         being = [p.text for p in browser.find_elements(By.CSS_SELECTOR, ".transcript .note")]
-        check("a transcript without its end says it is being written", being == ["En cours d’écriture — ce qui est là est vrai quand même."], being)
+        check("a transcript without its end says it is being written", being == ["Transcription en cours : la suite arrive."], being)  # U+00A0 read as a space
 
         browser.execute_script("location.hash = '#/meeting/' + encodeURIComponent('gone')")
         listed = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/")
@@ -10732,7 +11017,7 @@ def main() -> int:
         folder = folder_field()
         changed(lambda: typed(folder, "Kitokey"))
         said = not_saved()
-        check("a folder that is not a whole path is said, and nothing changes", said.startswith("Le réglage n’a pas été enregistré") and window.file.read_text() == text, said)
+        check("a folder that is not a whole path is said, and nothing changes", said.startswith("Non enregistré") and window.file.read_text() == text, said)
         browser.execute_script("location.hash = '#/'")
         listed = wait_for(browser, lambda b: str(elsewhere) in b.find_element(By.ID, "empty-folder").text, 5)
         check("the list reads the folder chosen", listed, browser.find_element(By.ID, "empty-folder").text)
@@ -10760,7 +11045,7 @@ def main() -> int:
         # Which setting, on which line, and what to do (#783) — never settings.rs's own sentence.
         # WebDriver's `.text` reads U+00A0 as a space.
         which = lambda line: f"Ligne {line} : « keep_audio » vaut « always » ou un nombre de jours, de 1 à 36\u202f500. Corrigez-le."  # noqa: E731
-        refused = f"Le réglage n’a pas été enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
+        refused = f"Non enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
         locked_said = f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which(len(lines))}"
         unreadable = lambda: browser.find_element(By.ID, "settings-unreadable").text  # noqa: E731
         window.file.write_text(broken)
@@ -10778,7 +11063,7 @@ def main() -> int:
         window.file.write_text("\n".join(lines) + "\n")
         raw = f'settings.toml, line {len(lines)}: keep_audio is "always" or a number of days'
         # The file's line has moved with developer mode written: the sentences name the new one.
-        refused = f"Le réglage n’a pas été enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
+        refused = f"Non enregistré : le fichier des réglages ne peut pas être lu. {which(len(lines))}"
         locked_said = f"Le fichier des réglages ne peut pas être lu : Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {which(len(lines))}"
         changed(lambda: browser.find_element(By.ID, "reminder").click())
         said = not_saved()
@@ -11185,7 +11470,7 @@ def main() -> int:
         browser.execute_script("location.hash = '#/meeting/2026-10-18_14-00'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "make-minutes"))
         browser.find_element(By.ID, "make-minutes").click()
-        waits = wait_for(browser, lambda b: "En file d’attente · 1 avant" in state(b), 3)
+        waits = wait_for(browser, lambda b: "En attente · 1 avant" in state(b), 3)
         check("one asked while another is written waits its turn, said on its page", waits, state(browser))
         browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: len([c for c in b.find_elements(By.CSS_SELECTOR, "#groups .chip.making") if c.is_displayed()]) == 2, 3)
@@ -11195,7 +11480,7 @@ def main() -> int:
         browser.execute_script("location.hash = '#/free'")
         held = wait_for(browser, lambda b: [r.text for r in b.find_elements(By.CSS_SELECTOR, "#free .freeable.busy")], 3)
         busy = [r.text for r in browser.find_elements(By.CSS_SELECTOR, "#free .freeable.busy")]
-        check("while its minutes are written, the meeting is busy on the page that frees space", held and "compte rendu" in " ".join(busy), busy)
+        check("while its minutes are written, the meeting is busy on the page that frees space", held and "en cours de traitement" in " ".join(busy), busy)
         # Elsewhere when they are written — the settings, being changed —: that page is left alone.
         browser.execute_script("location.hash = '#/settings'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "minutes"), 5)
@@ -11232,7 +11517,7 @@ def main() -> int:
         browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
         (WORK / "slow-minutes").unlink()
         passed = wait_for(browser, lambda b: makings()["minutes"] is None and not makings()["minutes_waiting"], 15)
-        aside_ = wait_for(browser, lambda b: "En attente de votre accord pour l’envoyer à openrouter.ai" in state(b) and b.find_elements(By.ID, "minutes-agree"), 5)
+        aside_ = wait_for(browser, lambda b: "En attente de votre accord pour l’envoi à openrouter.ai" in state(b) and b.find_elements(By.ID, "minutes-agree"), 5)
         check(
             "one needing the user's agreement is set aside, said on its page with the way to give it; the next one made",
             passed and aside_ and (WORK / "summary-args").read_text().split()[-1] == "mistral:7b"
@@ -11282,7 +11567,7 @@ def main() -> int:
         offered = redo_offered(browser, "redo-panel", "minutes")
         check(
             "Refaire offers, in its « Avancé », Settings' model first, then the models on this computer",
-            offered == ["Réglages\u00a0: Qwen3 14b", "Mistral 7b — sur cet ordinateur"],
+            offered == ["Celui des Réglages\u00a0: Qwen3 14b", "Mistral 7b — sur cet ordinateur"],
             offered,
         )
         before = (asked / "minutes.md").read_text()
@@ -11328,7 +11613,7 @@ def main() -> int:
         # The minutes kept, the failure is the redo's (#772): never « non fait » beside them, on the page nor in the list.
         chips = [c.text for c in browser.find_elements(By.CSS_SELECTOR, ".chip.making") if c.is_displayed()]
         check("minutes kept after a redo that failed: their chip says the last redo failed, never that none were made (#772)",
-              failed and "Refaire échoué" in chips and "Compte rendu non fait" not in chips and "pas été fait" not in state(browser), (chips, state(browser)))
+              failed and "Refaire échoué" in chips and "Échec compte rendu" not in chips and "pas pu être rédigé" not in state(browser), (chips, state(browser)))
         check("the failure said on the meeting's page too, in plain words, with a way to try again — never what the program said",
               failed and "not minutes" not in state(browser) and "not minutes" not in heard.read_text(), (state(browser), heard.read_text()[-400:]))
         # Its cause named by the program, its gesture said, on the page and in the notice (D29).
@@ -11448,7 +11733,7 @@ def main() -> int:
         wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"))
         offered = redo_offered(browser, "redo-transcript-panel", "transcription")
         check("Refaire offers, in its « Avancé », Settings' model first, then the Whisper models of this computer",
-              offered == ["Réglages\u00a0: Whisper large v3 turbo", "Whisper small"], offered)
+              offered == ["Celui des Réglages\u00a0: Whisper large v3 turbo", "Whisper small"], offered)
         redo_pick(browser, "redo-transcript-panel", "transcription", 1)
         browser.find_element(By.ID, "redo-transcript-do").click()
         redone = wait_for(browser, lambda b: sorted(trash_files.glob("transcript-before-*.jsonl")), 10)
@@ -11478,7 +11763,7 @@ def main() -> int:
             (asked / "transcript.jsonl").read_text(),
         )
         heard_state = lambda b: b.find_element(By.ID, "transcript-state").text if b.find_elements(By.ID, "transcript-state") else ""
-        unmade = wait_for(browser, lambda b: "La transcription n’a pas été faite" in heard_state(b) and b.find_elements(By.ID, "transcript-again"), 5)
+        unmade = wait_for(browser, lambda b: "La transcription n’a pas pu être faite" in heard_state(b) and b.find_elements(By.ID, "transcript-again"), 5)
         shot(browser, "9-transcript-failed")
         check("what is not known of who wrote the minutes is left unsaid (#312)",
               "— · —" not in browser.find_element(By.ID, "meeting").text and "via —" not in browser.find_element(By.ID, "meeting").text,
@@ -11560,7 +11845,7 @@ def main() -> int:
         wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#free .freeable input[value=heavy]"))
         browser.execute_script("document.querySelector('#free .freeable input[value=heavy]').click()")
         button = browser.find_element(By.ID, "free-do")
-        check("the whole meeting is said as such", button.text == "Mettre ces réunions à la corbeille", button.text)
+        check("the whole meeting is said as such", button.text == "Mettre les réunions à la corbeille", button.text)
         button.click()
         whole = wait_for(browser, lambda b: not (roomy / "heavy").exists(), 10)
         check("the whole meeting's folder goes to the trash", whole and (trash / "heavy").is_dir(), sorted(p.name for p in trash.glob("*")))
@@ -11587,7 +11872,7 @@ def main() -> int:
         check("at rest the bar is 440 × 44: one row, the mark as its handle, nothing to scroll", rest and got["row"] == 44 and got["mark"] == 1 and got["scroll"][0] <= got["scroll"][1], got)
         check("●, « Plus d’options », the whole window and « Masquer la barre », each 28 px, an icon alone named by its words, its tooltip the same",
               [b[0] for b in got["buttons"]] == ["small-record", "small-more", "small-full", "small-hide"] and all(b[1] == b[2] == 28 and b[3] == "" and b[4] and b[5].startswith(b[4]) for b in got["buttons"])
-              and got["buttons"][2][4] == "Toute la fenêtre", got["buttons"])
+              and got["buttons"][2][4] == "Ouvrir la fenêtre complète", got["buttons"])
         keys = browser.execute_script("return window.__TAURI__.core.invoke('header')")["shortcut"]
         check("●'s tooltip: « Démarrer un enregistrement », the shortcut beside when granted", got["buttons"][0][5] == (f"Démarrer un enregistrement ({keys})" if keys else "Démarrer un enregistrement"), [got["buttons"][0][5], keys])
         check("the last meeting and the shortcut's line are no longer in it (D90)", got["gone"] == 0, got)
@@ -11645,12 +11930,12 @@ def main() -> int:
         except NoSuchWindowException:
             pass  # the small window goes with the click, sometimes before the driver has answered it
         full = wait_for(browser, lambda b: len(b.window_handles) == 1 and b.window_handles != [small], 5)
-        check("Toute la fenêtre replaces the small one: one window", full, browser.window_handles)
+        check("Ouvrir la fenêtre complète replaces the small one: one window", full, browser.window_handles)
         browser.switch_to.window(browser.window_handles[0])
         wait_for(browser, lambda b: b.execute_script("return (document.getElementById('settings-link').getAttribute('aria-label') || '') !== ''"))
         check("the full window left is the one kept in the settings", 'window = "full"' in window.file.read_text(), window.file.read_text())
         back = browser.find_element(By.ID, "small-link")
-        check("at rest too, the full window offers the small one", back.is_displayed() and back.get_attribute("aria-label") == "La barre d’enregistrement", back.get_attribute("aria-label"))
+        check("at rest too, the full window offers the small one", back.is_displayed() and back.get_attribute("aria-label") == "Barre d’enregistrement", back.get_attribute("aria-label"))
         main = browser.current_window_handle
         back.click()
         smaller = wait_for(browser, lambda b: len(b.window_handles) == 2, 5)
@@ -11682,7 +11967,7 @@ def main() -> int:
         check("the transcript follows the stop: the bar's options say so", wait_for(browser, lambda b: note.is_displayed(), 3) and "transcript" in note.text, note.text)
         browser.find_element(By.ID, "small-stop").click()
         rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 5)
-        check("opened from the full window during a recording, it too comes back to rest, in English", rest and browser.find_element(By.ID, "small-record").get_attribute("aria-label") == "Start a recording")
+        check("opened from the full window during a recording, it too comes back to rest, in English", rest and browser.find_element(By.ID, "small-record").get_attribute("aria-label") == "Start recording")
         # Its transcript follows the stop: the bar at rest is its row of 44 and D92's one line alone under it, saying
         # that meeting (#939), as context_before_start reads it.
         rest_alone = ("const lines = [...document.querySelectorAll('#small .bar-lines > *')].filter(e => e.id !== 'small-last' && e.getClientRects().length);"
@@ -11703,7 +11988,7 @@ def main() -> int:
         lang = browser.execute_script("return document.documentElement.lang")
         check("the page says it is in English", lang == "en", lang)
         sections = browser.find_element(By.TAG_NAME, "nav").get_attribute("aria-label")
-        check("its sections are named in English for a screen reader", sections == "Sections", sections)
+        check("its sections are named in English for a screen reader", sections == "Navigation", sections)
         check("no weight is shown for nothing", not browser.find_element(By.ID, "weight").is_displayed())
         # One meeting is one, not "1 meetings".
         session(empty / "one", now - dt.timedelta(hours=2), 10, {"local.wav": 3000})
@@ -11950,7 +12235,7 @@ def main() -> int:
         (listening / "aside-long.wav").rename(long / "local.wav")
         # A track in a form no player reads: no sound, and it is said not playable here.
         browser.execute_script("location.hash = '#/meeting/2026-10-19_07-00'")
-        unread = wait_for(browser, lambda b: b.find_elements(By.ID, "no-player") and "ne peut pas lire cet audio" in b.find_element(By.ID, "no-player").text, 10)
+        unread = wait_for(browser, lambda b: b.find_elements(By.ID, "no-player") and "ne peut pas être lu dans Kitokey" in b.find_element(By.ID, "no-player").text, 10)
         check("a track no player reads is said not playable here", unread)
         # The page before stays drawn until the next one is: its sentence is waited for, read in
         # the page at once — an element found then read may be the page before's, drawn again.
@@ -11962,7 +12247,7 @@ def main() -> int:
               and not browser.execute_script("return document.querySelectorAll('audio.track').length"),
               browser.execute_script(no_player))
         browser.execute_script("location.hash = '#/meeting/2026-10-19_08-00'")
-        there = wait_for(browser, lambda b: "ne peut pas lire cet audio" in b.execute_script(no_player), 10)
+        there = wait_for(browser, lambda b: "ne peut pas être lu dans Kitokey" in b.execute_script(no_player), 10)
         check("a meeting whose audio is there but not playable is not said freed",
               there and "supprimé pour faire de la place" not in browser.execute_script(no_player), browser.execute_script(no_player))
     # None remembered before the run, as on a desktop where Kitokey never played: none of the user's to keep.
@@ -12004,6 +12289,8 @@ def main() -> int:
     redo_choice_starts_nothing(now)
     redo_offers_the_services_models(now)
     models_on_the_page(now)
+    unsaved_choice_kept(now)
+    key_kept_to_its_host(now)
     settings_folded(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
