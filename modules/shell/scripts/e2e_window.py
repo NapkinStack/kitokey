@@ -647,10 +647,14 @@ class Window:
             # Gone within a bound, its single-instance name released (#960): a Kitokey that does not end
             # on SIGTERM holds that name, and every later start of the shard hands over to it and raises
             # « no session in a minute ». Still there: said, by the scenario that left it, then killed.
-            until = time.monotonic() + 10
+            asked = time.monotonic()
+            until = asked + 10
             while (instances() or single_instance_held()) and time.monotonic() < until:
                 time.sleep(0.2)
             left = instances()
+            # A slow end said, ended or not: what #961 and the stability measure read.
+            if time.monotonic() - asked > 1:
+                print(f"    (Kitokey's end after SIGTERM: {time.monotonic() - asked:.1f} s)")
             if left or single_instance_held():
                 check(f"{PLAYING or 'a window outside a scenario'} left Kitokey {left} running 10 s after SIGTERM:"
                       " ended by SIGKILL (#960)", False, {"processes": left, "single-instance name held": single_instance_held()})

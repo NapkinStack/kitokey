@@ -68,7 +68,7 @@ fn a_scenario_that_leaves_its_kitokey_running_is_named_and_the_kitokey_ended() {
         field("failed").starts_with("[\"corrections_gated left Kitokey"),
         "not counted as failed: {said}"
     );
-    // Within a bound: the wait for it is not the next start's minute.
+    // Within its bound: about ten seconds — not the next start's minute, nor a bound let go.
     let took: f64 = field("took")
         .split([',', '}'])
         .next()
@@ -76,5 +76,7 @@ fn a_scenario_that_leaves_its_kitokey_running_is_named_and_the_kitokey_ended() {
         .trim()
         .parse()
         .unwrap_or(f64::MAX);
-    assert!(took < 30.0, "waited {took} s: {said}");
+    assert!((9.0..13.0).contains(&took), "waited {took} s: {said}");
+    // The slow end said, in seconds.
+    assert!(said.contains("(Kitokey's end after SIGTERM: "), "the slow end not said: {said}");
 }
