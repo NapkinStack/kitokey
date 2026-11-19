@@ -1847,7 +1847,7 @@ def ollama_pulled(now: dt.datetime) -> None:
             check("whole: on this computer, Ollama asked for qwen3:8b", here and pulls[-1].get("model") == "qwen3:8b", (browser.execute_script(row), pulls))
             first = browser.execute_script("return document.querySelector('#minutes option')?.textContent || ''")
             check("it is offered first among the minutes' models, said as people say it", first.startswith("Qwen3 8b"), first)
-            check("its notice says it is ready for the minutes", wait_for(browser, lambda b: "comptes rendus" in notified.read_text(), 5), notified.read_text()[-300:])
+            check("its notice says it is ready for the minutes", wait_for(browser, lambda b: "proposé en premier pour le compte rendu" in notified.read_text(), 5), notified.read_text()[-300:])
     finally:
         monitor.terminate()
         monitor.wait(timeout=10)
