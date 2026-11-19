@@ -1396,6 +1396,8 @@ def models_guided(now: dt.datetime) -> None:
     print("BJ. Settings: the summary set up in a few guided steps, a service's key tested at once (D95)")
     good, false = "sk-stand-in-good", "sk-stand-in-false"
     asked = []
+    # Set, the stand-in answers the good key with no model at all (ines' V5 of #971).
+    empty = []
 
     # The named services' stand-in (OpenRouter's routes): its key route, then its models — the false
     # key refused on both, as the services do (401).
@@ -1408,7 +1410,7 @@ def models_guided(now: dt.datetime) -> None:
             elif self.path.endswith("/key"):
                 status, body = 200, {"data": {"label": "stand-in"}}
             elif self.path.endswith("/models"):
-                status, body = 200, {"data": [{"id": "anthropic/claude-sonnet-4-5"}, {"id": "openai/gpt-4o-mini"}, {"id": "mistralai/mistral-7b-instruct:free"}]}
+                status, body = 200, {"data": [] if empty else [{"id": "anthropic/claude-sonnet-4-5"}, {"id": "openai/gpt-4o-mini"}, {"id": "mistralai/mistral-7b-instruct:free"}]}
             else:
                 status, body = 404, {}
             raw = json.dumps(body).encode()
@@ -1460,6 +1462,8 @@ def models_guided(now: dt.datetime) -> None:
               browser.execute_script(addresses) == [] and browser.find_element(By.ID, "minutes-advanced").get_attribute("aria-expanded") == "false",
               browser.execute_script(addresses))
         check("a service, before its key: no model offered", not browser.find_element(By.ID, "minutes-models").is_displayed())
+        # Nothing to save before a model is listed: its « Enregistrer » not offered (#968, ines' V4).
+        check("a service, before its key: its « Enregistrer » not offered, nothing to save", not browser.find_element(By.ID, "minutes-online-save").is_displayed())
         # A false key: refused at once, its cause said in a sentence, nothing of the service's own words (E4).
         choose(browser, "minutes-service", "0")
         browser.find_element(By.ID, "minutes-key").send_keys(false)
@@ -1475,6 +1479,18 @@ def models_guided(now: dt.datetime) -> None:
         browser.execute_script(drawn_again)
         wait_for(browser, lambda b: b.execute_script(anew), 5)
         check("drawn again by itself: the refusal still said, until the key is tried again", browser.execute_script(said) == TEST_CAUSES[0][1], browser.execute_script(said))
+        # A key taken by a service that lists no model: nothing to save, its « Enregistrer » not offered (#968, ines' V5).
+        empty.append(True)
+        key = browser.find_element(By.ID, "minutes-key")
+        key.clear()
+        key.send_keys(good)
+        del asked[:]
+        press(browser, "minutes-key-test")
+        answered = wait_for(browser, lambda b: ["/api/v1/models", good] in asked, 10)
+        time.sleep(1)
+        bare = [browser.find_element(By.ID, i).is_displayed() for i in ("minutes-models", "minutes-online-save")]
+        check("a key taken, no model listed by the service: no list, its « Enregistrer » not offered", answered and bare == [False, False], [answered, bare])
+        empty.clear()
         # The good one: taken, the service's models listed as people say them.
         key = browser.find_element(By.ID, "minutes-key")
         key.clear()
