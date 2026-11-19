@@ -1797,10 +1797,10 @@ def ollama_pulled(now: dt.datetime) -> None:
 
 
 def first_read_said(browser, ids, expected, got) -> None:
-    """#965: the assistant's buttons read empty twice in 30 attests, a cause not established — not the card's
-    fade, a probe holding it at opacity 0 read them all the same. A first read other than expected is said, with
-    the page's state just after and a second read a second later: the next one names its cause. The check's verdict
-    is left as it was: this only says."""
+    """#965: the assistant's buttons read empty twice in 30 attests. Measured (s965de): the card at opacity exactly 0,
+    its fade's first frame, where WebKitWebDriver's `.text` is '' though the text is there. A first read other than
+    expected is said, with the page's state just after and a second read a second later, so that a cause other than
+    that one would show; the check itself waits for the text, bounded, and judges what is then read."""
     if got == expected:
         return
     state = ("const w = document.getElementById('welcome'), c = document.querySelector('.welcome');"
@@ -1913,8 +1913,11 @@ def first_run(now: dt.datetime) -> None:
         again = browser.execute_script("const b = document.getElementById('welcome-ollama-again');"
                                        " return b ? [b.tagName, b.textContent, b.closest('.welcome-wait')?.textContent.includes('ollama.com') ?? false] : null")
         check("Ollama not answering: « Réessayer » beside ollama.com, a button (#781)", again == ["BUTTON", "Réessayer", True], again)
+        first_read_said(browser, ("welcome-later",), ["Plus tard — vos réunions attendront le modèle"],
+                        [browser.find_element(By.ID, "welcome-later").text])
+        # Once the card is past its fade's first frame (#965).
+        wait_for(browser, lambda b: b.find_element(By.ID, "welcome-later").text != "", 5)
         later = browser.find_element(By.ID, "welcome-later").text
-        first_read_said(browser, ("welcome-later",), ["Plus tard — vos réunions attendront le modèle"], [later])
         check("the model missing: « Plus tard » says the meetings will wait for it (#781)",
               later == "Plus tard — vos réunions attendront le modèle", later)
         check("the model missing: offered with its size and host",
@@ -2077,8 +2080,12 @@ def first_run(now: dt.datetime) -> None:
         press(browser, "welcome-next")
         wait_for(browser, lambda b: "Private mode" in b.execute_script(summary), 5)
         check("Next with nothing chosen is private", "Private mode" in browser.execute_script(summary), browser.execute_script(summary))
-        english = [browser.find_element(By.ID, i).text for i in ("welcome-later", "welcome-ollama-again")]
-        first_read_said(browser, ("welcome-later", "welcome-ollama-again"), ["Later — your meetings will wait for the model", "Try again"], english)
+        later_en = ["Later — your meetings will wait for the model", "Try again"]
+        buttons = lambda b: [b.find_element(By.ID, i).text for i in ("welcome-later", "welcome-ollama-again")]
+        first_read_said(browser, ("welcome-later", "welcome-ollama-again"), later_en, buttons(browser))
+        # Once the card is past its fade's first frame, where `.text` is '' (#965).
+        wait_for(browser, lambda b: buttons(b) == later_en, 5)
+        english = buttons(browser)
         check("in English: « Later » says what waits, « Try again » beside ollama.com (#781)",
               english == ["Later — your meetings will wait for the model", "Try again"], english)
         seen(browser, "d58-3-summary-private-dark")
