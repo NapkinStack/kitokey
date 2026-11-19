@@ -202,6 +202,12 @@ impl Summarising {
             thread::spawn(move || crate::transcription::cancel(&program));
         }
     }
+
+    /// The group its program leads, which a cancel empties: what is waited for before Kitokey leaves (#961).
+    #[cfg(unix)]
+    pub fn group(&self) -> Option<i32> {
+        self.program.lock().ok().and_then(|child| i32::try_from(child.id()).ok())
+    }
 }
 
 /// The event a line of the contract names; none for a line that is not one.

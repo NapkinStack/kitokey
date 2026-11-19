@@ -684,12 +684,31 @@ fn ends_on_sigterm(app: &AppHandle) {
                     }),
             )
             .collect();
-        // A token stops its program on a thread of its own, which KILLs what is left after its grace:
-        // that grace waited, then Kitokey leaves — or what was deaf to TERM outlives it (s961g2).
-        let making = !tokens.is_empty();
+        // The groups being made, read before they are cancelled. A token stops its program on a thread
+        // of its own — TERM, a second's grace, KILL — and returns at once: Kitokey waits for those groups
+        // to be empty, within 1.8 s, or what was deaf to TERM outlives it (s961g2).
+        let groups: Vec<i32> = [
+            shell
+                .transcription
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_ref()
+                .and_then(Transcription::group),
+            shell
+                .minuting
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_ref()
+                .and_then(Summarising::group),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
         tokens.iter().for_each(Cancel::cancel);
-        if making {
-            tokio::time::sleep(transcription::GRACE + Duration::from_millis(200)).await;
+        let until = Instant::now() + Duration::from_millis(1800);
+        // SAFETY: signal 0 sends nothing: it asks whether a group still holds a process.
+        while Instant::now() < until && groups.iter().any(|&group| unsafe { libc::kill(-group, 0) } == 0) {
+            tokio::time::sleep(Duration::from_millis(50)).await;
         }
         app.exit(0);
     });

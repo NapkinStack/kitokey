@@ -248,11 +248,17 @@ impl Transcription {
             thread::spawn(move || cancel(&program));
         }
     }
+
+    /// The group its program leads, which a cancel empties: what is waited for before Kitokey leaves (#961).
+    #[cfg(unix)]
+    pub fn group(&self) -> Option<i32> {
+        self.program.lock().ok().and_then(|child| i32::try_from(child.id()).ok())
+    }
 }
 
 /// How long a program told to stop is given before it is killed, with what it started: the two
 /// seconds « Annuler » promises hold it, the shell's waiting a tenth of a second at a time (D92).
-pub const GRACE: Duration = Duration::from_secs(1);
+const GRACE: Duration = Duration::from_secs(1);
 
 /// Stops a program that leads a group of its own, and whatever it started: TERM to the group, a
 /// second's grace, then KILL to what is left of it. The group is taken while its leader runs, its
