@@ -293,30 +293,17 @@ def choose(browser, element_id: str, value: str) -> None:
     Select(browser.find_element(By.ID, element_id)).select_by_value(value)
 
 
-def typed(browser, element_id: str, text: str, quarantined: str = "") -> bool:
+def typed(browser, element_id: str, text: str) -> bool:
     """Text typed in a field of the page once it is drawn, shown and enabled — a choice just made
     draws its fields anew, and one not yet there cannot take the focus (#901). A field that never
     comes is a FAIL naming it and what was there — absent, hidden or disabled —, nothing typed, never
-    an exception that stops the shard (#907): False, for its caller to stop where nothing could hold.
-    `quarantined`, the issue and the date it is taken back up: the same said as quarantined, not
-    failed (tests.md, *Flaky tests*), with what the page showed and a screenshot, for its cause."""
+    an exception that stops the shard (#907): False, for its caller to stop where nothing could hold."""
     ready = lambda b: any(f.is_displayed() and f.is_enabled() for f in b.find_elements(By.ID, element_id))
     if not wait_for(browser, ready, 10):
         seen = browser.execute_script(
             "const f = document.getElementById(arguments[0]);"
             " return f ? {shown: f.getClientRects().length > 0, disabled: f.disabled} : 'absent'", element_id)
-        what = f"the field « {element_id} » comes, shown and enabled, to be typed in"
-        if not quarantined:
-            check(what, False, seen)
-            return False
-        # What hides it: the choice of where, its block, and Settings drawn — read when it happens.
-        page = browser.execute_script(
-            "const r = (id) => { const e = document.getElementById(id); return e ? {checked: e.checked, disabled: e.disabled,"
-            " hidden: e.hidden, shown: e.getClientRects().length > 0} : 'absent'; };"
-            " return {online: r('transcription-online'), here: r('transcription-here'), away: r('transcription-away'),"
-            " settings: r('settings'), hash: location.hash}")
-        print(f"  QUARANTINED  {what} ({quarantined})\n        got: {seen}\n        page: {page}")
-        shot(browser, f"quarantined-{element_id}")
+        check(f"the field « {element_id} » comes, shown and enabled, to be typed in", False, seen)
         return False
     browser.find_element(By.ID, element_id).send_keys(text)
     return True
@@ -7446,16 +7433,28 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "minutes-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "minutes-models").is_displayed(), 10)
             choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
+            # The radio as drawn before the save, marked: a node drawn anew carries no mark. (A WebElement of the old
+            # node passed back to the page would be stale once it is replaced, and never compare.)
+            browser.execute_script("document.getElementById('transcription-online').dataset.beforeSave = 'yes'")
             press(browser, "minutes-online-save")
             saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
             check("a service set up in Settings, its key kept, a model saved", saved, window.file.read_text())
+            # Settings drawn anew by the save before the next click (#930): the file is written 13 to 18 ms
+            # before that drawing ends, and a click resolved meanwhile — on the radio that drawing replaces —
+            # can land, once placeBack has scrolled the page back, on whatever is then at its point.
+            anew = "const r = document.getElementById('transcription-online'); return !!r && r.dataset.beforeSave !== 'yes'"
+            drawn = wait_for(browser, lambda b: b.execute_script(anew), 5)
+            check("Settings drawn anew by the save before the next click (#930)", drawn,
+                  browser.execute_script("const r = document.getElementById('transcription-online');"
+                                         " return r ? {marked: r.dataset.beforeSave || null, checked: r.checked} : 'absent'"))
             # A service that transcribes, set up as BG guides it: its key kept under the transcription's account.
             press(browser, "transcription-online")
+            taken = wait_for(browser, lambda b: b.find_element(By.ID, "transcription-online").is_selected(), 3)
+            check("« Un service » chosen for the transcription: its radio checked (#930)", taken,
+                  browser.execute_script("const a = document.activeElement; return [a ? a.id || a.tagName : null, scrollY]"))
             wait_for(browser, lambda b: b.execute_script(options, "transcription-service"), 5)
             choose(browser, "transcription-service", "0")
-            # Quarantined (#930): the field sometimes never shown, 3 of about 15 full runs; its cause not
-            # yet known. Nothing after it is checked then. Taken back up on 2026-11-25 at the latest.
-            if not typed(browser, "transcription-key", heard, quarantined="#930, taken back up by 2026-11-25"):
+            if not typed(browser, "transcription-key", heard):
                 return
             press(browser, "transcription-key-test")
             wait_for(browser, lambda b: b.find_element(By.ID, "transcription-models").is_displayed(), 10)
@@ -10179,11 +10178,19 @@ def trial_left(now: dt.datetime) -> None:
 
 
 def timed(scenario):
-    """A scenario, its time said after it, done or failed: where a run's minutes go (#862)."""
+    """A scenario, its time said after it, done or failed: where a run's minutes go (#862). One that
+    raises is a FAIL named by it and by what it raised, its traceback under it, and the run goes on
+    to the next: never a shard cut short, the checks after it hidden as « NOT RUN » (#949)."""
     def played(*args, **kwargs):
         began = time.monotonic()
         try:
             return scenario(*args, **kwargs)
+        except Exception as why:
+            what = f"{scenario.__name__} raised {type(why).__name__}: {why}"
+            print(f"  FAIL  {what}")
+            print("".join(f"        {line}\n" for line in traceback.format_exc().splitlines()), end="")
+            FAILED.append(what)
+            return None
         finally:
             print(f"    ({scenario.__name__}: {time.monotonic() - began:.1f} s)")
     return played
