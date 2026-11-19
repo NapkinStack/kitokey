@@ -3,7 +3,8 @@
 How Kitokey speaks to its users, in English and in French. Every sentence it says is in
 [`src/words.rs`](../src/words.rs) (`AGENTS.md`); this page is what a sentence there is written
 to. It comes from the copy review of 2026-11-13 (D94, cycle 10): its principles, its lexicon and
-its templates. Each example is given in both languages, English first.
+its templates. The review itself, every sentence with its three rewrites, is
+[`docs/project/reviews/2026-11-13-copy.md`](../../../docs/project/reviews/2026-11-13-copy.md). Each example is given in both languages, English first.
 
 The reader is not technical. They are often busy, sometimes in the middle of a call, sometimes
 worried — a recording that stops, an error.
