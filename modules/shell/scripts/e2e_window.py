@@ -680,6 +680,32 @@ def asking_less_motion(window: Window) -> Window:
     return window
 
 
+# The page's bar, each part's opaque colours and opacity, and the card's colour behind it (#954).
+BAR_COLOURS = ("const rgb = (t) => [...t.matchAll(/rgba?\\(([^)]+)\\)/g)].map((m) => m[1].split(',').map(Number))"
+               "  .filter((c) => c.length < 4 || c[3] > 0).map((c) => c.slice(0, 3));"
+               " const m = document.getElementById('making'); if (!m) return null; let e = m, behind = null;"
+               " while (e && !behind) { behind = rgb(getComputedStyle(e).backgroundColor)[0] || null; e = e.parentElement; }"
+               " return {behind, parts: [...m.querySelectorAll('.segment')].map((g) => { const s = getComputedStyle(g);"
+               "  return {state: g.dataset.state, opacity: Number(s.opacity), colours: rgb(s.backgroundImage + ' ' + s.backgroundColor)}; })}")
+
+
+def contrast(one: list[float], other: list[float]) -> float:
+    """WCAG 2.2's contrast ratio of two sRGB colours, 0–255 each."""
+    def luminance(colour):
+        linear = [c / 255 / 12.92 if c / 255 <= 0.04045 else ((c / 255 + 0.055) / 1.055) ** 2.4 for c in colour]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+    light, dark = sorted((luminance(one), luminance(other)), reverse=True)
+    return (light + 0.05) / (dark + 0.05)
+
+
+def parts_contrast(got: dict | None) -> list[tuple[str, float, float]]:
+    """Each part of the bar: its state, the lowest contrast of its colours against the card, its opacity."""
+    if not got or not got["behind"]:
+        return []
+    return [(part["state"], round(min((contrast(c, got["behind"]) for c in part["colours"]), default=0.0), 2), part["opacity"])
+            for part in got["parts"]]
+
+
 # The sidebar's primary actions shown, by their ids: one at a time (D69).
 PRIMARIES = "return [...document.querySelectorAll('#sidebar .primary')].filter(b => b.offsetParent).map(b => b.id)"
 LESS_MOTION = "return matchMedia('(prefers-reduced-motion: reduce)').matches"
@@ -5272,6 +5298,10 @@ def page_one_bar(now: dt.datetime) -> None:
                       first and got["segments"] == ["running", "next"] and got["live"] == "polite" and got["cancel"] and got["cards"] == 0
                       and bool(timed.match(got["by"])), got)
                 shot_themed(browser, f"d92-page-bar-{short}-{theme}", theme)
+                # WCAG 2.2 SC 1.4.11: each part, the one to come too, at 3:1 at least against the card (#954).
+                seen = parts_contrast(browser.execute_script(BAR_COLOURS))
+                check(f"{short}, {theme}: each part of the bar, the step to come too, at 3:1 at least against the card, never dimmed (#954)",
+                      [s for s, _, _ in seen] == ["running", "next"] and all(ratio >= 3 and opacity == 1 for _, ratio, opacity in seen), seen)
                 # Between the two steps — its transcript written, its summary not yet in line — the shell says the
                 # meeting `between` them. That moment lasts a few milliseconds with no program to hold it open, so
                 # the page is given, for two of its readings, the makings as the shell says them then: the bar
@@ -5346,6 +5376,32 @@ def page_one_bar(now: dt.datetime) -> None:
             finally:
                 for gate in gates:
                     gate.unlink(missing_ok=True)
+    # Less motion asked: the running part is still, never dimmed, every colour at 3:1 at least, and never one
+    # fill, which a part done is (#954).
+    for language, short, theme in (("fr_FR.UTF-8", "fr", "light"), ("en_US.UTF-8", "en", "dark")):
+        meetings = WORK / f"one-bar-still-{short}"
+        meeting = meetings / "2026-10-18_12-00"
+        session(meeting, now - dt.timedelta(hours=1), 1, {"local.wav": 1000})
+        window = asking_less_motion(Window(meetings, language, settings))
+        if theme == "dark":
+            window.env.update(GTK_THEME="Adwaita:dark")
+        with window as browser:
+            gates[0].touch()
+            try:
+                browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+                wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
+                browser.execute_script("window.__TAURI__.core.invoke('transcript_asked', {name: arguments[0]})", meeting.name)
+                shown = wait_for(browser, lambda b: (b.execute_script(bar) or {}).get("segments") == ["running", "next"], 10)
+                still = browser.execute_script("return matchMedia('(prefers-reduced-motion: reduce)').matches")
+                got = browser.execute_script(BAR_COLOURS)
+                seen = parts_contrast(got)
+                running = next((part for part in (got or {}).get("parts", []) if part["state"] == "running"), None)
+                check(f"{short}, {theme}, less motion: the running part never dimmed, each colour at 3:1 at least, never one fill as a part done (#954)",
+                      shown and still and all(ratio >= 3 and opacity == 1 for _, ratio, opacity in seen)
+                      and running is not None and len({tuple(c) for c in running["colours"]}) > 1, [still, seen])
+                shot_themed(browser, f"d92-page-bar-still-{short}-{theme}", theme)
+            finally:
+                gates[0].unlink(missing_ok=True)
     # Its summary cancelled from the bar, none made before: the focus on what the summary's card offers in its
     # place, never on the page's body — the bar's « Annuler » is the step's own card's (#938, ines' mutant B).
     meetings = WORK / "one-bar-cancel"
