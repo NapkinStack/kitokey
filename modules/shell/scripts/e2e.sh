@@ -397,7 +397,7 @@ click 6
 # An address that names no host: said, nothing run.
 start fr_FR.UTF-8 "minutes_provider = \"nowhere\"\nminutes_model = \"m\"" "$work/kitokey-capture"
 click 5; sleep 2
-check is "$(titles 'Le compte rendu n’a pas été fait')" 1
+check is "$(titles 'Le compte rendu n’a pas pu être rédigé')" 1
 check is "$(wc -l < "$work/summarised")" 1
 click 6
 # Online, not agreed: nothing is sent, the window opens to ask.
