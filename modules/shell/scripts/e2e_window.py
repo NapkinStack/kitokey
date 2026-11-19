@@ -7556,10 +7556,12 @@ def unsaved_choice_kept(now: dt.datetime) -> None:
     chosen, its note said, when another control is saved and the page drawn anew; « Enregistrer » then
     saves the one chosen, never the one before."""
     print("CA. Settings: a model chosen and not yet saved, kept when another control is saved (#948)")
+    # What the stand-in Ollama lists: a model it no longer has drops out of it (ines' N9).
+    listed = ["qwen3:14b", "mistral:7b"]
 
     class Tags(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
-            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            body = json.dumps({"models": [{"name": name} for name in listed]}).encode()
             self.send_response(200)
             self.send_header("content-length", str(len(body)))
             self.end_headers()
@@ -7594,6 +7596,16 @@ def unsaved_choice_kept(now: dt.datetime) -> None:
             browser.find_element(By.ID, "minutes-save").click()
             kept = wait_for(browser, lambda b: 'minutes_model = "mistral:7b"' in window.file.read_text(), 5)
             check("Settings: then « Enregistrer » saves the one chosen, never the one before (#948)", kept, window.file.read_text())
+            # Chosen, not saved, then gone from Ollama before the next drawing: the saved one shown, no note (#963, ines' N9).
+            wait_for(browser, lambda b_: b_.find_elements(By.ID, "minutes") and len(Select(b_.find_element(By.ID, "minutes")).options) == 2, 5)
+            choose(browser, "minutes", "qwen3:14b")
+            listed.remove("qwen3:14b")
+            browser.execute_script("window.__oldMinutes = document.getElementById('minutes'); refresh()")
+            wait_for(browser, lambda b_: b_.execute_script("return !window.__oldMinutes.isConnected && !!document.getElementById('minutes')"), 5)
+            gone = browser.execute_script("const m = document.getElementById('minutes'), n = document.getElementById('minutes-unsaved');"
+                                          " return {value: m ? m.value : null, note: !!n && n.getClientRects().length > 0}")
+            check("Settings: a model chosen and not saved, gone from Ollama at the next drawing: the saved one shown, its note gone (#963)",
+                  gone == {"value": "mistral:7b", "note": False}, gone)
     finally:
         tags.shutdown()
 
