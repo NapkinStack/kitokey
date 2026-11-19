@@ -7648,14 +7648,17 @@ def key_kept_to_its_host(now: dt.datetime) -> None:
             check("the summary's « Avancé », saved for another host: no key typed for the service handed with it (#964)",
                   saved and browser.execute_script(sent, "minutes_saved", zero) == [False] and zero not in window.file.read_text(),
                   [saved, browser.execute_script(sent, "minutes_saved", zero)])
-            # Saved for the service: no longer kept in the page; the field says a key is kept (#963).
+            # « Avancé » folded over the address saved on B: the field is the service's, its key back (#963).
             wait_for(browser, lambda b_: b_.execute_script("return !window.__old.isConnected && !!document.getElementById('minutes-key')"), 5)
-            browser.execute_script(address_to, "minutes-address", "")
             choose(browser, "minutes-service", "0")
+            press(browser, "minutes-advanced")
+            wait_for(browser, lambda b_: not b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
+            folded = browser.execute_script("return [document.getElementById('minutes-address').value === arguments[0], document.getElementById('minutes-key').value === arguments[1]]", b, zero)
+            check("the summary's « Avancé » folded over an address saved on another host: the key field is the service's, its key typed back (#963)",
+                  folded == [True, True], folded)
+            # Saved for the service: no longer kept in the page; the field says a key is kept (#963).
             press(browser, "minutes-key-test")
             listed = wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-models").is_displayed(), 10)
-            press(browser, "minutes-advanced")
-            wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-online-save").is_displayed(), 3)
             browser.execute_script("window.__old = document.getElementById('minutes-key')")
             press(browser, "minutes-online-save")
             wait_for(browser, lambda b_: f'minutes_provider = "{a}"' in window.file.read_text(), 5)

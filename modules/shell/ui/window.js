@@ -2876,7 +2876,8 @@ function minutesRow(minutes, words, locked) {
   // Its address left empty: the service chosen above, with a model it does not list — a new release,
   // an id of its own — named by hand.
   address.placeholder = service().address;
-  const keyNow = () => keyFor(address.value, service().address, servicePick.value);
+  // « Avancé » folded, its address is not what the key is typed for: the service's is (#963).
+  const keyNow = () => keyFor((guided.minutes.advanced ?? own) ? address.value : "", service().address, servicePick.value);
   const keyed = guidedKeyTested("minutes", words, locked, { servicePick, key, keyTest, keySaid, modelsPick },
     (index, typed) => window.__TAURI__.core.invoke("minutes_models", { provider: minutes.online[Number(index)].address, key: typed }), shownSaved, keyNow);
   address.addEventListener("input", keyed.shown);
@@ -2884,6 +2885,7 @@ function minutesRow(minutes, words, locked) {
   onlineSave.addEventListener("click", () => save(service().address, modelsPick.value, keyed.typed(serviceKeyId()), serviceKeyId()));
   ownSave.addEventListener("click", () => save(address.value.trim() || service().address, model.value, keyed.typed(keyNow()), keyNow()));
   const [toggle, advanced] = guidedAdvanced("minutes", words, own, [addressWrap, modelWrap, ownSave]);
+  toggle.addEventListener("click", keyed.shown);
   const away = element("div", "fields");
   away.append(serviceWrap, keyWrap, keyTest, keySaid, modelsWrap, onlineSave, toggle, advanced);
   const here = element("div", "fields");
@@ -3233,7 +3235,8 @@ function showSettings(shown, minutes, words) {
     ownAgreeHost(hostOf(ownAddress()));
   };
   standsIn();
-  const keyNow = () => keyFor(address.value, hearing().address, servicePick.value);
+  // « Avancé » folded, its address is not what the key is typed for: the service's is (#963).
+  const keyNow = () => keyFor((guided.transcription.advanced ?? own) ? address.value : "", hearing().address, servicePick.value);
   const keyed = guidedKeyTested("transcription", words, locked, { servicePick, key: serviceKey, keyTest, keySaid, modelsPick: serviceModels },
     (index, typed) => window.__TAURI__.core.invoke("transcription_models", { index: Number(index), key: typed }), shownSaved, keyNow);
   address.addEventListener("input", () => {
@@ -3243,7 +3246,10 @@ function showSettings(shown, minutes, words) {
   });
   const ownSave = guidedButton("transcription-own-save", words.service_save, false, locked);
   const [hearToggle, hearAdvanced] = guidedAdvanced("transcription", words, own, [addressWrap, modelWrap, ownAgreeWrap, ownSave]);
-  hearToggle.addEventListener("click", paintSaves);
+  hearToggle.addEventListener("click", () => {
+    paintSaves();
+    keyed.shown();
+  });
   paintSaves();
   // What « Avancé »'s « Enregistrer » saves: its model typed, or else — its address left empty, the
   // service chosen above — the model chosen in that service's list (#860).
