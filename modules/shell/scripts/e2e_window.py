@@ -1053,7 +1053,7 @@ def list_refreshed(now: dt.datetime) -> None:
                   and browser.find_elements(By.CSS_SELECTOR, '[data-offered="ggml-small-q8_0.bin"]'), (refusal, asked))
         taken = read_again("the decider's", shipped, signature)
         check("the list the decider signed: taken, nothing said against it, its models offered",
-              "n’a pas pu" not in taken and asked == ["/models.json", "/models.json.minisig"]
+              "Impossible d’actualiser" not in taken and asked == ["/models.json", "/models.json.minisig"]
               and browser.find_elements(By.CSS_SELECTOR, '[data-offered="ggml-small-q8_0.bin"]'), (taken, asked))
     server.shutdown()
 
