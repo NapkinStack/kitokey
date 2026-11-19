@@ -1894,6 +1894,8 @@ def first_run(now: dt.datetime) -> None:
         again = browser.execute_script("const b = document.getElementById('welcome-ollama-again');"
                                        " return b ? [b.tagName, b.textContent, b.closest('.welcome-wait')?.textContent.includes('ollama.com') ?? false] : null")
         check("Ollama not answering: « Réessayer » beside ollama.com, a button (#781)", again == ["BUTTON", "Réessayer", True], again)
+        # The same read once the card has arrived (#965).
+        wait_for(browser, lambda b: b.find_element(By.ID, "welcome-later").text != "", 2)
         later = browser.find_element(By.ID, "welcome-later").text
         check("the model missing: « Plus tard » says the meetings will wait for it (#781)",
               later == "Plus tard — vos réunions attendront le modèle", later)
