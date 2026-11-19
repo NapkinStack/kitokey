@@ -1281,6 +1281,20 @@ def service_named(now: dt.datetime) -> None:
               models and listed == ["/api/v1/key", "/api/v1/models?output_modalities=transcription"] and not browser.find_element(By.ID, "transcription-provider").is_displayed(),
               (offered(browser, "transcription-models"), listed))
         Select(browser.find_element(By.ID, "transcription-models")).select_by_value("vendor/scribe")
+        # Drawn anew before « Enregistrer » — another control saved, say —: the model chosen stays chosen (#948).
+        browser.execute_script("window.__old = document.getElementById('transcription-models'); refresh()")
+        wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && !!document.getElementById('transcription-models')"), 5)
+        check("drawn anew before « Enregistrer »: the transcription model chosen in the service's list still chosen (#948)",
+              browser.execute_script("return document.getElementById('transcription-models').value") == "vendor/scribe",
+              browser.execute_script("return document.getElementById('transcription-models').value"))
+        # « Avancé », folded by the user above, stays folded: the service's « Enregistrer » still there to save it (#948).
+        folded = browser.execute_script("const t = document.getElementById('transcription-advanced'), s = document.getElementById('transcription-save');"
+                                        " return [t.getAttribute('aria-expanded'), !!s && s.getClientRects().length > 0]")
+        check("drawn anew before « Enregistrer »: « Avancé » left folded as the user folded it, the service's « Enregistrer » offered (#948)",
+              folded == ["false", True], folded)
+        # The key typed, not yet saved, still there to be saved with it (#948).
+        typed = browser.execute_script("return document.getElementById('transcription-key').value")
+        check("drawn anew before « Enregistrer »: the key typed still in its field", typed == "sk-stand-in-not-a-key", len(typed))
         # The stand-in is on this computer: no agreement asked, and it saves without one (#859); a host
         # elsewhere is agreed to above, under « Avancé ».
         asked = browser.execute_script("const a = document.getElementById('transcription-agreed'); return !!a && a.getClientRects().length > 0")
@@ -1475,6 +1489,13 @@ def models_guided(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.execute_script(anew), 5)
         check("drawn again by itself: the models listed with the key still offered",
               browser.find_element(By.ID, "minutes-models").is_displayed() and browser.execute_script(options, "minutes-models") == offered, browser.execute_script(options, "minutes-models"))
+        # Another model chosen, then drawn anew before « Enregistrer »: it stays chosen (#948).
+        choose(browser, "minutes-models", "openai/gpt-4o-mini")
+        browser.execute_script("window.__old = document.getElementById('minutes-models'); refresh()")
+        wait_for(browser, lambda b: b.execute_script("return !window.__old.isConnected && !!document.getElementById('minutes-models')"), 5)
+        check("drawn anew before « Enregistrer »: the summary's model chosen in the service's list still chosen (#948)",
+              browser.execute_script("return document.getElementById('minutes-models').value") == "openai/gpt-4o-mini",
+              browser.execute_script("return document.getElementById('minutes-models').value"))
         choose(browser, "minutes-models", "anthropic/claude-sonnet-4-5")
         press(browser, "minutes-online-save")
         saved = wait_for(browser, lambda b: 'minutes_model = "anthropic/claude-sonnet-4-5"' in window.file.read_text(), 5)
@@ -7525,6 +7546,215 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             server.shutdown()
 
 
+def unsaved_choice_kept(now: dt.datetime) -> None:
+    """CA. #948: a model chosen in Settings and not yet saved — its list waits for « Enregistrer » — stays
+    chosen, its note said, when another control is saved and the page drawn anew; « Enregistrer » then
+    saves the one chosen, never the one before."""
+    print("CA. Settings: a model chosen and not yet saved, kept when another control is saved (#948)")
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+            self.send_response(200)
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_):
+            pass
+
+    tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
+    threading.Thread(target=tags.serve_forever, daemon=True).start()
+    ollama = f"http://127.0.0.1:{tags.server_address[1]}"
+    meetings = WORK / "unsaved-choice"
+    meetings.mkdir(exist_ok=True)
+    window = Window(meetings, "fr_FR.UTF-8", f'reminder = false\nminutes_provider = "{ollama}/v1"\nminutes_model = "qwen3:14b"\n', ollama=ollama)
+    try:
+        with window as browser:
+            browser.find_element(By.ID, "settings-link").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "minutes") and b.find_elements(By.ID, "reminder"), 10)
+            Select(browser.find_element(By.ID, "minutes")).select_by_visible_text("Mistral 7b")
+            unsaid = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-unsaved").is_displayed(), 3)
+            # The list as it is, marked in the page: a reference the driver holds is refused once it is gone.
+            browser.execute_script("window.__oldMinutes = document.getElementById('minutes')")
+            # Another control, saved at once: the page is drawn anew from what the shell holds.
+            browser.find_element(By.ID, "reminder").click()
+            saved = wait_for(browser, lambda b: "reminder = true" in window.file.read_text(), 5)
+            redrawn = wait_for(browser, lambda b: b.execute_script("return !window.__oldMinutes.isConnected && !!document.getElementById('minutes')"), 5)
+            time.sleep(1)
+            got = browser.execute_script("const m = document.getElementById('minutes'), n = document.getElementById('minutes-unsaved');"
+                                         " return {value: m ? m.value : null, note: !!n && n.getClientRects().length > 0}")
+            check("Settings: a model chosen and not yet saved, another control saved meanwhile: still chosen, its note still said (#948)",
+                  unsaid and saved and redrawn and got["value"] == "mistral:7b" and got["note"], [unsaid, saved, redrawn, got])
+            browser.find_element(By.ID, "minutes-save").click()
+            kept = wait_for(browser, lambda b: 'minutes_model = "mistral:7b"' in window.file.read_text(), 5)
+            check("Settings: then « Enregistrer » saves the one chosen, never the one before (#948)", kept, window.file.read_text())
+    finally:
+        tags.shutdown()
+
+
+
+def key_kept_to_its_host(now: dt.datetime) -> None:
+    """CB. #964: a key typed in Settings leaves only for what it was typed for. Typed for a service,
+    another service chosen, or under « Avancé » an address on another host: its field is empty and
+    nothing asks or saves with it there; back to the service, the key typed for it is back. Saved, it
+    is no longer kept in the page (#963). Values never printed: what is checked says only whether."""
+    print("CB. Settings: a key typed for a service never leaves for another service or another host (#964)")
+    zero, hears, own = "sk-typed-for-zero", "sk-hears-for-zero", "sk-typed-for-b"
+    asked = []
+
+    # Two stand-ins, two hosts (their ports): A stands in for every service, B is an address of one's own.
+    def stand_in(name):
+        class Service(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                asked.append([name, (self.headers.get("authorization") or "").removeprefix("Bearer ")])
+                body = {"data": [{"id": "vendor/model"}]} if "models" in self.path else {"data": {"label": "stand-in"}}
+                raw = json.dumps(body).encode()
+                self.send_response(200)
+                self.send_header("content-length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+
+            def log_message(self, *_):
+                pass
+        return Service
+
+    servers = [http.server.ThreadingHTTPServer(("127.0.0.1", 0), stand_in(name)) for name in ("A", "B")]
+    for server in servers:
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    a, b = (f"http://127.0.0.1:{server.server_address[1]}/api/v1" for server in servers)
+    meetings = WORK / "key-host"
+    meetings.mkdir(exist_ok=True)
+    window = Window(meetings, "fr_FR.UTF-8")
+    window.env.update(KITOKEY_ONLINE=a, KITOKEY_HEARING=a)
+    # Each key the page hands the shell, by the command that takes it: compared in the page, never printed.
+    spied = ("const real = window.__TAURI__.core; window.keysSent = [];"
+             " window.__TAURI__.core = { ...real, invoke: (cmd, args, ...rest) => {"
+             " if (['minutes_models', 'minutes_saved', 'transcription_models', 'transcription_saved'].includes(cmd)) window.keysSent.push([cmd, args?.key ?? null]);"
+             " return real.invoke(cmd, args, ...rest); } }")
+    sent = "return window.keysSent.filter(([cmd, key]) => cmd === arguments[0]).map(([cmd, key]) => key === arguments[1])"
+    value = "return document.getElementById(arguments[0]).value === arguments[1]"
+    address_to = "const a = document.getElementById(arguments[0]); a.value = arguments[1]; a.dispatchEvent(new Event('input'))"
+    try:
+        with window as browser:
+            browser.find_element(By.ID, "settings-link").click()
+            wait_for(browser, lambda b_: b_.find_elements(By.ID, "minutes-where") and b_.find_elements(By.ID, "transcription-online"), 10)
+            browser.execute_script(spied)
+            # (1) The summary: typed for service 0, service 1 chosen.
+            press(browser, "minutes-online")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-key").is_displayed(), 5)
+            choose(browser, "minutes-service", "0")
+            browser.find_element(By.ID, "minutes-key").send_keys(zero)
+            choose(browser, "minutes-service", "1")
+            empty = browser.execute_script(value, "minutes-key", "")
+            del asked[:]
+            press(browser, "minutes-key-test")
+            heard = wait_for(browser, lambda b_: len(asked) > 0, 10)
+            check("the summary: a key typed for one service, another chosen: its field empty, « Vérifier la clé » sends it nothing typed for the first (#964)",
+                  empty and heard and not any(key == zero for _, key in asked) and browser.execute_script(sent, "minutes_models", zero) == [False],
+                  [empty, heard, [key == zero for _, key in asked]])
+            choose(browser, "minutes-service", "0")
+            check("the summary: back to the first service, the key typed for it is back (#964)", browser.execute_script(value, "minutes-key", zero))
+            # (3) « Avancé »: an address of one's own on another host. Each sequence reads its own gestures alone.
+            browser.execute_script("window.keysSent = []")
+            press(browser, "minutes-advanced")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
+            browser.execute_script(address_to, "minutes-address", b)
+            other = browser.execute_script(value, "minutes-key", "")
+            # A key typed for B, « Avancé » unfolded: « Vérifier la clé » asks the service, with the service's key alone (#964).
+            browser.find_element(By.ID, "minutes-key").send_keys(own)
+            del asked[:]
+            press(browser, "minutes-key-test")
+            heard = wait_for(browser, lambda b_: len(asked) > 0, 10)
+            check("the summary's « Avancé » on another host, a key typed for it: « Vérifier la clé » sends the service nothing typed for that host (#964)",
+                  heard and not any(key == own for _, key in asked) and browser.execute_script(sent, "minutes_models", own) == [False],
+                  [heard, [key == own for _, key in asked]])
+            browser.execute_script(address_to, "minutes-address", "")
+            back = browser.execute_script(value, "minutes-key", zero)
+            browser.execute_script(address_to, "minutes-address", a.replace("/api/v1", "/v1"))
+            same = browser.execute_script(value, "minutes-key", zero)
+            check("the summary's « Avancé »: an address on another host, its key field empty; empty again, or on the service's host, the key typed for it back (#964)",
+                  other and back and same, [other, back, same])
+            browser.execute_script(address_to, "minutes-address", b)
+            browser.find_element(By.ID, "minutes-model").send_keys("vendor/model")
+            browser.execute_script("window.__old = document.getElementById('minutes-key'); document.getElementById('minutes-own-save').click()")
+            saved = wait_for(browser, lambda b_: f'minutes_provider = "{b}"' in window.file.read_text(), 5)
+            check("the summary's « Avancé », saved for another host: no key typed for the service handed with it (#964)",
+                  saved and browser.execute_script(sent, "minutes_saved", zero) == [False] and zero not in window.file.read_text(),
+                  [saved, browser.execute_script(sent, "minutes_saved", zero)])
+            # « Avancé » folded over the address saved on B: the field is the service's, its key back (#963).
+            wait_for(browser, lambda b_: b_.execute_script("return !window.__old.isConnected && !!document.getElementById('minutes-key')"), 5)
+            choose(browser, "minutes-service", "0")
+            press(browser, "minutes-advanced")
+            wait_for(browser, lambda b_: not b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
+            folded = browser.execute_script("return [document.getElementById('minutes-address').value === arguments[0], document.getElementById('minutes-key').value === arguments[1]]", b, zero)
+            check("the summary's « Avancé » folded over an address saved on another host: the key field is the service's, its key typed back (#963)",
+                  folded == [True, True], folded)
+            # Saved for the service: no longer kept in the page; the field says a key is kept (#963).
+            press(browser, "minutes-key-test")
+            listed = wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-models").is_displayed(), 10)
+            # Unfolded again on B, a key typed for B: the service's « Enregistrer », still offered above, saves
+            # the service's key alone (#964).
+            press(browser, "minutes-advanced")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "minutes-address").is_displayed(), 3)
+            browser.find_element(By.ID, "minutes-key").send_keys(own)
+            browser.execute_script("window.__old = document.getElementById('minutes-key')")
+            press(browser, "minutes-online-save")
+            wait_for(browser, lambda b_: f'minutes_provider = "{a}"' in window.file.read_text(), 5)
+            handed = browser.execute_script(sent, "minutes_saved", zero)[-1:] == [True] and browser.execute_script(sent, "minutes_saved", own)[-1:] == [False]
+            check("the summary's service saved, « Avancé » unfolded on another host with a key typed for it: the service's key handed, nothing typed for that host (#964)",
+                  handed and own not in window.file.read_text(), handed)
+            wait_for(browser, lambda b_: b_.execute_script("return !window.__old.isConnected && !!document.getElementById('minutes-key')"), 5)
+            forgotten = browser.execute_script(value, "minutes-key", "")
+            check("the summary, saved with its key: drawn anew, the key no longer in its field (#963)",
+                  listed and forgotten and browser.execute_script(sent, "minutes_saved", zero)[-1:] == [True], [listed, forgotten])
+            # (2) The transcription: typed for service 0, service 1 chosen (OpenAI's own host: nothing asked of it here).
+            press(browser, "transcription-online")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-key").is_displayed(), 5)
+            choose(browser, "transcription-service", "0")
+            browser.find_element(By.ID, "transcription-key").send_keys(hears)
+            choose(browser, "transcription-service", "1")
+            empty = browser.execute_script(value, "transcription-key", "")
+            choose(browser, "transcription-service", "0")
+            back = browser.execute_script(value, "transcription-key", hears)
+            check("the transcription: a key typed for one service, another chosen: its field empty; back to the first, its key back (#964)",
+                  empty and back, [empty, back])
+            # Saved for the service with its key, then drawn anew: no longer kept in the page (#963, ines' S7).
+            press(browser, "transcription-key-test")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-models").is_displayed(), 10)
+            press(browser, "transcription-save")
+            saved = wait_for(browser, lambda b_: f'transcription_provider = "{a}"' in window.file.read_text(), 5)
+            browser.execute_script("window.__old = document.getElementById('transcription-key'); refresh()")
+            wait_for(browser, lambda b_: b_.execute_script("return !window.__old.isConnected && !!document.getElementById('transcription-key')"), 5)
+            forgotten = browser.execute_script(value, "transcription-key", "")
+            check("the transcription, saved with its key: drawn anew, the key no longer in its field (#963)",
+                  saved and forgotten and browser.execute_script(sent, "transcription_saved", hears) == [True] and hears not in window.file.read_text(),
+                  [saved, forgotten])
+            # Its « Avancé »: an address of one's own on another host, saved there: nothing typed for the service handed with it.
+            # A key typed for the service again, not saved: the one that could leave for the other host (ines' S5).
+            browser.execute_script("window.keysSent = []")
+            browser.find_element(By.ID, "transcription-key").send_keys(hears)
+            press(browser, "transcription-advanced")
+            wait_for(browser, lambda b_: b_.find_element(By.ID, "transcription-provider").is_displayed(), 3)
+            browser.execute_script(address_to, "transcription-provider", b)
+            other = browser.execute_script(value, "transcription-key", "")
+            browser.find_element(By.ID, "transcription-key").send_keys(own)
+            del asked[:]
+            press(browser, "transcription-key-test")
+            heard = wait_for(browser, lambda b_: len(asked) > 0, 10)
+            check("the transcription's « Avancé » on another host, a key typed for it: « Vérifier la clé » sends the service nothing typed for that host (#964)",
+                  heard and not any(key == own for _, key in asked) and browser.execute_script(sent, "transcription_models", own) == [False],
+                  [heard, [key == own for _, key in asked]])
+            browser.find_element(By.ID, "transcription-model").send_keys("whisper-1")
+            browser.execute_script("document.getElementById('transcription-own-save').click()")
+            saved = wait_for(browser, lambda b_: f'transcription_provider = "{b}"' in window.file.read_text(), 5)
+            check("the transcription's « Avancé », an address on another host: its key field empty, saved with no key typed for the service (#964)",
+                  other and saved and browser.execute_script(sent, "transcription_saved", hears) == [False] and hears not in window.file.read_text(),
+                  [other, saved, browser.execute_script(sent, "transcription_saved", hears)])
+    finally:
+        for server in servers:
+            server.shutdown()
+
 def models_on_the_page(now: dt.datetime) -> None:
     """BW. D93, criterion 5: on a meeting's page, each version's model is a list in its line itself — no redo
     panel opened —, showing the model that made it; a model chosen there starts nothing and is kept as the
@@ -11908,6 +12138,8 @@ def main() -> int:
     redo_choice_starts_nothing(now)
     redo_offers_the_services_models(now)
     models_on_the_page(now)
+    unsaved_choice_kept(now)
+    key_kept_to_its_host(now)
     settings_folded(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
