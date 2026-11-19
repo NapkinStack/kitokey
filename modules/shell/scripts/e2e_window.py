@@ -11054,7 +11054,7 @@ def main() -> int:
         shot(browser, "8-minutes-unsaved")
         check(
             "a model chosen in the list is not saved by itself; who still writes them is said",
-            "minutes_" not in window.file.read_text() and unsaid.is_displayed() and unsaid.text == "Non enregistré : aucun compte rendu ne sera rédigé d’ici là.",
+            "minutes_" not in window.file.read_text() and unsaid.is_displayed() and unsaid.text == "Non enregistré : aucun compte rendu ne sera rédigé d’ici là.",  # U+00A0 read as a space
             (window.file.read_text(), unsaid.text),
         )
         browser.find_element(By.ID, "minutes-save").click()
@@ -11086,7 +11086,7 @@ def main() -> int:
         wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-test"), 5)
         # Tester asks kitokey-summary about the choice saved: no key for Ollama here.
         press(browser, "minutes-test")
-        answered = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-tested").text == "Ça marche : le modèle répond.", 10)
+        answered = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-tested").text == "Ça fonctionne : le modèle répond.", 10)  # U+00A0 read as a space
         check(
             "Tester says the model answers, asking kitokey-summary with the choice saved",
             answered
