@@ -5764,6 +5764,19 @@ def focus_kept(now: dt.datetime) -> None:
                       done and after[0] in ("minutes", "minutes-save") and abs(after[1] - before[1]) <= 1, {"saved": done, "before": before, "after": after})
             else:
                 check("Settings offer the minutes' model on this computer, to be chosen (D101)", False, browser.execute_script(where))
+            # Another page asked from Settings scrolled down: it opens at its start. The place kept for a drawing
+            # is Settings' own, given back only at Settings' address — never Settings' scroll carried to the
+            # meeting's page (ines's P6 on #951, D101).
+            browser.execute_script("window.scrollTo(0, document.scrollingElement.scrollHeight)")
+            time.sleep(0.4)
+            down = browser.execute_script("return Math.round(scrollY)")
+            browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+            opened = wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == folder.name
+                              and b.find_elements(By.ID, "meeting-language"), 10)
+            time.sleep(1)
+            top = browser.execute_script("return Math.round(scrollY)")
+            check("Settings scrolled down, then a meeting's page asked: it opens at its start, not at Settings' scroll (#951, D101)",
+                  down > 0 and opened and top == 0, {"Settings' scroll": down, "opened": opened, "the page's scroll": top})
     finally:
         tags.shutdown()
     # A control the change removes, on a Kitokey with no model, which offers to fetch it: served slowly, so
