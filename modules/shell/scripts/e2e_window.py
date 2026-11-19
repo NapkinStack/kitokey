@@ -2165,7 +2165,7 @@ def first_run(now: dt.datetime) -> None:
                 press(browser, "welcome-go")
                 away = wait_for(browser, lambda b: b.execute_script("return location.hash") in ("#/", "") and b.find_element(By.ID, "list").is_displayed() and asked == ["refused", "cut", "whole"][:round_ + 1], 5)
                 check(f"{way}: the click fetches it, the window at the meetings while it comes",
-                      away and not fetched.exists() and "Le modèle" not in notified.read_text()[mark:], (asked, notified.read_text()[mark:]))
+                      away and not fetched.exists() and "téléchargement du modèle" not in notified.read_text()[mark:], (asked, notified.read_text()[mark:]))
                 if way != "whole":
                     told = wait_for(browser, lambda b: "Échec du téléchargement du modèle" in notified.read_text()[mark:], 15)
                     check(f"{way}: said as Settings say it, the model not put in its place", told and not fetched.exists(), notified.read_text()[mark:][-300:])
