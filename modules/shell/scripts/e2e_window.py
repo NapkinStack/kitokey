@@ -686,7 +686,8 @@ BAR_COLOURS = ("const rgb = (t) => [...t.matchAll(/rgba?\\(([^)]+)\\)/g)].map((m
                " const m = document.getElementById('making'); if (!m) return null; let e = m, behind = null;"
                " while (e && !behind) { behind = rgb(getComputedStyle(e).backgroundColor)[0] || null; e = e.parentElement; }"
                " return {behind, parts: [...m.querySelectorAll('.segment')].map((g) => { const s = getComputedStyle(g);"
-               "  return {state: g.dataset.state, opacity: Number(s.opacity), colours: rgb(s.backgroundImage + ' ' + s.backgroundColor)}; })}")
+               "  return {state: g.dataset.state, opacity: Number(s.opacity), colours: rgb(s.backgroundImage + ' ' + s.backgroundColor),"
+               "   repeating: s.backgroundImage.startsWith('repeating-linear-gradient')}; })}")
 
 
 def contrast(one: list[float], other: list[float]) -> float:
@@ -5378,8 +5379,8 @@ def page_one_bar(now: dt.datetime) -> None:
             finally:
                 for gate in gates:
                     gate.unlink(missing_ok=True)
-    # Less motion asked: the running part is still, never dimmed, every colour at 3:1 at least, and never one
-    # fill, which a part done is (#954).
+    # Less motion asked: the running part is still, never dimmed, every colour at 3:1 at least, never one fill,
+    # which a part done is, and never a partial fill, which reads as progress: a pattern across it (#954).
     for language, short, theme in (("fr_FR.UTF-8", "fr", "light"), ("en_US.UTF-8", "en", "dark")):
         meetings = WORK / f"one-bar-still-{short}"
         meeting = meetings / "2026-10-18_12-00"
@@ -5398,9 +5399,9 @@ def page_one_bar(now: dt.datetime) -> None:
                 got = browser.execute_script(BAR_COLOURS)
                 seen = parts_contrast(got)
                 running = next((part for part in (got or {}).get("parts", []) if part["state"] == "running"), None)
-                check(f"{short}, {theme}, less motion: the running part never dimmed, each colour at 3:1 at least, never one fill as a part done (#954)",
+                check(f"{short}, {theme}, less motion: the running part never dimmed, each colour at 3:1 at least, a pattern across it, never one fill nor a partial one (#954)",
                       shown and still and all(ratio >= 3 and opacity == 1 for _, ratio, opacity in seen)
-                      and running is not None and len({tuple(c) for c in running["colours"]}) > 1, [still, seen])
+                      and running is not None and len({tuple(c) for c in running["colours"]}) > 1 and running["repeating"], [still, seen, running and running["repeating"]])
                 print(f"        {short}, {theme}, less motion, measured: {seen}")
                 shot_themed(browser, f"d92-page-bar-still-{short}-{theme}", theme)
             finally:
