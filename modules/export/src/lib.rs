@@ -240,18 +240,23 @@ fn row(cells: impl Iterator<Item = String>) -> String {
     format!("| {} |\n", cells.collect::<Vec<_>>().join(" | "))
 }
 
-/// `[mm:ss]`'s form, as `minutes` gives a time: minutes in two digits or more.
+/// A time as the meeting's page says it: `mm:ss`, and `hh:mm:ss` once past an hour (R9).
 fn time(seconds: f64) -> String {
     let whole = seconds.max(0.0) as u64;
-    format!("{:02}:{:02}", whole / 60, whole % 60)
+    let (hours, minutes, seconds) = (whole / 3600, whole / 60 % 60, whole % 60);
+    if hours > 0 {
+        format!("{hours:02}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("{minutes:02}:{seconds:02}")
+    }
 }
 
-/// Text said as it is: every ASCII punctuation escaped, so that CommonMark reads none of it as
-/// markup and a `|` stays inside its cell.
+/// Text said as it is, and left to edit: only what CommonMark and GFM could read as markup inside a
+/// line — emphasis, code, a link, HTML, an entity, a strikethrough, a cell's end — is escaped.
 fn escaped(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
-        if c.is_ascii_punctuation() {
+        if matches!(c, '\\' | '`' | '*' | '_' | '[' | ']' | '<' | '>' | '|' | '&' | '~') {
             out.push('\\');
         }
         out.push(c);

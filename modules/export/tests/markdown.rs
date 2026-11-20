@@ -226,3 +226,47 @@ fn a_title_out_of_the_minutes_bounds_is_no_title() {
         "é".repeat(80)
     );
 }
+
+#[test]
+fn a_time_past_an_hour_says_its_hours_as_the_window_does() {
+    // The page's clock says « 01:05:00 » past an hour, « 59:59 » before (R9: one passage, one reading).
+    let transcript = concat!(
+        r#"{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"small","language":null,"context":null}"#,
+        "\n",
+        r#"{"type":"segment","speaker":"me","track":"local","voice":null,"start":3599.9,"end":3600.5,"text":"avant"}"#,
+        "\n",
+        r#"{"type":"segment","speaker":"me","track":"local","voice":null,"start":3900.0,"end":3901.0,"text":"après"}"#,
+        "\n",
+    );
+    let dir = folder(MINUTES_V4);
+    fs::write(dir.path().join("transcript.jsonl"), transcript).unwrap();
+    let times: Vec<String> = read(&written(dir.path(), Include::all())).rows[1..]
+        .iter()
+        .map(|row| row[0].clone())
+        .collect();
+    assert_eq!(times, ["59:59", "01:05:00"]);
+}
+
+#[test]
+fn a_text_to_edit_keeps_its_punctuation_where_commonmark_reads_none_of_it_as_markup() {
+    // D108 writes a file to edit: « 20 min, http://a.b (ok) » stays as typed; only what CommonMark
+    // could take for markup in a line of a cell is escaped, and still reads back as said.
+    let transcript = concat!(
+        r#"{"type":"segment","speaker":"me","track":"local","voice":null,"start":1.0,"end":2.0,"text":"20 min, http://a.b (ok) - fin."}"#,
+        "\n",
+        r#"{"type":"segment","speaker":"me","track":"local","voice":null,"start":3.0,"end":4.0,"text":"*a* _b_ `c` [d](e) <f> a|b &amp; ~g~ \\h"}"#,
+        "\n",
+    );
+    let dir = folder(MINUTES_V4);
+    fs::write(dir.path().join("transcript.jsonl"), transcript).unwrap();
+    let text = written(dir.path(), Include::all());
+    assert!(
+        text.contains("| 20 min, http://a.b (ok) - fin. |"),
+        "plain punctuation escaped:\n{text}"
+    );
+    let rows = read(&text).rows;
+    assert_eq!(
+        rows[2][2], "*a* _b_ `c` [d](e) <f> a|b &amp; ~g~ \\h",
+        "markup taken as such:\n{text}"
+    );
+}
