@@ -28,4 +28,4 @@ lexicon cause_own "The provider answers that it is failing: try again later. On 
 lexicon cause_own "The provider does not know {}, chosen for this meeting: choose another in Redo…\u{a0}› Advanced." « provider »
 lexicon cause_own "{}, chosen for this meeting, did not write minutes: try again, or choose another model in Redo…\u{a0}› Advanced." « minutes »
 lexicon window.minutes_stopped[0] "Minutes stopped. You can start them again, with another model if you like." « minutes »
-placeholders of: in both languages
+placeholders of comment 11: in both languages
