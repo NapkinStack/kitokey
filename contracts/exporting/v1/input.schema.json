@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "The exporting program's input",
+  "description": "exporting/v1 — one JSON object on the program's input, then its end: where to write, and the words a file shows that no contract carries, in the person's language. What a schema cannot say is on the contract's page.",
+  "type": "object",
+  "properties": {
+    "to": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "transcript": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "me": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "others": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "time": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "speaker": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    }
+  },
+  "required": [
+    "to",
+    "name",
+    "transcript",
+    "me",
+    "others",
+    "time",
+    "speaker",
+    "text"
+  ]
+}
