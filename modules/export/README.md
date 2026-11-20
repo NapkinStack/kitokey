@@ -21,9 +21,19 @@ flowchart LR
 
 **Legend** — grey: a meeting's files and the contract each follows · green: this module · blue: what it writes.
 
-A library: a meeting's folder read into one model, every format written from it (D108). It
-writes Markdown today; HTML, DOCX, subtitles and a PDF follow. The words a file shows that no
-contract carries — « Transcription », who spoke — are given by its caller.
+A library and its program: a meeting's folder read into one model, every format written from it
+(D108). It writes Markdown today; HTML, DOCX, subtitles and a PDF follow. The words a file shows that
+no contract carries — « Transcription », who spoke — are given by its caller.
+
+The program, `kitokey-export`, is what the shell starts ([`exporting/v1`](../../contracts/exporting/v1/README.md)):
+
+```sh
+echo '{"to": "<documents>/meeting.md", "name": "Réunion", "transcript": "Transcription", "me": "Moi", "others": "Les autres", "time": "Heure", "speaker": "Qui", "text": "Texte"}' \
+  | kitokey-export <meetings>/2026-11-20_09-30 --format md --lang fr
+```
+
+It answers one JSON line, `written` or `failed`, and ends in failure with one sentence on its error
+stream.
 
 ## Getting started
 
