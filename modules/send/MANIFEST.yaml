@@ -93,9 +93,13 @@ dependencies:
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
     exit_strategy: input, minutes_read and body in src/; any JSON library replaces it.
   - name: ureq
-    purpose: The one connection of the module, to the address the user set up, through a resolver that judges every address
+    purpose: >
+      The one connection of the module, to the address the user set up, through a resolver that
+      judges every address
     adr: docs/adr/0018-a-module-send-of-its-own-the-one-to-reach-a-channel.md
-    exit_strategy: post() in src/lib.rs, its Judging resolver; any HTTP client that resolves through a resolver of ours replaces it.
+    exit_strategy: >
+      post() in src/lib.rs, its Judging resolver; any HTTP client that resolves through a resolver of
+      ours replaces it.
   - name: url
     purpose: Reads the address as a browser does, IDNA and IPv4 forms included, before it is judged
     adr: docs/adr/0018-a-module-send-of-its-own-the-one-to-reach-a-channel.md
