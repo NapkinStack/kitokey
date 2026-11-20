@@ -170,8 +170,10 @@ if [ "$1" = listen ]; then
   done
 fi
 printf '%s\\n' "$*" > "$here/recorder-args"
-folder="$2/2026-10-18_12-00"; mkdir -p "$folder"
-printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","tracks":{}}' > "$folder/session.json"
+# Its meeting's folder and times: the scenarios' fixed ones, or another a scenario names (D103's screenshots).
+at=${KITOKEY_E2E_RECORDED_AT:-2026-10-18T12:00:00+02:00}; until=${KITOKEY_E2E_RECORDED_UNTIL:-2026-10-18T12:00:05+02:00}
+folder="$2/${KITOKEY_E2E_RECORDED:-2026-10-18_12-00}"; mkdir -p "$folder"
+printf '{"contract":"session-audio/v2","started":"%s","tracks":{}}' "$at" > "$folder/session.json"
 # As recording/v1 says, where the scenario asks it (`faithful-recorder`, CC): its reader gone, it goes on
 # (#773); its input closed stops nothing; a termination signal stops it as `stop` does — `session.json` says
 # `stopped`, and it ends well. Unasked, it dies with its reader, as every other scenario has it (s961b2).
@@ -181,7 +183,7 @@ if [ -e "$2/faithful-recorder" ]; then
   faithful=true
   trap '' PIPE
   echo $$ > "$here/recorder-pid"
-  stopped() { printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"; echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'; exit 0; }
+  stopped() { printf '{"contract":"session-audio/v2","started":"%s","stopped":"%s","tracks":{}}' "$at" "$until" > "$folder/session.json"; echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'; exit 0; }
   trap stopped TERM INT
 fi
 me='"Mic"'
@@ -216,7 +218,7 @@ while :; do
   # Another device that reads as the one chosen, which is not back.
   if [ -e "$2/mic-same" ]; then d=$(cat "$2/mic-same"); rm "$2/mic-same"; echo '{"event":"device","source":"me","device":"'"$d"'"}'; fi
 done
-printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"
+printf '{"contract":"session-audio/v2","started":"%s","stopped":"%s","tracks":{}}' "$at" "$until" > "$folder/session.json"
 echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'
 """
 )
@@ -11327,6 +11329,41 @@ STORE_MEETINGS = {
                  ("me", None, "Perfect, we ship on Thursday.")],
     },
 }
+# What the user types while the meeting records, as they would (D59).
+STORE_CONTEXT = {"fr": "Revue des retours clients avec Camille et Hugo : export PDF, calendrier de la 2.4.",
+                 "en": "Customer feedback review with Camille and Hugo: PDF export, the 2.4 schedule."}
+# Each line of the opened meeting spoken for 32 s, every 40 s: its sound covers the six minutes.
+STORE_EVERY, STORE_SPOKEN, STORE_RATE = 40.0, 32.0, 8000
+
+
+def store_audio(folder: Path, said: list, seed: int) -> None:
+    """The opened meeting's two tracks, made here and never kept in the repository: speech-like bursts where its
+    transcript says each side spoke, silence elsewhere — the same every run (`seed`), so two runs draw the same."""
+    random = __import__("random").Random(seed)
+    length = int(STORE_RATE * STORE_EVERY * len(said))
+    for track, who in (("local", "me"), ("remote", "others")):
+        samples = bytearray(2 * length)
+        for index, (speaker, _, _) in enumerate(said):
+            if speaker != who:
+                continue
+            first = int(STORE_RATE * (STORE_EVERY * index + 5))
+            for n in range(int(STORE_RATE * STORE_SPOKEN)):
+                t = n / STORE_RATE
+                # Syllables at about 4 a second, a breath every few seconds, the attack and the end softened.
+                level = (0.55 + 0.45 * math.sin(2 * math.pi * 4.1 * t)) * (0.6 + 0.4 * math.sin(2 * math.pi * 0.23 * t + index))
+                level *= min(1.0, t / 0.3, (STORE_SPOKEN - t) / 0.3)
+                struct.pack_into("<h", samples, 2 * (first + n), int(9000 * level * random.uniform(-1, 1)))
+        with wave.open(str(folder / f"{track}.wav"), "wb") as made:
+            made.setnchannels(1)
+            made.setsampwidth(2)
+            made.setframerate(STORE_RATE)
+            made.writeframes(bytes(samples))
+    record = json.loads((folder / "session.json").read_text())
+    record["tracks"] = {"local": {"device": "Mic"}, "remote": {"device": "Speaker"}}
+    (folder / "session.json").write_text(json.dumps(record))
+    (folder / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n{"track":"remote","sample":0,"at":0.0}\n')
+
+
 # Microsoft's least for a desktop screenshot: « 1366 x 768 pixels or larger », a .png of at most 50 MB (D103).
 STORE_LEAST, STORE_MOST = (1366, 768), 50 * 1024 * 1024
 
@@ -11353,18 +11390,26 @@ def store_shots(now: dt.datetime) -> None:
                  for index in range(len(said["titles"]))]
         for index, (name, title) in enumerate(zip(names, said["titles"])):
             folder = meetings / name
-            session(folder, now - dt.timedelta(days=2 * (len(names) - index), hours=3), 25 + 5 * index, {"local.wav": 1000})
+            last = index == len(names) - 1
+            session(folder, now - dt.timedelta(days=2 * (len(names) - index), hours=3),
+                    STORE_EVERY * len(said["said"]) / 60 if last else 25 + 5 * index, {} if last else {"local.wav": 1000})
             (folder / "minutes.md").write_text(
                 f"---\ncontract: minutes/v2\nmade: {now.isoformat(timespec='seconds')}\nprovider: local\nmodel: qwen3:8b\ncontext: null\n"
                 f"title: {json.dumps(title, ensure_ascii=False)}\n---\n\n" + said["minutes"])
         lines = [{"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0",
                   "language": short, "context": None},
                  *({"type": "segment", "speaker": who, "track": "local" if who == "me" else "remote", "voice": voice,
-                    "start": 40.0 * index + 5, "end": 40.0 * index + 12, "text": text} for index, (who, voice, text) in enumerate(said["said"])),
-                 {"type": "complete", "duration": 1800.0}]
+                    "start": STORE_EVERY * index + 5, "end": STORE_EVERY * index + 5 + STORE_SPOKEN, "text": text}
+                   for index, (who, voice, text) in enumerate(said["said"])),
+                 {"type": "complete", "duration": STORE_EVERY * len(said["said"])}]
         (meetings / names[-1] / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
+        store_audio(meetings / names[-1], said["said"], 103)
         window = Window(meetings, language, 'reminder = false\nafter = "nothing"\n')
-        window.env.update(GTK_THEME="Adwaita")
+        # The recorded meeting is one of now, not the scenarios' fixed one (the recorder stand-in's own folder).
+        recorded_at = now.replace(second=0, microsecond=0)
+        window.env.update(GTK_THEME="Adwaita", KITOKEY_E2E_RECORDED=recorded_at.strftime("%Y-%m-%d_%H-%M"),
+                          KITOKEY_E2E_RECORDED_AT=recorded_at.isoformat(timespec="seconds"),
+                          KITOKEY_E2E_RECORDED_UNTIL=(recorded_at + dt.timedelta(seconds=5)).isoformat(timespec="seconds"))
         with window as browser:
             browser.set_window_size(1920, 1080)
             if not wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 3):
@@ -11372,7 +11417,7 @@ def store_shots(now: dt.datetime) -> None:
                 browser.set_window_size(2 * 1920 - browser.execute_script("return innerWidth"), 1080)
                 wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 5)
             (store / short).mkdir(parents=True, exist_ok=True)
-            pages = (("1-list", "#/", "#sidebar"),
+            pages = (("1-list", f"#/meeting/{names[3]}", "#meeting .minutes .body h2"),
                      ("2-meeting", f"#/meeting/{names[-1]}", "#meeting .transcript .lines li"))
             for shot_name, address, drawn in pages:
                 browser.execute_script("location.hash = arguments[0]", address)
@@ -11388,7 +11433,12 @@ def store_shots(now: dt.datetime) -> None:
             recorded = sorted({f.name for f in meetings.iterdir()} - before)
             if recorded:
                 browser.execute_script("location.hash = arguments[0]", f"#/meeting/{recorded[0]}")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "context-text"), 10)
+                wait_for(browser, lambda b: b.find_elements(By.ID, "context-text")
+                         and b.find_element(By.ID, "context-text").get_attribute("readonly") is None, 10)
+                context_opened(browser).click()
+                ActionChains(browser).send_keys(STORE_CONTEXT[short]).perform()
+                wait_for(browser, lambda b: (meetings / recorded[0] / "context.txt").exists(), 3)
+                browser.execute_script("document.activeElement.blur(); scrollTo(0, 0)")
                 time.sleep(1.5)
                 browser.save_screenshot(str(store / short / "3-recording.png"))
                 time.sleep(0.6)
