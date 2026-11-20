@@ -2,8 +2,9 @@
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
-- **Status**: Proposed — by sam (session wholeheard-sam-13), author of D110, 2026-11-20. The criticality is the
-  decider's word, written here with its day.
+- **Status**: Accepted for its criticality — the decider, 2026-11-20, in their working session with the coordinator:
+  « send en "stabdard" » (standard). Proposed by sam (session wholeheard-sam-13), author of D110, the same day, with
+  `high`; the boundary (decision 1, 2) settled with the coordinator.
 - **Date**: 2026-11-20
 - **Decision makers**: the decider, `@napkinstack-admin`; the boundary settled with the coordinator, 2026-11-20
 - **Scope**: module `send` — its capability, its boundary, its criticality
@@ -26,11 +27,13 @@ contacts nothing »); D108 and D109 go through it.
    `session-audio` and `minutes` by their contracts, as `export` does; it shares no code with it.
 2. **`export` stays `standard`**: a file written on the machine, approved between agents, D108 and D109 not
    waiting on the decider. The risk of the network and of a secret is `send`'s alone.
-3. **Its criticality: `high`** (proposed): its failure costs a person a day — a summary sent where it
-   should not go, or a channel's address leaked — but it holds no key of its own (the shell keeps the
-   address in the keyring; `send` receives it for one send) and it places no order and moves no money,
-   which `critical` names. Below, `standard` would let an agent approve a change to what leaves the
-   machine. Its cost: a runbook, the e2e of the journey, each pull request approved by the decider.
+3. **Its criticality: `standard`**, the decider's word (*Status*). `high` was proposed: its failure costs a
+   person a day — a summary sent where it should not go, or a channel's address leaked —, though it holds no
+   key of its own (the shell keeps the address in the keyring; `send` receives it for one send) and places no
+   order and moves no money, which `critical` names. The guard stays in the code and its tests whatever the
+   criticality: the address judged and pinned, no proxy, no redirect, a confidential meeting refused first,
+   the address in no output (`modules/send/AGENTS.md`). At `standard`, a verifier's approval suffices; the
+   runbook is kept, as a good practice.
 4. **Its one connection: ureq 3**, as `summary`'s, given a resolver of ours (`Judging`) that judges every
    address a name resolves to before ureq connects to one of them — no second resolution —, no proxy, no
    redirect. **The address read by `url`** (WHATWG), so that IDNA and an IPv4 in hex are what is judged.
