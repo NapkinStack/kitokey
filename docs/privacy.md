@@ -1,6 +1,6 @@
 # Kitokey — privacy policy / politique de confidentialité
 
-Last changed / dernière modification: 2026-11-04. Publisher / éditeur: NapkinStack.
+Last changed / dernière modification: 2026-11-20. Publisher / éditeur: NapkinStack.
 [English](#english) · [Français](#français)
 
 ```mermaid
@@ -52,6 +52,9 @@ The host is shown to you and agreed by you before a first sending. What a servic
 it receives is under its own policy: read it before you choose it.
 
 A meeting you say **confidential** is made on this computer alone, even when a service is chosen.
+
+Kitokey sends a meeting to no channel today — no mail, no chat, no shared folder. Copying its
+minutes or its transcript puts them on your clipboard, and they go where you paste them.
 
 There is no telemetry, no analytics, no advertising, and we receive no data about you. Should
 telemetry ever exist, it will be off until you turn it on, and will show what it sends and where.
@@ -115,6 +118,10 @@ reçoit relève de sa propre politique : lisez-la avant de le choisir.
 
 Une réunion dite **confidentielle** est traitée sur cet ordinateur seulement, même si un service est
 choisi.
+
+Kitokey n'envoie aujourd'hui une réunion vers aucun canal — ni courriel, ni messagerie, ni dossier
+partagé. Copier son compte rendu ou sa transcription les met dans votre presse-papiers, et ils vont là
+où vous les collez.
 
 Il n'y a ni télémétrie, ni mesure d'audience, ni publicité, et nous ne recevons aucune donnée sur
 vous. Si une télémétrie existait un jour, elle resterait coupée tant que vous ne l'activez pas, et
