@@ -5834,7 +5834,8 @@ def previous_transcript_back(now: dt.datetime) -> None:
         sizes = sum(path.stat().st_size for path in (current, previous) if path.is_file())
         check("the previous transcript counts in the meeting's text weight (D113)", previous.is_file() and len(text) == 1 and text[0] >= sizes, [text, sizes])
         browser.execute_script("window.__TAURI__.core.invoke('freed', {names: [arguments[0]], whole: true})", meeting.name)
-        trashed = WORK / "data" / "Trash" / "files" / meeting.name
+        # Its trash is under the data folder this scenario names for its models.
+        trashed = data / "Trash" / "files" / meeting.name
         gone = wait_for(None, lambda b_: not meeting.exists(), 10)
         check("the meeting moved to the trash takes its previous transcript with it (D113)",
               gone and (trashed / "transcript-previous.jsonl").is_file(), [meeting.exists(), sorted(p.name for p in trashed.iterdir()) if trashed.exists() else None])
