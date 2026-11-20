@@ -334,10 +334,10 @@ fn the_menu_and_the_shells_own_troubles_are_said_in_both_languages() {
     }
     // Each says what still works, or what to do — not the trouble a second time.
     let body = |trouble, language| words::trouble(&trouble, language).body;
-    assert!(body(Trouble::NoRecorder(String::new()), Language::English).ends_with("Installing Kitokey again puts it back."));
-    assert!(body(Trouble::NoRecorder(String::new()), Language::French).ends_with("Réinstaller Kitokey le remet en place."));
-    assert!(body(Trouble::Settings(Refused::Unopened), Language::English).contains("runs with its defaults"));
-    assert!(body(Trouble::Shortcut(String::new()), Language::French).contains("permet toujours de démarrer"));
+    assert!(body(Trouble::NoRecorder(String::new()), Language::English).ends_with("Reinstall Kitokey to fix it."));
+    assert!(body(Trouble::NoRecorder(String::new()), Language::French).ends_with("Réinstallez Kitokey pour le réparer."));
+    assert!(body(Trouble::Settings(Refused::Unopened), Language::English).contains("using default settings"));
+    assert!(body(Trouble::Shortcut(String::new()), Language::French).contains("pouvez toujours démarrer"));
 }
 
 #[test]
@@ -397,7 +397,7 @@ fn the_model_is_offered_with_its_size_and_host_and_its_fetch_is_said() {
         let kept = if language == Language::French {
             "L’enregistrement est conservé"
         } else {
-            "The recording is kept"
+            "The recording is saved"
         };
         assert!(needed.body.contains(kept), "{}", needed.body);
         assert!(words::downloading(language, 37).contains("37"));
@@ -2020,18 +2020,18 @@ fn a_settings_file_that_cannot_be_read_is_said_whole_its_raw_text_under_it_only_
     let page = |language, developer| serde_json::to_value(words::told(locked, raw, language, developer)).unwrap();
     assert_eq!(
         page(Language::French, false),
-        "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. \
+        "Le fichier de réglages est illisible\u{a0}: Kitokey n’y touchera pas tant qu’il n’est pas corrigé. \
          Ligne 1\u{a0}: «\u{a0}keep_audio\u{a0}» vaut «\u{a0}always\u{a0}» ou un nombre de jours, de 1 à 36\u{202f}500. Corrigez-le."
     );
     assert_eq!(
         page(Language::English, false),
-        "The settings file cannot be read: Kitokey does not write over it until it is corrected. \
+        "The settings file can’t be read. Kitokey won’t change it until it’s fixed. \
          Line 1: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it."
     );
     assert_eq!(
         page(Language::English, true),
         format!(
-            "The settings file cannot be read: Kitokey does not write over it until it is corrected. \
+            "The settings file can’t be read. Kitokey won’t change it until it’s fixed. \
              Line 1: “keep_audio” is “always” or a number of days, from 1 to 36,500. Correct it.\n{raw}"
         )
         .as_str()
@@ -2044,9 +2044,9 @@ fn a_command_that_failed_says_its_sentence_and_the_raw_text_only_in_developer_mo
     let page = |language, developer| serde_json::to_string(&words::told(Failure::MeetingFile, raw, language, developer)).unwrap();
     assert_eq!(
         page(Language::French, false),
-        "\"son dossier n’a pas pu être écrit\u{a0}: vérifiez qu’il reste de la place et que vous pouvez y écrire, puis réessayez.\""
+        "\"impossible d’écrire dans son dossier. Vérifiez l’espace disque et vos droits sur ce dossier, puis réessayez.\""
     );
-    assert!(page(Language::English, false).starts_with("\"its folder could not be written to"));
+    assert!(page(Language::English, false).starts_with("\"can’t write to its folder"));
     assert!(!page(Language::English, false).contains(raw));
     assert!(
         page(Language::French, true).ends_with("réessayez.\\nos error 28\""),
@@ -2372,7 +2372,7 @@ fn a_settings_file_refused_says_which_setting_and_what_to_do_in_both_languages()
             let Notice { title, body } = words::trouble(&Trouble::Settings(refused), language);
             assert!(title.chars().count() <= 50 && body.ends_with(sentence), "{title} — {body}");
             assert!(
-                body.starts_with(["Kitokey runs with its defaults", "Kitokey fonctionne avec ses réglages par défaut"][language as usize]),
+                body.starts_with(["Kitokey is using default settings", "Kitokey utilise les réglages par défaut"][language as usize]),
                 "{body}"
             );
             // Under a command the window refused: its sentence, the refusal after it, the raw text
