@@ -30,7 +30,7 @@ Delivers the files of a session to where the user wants them.
 - A transcript's text is written as said: every ASCII punctuation escaped, so that no reader
   takes it for markup and a `|` stays in its cell.
 - A model's raw HTML in the summary is said as text in a page or a document, never run; its links and images
-  are said as their words, never followed nor fetched (`tests/html.rs`, `tests/docx.rs`).
+  are said as their words, never followed nor fetched (`tests/html.rs`, `tests/docx.rs`, `tests/pdf.rs`).
 - `kitokey-export` (`src/main.rs`) speaks `exporting/v1`: its arguments hold no word of the meeting —
   the session's folder and the choices of form —; where to write and the file's words come on its
   input, a process's arguments being public to the machine's users (`tests/program.rs`).
@@ -40,6 +40,10 @@ Delivers the files of a session to where the user wants them.
   argument or input: exit 2 and one sentence, no line (`WRITTEN` in `src/main.rs`; pandoc and typst
   alike). A cause of the contract is its `failed` line and exit 1. Each format joins `WRITTEN` with its
   writer; the shell offers only those listed.
+- Every word reaches typst as a string literal, never as markup (`pdf::literal`): a transcript saying
+  `$`, `#` or `]` is written as said (`tests/pdf.rs`).
+- `pdf()` reads no font: the caller gives them, in the order it prefers them. The tests give their own,
+  static subsets in `tests/fonts/`.
 
 ## Known traps
 
