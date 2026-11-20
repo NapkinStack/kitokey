@@ -2940,34 +2940,34 @@ pub fn cause_own(cause: Cause, language: Language) -> Option<&'static str> {
     use Language::{English, French};
     Some(match (cause, language) {
         (Cause::TooSlow, English) => {
-            "{}, chosen for this meeting, did not answer in time: try again later, or choose a faster model in Redo…\u{a0}› Advanced."
+            "{}, chosen for this meeting, took too long to respond. Try again later or choose a faster model in Redo…\u{a0}› Advanced."
         }
         (Cause::TooSlow, French) => {
-            "{}, choisi pour cette réunion, n’a pas répondu à temps\u{a0}: réessayez plus tard, ou choisissez un modèle plus rapide dans Refaire…\u{a0}› Avancé."
+            "{}, choisi pour cette réunion, n’a pas répondu à temps. Réessayez plus tard ou choisissez un modèle plus rapide dans Refaire…\u{a0}› Avancé."
         }
         (Cause::UnknownModel, English) => {
-            "The provider does not know {}, chosen for this meeting: choose another in Redo…\u{a0}› Advanced."
+            "The service doesn’t recognize {}, chosen for this meeting. Choose another in Redo…\u{a0}› Advanced."
         }
         (Cause::UnknownModel, French) => {
-            "Le fournisseur ne connaît pas {}, choisi pour cette réunion\u{a0}: choisissez-en un autre dans Refaire…\u{a0}› Avancé."
+            "Le service ne reconnaît pas {}, choisi pour cette réunion. Choisissez-en un autre dans Refaire…\u{a0}› Avancé."
         }
         (Cause::Down, English) => {
-            "The provider answers that it is failing: try again later. On this computer, {}, chosen for this meeting, may be too large for the memory: choose a smaller one in Redo…\u{a0}› Advanced."
+            "The service is having problems. Try again later. If {} runs on this computer, it may be too large for its memory — choose a smaller one in Redo…\u{a0}› Advanced."
         }
         (Cause::Down, French) => {
-            "Le fournisseur répond qu’il est en panne\u{a0}: réessayez plus tard. Sur cet ordinateur, {}, choisi pour cette réunion, est peut-être trop gros pour la mémoire\u{a0}: choisissez-en un plus petit dans Refaire…\u{a0}› Avancé."
+            "Le service rencontre un problème. Réessayez plus tard. Si {} tourne sur cet ordinateur, il est peut-être trop gros pour sa mémoire\u{a0}: choisissez-en un plus petit dans Refaire…\u{a0}› Avancé."
         }
         (Cause::CutShort, English) => {
-            "{}, chosen for this meeting, stopped before the end: choose one that writes longer answers in Redo…\u{a0}› Advanced."
+            "{}, chosen for this meeting, stopped before finishing. Choose a model that handles longer answers in Redo…\u{a0}› Advanced."
         }
         (Cause::CutShort, French) => {
-            "{}, choisi pour cette réunion, s’est arrêté avant la fin\u{a0}: choisissez-en un qui écrit plus long dans Refaire…\u{a0}› Avancé."
+            "{}, choisi pour cette réunion, s’est arrêté avant la fin. Choisissez un modèle capable de réponses plus longues dans Refaire…\u{a0}› Avancé."
         }
         (Cause::NotMinutes, English) => {
-            "{}, chosen for this meeting, did not write minutes: try again, or choose another model in Redo…\u{a0}› Advanced."
+            "{}, chosen for this meeting, didn’t produce a summary. Try again or choose another model in Redo…\u{a0}› Advanced."
         }
         (Cause::NotMinutes, French) => {
-            "{}, choisi pour cette réunion, n’a pas écrit de compte rendu\u{a0}: réessayez, ou choisissez un autre modèle dans Refaire…\u{a0}› Avancé."
+            "{}, choisi pour cette réunion, n’a pas produit de compte rendu. Réessayez ou choisissez un autre modèle dans Refaire…\u{a0}› Avancé."
         }
         _ => return None,
     })
@@ -2979,65 +2979,55 @@ pub fn cause(cause: Cause, language: Language) -> &'static str {
     // When: kitokey-summary names its cause. At most: no limit. Placeholders: none.
     use Language::{English, French};
     match (cause, language) {
-        (Cause::Unreachable, English) => "The provider could not be reached: check that it runs, or the network, then try again.",
-        (Cause::Unreachable, French) => "Le fournisseur n’a pas pu être joint\u{a0}: vérifiez qu’il tourne, ou le réseau, puis réessayez.",
-        (Cause::TooSlow, English) => {
-            "The provider did not answer in time: try again later, or choose a faster model in Kitokey’s settings."
+        (Cause::Unreachable, English) => {
+            "Can’t reach the service. Check your connection — or that it’s running, if it’s on this computer — then try again."
         }
+        (Cause::Unreachable, French) => {
+            "Impossible de joindre le service. Vérifiez votre connexion, ou qu’il est bien lancé s’il tourne sur cet ordinateur, puis réessayez."
+        }
+        (Cause::TooSlow, English) => "The service took too long to respond. Try again later or choose a faster model in Settings.",
         (Cause::TooSlow, French) => {
-            "Le fournisseur n’a pas répondu à temps\u{a0}: réessayez plus tard, ou choisissez un modèle plus rapide dans les réglages de Kitokey."
+            "Le service n’a pas répondu à temps. Réessayez plus tard ou choisissez un modèle plus rapide dans les Réglages."
         }
-        (Cause::RefusedKey, English) => "The provider refused the key: give it again in Kitokey’s settings.",
-        (Cause::RefusedKey, French) => "Le fournisseur a refusé la clé\u{a0}: saisissez-la de nouveau dans les réglages de Kitokey.",
-        (Cause::NoCredit, English) => "The provider refused for lack of credit: add credit with it, then try again.",
-        (Cause::NoCredit, French) => "Le fournisseur a refusé faute de crédit\u{a0}: ajoutez du crédit chez lui, puis réessayez.",
-        (Cause::UnknownModel, English) => "The provider does not know this model or this address: choose them again in Kitokey’s settings.",
-        (Cause::UnknownModel, French) => {
-            "Le fournisseur ne connaît pas ce modèle ou cette adresse\u{a0}: choisissez-les de nouveau dans les réglages de Kitokey."
-        }
-        (Cause::TooMany, English) => "The provider refuses for too many requests, or a quota used up: wait, or check your plan with it.",
+        (Cause::RefusedKey, English) => "The service rejected the API key. Enter it again in Settings.",
+        (Cause::RefusedKey, French) => "Le service a refusé la clé d’API. Saisissez-la à nouveau dans les Réglages.",
+        (Cause::NoCredit, English) => "Not enough credit with the service. Top up your account, then try again.",
+        (Cause::NoCredit, French) => "Crédit insuffisant chez le service. Rechargez votre compte, puis réessayez.",
+        (Cause::UnknownModel, English) => "The service doesn’t recognize this model or address. Check them in Settings.",
+        (Cause::UnknownModel, French) => "Le service ne reconnaît pas ce modèle ou cette adresse. Vérifiez-les dans les Réglages.",
+        (Cause::TooMany, English) => "The service is limiting requests, or your quota is used up. Wait, or check your plan.",
         (Cause::TooMany, French) => {
-            "Le fournisseur refuse pour trop de demandes, ou un quota épuisé\u{a0}: patientez, ou vérifiez votre forfait chez lui."
+            "Le service limite le nombre de demandes, ou votre quota est atteint. Patientez, ou vérifiez votre abonnement."
         }
         (Cause::Down, English) => {
-            "The provider answers that it is failing: try again later. On this computer, this model may be too large for the memory: choose a smaller one."
+            "The service is having problems. Try again later. If the model runs on this computer, it may be too large for its memory — choose a smaller one."
         }
         (Cause::Down, French) => {
-            "Le fournisseur répond qu’il est en panne\u{a0}: réessayez plus tard. Sur cet ordinateur, ce modèle est peut-être trop gros pour la mémoire\u{a0}: choisissez-en un plus petit."
+            "Le service rencontre un problème. Réessayez plus tard. Si le modèle tourne sur cet ordinateur, il est peut-être trop gros pour sa mémoire\u{a0}: choisissez-en un plus petit."
         }
-        (Cause::NoTimes, English) => {
-            "This model gives no times for what it hears: choose one that gives each segment’s times in Kitokey’s settings."
-        }
-        (Cause::NoTimes, French) => {
-            "Ce modèle ne donne pas les temps de ce qu’il entend\u{a0}: choisissez-en un qui donne ceux de chaque segment dans les réglages de Kitokey."
-        }
-        (Cause::Redirected, English) => "The provider sends the request to another address: check the address in Kitokey’s settings.",
-        (Cause::Redirected, French) => {
-            "Le fournisseur renvoie la demande vers une autre adresse\u{a0}: vérifiez l’adresse dans les réglages de Kitokey."
-        }
-        (Cause::ProviderFailed, English) => "The provider failed to answer: try again later.",
-        (Cause::ProviderFailed, French) => "Le fournisseur n’a pas su répondre\u{a0}: réessayez plus tard.",
-        (Cause::CutShort, English) => "The model stopped before the end: choose one that writes longer answers in Kitokey’s settings.",
+        (Cause::NoTimes, English) => "This model doesn’t provide timestamps. Choose one that does in Settings.",
+        (Cause::NoTimes, French) => "Ce modèle ne fournit pas d’horodatage. Choisissez-en un qui en fournit dans les Réglages.",
+        (Cause::Redirected, English) => "The service redirects to another address. Check the address in Settings.",
+        (Cause::Redirected, French) => "Le service redirige vers une autre adresse. Vérifiez l’adresse dans les Réglages.",
+        (Cause::ProviderFailed, English) => "The service couldn’t respond. Try again later.",
+        (Cause::ProviderFailed, French) => "Le service n’a pas pu répondre. Réessayez plus tard.",
+        (Cause::CutShort, English) => "The model stopped before finishing. Choose a model that handles longer answers in Settings.",
         (Cause::CutShort, French) => {
-            "Le modèle s’est arrêté avant la fin\u{a0}: choisissez-en un qui écrit plus long dans les réglages de Kitokey."
+            "Le modèle s’est arrêté avant la fin. Choisissez un modèle capable de réponses plus longues dans les Réglages."
         }
-        (Cause::NotMinutes, English) => "The model did not write minutes: try again, or choose another model in Kitokey’s settings.",
+        (Cause::NotMinutes, English) => "The model didn’t produce a summary. Try again or choose another model in Settings.",
         (Cause::NotMinutes, French) => {
-            "Le modèle n’a pas écrit de compte rendu\u{a0}: réessayez, ou choisissez un autre modèle dans les réglages de Kitokey."
+            "Le modèle n’a pas produit de compte rendu. Réessayez ou choisissez un autre modèle dans les Réglages."
         }
-        (Cause::TranscriptUnusable, English) => "The transcript cannot be read: make it again first.",
-        (Cause::TranscriptUnusable, French) => "La transcription ne peut pas être lue\u{a0}: refaites-la d’abord.",
-        (Cause::NoSpeech, English) => "The transcript holds no speech: there is nothing to write minutes of. Check the recording.",
-        (Cause::NoSpeech, French) => {
-            "La transcription ne contient aucune parole\u{a0}: il n’y a rien à résumer. Vérifiez l’enregistrement."
-        }
-        (Cause::Settings, English) => "The provider’s address, model or key cannot be used as given: correct them in Kitokey’s settings.",
-        (Cause::Settings, French) => {
-            "L’adresse, le modèle ou la clé du fournisseur ne peuvent pas être utilisés tels quels\u{a0}: corrigez-les dans les réglages de Kitokey."
-        }
-        (Cause::Unwritable, English) => "The minutes could not be written in the meeting’s folder: free space, or check the folder.",
+        (Cause::TranscriptUnusable, English) => "The transcript can’t be read. Redo it first.",
+        (Cause::TranscriptUnusable, French) => "La transcription est illisible. Refaites-la d’abord.",
+        (Cause::NoSpeech, English) => "No speech in the transcript, so nothing to summarize. Check the recording.",
+        (Cause::NoSpeech, French) => "Aucune parole dans la transcription\u{a0}: rien à résumer. Vérifiez l’enregistrement.",
+        (Cause::Settings, English) => "The service’s address, model or key isn’t valid. Fix them in Settings.",
+        (Cause::Settings, French) => "L’adresse, le modèle ou la clé du service ne sont pas valides. Corrigez-les dans les Réglages.",
+        (Cause::Unwritable, English) => "Couldn’t save the summary in the meeting’s folder. Free up space or check the folder.",
         (Cause::Unwritable, French) => {
-            "Le compte rendu n’a pas pu être écrit dans le dossier de la réunion\u{a0}: libérez de la place, ou vérifiez le dossier."
+            "Impossible d’enregistrer le compte rendu dans le dossier de la réunion. Libérez de l’espace ou vérifiez le dossier."
         }
     }
 }
