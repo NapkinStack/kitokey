@@ -21,7 +21,15 @@ fn run(args: &[&str], input: &str) -> Ran {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child.stdin.take().unwrap().write_all(input.as_bytes()).ok();
+    // A program that refuses its arguments ends before reading its input: a pipe closed under the write is
+    // that end, judged by its exit and its sentence (as export's, #1068); any other error fails the test.
+    if let Err(error) = child.stdin.take().unwrap().write_all(input.as_bytes()) {
+        assert_eq!(
+            error.kind(),
+            std::io::ErrorKind::BrokenPipe,
+            "the input could not be written: {error}"
+        );
+    }
     let out = child.wait_with_output().unwrap();
     let ran = Ran {
         code: out.status.code(),
