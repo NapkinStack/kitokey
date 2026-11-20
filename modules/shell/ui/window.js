@@ -1930,6 +1930,12 @@ function tookAndCost(read, words) {
   return said;
 }
 
+// Who said a line, as the page names them: the track, and the voice within it when one was told.
+function whoSaid(segment, words) {
+  const side = segment.track === "local" ? words.here : words.remote;
+  return segment.voice === null ? side : `${side} · ${fill(words.voice, segment.voice)}`;
+}
+
 function transcriptCard(read, words, session, onPage) {
   const card = element("aside", "card transcript");
   card.setAttribute("aria-label", words.transcript_title);
@@ -1971,7 +1977,25 @@ function transcriptCard(read, words, session, onPage) {
     redo.replaceWith(panel);
     panel.querySelector("button:enabled").focus();
   });
-  top.append(finding, redo);
+  // Copied in one click, each line with when and who said it, as the page names them (D109); said in
+  // place, a moment, as the minutes' copy is.
+  const copy = iconButton("copy", words.copy_transcript, "copy-transcript");
+  const copied = element("span", "says copied");
+  copied.id = "transcript-copied";
+  copied.setAttribute("role", "status");
+  let said = 0;
+  copy.addEventListener("click", async () => {
+    const mine = ++said;
+    const lines = read.segments.map((segment) => fill(words.transcript_copied_line, clock(segment.start), whoSaid(segment, words), segment.text));
+    try {
+      await navigator.clipboard.writeText(`${lines.join("\n")}\n`);
+      copied.textContent = words.minutes_copied;
+      setTimeout(() => mine === said && (copied.textContent = ""), 2000);
+    } catch {
+      copied.textContent = words.transcript_not_copied;
+    }
+  });
+  top.append(finding, copied, copy, redo);
   const heard = element("div", "made");
   // A service names its host as who heard (D43): said as the minutes' maker is, never « on this
   // computer » — a host of one word (`http://transcriber/v1`) is a service too. This computer's
@@ -2042,8 +2066,7 @@ function transcriptCard(read, words, session, onPage) {
         if (!event.repeat) from();
       });
     }
-    const side = segment.track === "local" ? words.here : words.remote;
-    const who = segment.voice === null ? side : `${side} · ${fill(words.voice, segment.voice)}`;
+    const who = whoSaid(segment, words);
     const said = element("div", "said");
     const text = element("span", "text", segment.text);
     said.append(element("span", `who ${segment.track}`, who), text);
