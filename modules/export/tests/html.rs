@@ -172,3 +172,39 @@ fn what_is_included_is_the_callers_choice_and_a_meeting_without_a_title_takes_th
     let all = elements(&page(Some(MINUTES), none));
     assert!(!all.iter().any(|e| e.name == "table"), "no transcript asked, a table written");
 }
+
+#[test]
+fn a_models_links_and_images_are_said_as_their_words_never_followed_nor_fetched() {
+    // lina, verifying #1021: a `javascript:` link runs at a click and could send the meeting the page
+    // shows; a remote image is fetched as the file opens. The shell already says both as their words.
+    let minutes = MINUTES.replace(
+        "Le prix est **fixé**.",
+        "Le prix est **fixé**. [voir](javascript:alert(1)) ![pixel](http://tracker.example/p.png) <https://a.example>",
+    );
+    let page = page(Some(&minutes), Include::all());
+    let all = elements(&page);
+    assert!(
+        !all.iter().any(|e| e.name == "a" || e.name == "img"),
+        "a link or an image written:\n{page}"
+    );
+    assert!(
+        !page.contains("javascript:") && !page.contains("tracker.example"),
+        "a target kept:\n{page}"
+    );
+    let said: String = all.iter().filter(|e| e.name == "p").map(|e| e.text.as_str()).collect();
+    assert!(
+        said.contains("voir") && said.contains("pixel") && said.contains("https://a.example"),
+        "their words lost: {said}"
+    );
+}
+
+#[test]
+fn a_heading_inside_a_section_stays_under_the_sections_own() {
+    // The page's outline: h1 the meeting, h2 each section; a model's `#` comes below them. A `## ` line
+    // opens a section, as `minutes` says; a `###` stays where it is.
+    let minutes = MINUTES.replace("- 49 €\n", "- 49 €\n\n# Annexe\n\n### Détail\n\ntexte\n");
+    let all = elements(&page(Some(&minutes), Include::all()));
+    assert_eq!(texts(&all, "h1"), ["Prix & essai"]);
+    assert_eq!(texts(&all, "h2"), ["Points forts", "Actions", "Points clés", "Transcription"]);
+    assert_eq!(texts(&all, "h3"), ["Annexe", "Détail"]);
+}

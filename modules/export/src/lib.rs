@@ -276,10 +276,21 @@ pub fn html(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, na
     if include.summary {
         for section in &meeting.sections {
             out += &format!("<h2>{}</h2>\n", text(&section.title));
-            // A model's raw HTML is said as text, never run.
-            let events = pulldown_cmark::Parser::new(&section.body).map(|event| match event {
-                pulldown_cmark::Event::Html(raw) | pulldown_cmark::Event::InlineHtml(raw) => pulldown_cmark::Event::Text(raw),
-                event => event,
+            use pulldown_cmark::{Event, HeadingLevel, Tag, TagEnd};
+            // A model's raw HTML is said as text, never run; its links and images are said as their
+            // words, never followed nor fetched — as the shell says them; its headings come under
+            // the section's own h2, so that the page keeps its outline.
+            let events = pulldown_cmark::Parser::new(&section.body).filter_map(|event| match event {
+                Event::Html(raw) | Event::InlineHtml(raw) => Some(Event::Text(raw)),
+                Event::Start(Tag::Link { .. } | Tag::Image { .. }) | Event::End(TagEnd::Link | TagEnd::Image) => None,
+                Event::Start(Tag::Heading { level, id, classes, attrs }) => Some(Event::Start(Tag::Heading {
+                    level: level.max(HeadingLevel::H3),
+                    id,
+                    classes,
+                    attrs,
+                })),
+                Event::End(TagEnd::Heading(level)) => Some(Event::End(TagEnd::Heading(level.max(HeadingLevel::H3)))),
+                event => Some(event),
             });
             pulldown_cmark::html::push_html(&mut out, events);
         }
