@@ -1,4 +1,4 @@
-"""sending/v1's security promises (D110, PDR-0007), held on its page: the address ranges it refuses,
+"""posting/v1's security promises (D110, PDR-0007), held on its page: the address ranges it refuses,
 no redirect and no proxy followed, the address never in a sentence or a log, Discord's mentions off.
 A promise taken out of the page, or a range removed, fails here."""
 
@@ -6,7 +6,7 @@ import ipaddress
 import re
 from pathlib import Path
 
-PAGE = (Path(__file__).parent.parent / "sending/v1/README.md").read_text()
+PAGE = (Path(__file__).parent.parent / "posting/v1/README.md").read_text()
 
 # Refused outright: this computer, a local network, and what no channel's webhook is.
 REFUSED = {

@@ -1,4 +1,4 @@
-# sending — version 1
+# posting — version 1
 
 How the program that sends a meeting's summary to a channel is started, what it is given, what it
 sends, and what it says: one line of text per event, for whoever started it. D110's program,

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "A line of the sending program's output",
-  "description": "sending/v1 — one JSON object a line. What a schema cannot say is on the contract's page: `sent`, `checked` or `failed` is the last line, and the only one.",
+  "title": "A line of the posting program's output",
+  "description": "posting/v1 — one JSON object a line. What a schema cannot say is on the contract's page: `sent`, `checked` or `failed` is the last line, and the only one.",
   "oneOf": [
     {
       "type": "object",
