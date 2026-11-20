@@ -263,3 +263,77 @@ fn escaped(text: &str) -> String {
     }
     out
 }
+
+/// The meeting as an HTML page: `lang` set, `name` its title when the summary gives none, real
+/// headings, the summary's Markdown rendered, the transcript a table its columns headed. Written well
+/// formed — every element closed, every attribute quoted —, so that an XML reader reads it too.
+pub fn html(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, name: &str) -> String {
+    let title = text(meeting.title.as_deref().unwrap_or(name));
+    let mut out = format!(
+        "<!DOCTYPE html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\" />\n<title>{title}</title>\n</head>\n<body>\n<h1>{title}</h1>\n",
+        text(lang)
+    );
+    if include.summary {
+        for section in &meeting.sections {
+            out += &format!("<h2>{}</h2>\n", text(&section.title));
+            use pulldown_cmark::{Event, HeadingLevel, Tag, TagEnd};
+            // A model's raw HTML is said as text, never run; its links and images are said as their
+            // words, never followed nor fetched — as the shell says them; its headings come under
+            // the section's own h2, so that the page keeps its outline.
+            let events = pulldown_cmark::Parser::new(&section.body).filter_map(|event| match event {
+                Event::Html(raw) | Event::InlineHtml(raw) => Some(Event::Text(raw)),
+                Event::Start(Tag::Link { .. } | Tag::Image { .. }) | Event::End(TagEnd::Link | TagEnd::Image) => None,
+                Event::Start(Tag::Heading { level, id, classes, attrs }) => Some(Event::Start(Tag::Heading {
+                    level: level.max(HeadingLevel::H3),
+                    id,
+                    classes,
+                    attrs,
+                })),
+                Event::End(TagEnd::Heading(level)) => Some(Event::End(TagEnd::Heading(level.max(HeadingLevel::H3)))),
+                event => Some(event),
+            });
+            pulldown_cmark::html::push_html(&mut out, events);
+        }
+    }
+    if include.transcript && !meeting.segments.is_empty() {
+        out += &format!("<h2>{}</h2>\n<table>\n<thead>\n<tr>", text(&labels.transcript));
+        let mut head = vec![];
+        if include.times {
+            head.push(&labels.time);
+        }
+        if include.speakers {
+            head.push(&labels.speaker);
+        }
+        head.push(&labels.text);
+        for column in head {
+            out += &format!("<th scope=\"col\">{}</th>", text(column));
+        }
+        out += "</tr>\n</thead>\n<tbody>\n";
+        for segment in &meeting.segments {
+            out += "<tr>";
+            if include.times {
+                out += &format!("<td>{}</td>", time(segment.start));
+            }
+            if include.speakers {
+                let who = match segment.speaker {
+                    Speaker::Me => &labels.me,
+                    Speaker::Others => &labels.others,
+                };
+                out += &format!("<td>{}</td>", text(who));
+            }
+            out += &format!("<td>{}</td></tr>\n", text(&segment.text));
+        }
+        out += "</tbody>\n</table>\n";
+    }
+    out += "</body>\n</html>\n";
+    out
+}
+
+/// Text in HTML, as said: the five characters that could be markup written as entities.
+fn text(said: &str) -> String {
+    said.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
