@@ -263,3 +263,66 @@ fn escaped(text: &str) -> String {
     }
     out
 }
+
+/// The meeting as an HTML page: `lang` set, `name` its title when the summary gives none, real
+/// headings, the summary's Markdown rendered, the transcript a table its columns headed. Written well
+/// formed — every element closed, every attribute quoted —, so that an XML reader reads it too.
+pub fn html(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, name: &str) -> String {
+    let title = text(meeting.title.as_deref().unwrap_or(name));
+    let mut out = format!(
+        "<!DOCTYPE html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\" />\n<title>{title}</title>\n</head>\n<body>\n<h1>{title}</h1>\n",
+        text(lang)
+    );
+    if include.summary {
+        for section in &meeting.sections {
+            out += &format!("<h2>{}</h2>\n", text(&section.title));
+            // A model's raw HTML is said as text, never run.
+            let events = pulldown_cmark::Parser::new(&section.body).map(|event| match event {
+                pulldown_cmark::Event::Html(raw) | pulldown_cmark::Event::InlineHtml(raw) => pulldown_cmark::Event::Text(raw),
+                event => event,
+            });
+            pulldown_cmark::html::push_html(&mut out, events);
+        }
+    }
+    if include.transcript && !meeting.segments.is_empty() {
+        out += &format!("<h2>{}</h2>\n<table>\n<thead>\n<tr>", text(&labels.transcript));
+        let mut head = vec![];
+        if include.times {
+            head.push(&labels.time);
+        }
+        if include.speakers {
+            head.push(&labels.speaker);
+        }
+        head.push(&labels.text);
+        for column in head {
+            out += &format!("<th scope=\"col\">{}</th>", text(column));
+        }
+        out += "</tr>\n</thead>\n<tbody>\n";
+        for segment in &meeting.segments {
+            out += "<tr>";
+            if include.times {
+                out += &format!("<td>{}</td>", time(segment.start));
+            }
+            if include.speakers {
+                let who = match segment.speaker {
+                    Speaker::Me => &labels.me,
+                    Speaker::Others => &labels.others,
+                };
+                out += &format!("<td>{}</td>", text(who));
+            }
+            out += &format!("<td>{}</td></tr>\n", text(&segment.text));
+        }
+        out += "</tbody>\n</table>\n";
+    }
+    out += "</body>\n</html>\n";
+    out
+}
+
+/// Text in HTML, as said: the five characters that could be markup written as entities.
+fn text(said: &str) -> String {
+    said.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}

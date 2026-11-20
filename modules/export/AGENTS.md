@@ -29,6 +29,7 @@ Delivers the files of a session to where the user wants them.
   sections add to it and break nothing (`tests/markdown.rs`).
 - A transcript's text is written as said: every ASCII punctuation escaped, so that no reader
   takes it for markup and a `|` stays in its cell.
+- A model's raw HTML in the summary is said as text in a page, never run (`tests/html.rs`).
 
 ## Known traps
 
