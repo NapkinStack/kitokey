@@ -113,3 +113,12 @@ fn a_name_answering_one_local_address_among_public_ones_is_refused_whole() {
     assert!(!admitted(&[public, here], strict));
     assert!(!admitted(&[here, public], strict));
 }
+
+#[test]
+fn the_programs_policy_is_https_alone_within_30_seconds_and_no_local_address() {
+    use kitokey_send::Policy;
+    let strict = Policy::strict();
+    assert!(strict.https_only);
+    assert_eq!(strict.bound, std::time::Duration::from_secs(30));
+    assert!(!(strict.reachable)(ip("10.0.0.1")) && (strict.reachable)(ip("1.1.1.1")));
+}
