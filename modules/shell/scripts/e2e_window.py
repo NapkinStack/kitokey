@@ -635,13 +635,17 @@ class Window:
             except ReadTimeoutError:
                 self.driver_process.terminate()
                 self.driver_process.wait(timeout=10)
-                raise RuntimeError(f"tauri-driver opened no session in a minute; Kitokey's processes: {instances()},"
-                                   f" its single-instance name held: {single_instance_held()}") from None
+                failed = (f"tauri-driver opened no session in a minute; Kitokey's processes: {instances()},"
+                          f" its single-instance name held: {single_instance_held()}")
+                # The Kitokey this start launched ended with it: never left to hold the next start (#991).
+                self.end_kitokey()
+                raise RuntimeError(failed) from None
             except (WebDriverException, HTTPError):
                 time.sleep(0.2)
         else:
             self.driver_process.terminate()
             self.driver_process.wait(timeout=10)
+            self.end_kitokey()
             raise SystemExit("tauri-driver did not answer")
         # Whichever window opened: the small one at rest, or the full one's sections named.
         wait_for(self.browser, lambda b: b.find_elements(By.ID, "small-record") or b.execute_script("return (document.getElementById('settings-link').getAttribute('aria-label') || '') !== ''"))
@@ -653,36 +657,40 @@ class Window:
         finally:
             self.driver_process.terminate()
             self.driver_process.wait(timeout=10)
-            # A session that never answered leaves the Kitokey under test behind: ended, or it takes
-            # the next start's arguments and the next session never opens (#510). Only this binary's.
-            for pid in instances():
+            self.end_kitokey()
+
+    def end_kitokey(self) -> None:
+        """A session that never answered leaves the Kitokey under test behind: ended, or it takes the next
+        start's arguments and the next session never opens (#510). Only this binary's. On leaving a
+        window, and on a start whose session never opened, which never reaches `__exit__` (#991)."""
+        for pid in instances():
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        # Gone within a bound, its single-instance name released (#960): a Kitokey that does not end
+        # on SIGTERM holds that name, and every later start of the shard hands over to it and raises
+        # « no session in a minute ». Still there: said, by the scenario that left it, then killed.
+        asked = time.monotonic()
+        until = asked + 10
+        while (instances() or single_instance_held()) and time.monotonic() < until:
+            time.sleep(0.2)
+        left = instances()
+        # A slow end said, ended or not: what #961 and the stability measure read.
+        if time.monotonic() - asked > 1:
+            print(f"    (Kitokey's end after SIGTERM: {time.monotonic() - asked:.1f} s)")
+        if left or single_instance_held():
+            check(f"{PLAYING or 'a window outside a scenario'} left Kitokey {left} running 10 s after SIGTERM:"
+                  " ended by SIGKILL (#960)", False, {"processes": left, "single-instance name held": single_instance_held()})
+            for pid in left:
                 try:
-                    os.kill(pid, signal.SIGTERM)
+                    os.kill(pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
-            # Gone within a bound, its single-instance name released (#960): a Kitokey that does not end
-            # on SIGTERM holds that name, and every later start of the shard hands over to it and raises
-            # « no session in a minute ». Still there: said, by the scenario that left it, then killed.
-            asked = time.monotonic()
-            until = asked + 10
+            # Gone before the next start: a process killed holds its name until it has ended.
+            until = time.monotonic() + 5
             while (instances() or single_instance_held()) and time.monotonic() < until:
-                time.sleep(0.2)
-            left = instances()
-            # A slow end said, ended or not: what #961 and the stability measure read.
-            if time.monotonic() - asked > 1:
-                print(f"    (Kitokey's end after SIGTERM: {time.monotonic() - asked:.1f} s)")
-            if left or single_instance_held():
-                check(f"{PLAYING or 'a window outside a scenario'} left Kitokey {left} running 10 s after SIGTERM:"
-                      " ended by SIGKILL (#960)", False, {"processes": left, "single-instance name held": single_instance_held()})
-                for pid in left:
-                    try:
-                        os.kill(pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                # Gone before the next start: a process killed holds its name until it has ended.
-                until = time.monotonic() + 5
-                while (instances() or single_instance_held()) and time.monotonic() < until:
-                    time.sleep(0.1)
+                time.sleep(0.1)
 
 
 def asking_less_motion(window: Window) -> Window:
