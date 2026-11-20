@@ -193,7 +193,7 @@ fn a_transcript_left_unfinished_is_not_told_to_wait_it_will_not_finish_on_its_ow
     assert_eq!(Closed::Unfinished.failure(), Failure::NotComplete);
     assert_eq!(
         words::failure(Closed::Unfinished.failure(), Language::French),
-        "sa transcription n’est pas complète\u{a0}: refaites-la d’abord."
+        "sa transcription est incomplète. Refaites-la d’abord."
     );
 }
 
