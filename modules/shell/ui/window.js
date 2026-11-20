@@ -1725,7 +1725,9 @@ function minutesCard(read, words, session, transcript, onPage) {
     redo.replaceWith(panel);
     panel.querySelector("button:enabled").focus();
   });
-  // Copied in one click, as written, to paste where the user writes (D45): said in place, a moment.
+  // Copied in one click, as written, to paste where the user writes (D45): said in place, a moment. As
+  // rich text and as Markdown together, so that a document or a chat keeps its headings and lists, and
+  // a plain field takes the Markdown (D109). Without ClipboardItem, the Markdown alone, as before.
   const copy = iconButton("copy", words.copy_minutes, "copy-minutes");
   const copied = element("span", "says copied");
   copied.id = "minutes-copied";
@@ -1734,7 +1736,14 @@ function minutesCard(read, words, session, transcript, onPage) {
   copy.addEventListener("click", async () => {
     const mine = ++said;
     try {
-      await navigator.clipboard.writeText(read.markdown);
+      if (typeof ClipboardItem === "function" && navigator.clipboard.write) {
+        await navigator.clipboard.write([new ClipboardItem({
+          "text/html": new Blob([read.body], { type: "text/html" }),
+          "text/plain": new Blob([read.markdown], { type: "text/plain" }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(read.markdown);
+      }
       copied.textContent = words.minutes_copied;
       setTimeout(() => mine === said && (copied.textContent = ""), 2000);
     } catch {
