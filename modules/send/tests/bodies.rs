@@ -4,7 +4,7 @@
 use std::fs;
 use std::path::Path;
 
-use kitokey_send::{DISCORD_CONTENT, Kind, Meeting, SLACK_TEXT, Unsent, body, mrkdwn};
+use kitokey_send::{DISCORD_CONTENT, DISCORD_FILE, Kind, Meeting, SLACK_TEXT, Unsent, body, mrkdwn};
 use serde_json::Value;
 
 const V4: &str = "---\ncontract: minutes/v4\nmade: 2026-11-20T10:00:00+01:00\nprovider: local\nmodel: m\n\
@@ -134,4 +134,14 @@ fn slack_receives_mrkdwn_its_mentions_escaped_within_40000_characters_or_nothing
     );
     let long = format!("---\ncontract: minutes/v4\n---\n\n## A\n\n{}\n", "x".repeat(SLACK_TEXT));
     assert_eq!(body(Kind::Slack, &read(&[("minutes.md", &long)]).unwrap(), "T", "f"), None);
+}
+
+#[test]
+fn a_summary_beyond_discords_20_mib_is_not_sent_rather_than_cut() {
+    let big = format!("---\ncontract: minutes/v4\n---\n\n## A\n\n{}\n", "x".repeat(DISCORD_FILE));
+    let meeting = read(&[("minutes.md", &big)]).unwrap();
+    assert_eq!(body(Kind::Discord, &meeting, "T", "f"), None);
+    // Just within: sent, whole.
+    let within = format!("---\ncontract: minutes/v4\n---\n\n## A\n\n{}\n", "x".repeat(DISCORD_FILE - 100));
+    assert!(body(Kind::Discord, &read(&[("minutes.md", &within)]).unwrap(), "T", "f").is_some());
 }
