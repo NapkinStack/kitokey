@@ -16,10 +16,11 @@ tree = ast.parse(pathlib.Path(sys.argv[1]).read_text())
 main = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "main")
 start = next(i for i, node in enumerate(main.body) if isinstance(node, ast.If) and "KITOKEY_E2E_ONLY" in ast.unparse(node.test)) + 1
 end = next(i for i, node in enumerate(main.body) if isinstance(node, ast.Expr) and ast.unparse(node) == "model_offered(now)")
-outside = [f"l.{node.lineno}: {ast.unparse(node).splitlines()[0][:80]}" for node in main.body[start:end]
-           if not (isinstance(node, ast.With) and len(node.items) == 1 and isinstance(node.items[0].context_expr, ast.Call)
-                   and getattr(node.items[0].context_expr.func, "id", "") == "section")]
-sections = [ast.unparse(node.items[0].context_expr.args[0])[:40] for node in main.body[start:end] if node not in outside and isinstance(node, ast.With)]
+def in_section(node):
+    return (isinstance(node, ast.With) and len(node.items) == 1 and isinstance(node.items[0].context_expr, ast.Call)
+            and getattr(node.items[0].context_expr.func, "id", "") == "section")
+outside = [f"l.{node.lineno}: {ast.unparse(node).splitlines()[0][:80]}" for node in main.body[start:end] if not in_section(node)]
+sections = [ast.unparse(node.items[0].context_expr.args[0])[:40] for node in main.body[start:end] if in_section(node)]
 taken = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "section"]
 played, out, escaped, failed = [], io.StringIO(), None, []
 if taken:
