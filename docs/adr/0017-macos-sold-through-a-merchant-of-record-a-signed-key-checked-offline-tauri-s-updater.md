@@ -62,7 +62,10 @@ or its framework's updater, the update signed with Ed25519.
 | [Paddle Billing](https://www.paddle.com/pricing) | « 5% + 50¢ » « per Checkout transaction », « No monthly fees » | « Paddle as your Merchant of Record »; « We collect the correct rate of tax » | None: Classic handled them, but « New signups for Paddle Classic aren't allowed »; Billing: « Build your own workflows using transaction webhooks » ([Paddle's docs](https://developer.paddle.com/llms.txt)) — a server of ours |
 | [Gumroad](https://gumroad.com/pricing) | « 10% + $0.50 » on direct sales | « Gumroad is your merchant of record »; « Since January 1, 2025, Gumroad handles ALL your tax obligations » | Not verified: its help page on licence keys did not load |
 | [Lemon Squeezy](https://www.lemonsqueezy.com/pricing) | « 5% + 50¢ » | « Lemon Squeezy is your merchant of record » | A License API checked by `POST /v1/licenses/validate`, online ([License API](https://docs.lemonsqueezy.com/api/license-api)) — and it closes on 2027-03-31 |
-| [Keygen](https://keygen.sh/docs/api/cryptography/) | Paid tiers ([pricing](https://keygen.sh/pricing/)) | Not a merchant | Licences signed with the account's key, « powerful options for offline license verification »; « your account ID and public key should be hard-coded into your application code » |
+| [Polar](https://polar.sh/resources/pricing) | « 5% + 50¢ » (free plan), « +1.5% for international cards » | « Polar is the Merchant of Record » | Checked online: « validate the users license key via the `/v1/customer-portal/license-keys/validate` endpoint » ([licence keys](https://polar.sh/docs/features/benefits/license-keys)); no signed key found |
+| [Dodo Payments](https://dodopayments.com/pricing) | « 4% + 40c per domestic US transaction », « International payments… add +1.5% » | « a **Merchant of Record** » ([docs](https://docs.dodopayments.com/)) | Its own keys checked online (« The activate, deactivate, and validate license endpoints are public »); **keys the seller generates may be delivered** ([manual fulfilment](https://docs.dodopayments.com/developer-resources/manual-license-key-fulfillment.md)) |
+| [Creem](https://www.creem.io/pricing) | « 3.9 percent plus 40 US cents » | « We are the legal seller of record » ([docs](https://docs.creem.io/)) | « Generate and deliver software license keys automatically on purchase »; no page on checking them found; « the API key must stay on your backend » |
+| [Keygen](https://keygen.sh/docs/api/cryptography/) | « We will never take a percentage of revenue »; its tiers' prices did not load ([pricing](https://keygen.sh/pricing/)) | Not a merchant | Licences signed with the account's key, « powerful options for offline license verification »; « your account ID and public key should be hard-coded into your application code ». With Paddle: « allowing Paddle to communicate with Keygen using webhooks » ([Keygen + Paddle](https://keygen.sh/integrate/paddle/)), Billing or Classic not said |
 | [Tauri's updater](https://v2.tauri.app/plugin/updater/) (updated 2025-11-28) | — | — | Updates: `myapp.app.tar.gz` and its `.sig`; « Tauri's updater needs a signature… This cannot be disabled »; the public key in `tauri.conf.json` |
 | [Sparkle 2](https://sparkle-project.org/documentation/) | — | — | Updates: « Sparkle's EdDSA (ed25519) signature », the key in `Info.plist`; « Notarize and code sign the application via Apple's Developer ID program » |
 
@@ -77,43 +80,55 @@ The updater is the same in every option (Tauri's, below); the options differ in 
 ### Option 1 — FastSpring delivers keys Kitokey signed beforehand
 
 - **Description**:
-  - The decider signs, on their own machine, a batch of keys — say 5,000 —, each a short payload signed with
+  - The decider signs, on their own machine, a batch of 10,000 keys, each a short payload signed with
     Kitokey's Ed25519 private key: a serial number, the major version it covers. The private key never leaves that
     machine, kept offline as ADR-0010's minisign key is.
+  - The payload is `{id, edition, max_version}` — a serial, the edition, the last major version it opens — and
+    nothing personal: no name, no email, no order.
   - The batch is pasted into FastSpring's pre-defined list. Each order takes one key; FastSpring shows it on the
     completion page and in its receipt.
   - The app checks a key with the public key built in: offline, no account, nothing sent.
 - **Cost**: FastSpring's share, unknown until its quote. Operation: none running; a batch to refill before it runs
   out — minutes of the decider's, a few times a year at most.
-- **Risk**: what FastSpring does with an empty list is not documented — an order without a key. Kept far from it by
-  a batch large against sales, and its count watched in FastSpring's dashboard. A key, once sold, cannot be revoked
+- **Risk**: what FastSpring does with an empty list is not documented, nor any stock alert — an order without a
+  key. Kept far from it by 10,000 keys loaded, their count read each month, and a batch added under 20 %. A key, once sold, cannot be revoked
   except by a list of refused serials shipped in an update.
 - **Cost of getting out**: another merchant that takes a list (or the same batch on a server, option 2): the keys
   sold stay valid, since they are ours.
 
-### Option 2 — Paddle Billing and a function of ours that signs each key
+### Option 2 — Paddle Billing and Keygen Cloud (the fallback)
 
-- **Description**: Paddle sells; its `transaction.completed` webhook reaches a function of ours, which signs a key
-  for that order and emails it.
-- **Cost**: 5% + 50¢ — about €2.95 at €49, 6 %. Operation: the function's hosting, an email service, its secret, its
-  logs, its availability, and someone to warn when it falls.
-- **Risk**: the private key held online; a function down is a buyer who paid and has no key; a webhook missed is
-  the same. It is Kitokey's first server.
+- **Description**: Paddle sells and takes the VAT; Keygen issues each key on Paddle's webhook and signs it with
+  Ed25519; the app checks it offline, built with both public keys — Kitokey's, for the keys of option 1, and
+  Keygen's account's.
+- **Cost**: 5% + 50¢ — about €2.95 at €49, 6 % —, and Keygen's tier, whose price did not load.
+- **Risk**: honestly, a webhook or a connector between Paddle and Keygen to set up and keep — Keygen's page says
+  Paddle « communicate[s] with Keygen using webhooks », not whether for Billing; the signing key is Keygen's
+  account's: leaving it means new keys for its customers. No server of ours if the connector is Keygen's.
+- **Cost of getting out**: back to option 1's keys, which the app still checks.
+
+### Option 3 — Dodo Payments delivering the same pre-signed keys
+
+- **Description**: Dodo sells and takes the taxes, and delivers keys the seller generated (*manual fulfilment*):
+  option 1's batch, checked offline the same way; Dodo's own online check left unused.
+- **Cost**: 4% + 40¢, and +1.5 % outside the US: for a buyer in Europe, about €3.05 at €49, 6.2 % — Paddle's level.
+- **Risk**: how its manual fulfilment hands one key per order, and what it does once they run out, were not read.
 - **Cost of getting out**: as option 1.
 
-### Option 3 — A licence service (Keygen) beside a merchant
+### Option 4 — A licence service (Keygen) beside a merchant
 
 - **Description**: Keygen issues and signs the keys from the merchant's webhook; the app checks them offline.
 - **Cost**: a third vendor's fee beside the merchant's; no server of ours.
 - **Risk**: the signing key is Keygen's account's: leaving Keygen means new keys for every customer.
 
-### Option 4 — Gumroad
+### Option 5 — Gumroad
 
 - **Description**: Gumroad sells and takes the taxes; its own licence keys.
 - **Cost**: 10% + $0.50 — about €5.40 at €49, 11 %, twice Paddle's.
+- **Polar, Creem**: merchants of record whose keys are checked online, or not shown to be checked offline: set aside with Lemon Squeezy's.
 - **Risk**: how its keys are made and checked was not read; not retained without it.
 
-### Option 5 — Do nothing
+### Option 6 — Do nothing
 
 - macOS stays unsold: PDR-0001's decision 4 unmet, and the Mac's users build it or go without.
 
@@ -141,12 +156,15 @@ static file beside the release.
 
 **Option 1**: FastSpring delivers keys Kitokey signed beforehand; Tauri's updater.
 
-- **No server of ours** settles it: option 2 is Kitokey's first server, a secret online, for each sale; option 1 runs
-  nothing and keeps the private key offline. Option 3 holds no server either, but gives the signing key to a vendor
-  and adds a fee. Option 4 costs twice as much, its keys unread.
-- **The condition**: FastSpring's quote. If it is above Paddle's 5% + 50¢ at €49–69, the decider weighs that
-  difference against running a server (option 2); this ADR recommends paying the difference.
-- **The key is ours**, whatever the merchant: Ed25519 over a serial and a major version, checked offline with the
+- **Four requirements**: a merchant of record; a key signed with Ed25519 and checked offline; no server of ours;
+  no secret online. FastSpring's pre-defined list holds all four; so may Dodo's manual fulfilment (option 3), not
+  yet read whole. Paddle Billing has no keys of its own; Polar, Lemon Squeezy and, as far as read, Creem check
+  theirs online; Gumroad costs twice as much; Keygen is not a merchant.
+- **The condition: FastSpring's written quote.** Its rate is not published — a figure attributed to a third party,
+  5.9 % + $0.95, was not found and stays unconfirmed. Signing with FastSpring waits for its quote in writing.
+- **The fallback is option 2**, Paddle Billing and Keygen Cloud — not a function of ours. Option 3, Dodo, is to read
+  further: if its manual fulfilment holds a list as FastSpring's does, it is an alternative at Paddle's price.
+- **The key is ours**, whatever the merchant: Ed25519 over `{id, edition, max_version}`, nothing personal, checked offline with the
   public key built into the app — as Keygen recommends, and as Kitokey already checks its list of models. A key
   covers a major version: minor versions included, as PDR-0001 says. It is never sent anywhere.
 - **The updater is Tauri's**: in the stack, Ed25519 signatures, the feed a static file. Sparkle is the Mac's own
@@ -158,8 +176,8 @@ static file beside the release.
 
 Read with lina's review (#1017, at d39c681). Not code of cycle 11: what cycle 12 holds before the first sale.
 
-1. **An empty list.** What FastSpring does with an empty pre-defined list is tried in its test mode, and a stock
-   alert asked of it; until then the batch stays large against sales.
+1. **An empty list.** 10,000 keys loaded; their count read each month; a batch added under 20 %. What FastSpring
+   does with an empty list is tried in its test mode, and a stock alert asked of it: none is documented.
 2. **A key lost.** How a buyer finds their key again — FastSpring's account portal, its receipt sent again — is
    checked with FastSpring: its page does not say.
 3. **The key's form.** Pasted, never typed: whitespace and line breaks tolerated, an alphabet without look-alikes
@@ -189,8 +207,8 @@ So the App Store is a second build, not a setting of this one: no key, no update
 > pre-signed list and unlocks a notarised Kitokey offline, then receives an update through Tauri's updater — with no
 > server of Kitokey's running —, on a build of cycle 12** before **2026-12-18**.
 
-What we do if it is not: correct — if FastSpring refuses or its list fails, another merchant that takes a list; a
-server (option 2) only on the decider's word, as a new record.
+What we do if it is not: correct — if FastSpring's quote or its list fails, option 3 (Dodo) if it holds a list,
+else option 2 (Paddle Billing and Keygen Cloud); never a server of ours but on the decider's word, as a new record.
 
 ---
 
@@ -218,8 +236,9 @@ built in is the batch's; and a check that no secret key is in the repository —
 
 ## Rejected alternatives
 
-- **Paddle Billing with a function of ours** (option 2): Kitokey's first server, its private key online, for each
-  sale — kept only as the fallback the decider may choose against FastSpring's quote.
+- **Paddle Billing with a function of ours**: Kitokey's first server, its private key online, for each sale. The
+  fallback is Keygen's instead (option 2).
+- **Polar, Creem**: their keys checked online, or not shown checked offline.
 - **Lemon Squeezy**: it closes on 2027-03-31, and its licence check is a call to its server.
 - **Paddle Classic's licence keys**: closed to new sellers.
 - **An online activation** (Lemon Squeezy's, Keygen's online mode): the app would send something to check a
@@ -231,7 +250,9 @@ built in is the batch's; and a check that no secret key is in the repository —
 
 ## Not verified here
 
-- FastSpring: its fee (by quote), what an empty pre-defined list does, any limit on its size.
+- FastSpring: its fee (by quote; « 5.9 % + $0.95 », said of a third party, not found), what an empty pre-defined list does, any limit on its size.
+- Dodo: how its manual fulfilment hands out a seller's keys. Keygen: its tiers' prices, and whether its Paddle connector is for Billing.
+- Creem: no page on checking its keys was found.
 - Gumroad's licence keys: its help page did not load.
 - Paddle Billing's whole API reference: no licence feature was found in the pages read.
 - App Review Guideline 3.1.1, on in-app purchase, was not read verbatim; 2.4.5 was.
