@@ -54,9 +54,11 @@ A meeting said confidential cannot be sent.
 
 - **Sending each new summary by itself** (Fireflies' and Granola's automatic posting). This cycle sends on a
   gesture only; automatic sending is reconsidered at this PDR's criterion date (*Removal condition*).
-- **Slack, Teams, Notion, Google Drive by their own APIs**: they need OAuth, and most need a secret or a
-  backend of ours (cycle 11's *Out of scope* and *Later*, cycle 12). A generic webhook reaches them today
-  through the user's own Zapier, Make or n8n.
+- **Slack's, Notion's and Google Drive's APIs**: they need OAuth, and most need a secret or a backend of ours
+  (cycle 11's *Out of scope* and *Later*, cycle 12). Slack is reached here by its incoming webhook, which needs
+  neither.
+- **Teams as a destination of its own**: its Workflows webhooks expect Adaptive Cards. It is reached through the
+  generic webhook until cycle 12.
 - **Sending the audio or the transcript**: the summary, its title and its actions only.
 - **A share link**: it needs a cloud of ours.
 - **Taking back a summary sent**: once in a channel, it is the channel's. Kitokey says so before the first send.
@@ -74,6 +76,7 @@ The market leaders were read on 2026-11-20 through search results and the vendor
 | **Granola** ([Slack docs](https://docs.granola.ai/help-center/sharing/integrations/slack)) | Automatic posting is set **per folder**: only notes added afterwards are posted, never earlier ones. A single note can be sent by its Slack button. Nothing posts before the notes are « enhanced », that is, summarised. | Sending is tied to a finished summary, never the raw notes. An automatic rule never reaches back to meetings made before it. |
 | **Otter** ([its Slack app, 2023](https://otter.ai/blog/from-video-meeting-to-slack-otter-app-for-slack-uses-ai-to-bridge-the-work-communications-gap)) | Meeting notes, summary and action items are shared to Slack channels automatically; action items go to their assignees. *(The 2023 launch post; today's plans not read.)* | The actions travel with the summary. |
 | **Discord's webhooks** ([Execute Webhook](https://discord.com/developers/docs/resources/webhook)) | A channel's URL, no OAuth and no secret of the app. `content` up to 2000 characters; files as multipart, by default up to 20 MiB each (changelog: 10 → 20 MiB). | The second destination, within these limits: a short message, the summary attached as a Markdown file. |
+| **Slack's incoming webhooks** ([Sending messages using incoming webhooks](https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/)) | A URL the person creates in their own workspace, through a Slack app: no OAuth, and no secret of Kitokey's. It takes a POST of JSON with a `text` field, in mrkdwn, Slack's own syntax and not Markdown ([Formatting message text](https://docs.slack.dev/messaging/formatting-message-text/)). | The third destination. Slack is the one channel that Fireflies, Granola and Otter all name. The only cost is converting Markdown to mrkdwn. |
 | **Zapier's, Make's and n8n's « catch hook »** (the Zapier templates read above) | Any app that POSTs JSON to a URL feeds the user's own flows: Slack, Notion, a CRM. | The first destination is a generic webhook: one JSON object that every one of them reads. |
 
 **The convention the user already knows:**
@@ -92,13 +95,15 @@ user sees what leaves before anything leaves on its own. The cost is one click p
 | Option | What the user experiences | Cost | Chosen? |
 |---|---|---|---|
 | Do nothing | A copy and a paste each time; Markdown breaks in chat | 0 | No: the cycle's goal |
-| **A gesture each time**, a generic webhook and Discord's | « Envoyer à #équipe » on the page; what leaves said once, before the first send | D110 as written | **Yes** |
+| **A gesture each time**, a generic webhook, Discord's and Slack's | « Envoyer à #équipe » on the page; what leaves said once, before the first send | D110 as written, plus Slack's message: Markdown to mrkdwn | **Yes** |
+| The same, Slack through Zapier, Make or n8n only | The same, after setting up a third-party account, often paid, which reads the summary | D110 as written | No: a third party between the meeting and the channel goes against Kitokey's promise |
 | A gesture, or « each new summary » set once per destination | As above, plus a switch per destination that sends every new summary | The same, plus: a rule that runs without a gesture, its first run, what it skips, the confidential meeting made after the rule | Later: reconsidered at the criterion's date |
 | OAuth destinations (Slack, Notion) | A button that connects an account | A client secret or a backend of ours | No: cycle 12, after a spike each |
 
 ## Decision
 
-1. **Two kinds of destination**: a webhook (any `https:` URL), and a Discord channel's webhook. The user
+1. **Three kinds of destination**: a webhook (any `https:` URL), a Discord channel's webhook, and a Slack
+   channel's incoming webhook. The user
    pastes the address in Settings and gives the destination a name, such as « #équipe ». The address is kept
    in the system's keyring, as a service's key is (ADR-0013). It is never written in the settings file or in
    a log (ADR-0007), and once saved it is never shown whole again.
@@ -117,7 +122,9 @@ user sees what leaves before anything leaves on its own. The cost is one click p
    outcome is read, never shown raw.
 7. **Discord**: a short message with the title and the summary's first lines, within 2000 characters, and
    the whole summary attached as a `.md` file, within the default 20 MiB per file. The generic webhook
-   receives one JSON object: the title, the summary in Markdown, and the actions.
+   receives one JSON object: the title, the summary in Markdown, and the actions. **Slack** receives one
+   message: the title and the summary converted to mrkdwn, within Slack's documented limits, cited in the
+   pull request that sends it.
 
 ---
 
@@ -150,11 +157,15 @@ user sees what leaves before anything leaves on its own. The cost is one click p
 
 - [ ] Given this PDR, when the decider reads it, then their word and its day are written in it before any
   sending is merged.
-- [ ] Given a webhook address pasted (a generic one or Discord's), when the user sends a summary, then an
-  address that is not `https:`, or that points to the local network, is said before anything is sent.
+- [ ] Given a webhook address pasted (a generic one, Discord's or Slack's), when the user sends a summary,
+  then an address that is not `https:`, or that points to the local network, is said before anything is sent.
+  - **Slack is an addition to D110's second criterion as cycle 11 wrote it**, which names the generic webhook
+    and Discord's. It is a change of criterion, the decider's to accept with this PDR. Without that word, D110
+    ships the generic webhook and Discord's, and Slack waits for cycle 12.
   - The generic one receives the title, the summary in Markdown and its actions.
   - Discord's receives a short message with the summary attached as a Markdown file, within its documented
     limits.
+  - Slack's receives the title and the summary in mrkdwn, within its documented limits.
   - A refusal or no network is said on the page with what to do.
   - A confidential meeting offers no send.
   - Held by the module's tests against a local server, and by the e2e.
