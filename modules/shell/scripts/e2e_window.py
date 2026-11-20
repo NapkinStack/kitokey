@@ -5739,17 +5739,20 @@ def previous_summary_back(now: dt.datetime) -> None:
         got = browser.execute_script(back) or [None, None]
         check("the page offers « Revenir à la version précédente », with its time and model, and says the same button brings back the one left (D113)",
               offered and got[0].startswith("Revenir à la version précédente (") and "18 oct." in got[0] and "Qwen3 14b" in got[0] and got[1] == help_said, got)
-        press(browser, "minutes-previous")
-        swapped = wait_for(None, lambda b: (meeting / "minutes.md").read_text() == first and previous.read_text() == second, 10)
+        # Pressed when it is there; absent, the rows below fail saying so, never raise (s113bred).
+        if offered:
+            press(browser, "minutes-previous")
+        held = lambda path: path.read_text() if path.is_file() else "the file absent"
+        swapped = offered and wait_for(None, lambda b: held(meeting / "minutes.md") == first and held(previous) == second, 10)
         shown = wait_for(browser, lambda b: "La première version." in b.execute_script(
             "return document.querySelector('#meeting .minutes .body')?.textContent ?? ''"), 10)
         named = wait_for(browser, lambda b: (b.execute_script(back) or [""])[0].find("Mistral") > 0, 10)
         check("pressed: the two swap, the page shows the one brought back and offers the one left (D113)",
-              swapped and shown and named, [browser.execute_script(back), asides()])
+              swapped and shown and named, [browser.execute_script(back) or "the button absent", asides()])
         browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: null, model: null})", meeting.name)
-        again = wait_for(browser, lambda b: (meeting / "minutes.md").read_text() != first and b.execute_script(idle), 15)
+        again = wait_for(browser, lambda b: held(meeting / "minutes.md") != first and b.execute_script(idle), 15)
         check("the next redo: the one it replaced is the previous one, the older gone from the folder (D113)",
-              again and previous.read_text() == first and asides() == [], [previous.read_text()[:60], asides()])
+              again and held(previous) == first and asides() == [], [held(previous)[:60], asides()])
 
 
 def page_one_bar(now: dt.datetime) -> None:
