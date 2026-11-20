@@ -29,6 +29,13 @@ Delivers the files of a session to where the user wants them.
   sections add to it and break nothing (`tests/markdown.rs`).
 - A transcript's text is written as said: every ASCII punctuation escaped, so that no reader
   takes it for markup and a `|` stays in its cell.
+- `kitokey-export` (`src/main.rs`) speaks `exporting/v1`: its arguments hold no word of the meeting —
+  the session's folder and the choices of form —; where to write and the file's words come on its
+  input, a process's arguments being public to the machine's users (`tests/program.rs`).
+- It writes the file beside its place, then renames it over: whole or not at all, nothing left
+  beside it. The session's folder is only read.
+- A format `exporting/v1` names that this version does not write yet is a wrong argument (`WRITTEN`
+  in `src/main.rs`): each joins that list with its writer. The shell offers only those listed.
 
 ## Known traps
 
