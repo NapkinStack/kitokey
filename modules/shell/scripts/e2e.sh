@@ -228,15 +228,15 @@ kill "$recorder" 2>/dev/null || true            # gone before the next start fin
 scenario D "no recorder, or one that ends before it starts: said, and the menu still offers to start"
 start en_GB.UTF-8 "transcript = false" "$work/nowhere"
 click 3
-check is "$(titles 'Kitokey cannot record')" 1
+check is "$(titles 'Kitokey can’t record')" 1
 check is "$(labels)" "Open Kitokey|Start recording|Transcribe last recording|Write summary of last recording|Quit Kitokey"
 click 6
 printf '#!/bin/sh\necho "kitokey-capture: no source could be opened: nothing to record" >&2\nexit 1\n' > "$work/refuses"; chmod +x "$work/refuses"
 start en_GB.UTF-8 "transcript = false" "$work/refuses"
 click 3
-check is "$(titles 'Kitokey cannot record')" 2
+check is "$(titles 'Kitokey can’t record')" 2
 check is "$(titles 'Recording stopped unexpectedly')" 0
-check grep -q 'Installing Kitokey again puts it back.' "$work/notified"
+check grep -q 'Reinstall Kitokey to fix it.' "$work/notified"
 # What the program said is the log's, never a notification's (D29).
 check is "$(grep -c 'nothing to record' "$work/notified")" 0
 click 6
@@ -298,7 +298,7 @@ check is "$(cat "$work/sessions/told") $(kill -0 "$app" 2>/dev/null || echo gone
 check is "$(wc -l < "$work/sessions/heard")" 7
 start en_GB.UTF-8 "reminder = false\nmodel = \"$work/no-model.bin\"" "$work/kitokey-capture"
 click 3; click 3; sleep 1
-check is "$(titles 'No transcript: the model is missing')" 1
+check is "$(titles 'Can’t transcribe: model missing')" 1
 check is "$(wc -l < "$work/sessions/heard")" 7
 click 6
 
@@ -322,23 +322,23 @@ chmod +x "$work/numbering"
 start en_GB.UTF-8 "reminder = false" "$work/numbering"
 before=$(wc -l < "$work/sessions/heard")
 click 3; click 3; sleep 1; click 3; click 3; sleep 1    # two sessions, both waiting for the model
-check is "$(titles 'The transcription model is needed')" 2
+check is "$(titles 'Transcription model needed')" 2
 check is "$(labels)" "Open Kitokey|Start recording|Transcribe last recording|Download the model (0 MB, 127.0.0.1:$port)|Write summary of last recording|Quit Kitokey"
 check is "$(grep -c 'GET' "$work/server")" 0      # nothing fetched before the click
 # Served first is not the published file: refused, nothing in place, and the entry tries again.
 click "$(entry Download)"; sleep 7
-check is "$(titles 'The model was not downloaded')" 1
+check is "$(titles 'Model download failed')" 1
 check test ! -e "$work/data/kitokey/models/ggml-large-v3-turbo-q8_0.bin"
 check test ! -e "$work/data/kitokey/models/ggml-large-v3-turbo-q8_0.bin.part"
 check is "$(greyed)" 0
 cp "$work/right.bin" "$work/served/model.bin"
 # A third stop during the fetch: it waits in line, nothing is offered again, the entry stays greyed.
 click "$(entry Download)"; click 3; click 3
-check is "$(titles 'The transcription model is needed')" 2
+check is "$(titles 'Transcription model needed')" 2
 check is "$(greyed)" 1
 sleep 5
 check is "$(titles 'Model ready')" 1
-check is "$(titles 'The transcription model is needed')" 2    # nor later in the fetch
+check is "$(titles 'Transcription model needed')" 2    # nor later in the fetch
 check cmp -s "$work/right.bin" "$work/data/kitokey/models/ggml-large-v3-turbo-q8_0.bin"
 check is "$(wc -l < "$work/sessions/heard")" "$((before + 3))"
 # No level chosen, none is named: the programs log at their usual one.

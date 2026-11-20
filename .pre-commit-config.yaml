@@ -18,6 +18,9 @@ repos:
       - id: detect-private-key
       - id: check-added-large-files
         stages: [pre-commit]  # its own default adds the push
+        # One file, by its path: axe-core's 637 KB, a test asset vendored for the shell's e2e (D106), pinned by
+        # its SHA-256 and checked before it is injected, never shipped. Every other file keeps the limit.
+        exclude: ^modules/shell/scripts/vendor/axe-core-4\.14\.0/axe\.min\.js$
       # Also outside a git merge: Copier writes its update conflicts straight into the
       # files. The configuration its documentation recommends.
       - id: check-merge-conflict

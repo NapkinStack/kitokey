@@ -12,7 +12,9 @@ Delivers the files of a session to where the user wants them.
 
 ## What this module does not do
 
-<The likely confusions, and which module to point at instead.>
+- It owns no sentence. A heading or a speaker's name a file shows comes from the caller, the
+  shell's `words.rs` (`Labels`).
+- It makes nothing: no transcript, no summary. It reads what `transcription` and `summary` wrote.
 
 ## Internal conventions nobody could guess
 
@@ -20,7 +22,13 @@ Delivers the files of a session to where the user wants them.
 
 ## Business invariants
 
-<What must stay true in every circumstance. Ideally each one has a test.>
+- It reads the contracts alone — `session-audio`, `minutes` v1 to v4, `transcript/v1` —, never
+  another module's code.
+- A file absent is a part absent, never an error: a meeting without minutes still writes.
+- The summary's sections are a list read by their place, whatever their number: v5's named
+  sections add to it and break nothing (`tests/markdown.rs`).
+- A transcript's text is written as said: every ASCII punctuation escaped, so that no reader
+  takes it for markup and a `|` stays in its cell.
 
 ## Known traps
 

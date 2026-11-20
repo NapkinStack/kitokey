@@ -27,8 +27,5 @@ lexicon cause_own "Le fournisseur répond qu’il est en panne\u{a0}: réessayez
 lexicon cause_own "The provider answers that it is failing: try again later. On this computer, {}, chosen for this meeting, may be too large for the memory: choose a smaller one in Redo…\u{a0}› Advanced." « provider »
 lexicon cause_own "The provider does not know {}, chosen for this meeting: choose another in Redo…\u{a0}› Advanced." « provider »
 lexicon cause_own "{}, chosen for this meeting, did not write minutes: try again, or choose another model in Redo…\u{a0}› Advanced." « minutes »
-lexicon failure "the system’s keyring does not answer: unlock it, then try again." « keyring »
-lexicon failure "who writes the minutes has changed: look at this page again." « minutes »
-lexicon pulled "{model} is in Ollama: it is offered first for the minutes." « minutes »
 lexicon window.minutes_stopped[0] "Minutes stopped. You can start them again, with another model if you like." « minutes »
 placeholders of: in both languages
