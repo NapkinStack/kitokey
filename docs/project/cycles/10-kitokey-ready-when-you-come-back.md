@@ -1,15 +1,17 @@
 ---
 goal: "After a stop, the user knows where their meeting is and is told once when it is ready; a redo says what it will make, dates what it made and can go back; Settings are put in order, a service set up in a few guided steps; and Kitokey says all of it in one voice, in French and in English"
-status: accepted          # proposed | accepted | closed | stopped — the decider accepts
+status: closed            # proposed | accepted | closed | stopped — the decider accepts
 accepted_on: 2026-11-13   # « cycle 10 accepté »; started at cycle 09's closure, the same day
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
 start: 2026-11-13         # cycle 09's closure, early, on the decider's « on enchaine des que possible »
 end: 2026-11-27           # start + appetite: the first day the cycle is over — the circuit breaker
+outcome: shipped          # closed early, on the decider's « on termine le cycle en cours »
+ended_on: 2026-11-20
 deliverables:
   - id: D92
     title: "After the stop, the bar names the meeting and its stage, the page gives an estimate and Cancel, and one notification says it is ready"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given a recording stopped from the bar, when its meeting is made, then the bar at rest names it — « Réunion de 17:31 » / \"Meeting at 17:31\" — and its stage — transcription, then summary, then ready with « Ouvrir » to its page —, in a polite live region, until its page is opened or another recording starts; a step that fails is said there, with « Ouvrir »; held by the window's e2e on its played engines, in French and in English, both themes, by keyboard alone"
       - "Given the meeting's page while it is made, when it shows, then one bar across both steps names the step and gives « environ N min », estimated from the audio's length and the speed last measured on this machine for each step and model — none measured yet, the step alone and no number —, never moving back; and « Annuler » ends the running step within two seconds, keeps what is whole — a complete transcript stays —, and the page says what was stopped and how to make it again; held by the e2e and by tests of the estimate"
@@ -18,7 +20,7 @@ deliverables:
   - id: D93
     title: "Redo says what it will make before it starts, each version says when it was made and with which model, and the previous one can come back"
     module: shell
-    state: ready
+    state: deferred   # closed early, 2026-11-20: criteria 2 and 5 held (#809, #810, #879, #931); 1 in part, 3 and 4 left (#779, #771, #777)
     acceptance:
       - "Given a meeting's page, when the user presses the control that opens the redo panel, then nothing starts: the only buttons that start a making name it — « Refaire la transcription », « Refaire le compte rendu » —, and a changed context starts nothing by itself either; before it starts, the panel says in one line what will be made, with which model, what follows it — the summary made again after a transcript — and that the current version stays until the new one is whole; Escape or « Annuler » leaves everything as it was; held by the e2e, no played engine started before the button that names it"
       - "Given a transcript and a summary, when their page shows, then each says when it was made beside its model — « Transcrit le 13 nov. à 09:42 · Whisper small », « Compte rendu du 13 nov. à 09:45 · Qwen3 8B » — in the system's language and local time; the summary's time is the `made` every version of `minutes` carries; the transcript's is an optional `made` on `transcript/v1`'s `complete` line — RFC 3339 with its offset, as `edited` is —, added to the contract's page and schema in its own pull request, then written by transcription in its own, before the shell reads it; a transcript without it shows its model alone; held by the contract's tests on both sides, transcription's tests and the e2e"
@@ -28,7 +30,7 @@ deliverables:
   - id: D94
     title: "Kitokey speaks in one voice, in French and in English, from a guide kept in the repository"
     module: shell
-    state: ready
+    state: deferred   # closed early, 2026-11-20: criteria 1 and 4 held (#811, #813); 3 near (#988 and P8b-2 open); 2's comments left (318 sentences)
     acceptance:
       - "Given the shell, when its voice guide is read (`modules/shell/docs/voice.md`, linked from its `AGENTS.md`), then it holds the copy review's principles, its lexicon and its templates (2026-11-13) — the user addressed as « vous », and « summary » in English where it says « minutes » today, in the interface only —, in English with each example in both languages"
       - "Given `src/words.rs`, still the one source of every sentence, when the shell's tests run, then each sentence carries a comment saying where it shows, when, its length limit and its placeholders; each has the same placeholders in French and in English; no straight apostrophe in either; a notification's title holds at most 50 characters and a list's label at most 18; none says a word the guide's lexicon refuses — « fournisseur », « segment », « tu » in French; « provider », « keyring », « minutes » for the summary in English —; the tests that freeze sentences change in the same pull request as them"
@@ -37,7 +39,7 @@ deliverables:
   - id: D95
     title: "Settings are put in order: three groups, and a model or a service set up in a few guided steps"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given Settings, when they show, then they hold at most three groups, as GNOME's preferences do — « Après un enregistrement », « Modèles », « Général » —, their content centred at a maximum width; the card that repeats the transcription model's state is gone (#782); held by the e2e, which reads the groups and their order, in French and in English"
       - "Given the « Modèles » group, when the user sets up the transcription or the summary, then it is one guided path: on this computer (Whisper, Ollama) or a named service (OpenRouter, OpenAI, Mistral); for a service, its key, tested at once, a refusal said in plain words with its cause; then the model chosen from a readable list, each said as `modelSaid` says it; no raw identifier is shown and no address is typed in the common case — a service of the user's own address folded under « Avancé »; held by the e2e setting up a service with a false key, then a good one, against a stand-in server made for the run"
@@ -45,39 +47,39 @@ deliverables:
   - id: D96
     title: "Redo offers every model of a service set up, and choosing one starts nothing"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given a service set up in Settings with its key — OpenRouter, OpenAI or Mistral —, when the redo panel of a meeting's summary shows, then its list offers the models that service lists, said as people say them and grouped under the service's name, beside the models on this computer — not Settings' one alone; the same for the transcript with a service that transcribes; a meeting said confidential is offered the models on this computer alone, as in D91; held by the e2e on a stand-in service that lists models"
       - "Given the redo panel, on a meeting's page or in the bar, when the user chooses a model in its list, then nothing starts and the panel stays open, the choice shown; the one button that starts names the making and the model — « Refaire le compte rendu avec Claude Sonnet 4.5 »; Escape or « Annuler » leaves everything as it was; held by the e2e in both places — the decider saw a choice close the panel on 2026-11-15, on the test build of `main` and, he believes, on 0.2.5"
   - id: D97
     title: "A transcript and a summary say how long they took and, when the service says it, what they cost"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given a transcript or a summary made, when its page shows, then its line says how long the making took beside who made it and when — « Compte rendu du 13 nov. à 14:53 · Claude Sonnet 4.5, via openrouter.ai · en 3 s · 0,002 $ », « Transcrit le 13 nov. à 14:50 · Whisper small · en 40 s » / « … · in 3 s » —, one form for both lines (the decider, 2026-11-17): D93's date first, no day of the week, then the model and its service, the duration, and the cost D51 shows last, each only when known; no size on disk, the time from the making's start to its last line written, kept with the version it made: an optional field, added to the contract's page and schema in the contract's own pull request, then written by its producer in its own, before the shell reads it; a version without it shows the rest of the line; held by the contracts' tests on both sides and the e2e"
       - "Given a service that reports what a making cost — OpenRouter's `usage.cost`, as D51 reads it for the summary —, when the line shows, then it adds the cost, rounded and written in the user's language as D51 writes the summary's — « · 0,012 $US » / « · $0.012 » (the decider, 2026-11-18: D51's form holds this criterion, in place of « · env. 0,2 ct $ » / « · about $0.002 ») —; given a service that does not report it, or this computer, then no cost is said, never one Kitokey estimates; held by tests of the format and the e2e"
   - id: D98
     title: "Settings offer the appearance: System, Light or Dark"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given Settings' « Général », when the user chooses the appearance — « Système », « Clair », « Sombre » —, then every window of Kitokey, the full one and the bar, takes it at once, kept across starts; « Système » by default, following the system's light or dark as today; held by the e2e: each choice, then a restart, the screenshots light or dark as chosen while the system says the other"
   - id: D99
     title: "The bar offers the meeting's language"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given the bar's options, when they show — at rest for the next meeting, while recording for the meeting in progress —, then they offer the meeting's language, the same list and the same refusal said as on the meeting's page (D89), « Celle des Réglages » first; the language chosen at rest is the next meeting's; held by the e2e, in French and in English, by keyboard alone"
   - id: D100
     title: "A meeting can be moved to the trash from its own page"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given a meeting's page, when it shows, then beside the button that opens its folder a button « Mettre à la corbeille » / \"Move to trash\" — an icon with its name said to assistive technology and as a tooltip — asks, in place, « Mettre cette réunion à la corbeille ? » with what it holds (audio, transcript, summary) and that it can be restored from the system's trash, « Annuler » focused first; confirmed, the meeting's folder goes to the system's trash as « Faire de la place » sends it (never deleted for good), the page closes onto the list with the focus on the next meeting or, with none, on the list itself; Escape or « Annuler » leaves everything as it was; refused while that meeting is recording or being made, saying why; held by the e2e, in French and in English (the decider, 2026-11-17)"
   - id: D101
     title: "A setting changed keeps the focus where the user is"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given a meeting's page or Settings, when the user changes a choice there with the keyboard or the mouse — a model, a language, the context, the appearance, a model to download —, then once it is saved and the page drawn again the focus is on the same control and the page has not scrolled; a control the change removes gives the focus to the one that took its place, never to the page's start; held by the e2e for every choice of both pages, each read by `document.activeElement` and the scroll position after the redraw (the decider, 2026-11-17)"
 
@@ -330,6 +332,16 @@ rapidement dans le même cycle », its end unchanged.
   cycle 09's *Later*.
 - Fluent in place of `words.rs` at a third language or a translator who does not write Rust (the copy
   review, 2026-11-13).
+- **What is left of D93**: the panel's line on what follows and that the current version stays (#779); a
+  missing model or a folder not writable said in the panel (#771); the panel across the 840 px break (#777);
+  going back to the previous version (criterion 3). Candidates for cycle 11, on the decider's word.
+- **What is left of D94**: #988 and P8b-2 (the troubles, a step's failure), the comments of the page (P2) and
+  of the notifications (P3), down to none without one; the English contractions (#989, #990).
+- **Found during this cycle**: the fallback of #951 reduced to the direct predecessor and its dead reset
+  removed (#972); the recorder's stand-in faithful to `recording/v1` everywhere (#981); the e2e's own
+  harness — a session that does not open leaves its Kitokey (#991), a panel read under load (#980); each
+  operating system's name for its secret store (#975). For the framework: `install-engine.sh` on an
+  executable already there (engineering-os#453).
 - Everything in cycle 09's *Later*, unchanged.
 
 ## Open questions
@@ -356,3 +368,49 @@ rapidement dans le même cycle », its end unchanged.
 
 ## Closure
 
+**Closed on 2026-11-20, early, shipped, on the decider's word that day** in their working session with the
+coordinator: « on termine le cycle en cours ». They had given it the day before, with « GO », on the proposal
+to close this cycle once its open pull requests merge and to start cycle 11 at once. One accepted cycle at a
+time, so this one closes first, a week before its end. [Cycle 11](11-kitokey-on-sale-and-out-of-the-app.md),
+accepted on 2026-11-19, starts at this closure. D92, D95, D96, D97, D98, D99, D100 and D101 are accepted from
+their records by `nstack deliver --write-states`. D93 and D94 are deferred to this cycle's *Later*, never
+moved into cycle 11: the decider adds them there, or not. 8 of 10 accepted.
+
+**Merged, not delivered.** The criteria are read at `main` 6366513.
+
+| Deliverable | Criterion | Holds? | Pull requests |
+|---|---|---|---|
+| D93 redo | 1 nothing starts on opening; the button names the making | In part: the button names the making and its model, a choice starts nothing (D96). The panel's line on what follows and that the current version stays is not built (#779) | #876, #900 |
+| | 2 each version dated beside its model | Yes, both contracts' sides and the e2e | #809, #810, #879 |
+| | 3 the version replaced kept, « Revenir à la version précédente » | No: cut first, as the cut order said | — |
+| | 4 #771, #772, #777 | #772 only | #920; #771, #777 open |
+| | 5 each version's model a choice on the page | Yes | #931 |
+| D94 one voice | 1 the voice guide | Yes | #811 |
+| | 2 every sentence of `words.rs` with its comment; placeholders, apostrophes, lengths, lexicon held by tests | The tests yes; the comments not all: 318 sentences still without one, held from rising by a ratchet. The comments of the page (P2) and of the notifications (P3) are written, not yet opened | #812, #947, #945 |
+| | 3 the review's Claude version, the decider's word of 2026-11-18 (« prend la version claude »); the sentences no code reads removed | Nearly: the list and the bar, the page, Settings and the assistant, the notifications and the tray are merged; #988 (the troubles) and P8b-2 (a step's failure) remain, and merge into `main` as they come | #950, #952, #966, #974, #985, #986 |
+| | 4 a settings file refused says which setting and what to do (#783) | Yes | #813 |
+
+**Deferred with a reason, one line each:**
+
+- D93: criterion 3 was cut first, as planned; criterion 4 waits on #771 and #777; criterion 1's panel line on
+  #779.
+- D94: what is left is words and comments only — #988, P8b-2, P2, P3, and #989 and #990 on the English
+  contractions. None changes a behaviour.
+- D94's row in *What needs a person* is done: the decider took the review's Claude version on 2026-11-18.
+
+**Out-of-cycle pull requests**, merged during this cycle and carried by none of its deliverables: #951 (the
+focus kept by the mouse), #963 (a key kept to its own host), #976 (the first run read after its fade), #979
+(the focus check reads the control's place), #982 (#961, Kitokey ends its makings on SIGTERM), #983 (#978,
+a logout during a recording keeps its audio whole), #984 (#954, the bar's parts at 3:1), #987 (NapkinStack
+v0.33.0).
+
+**The goal.** Mostly reached: after a stop the bar and the page say where the meeting is, with an estimate
+and Cancel, and it is told once when ready (D92); Settings are in three groups with a guided service (D95);
+a redo says what it makes and with which model, and dates what it made (D93 in part, D96); Kitokey says
+nearly all of it in the review's voice (D94 in part).
+
+**Success criteria**: none moved.
+
+**Documents brought current:** the shell's voice guide (`modules/shell/docs/voice.md`, #811), the copy
+review's record (`docs/project/reviews/2026-11-13-copy.md`, #967). Cycle 11's front matter: `accepted`,
+starting today.

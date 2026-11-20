@@ -1,10 +1,10 @@
 ---
 goal: "Kitokey is ready to be sold on the Microsoft Store — a package Microsoft can certify, its listing, policy and screenshots ready — and a meeting leaves the app as the user wants it — a file to edit, a PDF, or a channel — from a summary shaped by its meeting's kind"
-status: proposed          # proposed | accepted | closed | stopped — the decider accepts
+status: accepted          # proposed | accepted | closed | stopped — the decider accepts
 accepted_on: 2026-11-19   # « ok cycle 11 des que possible, ou en parallele »; starts at cycle 10's closure (C5)
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
-start: 2026-11-27         # cycle 10's end; an earlier closure of cycle 10 moves start and end with it
-end: 2026-12-11           # start + appetite: the first day the cycle is over — the circuit breaker
+start: 2026-11-20         # cycle 10's closure, early, on the decider's « on termine le cycle en cours »
+end: 2026-12-04           # start + appetite: the first day the cycle is over — the circuit breaker
 deliverables:
   - id: D102
     title: "The package for the Microsoft Store carries Kitokey's real identity, updates and licenses through the Store, and passes Microsoft's certification kit"
@@ -84,6 +84,10 @@ deliverables:
 # Cycle 11 — Kitokey on sale, and out of the app
 
 > The framework's words: `.nstack/handbook/glossary.md`.
+
+> **Started on 2026-11-20**, at cycle 10's closure, early, on the decider's word that day in their working
+> session with the coordinator: « on termine le cycle en cours ». `start` and `end` move to that day, as this
+> page said they would; the two dated dependencies below move with them.
 
 > **Proposed by the framer on 2026-11-19, and accepted by the decider the same day**, in their working session
 > with the coordinator: « ok cycle 11 des que possible, ou en parallele ». It stays `proposed` while cycle 10
@@ -273,8 +277,8 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 
 ## Dependency with a date
 
-- **The name reserved in Partner Center, and its identity given**, by 2026-12-02, the cycle's fourth working
-  day. Missed, D102's first criterion waits and is said at the closure; its second runs on the test identity.
+- **The name reserved in Partner Center, and its identity given**, by 2026-11-25, the cycle's fourth working
+  day (2026-12-02 before cycle 10 closed early). Missed, D102's first criterion waits and is said at the closure; its second runs on the test identity.
 - **The PDR of D110**, the decider's word within two working days of its pull request. Missed, D110's sending
   waits, said at the closure; the PDR stays.
 - **The submission to the Store**, once D102 and D103 are merged and the decider has said the price: the
@@ -282,7 +286,7 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   deliverable of this cycle; its answer is recorded at the closure.
 - **The trial on a real Windows 11** (#482, #795; and #642, #749 once their fixes land): it waits on a person
   outside the team, so it is a dependency, not a deliverable (`framing.md` §2). Its date: the colleague's
-  answer by 2026-12-09; cycle 09's D53 and D84 stay deferred until then.
+  answer by 2026-12-02 (2026-12-09 before cycle 10 closed early); cycle 09's D53 and D84 stay deferred until then.
 
 ## Out of scope
 
