@@ -11,7 +11,7 @@ const TRANSCRIPT: &str = concat!(
     "\n",
     r#"{"type":"segment","speaker":"others","track":"remote","voice":null,"start":4.5,"end":6.07,"text":"a|b <i>c</i> & d --> e"}"#,
     "\n",
-    r#"{"type":"segment","speaker":"me","track":"local","voice":null,"start":1.0,"end":3.25,"text":"Bonjour à tous."}"#,
+    r#"{"type":"segment","speaker":"me","track":"local","voice":null,"start":1.0,"end":4.02,"text":"Bonjour à tous."}"#,
     "\n",
     r#"{"type":"segment","speaker":"me","track":"local","voice":null,"start":3725.5,"end":3727.0,"text":"Après une heure."}"#,
     "\n",
@@ -50,11 +50,11 @@ fn srt_gives_each_segment_a_numbered_cue_between_its_start_and_its_end_in_the_me
     let cues: Vec<_> = read.events().iter().map(|e| (e.line_number, ms(e.start), ms(e.end))).collect();
     assert_eq!(
         cues,
-        [(1, 1_000, 3_250), (2, 4_500, 6_070), (3, 3_725_500, 3_727_000)],
+        [(1, 1_000, 4_020), (2, 4_500, 6_070), (3, 3_725_500, 3_727_000)],
         "a segment whose end is before its start is left out: {file}"
     );
     assert!(
-        file.starts_with("1\n00:00:01,000 --> 00:00:03,250\n[Moi] Bonjour à tous.\n\n2\n"),
+        file.starts_with("1\n00:00:01,000 --> 00:00:04,020\n[Moi] Bonjour à tous.\n\n2\n"),
         "{file}"
     );
     assert!(file.contains("\n01:02:05,500 --> 01:02:07,000\n"), "{file}");
@@ -70,7 +70,7 @@ fn vtt_gives_each_segment_a_cue_its_speaker_a_voice_and_its_text_escaped() {
     assert_eq!(
         cues,
         [
-            (1_000, 3_250, "<v Moi>Bonjour à tous."),
+            (1_000, 4_020, "<v Moi>Bonjour à tous."),
             (
                 4_500,
                 6_070,
@@ -89,11 +89,11 @@ fn without_speakers_a_cue_is_its_text_alone_and_without_the_transcript_there_is_
     let srt_file = srt(&meeting(), include, &labels());
     let vtt_file = vtt(&meeting(), include, &labels());
     assert!(
-        srt_file.starts_with("1\n00:00:01,000 --> 00:00:03,250\nBonjour à tous.\n\n"),
+        srt_file.starts_with("1\n00:00:01,000 --> 00:00:04,020\nBonjour à tous.\n\n"),
         "{srt_file}"
     );
     assert!(
-        vtt_file.contains("\n00:00:01.000 --> 00:00:03.250\nBonjour à tous.\n\n"),
+        vtt_file.contains("\n00:00:01.000 --> 00:00:04.020\nBonjour à tous.\n\n"),
         "{vtt_file}"
     );
     assert!(!srt_file.contains("Moi") && !vtt_file.contains("<v"), "{srt_file}{vtt_file}");

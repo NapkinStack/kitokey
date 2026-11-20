@@ -493,7 +493,7 @@ pub fn srt(meeting: &Meeting, include: Include, labels: &Labels) -> String {
             number + 1,
             stamp(segment.start, ','),
             stamp(end, ','),
-            one_line(&segment.text)
+            segment.text
         );
     }
     out
@@ -512,7 +512,7 @@ pub fn vtt(meeting: &Meeting, include: Include, labels: &Labels) -> String {
             "\n{} --> {}\n{voice}{}\n",
             stamp(segment.start, '.'),
             stamp(end, '.'),
-            vtt_escaped(&one_line(&segment.text))
+            vtt_escaped(&segment.text)
         );
     }
     out
@@ -538,14 +538,6 @@ fn stamp(seconds: f64, separator: char) -> String {
     let ms = (seconds.max(0.0) * 1000.0).round() as u64;
     let (hours, minutes, seconds, ms) = (ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000);
     format!("{hours:02}:{minutes:02}:{seconds:02}{separator}{ms:03}")
-}
-
-/// A blank line ends a cue: a text holding a line break is said on one line.
-fn one_line(text: &str) -> String {
-    text.split(['\r', '\n'])
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 fn vtt_escaped(text: &str) -> String {
