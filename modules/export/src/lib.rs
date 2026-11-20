@@ -55,10 +55,11 @@ pub enum Speaker {
     Others,
 }
 
-/// A stretch of speech, its start in seconds from the session's start.
+/// A stretch of speech, its start and its end in seconds from the session's start.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Segment {
     pub start: f64,
+    pub end: Option<f64>,
     pub speaker: Speaker,
     pub text: String,
 }
@@ -161,6 +162,7 @@ fn read_transcript(text: &str, meeting: &mut Meeting) {
                 if let (Some(start), Some(text)) = (line["start"].as_f64(), line["text"].as_str()) {
                     meeting.segments.push(Segment {
                         start,
+                        end: line["end"].as_f64(),
                         speaker,
                         text: text.to_string(),
                     });
@@ -474,4 +476,78 @@ fn paragraphs(markdown: &str) -> Vec<docx_rs::Paragraph> {
     }
     flush(&mut out, &mut runs, style);
     out
+}
+
+/// The transcript as SubRip subtitles: each segment a numbered cue between its start and its end, its
+/// speaker in brackets before it — SDH's speaker identification. SubRip escapes nothing: the text is
+/// written as said.
+pub fn srt(meeting: &Meeting, include: Include, labels: &Labels) -> String {
+    let mut out = String::new();
+    for (number, (segment, end)) in cues(meeting, include).enumerate() {
+        let speaker = match include.speakers {
+            true => format!("[{}] ", speaker(segment, labels)),
+            false => String::new(),
+        };
+        out += &format!(
+            "{}\n{} --> {}\n{speaker}{}\n\n",
+            number + 1,
+            stamp(segment.start, ','),
+            stamp(end, ','),
+            one_line(&segment.text)
+        );
+    }
+    out
+}
+
+/// The transcript as WebVTT: each segment a cue between its start and its end, its speaker a voice
+/// (`<v>`), its text escaped as WebVTT asks — `&`, `<` and `>`.
+pub fn vtt(meeting: &Meeting, include: Include, labels: &Labels) -> String {
+    let mut out = String::from("WEBVTT\n");
+    for (segment, end) in cues(meeting, include) {
+        let voice = match include.speakers {
+            true => format!("<v {}>", vtt_escaped(speaker(segment, labels))),
+            false => String::new(),
+        };
+        out += &format!(
+            "\n{} --> {}\n{voice}{}\n",
+            stamp(segment.start, '.'),
+            stamp(end, '.'),
+            vtt_escaped(&one_line(&segment.text))
+        );
+    }
+    out
+}
+
+/// The segments a subtitle shows: those that end after they start, when the transcript is asked for.
+fn cues(meeting: &Meeting, include: Include) -> impl Iterator<Item = (&Segment, f64)> {
+    let segments = if include.transcript { &meeting.segments[..] } else { &[] };
+    segments
+        .iter()
+        .filter_map(|segment| segment.end.filter(|end| *end > segment.start).map(|end| (segment, end)))
+}
+
+fn speaker<'a>(segment: &Segment, labels: &'a Labels) -> &'a str {
+    match segment.speaker {
+        Speaker::Me => &labels.me,
+        Speaker::Others => &labels.others,
+    }
+}
+
+/// `hh:mm:ss` then the milliseconds, after a comma for SubRip, a full stop for WebVTT.
+fn stamp(seconds: f64, separator: char) -> String {
+    let ms = (seconds.max(0.0) * 1000.0).round() as u64;
+    let (hours, minutes, seconds, ms) = (ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000);
+    format!("{hours:02}:{minutes:02}:{seconds:02}{separator}{ms:03}")
+}
+
+/// A blank line ends a cue: a text holding a line break is said on one line.
+fn one_line(text: &str) -> String {
+    text.split(['\r', '\n'])
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn vtt_escaped(text: &str) -> String {
+    text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
