@@ -5505,6 +5505,201 @@ def axe_first_surfaces(now: dt.datetime) -> None:
                     check(f"{short}, {theme}: {what}, no violation of axe's WCAG 2.2 A and AA rules (D106)",
                           shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
 
+# What acts, by a tag or a role: what CE reaches, marks and measures (WCAG 2.1.1, 2.5.8).
+KEY_ACTING = ("a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=link],"
+              " [role=checkbox], [role=radio], [role=switch], [role=slider], [role=tab], [role=menuitem], [role=textbox]")
+# Each node that acts marked once (`data-ce`), so that a stop and a control are told apart by their
+# node, never by a name two may share (the team's rule, #958).
+KEY_MARK = ("window.__ce ??= 0; for (const e of document.querySelectorAll(arguments[0]))"
+            " if (!e.dataset.ce) e.dataset.ce = String(++window.__ce);")
+# One Tab, or Shift+Tab, and what it reached: its mark, its focus seen — a ring drawn that differs from
+# the same element's at rest, as two_panes measures it —, and whether any of it shows (WCAG 2.4.11): a
+# point of its box, inside the window, where the element on top is it, inside it, or its label. WebKit
+# reveals a text field's caret, and so scrolls to it, after the focus, a frame or several later (s106ceP,
+# s106ce5): the stop is read at each frame until it shows, for a second at most — waited for as its
+# event, bounded (tests.md §5); a stop a header keeps covering still fails. What was seen goes with it:
+# its box, the window's height, what was on top at its centre.
+KEY_STOP = (
+    "const done = arguments[arguments.length - 1];"
+    "const e = document.activeElement, n = e.closest('.choice') ?? e;"
+    "if (e !== document.body && !e.dataset.ce) e.dataset.ce = 'late ' + String(++window.__ce);"
+    "const mine = (h) => !!h && (h === e || n.contains(h) || h.contains(e) || [...(e.labels ?? [])].some((l) => l.contains(h)));"
+    "const bounds = () => { const r = n.getBoundingClientRect(); return [r, Math.max(r.left, 0) + 1, Math.min(r.right, innerWidth) - 1,"
+    " Math.max(r.top, 0) + 1, Math.min(r.bottom, innerHeight) - 1]; };"
+    "const showing = () => { const [, x0, x1, y0, y1] = bounds(); return x0 <= x1 && y0 <= y1"
+    " && [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [(x0 + x1) / 2, (y0 + y1) / 2]].some(([x, y]) => mine(document.elementFromPoint(x, y))); };"
+    "const until = performance.now() + 1000;"
+    "const settle = () => requestAnimationFrame(() => (showing() || performance.now() > until ? measure() : settle()));"
+    "const measure = () => {"
+    "const [r, x0, x1, y0, y1] = bounds(), shows = showing();"
+    "const top = document.elementFromPoint((x0 + x1) / 2, (y0 + y1) / 2);"
+    "const seen = shows || [[r.top, r.bottom].map(Math.round), innerHeight, top ? top.id || `${top.tagName}.${top.className}` : null];"
+    "const look = () => { const s = getComputedStyle(n); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow].join('|'); };"
+    "const focused = look(); e.blur(); const rest = look(); e.focus({focusVisible: true, preventScroll: true});"
+    "const s = getComputedStyle(n), drawn = (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || s.boxShadow !== 'none';"
+    "done([e === document.body ? 'body' : e.dataset.ce, e.id || `${e.tagName}.${e.className}`,"
+    " drawn && focused !== rest && document.activeElement === e, seen]); };"
+    "settle();")
+# Every control shown that acts, as [its mark, its name, its tabIndex, its group, whether it leads it].
+# A group is WAI-ARIA APG's roving tabindex: members of one role under one parent, one at tabIndex 0,
+# the others at -1, reached by the arrows from it — or radios of one name. What sits inside a member (a
+# line's pencil) goes with it (D62).
+KEY_CONTROLS = (
+    "const shown = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[inert]') && !e.disabled;"
+    "const member = (e) => { const m = e.closest('[role]'); if (!m || !m.parentElement) return null;"
+    " const kin = [...m.parentElement.children].filter((o) => o.getAttribute('role') === m.getAttribute('role'));"
+    " return kin.length > 1 && kin.some((o) => o.tabIndex < 0) && kin.some((o) => o.tabIndex === 0) ? m : null; };"
+    "const place = (p) => p.id ? `#${p.id}` : `${p.tagName}.${[...p.classList].join('.')}`;"
+    "return [...document.querySelectorAll(arguments[0])].filter(shown).map((e) => {"
+    " const m = e.type === 'radio' && e.name ? null : member(e);"
+    " const group = e.type === 'radio' && e.name ? `radio ${e.name}` : m ? `${m.getAttribute('role')} in ${place(m.parentElement)}` : null;"
+    " return [e.dataset.ce, e.id || `${e.tagName}.${e.className}`, e.tabIndex, group, m === e || e.type === 'radio']; })")
+# A group is named by what survives a redraw — its radios' name, or its members' role and their parent's
+# id or classes —: a radio chosen by an arrow can draw its section again (s106ce6). Its one Tab stop is
+# found in the page as it is then — the radio checked, or the member at tabIndex 0 — and focused; none,
+# null, said in the got rather than raised.
+KEY_LEAD = ("const [kind, name] = arguments;"
+            "const lead = kind === 'radio' ? document.querySelector(`input[type=radio][name='${CSS.escape(name)}']:checked`)"
+            " ?? document.querySelector(`input[type=radio][name='${CSS.escape(name)}']`)"
+            " : [...document.querySelectorAll(`[role='${kind}']`)].find((m) => m.tabIndex === 0 && m.parentElement"
+            " && (m.parentElement.id ? `#${m.parentElement.id}` : `${m.parentElement.tagName}.${[...m.parentElement.classList].join('.')}`) === name);"
+            "if (!lead) return null; lead.focus(); lead.dataset.ce ??= 'late ' + String(++window.__ce); return lead.dataset.ce")
+# From that stop, an arrow moves the focus to another of its group (APG): what has the focus then, its
+# mark and its group, named as above.
+KEY_ARROWED = ("const e = document.activeElement, m = e.closest('[role]'), p = m && m.parentElement;"
+               "const place = (q) => q.id ? `#${q.id}` : `${q.tagName}.${[...q.classList].join('.')}`;"
+               "return [e.dataset.ce ?? null, e.type === 'radio' && e.name ? `radio ${e.name}` : p ? `${m.getAttribute('role')} in ${place(p)}` : null]")
+# WCAG 2.5.8, measured as its words have it: each target shown is 24 by 24 CSS px — a hundredth of a
+# pixel left for the sub-pixel rounding —, or a circle of 24 px across, centred on its box, cuts no
+# other target and no other small target's circle. A target in a sentence is the criterion's own
+# exception: inline, in a block that holds text of its own besides the targets'. A radio or a box is the
+# label or the `.choice` that takes its click. Those that fail, with their size.
+KEY_TARGETS = (
+    "const acting = arguments[0];"
+    "const shown = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[inert]') && !e.disabled;"
+    "const boxOf = (e) => ['radio', 'checkbox'].includes(e.type) ? e.closest('.choice, label') ?? e : e;"
+    "const inSentence = (e) => { if (getComputedStyle(e).display !== 'inline') return false;"
+    " let b = e.parentElement; while (b && ['inline', 'contents'].includes(getComputedStyle(b).display)) b = b.parentElement;"
+    " if (!b) return false; const walk = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);"
+    " for (let t = walk.nextNode(); t; t = walk.nextNode()) { const owner = t.parentElement.closest(acting);"
+    " if ((!owner || !b.contains(owner)) && t.textContent.trim()) return true; } return false; };"
+    "const targets = [...new Set([...document.querySelectorAll(acting)].filter(shown)"
+    " .filter((e) => !inSentence(e)).map(boxOf))].map((e) => [e, e.getBoundingClientRect()]);"
+    "const centre = (r) => [r.left + r.width / 2, r.top + r.height / 2];"
+    "const small = targets.filter(([, r]) => r.width < 23.99 || r.height < 23.99);"
+    "const near = (c, r) => Math.hypot(Math.max(r.left - c[0], 0, c[0] - r.right), Math.max(r.top - c[1], 0, c[1] - r.bottom));"
+    "return small.filter(([e, r]) => { const c = centre(r);"
+    " return targets.some(([o, q]) => o !== e && !o.contains(e) && !e.contains(o) && near(c, q) < 12)"
+    " || small.some(([o, q]) => o !== e && Math.hypot(...centre(q).map((v, i) => v - c[i])) < 24); })"
+    " .map(([e, r]) => [e.id || `${e.tagName}.${e.className}`, Math.round(r.width * 100) / 100, Math.round(r.height * 100) / 100])")
+
+
+def keys_first_surfaces(now: dt.datetime) -> None:
+    """CE. D106, criterion 2: what axe cannot judge, on the surfaces a buyer sees first — the list, a
+    meeting's page (one it plays, and one it does not, each line then a stop of its own), Settings and the bar —, each language in each theme, the keyboard alone: each Tab
+    stop shows its focus (WCAG 2.4.7); none is entirely hidden, by Tab or by Shift+Tab (2.4.11); every
+    control is reached, a roving group by Tab to its one stop then an arrow to another — the transcript's
+    lines, the meeting played (2.1.1); each target is 24 px or spaced (2.5.8): axe leaves its target-size
+    to a person (s106cdT). 2.5.7 is held elsewhere: the shell has no drag, and a click on the drawing seeks (main())."""
+    print("CE. the list, a meeting's page, Settings and the bar: by the keyboard alone the focus seen, never hidden, every control reached; targets of 24 px (D106)")
+    dark = "return matchMedia('(prefers-color-scheme: dark)').matches"
+    # Each language in each theme: the words move what overflows or hides a stop, the theme the ring's colour.
+    for (language, short), theme in itertools.product((("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")), ("light", "dark")):
+        meetings = WORK / f"keys-{short}-{theme}"
+        meeting = meetings / "2026-10-18_12-00"
+        # A meeting it plays, as the player's scenarios make one: its lines are then one stop, the arrows
+        # going to the others (WAI-ARIA APG's roving tabindex) — the group 2.1.1 must find reached.
+        session(meeting, now - dt.timedelta(hours=1), 40 / 60, {})
+        record = json.loads((meeting / "session.json").read_text())
+        record["tracks"] = {"local": {"device": "Mic"}}
+        (meeting / "session.json").write_text(json.dumps(record))
+        with wave.open(str(meeting / "local.wav"), "wb") as made:
+            made.setnchannels(1)
+            made.setsampwidth(2)
+            made.setframerate(48000)
+            made.writeframes(bytes(2 * 48000 * 40))
+        (meeting / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n')
+        # A transcript longer than the window: its page scrolls, so a stop could go under what stays.
+        (meeting / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            + "".join(f'{{"type":"segment","speaker":"me","track":"local","start":{i}.0,"end":{i}.5,"text":"Ligne {i}."}}\n' for i in range(40))
+            + '{"type":"complete","duration":40.0}\n')
+        (meeting / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+        # An older meeting whose sound this version does not play: each line and its pencil is a Tab stop,
+        # so Shift+Tab brings stops up to the window's top, where a header that stayed would cover them.
+        unplayed = meetings / "2026-10-18_10-00"
+        session(unplayed, now - dt.timedelta(hours=3), 60, {"local.wav": 1000})
+        shutil.copy(meeting / "transcript.jsonl", unplayed / "transcript.jsonl")
+        shutil.copy(meeting / "minutes.md", unplayed / "minutes.md")
+        for small in (False, True):
+            window = Window(meetings, language, "reminder = false\n", small=small)
+            window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+            with window as browser:
+                if small:
+                    surfaces = (("the bar", None, lambda b: b.find_element(By.ID, "small-record").is_displayed()),)
+                else:
+                    browser.set_window_size(1100, 600)
+                    # That meeting's page drawn, its lines there: not the page before it, which has lines too.
+                    drawn_for = lambda name: lambda b: b.execute_script(
+                        "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
+                        " && p.querySelectorAll('.transcript .lines li').length > 0", name)
+                    surfaces = (("the list", "#/", lambda b: b.find_element(By.ID, "list").is_displayed()),
+                                ("a meeting's page", f"#/meeting/{meeting.name}", drawn_for(meeting.name)),
+                                ("a meeting's page not played", f"#/meeting/{unplayed.name}", drawn_for(unplayed.name)),
+                                ("Settings", "#/settings", lambda b: b.find_element(By.ID, "reminder").is_displayed()))
+                for what, address, drawn in surfaces:
+                    if address:
+                        browser.execute_script("location.hash = arguments[0]", address)
+                    shown = wait_for(browser, drawn, 10) and browser.execute_script(dark) == (theme == "dark")
+                    time.sleep(0.5)
+                    browser.execute_script("document.activeElement.blur(); scrollTo(0, 0)")
+                    browser.execute_script(KEY_MARK, KEY_ACTING)
+                    forth, back = [], []
+                    for _ in range(120):
+                        ActionChains(browser).send_keys(Keys.TAB).perform()
+                        stop = browser.execute_async_script(KEY_STOP)
+                        if forth and stop[0] == forth[0][0] or stop[0] == "body":
+                            break
+                        forth.append(stop)
+                    for _ in range(len(forth)):
+                        ActionChains(browser).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+                        back.append(browser.execute_async_script(KEY_STOP))
+                    reached = {mark for mark, _, _, _ in forth}
+                    browser.execute_script(KEY_MARK, KEY_ACTING)
+                    controls = browser.execute_script(KEY_CONTROLS, KEY_ACTING)
+                    # A group counts once Tab reached one of it and an arrow, from its member reached, goes to another.
+                    led = {group: mark for mark, _, _, group, leads in controls if group and leads and mark in reached}
+                    unmoved = []
+                    for group in led:
+                        kind, _, name = group.partition(" ")
+                        lead = browser.execute_script(KEY_LEAD, kind, name.removeprefix("in "))
+                        if lead is None:
+                            unmoved.append((group, "its Tab stop gone from the page"))
+                            continue
+                        ActionChains(browser).send_keys(Keys.ARROW_DOWN).perform()
+                        to = browser.execute_script(KEY_ARROWED)
+                        if not (to[0] != lead and to[1] == group):
+                            unmoved.append((group, to))
+                    moving = {group for group in led if group not in {g for g, _ in unmoved}}
+                    # A radio out of Tab's order keeps its tabIndex at 0: the browser leaves it out, the arrows
+                    # reach it (HTML's radio group), so a radio is credited by its group whatever its tabIndex.
+                    missed = sorted({name for mark, name, tab, group, _ in controls
+                                     if mark not in reached and not (group in moving and (tab < 0 or group.startswith("radio ")))})
+                    unseen = [name for _, name, seen, _ in forth if not seen]
+                    hidden = [("Tab", name, part) for _, name, _, part in forth if part is not True] + [("Shift+Tab", name, part) for _, name, _, part in back if part is not True]
+                    said = f"{short}, {theme}: {what}"
+                    # Which roving groups were credited, said in a green run too: the verifier reads them there.
+                    print(f"    {said}: {len(forth)} Tab stops; groups reached by Tab and an arrow: {sorted(moving)}")
+                    check(f"{said}, each Tab stop shows its focus (WCAG 2.4.7, D106)", shown and forth and unseen == [], (len(forth), unseen))
+                    check(f"{said}, no stop entirely hidden, by Tab or Shift+Tab (WCAG 2.4.11, D106)", shown and forth and hidden == [], hidden)
+                    check(f"{said}, every control reached by the keyboard, a roving group by its arrows (WCAG 2.1.1, D106)",
+                          shown and forth and missed == [] and unmoved == [] and (what != "a meeting's page" or led), (missed, unmoved, sorted(led)))
+                    tight = browser.execute_script(KEY_TARGETS, KEY_ACTING)
+                    check(f"{said}, each target 24 by 24 CSS px, or spaced as the criterion allows (WCAG 2.5.8, D106)", shown and tight == [], tight)
+
+
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
     shows one bar across both steps — the transcript, then its summary —, naming the step, never moving back:
@@ -13162,6 +13357,7 @@ def main() -> int:
     bar_language(now)
     bar_after_stop(now)
     axe_first_surfaces(now)
+    keys_first_surfaces(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)
