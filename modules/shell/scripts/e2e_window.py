@@ -741,10 +741,16 @@ def axe_violations(browser) -> list:
         raise RuntimeError(f"{AXE} is not the axe-core pinned by its SHA-256 (D106)")
     if not browser.execute_script("return typeof axe !== 'undefined'"):
         browser.execute_script(source.decode())
-    return browser.execute_script(
-        "return axe.run(document, {runOnly: {type: 'tag', values: arguments[0]}, resultTypes: ['violations']})"
-        ".then((r) => r.violations.map((v) => [v.id, v.impact, v.nodes.length, v.nodes.slice(0, 3).map((n) => n.target.join(' '))]))",
+    said = lambda kind: (f"r.{kind}.map((v) => [v.id, v.impact, v.nodes.length,"
+                         " v.nodes.slice(0, 3).map((n) => n.target.join(' '))])")
+    result = browser.execute_script(
+        "return axe.run(document, {runOnly: {type: 'tag', values: arguments[0]}, resultTypes: ['violations', 'incomplete']})"
+        f".then((r) => ({{passes: r.passes.length, violations: {said('violations')}, incomplete: {said('incomplete')}}}))",
         AXE_TAGS)
+    # What axe judged, and what it left to a person (« incomplete »: a contrast over an image or a
+    # gradient, say): a clean page with nothing judged would pass for nothing.
+    print(f"    axe: {result['passes']} rule(s) passed; left to a person: {result['incomplete']}")
+    return result["violations"] if result["passes"] else [("axe judged no rule", None, 0, [])]
 
 # The sidebar's primary actions shown, by their ids: one at a time (D69).
 PRIMARIES = "return [...document.querySelectorAll('#sidebar .primary')].filter(b => b.offsetParent).map(b => b.id)"
