@@ -5393,18 +5393,25 @@ def axe_first_surfaces(now: dt.datetime) -> None:
 
 # One Tab, or Shift+Tab, and what it reached: its place, its focus seen — a ring drawn that differs from
 # the same element's at rest, as two_panes measures it —, and whether any of it shows (WCAG 2.4.11): a
-# point of its box, inside the window, where the element on top is it, inside it, or its label.
+# point of its box, inside the window, where the element on top is it, inside it, or its label. Read two
+# frames after the key: WebKit reveals a text field's caret, and so scrolls to it, after the focus (s106ce).
+# What was seen goes with it: its box, the window's height, and what was on top at its centre.
 KEY_STOP = (
+    "const done = arguments[arguments.length - 1];"
+    "requestAnimationFrame(() => requestAnimationFrame(() => {"
     "const e = document.activeElement, n = e.closest('.choice') ?? e;"
-    "const look = () => { const s = getComputedStyle(n); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow].join('|'); };"
-    "const focused = look(); e.blur(); const rest = look(); e.focus({focusVisible: true});"
-    "const s = getComputedStyle(n), drawn = (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || s.boxShadow !== 'none';"
     "const r = n.getBoundingClientRect(), x0 = Math.max(r.left, 0) + 1, x1 = Math.min(r.right, innerWidth) - 1,"
     " y0 = Math.max(r.top, 0) + 1, y1 = Math.min(r.bottom, innerHeight) - 1;"
     "const mine = (h) => !!h && (h === e || n.contains(h) || h.contains(e) || [...(e.labels ?? [])].some((l) => l.contains(h)));"
     "const shows = x0 <= x1 && y0 <= y1 && [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [(x0 + x1) / 2, (y0 + y1) / 2]]"
     " .some(([x, y]) => mine(document.elementFromPoint(x, y)));"
-    "return [e === document.body ? 'body' : e.id || `${e.tagName}.${e.className}`, drawn && focused !== rest && document.activeElement === e, shows]")
+    "const top = document.elementFromPoint((x0 + x1) / 2, (y0 + y1) / 2);"
+    "const seen = shows || [[r.top, r.bottom].map(Math.round), innerHeight, top ? top.id || `${top.tagName}.${top.className}` : null];"
+    "const look = () => { const s = getComputedStyle(n); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow].join('|'); };"
+    "const focused = look(); e.blur(); const rest = look(); e.focus({focusVisible: true, preventScroll: true});"
+    "const s = getComputedStyle(n), drawn = (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || s.boxShadow !== 'none';"
+    "done([e === document.body ? 'body' : e.id || `${e.tagName}.${e.className}`, drawn && focused !== rest && document.activeElement === e, seen]);"
+    "}))")
 # Every control a hand can use, shown: a tag or a role that acts. One of a group that moves its one stop
 # by the arrows — radios of one name, a slider's lines, a menu's items — counts as reached when one of
 # its group is (WAI-ARIA APG, roving tabindex).
@@ -5458,19 +5465,19 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                     forth, back = [], []
                     for _ in range(120):
                         ActionChains(browser).send_keys(Keys.TAB).perform()
-                        stop = browser.execute_script(KEY_STOP)
+                        stop = browser.execute_async_script(KEY_STOP)
                         if forth and stop[0] == forth[0][0] or stop[0] == "body":
                             break
                         forth.append(stop)
                     for _ in range(len(forth)):
                         ActionChains(browser).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
-                        back.append(browser.execute_script(KEY_STOP))
+                        back.append(browser.execute_async_script(KEY_STOP))
                     reached = {name for name, _, _ in forth}
                     controls = browser.execute_script(KEY_CONTROLS)
                     grouped = {group for name, group in controls if group and name in reached}
                     missed = sorted({name for name, group in controls if name not in reached and not (group and group in grouped)})
                     unseen = [name for name, seen, _ in forth if not seen]
-                    hidden = [("Tab", name) for name, _, part in forth if not part] + [("Shift+Tab", name) for name, _, part in back if not part]
+                    hidden = [("Tab", name, part) for name, _, part in forth if part is not True] + [("Shift+Tab", name, part) for name, _, part in back if part is not True]
                     said = f"{short}, {theme}: {what}"
                     check(f"{said}, each Tab stop shows its focus (WCAG 2.4.7, D106)", shown and forth and unseen == [], (len(forth), unseen))
                     check(f"{said}, no stop entirely hidden, by Tab or Shift+Tab (WCAG 2.4.11, D106)", shown and forth and hidden == [], hidden)
