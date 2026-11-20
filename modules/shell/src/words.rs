@@ -1195,6 +1195,10 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
     /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as an error above its button (#771). When: the redo
+    /// could not start. At most: no limit. Placeholders: {} what is wrong and what to do, as the failure
+    /// says it.
+    pub redo_not_done: &'static str,
     /// What a meeting lacks, offered on its page; what is said once asked; where a step ran.
     /// Shows: a meeting's page, as a button. When: meeting lacks minutes. At most: about 30
     /// characters. Placeholders: none.
@@ -1972,6 +1976,7 @@ pub fn window(language: Language) -> Window {
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept.",
+            redo_not_done: "Not redone: {}",
             make_minutes: "Write summary",
             make_transcript: "Transcribe",
             make_minutes_with: "Write summary with {}",
@@ -2418,6 +2423,7 @@ pub fn window(language: Language) -> Window {
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée.",
+            redo_not_done: "Pas refait\u{a0}: {}",
             make_minutes: "Rédiger le compte rendu",
             make_transcript: "Transcrire",
             make_minutes_with: "Rédiger le compte rendu avec {}",
