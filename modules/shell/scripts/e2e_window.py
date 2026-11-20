@@ -476,6 +476,34 @@ def free_port() -> int:
         return probe.getsockname()[1]
 
 
+def descendants(pid: int) -> list[int]:
+    """A process and every process under it, read in /proc: those still there."""
+    found, ahead = [], [pid]
+    while ahead:
+        one = ahead.pop()
+        found.append(one)
+        with contextlib.suppress(OSError):
+            for task in Path(f"/proc/{one}/task").iterdir():
+                ahead += [int(child) for child in (task / "children").read_text().split()]
+    return found
+
+
+def listening(pids: list[int], port: int) -> bool:
+    """Whether one of these processes is the one listening on 127.0.0.1:`port`: its socket, read in
+    /proc, not whoever answers there (#943)."""
+    wanted = f"0100007F:{port:04X}"
+    sockets = {f"socket:[{row.split()[9]}]" for row in Path("/proc/net/tcp").read_text().splitlines()[1:]
+               if row.split()[1] == wanted and row.split()[3] == "0A"}
+    for pid in pids:
+        # A descriptor may close while it is read (the listing's own, at least): skipped, not the process.
+        with contextlib.suppress(OSError):
+            for fd in Path(f"/proc/{pid}/fd").iterdir():
+                with contextlib.suppress(OSError):
+                    if os.readlink(fd) in sockets:
+                        return True
+    return False
+
+
 def session(folder: Path, started: dt.datetime, minutes: float | None, files: dict[str, int], form: str = "v2") -> None:
     folder.mkdir(parents=True)
     record = {"contract": f"session-audio/{form}", "started": started.isoformat(timespec="seconds")}
@@ -614,13 +642,7 @@ class Window:
         until = time.monotonic() + 20
         while (instances() or single_instance_held()) and time.monotonic() < until:
             time.sleep(0.1)
-        port, native = free_port(), free_port()
-        self.driver_process = subprocess.Popen(
-            ["tauri-driver", "--port", str(port), "--native-port", str(native)],
-            env=self.env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        port = self.start_driver()
         options = ArgOptions()
         options.set_capability("browserName", "wry")
         options.set_capability("tauri:options", {"application": str(BINARY), "args": self.args})
@@ -651,6 +673,47 @@ class Window:
         # Whichever window opened: the small one at rest, or the full one's sections named.
         wait_for(self.browser, lambda b: b.find_elements(By.ID, "small-record") or b.execute_script("return (document.getElementById('settings-link').getAttribute('aria-label') || '') !== ''"))
         return self.browser
+
+    def start_driver(self) -> int:
+        """tauri-driver on two ports picked free, then released before it binds them, as Selenium picks
+        them: another run on the machine may take one in between (#943). The driver says so, never by
+        its code: its port taken, it ends, code 0, « can not listen to address »; its native port taken,
+        it stays while its WebKitWebDriver ends, « FATAL: Unable to listen », the port answered by
+        whoever holds it. So its output is kept, and the session asked only once its own processes
+        listen on both ports; else it is started again on fresh ones, said with what it said — a
+        collision the e2e's count sees —, and still taken the third time, the start fails naming it."""
+        taken = []
+        for _ in range(3):
+            port, native = free_port(), free_port()
+            said = WORK / f"tauri-driver-{port}.txt"
+            with said.open("wb") as out:
+                self.driver_process = subprocess.Popen(
+                    ["tauri-driver", "--port", str(port), "--native-port", str(native)],
+                    env=self.env,
+                    stdout=out,
+                    stderr=subprocess.STDOUT,
+                    # Its own group: its WebKitWebDriver, even outliving it, ended with it on a start again.
+                    start_new_session=True,
+                )
+            mine = [self.driver_process.pid]
+            refused = lambda: [line for line in said.read_text(errors="replace").splitlines() if "listen" in line]
+            until = time.monotonic() + 10
+            while time.monotonic() < until and not refused():
+                mine = sorted(set(mine) | set(descendants(self.driver_process.pid)))
+                if self.driver_process.poll() is None and listening(mine, port) and listening(mine, native):
+                    return port
+                time.sleep(0.01)
+            if not refused():
+                # Neither taken nor up in ten seconds: said, then the session's own bounds say what it was (#510).
+                print("    (tauri-driver neither refused nor listening in 10 s: the session asked as before — #943)")
+                return port
+            taken.append(refused()[0])
+            print(f"    (tauri-driver's ports taken, started again on fresh ones: {taken[-1]} — #943)")
+            # Its WebKitWebDriver outlives a driver whose own port was taken: both ended, by their group.
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(self.driver_process.pid, signal.SIGTERM)
+            self.driver_process.wait(timeout=10)
+        raise RuntimeError(f"tauri-driver's ports taken three times, each on fresh ones (#943): {taken}")
 
     def __exit__(self, *_) -> None:
         try:
