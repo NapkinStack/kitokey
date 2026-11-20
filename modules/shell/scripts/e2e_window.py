@@ -5471,7 +5471,7 @@ def summaries_to_a_folder(now: dt.datetime) -> None:
     print("CF. every new summary written to the folder chosen, in Markdown, named by its meeting; never a confidential one; a refusal said (D109)")
     words_of = {
         "fr": {"none": "Aucun dossier", "help": "Chaque nouveau compte rendu est aussi écrit dans ce dossier, en Markdown, nommé par la date et l’heure de la réunion. Refaire un compte rendu remplace son fichier dans le dossier.",
-               "confidential": "Confidentielle : pas exportée.",
+               "confidential": "Confidentielle\u00a0: pas exportée.",
                "failed": "Impossible d’écrire le compte rendu dans le dossier d’export. Choisissez un autre dossier dans les Réglages."},
         "en": {"none": "No folder", "help": "Each new summary is also written to this folder, in Markdown, named by the meeting’s date and time. Redoing a summary replaces its file in the folder.",
                "confidential": "Confidential: not exported.",
