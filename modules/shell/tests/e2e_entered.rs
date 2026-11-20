@@ -1,15 +1,18 @@
 //! A window whose session never opens (#991): its start raises, as it did, and the Kitokey it started
 //! is ended with it — never left holding the single-instance name, every later start of the shard
 //! handing its arguments over to it and raising « no session in a minute » in turn (3 attests in 63).
-//! `Window.__enter__`, read from `scripts/e2e_window.py` without Selenium, is played with a driver
-//! that never answers and a stand-in Kitokey that ignores SIGTERM. Unix only, as the module's other
-//! tests that drive its scripts.
+//! `Window.__enter__`, read from `scripts/e2e_window.py` without Selenium, is played with a stand-in
+//! Kitokey that ignores SIGTERM and a driver that fails in each of the two ways a start gives up: its
+//! session never answering (« no session in a minute »), or the driver never answering at all, each
+//! of its connections refused (« tauri-driver did not answer »). Unix only, as the module's other tests
+//! that drive its scripts.
 #![cfg(unix)]
 
 use std::process::Command;
 
-/// The window's methods, its driver a stand-in whose session never answers, the Kitokey it starts a
-/// stand-in that ignores SIGTERM: what the start raised, what the run printed and counted as failed,
+/// The window's methods, its driver a stand-in that fails as `sys.argv[2]` says — `session`, its
+/// session never answering; `driver`, each connection refused —, the Kitokey it starts a stand-in that
+/// ignores SIGTERM: what the start raised, what the run printed and counted as failed,
 /// and whether the stand-in Kitokey is still there, in JSON.
 const PLAY: &str = r#"
 import ast, contextlib, io, json, pathlib, signal, subprocess, sys, time, os
@@ -25,8 +28,10 @@ class Popen:
     def terminate(self): pass
     def wait(self, timeout=None): return 0
 class ReadTimeoutError(Exception): pass
+class WebDriverException(Exception): pass
 class Remote:
-    def __init__(self, *args, **kwargs): raise ReadTimeoutError("read timed out")
+    def __init__(self, *args, **kwargs):
+        raise ReadTimeoutError("read timed out") if sys.argv[2] == "session" else WebDriverException("connection refused")
 alive = lambda: [p.pid for p in started if p.poll() is None]
 FAILED = []
 def check(what, held, got=""):
@@ -39,7 +44,7 @@ scope = {"os": os, "signal": signal, "time": time, "sys": sys, "FAILED": FAILED,
          "subprocess": type("subprocess", (), {"Popen": Popen, "DEVNULL": None}), "free_port": lambda: 0,
          "instances": alive, "single_instance_held": lambda: bool(alive()), "ArgOptions": Options,
          "webdriver": type("webdriver", (), {"Remote": Remote}), "ClientConfig": lambda *a, **k: None,
-         "ReadTimeoutError": ReadTimeoutError, "WebDriverException": type("W", (Exception,), {}), "HTTPError": type("H", (Exception,), {}),
+         "ReadTimeoutError": ReadTimeoutError, "WebDriverException": WebDriverException, "HTTPError": type("H", (Exception,), {}),
          "BINARY": pathlib.Path("/kitokey"), "Path": pathlib.Path}
 klass = ast.fix_missing_locations(ast.Module(body=[ast.ClassDef(name="Window", bases=[], keywords=[], body=methods, decorator_list=[], type_params=[])], type_ignores=[]))
 exec(compile(klass, "e2e_window.py", "exec"), scope)
@@ -60,29 +65,43 @@ for p in started:
 print(json.dumps({"raised": raised, "out": out.getvalue(), "failed": FAILED, "left": left, "started": len(started), "took": round(took, 1)}))
 "#;
 
-#[test]
-fn a_window_whose_session_never_opens_ends_the_kitokey_it_started() {
+/// `Window.__enter__` played with its driver failing as `how` says: what it printed, in JSON; `None`
+/// where python3 is not there, outside CI.
+fn played(how: &str) -> Option<String> {
     let script = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/e2e_window.py");
-    let Ok(output) = Command::new("python3").args(["-I", "-c", PLAY, script]).output() else {
+    let Ok(output) = Command::new("python3").args(["-I", "-c", PLAY, script, how]).output() else {
         assert!(std::env::var_os("CI").is_none(), "python3 is not there on this CI runner");
         eprintln!("python3 is not there: a failed start is not played");
-        return;
+        return None;
     };
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "the window could not be played: {stderr}");
-    let said = String::from_utf8_lossy(&output.stdout).to_string();
+    Some(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+/// The start raised as it did, `raised` its first words, and the Kitokey it started is gone, said as
+/// `__exit__` says one (#962): no single-instance name held for the next start.
+fn ended_with_its_start(said: &str, raised: &str) {
     let field = |name: &str| said.split(&format!("\"{name}\": ")).nth(1).unwrap_or("").to_string();
-    // The start still fails, as before: the scenario's own FAIL, by `timed`.
     assert!(field("started").starts_with('1'), "the stand-in Kitokey was not started: {said}");
-    assert!(
-        field("raised").starts_with("\"RuntimeError: tauri-driver opened no session in a minute"),
-        "the start did not raise as before: {said}"
-    );
-    // And the Kitokey it started is gone: no single-instance name held for the next start.
+    assert!(field("raised").starts_with(raised), "the start did not raise as before: {said}");
     assert!(field("left").starts_with("[]"), "the Kitokey it started still runs: {said}");
-    // Ended as `__exit__` ends one (#962): said, by the scenario that left it, then killed.
     assert!(
         said.contains("FAIL  page_one_bar left Kitokey"),
         "the Kitokey left not said: {said}"
     );
+}
+
+#[test]
+fn a_window_whose_session_never_opens_ends_the_kitokey_it_started() {
+    if let Some(said) = played("session") {
+        ended_with_its_start(&said, "\"RuntimeError: tauri-driver opened no session in a minute");
+    }
+}
+
+#[test]
+fn a_window_whose_driver_never_answers_ends_the_kitokey_it_started() {
+    if let Some(said) = played("driver") {
+        ended_with_its_start(&said, "\"SystemExit: tauri-driver did not answer");
+    }
 }
