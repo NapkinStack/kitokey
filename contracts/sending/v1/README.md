@@ -54,15 +54,29 @@ Before anything is sent, and by `--check`, an address is refused — `failed`, `
 
 - it is not `https:`;
 - it holds a user or a password (`https://user:secret@…`);
-- its host is, or resolves to, an address of this computer or of a local network: loopback
-  (`127.0.0.0/8`, `::1`), unspecified (`0.0.0.0/8`, `::`), private (`10.0.0.0/8`, `172.16.0.0/12`,
-  `192.168.0.0/16`), shared (`100.64.0.0/10`), link-local (`169.254.0.0/16`, `fe80::/10`), unique
-  local (`fc00::/7`), multicast or broadcast — an IPv6 address that carries an IPv4 one judged as that
-  IPv4 address. **Every** address the host resolves to is judged, and the connection is made to one
-  of the addresses judged, never to a second resolution: a name cannot answer a public address to the
-  check and a local one to the connection.
+- its host is, or resolves to, an address of this computer or of a local network, one of:
+  - loopback: `127.0.0.0/8`, `::1/128`;
+  - unspecified: `0.0.0.0/8`, `::/128`;
+  - private: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`;
+  - shared: `100.64.0.0/10`;
+  - link-local: `169.254.0.0/16`, `fe80::/10`;
+  - unique local: `fc00::/7`;
+  - multicast: `224.0.0.0/4`, `ff00::/8`;
+  - broadcast: `255.255.255.255/32`;
+  - NAT64 for local use: `64:ff9b:1::/48`.
 
-A redirect is never followed: an answer `3xx` is a refusal of the destination.
+  An IPv6 address that carries an IPv4 one is judged as that IPv4 address: mapped (`::ffff:0:0/96`),
+  and NAT64's well-known prefix (`64:ff9b::/96`).
+
+**Every** address the host resolves to is judged, and the connection is made to one of the addresses
+judged, never to a second resolution: a name cannot answer a public address to the check and a local
+one to the connection. The host is judged as the parser the program connects with reads it, so an IPv4
+written another way (`0x7f.1`, `2130706433`) is the address it stands for.
+
+A redirect is never followed: an answer `3xx` is a refusal of the destination. No proxy is followed:
+`HTTPS_PROXY`, `ALL_PROXY` and the system's are ignored, since a proxy would resolve the host itself,
+beyond the judgement and the address it pins. The host is read lowercased, a name in another script as
+its punycode (IDNA), before it is resolved.
 
 ## What it sends
 
@@ -74,7 +88,7 @@ a string. **Never the audio, never the transcript**, and nothing of the front ma
 | `--kind` | One POST to the address | Within |
 |---|---|---|
 | `webhook` | `application/json`: one object, [`payload.schema.json`](./payload.schema.json) — `title`; `summary`, the sections as Markdown, each opening on its `## ` title; `actions`, each item without its bullet | Nothing the program bounds |
-| `discord` | `multipart/form-data`, as [Discord's *Execute Webhook*](https://discord.com/developers/docs/resources/webhook) takes it: `payload_json` whose `content` is the title in bold, then the summary's first lines, cut at a line's end; `files[0]`, the summary as a Markdown file, `# ` and the title then the sections, named after the session's folder (`2026-11-20_09-30.md`) | `content`, 2000 characters; the file, 20 MiB — Discord's default, read on that page, 2026-11-20 |
+| `discord` | `multipart/form-data`, as [Discord's *Execute Webhook*](https://discord.com/developers/docs/resources/webhook) takes it: `payload_json` whose `content` is the title in bold, then the summary's first lines, cut at a line's end, and `allowed_mentions` `{"parse": []}`: a webhook parses users' mentions by default, so a summary holding `<@id>` would ring that person; with it, no mention notifies anyone ([Allowed Mentions](https://discord.com/developers/docs/resources/message#allowed-mentions-object), « to prevent unexpected mentions », read by #1051's verifier, 2026-11-20); `files[0]`, the summary as a Markdown file, `# ` and the title then the sections, named after the session's folder (`2026-11-20_09-30.md`) | `content`, 2000 characters; the file, 20 MiB — Discord's default, read on that page, 2026-11-20 |
 | `slack` | `application/json`: `{"text": …}`, the title in bold then the summary, in [mrkdwn](https://docs.slack.dev/messaging/formatting-message-text/) — Slack's own syntax, not Markdown: headings in bold, `**bold**` as `*bold*`, a link as `<url\|text>`, `&`, `<` and `>` escaped | 40,000 characters, past which Slack truncates a message ([chat.postMessage](https://docs.slack.dev/reference/methods/chat.postMessage/), read 2026-11-20) |
 
 A summary that does not fit within the bounds is not cut to fit: `failed`, `summary.too_large`, and
@@ -94,7 +108,8 @@ send again is the person's gesture.
 | `failed` | `code`: the cause, one of the codes below, on one line; `retry_after`: seconds, a whole number, with `destination.busy` when the destination said it | The program is ending in failure. **Last**, and the only line |
 
 **Failing**: the program ends in failure with one sentence on its error stream, starting
-`kitokey-send: `, and no `sent`. When the cause is one a person acts on differently, the output's one
+`kitokey-send: `, and no `sent`. The sentence never holds the address, nor any part of it: a
+consumer logs it, and a client's error often names its URL, which here is the secret. When the cause is one a person acts on differently, the output's one
 line names it: `failed`, with its `code`; the program exits 1. Otherwise no line names it, and the
 sentence alone does, exit 2: wrong arguments, an input that is not this page's, an output that closed.
 The destination's answer is external input: only its status, and `Retry-After`, are read — its body
@@ -123,8 +138,8 @@ version for it.
   record of a send — to which destination, when — is the consumer's (PDR-0007, decision 5).
 - `meeting.confidential` is judged before the address is: a confidential meeting is never sent, whoever
   started the program.
-- It contacts the address alone, once, over `https:`, within 30 s, and nothing else: no proxy of its
-  own choosing, no telemetry.
+- It contacts the address alone, once, over `https:`, within 30 s, and nothing else: no proxy, no
+  telemetry.
 - Its logs follow ADR-0007, under `KITOKEY_TRACE` when it is given: the kind, the outcome, the status
   and the size sent; **never the address, nor any part of it**, nor any word of the meeting.
 
