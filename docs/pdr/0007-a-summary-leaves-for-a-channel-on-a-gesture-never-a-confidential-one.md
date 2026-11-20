@@ -2,8 +2,9 @@
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
-- **Status**: Proposed — by sam, author of D110 (cycle 11), 2026-11-20. Its acceptance is the decider's
-  word, written here with its day, before any sending is merged (D110's first criterion).
+- **Status**: Accepted — the decider, 2026-11-20, in their working session with the coordinator: « PDR
+  acceptée, ok Slack dans D110 ». Proposed by sam, author of D110 (cycle 11), the same day. Slack's incoming
+  webhook is thereby in D110's second criterion (cycle 11's file, its dated note).
 - **Date**: 2026-11-20
 - **Decision makers**: the decider, `@napkinstack-admin`
 - **Modules affected**: `export` (what a summary becomes when it is sent, D108's Markdown); `shell` (the
@@ -155,13 +156,12 @@ user sees what leaves before anything leaves on its own. The cost is one click p
 
 **Acceptance criteria** (D110's, which this PDR frames):
 
-- [ ] Given this PDR, when the decider reads it, then their word and its day are written in it before any
+- [x] Given this PDR, when the decider reads it, then their word and its day are written in it before any
   sending is merged.
 - [ ] Given a webhook address pasted (a generic one, Discord's or Slack's), when the user sends a summary,
   then an address that is not `https:`, or that points to the local network, is said before anything is sent.
-  - **Slack is an addition to D110's second criterion as cycle 11 wrote it**, which names the generic webhook
-    and Discord's. It is a change of criterion, the decider's to accept with this PDR. Without that word, D110
-    ships the generic webhook and Discord's, and Slack waits for cycle 12.
+  - **Slack is an addition to D110's second criterion as cycle 11 wrote it**, which named the generic webhook
+    and Discord's: accepted by the decider with this PDR, 2026-11-20 (« ok Slack dans D110 »).
   - The generic one receives the title, the summary in Markdown and its actions.
   - Discord's receives a short message with the summary attached as a Markdown file, within its documented
     limits.
