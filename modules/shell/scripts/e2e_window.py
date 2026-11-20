@@ -3837,13 +3837,15 @@ def minutes_copied(now: dt.datetime) -> None:
         browser.execute_script("delete navigator.clipboard")
         press(browser, "copy-minutes")
         wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
-        pasted = lambda *how: subprocess.run(["wl-paste", "--no-newline", *how], capture_output=True, text=True, timeout=5)
-        types = pasted("--list-types")
-        rich, plain = pasted("--type", "text/html"), pasted("--type", "text/plain")
+        # Each read as bytes, said in UTF-8 as an application asks for it: GTK offers the text in UTF-8 under
+        # `text/plain;charset=utf-8`, and under the bare `text/plain` in its legacy Latin-1 (s109ok).
+        pasted = lambda *how: subprocess.run(["wl-paste", "--no-newline", *how], capture_output=True, timeout=5)
+        said = lambda run: run.stdout.decode("utf-8", errors="replace")
+        types = said(pasted("--list-types")).split()
+        rich, plain = said(pasted("--type", "text/html")), said(pasted("--type", "text/plain;charset=utf-8"))
         check("the session's clipboard, read as a paste reads it: text/html with its headings, text/plain its Markdown (D109)",
-              "text/html" in types.stdout.split() and any(t.startswith("text/plain") for t in types.stdout.split())
-              and rich.stdout.count("<h2") == 3 and plain.stdout.strip() == expected.strip(),
-              [types.stdout.split(), types.stderr.strip(), rich.stdout[:80], plain.stdout[:80]])
+              "text/html" in types and "text/plain;charset=utf-8" in types and rich.count("<h2") == 3 and plain.strip() == expected.strip(),
+              [types, rich[:80], plain[:80]])
         for folder, why in ((none_, "without minutes"), (broken, "with minutes that do not read")):
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == folder.name
