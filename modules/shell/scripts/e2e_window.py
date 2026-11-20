@@ -5391,6 +5391,92 @@ def axe_first_surfaces(now: dt.datetime) -> None:
                     check(f"{short}, {theme}: {what}, no violation of axe's WCAG 2.2 A and AA rules (D106)",
                           shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
 
+# One Tab, or Shift+Tab, and what it reached: its place, its focus seen — a ring drawn that differs from
+# the same element's at rest, as two_panes measures it —, and whether any of it shows (WCAG 2.4.11): a
+# point of its box, inside the window, where the element on top is it, inside it, or its label.
+KEY_STOP = (
+    "const e = document.activeElement, n = e.closest('.choice') ?? e;"
+    "const look = () => { const s = getComputedStyle(n); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow].join('|'); };"
+    "const focused = look(); e.blur(); const rest = look(); e.focus({focusVisible: true});"
+    "const s = getComputedStyle(n), drawn = (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || s.boxShadow !== 'none';"
+    "const r = n.getBoundingClientRect(), x0 = Math.max(r.left, 0) + 1, x1 = Math.min(r.right, innerWidth) - 1,"
+    " y0 = Math.max(r.top, 0) + 1, y1 = Math.min(r.bottom, innerHeight) - 1;"
+    "const mine = (h) => !!h && (h === e || n.contains(h) || h.contains(e) || [...(e.labels ?? [])].some((l) => l.contains(h)));"
+    "const shows = x0 <= x1 && y0 <= y1 && [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [(x0 + x1) / 2, (y0 + y1) / 2]]"
+    " .some(([x, y]) => mine(document.elementFromPoint(x, y)));"
+    "return [e === document.body ? 'body' : e.id || `${e.tagName}.${e.className}`, drawn && focused !== rest && document.activeElement === e, shows]")
+# Every control a hand can use, shown: a tag or a role that acts. One of a group that moves its one stop
+# by the arrows — radios of one name, a slider's lines, a menu's items — counts as reached when one of
+# its group is (WAI-ARIA APG, roving tabindex).
+KEY_CONTROLS = (
+    "const acting = 'a[href], button, input:not([type=hidden]), select, textarea, summary,"
+    " [role=button], [role=link], [role=checkbox], [role=radio], [role=switch], [role=slider], [role=tab], [role=menuitem], [role=textbox]';"
+    "const shown = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[inert]') && !e.disabled;"
+    "const group = (e) => e.type === 'radio' && e.name ? `radio ${e.name}` : e.tabIndex < 0 && e.parentElement"
+    " ? `${e.getAttribute('role') ?? e.tagName} in ${e.parentElement.id || e.parentElement.className}` : null;"
+    "return [...document.querySelectorAll(acting)].filter(shown).map((e) => [e.id || `${e.tagName}.${e.className}`, group(e)])")
+
+
+def keys_first_surfaces(now: dt.datetime) -> None:
+    """CE. D106, criterion 2: what axe cannot judge, on the surfaces a buyer sees first — the list, a
+    meeting's page, Settings and the bar —, each language in each theme, the keyboard alone: each Tab
+    stop shows its focus (WCAG 2.4.7); none is entirely hidden, by Tab or by Shift+Tab (2.4.11); every
+    control is reached (2.1.1). 2.5.7 and 2.5.8 are held elsewhere: a click on the drawing seeks (main()),
+    axe's target-size runs in CD."""
+    print("CE. the list, a meeting's page, Settings and the bar by the keyboard alone: the focus seen, never hidden, every control reached (D106)")
+    dark = "return matchMedia('(prefers-color-scheme: dark)').matches"
+    # Each language in each theme: the words move what overflows or hides a stop, the theme the ring's colour.
+    for (language, short), theme in itertools.product((("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")), ("light", "dark")):
+        meetings = WORK / f"keys-{short}-{theme}"
+        meeting = meetings / "2026-10-18_12-00"
+        session(meeting, now - dt.timedelta(hours=1), 60, {"local.wav": 1000})
+        # A transcript longer than the window: its page scrolls, so a stop could go under what stays.
+        (meeting / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            + "".join(f'{{"type":"segment","speaker":"me","track":"local","start":{i}.0,"end":{i}.5,"text":"Ligne {i}."}}\n' for i in range(40))
+            + '{"type":"complete","duration":40.0}\n')
+        (meeting / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+        for small in (False, True):
+            window = Window(meetings, language, "reminder = false\n", small=small)
+            window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+            with window as browser:
+                if small:
+                    surfaces = (("the bar", None, lambda b: b.find_element(By.ID, "small-record").is_displayed()),)
+                else:
+                    browser.set_window_size(1100, 600)
+                    surfaces = (("the list", "#/", lambda b: b.find_element(By.ID, "list").is_displayed()),
+                                ("a meeting's page", f"#/meeting/{meeting.name}", lambda b: b.find_elements(By.CSS_SELECTOR, ".transcript .lines li")),
+                                ("Settings", "#/settings", lambda b: b.find_element(By.ID, "reminder").is_displayed()))
+                for what, address, drawn in surfaces:
+                    if address:
+                        browser.execute_script("location.hash = arguments[0]", address)
+                    shown = wait_for(browser, drawn, 10) and browser.execute_script(dark) == (theme == "dark")
+                    time.sleep(0.5)
+                    browser.execute_script("document.activeElement.blur(); scrollTo(0, 0)")
+                    forth, back = [], []
+                    for _ in range(120):
+                        ActionChains(browser).send_keys(Keys.TAB).perform()
+                        stop = browser.execute_script(KEY_STOP)
+                        if forth and stop[0] == forth[0][0] or stop[0] == "body":
+                            break
+                        forth.append(stop)
+                    for _ in range(len(forth)):
+                        ActionChains(browser).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+                        back.append(browser.execute_script(KEY_STOP))
+                    reached = {name for name, _, _ in forth}
+                    controls = browser.execute_script(KEY_CONTROLS)
+                    grouped = {group for name, group in controls if group and name in reached}
+                    missed = sorted({name for name, group in controls if name not in reached and not (group and group in grouped)})
+                    unseen = [name for name, seen, _ in forth if not seen]
+                    hidden = [("Tab", name) for name, _, part in forth if not part] + [("Shift+Tab", name) for name, _, part in back if not part]
+                    said = f"{short}, {theme}: {what}"
+                    check(f"{said}, each Tab stop shows its focus (WCAG 2.4.7, D106)", shown and forth and unseen == [], (len(forth), unseen))
+                    check(f"{said}, no stop entirely hidden, by Tab or Shift+Tab (WCAG 2.4.11, D106)", shown and forth and hidden == [], hidden)
+                    check(f"{said}, every control reached by the keyboard (WCAG 2.1.1, D106)", shown and forth and missed == [], missed)
+
+
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
     shows one bar across both steps — the transcript, then its summary —, naming the step, never moving back:
@@ -13030,6 +13116,7 @@ def main() -> int:
     bar_language(now)
     bar_after_stop(now)
     axe_first_surfaces(now)
+    keys_first_surfaces(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)
