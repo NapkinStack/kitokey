@@ -15,6 +15,7 @@ coverage/
 
 # Skills generated from .nstack/playbooks/ — the source of truth is .nstack/playbooks/
 .claude/skills/
+.agents/skills/
 
 # Evidence of the end-to-end scenarios: a CI artefact, or an evidence branch — never committed to a change
 .evidence/

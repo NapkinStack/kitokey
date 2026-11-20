@@ -1,6 +1,3 @@
-apostrophe audio_trashed "The system's trash did not take it."
-lexicon audio_trashed "The audio of 1 meeting kept more than {} is in the trash; its transcript and minutes stay." « minutes »
-lexicon audio_trashed "The audio of {meetings} meetings kept more than {} is in the trash; their transcripts and minutes stay." « minutes »
 lexicon cause "Ce modèle ne donne pas les temps de ce qu’il entend\u{a0}: choisissez-en un qui donne ceux de chaque segment dans les réglages de Kitokey." « segment »
 lexicon cause "Le fournisseur a refusé faute de crédit\u{a0}: ajoutez du crédit chez lui, puis réessayez." « fournisseur »
 lexicon cause "Le fournisseur a refusé la clé\u{a0}: saisissez-la de nouveau dans les réglages de Kitokey." « fournisseur »
@@ -32,23 +29,6 @@ lexicon cause_own "The provider does not know {}, chosen for this meeting: choos
 lexicon cause_own "{}, chosen for this meeting, did not write minutes: try again, or choose another model in Redo…\u{a0}› Advanced." « minutes »
 lexicon failure "the system’s keyring does not answer: unlock it, then try again." « keyring »
 lexicon failure "who writes the minutes has changed: look at this page again." « minutes »
-lexicon menu.minutes[0] "Write the minutes of the last recording" « minutes »
-lexicon menu.minuting[0] "Writing the minutes…" « minutes »
-lexicon minutes "Minutes ready" « minutes »
-lexicon minutes "Minutes ready" « minutes »
-lexicon minutes "No minutes without a transcript" « minutes »
-lexicon minutes "No one is chosen to write the minutes" « minutes »
-lexicon minutes "The minutes wait for Ollama" « minutes »
-lexicon minutes "The minutes wait for Ollama" « minutes »
-lexicon minutes "The minutes wait for your agreement" « minutes »
-lexicon minutes "The minutes were not made again" « minutes »
-lexicon minutes "The minutes were not made again" « minutes »
-lexicon minutes "The minutes were not written" « minutes »
-lexicon minutes "The minutes were not written" « minutes »
-lexicon minutes "The minutes were not written" « minutes »
-lexicon minutes "The minutes were not written" « minutes »
-lexicon minutes "«\u{a0}{address}\u{a0}» n’est pas l’adresse d’un fournisseur\u{a0}: choisissez qui écrit le compte rendu dans les réglages de Kitokey." « fournisseur »
-lexicon minutes "“{address}” is not a provider’s address: choose who writes the minutes in Kitokey’s settings." « provider »
 lexicon pulled "{model} is in Ollama: it is offered first for the minutes." « minutes »
 lexicon window.minutes_stopped[0] "Minutes stopped. You can start them again, with another model if you like." « minutes »
 placeholders of: in both languages

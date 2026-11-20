@@ -343,11 +343,11 @@ pub fn menu(language: Language) -> Menu {
             quit: "Quit Kitokey",
             open: "Open Kitokey",
             recording: "Kitokey — recording",
-            transcribe: "Transcribe the last recording",
+            transcribe: "Transcribe last recording",
             transcribing: "Transcribing…",
-            minutes: "Write the minutes of the last recording",
-            minuting: "Writing the minutes…",
-            show_bar: "Show the bar",
+            minutes: "Write summary of last recording",
+            minuting: "Writing summary…",
+            show_bar: "Show recording bar",
         },
         Language::French => Menu {
             start: "Démarrer un enregistrement",
@@ -358,9 +358,9 @@ pub fn menu(language: Language) -> Menu {
             recording: "Kitokey — enregistrement en cours",
             transcribe: "Transcrire le dernier enregistrement",
             transcribing: "Transcription en cours…",
-            minutes: "Rédiger le compte rendu de la dernière réunion",
-            minuting: "Compte rendu en cours…",
-            show_bar: "Afficher la barre",
+            minutes: "Rédiger le compte rendu du dernier enregistrement",
+            minuting: "Rédaction du compte rendu…",
+            show_bar: "Afficher la barre d’enregistrement",
         },
     }
 }
@@ -2854,7 +2854,7 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
         (Trouble::NoModel(at), English) => {
             return said(
                 "No transcript: the model is missing",
-                format!("The recording is kept. Place the Whisper model at {at}, then use “Transcribe the last recording”."),
+                format!("The recording is kept. Place the Whisper model at {at}, then use “Transcribe last recording”."),
             );
         }
         (Trouble::NoModel(at), French) => {
@@ -2910,7 +2910,7 @@ pub fn made(made: &Made, language: Language) -> Notice {
             if CLICKED {
                 "Click to open it."
             } else {
-                "It is in Kitokey’s window."
+                "Find it in the Kitokey window."
             },
         ),
         (Made::Written(_), French) => (
@@ -2918,16 +2918,16 @@ pub fn made(made: &Made, language: Language) -> Notice {
             if CLICKED {
                 "Cliquez pour l’ouvrir."
             } else {
-                "Elle est dans la fenêtre de Kitokey."
+                "Retrouvez-la dans la fenêtre de Kitokey."
             },
         ),
         (Made::Failed(_), English) => (
-            "The transcript was not made",
-            "The recording is untouched. “Transcribe the last recording” in Kitokey’s menu tries again from where it stopped.",
+            "Transcription failed",
+            "The recording is safe. Choose “Transcribe last recording” in the Kitokey menu to resume where it stopped.",
         ),
         (Made::Failed(_), French) => (
-            "La transcription n’a pas été faite",
-            "L’enregistrement est intact. «\u{a0}Transcrire le dernier enregistrement\u{a0}», dans le menu de Kitokey, reprend là où elle s’est arrêtée.",
+            "La transcription a échoué",
+            "L’enregistrement est intact. Choisissez «\u{a0}Transcrire le dernier enregistrement\u{a0}» dans le menu de Kitokey pour reprendre là où elle s’est arrêtée.",
         ),
     };
     notice(title, body.to_string()).expect("a transcript's end is always said")
@@ -2993,59 +2993,59 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
     let entry = menu(language).minutes;
     let (title, body) = match (said, language) {
         (Minutes::Ready, English) => (
-            "Minutes ready",
+            "Summary ready",
             if CLICKED {
                 "Click to open it."
             } else {
-                "They are in Kitokey’s window, beside the transcript."
+                "Find it in the Kitokey window, next to the transcript."
             }
             .to_string(),
         ),
         (Minutes::ReadyKeptBeside(name), English) => (
-            "Minutes ready",
-            format!("The ones they replace could not go to the trash: they are kept beside them, as {name}."),
+            "Summary ready",
+            format!("The previous summary couldn’t be moved to the trash. It’s kept alongside as {name}."),
         ),
         (Minutes::ReadyKeptBeside(name), French) => (
             "Compte rendu prêt",
-            format!("Celui qu’il remplace n’a pas pu aller à la corbeille\u{a0}: il est gardé à côté, sous {name}."),
+            format!("L’ancien compte rendu n’a pas pu aller à la corbeille\u{a0}: il est conservé à côté, sous le nom {name}."),
         ),
         (Minutes::Ready, French) => (
             "Compte rendu prêt",
             if CLICKED {
                 "Cliquez pour l’ouvrir."
             } else {
-                "Il est dans la fenêtre de Kitokey, à côté de la transcription."
+                "Retrouvez-le dans la fenêtre de Kitokey, à côté de la transcription."
             }
             .to_string(),
         ),
         // Its cause named, the cause's gesture; else the menu's entry, which tries again.
         (Minutes::Failed(Some(cause)), English) => (
-            "The minutes were not written",
-            format!("The transcript is untouched. {}", self::cause(*cause, language)),
+            "Couldn’t write the summary",
+            format!("The transcript is unchanged. {}", self::cause(*cause, language)),
         ),
         (Minutes::Failed(Some(cause)), French) => (
-            "Le compte rendu n’a pas été fait",
-            format!("La transcription est intacte. {}", self::cause(*cause, language)),
+            "Le compte rendu n’a pas pu être rédigé",
+            format!("La transcription n’a pas changé. {}", self::cause(*cause, language)),
         ),
         (Minutes::Failed(None), English) => (
-            "The minutes were not written",
-            format!("The transcript is untouched. “{entry}”, in Kitokey’s menu, tries again."),
+            "Couldn’t write the summary",
+            format!("The transcript is unchanged. Choose “{entry}” in the Kitokey menu to try again."),
         ),
         (Minutes::Failed(None), French) => (
-            "Le compte rendu n’a pas été fait",
-            format!("La transcription est intacte. «\u{a0}{entry}\u{a0}», dans le menu de Kitokey, le refait."),
+            "Le compte rendu n’a pas pu être rédigé",
+            format!("La transcription n’a pas changé. Choisissez «\u{a0}{entry}\u{a0}» dans le menu de Kitokey pour réessayer."),
         ),
         (Minutes::RedoFailed(cause), English) => (
-            "The minutes were not made again",
+            "Couldn’t redo the summary",
             match cause {
-                Some(cause) => format!("The previous ones stayed in place. {}", self::cause(*cause, language)),
+                Some(cause) => format!("The previous one is kept. {}", self::cause(*cause, language)),
                 None => "The previous ones stayed in place.".to_string(),
             },
         ),
         (Minutes::RedoFailed(cause), French) => (
-            "Le compte rendu n’a pas été refait",
+            "Le compte rendu n’a pas pu être refait",
             match cause {
-                Some(cause) => format!("Celui d’avant est resté en place. {}", self::cause(*cause, language)),
+                Some(cause) => format!("L’ancien est conservé. {}", self::cause(*cause, language)),
                 None => "Celui d’avant est resté en place.".to_string(),
             },
         ),
@@ -3058,8 +3058,8 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
             },
             English,
         ) => (
-            "The minutes were not written",
-            format!("The transcript is untouched. {}", cause_said(*cause, Some(model), language)),
+            "Couldn’t write the summary",
+            format!("The transcript is unchanged. {}", cause_said(*cause, Some(model), language)),
         ),
         (
             Minutes::FailedOwn {
@@ -3069,70 +3069,70 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
             },
             French,
         ) => (
-            "Le compte rendu n’a pas été fait",
-            format!("La transcription est intacte. {}", cause_said(*cause, Some(model), language)),
+            "Le compte rendu n’a pas pu être rédigé",
+            format!("La transcription n’a pas changé. {}", cause_said(*cause, Some(model), language)),
         ),
         (Minutes::FailedOwn { cause, model, again: true }, English) => (
-            "The minutes were not made again",
-            format!("The previous ones stayed in place. {}", cause_said(*cause, Some(model), language)),
+            "Couldn’t redo the summary",
+            format!("The previous one is kept. {}", cause_said(*cause, Some(model), language)),
         ),
         (Minutes::FailedOwn { cause, model, again: true }, French) => (
-            "Le compte rendu n’a pas été refait",
-            format!("Celui d’avant est resté en place. {}", cause_said(*cause, Some(model), language)),
+            "Le compte rendu n’a pas pu être refait",
+            format!("L’ancien est conservé. {}", cause_said(*cause, Some(model), language)),
         ),
         (Minutes::Waiting(host), English) => (
-            "The minutes wait for your agreement",
-            format!("Nothing is sent to {host} before you agree, in Kitokey’s window."),
+            "The summary needs your OK",
+            format!("Nothing is sent to {host} without your OK. Give it in the Kitokey window."),
         ),
         (Minutes::Waiting(host), French) => (
             "Le compte rendu attend votre accord",
-            format!("Rien n’est envoyé à {host} avant votre accord, dans la fenêtre de Kitokey."),
+            format!("Rien n’est envoyé à {host} sans votre accord. Donnez-le dans la fenêtre de Kitokey."),
         ),
-        (Minutes::Unchosen, English) => ("No one is chosen to write the minutes", "Choose in Kitokey’s settings.".to_string()),
+        (Minutes::Unchosen, English) => ("No model chosen for summaries", "Choose one in Kitokey Settings.".to_string()),
         (Minutes::Unchosen, French) => (
             "Aucun modèle choisi pour les comptes rendus",
-            "Choisissez-le dans les réglages de Kitokey.".to_string(),
+            "Choisissez-en un dans les Réglages de Kitokey.".to_string(),
         ),
         (Minutes::NoProvider(address), English) => (
-            "The minutes were not written",
-            format!("“{address}” is not a provider’s address: choose who writes the minutes in Kitokey’s settings."),
+            "Couldn’t write the summary",
+            format!("“{address}” isn’t a valid service address. Choose the summary service in Settings."),
         ),
         (Minutes::NoProvider(address), French) => (
-            "Le compte rendu n’a pas été fait",
+            "Le compte rendu n’a pas pu être rédigé",
             format!(
-                "«\u{a0}{address}\u{a0}» n’est pas l’adresse d’un fournisseur\u{a0}: choisissez qui écrit le compte rendu dans les réglages de Kitokey."
+                "«\u{a0}{address}\u{a0}» n’est pas l’adresse d’un service valide. Choisissez le service de compte rendu dans les Réglages."
             ),
         ),
         (Minutes::NoTranscript, English) => (
-            "No minutes without a transcript",
-            format!("The last recording has no whole transcript: “{}” first.", menu(language).transcribe),
+            "No summary without a transcript",
+            format!("The last recording has no complete transcript. Choose “{}” first.", menu(language).transcribe),
         ),
         (Minutes::NoTranscript, French) => (
             "Pas de compte rendu sans transcription",
             format!(
-                "Le dernier enregistrement n’a pas de transcription entière\u{a0}: «\u{a0}{}\u{a0}» d’abord.",
+                "Le dernier enregistrement n’a pas de transcription complète. Choisissez d’abord «\u{a0}{}\u{a0}».",
                 menu(language).transcribe
             ),
         ),
         (Minutes::OllamaWaits { silent: true }, English) => (
-            "The minutes wait for Ollama",
-            "The meeting is confidential, and Ollama does not answer on this computer. It is free, at ollama.com.".to_string(),
+            "The summary is waiting for Ollama",
+            "Confidential meeting: the summary must be written on this computer, but Ollama isn’t responding. Ollama is free at ollama.com.".to_string(),
         ),
         (Minutes::OllamaWaits { silent: true }, French) => (
             "Le compte rendu attend Ollama",
-            "La réunion est confidentielle, et Ollama ne répond pas sur cet ordinateur. Il est gratuit, sur ollama.com.".to_string(),
+            "Réunion confidentielle\u{a0}: le compte rendu doit être rédigé sur cet ordinateur, mais Ollama ne répond pas. Ollama est gratuit, sur ollama.com.".to_string(),
         ),
         (Minutes::OllamaWaits { silent: false }, English) => (
-            "The minutes wait for Ollama",
+            "The summary is waiting for Ollama",
             format!(
-                "The meeting is confidential, and Ollama holds no model yet: Kitokey’s window fetches {} in one click.",
+                "Confidential meeting: the summary must be written on this computer, but Ollama has no model. Download {} in one click in the Kitokey window.",
                 crate::providers::RECOMMENDED
             ),
         ),
         (Minutes::OllamaWaits { silent: false }, French) => (
             "Le compte rendu attend Ollama",
             format!(
-                "La réunion est confidentielle, et Ollama n’a encore aucun modèle\u{a0}: la fenêtre de Kitokey télécharge {} en un clic.",
+                "Réunion confidentielle\u{a0}: le compte rendu doit être rédigé sur cet ordinateur, mais Ollama n’a aucun modèle. Téléchargez {} en un clic dans la fenêtre de Kitokey.",
                 crate::providers::RECOMMENDED
             ),
         ),
@@ -3145,20 +3145,20 @@ pub fn minutes(said: &Minutes, language: Language) -> Notice {
 pub fn transcript_kept_beside(language: Language, name: &str, not_put_back: bool) -> Notice {
     let (title, body) = match (language, not_put_back) {
         (Language::English, false) => (
-            "The previous transcript is kept",
-            format!("It could not go to the trash: it is beside the new one, as {name}."),
+            "Previous transcript kept",
+            format!("It couldn’t be moved to the trash. It’s next to the new one, as {name}."),
         ),
         (Language::French, false) => (
-            "L’ancienne transcription est gardée",
-            format!("Elle n’a pas pu aller à la corbeille\u{a0}: elle est à côté de la nouvelle, sous {name}."),
+            "Ancienne transcription conservée",
+            format!("Elle n’a pas pu aller à la corbeille\u{a0}: elle est à côté de la nouvelle, sous le nom {name}."),
         ),
         (Language::English, true) => (
-            "The transcript could not be put back",
-            format!("It is in the meeting’s folder, as {name}."),
+            "Couldn’t restore the transcript",
+            format!("It’s in the meeting’s folder, as {name}."),
         ),
         (Language::French, true) => (
-            "La transcription n’a pas pu être remise en place",
-            format!("Elle est dans le dossier de la réunion, sous {name}."),
+            "La transcription n’a pas pu être restaurée",
+            format!("Elle se trouve dans le dossier de la réunion, sous le nom {name}."),
         ),
     };
     Notice { title: title.into(), body }
@@ -3296,7 +3296,7 @@ pub fn offer(application: &str, language: Language) -> (Notice, [&'static str; 3
                 title: format!("{application} is using your microphone"),
                 body: "Record this call with Kitokey?".into(),
             },
-            ["Record", "Not this time", "Never offer"],
+            ["Record", "Not this time", "Don’t ask again"],
         ),
         Language::French => (
             Notice {
@@ -3359,53 +3359,53 @@ pub enum Refusal {
 pub fn audio_trashed(language: Language, outcome: &Result<(usize, u32), Refusal>) -> Notice {
     let (title, body) = match (language, outcome) {
         (Language::English, Ok((1, days))) => (
-            "Audio moved to the trash".to_string(),
+            "Audio moved to trash".to_string(),
             format!(
-                "The audio of 1 meeting kept more than {} is in the trash; its transcript and minutes stay.",
+                "The audio of 1 meeting older than {} is in the trash; its transcript and summary remain.",
                 english_days(*days)
             ),
         ),
         (Language::English, Ok((meetings, days))) => (
-            "Audio moved to the trash".to_string(),
+            "Audio moved to trash".to_string(),
             format!(
-                "The audio of {meetings} meetings kept more than {} is in the trash; their transcripts and minutes stay.",
+                "The audio of {meetings} meetings older than {} is in the trash; their transcripts and summaries remain.",
                 english_days(*days)
             ),
         ),
         (Language::French, Ok((1, days))) => (
-            "Audio mis à la corbeille".to_string(),
+            "Audio déplacé dans la corbeille".to_string(),
             format!(
-                "L’audio d’une réunion gardé plus {} est dans la corbeille\u{202f}; sa transcription et son compte rendu restent.",
+                "L’audio d’une réunion de plus {} est dans la corbeille\u{202f}; sa transcription et son compte rendu restent.",
                 french_days(*days)
             ),
         ),
         (Language::French, Ok((meetings, days))) => (
-            "Audio mis à la corbeille".to_string(),
+            "Audio déplacé dans la corbeille".to_string(),
             format!(
-                "L’audio de {meetings} réunions gardé plus {} est dans la corbeille\u{202f}; leurs transcriptions et leurs comptes rendus restent.",
+                "L’audio de {meetings} réunions de plus {} est dans la corbeille\u{202f}; leurs transcriptions et comptes rendus restent.",
                 french_days(*days)
             ),
         ),
         // The trash may have taken some before it refused: what is said holds either way.
         (Language::English, Err(refusal)) => (
-            "The audio was not all moved to the trash".to_string(),
+            "Some audio couldn’t be moved to the trash".to_string(),
             format!(
-                "{} What was not moved stays where it was; nothing was deleted.",
+                "{} The rest is untouched — nothing was deleted.",
                 match refusal {
                     Refusal::NotAllowed => "The trash refused access.",
-                    Refusal::NoSpace => "The trash has no room left.",
-                    Refusal::Other => "The system's trash did not take it.",
+                    Refusal::NoSpace => "The trash is full.",
+                    Refusal::Other => "The system trash refused these files.",
                 }
             ),
         ),
         (Language::French, Err(refusal)) => (
-            "L’audio n’a pas été entièrement mis à la corbeille".to_string(),
+            "Audio pas entièrement mis à la corbeille".to_string(),
             format!(
-                "{} Ce qui n’a pas été déplacé reste à sa place\u{202f}; rien n’a été supprimé.",
+                "{} Le reste est intact\u{a0}: rien n’a été supprimé.",
                 match refusal {
                     Refusal::NotAllowed => "La corbeille a refusé l’accès.",
-                    Refusal::NoSpace => "La corbeille n’a plus de place.",
-                    Refusal::Other => "La corbeille du système ne l’a pas pris.",
+                    Refusal::NoSpace => "La corbeille est pleine.",
+                    Refusal::Other => "La corbeille du système a refusé ces fichiers.",
                 }
             ),
         ),
@@ -3430,10 +3430,10 @@ pub fn trial_left(left: Left, language: Language) -> String {
     match (language, left.days, left.meetings) {
         (Language::English, 0, _) => format!("{meetings} left."),
         (Language::English, _, 0) => format!("{days} left."),
-        (Language::English, ..) => format!("{days} and {meetings} left; the trial ends once both are used up."),
+        (Language::English, ..) => format!("{days} and {meetings} left. The trial ends when both run out."),
         (Language::French, 0, _) => format!("Il reste {meetings}."),
         (Language::French, _, 0) => format!("Il reste {days}."),
-        (Language::French, ..) => format!("Il reste {days} et {meetings}\u{202f}; l’essai prend fin une fois les deux épuisés."),
+        (Language::French, ..) => format!("Il reste {days} et {meetings}\u{202f}; l’essai se termine quand les deux sont épuisés."),
     }
 }
 
@@ -3456,11 +3456,11 @@ pub fn carried_over(language: Language) -> Notice {
     let (title, body) = match language {
         Language::English => (
             "Wholeheard is now Kitokey",
-            "Your settings, your meetings and the transcription model are carried over; the keyboard shortcut may be asked once more.",
+            "Your settings, meetings and transcription model have been carried over. You may be asked for the keyboard shortcut once more.",
         ),
         Language::French => (
             "Wholeheard s’appelle maintenant Kitokey",
-            "Vos réglages, vos réunions et le modèle de transcription sont repris\u{202f}; le raccourci clavier peut être redemandé une fois.",
+            "Vos réglages, vos réunions et le modèle de transcription ont été repris. Le raccourci clavier pourra vous être redemandé une fois.",
         ),
     };
     Notice {
@@ -3474,12 +3474,12 @@ pub fn carried_over(language: Language) -> Notice {
 pub fn carry_failed(language: Language) -> Notice {
     let (title, body) = match language {
         Language::English => (
-            "Wholeheard’s settings were not all carried over",
-            "Nothing is lost: they stay where they were, and it is tried again at the next start.",
+            "Some Wholeheard settings weren’t carried over",
+            "Nothing is lost — Kitokey will try again next time it starts.",
         ),
         Language::French => (
-            "Les réglages de Wholeheard n’ont pas tous été repris",
-            "Rien n’est perdu\u{a0}: ils restent où ils étaient, et la reprise est tentée de nouveau au prochain démarrage.",
+            "Réglages de Wholeheard en partie non repris",
+            "Rien n’est perdu\u{a0}: Kitokey réessaiera au prochain démarrage.",
         ),
     };
     Notice {
