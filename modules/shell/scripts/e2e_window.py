@@ -704,7 +704,8 @@ class Window:
                     return port
                 time.sleep(0.01)
             if not refused():
-                # Neither taken nor up in ten seconds: the session's own bounds say what it was (#510).
+                # Neither taken nor up in ten seconds: said, then the session's own bounds say what it was (#510).
+                print("    (tauri-driver neither refused nor listening in 10 s: the session asked as before — #943)")
                 return port
             taken.append(refused()[0])
             print(f"    (tauri-driver's ports taken, started again on fresh ones: {taken[-1]} — #943)")

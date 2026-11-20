@@ -165,6 +165,10 @@ fn its_port_taken_the_driver_is_started_again_and_the_session_is_asked_of_its_ow
         "the start again not said with what the driver said: {said}"
     );
     assert!(
+        !said.contains("neither refused nor listening"),
+        "a start fell back on its 10 s: {said}"
+    );
+    assert!(
         field(&said, "stale").starts_with("[]"),
         "a given-up start's WebKitWebDriver still runs: {said}"
     );
@@ -182,6 +186,10 @@ fn its_native_port_taken_the_driver_is_started_again_and_the_session_is_asked_of
         "the start again not said with what the driver said: {said}"
     );
     assert!(
+        !said.contains("neither refused nor listening"),
+        "a start fell back on its 10 s: {said}"
+    );
+    assert!(
         field(&said, "stale").starts_with("[]"),
         "a given-up start's WebKitWebDriver still runs: {said}"
     );
@@ -194,6 +202,10 @@ fn a_port_still_taken_after_three_starts_fails_the_start_naming_it() {
         field(&said, "raised").starts_with("\"RuntimeError: tauri-driver's ports taken three times")
             && field(&said, "raised").contains("can not listen to address"),
         "the start did not fail naming the taken port: {said}"
+    );
+    assert!(
+        !said.contains("neither refused nor listening"),
+        "a start fell back on its 10 s: {said}"
     );
     assert!(field(&said, "picks").starts_with('6'), "not three starts, two ports each: {said}");
 }
