@@ -637,6 +637,18 @@ fn minutes_v5_whose_front_matter_and_body_disagree_are_unreadable() {
         ("no structure", example.replacen("structure: project_review\n", "", 1)),
         ("an id twice", example.replacen(r#""id": "risks""#, r#""id": "status""#, 1)),
         ("sections not an array", example.replacen("sections: [", "sections: {\"a\": [", 1)),
+        (
+            "an empty about",
+            example.replacen(r#""about": "Each risk"#, r#""about": "", "was": "Each risk"#, 1),
+        ),
+        (
+            "an about on two lines",
+            example.replacen(r#""about": "Each risk"#, r#""about": "Each\nrisk"#, 1),
+        ),
+        (
+            "an about over 200 characters",
+            example.replacen(r#""about": "Each risk"#, &format!(r#""about": "{}"#, "x".repeat(201)), 1),
+        ),
         ("seven sections", {
             let more: String = ["a", "b", "c"]
                 .iter()
@@ -676,4 +688,17 @@ fn in_minutes_v5_a_time_ends_an_item_of_the_first_section_too() {
         panic!("not read")
     };
     assert!(minutes.body.contains(r#"<time data-second="65">01:05</time>"#), "{}", minutes.body);
+}
+
+#[test]
+fn an_about_of_200_characters_is_within_its_bounds() {
+    let text = v5_example().replacen(
+        r#""about": "Each risk or issue raised, one bullet each.""#,
+        &format!(r#""about": "{}""#, "x".repeat(200)),
+        1,
+    );
+    assert!(
+        matches!(read_v5(&text), Read::Present(_)),
+        "200 characters is the most, not too many"
+    );
 }
