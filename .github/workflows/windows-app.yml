@@ -23,6 +23,7 @@ on:
     paths:
       - "modules/capture/**"
       - "modules/summary/**"
+      - "modules/export/**"
       - "modules/transcription/**"
       - "modules/shell/**"
       - "modules/install/**"
@@ -68,7 +69,7 @@ jobs:
           python - "$zip" <<'PY'
           import sys, zipfile
           names = sorted(zipfile.ZipFile(sys.argv[1]).namelist())
-          programs = ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary")
+          programs = ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary", "kitokey-export")
           wanted = sorted(f"Kitokey/{p}.exe" for p in programs)
           print(names)
           sys.exit(names != wanted)

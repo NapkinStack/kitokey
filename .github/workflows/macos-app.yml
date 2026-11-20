@@ -17,6 +17,7 @@ on:
     paths:
       - "modules/capture/**"
       - "modules/summary/**"
+      - "modules/export/**"
       - "modules/transcription/**"
       - "modules/shell/**"
       - "modules/install/**"
@@ -55,7 +56,7 @@ jobs:
           unpacked=$(mktemp -d)
           ditto -x -k "$zip" "$unpacked"
           app=$unpacked/Kitokey.app
-          for program in kitokey kitokey-capture kitokey-transcription kitokey-speech kitokey-summary; do
+          for program in kitokey kitokey-capture kitokey-transcription kitokey-speech kitokey-summary kitokey-export; do
             test -x "$app/Contents/MacOS/$program"
           done
           read_key() { plutil -extract "$1" raw "$app/Contents/Info.plist"; }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run on a Mac by scripts/release.sh: Kitokey.app from the artefacts each module's release
-# left — the four programs side by side in Contents/MacOS, where the shell looks for them, and
+# left — the five programs side by side in Contents/MacOS, where the shell looks for them, and
 # transcription's kitokey-speech beside its own (D42) —, its
 # Info.plist and icon, signed ad hoc (an Apple chip runs nothing unsigned), zipped as macOS keeps a
 # bundle whole. Usage: build.sh <artefacts> <version> <out>
@@ -12,7 +12,7 @@ trap 'rm -rf "$work"' EXIT
 app=$work/Kitokey.app
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 for program in shell/kitokey capture/kitokey-capture transcription/kitokey-transcription transcription/kitokey-speech \
-  summary/kitokey-summary; do
+  summary/kitokey-summary export/kitokey-export; do
   install -m755 "$artefacts/$program" "$app/Contents/MacOS/${program#*/}"
 done
 python3 "$here/info.py" "$app" "$version"

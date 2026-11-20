@@ -22,7 +22,7 @@ def check(what, held, got=""):
     print(f"  {'ok  ' if held else 'FAIL'}  {what}" + ("" if held else f"\n        got: {got}"))
     failed |= not held
 check("what is installed is what %files lists", installed == files, installed ^ files)
-for program in ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary"):
+for program in ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary", "kitokey-export"):
     check(f"{program} in /usr/bin, beside the others", f"/usr/bin/{program}" in files)
 check("the desktop entry is named as the application's id", "/usr/share/applications/com.napkinstack.Kitokey.desktop" in files)
 check("its icon, under the same name", "/usr/share/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png" in files)
@@ -34,7 +34,7 @@ check("pw-metadata required: capture runs it, no library names it", re.search(r"
 check("the tray's library required: the shell opens it at run time, no link names it",
       re.search(r"^Requires:.*\blib(ayatana-)?appindicator-gtk3\b", spec, re.M) is not None)
 pairs = re.findall(r"^install -D\S* %\{artefacts\}/\S+/(\S+) %\{buildroot\}%\{_bindir\}/(\S+)$", spec, re.M)
-check("each program installs its own artefact", len(pairs) == 4 and all(a == b for a, b in pairs), pairs)
+check("each program installs its own artefact", len(pairs) == 5 and all(a == b for a, b in pairs), pairs)
 scriptlets = re.findall(r"^%(pre|post|preun|postun|pretrans|posttrans|trigger\w*)\b", spec, re.M)
 check("no scriptlet: installing and removing touch nothing but the package's files", not scriptlets, scriptlets)
 # The .deb (D27): made by deb/build.sh from the same artefacts — what it installs is judged on the
@@ -60,6 +60,7 @@ check("Kitokey takes Wholeheard's place, and Summit's still: the rpm obsoletes a
 mac = sys.argv[4]
 macbuild = open(os.path.join(mac, "build.sh"), encoding="utf-8").read()
 for program in ("shell/kitokey", "capture/kitokey-capture", "transcription/kitokey-transcription", "summary/kitokey-summary",
+                "export/kitokey-export",
                 # Apple's SpeechAnalyzer, through transcription's Swift program (D42, ADR-0012).
                 "transcription/kitokey-speech"):
     check(f"{program.split('/')[1]} in Contents/MacOS, beside the others", program in macbuild)
@@ -87,7 +88,7 @@ windows = os.path.join(os.path.dirname(mac), "windows", "build.py")
 with tempfile.TemporaryDirectory() as work:
     artefacts, out = os.path.join(work, "artefacts"), os.path.join(work, "out")
     names = ("shell/kitokey.exe", "capture/kitokey-capture.exe",
-             "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe")
+             "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe", "export/kitokey-export.exe")
     for name in names:
         os.makedirs(os.path.join(artefacts, os.path.dirname(name)), exist_ok=True)
         open(os.path.join(artefacts, name), "wb").write(name.encode())
@@ -96,7 +97,7 @@ with tempfile.TemporaryDirectory() as work:
     made = os.listdir(out)
     check("Windows' zip is named by its version and processor", made == ["Kitokey-1.2.3-windows-x64.zip"], made)
     inside = sorted(zipfile.ZipFile(os.path.join(out, made[0])).namelist()) if made else []
-    check("the four programs side by side in one folder, where the shell looks for them",
+    check("the five programs side by side in one folder, where the shell looks for them",
           inside == sorted(f"Kitokey/{name.split('/')[1]}" for name in names), inside)
 # Windows' package (D54): made on Windows by windows/msix.py; its manifest and what it holds, read here.
 sys.dont_write_bytecode = True
@@ -157,7 +158,7 @@ with tempfile.TemporaryDirectory() as work:
         open(os.path.join(artefacts, name), "wb").write(name.encode())
     msix.stage(artefacts, "1.2.3", stage)
     held = {os.path.relpath(os.path.join(folder, file), stage).replace(os.sep, "/") for folder, _, files in os.walk(stage) for file in files}
-    check("the four programs, the manifest and its logos are what it holds, and no more",
+    check("the five programs, the manifest and its logos are what it holds, and no more",
           held == {name.split("/")[1] for name in names} | {"AppxManifest.xml"} | {logo.replace("\\", "/") for logo in sizes}, held)
     for logo, side in sizes.items():
         head = open(os.path.join(stage, logo.replace("\\", "/")), "rb").read(24) if logo else b""

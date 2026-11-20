@@ -90,7 +90,7 @@ try {
     Add-AppxPackage -Path $first
     $installed = Get-AppxPackage -Name $identity.name
     Check "installed, version $version.0" ($installed.Version -eq "$version.0")
-    foreach ($program in 'kitokey', 'kitokey-capture', 'kitokey-transcription', 'kitokey-summary') {
+    foreach ($program in 'kitokey', 'kitokey-capture', 'kitokey-transcription', 'kitokey-summary', 'kitokey-export') {
         Check "$program.exe inside it" (Test-Path (Join-Path $installed.InstallLocation "$program.exe"))
     }
     $own = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalCache"
