@@ -497,7 +497,7 @@ fn discord_content(title: &str, summary: &str) -> String {
 
 /// A `multipart/form-data` body of `payload_json` and one file, as Discord's *Execute Webhook* takes it.
 fn multipart(payload: &str, file_name: &str, file: &[u8]) -> Body {
-    let boundary = "kitokey-send-7b1f0c2e9a4d4b8f";
+    let boundary = boundary(&[payload.as_bytes(), file]);
     let mut bytes = Vec::new();
     bytes.extend_from_slice(
         format!(
@@ -513,6 +513,22 @@ fn multipart(payload: &str, file_name: &str, file: &[u8]) -> Body {
     Body {
         content_type: format!("multipart/form-data; boundary={boundary}"),
         bytes,
+    }
+}
+
+/// A boundary drawn for each send and absent from every part, as RFC 2046 asks: a meeting's text can
+/// never close a part, whatever line ending a server's parser accepts.
+fn boundary(parts: &[&[u8]]) -> String {
+    use std::hash::{BuildHasher, Hasher};
+    loop {
+        let drawn = || std::collections::hash_map::RandomState::new().build_hasher().finish();
+        let boundary = format!("kitokey-send-{:016x}{:016x}", drawn(), drawn());
+        if !parts
+            .iter()
+            .any(|part| part.windows(boundary.len()).any(|window| window == boundary.as_bytes()))
+        {
+            return boundary;
+        }
     }
 }
 

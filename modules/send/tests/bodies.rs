@@ -145,3 +145,23 @@ fn a_summary_beyond_discords_20_mib_is_not_sent_rather_than_cut() {
     let within = format!("---\ncontract: minutes/v4\n---\n\n## A\n\n{}\n", "x".repeat(DISCORD_FILE - 100));
     assert!(body(Kind::Discord, &read(&[("minutes.md", &within)]).unwrap(), "T", "f").is_some());
 }
+
+#[test]
+fn discords_boundary_is_drawn_for_each_send_and_absent_from_the_meetings_text() {
+    let meeting = read(&[("minutes.md", V4)]).unwrap();
+    let boundary = |sent: &kitokey_send::Body| {
+        sent.content_type
+            .strip_prefix("multipart/form-data; boundary=")
+            .unwrap()
+            .to_string()
+    };
+    let first = body(Kind::Discord, &meeting, "T", "f").unwrap();
+    let second = body(Kind::Discord, &meeting, "T", "f").unwrap();
+    assert_ne!(boundary(&first), boundary(&second));
+    // A summary holding the first boundary, on a line of its own as a lenient parser would read it.
+    let forged = format!("---\ncontract: minutes/v4\n---\n\n## A\n\nx\n--{}\ny\n", boundary(&first));
+    let sent = body(Kind::Discord, &read(&[("minutes.md", &forged)]).unwrap(), "T", "f").unwrap();
+    let text = String::from_utf8(sent.bytes.clone()).unwrap();
+    // Its own boundary opens two parts and closes them, and is nowhere in the text.
+    assert_eq!(text.matches(&format!("--{}", boundary(&sent))).count(), 3);
+}
