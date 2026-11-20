@@ -3832,6 +3832,11 @@ def minutes_copied(now: dt.datetime) -> None:
         lines = browser.execute_script("return window.__copied")
         check("« Copier la transcription »: each line with its time and who said it, as the page names them; « Copié » said in place (D109)",
               told and lines == [{"text/plain": "[00:00] Vous\u00a0: Bonjour.\n[01:15] Les autres · voix 2\u00a0: Le devis part vendredi.\n"}], lines)
+        browser.execute_script(stand_in, True)
+        press(browser, "copy-transcript")
+        said_back = "return document.getElementById('transcript-copied')?.textContent"
+        refused = wait_for(browser, lambda b: b.execute_script(said_back) == "Impossible de copier la transcription.", 3)
+        check("the clipboard refused the transcript: one sentence says so (D109)", refused, browser.execute_script(said_back))
         # The real clipboard, the run's own private session's (WAYLAND_DISPLAY, never the user's): what a
         # paste elsewhere reads, its two types (D109, the harness proved to read them).
         browser.execute_script("delete navigator.clipboard")
