@@ -669,6 +669,13 @@ for _name in ("session.schema.json", "clock.schema.json"):
     EXAMPLES[f"session-audio/v3/{_name}"] = (_allowed, _refused)
 EXAMPLES["session-audio/v3/session.schema.json"][1].append(EXAMPLES["session-audio/v2/session.schema.json"][0][0])
 
+# exporting/v1's input: each of its fields refused when it alone is missing, and when it holds a line break.
+_INPUT = EXAMPLES["exporting/v1/input.schema.json"][0][0]
+EXAMPLES["exporting/v1/input.schema.json"][1].extend(
+    [{key: value for key, value in _INPUT.items() if key != name} for name in _INPUT]
+    + [{**_INPUT, name: f"{value}\n"} for name, value in _INPUT.items()]
+)
+
 
 @pytest.mark.parametrize("path", SCHEMAS, ids=NAMES)
 def test_a_schema_allows_what_its_page_shows_and_refuses_what_its_page_refuses(path):

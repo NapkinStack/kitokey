@@ -31,8 +31,10 @@ and nowhere else.
 
 `kitokey-export <session-folder> --format <format> --lang <language>`, then any of
 `--without-summary`, `--without-transcript`, `--without-speakers`, `--without-times`; the options
-in any order. The arguments hold nothing of the person's: a session's folder is named by the day
-and hour it started (`session-audio`), and every other argument is a choice of form.
+in any order. The arguments hold no word of the meeting: a session's folder is named by the day
+and hour it started (`session-audio`) — its path, under the folder the person chose, is an argument
+as it is for `summarising/v1` — and every other argument is a choice of form. A process's arguments
+are public to the machine's users; what is the person's goes on the input.
 
 - `<format>`: `md` — CommonMark, a YAML front matter, the transcript a GFM table —, `html`, `docx`,
   `srt`, `vtt`, `pdf` — tagged, PDF/UA-1.
