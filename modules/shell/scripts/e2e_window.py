@@ -3781,6 +3781,12 @@ def minutes_copied(now: dt.datetime) -> None:
         "---\ncontract: minutes/v1\nmade: 2026-10-28T10:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
         "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
     (broken / "minutes.md").write_text("pas un compte rendu\n")
+    # Two lines, two speakers: the page's own words for each, a voice told in the second (D109).
+    (written / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n'
+        '{"type":"segment","speaker":"others","track":"remote","voice":"2","start":75.0,"end":77.0,"text":"Le devis part vendredi."}\n'
+        '{"type":"complete","duration":77.0}\n')
     expected = ("## Points saillants\n\nLe budget est validé.\n\n## Actions\n\n- Envoyer le devis — Inès — vendredi\n\n"
                 "## Points clés\n\n- Rien\n")
     # The clipboard stood in: what the page writes is kept on the page, never the user's own clipboard —
@@ -3819,6 +3825,13 @@ def minutes_copied(now: dt.datetime) -> None:
         refused = wait_for(browser, lambda b: b.execute_script(status) == "Impossible de copier le compte rendu.", 3)
         check("the clipboard refused: one sentence says so, the minutes as they were",
               refused and browser.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2"), browser.execute_script(status))
+        # The transcript copied too, each line with when and who said it, as the page names them (D109).
+        browser.execute_script(stand_in, False)
+        press(browser, "copy-transcript")
+        told = wait_for(browser, lambda b: b.execute_script("return document.getElementById('transcript-copied')?.textContent") == "Copié", 3)
+        lines = browser.execute_script("return window.__copied")
+        check("« Copier la transcription »: each line with its time and who said it, as the page names them; « Copié » said in place (D109)",
+              told and lines == [{"text/plain": "[00:00] Vous\u00a0: Bonjour.\n[01:15] Les autres · voix 2\u00a0: Le devis part vendredi.\n"}], lines)
         # The real clipboard, the run's own private session's (WAYLAND_DISPLAY, never the user's): what a
         # paste elsewhere reads, its two types (D109, the harness proved to read them).
         browser.execute_script("delete navigator.clipboard")
