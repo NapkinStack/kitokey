@@ -11376,8 +11376,9 @@ def png_size(file: Path) -> tuple[int, int]:
 
 def store_shots(now: dt.datetime) -> None:
     """CH. D103: the Microsoft Store's screenshots, made here from meetings invented for them, in French then
-    in English, light: the list with a meeting open, a meeting's page with its minutes and transcript, a
-    meeting's page while it records, Settings. Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
+    in English, light, in the Store's order — the benefit first (the coordinator, 2026-11-20, from Microsoft's
+    « especially representative » first image): a meeting's page with its minutes and transcript, a meeting's
+    page while it records, the list with another meeting open, Settings. Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
     its MSIX page read on 2026-11-20 (D103's section) —, written to `store/<fr|en>/` in KITOKEY_SCREENSHOTS'
     folder, or the run's own; then counted: four PNGs a language, each at least 1366 × 768, at most 50 MB."""
     print("CH. the Store's screenshots: four a language, French and English, 1920 × 1080, from meetings invented for them (D103)")
@@ -11417,8 +11418,8 @@ def store_shots(now: dt.datetime) -> None:
                 browser.set_window_size(2 * 1920 - browser.execute_script("return innerWidth"), 1080)
                 wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 5)
             (store / short).mkdir(parents=True, exist_ok=True)
-            pages = (("1-list", f"#/meeting/{names[3]}", "#meeting .minutes .body h2"),
-                     ("2-meeting", f"#/meeting/{names[-1]}", "#meeting .transcript .lines li"))
+            pages = (("3-list", f"#/meeting/{names[3]}", "#meeting .minutes .body h2"),
+                     ("1-meeting", f"#/meeting/{names[-1]}", "#meeting .transcript .lines li"))
             for shot_name, address, drawn in pages:
                 browser.execute_script("location.hash = arguments[0]", address)
                 wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, drawn), 10)
@@ -11440,7 +11441,7 @@ def store_shots(now: dt.datetime) -> None:
                 wait_for(browser, lambda b: (meetings / recorded[0] / "context.txt").exists(), 3)
                 browser.execute_script("document.activeElement.blur(); scrollTo(0, 0)")
                 time.sleep(1.5)
-                browser.save_screenshot(str(store / short / "3-recording.png"))
+                browser.save_screenshot(str(store / short / "2-recording.png"))
                 time.sleep(0.6)
                 browser.find_element(By.ID, "record").click()
                 wait_for(browser, lambda b: not live(b), 10)
@@ -11453,7 +11454,7 @@ def store_shots(now: dt.datetime) -> None:
     sizes = {f"{file.parent.name}/{file.name}": (png_size(file), file.stat().st_size) for file in made}
     check("the Store's screenshots: four a language, French and English, in the Store's order (D103)",
           [name for name in sizes] == [f"{short}/{n}" for short in ("en", "fr")
-                                       for n in ("1-list.png", "2-meeting.png", "3-recording.png", "4-settings.png")], sorted(sizes))
+                                       for n in ("1-meeting.png", "2-recording.png", "3-list.png", "4-settings.png")], sorted(sizes))
     check("each at least 1366 × 768 and at most 50 MB, as Microsoft's page asks (D103)",
           bool(sizes) and all(w >= STORE_LEAST[0] and h >= STORE_LEAST[1] and 0 < size <= STORE_MOST for (w, h), size in sizes.values()),
           sizes)
