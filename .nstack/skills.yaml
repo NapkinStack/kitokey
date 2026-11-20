@@ -1,4 +1,4 @@
-# Mapping from playbooks to Claude Code skills.
+# Mapping from playbooks to the agents' skills.
 #
 # The playbooks in `.nstack/playbooks/` are the SOURCE OF TRUTH: plain markdown, portable,
 # usable by any agent. The skills are derived from them.

@@ -171,7 +171,7 @@ flowchart TD
     B --> C1["MANIFEST pre-filled<br/>owner organisation/team"]:::generated
     B --> C2["AGENTS.md and README<br/>with the expected sections"]:::generated
     B --> C3["No command yet: green<br/>until its first code"]:::generated
-    B --> C4["CODEOWNERS updated"]:::generated
+    B --> C4["CODEOWNERS updated<br/>unless another agent approves it"]:::generated
     B --> C5["Runbook<br/>when criticality is high or critical"]:::generated
     B --> C6["Fitness functions and CI<br/>active from the first commit"]:::generated
     C3 --> E["The team declares its stack's<br/>check and test, then codes"]:::human
