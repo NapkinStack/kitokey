@@ -646,8 +646,8 @@ pub struct Window {
     /// limit. Placeholders: none.
     pub remote_described: &'static str,
     /// Who spoke over the meeting, for whoever does not see the drawing.
-    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the speaking-
-    /// time drawing. At most: no limit. Placeholders: none.
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the
+    /// speaking-time drawing. At most: no limit. Placeholders: none.
     pub who_spoke: &'static str,
     /// Shows: a meeting's page, as a status. When: transcript card, none yet. At most: no limit.
     /// Placeholders: none.
@@ -716,7 +716,7 @@ pub struct Window {
     /// downloaded. At most: one line. Placeholders: none.
     pub model_coming: &'static str,
     /// Shows: a meeting's page, as a button. When: download the transcription model. At most: about
-    /// 40 characters. Placeholders: {} host.
+    /// 40 characters. Placeholders: {} the model's size, then {} its host.
     pub model_offer: &'static str,
     /// The short list of models to download (D37): its heading, the gesture, how far, and the
     /// model chosen that is not here yet, in the choice.
@@ -1362,8 +1362,8 @@ pub struct Window {
     /// At most: no limit. Placeholders: none.
     pub agree_lead: &'static str,
     /// Shows: the agreement before a meeting leaves, as a name, then its line. When: what leaves:
-    /// the transcript; {} minutes, {} words. At most: no limit. Placeholders: {} filled by the
-    /// window.
+    /// the transcript. At most: no limit. Placeholders: in the line, {} the minutes, then {} the
+    /// words.
     pub agree_leaves: [&'static str; 2],
     /// Shows: the agreement before a meeting leaves, as a name, then its line. When: what leaves:
     /// the context; {} words. At most: no limit. Placeholders: {} the context's number of words.
@@ -1627,8 +1627,8 @@ pub struct Window {
     /// Shows: a meeting's page, as a label. When: row: spoken language. At most: about 20
     /// characters. Placeholders: none.
     pub language_label: &'static str,
-    /// Shows: a meeting's page, as a choice of a list. When: "As in Settings", followed by — value.
-    /// At most: about 30 characters. Placeholders: none.
+    /// Shows: a meeting's page, as a choice of a list: its first, followed by « — » and the language
+    /// Settings name. When: always. At most: about 30 characters. Placeholders: none.
     pub language_default: &'static str,
     /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
     /// first choice. When: Whisper or a service hears. At most: one line. Placeholders: none.
