@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A line of the posting program's output",
+  "description": "posting/v1 — one JSON object a line. What a schema cannot say is on the contract's page: `sent`, `checked` or `failed` is the last line, and the only one.",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "sent"
+        }
+      },
+      "required": [
+        "event"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "checked"
+        }
+      },
+      "required": [
+        "event"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "failed"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "retry_after": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "event",
+        "code"
+      ]
+    },
+    {
+      "description": "An event this version does not name: a consumer ignores it.",
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string",
+          "not": {
+            "enum": [
+              "sent",
+              "checked",
+              "failed"
+            ]
+          }
+        }
+      },
+      "required": [
+        "event"
+      ]
+    }
+  ]
+}
