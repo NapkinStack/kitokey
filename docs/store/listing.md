@@ -16,14 +16,17 @@ a `.png` of at most 50 MB, shown « in order », each with a caption of at most 
 ([*App screenshots, images, and trailers for MSIX app*](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/screenshots-and-images),
 read on 2026-11-20, D103's section of [cycle 11](../project/cycles/11-kitokey-on-sale-and-out-of-the-app.md#d103)).
 The run writes them to `store/<en|fr>/<n>-<what>.png` in its screenshots' folder, and checks their count, order and
-size; they are uploaded for each language in this order.
+size; they are uploaded for each language in this order. The order puts the benefit first — Microsoft's first
+image « especially representative and appealing » —, and each caption says what the buyer gets, not the
+screen's name (the coordinator's ruling, 2026-11-20). Nothing is added to the images: no logo, no text. What
+matters stays in their top two-thirds, the bottom third being where the Store may lay its own text.
 
 | # | File | Caption (English) | Légende (français) |
 |---|---|---|---|
-| 1 | `1-list.png` | Your meetings by week, each with its minutes, open beside the list. | Vos réunions par semaine, chacune avec son compte rendu, ouverte à côté de la liste. |
-| 2 | `2-meeting.png` | Minutes written on your computer — highlights, actions by who and by when, key points — beside a transcript you can listen to. | Un compte rendu écrit sur votre ordinateur — points saillants, actions par qui et pour quand, points clés — à côté d'une transcription à réécouter. |
-| 3 | `3-recording.png` | Recording any call from the window, or from a discreet bar above your other windows. | L'enregistrement de tout appel, depuis la fenêtre ou une barre discrète au-dessus de vos autres fenêtres. |
-| 4 | `4-settings.png` | Transcription and minutes on this computer by default; a service only if you choose one, with your own key. | Transcription et compte rendu sur cet ordinateur par défaut ; un service seulement si vous le choisissez, avec votre clé. |
+| 1 | `1-meeting.png` | Minutes and actions written after your meeting — who does what, by when — on your computer, beside a transcript you can listen to. | Le compte rendu et les actions, écrits après votre réunion — qui fait quoi, pour quand — sur votre ordinateur, à côté d'une transcription à réécouter. |
+| 2 | `2-recording.png` | Record any call with no bot in it: from the window, or from a discreet bar above your other windows. | Enregistrez tout appel, sans robot dedans : depuis la fenêtre, ou une barre discrète au-dessus de vos autres fenêtres. |
+| 3 | `3-list.png` | Every meeting kept on your computer, by week, its minutes one click away. | Toutes vos réunions gardées sur votre ordinateur, par semaine, leur compte rendu à un clic. |
+| 4 | `4-settings.png` | On this computer by default. A service only if you choose one, with your own key. | Sur cet ordinateur par défaut. Un service seulement si vous le choisissez, avec votre clé. |
 
 ## English
 
