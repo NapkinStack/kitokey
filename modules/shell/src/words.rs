@@ -337,23 +337,11 @@ pub struct Menu {
 /// The words a file exported shows that no contract carries (`exporting/v1`'s input, D109): the
 /// transcript's heading, who spoke, and the transcript's three columns.
 pub struct Exported {
-    /// Shows: an exported file, the transcript's heading. When: the transcript is included. At
-    /// most: 24 characters. Placeholders: none.
     pub transcript: &'static str,
-    /// Shows: an exported file, who spoke: the person. When: the transcript is included. At most:
-    /// 16 characters. Placeholders: none.
     pub me: &'static str,
-    /// Shows: an exported file, who spoke: the others. When: the transcript is included. At most:
-    /// 16 characters. Placeholders: none.
     pub others: &'static str,
-    /// Shows: an exported file, the transcript's column of times. When: the transcript is included.
-    /// At most: 12 characters. Placeholders: none.
     pub time: &'static str,
-    /// Shows: an exported file, the transcript's column of who spoke. When: the transcript is
-    /// included. At most: 12 characters. Placeholders: none.
     pub speaker: &'static str,
-    /// Shows: an exported file, the transcript's column of what was said. When: the transcript is
-    /// included. At most: 12 characters. Placeholders: none.
     pub text: &'static str,
 }
 
