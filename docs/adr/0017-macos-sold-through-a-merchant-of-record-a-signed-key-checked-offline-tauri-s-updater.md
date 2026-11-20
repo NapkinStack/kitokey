@@ -151,7 +151,20 @@ static file beside the release.
   covers a major version: minor versions included, as PDR-0001 says. It is never sent anywhere.
 - **The updater is Tauri's**: in the stack, Ed25519 signatures, the feed a static file. Sparkle is the Mac's own
   convention, but it is an Objective-C framework to embed beside Tauri for the same check.
-- **The trial** stays the app's own, 14 days or 10 meetings (PDR-0001): the key ends it.
+- **The trial** stays the app's own, as PDR-0001 says it: « 14 days or 10 meetings, whichever comes last ». The key
+  ends it.
+
+### Conditions before it goes on sale
+
+Read with lina's review (#1017, at d39c681). Not code of cycle 11: what cycle 12 holds before the first sale.
+
+1. **An empty list.** What FastSpring does with an empty pre-defined list is tried in its test mode, and a stock
+   alert asked of it; until then the batch stays large against sales.
+2. **A key lost.** How a buyer finds their key again — FastSpring's account portal, its receipt sent again — is
+   checked with FastSpring: its page does not say.
+3. **The key's form.** Pasted, never typed: whitespace and line breaks tolerated, an alphabet without look-alikes
+   (base32, no 0/O, 1/I/l). A `kitokey://` link that fills it in is noted, not verified.
+4. **What a key covers**, said before the purchase on the checkout page: how many Macs, and which major version.
 
 ### What the Mac App Store would change — not decided here
 
