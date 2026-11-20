@@ -219,6 +219,12 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 - An app that records the microphone needs a privacy policy linked from its listing. A buyer reads before
   paying that the summary needs Ollama, which Kitokey never installs, and that the transcription model is
   downloaded at first run.
+- **Microsoft's page for Store screenshots, read on 2026-11-20** (ines, before D103's first pull request):
+  [*App screenshots, images, and trailers for MSIX app*](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/screenshots-and-images)
+  — the MSIX page, Kitokey being an MSIX ([PDR-0004](../../pdr/0004-windows-through-the-microsoft-store.md)).
+  Desktop « 1366 x 768 pixels or larger » (4K supported), a `.png` of at most 50 MB; one to ten, « at least four »
+  suggested; a caption of at most 200 characters; images and captions uploaded for each listing language;
+  « displayed in your listing in order »; no logo, icon or marketing message added.
 
 ### D104
 
