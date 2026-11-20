@@ -2,7 +2,8 @@
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
-- **Status**: Proposed
+- **Status**: Accepted — by the decider, 2026-11-20 (« 1017 approuvé », in their conversation with the coordinator; their
+  approval of #1017 on GitHub, again at efd2932 after main was merged into it)
 - **Date**: 2026-11-20
 - **Decision makers**: the decider, `@napkinstack-admin`; proposed by an agent (marc, session 2b57f890-8981-4ce3-92f0-1ca23ed36acf)
 - **Scope**: project — the macOS build, sold; modules `shell` (the licence check, the updater) and `install` (the
