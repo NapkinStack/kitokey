@@ -35,7 +35,11 @@ module:
   #   removal_date: YYYY-MM-DD
 
 # Contracts PROVIDED by this module. `path` holds its document (B7).
-provides: []   # posting/v1, once its program is delivered (D110's next pull request)
+provides:
+  - contract: posting
+    version: v1
+    path: contracts/posting/v1
+    stability: experimental
 #  - contract: send-api
 #    version: v1
 #    path: contracts/send-api/v1
@@ -45,7 +49,28 @@ provides: []   # posting/v1, once its program is delivered (D110's next pull req
 # Contracts CONSUMED - this is the DECLARED graph.
 # CI compares it with the contracts this module's files read: one read and not declared
 # fails (B1), one declared and never read is reported (B4), one nobody provides fails (B6).
-consumes: []   # session-audio, minutes: read by the program, next pull request
+consumes:
+  - contract: session-audio
+    version: v1
+    module: capture
+  - contract: session-audio
+    version: v2
+    module: capture
+  - contract: session-audio
+    version: v3
+    module: capture
+  - contract: minutes
+    version: v1
+    module: summary
+  - contract: minutes
+    version: v2
+    module: summary
+  - contract: minutes
+    version: v3
+    module: summary
+  - contract: minutes
+    version: v4
+    module: summary
 #  - contract: identity-api
 #    version: v1
 #    module: identity
@@ -63,6 +88,10 @@ data:
 # Significant external dependencies.
 # Each one declares its exit strategy (.nstack/handbook/06-decisions.md §3).
 dependencies:
+  - name: serde_json
+    purpose: Reads the input and the minutes' quoted values; writes the output's lines and the bodies sent
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: input, minutes_read and body in src/; any JSON library replaces it.
   - name: ureq
     purpose: >
       The one connection of the module, to the address the user set up, through a resolver that
@@ -85,8 +114,9 @@ dependencies:
 # No stack is imposed. check and test are required once the module holds more than its
 # description (fitness M7): declare them before its first file of code.
 commands:
-  check: cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
+  check: bash -n scripts/release.sh && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
   test: cargo test --locked
+  release: bash scripts/release.sh
 #  check:                        # under 2 min: format, lint, types
 #  test:                         # NEVER starts another module
 #  bootstrap:                    # optional: make the module usable from a fresh clone
