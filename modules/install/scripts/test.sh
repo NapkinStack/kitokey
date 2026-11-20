@@ -181,6 +181,7 @@ with tempfile.TemporaryDirectory() as work:
     for path, why in ((broken, "a file that is not the kit's report"), (os.path.join(work, "none.xml"), "no file")):
         got = appcert.said(path)
         check(f"{why}: one line, saying no report was read", len(got) == 1 and got[0].startswith("certification kit: no report read"), got)
+        check(f"{why}: the run fails, no report read (D102)", appcert.verdict(path) == 2)
 # D102: the run fails on a required test failed, or on no report at all; an optional test failed is named, never blocking.
 check("the kit's report with only an optional test failed passes the run",
       appcert.verdict(os.path.join(os.path.dirname(mac), "tests", "appcert-report.xml")) == 0)
@@ -193,6 +194,9 @@ with tempfile.TemporaryDirectory() as work:
     open(unrun, "w", encoding="utf-8").write(report.replace("<RESULT><![CDATA[PASS]]></RESULT>", "<RESULT><![CDATA[NOT RUN]]></RESULT>", 1))
     check("a required test not run fails the run, never skipped silently", appcert.verdict(unrun) == 1)
     check("no report read fails the run: a kit that did not run is never a pass", appcert.verdict(os.path.join(work, "none.xml")) == 2)
+    empty = os.path.join(work, "empty.xml")
+    open(empty, "w", encoding="utf-8").write(re.sub(r"<REQUIREMENTS>.*</REQUIREMENTS>", "<REQUIREMENTS />", report, flags=re.S))
+    check("a report without a test fails the run: a kit that tested nothing is never a pass", appcert.verdict(empty) == 2)
 check("the notes for certification say what stands between the package and a submission, the kit's failure in it",
       "## What stands between the package and a submission" in certification and "Blocked executables" in certification)
 print("test: passed" if not failed else "test: FAILED")

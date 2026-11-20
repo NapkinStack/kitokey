@@ -6,8 +6,8 @@ runner by the kit 10.0.26100.9457 (tests/appcert-report.xml, cut from it). Run a
 `python appcert.py <report.xml>`, it prints them; a report it cannot read is said in one line.
 
 Its exit is the run's verdict (D102): 0 when no required test failed — an optional test failed is
-named, never blocking —, 1 when a required test did not pass, 2 when no report was read: a kit that
-did not run is never a pass.
+named, never blocking —, 1 when a required test did not pass, 2 when no report was read or it holds
+no required test: a kit that did not run, or tested nothing, is never a pass.
 """
 import sys
 from xml.etree import ElementTree
@@ -34,7 +34,7 @@ def said(path):
 
 
 def verdict(path):
-    """0: no required test failed; 1: a required test did not pass; 2: no report read."""
+    """0: no required test failed; 1: a required test did not pass; 2: no report read, or none required tested."""
     try:
         report = ElementTree.parse(path).getroot()
     except (OSError, ElementTree.ParseError):
@@ -42,6 +42,9 @@ def verdict(path):
     if report.tag != "REPORT":
         return 2
     required = [test for test in report.iter("TEST") if test.get("OPTIONAL") != "TRUE"]
+    # A kit that tested nothing required is no pass.
+    if not required:
+        return 2
     return 1 if any((test.findtext("RESULT") or "").strip() != "PASS" for test in required) else 0
 
 

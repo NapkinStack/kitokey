@@ -12,6 +12,8 @@ if (-not (Test-Path $kit)) {
 }
 $package = (Get-ChildItem (Join-Path $Out 'Kitokey-*-x64.msix') | Select-Object -First 1).FullName
 $report = Join-Path (Resolve-Path $Out) 'appcert-report.xml'
+# A report of an earlier run is never read as this one's (D102).
+Remove-Item $report -ErrorAction SilentlyContinue
 # The kit's return codes, as `appcert.exe /?` lists them.
 $meaning = @{ -1 = 'invalid command line'; -2 = 'infrastructure error'; -3 = 'user initiated error'
               -4 = 'app installation error'; -5 = 'app unpackaging error' }
