@@ -11286,6 +11286,128 @@ def pages_seen(now: dt.datetime) -> None:
                     shot_themed(browser, f"d89-{page}-{width}-{theme}", theme)
 
 
+
+# The meetings the Store's screenshots show (D103): invented for them, nothing of a real one. Each language its
+# own, the last one opened: its minutes — what was said, what follows, who does what by when — and its transcript.
+STORE_MEETINGS = {
+    "fr": {
+        "titles": ["Point d’équipe du lundi", "Entretien — designer produit", "Revue du budget T4",
+                   "Appel client — Atelier Lumen", "Comité de pilotage", "Revue produit de la semaine"],
+        "minutes": ("## 1.\n\nLa version 2.4 sort jeudi ; l’export PDF passe à la suivante pour finir les tests.\n\n"
+                    "## 2.\n\n- Préparer les notes de version — Camille — mercredi [03:10]\n"
+                    "- Prévenir le support du report de l’export — Hugo — demain [05:42]\n"
+                    "- Relancer l’équipe juridique sur les conditions — Camille — vendredi [08:15]\n\n"
+                    "## 3.\n\n- Les tests de charge passent depuis la correction du cache. [01:20]\n"
+                    "- Deux clients attendent l’export PDF. [04:55]\n"),
+        "said": [("me", None, "On commence par la 2.4 : où en sont les tests ?"),
+                 ("others", "1", "Tout passe depuis la correction du cache, les tests de charge aussi."),
+                 ("me", None, "Bien. Et l’export PDF, on le garde dans cette version ?"),
+                 ("others", "2", "Je préférerais le décaler, il reste deux cas à couvrir."),
+                 ("others", "1", "D’accord pour la suivante, mais deux clients l’attendent."),
+                 ("me", None, "Alors Hugo prévient le support dès demain."),
+                 ("others", "2", "Je prépare les notes de version pour mercredi."),
+                 ("me", None, "Parfait, on sort jeudi.")],
+    },
+    "en": {
+        "titles": ["Monday team check-in", "Interview — product designer", "Q4 budget review",
+                   "Client call — Lumen Studio", "Steering committee", "Weekly product review"],
+        "minutes": ("## 1.\n\nVersion 2.4 ships on Thursday; the PDF export moves to the next one to finish its tests.\n\n"
+                    "## 2.\n\n- Write the release notes — Camille — Wednesday [03:10]\n"
+                    "- Tell support the export is delayed — Hugo — tomorrow [05:42]\n"
+                    "- Follow up with legal on the terms — Camille — Friday [08:15]\n\n"
+                    "## 3.\n\n- Load tests pass since the cache fix. [01:20]\n"
+                    "- Two customers are waiting for the PDF export. [04:55]\n"),
+        "said": [("me", None, "Let’s start with 2.4: where are the tests?"),
+                 ("others", "1", "Everything passes since the cache fix, load tests included."),
+                 ("me", None, "Good. And the PDF export, do we keep it in this version?"),
+                 ("others", "2", "I’d rather move it, two cases are still uncovered."),
+                 ("others", "1", "Fine for the next one, but two customers are waiting for it."),
+                 ("me", None, "Then Hugo tells support tomorrow."),
+                 ("others", "2", "I’ll write the release notes for Wednesday."),
+                 ("me", None, "Perfect, we ship on Thursday.")],
+    },
+}
+# Microsoft's least for a desktop screenshot: « 1366 x 768 pixels or larger », a .png of at most 50 MB (D103).
+STORE_LEAST, STORE_MOST = (1366, 768), 50 * 1024 * 1024
+
+
+def png_size(file: Path) -> tuple[int, int]:
+    """A PNG's width and height, read from its header; (0, 0) when it is no PNG."""
+    head = file.read_bytes()[:24]
+    return struct.unpack(">II", head[16:24]) if head[:8] == b"\x89PNG\r\n\x1a\n" else (0, 0)
+
+
+def store_shots(now: dt.datetime) -> None:
+    """CH. D103: the Microsoft Store's screenshots, made here from meetings invented for them, in French then
+    in English, light: the list with a meeting open, a meeting's page with its minutes and transcript, a
+    meeting's page while it records, Settings. Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
+    its MSIX page read on 2026-11-20 (D103's section) —, written to `store/<fr|en>/` in KITOKEY_SCREENSHOTS'
+    folder, or the run's own; then counted: four PNGs a language, each at least 1366 × 768, at most 50 MB."""
+    print("CH. the Store's screenshots: four a language, French and English, 1920 × 1080, from meetings invented for them (D103)")
+    store = Path(os.environ.get("KITOKEY_SCREENSHOTS") or WORK / "shots") / "store"
+    shutil.rmtree(store, ignore_errors=True)
+    for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
+        said = STORE_MEETINGS[short]
+        meetings = WORK / f"store-{short}"
+        names = [(now - dt.timedelta(days=2 * (len(said["titles"]) - index), hours=3)).strftime("%Y-%m-%d_%H-%M")
+                 for index in range(len(said["titles"]))]
+        for index, (name, title) in enumerate(zip(names, said["titles"])):
+            folder = meetings / name
+            session(folder, now - dt.timedelta(days=2 * (len(names) - index), hours=3), 25 + 5 * index, {"local.wav": 1000})
+            (folder / "minutes.md").write_text(
+                f"---\ncontract: minutes/v2\nmade: {now.isoformat(timespec='seconds')}\nprovider: local\nmodel: qwen3:8b\ncontext: null\n"
+                f"title: {json.dumps(title, ensure_ascii=False)}\n---\n\n" + said["minutes"])
+        lines = [{"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0",
+                  "language": short, "context": None},
+                 *({"type": "segment", "speaker": who, "track": "local" if who == "me" else "remote", "voice": voice,
+                    "start": 40.0 * index + 5, "end": 40.0 * index + 12, "text": text} for index, (who, voice, text) in enumerate(said["said"])),
+                 {"type": "complete", "duration": 1800.0}]
+        (meetings / names[-1] / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
+        window = Window(meetings, language, 'reminder = false\nafter = "nothing"\n')
+        window.env.update(GTK_THEME="Adwaita")
+        with window as browser:
+            browser.set_window_size(1920, 1080)
+            if not wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 3):
+                # The window's frame took its share of what was asked: asked again, by what was missing.
+                browser.set_window_size(2 * 1920 - browser.execute_script("return innerWidth"), 1080)
+                wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 5)
+            (store / short).mkdir(parents=True, exist_ok=True)
+            pages = (("1-list", "#/", "#sidebar"),
+                     ("2-meeting", f"#/meeting/{names[-1]}", "#meeting .transcript .lines li"))
+            for shot_name, address, drawn in pages:
+                browser.execute_script("location.hash = arguments[0]", address)
+                wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, drawn), 10)
+                browser.execute_script("scrollTo(0, 0)")
+                time.sleep(0.4)
+                browser.save_screenshot(str(store / short / f"{shot_name}.png"))
+            # Recording: the full window's page of the meeting being recorded (the coordinator's choice, 2026-11-20).
+            before = {folder.name for folder in meetings.iterdir()}
+            live = lambda b: "live" in (b.find_element(By.ID, "record").get_attribute("class") or "")
+            browser.find_element(By.ID, "record").click()
+            wait_for(browser, lambda b: live(b) and {f.name for f in meetings.iterdir()} - before, 10)
+            recorded = sorted({f.name for f in meetings.iterdir()} - before)
+            if recorded:
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{recorded[0]}")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "context-text"), 10)
+                time.sleep(1.5)
+                browser.save_screenshot(str(store / short / "3-recording.png"))
+                time.sleep(0.6)
+                browser.find_element(By.ID, "record").click()
+                wait_for(browser, lambda b: not live(b), 10)
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 10)
+            browser.execute_script("scrollTo(0, 0)")
+            time.sleep(0.4)
+            browser.save_screenshot(str(store / short / "4-settings.png"))
+    made = sorted(store.glob("*/*.png"))
+    sizes = {f"{file.parent.name}/{file.name}": (png_size(file), file.stat().st_size) for file in made}
+    check("the Store's screenshots: four a language, French and English, in the Store's order (D103)",
+          [name for name in sizes] == [f"{short}/{n}" for short in ("en", "fr")
+                                       for n in ("1-list.png", "2-meeting.png", "3-recording.png", "4-settings.png")], sorted(sizes))
+    check("each at least 1366 × 768 and at most 50 MB, as Microsoft's page asks (D103)",
+          bool(sizes) and all(w >= STORE_LEAST[0] and h >= STORE_LEAST[1] and 0 < size <= STORE_MOST for (w, h), size in sizes.values()),
+          sizes)
+
 def trial_over(now: dt.datetime) -> None:
     """AV. The trial over on a stand-in licence (PDR-0005, D83): no recording from the window, the
     small one or the tray; why and « Acheter Kitokey » said in the full window; every meeting still read, played, corrected and
@@ -13333,6 +13455,7 @@ def main() -> int:
     gestures_answer(now)
     window_looks(now)
     pages_seen(now)
+    store_shots(now)
     actions_rows(now)
     announced(now)
     heard_checked(now)
