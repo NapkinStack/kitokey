@@ -12,7 +12,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given the identity Partner Center shows once the name is reserved, when CI builds the MSIX, then its `Identity` and `PublisherDisplayName` are Partner Center's, read from `identity.json` with no placeholder left — the build fails on one —, and the package installs, upgrades and is removed in CI as D54 already proves with the test certificate; held by CI's Windows job"
-      - "Given the MSIX build, when it is made, then cycle 07's self-updater is off in it — the Store updates the package —, and its licence is the Store's trial, D83's own trial counter off in that build; held by a test of the build, each switch read from the built package (the licence rule: *Open questions*)"
+      - "Given the MSIX build, when it is made, then cycle 07's self-updater is off in it — the Store updates the package —, and its trial is the app's own — PDR-0005's rule, held by D83's counter, the Store's trial set to « Unlimited » in Partner Center and the Store selling the licence (the decider, 2026-11-20: « essai (a) ») —; held by a test of the build, each switch read from the built package"
       - "Given that package, when it is built, then its size is recorded with the commit in a file of the repository, the baseline every later threshold reads; and when the Windows App Certification Kit runs on it in CI, every required test passes, its report kept with the run — half a day first proves the kit runs on CI's runner; a test it cannot run headless is named in the sheet with why, never skipped silently"
   - id: D103
     title: "The Store's listing is ready: its screenshots in French and in English made by the e2e, its privacy policy, and the downloads it needs said"
@@ -212,10 +212,18 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   which is the oracle.
 - Tauri emits EXE and MSI, not MSIX ([Tauri](https://v2.tauri.app/distribute/microsoft-store/)): the package is
   `install`'s own step, as it is today.
-- **The updater and the licence**: a Store package is updated by the Store (Microsoft's Store policies, to be
-  cited from their page in D102's first pull request), so cycle 07's self-updater is off in that build. Which
-  trial counts in the Store build — the Store's, or D83's own — is the decider's (*Open questions*); the
-  criterion is built with the convention, the Store's.
+- **The updater and the licence**: a Store package is updated by the Store. No policy names a self-update for
+  a non-game app — 10.2.5's « installed and updated only through the Store » is for games and Xbox —; 10.2.2
+  refuses « any form of dynamic inclusion of code » that changes the product ([Microsoft Store Policies
+  7.20](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies), read 2026-11-20). There is no
+  self-updater to switch off: cycle 07's is the system's (Copr, dnf), and the shell holds none; its rule is
+  written for the one to come (#1052, ADR-0017 #1053).
+- **The trial, decided** (the decider, 2026-11-20: « essai (a) »): the Store's trial cannot say PDR-0005's rule —
+  Partner Center offers « Time-limited » « 1 day, 7 days, 15 days, or 30 days », or « Unlimited », and counts no
+  meeting ([price and availability](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/price-and-availability)).
+  So the Store build keeps the app's own trial — 14 days or 10 meetings, whichever comes last, D83's counter —,
+  the Store's trial set to « Unlimited », and the Store sells the licence, which D83 already reads
+  (`StoreContext.GetAppLicenseAsync`). One rule of trial on every system; nothing to build for the licence.
 - **The size** is recorded here because every later threshold reads it, D108's first.
 
 ### D103
@@ -381,8 +389,9 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 - **The appetite**: two weeks, as cycles 08 to 10. Eleven deliverables do not all fit whole; the cut order
   above says what goes first. Three weeks would keep D111 whole. Default, without a word: two weeks.
 - **The PDF's size threshold**: 15 MB, D108's spike, read against D102's package size. A word changes it.
-- **The Store build's licence**: the convention is the Store's trial alone (PDR-0005's *Unlimited*), D83's
-  own counter off in that build; the decider may keep D83's in it. Default: the Store's.
+- ~~**The Store build's licence**: the convention is the Store's trial alone (PDR-0005's *Unlimited*), D83's
+  own counter off in that build; the decider may keep D83's in it. Default: the Store's.~~ Settled by the
+  decider, 2026-11-20 (« essai (a) »): D83's counter kept, the Store's trial « Unlimited » (D102's section).
 - **The six built-in structures**: the market's common core; the decider may name others.
 - **D111's spike threshold**: 4 of the 6 structures, every section filled or said empty, over 3 meetings, with
   Settings' default local model (D111's section). A word changes it.
