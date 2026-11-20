@@ -5701,11 +5701,11 @@ def keys_first_surfaces(now: dt.datetime) -> None:
 
 
 def redo_says_what_is_wrong(now: dt.datetime) -> None:
-    """CH. D113, criterion 3: Refaire… with Settings' model missing, or the meeting's folder not writable —
+    """CI. D113, criterion 3: Refaire… with Settings' model missing, or the meeting's folder not writable —
     its button stays and the panel says which is wrong and what to do, never a setting the user did not
     touch (#771); the panel open, the window crossing 840 px either way — the panel, its choice and the
     focus stay (#777). In French."""
-    print("CH. Refaire…: what is wrong said in its panel, its button kept; open across the 840 px break, it stays as it was (D113)")
+    print("CI. Refaire…: what is wrong said in its panel, its button kept; open across the 840 px break, it stays as it was (D113)")
     idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
             " && m.minutes_waiting.length === 0 && m.transcripts_waiting.length === 0)")
     note = ("const p = document.getElementById('redo-transcript-panel'); if (!p) return null;"
