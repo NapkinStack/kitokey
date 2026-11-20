@@ -12695,16 +12695,17 @@ def main() -> int:
                 return sorted(folder.glob("minutes-before-*.md")) if folder.exists() else []
 
             trash_files = WORK / "data" / "Trash" / "files"
-            redone = wait_for(browser, lambda b: aside(trash_files), 10)
+            # The minutes replaced kept beside as the previous version, no longer in the trash (D113).
+            kept_previous = asked / "minutes-previous.md"
+            redone = wait_for(browser, lambda b: kept_previous.is_file() and kept_previous.read_text() == before, 10)
             check(
-                "made again with the model chosen, kept for this meeting, Settings unchanged; the minutes there in the trash",
+                "made again with the model chosen, kept for this meeting, Settings unchanged; the minutes there kept as the previous version (D113)",
                 redone
                 and json.loads((asked / "models.json").read_text()).get("minutes", {}).get("model") == "mistral:7b"
                 and (WORK / "summary-args").read_text().split()[-1] == "mistral:7b"
-                and aside(trash_files)[0].read_text() == before
                 and 'minutes_model = "qwen3:14b"' in window.file.read_text()
                 and not aside(asked),
-                ((WORK / "summary-args").read_text(), aside(trash_files), aside(trash_files) and aside(trash_files)[0].read_text()[:60], before[:60], aside(asked)),
+                ((WORK / "summary-args").read_text(), kept_previous.exists() and kept_previous.read_text()[:60], before[:60], aside(asked)),
             )
             # Made again and failing — on this computer, then online through the agreement: the minutes
             # there stay, and the notice says a redo, not a first making.
@@ -12793,7 +12794,8 @@ def main() -> int:
                   plain and "produit de compte rendu" not in state(browser) and "produit de compte rendu" not in said, (state(browser), said[-300:]))
             time.sleep(3)
             left = sorted(p.name for p in asked.glob("minutes*"))
-            check("nothing else is made after, no copy left beside", (asked / "minutes.md").read_text() == before and left == ["minutes.md"], (left, (asked / "minutes.md").read_text()[:80], (WORK / "summary-args").read_text()))
+            # The previous version the redo before kept stays (D113); no copy of the failed one.
+            check("nothing else is made after, no copy left beside", (asked / "minutes.md").read_text() == before and left == ["minutes-previous.md", "minutes.md"], (left, (asked / "minutes.md").read_text()[:80], (WORK / "summary-args").read_text()))
             window.file.write_text(settled)
             # A trash that refuses: the minutes replaced stay beside the new ones, never deleted.
             trash = WORK / "data" / "Trash"

@@ -40,7 +40,20 @@ pub struct Minutes {
 
 /// The minutes of a session's folder, their three sections named as the page names them.
 pub fn minutes(folder: &Path, sections: [&str; 3]) -> Read<Minutes> {
-    match fs::read_to_string(folder.join("minutes.md")) {
+    read_from(&folder.join("minutes.md"), sections)
+}
+
+/// The last minutes a redo replaced, kept beside them under a name no step reads (D113,
+/// `minutes/v4`): what « Revenir à la version précédente » brings back.
+pub const PREVIOUS: &str = "minutes-previous.md";
+
+/// Those minutes, read as the others are.
+pub fn previous(folder: &Path, sections: [&str; 3]) -> Read<Minutes> {
+    read_from(&folder.join(PREVIOUS), sections)
+}
+
+fn read_from(file: &Path, sections: [&str; 3]) -> Read<Minutes> {
+    match fs::read_to_string(file) {
         Err(_) => Read::Absent,
         Ok(text) => parse_minutes(&text, sections).map_or(Read::Unreadable, Read::Present),
     }
