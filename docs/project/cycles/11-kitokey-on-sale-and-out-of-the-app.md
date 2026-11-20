@@ -164,7 +164,7 @@ D105 measures in windows the coordinator plans with the queues empty, so that it
 nor takes D104's machine.
 
 **Cut first, in this order, when the breaker nears**: D111 whole, to cycle 12, if `minutes/v5` is not merged by
-the cycle's fifth working day; then D110's Discord (the generic webhook kept); then D109's folder export; then
+the cycle's fifth working day (2026-11-26); then D110's Discord (the generic webhook kept); then D109's folder export; then
 D105's budgets (the baseline kept). Never cut: D102, D104, D106, D108's Markdown, D109's export and copy.
 D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 

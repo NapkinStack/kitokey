@@ -396,13 +396,15 @@ moved into cycle 11: the decider adds them there, or not. 8 of 10 accepted.
   #779.
 - D94: what is left is words and comments only — #988, P8b-2, P2, P3, and #989 and #990 on the English
   contractions. None changes a behaviour.
-- D94's row in *What needs a person* is done: the decider took the review's Claude version on 2026-11-18.
+- D94's row in *What needs a person* is done: the decider took the review's Claude version on 2026-11-18
+  (« prend la version claude », recorded in [D94's acceptance issue](https://github.com/NapkinStack/kitokey/issues/805)).
+  `nstack plan` still lists the row: it stops showing it once D94 is delivered.
 
-**Out-of-cycle pull requests**, merged during this cycle and carried by none of its deliverables: #951 (the
-focus kept by the mouse), #963 (a key kept to its own host), #976 (the first run read after its fade), #979
-(the focus check reads the control's place), #982 (#961, Kitokey ends its makings on SIGTERM), #983 (#978,
-a logout during a recording keeps its audio whole), #984 (#954, the bar's parts at 3:1), #987 (NapkinStack
-v0.33.0).
+**Out-of-cycle pull requests**, merged during this cycle and carried by none of its deliverables; among them,
+the notable: #951 (the focus kept by the mouse), #963 (#948, a model chosen in Settings and not yet saved stays
+chosen when Settings are drawn anew), #976 (the first run read after its fade), #979 (the focus check reads the
+control's place), #982 (#961, Kitokey ends its makings on SIGTERM), #983 (#978, a logout during a recording
+keeps its audio whole), #984 (#954, the bar's parts at 3:1), #987 (NapkinStack v0.33.0).
 
 **The goal.** Mostly reached: after a stop the bar and the page say where the meeting is, with an estimate
 and Cancel, and it is told once when ready (D92); Settings are in three groups with a guided service (D95);
