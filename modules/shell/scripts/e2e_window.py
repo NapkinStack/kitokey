@@ -5753,6 +5753,16 @@ def previous_summary_back(now: dt.datetime) -> None:
         again = wait_for(browser, lambda b: held(meeting / "minutes.md") != first and b.execute_script(idle), 15)
         check("the next redo: the one it replaced is the previous one, the older gone from the folder (D113)",
               again and held(previous) == first and asides() == [], [held(previous)[:60], asides()])
+        # Kept, it is the meeting's: in its text's weight, and in the trash with it (ines, #1062).
+        text = browser.execute_script("return window.__TAURI__.core.invoke('listed')"
+                                      ".then((l) => l.sessions.filter((s) => s.folder.endsWith(arguments[0])).map((s) => s.text))", meeting.name)
+        sizes = sum(path.stat().st_size for path in (meeting / "minutes.md", previous) if path.is_file())
+        check("the previous version counts in the meeting's text weight (D113)", previous.is_file() and len(text) == 1 and text[0] >= sizes, [text, sizes])
+        browser.execute_script("window.__TAURI__.core.invoke('freed', {names: [arguments[0]], whole: true})", meeting.name)
+        trashed = WORK / "data" / "Trash" / "files" / meeting.name
+        gone = wait_for(None, lambda b: not meeting.exists(), 10)
+        check("the meeting moved to the trash takes its previous version with it (D113)",
+              gone and (trashed / "minutes-previous.md").is_file(), [meeting.exists(), sorted(p.name for p in trashed.iterdir()) if trashed.exists() else None])
 
 
 def page_one_bar(now: dt.datetime) -> None:
