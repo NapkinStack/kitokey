@@ -10,6 +10,9 @@ use std::path::Path;
 
 use serde_json::Value;
 
+mod pdf;
+pub use pdf::pdf;
+
 /// What the caller asks to be written.
 #[derive(Clone, Copy, Debug)]
 pub struct Include {
