@@ -70,7 +70,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given what leaves the computer, when this deliverable starts, then a PDR says, for each destination, on whose word a meeting leaves — a gesture each time, or « each new summary » set once —, that a meeting said confidential never leaves, and where a webhook's address is kept (the system's keyring, as keys are: ADR-0013); the decider accepts it, the day of that word written in the PDR, before any sending is merged"
-      - "Given a webhook address the user pasted — a generic one or Discord's —, when they send a summary, then an address that is not `https:`, or that points to the local network, is said before anything is sent; the generic one receives a JSON of the title, the summary in Markdown and its actions, and Discord's receives a short message with the summary attached as a Markdown file, within Discord's documented limits (cited); a refusal or no network is said on the page with what to do; a confidential meeting offers no send; held by the module's tests against a local server and by the e2e"
+      - "Given a webhook address the user pasted — a generic one, Discord's or Slack's incoming webhook —, when they send a summary, then an address that is not `https:`, or that points to the local network, is said before anything is sent; the generic one receives a JSON of the title, the summary in Markdown and its actions, and Discord's receives a short message with the summary attached as a Markdown file, within Discord's documented limits (cited), and Slack's receives the title and the summary in mrkdwn, within Slack's documented limits (cited); a refusal or no network is said on the page with what to do; a confidential meeting offers no send; held by the module's tests against a local server and by the e2e"
   - id: D111
     title: "A meeting's summary takes the structure of its kind, chosen on its page"
     module: summary
@@ -126,6 +126,12 @@ deliverables:
 > what cycle 10 left of D94 and D93 ([cycle 10's *Later*](10-kitokey-ready-when-you-come-back.md#later)); the
 > end date does not move (`framing.md` §4).
 
+> **D110's criterion 2 amended on the decider's word, 2026-11-20**, in their working session with the
+> coordinator, on reading PDR-0007 (#1039): « PDR acceptée, ok Slack dans D110 ». Slack's incoming webhook joins
+> the generic webhook and Discord's: a URL the user creates in their own workspace, no OAuth and no secret of
+> Kitokey's; its message in mrkdwn ([PDR-0007](../../pdr/0007-a-summary-leaves-for-a-channel-on-a-gesture-never-a-confidential-one.md)).
+> Slack's OAuth stays in *Later*.
+
 > **D105's criterion 2 amended on the decider's word, 2026-11-20**, in their working session with the
 > coordinator: « ok pour l'amendement de D105 ». « 1 s load » is no longer RAIL's: today it asks 5 s for a
 > first load on a mid-range phone over slow 3G, and 2 s after ([web.dev/articles/rail](https://web.dev/articles/rail),
@@ -150,7 +156,7 @@ edge is that the meeting already is a folder of files: export is never paywalled
 flowchart LR
     M["A meeting's folder<br/>audio · transcript · minutes"]:::have --> X["export (D108)<br/>Markdown · HTML · DOCX · PDF"]:::build
     X --> P["Its page (D109)<br/>Exporter · Copier · a folder"]:::build
-    X --> S["A channel (D110)<br/>webhook · Discord"]:::build
+    X --> S["A channel (D110)<br/>webhook · Discord · Slack"]:::build
     T["Its kind (D111)<br/>minutes/v5 structures"]:::build --> M
     W["The Store (D102–D106)<br/>identity · screenshots · trust · speed · access"]:::store
     classDef have fill:#374151,color:#fff
