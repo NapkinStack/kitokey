@@ -23,4 +23,3 @@
 
 # Contracts: the most critical boundary in the system, never orphaned (criticality high).
 /contracts/                    @NapkinStack/maintainers
-/modules/send/                 @NapkinStack/maintainers
