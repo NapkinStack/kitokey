@@ -289,6 +289,15 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   summary model of Settings —, at least 4 of the 6 built-in structures yield every section either filled or said
   empty, over the team's sample of 3 meetings; below that, the structures that fail are cut and the result
   recorded — a refuted spike is a delivered one.
+- **The spike, 2026-11-20** (`kitokey-team/logs/d111-spike*.jsonl`): `qwen3:8b`, the local model Settings
+  recommends, on the bench's played meeting (`modules/platform/bench/meeting.txt`, French, synthesised voices),
+  3 runs per structure, 92 to 361 s an answer. Asked the sections' order in words, as v4 is: 3 of 6 structures
+  held every run — one-to-one, stand-up and interview each failed once, on form (no `## ` line twice, content
+  written as a title once). Given the skeleton to copy — `# <the meeting's title>`, then `## <section n's title>`
+  and `<section n's content>` line by line, each title « a few words naming the section, never its content »:
+  **6 of 6, every run; the threshold is held**, and summary asks it so (#1042). A JSON answer by constrained
+  decoding, the third variant, was not needed. Not met as written: one meeting played three times, not three
+  meetings; and the spike's request lacked summary's paragraph on the recogniser's errors and its times per bullet.
 - **The contract**: three pull requests, in order — `minutes/v5`'s page and schema, summary writing it, the
   shell reading v4 and v5. v4 is never removed in this cycle.
 

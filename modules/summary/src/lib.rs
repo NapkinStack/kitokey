@@ -315,9 +315,22 @@ pub fn request_in(segments: &[Segment], context: Option<&str>, structure: Option
              make one up.\n\n",
         ),
         Some(structure) => {
-            let three = "exactly three sections";
+            // D111's second spike: a small model copies a skeleton where it misses an order said in words.
+            let three = "Then answer with exactly three sections";
             let at = asked.rfind(three).expect("the request names its sections' number");
-            asked.replace_range(at..at + three.len(), &format!("exactly {} sections", structure.sections.len()));
+            let mut skeleton = format!(
+                "Then exactly {} sections, nothing between or after them. Your answer is this skeleton, copied line \
+                 for line, each <…> replaced:\n\n# <the meeting's title>\n\n",
+                structure.sections.len()
+            );
+            for n in 1..=structure.sections.len() {
+                skeleton.push_str(&format!("## <section {n}'s title>\n<section {n}'s content>\n\n"));
+            }
+            skeleton.push_str(
+                "Each title is a few words in the meeting's language naming the section, never its content; the \
+                 content goes on the lines below it. What each section holds:\n",
+            );
+            asked.replace_range(at.., &skeleton);
             for (n, section) in structure.sections.iter().enumerate() {
                 asked.push_str(&format!("{}. {}\n", n + 1, section.ask));
             }

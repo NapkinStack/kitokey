@@ -226,3 +226,26 @@ fn an_interview_is_asked_never_to_judge_the_candidate() {
         assert!(!asked.to_lowercase().contains(word), "{word}: {asked}");
     }
 }
+
+#[test]
+fn in_a_structure_the_model_is_given_the_skeleton_to_copy() {
+    // D111's second spike: asked by the sections' order alone, qwen3:8b held 3 of the 6 structures
+    // (no `## ` line, content in a title); given this skeleton to copy, 6 of 6, every run.
+    for structure in &kitokey_summary::STRUCTURES {
+        let asked = kitokey_summary::request_in(&[], None, Some(structure));
+        let mut skeleton = String::from("\n# <the meeting's title>\n\n");
+        for n in 1..=structure.sections.len() {
+            skeleton.push_str(&format!("## <section {n}'s title>\n<section {n}'s content>\n\n"));
+        }
+        assert!(asked.contains(&skeleton), "{}: {asked}", structure.name);
+        assert!(asked.contains("copied line for line"), "{}: {asked}", structure.name);
+        assert!(
+            asked.contains("naming the section, never its content"),
+            "{}: {asked}",
+            structure.name
+        );
+        assert!(!asked.contains("in this order:"), "{}: {asked}", structure.name);
+    }
+    // Without a structure, v4's request as before.
+    assert!(!kitokey_summary::request(&[], None).contains("<section 1's title>"));
+}
