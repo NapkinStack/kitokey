@@ -34,7 +34,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given the release package on Linux, when the baseline runs alone — in a window the coordinator plans with the queues empty, so that it neither measures their load nor takes D104's attests' machine —, then it records the cold start to the window drawn, the memory at rest — the shell's and its web view's proportional set size —, and the time to open a meeting's page with a transcript of an hour, each the median of ten runs, written with the commit and the machine in a file of the repository"
-      - "Given the baseline, when the budgets are set, then each is the baseline plus a margin said with its reason, set against RAIL's 100 ms response and 1 s load and Apple's 400 ms launch to first frame, each source cited; the measure runs on the release pull request, alone, and fails it when a budget is exceeded; held by that run red on a change slowed on purpose"
+      - "Given the baseline, when the budgets are set, then each is the baseline plus a margin said with its reason, set against RAIL's 100 ms response and Apple's 400 ms launch to first frame, each source cited; the measure runs on the release pull request, alone, and fails it when a budget is exceeded; held by that run red on a change slowed on purpose"
   - id: D106
     title: "The surfaces a buyer sees first pass axe-core's AA rules and a checked list of WCAG 2.2 criteria"
     module: shell
@@ -125,6 +125,13 @@ deliverables:
 > cycle 10's closure (#992): asked « Les restes de D93 et D94 au cycle 11 ? », they answered « ok c11 ». They are
 > what cycle 10 left of D94 and D93 ([cycle 10's *Later*](10-kitokey-ready-when-you-come-back.md#later)); the
 > end date does not move (`framing.md` §4).
+
+> **D105's criterion 2 amended on the decider's word, 2026-11-20**, in their working session with the
+> coordinator: « ok pour l'amendement de D105 ». « 1 s load » is no longer RAIL's: today it asks 5 s for a
+> first load on a mid-range phone over slow 3G, and 2 s after ([web.dev/articles/rail](https://web.dev/articles/rail),
+> read that day), neither a local desktop app's. The start is held against Apple's 400 ms to first frame
+> ([WWDC 2019, session 423](https://developer.apple.com/videos/play/wwdc2019/423/)), a meeting's page against
+> RAIL's 100 ms response; both stay targets until the baseline says where Kitokey is.
 
 ## Goal
 

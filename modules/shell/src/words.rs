@@ -417,6 +417,8 @@ pub struct Window {
     /// At most: 18 characters. Placeholders: none.
     pub audio_freed: &'static str,
     /// What a meeting's audio weighs, beside its length in its header (D89).
+    /// Shows: a meeting's page, as a status. When: header of a meeting, beside its duration: audio
+    /// size. At most: about 16 characters. Placeholders: {} the audio's size.
     pub audio_weighs: &'static str,
     /// Shows: the sidebar, as a list label. When: on the row of the meeting being recorded.
     /// At most: 18 characters. Placeholders: none.
@@ -450,15 +452,23 @@ pub struct Window {
     /// Shows: a banner above every page but Settings. When: the settings file cannot be read, read
     /// before, its last settings held. At most: no limit. Placeholders: none.
     pub settings_banner_kept: &'static str,
+    /// Shows: a meeting's page, as an error. When: "Try again" on a failed step was refused.
+    /// At most: no limit. Placeholders: {} failure sentence.
     pub again_refused: &'static str,
     /// Shows: the sidebar, as an error. When: the folded/unfolded state could not be saved.
     /// At most: no limit. Placeholders: {} failure sentence.
     pub fold_not_kept: &'static str,
+    /// Shows: the agreement before a meeting leaves, as an error. When: sending to the online
+    /// service was refused. At most: no limit. Placeholders: {} failure sentence.
     pub agreement_refused: &'static str,
+    /// Shows: a meeting's page, as an error. When: a meeting's page could not open. At most: no
+    /// limit. Placeholders: {} failure sentence.
     pub meeting_not_opened: &'static str,
     /// Shows: the window, as an error. When: a page failed to render. At most: no limit.
     /// Placeholders: none.
     pub page_not_shown: &'static str,
+    /// Shows: a meeting's page, as an error. When: the meeting context could not be re-read.
+    /// At most: no limit. Placeholders: {} failure sentence.
     pub context_not_read: &'static str,
     /// Shows: the sidebar and the recording bar, as a button. When: record button label while the
     /// recording starts. At most: about 24 characters. Placeholders: none.
@@ -466,6 +476,8 @@ pub struct Window {
     /// Shows: the sidebar and the recording bar, as a button. When: record button label while the
     /// recording stops. At most: about 24 characters. Placeholders: none.
     pub record_stopping: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a button. When: closes the Redo panel. At most:
+    /// about 16 characters. Placeholders: none.
     pub redo_cancel: &'static str,
     /// Shows: Settings, beside a setting just saved. When: for a moment after it is. At most: one
     /// line. Placeholders: none.
@@ -491,12 +503,18 @@ pub struct Window {
     /// Shows: the sidebar, as a name for a screen reader. When: icon button (tooltip + screen
     /// reader) that folds the sidebar; shortcut appended. At most: no limit. Placeholders: none.
     pub fold: &'static str,
+    /// Shows: any page of the window, as a name for a screen reader. When: icon button (tooltip +
+    /// screen reader) that brings the sidebar back. At most: no limit. Placeholders: none.
     pub unfold: &'static str,
     /// Shows: the sidebar, as a status. When: search finds no meeting. At most: no limit.
     /// Placeholders: none.
     pub none_found: &'static str,
     /// One meeting's page.
+    /// Shows: any page of the window, as a link. When: back link to the meeting list. At most:
+    /// about 16 characters. Placeholders: none.
     pub back: &'static str,
+    /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip): open
+    /// the meeting's folder in the file manager. At most: no limit. Placeholders: none.
     pub open_folder: &'static str,
     /// Shows: a meeting's page, beside « Ouvrir le dossier »: the icon's name, said and as its tooltip
     /// (D100). When: always. At most: one line. Placeholders: none.
@@ -525,20 +543,36 @@ pub struct Window {
     /// Placeholders: {} the reason.
     pub trash_refused: &'static str,
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
+    /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) of the
+    /// menu of rarer actions. At most: no limit. Placeholders: none.
     pub more_actions: &'static str,
     /// Shows: the window, as a format. When: a setting's name before its value: "{}:". At most: no
     /// limit. Placeholders: {} a setting's name.
     pub labelled: &'static str,
+    /// Shows: a meeting's page, as a heading. When: heading of the minutes card. At most: about 20
+    /// characters. Placeholders: none.
     pub minutes_title: &'static str,
+    /// Shows: a meeting's page, as a name for a screen reader. When: name of the transcript card.
+    /// At most: about 20 characters. Placeholders: none.
     pub transcript_title: &'static str,
+    /// Shows: a meeting's page, as a field's placeholder. When: search field over the transcript.
+    /// At most: about 30 characters. Placeholders: none.
     pub search: &'static str,
     /// The minutes' maker: the model, the provider, when.
+    /// Shows: a meeting's page, as a status. When: under minutes: the model that wrote them.
+    /// At most: no limit. Placeholders: {} model name.
     pub written_by: &'static str,
     /// Its provider, when known, said after the model.
+    /// Shows: a meeting's page, as a status. When: appended after written_by: the provider.
+    /// At most: no limit. Placeholders: {} provider.
     pub written_via: &'static str,
     /// Between a day and its hour: "13 oct. à 12:21", "Oct 13 at 12:21 PM".
+    /// Shows: a meeting's page, as a format. When: between a day and its hour. At most: no limit.
+    /// Placeholders: none.
     pub at: &'static str,
     /// The transcript's maker: the model, on this computer.
+    /// Shows: a meeting's page, as a status. When: under the transcript: the model that made it.
+    /// At most: no limit. Placeholders: {} model.
     pub heard_by: &'static str,
     /// Shows: a meeting's page, the transcript's maker line: that day and hour first, its model after —
     /// "Transcrit le 13 nov. à 09:42 · Whisper small" (D93). When: the transcript says when it was made
@@ -552,20 +586,44 @@ pub struct Window {
     /// "in 31 min 52 s" (D97). When: the version says how long its making took. At most: one line.
     /// Placeholders: `{}`, the time taken, its units the window's.
     pub made_in: &'static str,
+    /// Shows: a meeting's page, as a label. When: speaker side in the transcript: the user's
+    /// microphone. At most: about 12 characters. Placeholders: none.
     pub here: &'static str,
+    /// Shows: a meeting's page, as a label. When: speaker side in the transcript: the other
+    /// participants. At most: about 12 characters. Placeholders: none.
     pub remote: &'static str,
     /// A voice told within a track: its label.
+    /// Shows: a meeting's page, as a label. When: a voice told apart within a side. At most: about
+    /// 12 characters. Placeholders: {} number.
     pub voice: &'static str,
+    /// Shows: a meeting's page, as a label. When: legend of the speaking-time drawing. At most: no
+    /// limit. Placeholders: none.
     pub here_described: &'static str,
+    /// Shows: a meeting's page, as a label. When: legend of the speaking-time drawing. At most: no
+    /// limit. Placeholders: none.
     pub remote_described: &'static str,
     /// Who spoke over the meeting, for whoever does not see the drawing.
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the
+    /// speaking-time drawing. At most: no limit. Placeholders: none.
     pub who_spoke: &'static str,
+    /// Shows: a meeting's page, as a status. When: transcript card, none yet. At most: no limit.
+    /// Placeholders: none.
     pub no_transcript: &'static str,
+    /// Shows: a meeting's page, as a status. When: minutes card, none yet. At most: no limit.
+    /// Placeholders: none.
     pub no_minutes: &'static str,
+    /// Shows: a meeting's page, as a help line. When: transcript still being written: what is shown
+    /// is partial. At most: no limit. Placeholders: none.
     pub being_made: &'static str,
+    /// Shows: a meeting's page, as an error. When: a file of a newer/older format cannot be read.
+    /// At most: no limit. Placeholders: none.
     pub unreadable: &'static str,
     /// Lines of a transcript that are not the contract's, left out: how many.
+    /// Shows: a meeting's page, as a help line. When: some lines of the transcript file are
+    /// skipped; plural. At most: no limit. Placeholders: {} count.
     pub unread: &'static str,
+    /// Shows: a meeting's page, as a status. When: search in the transcript finds nothing. At most:
+    /// no limit. Placeholders: none.
     pub no_match: &'static str,
     /// The settings' page.
     /// Shows: the sidebar, as a name for a screen reader. When: icon link to Settings (tooltip) and
@@ -614,6 +672,8 @@ pub struct Window {
     /// Shows: Settings, « Modèles », the transcription's step, that state. When: the model is being
     /// downloaded. At most: one line. Placeholders: none.
     pub model_coming: &'static str,
+    /// Shows: a meeting's page, as a button. When: download the transcription model. At most: about
+    /// 40 characters. Placeholders: {} the model's size, then {} its host.
     pub model_offer: &'static str,
     /// The short list of models to download (D37): its heading, the gesture, how far, and the
     /// model chosen that is not here yet, in the choice.
@@ -771,29 +831,53 @@ pub struct Window {
     /// Placeholders: none.
     pub developer: [&'static str; 2],
     /// Under a making not made, in developer mode: what its program said ({}).
+    /// Shows: a meeting's page, as a status. When: developer mode: raw program message under a
+    /// failure. At most: no limit. Placeholders: {} raw text.
     pub program_said: &'static str,
     /// A meeting's minutes, their three sections as the page names them (D11's second board),
     /// whatever titles the model wrote: `minutes/v1` holds them in this order.
+    /// Shows: a meeting's page, as a heading. When: the three section titles of minutes. At most:
+    /// about 20 characters. Placeholders: none.
     pub minutes_sections: [&'static str; 3],
     /// The actions' three cells, named for assistive technology alone (D46), and what a meeting
     /// left unsettled, as the summary writes it.
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: column names of
+    /// the actions table. At most: about 12 characters. Placeholders: none.
     pub actions_cells: [&'static str; 3],
+    /// Shows: a meeting's page, as a status. When: written by the summary model when an action has
+    /// no owner/date; MATCHED by code. At most: no limit. Placeholders: none.
     pub unsettled: &'static str,
     /// A model of this computer that holds the minutes' form, as Settings offer it ({}).
     /// Shows: Settings, « Modèles », the summary's step, a model of this computer in the list.
     /// When: it holds the summary's form. At most: one line. Placeholders: {} the model.
     pub model_recommended: &'static str,
     /// A meeting's player (D26): its button, both ways, and why a meeting has none.
+    /// Shows: a meeting's page, as a button. When: player button at rest. At most: about 12
+    /// characters. Placeholders: none.
     pub play: &'static str,
+    /// Shows: a meeting's page, as a button. When: player button while playing. At most: about 12
+    /// characters. Placeholders: none.
     pub pause: &'static str,
+    /// Shows: a meeting's page, as a help line. When: audio deleted: no player. At most: no limit.
+    /// Placeholders: none.
     pub no_player: &'static str,
     /// Its audio is there, and no track of it is one this version plays.
+    /// Shows: a meeting's page, as a help line. When: audio present but no playable track. At most:
+    /// no limit. Placeholders: none.
     pub not_playable: &'static str,
     /// A line of the minutes' time, as a screen reader says it (D75): what a click on it does.
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: a time in the
+    /// minutes, click plays from there. At most: no limit. Placeholders: {} time.
     pub time_listen: &'static str,
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: a time in the
+    /// minutes, click shows the transcript passage. At most: no limit. Placeholders: {} time.
     pub time_passage: &'static str,
     /// A track the window could not play; and the drawing as the playback's slider, named.
+    /// Shows: a meeting's page, as an error. When: playback failed. At most: no limit.
+    /// Placeholders: none.
     pub not_played: &'static str,
+    /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the playback
+    /// slider. At most: no limit. Placeholders: none.
     pub playback: &'static str,
     /// In developer mode: the logs' level, the logs' folder, a meeting's diagnostic copied.
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, a list: its name, then its
@@ -816,9 +900,17 @@ pub struct Window {
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, under that button. When: the
     /// logs' folder could not be opened. At most: no limit. Placeholders: none.
     pub logs_not_opened: &'static str,
+    /// Shows: a meeting's page, as a menu entry. When: developer: menu item copies a diagnostic.
+    /// At most: about 30 characters. Placeholders: none.
     pub copy_diagnostic: &'static str,
+    /// Shows: a meeting's page, as a status. When: after copying. At most: about 24 characters.
+    /// Placeholders: none.
     pub diagnostic_copied: &'static str,
+    /// Shows: a meeting's page, as a status. When: nothing to copy. At most: no limit.
+    /// Placeholders: none.
     pub diagnostic_empty: &'static str,
+    /// Shows: a meeting's page, as an error. When: copy failed. At most: about 24 characters.
+    /// Placeholders: none.
     pub diagnostic_not_copied: &'static str,
     /// The folder the sessions go to, and the button that opens the system's dialog for it.
     /// Shows: Settings, « Après un enregistrement », a row: its name, then its line under it. When:
@@ -964,6 +1056,8 @@ pub struct Window {
     /// Shows: the recording bar and Redo…, as an error. When: choice not saved. At most: no limit.
     /// Placeholders: {} failure sentence.
     pub models_not_kept: &'static str,
+    /// Shows: a meeting's page, as an error. When: per-meeting models unreadable. At most: no
+    /// limit. Placeholders: {} failure sentence.
     pub models_not_read: &'static str,
     /// A meeting's own model gone (D91): Settings' choice stands in, as Auto does for a microphone.
     /// Shows: the recording bar and Redo…, as a status. When: per-meeting transcription model
@@ -1070,9 +1164,17 @@ pub struct Window {
     /// no limit. Placeholders: none.
     pub free_done: &'static str,
     /// *Refaire…* on the minutes (D11's sixth board): the panel's title, question, note and gesture.
+    /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) opening
+    /// the Redo panel. At most: no limit. Placeholders: none.
     pub redo: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a heading. When: redo the minutes. At most: no
+    /// limit. Placeholders: none.
     pub redo_title: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a help line. When: uses this meeting's models.
+    /// At most: no limit. Placeholders: none.
     pub redo_with: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a help line. When: current minutes go to trash
+    /// once new ones are ready. At most: no limit. Placeholders: none.
     pub redo_note: &'static str,
     /// Shows: the summary's redo panel, its one button that starts, naming the making and its model
     /// (D96): « Refaire le compte rendu avec Qwen3 14b ». When: a summary model is known, the meeting's,
@@ -1087,10 +1189,18 @@ pub struct Window {
     /// Shows: the recording bar and Redo…, as a choice of a list. When: appended to a local model's
     /// name. At most: about 20 characters. Placeholders: none.
     pub on_computer: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a heading. When: redo the transcript. At most:
+    /// no limit. Placeholders: none.
     pub redo_transcript_title: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
+    /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
     /// What a meeting lacks, offered on its page; what is said once asked; where a step ran.
+    /// Shows: a meeting's page, as a button. When: meeting lacks minutes. At most: about 30
+    /// characters. Placeholders: none.
     pub make_minutes: &'static str,
+    /// Shows: a meeting's page, as a button. When: meeting lacks a transcript. At most: about 30
+    /// characters. Placeholders: none.
     pub make_transcript: &'static str,
     /// Shows: a meeting's page, the button beside the summary's list of models, its transcript whole and
     /// no summary yet (D93): « Faire le compte rendu avec Qwen3 14b ». When: a model is chosen there or
@@ -1107,11 +1217,23 @@ pub struct Window {
     /// What is made in the background, said on the pages (D25): the minutes being written (by,
     /// for how long), waiting their turn ({} before), waiting for the user's agreement to send them
     /// ({} the host) with the way to give it, not written ({} the reason); on a list's row.
+    /// Shows: a meeting's page, as a status. When: minutes being written (followed by model and
+    /// elapsed time). At most: no limit. Placeholders: none.
     pub minutes_making: &'static str,
+    /// Shows: a meeting's page, as a status. When: queued. At most: no limit. Placeholders: {}
+    /// number before it.
     pub minutes_waiting: &'static str,
+    /// Shows: a meeting's page, as a status. When: waiting for consent. At most: no limit.
+    /// Placeholders: {} host.
     pub minutes_awaiting: &'static str,
+    /// Shows: a meeting's page, as a link. When: opens the consent page. At most: about 24
+    /// characters. Placeholders: none.
     pub agree_open: &'static str,
+    /// Shows: a meeting's page, as an error. When: minutes failed (cause follows). At most: no
+    /// limit. Placeholders: none.
     pub minutes_not_made: &'static str,
+    /// Shows: a meeting's page, as a button. When: retry a failed step. At most: about 16
+    /// characters. Placeholders: none.
     pub try_again: &'static str,
     /// Shows: the sidebar, as a list label. When: row: minutes being written. At most: 18
     /// characters. Placeholders: none.
@@ -1135,7 +1257,11 @@ pub struct Window {
     /// its minutes are kept and the last Refaire… of them failed. At most: no limit. Placeholders: none.
     pub minutes_redo_failed: &'static str,
     /// The same for the transcript: being made (by, for how long), not made ({} the reason).
+    /// Shows: a meeting's page, as a status. When: transcript being made. At most: no limit.
+    /// Placeholders: none.
     pub transcript_making: &'static str,
+    /// Shows: a meeting's page, as an error. When: transcript failed. At most: no limit.
+    /// Placeholders: none.
     pub transcript_not_made: &'static str,
     /// Shows: the sidebar, as a list label. When: row: transcript failed. At most: 18 characters.
     /// Placeholders: none.
@@ -1183,18 +1309,45 @@ pub struct Window {
     pub record_stop: &'static str,
     /// The agreement before a meeting first leaves for a host (D11's fifth board): what leaves,
     /// what stays, to whom; the user's word, once or for this service; on this computer instead.
+    /// Shows: the agreement before a meeting leaves, as a label. When: small heading above the
+    /// title. At most: no limit. Placeholders: none.
     pub agree_eyebrow: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a heading. When: always. At most: no limit.
+    /// Placeholders: {} meeting name.
     pub agree_title: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a help line. When: under the title.
+    /// At most: no limit. Placeholders: none.
     pub agree_lead: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a name, then its line. When: what leaves:
+    /// the transcript. At most: no limit. Placeholders: in the line, {} the minutes, then {} the
+    /// words.
     pub agree_leaves: [&'static str; 2],
+    /// Shows: the agreement before a meeting leaves, as a name, then its line. When: what leaves:
+    /// the context; {} words. At most: no limit. Placeholders: {} the context's number of words.
     pub agree_context: [&'static str; 2],
+    /// Shows: the agreement before a meeting leaves, as a name, then its line. When: what stays:
+    /// the audio. At most: no limit. Placeholders: none.
     pub agree_stays: [&'static str; 2],
+    /// Shows: the agreement before a meeting leaves, as a label. When: recipient row. At most:
+    /// about 16 characters. Placeholders: none.
     pub agree_to: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a label. When: model row. At most: about 16
+    /// characters. Placeholders: none.
     pub agree_model: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a label. When: checkbox: don't ask again
+    /// for this service. At most: no limit. Placeholders: none.
     pub agree_remember: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a button. When: primary: send. At most:
+    /// about 30 characters. Placeholders: none.
     pub agree_send: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a button. When: refuse. At most: about 20
+    /// characters. Placeholders: none.
     pub agree_not: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a link. When: alternative: write locally.
+    /// At most: no limit. Placeholders: none.
     pub agree_local: &'static str,
+    /// Shows: the agreement before a meeting leaves, as a button. When: confirm local writing.
+    /// At most: about 30 characters. Placeholders: none.
     pub agree_local_write: &'static str,
     /// The global shortcut: its keys as granted, none granted, where it changes, the button there.
     /// Shows: Settings, « Général », a row: its name, then its line under it. When: always. At
@@ -1356,6 +1509,8 @@ pub struct Window {
     /// Shows: the first run's assistant (D58), the reminder's row. When: the reminder is off. At
     /// most: one line. Placeholders: none.
     pub welcome_reminder_off: &'static str,
+    /// Shows: the first run's assistant and a meeting's page, as an error. When: Ollama not
+    /// answering: minutes wait. At most: no limit. Placeholders: none.
     pub welcome_ollama_silent: &'static str,
     /// Ollama answers without the model ({} the model).
     /// Shows: the first run's assistant (D58), its last step, under its rows. When: Ollama answers
@@ -1389,20 +1544,48 @@ pub struct Window {
     /// label, its example and why it helps; its count ({} the most, {} what is left — one, then
     /// more); another script than Latin or Cyrillic; why it is closed; what changed, the
     /// transcript alone or with the minutes, and the gesture that makes them again.
+    /// Shows: a meeting's page, as a button. When: context empty: add one. At most: about 24
+    /// characters. Placeholders: none.
     pub context_add: &'static str,
+    /// Shows: a meeting's page, as a label. When: context row name, followed by ':'. At most: about
+    /// 16 characters. Placeholders: none.
     pub context_title: &'static str,
+    /// Shows: a meeting's page, as a label. When: context field label. At most: no limit.
+    /// Placeholders: none.
     pub context_label: &'static str,
+    /// Shows: a meeting's page, as a field's placeholder. When: context field example. At most: no
+    /// limit. Placeholders: none.
     pub context_example: &'static str,
+    /// Shows: a meeting's page, as a help line. When: why context helps. At most: no limit.
+    /// Placeholders: none.
     pub context_why: &'static str,
+    /// Shows: a meeting's page, as a status. When: count. At most: no limit. Placeholders: {} max
+    /// characters.
     pub context_most: &'static str,
+    /// Shows: a meeting's page, as a status. When: count left; [one, many]. At most: no limit.
+    /// Placeholders: {} number.
     pub context_left: [&'static str; 2],
+    /// Shows: a meeting's page, as a help line. When: non-Latin script warning. At most: no limit.
+    /// Placeholders: none.
     pub context_script: &'static str,
+    /// Shows: a meeting's page, as a status. When: context locked during processing. At most: no
+    /// limit. Placeholders: none.
     pub context_making: &'static str,
+    /// Shows: a meeting's page, as a status. When: context locked: transcript unfinished. At most:
+    /// no limit. Placeholders: none.
     pub context_unfinished: &'static str,
+    /// Shows: a meeting's page, as a help line. When: transcript (or + minutes) made with another
+    /// context; [transcript only, both]. At most: no limit. Placeholders: none.
     pub context_changed: [&'static str; 2],
+    /// Shows: a meeting's page, as a button. When: redo with new context. At most: about 30
+    /// characters. Placeholders: none.
     pub context_redo: &'static str,
     /// The language a meeting is spoken in (D65).
+    /// Shows: a meeting's page, as a label. When: row: spoken language. At most: about 20
+    /// characters. Placeholders: none.
     pub language_label: &'static str,
+    /// Shows: a meeting's page, as a choice of a list: its first, followed by « — » and the language
+    /// Settings name. When: always. At most: about 30 characters. Placeholders: none.
     pub language_default: &'static str,
     /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
     /// first choice. When: Whisper or a service hears. At most: one line. Placeholders: none.
@@ -1410,10 +1593,20 @@ pub struct Window {
     /// Shows: Settings, « Modèles », the transcription's step, a list's label. When: always. At
     /// most: one line. Placeholders: none.
     pub meetings_language: &'static str,
+    /// Shows: a meeting's page, as an error. When: always. At most: no limit. Placeholders: {}
+    /// failure sentence.
     pub language_not_saved: &'static str,
+    /// Shows: a meeting's page, as a menu entry. When: rarer actions: rename. At most: about 30
+    /// characters. Placeholders: none.
     pub rename_meeting: &'static str,
+    /// Shows: a meeting's page, as a field's placeholder. When: name field. At most: about 30
+    /// characters. Placeholders: none.
     pub name_meeting: &'static str,
+    /// Shows: a meeting's page, as an error. When: always. At most: no limit. Placeholders: {}
+    /// failure sentence.
     pub name_not_saved: &'static str,
+    /// Shows: a meeting's page, as a choice of a list. When: appended "detected". At most: about 12
+    /// characters. Placeholders: none.
     pub language_detected_short: &'static str,
     /// SpeechAnalyzer's language when the settings name none: the system's, never the app's (D64).
     /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
@@ -1421,6 +1614,8 @@ pub struct Window {
     /// none.
     pub language_as_system: &'static str,
     /// A meeting's own language SpeechAnalyzer does not hear: the one it hears in, said (D65).
+    /// Shows: a meeting's page, on a Mac, as a choice of a list. When: {} language — SpeechAnalyzer
+    /// hears {}. At most: no limit. Placeholders: {} the language chosen, then the one heard.
     pub language_heard_as: &'static str,
     /// The language Kitokey speaks (D64): its row in Settings, and the system's, its default.
     /// Shows: Settings, « Général », a list: its name, then its line under it (D64). When: always.
@@ -1436,31 +1631,79 @@ pub struct Window {
     /// 18 characters each. Placeholders: none.
     pub appearance_choices: [&'static str; 3],
     /// A transcript's line corrected by whoever listens (D62).
+    /// Shows: a meeting's page, as a name for a screen reader. When: pencil on a transcript line.
+    /// At most: no limit. Placeholders: {} time.
     pub correct_line: &'static str,
+    /// Shows: a meeting's page, as a list label. When: line edited by the user. At most: 18
+    /// characters. Placeholders: none.
     pub corrected: &'static str,
+    /// Shows: a meeting's page, as an error. When: empty correction. At most: no limit.
+    /// Placeholders: none.
     pub correction_empty: &'static str,
+    /// Shows: a meeting's page, as an error. When: always. At most: no limit. Placeholders: {}
+    /// failure sentence.
     pub correction_failed: &'static str,
+    /// Shows: a meeting's page, as a help line. When: minutes older than transcript corrections.
+    /// At most: no limit. Placeholders: none.
     pub corrected_since: &'static str,
+    /// Shows: a meeting's page, as a button. When: redo minutes with corrections. At most: about 36
+    /// characters. Placeholders: none.
     pub redo_corrections: &'static str,
     /// The minutes copied in one click, said in place (D45).
+    /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip): copy
+    /// minutes. At most: no limit. Placeholders: none.
     pub copy_minutes: &'static str,
+    /// Shows: a meeting's page, as a status. When: after copy. At most: about 12 characters.
+    /// Placeholders: none.
     pub minutes_copied: &'static str,
+    /// Shows: a meeting's page, as an error. When: copy failed. At most: no limit. Placeholders:
+    /// none.
     pub minutes_not_copied: &'static str,
+    /// Shows: a meeting's page, the transcript's copy button, as its name for a screen reader and its
+    /// tooltip (D109). When: a transcript is there. At most: 24 characters. Placeholders: none.
+    pub copy_transcript: &'static str,
+    /// Shows: a meeting's page, beside the transcript's copy button, in its live region (D109). When:
+    /// the clipboard refused the copy. At most: one line. Placeholders: none.
+    pub transcript_not_copied: &'static str,
+    /// Shows: the clipboard, each line of a transcript copied (D109). When: the transcript's copy
+    /// button is pressed. At most: no limit. Placeholders: `{}` the time it was said at, `{}` who said
+    /// it, as the page names them, `{}` what was said.
+    pub transcript_copied_line: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a help line. When: warning: corrections lost.
+    /// At most: no limit. Placeholders: none.
     pub redo_loses_corrections: &'static str,
+    /// Shows: a meeting's page, as an error. When: context not saved. At most: no limit.
+    /// Placeholders: none.
     pub context_not_saved: &'static str,
     /// A meeting said confidential (D60): the switch's name and its words; the list's word beside
     /// the lock; what had left before ({} what, then each: the sound, the transcript, {} a host);
     /// the switch not saved; the minutes waiting for Ollama holding no model, and the fetch of {}.
+    /// Shows: a meeting's page and the recording bar, as a label. When: switch name. At most: about
+    /// 24 characters. Placeholders: none.
     pub confidential_name: &'static str,
+    /// Shows: a meeting's page and the recording bar, as a help line. When: switch line. At most:
+    /// no limit. Placeholders: none.
     pub confidential_says: &'static str,
     /// Shows: the sidebar, as a list label. When: row: confidential. At most: 18 characters.
     /// Placeholders: none.
     pub confidential_chip: &'static str,
+    /// Shows: a meeting's page, as a help line. When: data already sent before marking
+    /// confidential. At most: no limit. Placeholders: {} list.
     pub confidential_left: &'static str,
+    /// Shows: a meeting's page, as a status. When: list item. At most: no limit. Placeholders: {}
+    /// host.
     pub confidential_left_sound: &'static str,
+    /// Shows: a meeting's page, as a status. When: list item. At most: no limit. Placeholders: {}
+    /// host.
     pub confidential_left_transcript: &'static str,
+    /// Shows: a meeting's page, as an error. When: switch not saved. At most: no limit.
+    /// Placeholders: none.
     pub confidential_not_saved: &'static str,
+    /// Shows: a meeting's page, as an error. When: confidential + Ollama has no model. At most: no
+    /// limit. Placeholders: none.
     pub confidential_ollama_empty: &'static str,
+    /// Shows: a meeting's page, as a button. When: always. At most: about 30 characters.
+    /// Placeholders: {} model.
     pub confidential_fetch: &'static str,
 }
 
@@ -1888,6 +2131,9 @@ pub fn window(language: Language) -> Window {
             copy_minutes: "Copy summary",
             minutes_copied: "Copied",
             minutes_not_copied: "Couldn’t copy the summary.",
+            copy_transcript: "Copy transcript",
+            transcript_not_copied: "Couldn’t copy the transcript.",
+            transcript_copied_line: "[{}] {}: {}",
             redo_loses_corrections: "Your edits to this transcript will be lost.",
             context_not_saved: "Couldn’t save the context.",
             confidential_name: "Confidential meeting",
@@ -2340,6 +2586,9 @@ pub fn window(language: Language) -> Window {
             copy_minutes: "Copier le compte rendu",
             minutes_copied: "Copié",
             minutes_not_copied: "Impossible de copier le compte rendu.",
+            copy_transcript: "Copier la transcription",
+            transcript_not_copied: "Impossible de copier la transcription.",
+            transcript_copied_line: "[{}] {}\u{a0}: {}",
             redo_loses_corrections: "Vos corrections de cette transcription seront perdues.",
             context_not_saved: "Impossible d’enregistrer le contexte.",
             confidential_name: "Réunion confidentielle",
@@ -2659,34 +2908,34 @@ pub fn cause_own(cause: Cause, language: Language) -> Option<&'static str> {
     use Language::{English, French};
     Some(match (cause, language) {
         (Cause::TooSlow, English) => {
-            "{}, chosen for this meeting, did not answer in time: try again later, or choose a faster model in Redo…\u{a0}› Advanced."
+            "{}, chosen for this meeting, took too long to respond. Try again later or choose a faster model in Redo…\u{a0}› Advanced."
         }
         (Cause::TooSlow, French) => {
-            "{}, choisi pour cette réunion, n’a pas répondu à temps\u{a0}: réessayez plus tard, ou choisissez un modèle plus rapide dans Refaire…\u{a0}› Avancé."
+            "{}, choisi pour cette réunion, n’a pas répondu à temps. Réessayez plus tard ou choisissez un modèle plus rapide dans Refaire…\u{a0}› Avancé."
         }
         (Cause::UnknownModel, English) => {
-            "The provider does not know {}, chosen for this meeting: choose another in Redo…\u{a0}› Advanced."
+            "The service doesn’t recognize {}, chosen for this meeting. Choose another in Redo…\u{a0}› Advanced."
         }
         (Cause::UnknownModel, French) => {
-            "Le fournisseur ne connaît pas {}, choisi pour cette réunion\u{a0}: choisissez-en un autre dans Refaire…\u{a0}› Avancé."
+            "Le service ne reconnaît pas {}, choisi pour cette réunion. Choisissez-en un autre dans Refaire…\u{a0}› Avancé."
         }
         (Cause::Down, English) => {
-            "The provider answers that it is failing: try again later. On this computer, {}, chosen for this meeting, may be too large for the memory: choose a smaller one in Redo…\u{a0}› Advanced."
+            "The service is having problems. Try again later. If {} runs on this computer, it may be too large for its memory — choose a smaller one in Redo…\u{a0}› Advanced."
         }
         (Cause::Down, French) => {
-            "Le fournisseur répond qu’il est en panne\u{a0}: réessayez plus tard. Sur cet ordinateur, {}, choisi pour cette réunion, est peut-être trop gros pour la mémoire\u{a0}: choisissez-en un plus petit dans Refaire…\u{a0}› Avancé."
+            "Le service rencontre un problème. Réessayez plus tard. Si {} tourne sur cet ordinateur, il est peut-être trop gros pour sa mémoire\u{a0}: choisissez-en un plus petit dans Refaire…\u{a0}› Avancé."
         }
         (Cause::CutShort, English) => {
-            "{}, chosen for this meeting, stopped before the end: choose one that writes longer answers in Redo…\u{a0}› Advanced."
+            "{}, chosen for this meeting, stopped before finishing. Choose a model that handles longer answers in Redo…\u{a0}› Advanced."
         }
         (Cause::CutShort, French) => {
-            "{}, choisi pour cette réunion, s’est arrêté avant la fin\u{a0}: choisissez-en un qui écrit plus long dans Refaire…\u{a0}› Avancé."
+            "{}, choisi pour cette réunion, s’est arrêté avant la fin. Choisissez un modèle capable de réponses plus longues dans Refaire…\u{a0}› Avancé."
         }
         (Cause::NotMinutes, English) => {
-            "{}, chosen for this meeting, did not write minutes: try again, or choose another model in Redo…\u{a0}› Advanced."
+            "{}, chosen for this meeting, didn’t produce a summary. Try again or choose another model in Redo…\u{a0}› Advanced."
         }
         (Cause::NotMinutes, French) => {
-            "{}, choisi pour cette réunion, n’a pas écrit de compte rendu\u{a0}: réessayez, ou choisissez un autre modèle dans Refaire…\u{a0}› Avancé."
+            "{}, choisi pour cette réunion, n’a pas produit de compte rendu. Réessayez ou choisissez un autre modèle dans Refaire…\u{a0}› Avancé."
         }
         _ => return None,
     })
@@ -2696,65 +2945,55 @@ pub fn cause_own(cause: Cause, language: Language) -> Option<&'static str> {
 pub fn cause(cause: Cause, language: Language) -> &'static str {
     use Language::{English, French};
     match (cause, language) {
-        (Cause::Unreachable, English) => "The provider could not be reached: check that it runs, or the network, then try again.",
-        (Cause::Unreachable, French) => "Le fournisseur n’a pas pu être joint\u{a0}: vérifiez qu’il tourne, ou le réseau, puis réessayez.",
-        (Cause::TooSlow, English) => {
-            "The provider did not answer in time: try again later, or choose a faster model in Kitokey’s settings."
+        (Cause::Unreachable, English) => {
+            "Can’t reach the service. Check your connection — or that it’s running, if it’s on this computer — then try again."
         }
+        (Cause::Unreachable, French) => {
+            "Impossible de joindre le service. Vérifiez votre connexion, ou qu’il est bien lancé s’il tourne sur cet ordinateur, puis réessayez."
+        }
+        (Cause::TooSlow, English) => "The service took too long to respond. Try again later or choose a faster model in Settings.",
         (Cause::TooSlow, French) => {
-            "Le fournisseur n’a pas répondu à temps\u{a0}: réessayez plus tard, ou choisissez un modèle plus rapide dans les réglages de Kitokey."
+            "Le service n’a pas répondu à temps. Réessayez plus tard ou choisissez un modèle plus rapide dans les Réglages."
         }
-        (Cause::RefusedKey, English) => "The provider refused the key: give it again in Kitokey’s settings.",
-        (Cause::RefusedKey, French) => "Le fournisseur a refusé la clé\u{a0}: saisissez-la de nouveau dans les réglages de Kitokey.",
-        (Cause::NoCredit, English) => "The provider refused for lack of credit: add credit with it, then try again.",
-        (Cause::NoCredit, French) => "Le fournisseur a refusé faute de crédit\u{a0}: ajoutez du crédit chez lui, puis réessayez.",
-        (Cause::UnknownModel, English) => "The provider does not know this model or this address: choose them again in Kitokey’s settings.",
-        (Cause::UnknownModel, French) => {
-            "Le fournisseur ne connaît pas ce modèle ou cette adresse\u{a0}: choisissez-les de nouveau dans les réglages de Kitokey."
-        }
-        (Cause::TooMany, English) => "The provider refuses for too many requests, or a quota used up: wait, or check your plan with it.",
+        (Cause::RefusedKey, English) => "The service rejected the API key. Enter it again in Settings.",
+        (Cause::RefusedKey, French) => "Le service a refusé la clé d’API. Saisissez-la à nouveau dans les Réglages.",
+        (Cause::NoCredit, English) => "Not enough credit with the service. Top up your account, then try again.",
+        (Cause::NoCredit, French) => "Crédit insuffisant chez le service. Rechargez votre compte, puis réessayez.",
+        (Cause::UnknownModel, English) => "The service doesn’t recognize this model or address. Check them in Settings.",
+        (Cause::UnknownModel, French) => "Le service ne reconnaît pas ce modèle ou cette adresse. Vérifiez-les dans les Réglages.",
+        (Cause::TooMany, English) => "The service is limiting requests, or your quota is used up. Wait, or check your plan.",
         (Cause::TooMany, French) => {
-            "Le fournisseur refuse pour trop de demandes, ou un quota épuisé\u{a0}: patientez, ou vérifiez votre forfait chez lui."
+            "Le service limite le nombre de demandes, ou votre quota est atteint. Patientez, ou vérifiez votre abonnement."
         }
         (Cause::Down, English) => {
-            "The provider answers that it is failing: try again later. On this computer, this model may be too large for the memory: choose a smaller one."
+            "The service is having problems. Try again later. If the model runs on this computer, it may be too large for its memory — choose a smaller one."
         }
         (Cause::Down, French) => {
-            "Le fournisseur répond qu’il est en panne\u{a0}: réessayez plus tard. Sur cet ordinateur, ce modèle est peut-être trop gros pour la mémoire\u{a0}: choisissez-en un plus petit."
+            "Le service rencontre un problème. Réessayez plus tard. Si le modèle tourne sur cet ordinateur, il est peut-être trop gros pour sa mémoire\u{a0}: choisissez-en un plus petit."
         }
-        (Cause::NoTimes, English) => {
-            "This model gives no times for what it hears: choose one that gives each segment’s times in Kitokey’s settings."
-        }
-        (Cause::NoTimes, French) => {
-            "Ce modèle ne donne pas les temps de ce qu’il entend\u{a0}: choisissez-en un qui donne ceux de chaque segment dans les réglages de Kitokey."
-        }
-        (Cause::Redirected, English) => "The provider sends the request to another address: check the address in Kitokey’s settings.",
-        (Cause::Redirected, French) => {
-            "Le fournisseur renvoie la demande vers une autre adresse\u{a0}: vérifiez l’adresse dans les réglages de Kitokey."
-        }
-        (Cause::ProviderFailed, English) => "The provider failed to answer: try again later.",
-        (Cause::ProviderFailed, French) => "Le fournisseur n’a pas su répondre\u{a0}: réessayez plus tard.",
-        (Cause::CutShort, English) => "The model stopped before the end: choose one that writes longer answers in Kitokey’s settings.",
+        (Cause::NoTimes, English) => "This model doesn’t provide timestamps. Choose one that does in Settings.",
+        (Cause::NoTimes, French) => "Ce modèle ne fournit pas d’horodatage. Choisissez-en un qui en fournit dans les Réglages.",
+        (Cause::Redirected, English) => "The service redirects to another address. Check the address in Settings.",
+        (Cause::Redirected, French) => "Le service redirige vers une autre adresse. Vérifiez l’adresse dans les Réglages.",
+        (Cause::ProviderFailed, English) => "The service couldn’t respond. Try again later.",
+        (Cause::ProviderFailed, French) => "Le service n’a pas pu répondre. Réessayez plus tard.",
+        (Cause::CutShort, English) => "The model stopped before finishing. Choose a model that handles longer answers in Settings.",
         (Cause::CutShort, French) => {
-            "Le modèle s’est arrêté avant la fin\u{a0}: choisissez-en un qui écrit plus long dans les réglages de Kitokey."
+            "Le modèle s’est arrêté avant la fin. Choisissez un modèle capable de réponses plus longues dans les Réglages."
         }
-        (Cause::NotMinutes, English) => "The model did not write minutes: try again, or choose another model in Kitokey’s settings.",
+        (Cause::NotMinutes, English) => "The model didn’t produce a summary. Try again or choose another model in Settings.",
         (Cause::NotMinutes, French) => {
-            "Le modèle n’a pas écrit de compte rendu\u{a0}: réessayez, ou choisissez un autre modèle dans les réglages de Kitokey."
+            "Le modèle n’a pas produit de compte rendu. Réessayez ou choisissez un autre modèle dans les Réglages."
         }
-        (Cause::TranscriptUnusable, English) => "The transcript cannot be read: make it again first.",
-        (Cause::TranscriptUnusable, French) => "La transcription ne peut pas être lue\u{a0}: refaites-la d’abord.",
-        (Cause::NoSpeech, English) => "The transcript holds no speech: there is nothing to write minutes of. Check the recording.",
-        (Cause::NoSpeech, French) => {
-            "La transcription ne contient aucune parole\u{a0}: il n’y a rien à résumer. Vérifiez l’enregistrement."
-        }
-        (Cause::Settings, English) => "The provider’s address, model or key cannot be used as given: correct them in Kitokey’s settings.",
-        (Cause::Settings, French) => {
-            "L’adresse, le modèle ou la clé du fournisseur ne peuvent pas être utilisés tels quels\u{a0}: corrigez-les dans les réglages de Kitokey."
-        }
-        (Cause::Unwritable, English) => "The minutes could not be written in the meeting’s folder: free space, or check the folder.",
+        (Cause::TranscriptUnusable, English) => "The transcript can’t be read. Redo it first.",
+        (Cause::TranscriptUnusable, French) => "La transcription est illisible. Refaites-la d’abord.",
+        (Cause::NoSpeech, English) => "No speech in the transcript, so nothing to summarize. Check the recording.",
+        (Cause::NoSpeech, French) => "Aucune parole dans la transcription\u{a0}: rien à résumer. Vérifiez l’enregistrement.",
+        (Cause::Settings, English) => "The service’s address, model or key isn’t valid. Fix them in Settings.",
+        (Cause::Settings, French) => "L’adresse, le modèle ou la clé du service ne sont pas valides. Corrigez-les dans les Réglages.",
+        (Cause::Unwritable, English) => "Couldn’t save the summary in the meeting’s folder. Free up space or check the folder.",
         (Cause::Unwritable, French) => {
-            "Le compte rendu n’a pas pu être écrit dans le dossier de la réunion\u{a0}: libérez de la place, ou vérifiez le dossier."
+            "Impossible d’enregistrer le compte rendu dans le dossier de la réunion. Libérez de l’espace ou vérifiez le dossier."
         }
     }
 }
