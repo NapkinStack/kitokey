@@ -1195,6 +1195,16 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
     /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
+    /// Shows: a meeting's page, under its summary, as a button (D113). When: a redo replaced a version,
+    /// kept beside. At most: no limit. Placeholders: {} when that version was made and its model, as the
+    /// page's line says them.
+    pub previous_back: &'static str,
+    /// Shows: a meeting's page, under « Revenir à la version précédente », as a help line (D113). When:
+    /// the button shows. At most: no limit. Placeholders: none.
+    pub previous_help: &'static str,
+    /// Shows: a meeting's page, under « Revenir à la version précédente », as an error (D113). When: the
+    /// two versions could not swap. At most: no limit. Placeholders: {} what is wrong, as the failure says it.
+    pub previous_failed: &'static str,
     /// What a meeting lacks, offered on its page; what is said once asked; where a step ran.
     /// Shows: a meeting's page, as a button. When: meeting lacks minutes. At most: about 30
     /// characters. Placeholders: none.
@@ -1972,6 +1982,9 @@ pub fn window(language: Language) -> Window {
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept.",
+            previous_back: "Go back to the previous version ({})",
+            previous_help: "The version you leave becomes the previous one: the same button brings it back.",
+            previous_failed: "Couldn’t go back to the previous version: {}",
             make_minutes: "Write summary",
             make_transcript: "Transcribe",
             make_minutes_with: "Write summary with {}",
@@ -2418,6 +2431,9 @@ pub fn window(language: Language) -> Window {
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée.",
+            previous_back: "Revenir à la version précédente ({})",
+            previous_help: "La version quittée devient la précédente\u{a0}: le même bouton la ramène.",
+            previous_failed: "Impossible de revenir à la version précédente\u{a0}: {}",
             make_minutes: "Rédiger le compte rendu",
             make_transcript: "Transcrire",
             make_minutes_with: "Rédiger le compte rendu avec {}",
