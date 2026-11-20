@@ -39,11 +39,17 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(Refused(why, code)) => {
-            if let Some(code) = code {
-                println!("{}", json!({"event": "failed", "code": code}));
-            }
             eprintln!("kitokey-export: {why}");
-            ExitCode::FAILURE
+            match code {
+                // A cause of the contract: its line, then the failure.
+                Some(code) => {
+                    println!("{}", json!({"event": "failed", "code": code}));
+                    ExitCode::FAILURE
+                }
+                // A wrong argument or input — a format not written yet among them —: a usage error, 2, as
+                // pandoc's and typst's, before the contract is entered.
+                None => ExitCode::from(2),
+            }
         }
     }
 }

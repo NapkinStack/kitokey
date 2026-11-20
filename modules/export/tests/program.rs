@@ -33,6 +33,7 @@ fn words(to: &Path) -> Value {
 
 struct Ran {
     success: bool,
+    code: Option<i32>,
     lines: Vec<Value>,
     said: String,
 }
@@ -50,6 +51,7 @@ fn run(args: &[&str], input: &str) -> Ran {
     let stdout = String::from_utf8(output.stdout).expect("its output is UTF-8");
     Ran {
         success: output.status.success(),
+        code: output.status.code(),
         lines: stdout
             .lines()
             .map(|line| serde_json::from_str(line).expect("each line one JSON object"))
@@ -161,7 +163,7 @@ fn a_cause_a_person_acts_on_is_its_one_line_and_a_sentence_and_nothing_is_writte
         ),
     ] {
         let ran = run(&args, &words(to).to_string());
-        assert!(!ran.success, "{code}");
+        assert_eq!(ran.code, Some(1), "{code}: a cause of the contract ends at 1");
         assert_eq!(ran.lines, [json!({"event": "failed", "code": code})], "{code}");
         assert!(
             ran.said.starts_with("kitokey-export: ") && ran.said.lines().count() == 1,
@@ -200,7 +202,11 @@ fn a_wrong_argument_or_input_is_a_sentence_alone() {
         (vec![folder, "--format", "md", "--lang", "fr"], missing.to_string()),
     ] {
         let ran = run(&args, &input);
-        assert!(!ran.success, "{args:?} {input}");
+        assert_eq!(
+            ran.code,
+            Some(2),
+            "a wrong argument or input ends at 2, as a usage error: {args:?} {input}"
+        );
         assert!(ran.lines.is_empty(), "no line names a wrong argument: {args:?} {:?}", ran.lines);
         assert!(ran.said.starts_with("kitokey-export: "), "{args:?}: {}", ran.said);
         assert!(!to.exists(), "{args:?}: nothing written");

@@ -34,8 +34,10 @@ Delivers the files of a session to where the user wants them.
   input, a process's arguments being public to the machine's users (`tests/program.rs`).
 - It writes the file beside its place, then renames it over: whole or not at all, nothing left
   beside it. The session's folder is only read.
-- A format `exporting/v1` names that this version does not write yet is a wrong argument (`WRITTEN`
-  in `src/main.rs`): each joins that list with its writer. The shell offers only those listed.
+- A format `exporting/v1` names that this version does not write yet is a usage error, as any wrong
+  argument or input: exit 2 and one sentence, no line (`WRITTEN` in `src/main.rs`; pandoc and typst
+  alike). A cause of the contract is its `failed` line and exit 1. Each format joins `WRITTEN` with its
+  writer; the shell offers only those listed.
 
 ## Known traps
 
