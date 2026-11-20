@@ -44,6 +44,12 @@ most six —, their titles in the meeting's language. **A consumer finds a secti
 `n`-th section of the body being the `n`-th object of `sections`; never by its title, which the model
 writes.
 
+- **The producer places the sections**, in the order of `sections`: their titles are the model's
+  words, their order and their number the producer's.
+- **No other line of the body opens on `## `.** A title of second level the model writes inside a
+  section, the producer writes one level down, `### `; a line that opens on `# ` after the front
+  matter is none of the producer's. A consumer cuts the body on `## ` alone.
+
 **The section named by `actions`** holds a list; each item says **what**, **who** and **by when**, in
 that order, separated by ` — `, as v4's Actions. Every other section holds a few sentences or a list.
 
@@ -55,7 +61,7 @@ The six structures this version names, their sections in their order:
 | `one_to_one` | `updates`, `feedback`, `actions` | `actions` |
 | `stand_up` | `progress`, `blockers`, `actions` | `actions` |
 | `client_call` | `needs`, `questions`, `next_steps` | `next_steps` |
-| `interview` | `background`, `strengths`, `concerns`, `next_steps` | `next_steps` |
+| `interview` | `background`, `answers`, `questions`, `next_steps` | `next_steps` |
 | `project_review` | `status`, `risks`, `decisions`, `actions` | `actions` |
 
 The producer's `about` for each is its own, and may be worded otherwise in a later version of the
@@ -120,6 +126,10 @@ in two digits or more, seconds from 00 to 59. In the section named by `actions` 
 - Its sections' titles are never a fixed text: a consumer finds a section by its `id`, not by its
   title.
 - It never carries how the structure asked each section of the model beyond `about`'s one line.
+- It never judges a person. `interview` records what was asked and answered, never a candidate's
+  strengths or weaknesses: an AI system intended « to evaluate candidates » is high-risk under the EU
+  AI Act ([Regulation (EU) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj), Annex III,
+  point 4(a)), and the meeting does not say it.
 
 ## Examples
 
@@ -159,5 +169,7 @@ La recette commence lundi ; le lot 2 a une semaine de retard sur le plan.
 
 To refuse: a file without the front matter or naming a `contract` other than `minutes/v1` to
 `minutes/v5`; a line of the front matter that is not `key: value`; a v5 file without `structure` or
-`sections`, with an `id` twice or out of its bounds, with `actions` naming no `id`, or with another
-number of sections than `sections` has objects.
+`sections`, with `sections` not an array of one to six objects, an `id` twice or out of its bounds, an `about`
+empty, on two lines or over 200 characters, with `actions` naming no `id`, with another number of
+sections than `sections` has objects — a title of second level the model wrote and the producer did
+not write one level down among them —, or with a line opening on `# ` in its body.

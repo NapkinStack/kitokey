@@ -58,6 +58,8 @@ def refusal(text):
         return "an id twice"
     if "actions" in keys and keys["actions"] not in ids:
         return "actions names no id"
+    if any(line.startswith("# ") for line in body.split("\n")):
+        return "a title of first level in the body"
     titles = [line for line in body.split("\n") if line.startswith("## ")]
     if len(titles) != len(sections):
         return f"{len(titles)} sections in the body, {len(sections)} in the front matter"
@@ -92,6 +94,22 @@ def swapped(text, old, new):
         lambda t: swapped(t, "## Décisions\n", ""),
         lambda t: swapped(t, "## Actions", "## Actions\n\nRien.\n\n## Suite"),
         lambda t: swapped(t, "made: ", "made "),
+        lambda t: swapped(
+            swapped(
+                t,
+                '{"id": "status"',
+                "".join(f'{{"id": "{i}", "about": "Seven."}}, ' for i in "abc") + '{"id": "status"',
+            ),
+            "## État",
+            "## A\n\nUn.\n\n## B\n\nDeux.\n\n## C\n\nTrois.\n\n## État",
+        ),
+        lambda t: swapped(t, '"about": "Each risk', '"about": "Each\\nrisk'),
+        lambda t: swapped(t, '"about": "Each risk', '"about": "' + "x" * 201 + "Each risk"),
+        lambda t: swapped(t, '"about": "Each risk', '"about": "", "was": "Each risk'),
+        lambda t: swapped(t, '"about": "Each risk', '"about": 3, "was": "Each risk'),
+        lambda t: t[: t.index("sections: ")] + 'sections: {"id": "status"}' + t[t.index("\n", t.index("sections: ")) :],
+        lambda t: swapped(t, "- Le lot 3 est reporté", "## Le lot 3\n\n- Le lot 3 est reporté"),
+        lambda t: swapped(t, "## État", "# Atlas\n\n## État"),
     ],
     ids=[
         "another contract",
@@ -104,6 +122,14 @@ def swapped(text, old, new):
         "a section fewer",
         "a section more",
         "not key: value",
+        "seven sections",
+        "an about on two lines",
+        "an about over 200 characters",
+        "an empty about",
+        "an about not a string",
+        "sections an object",
+        "a model's title of second level inside a section",
+        "a title of first level in the body",
     ],
 )
 def test_what_the_page_refuses_is_refused(change):
