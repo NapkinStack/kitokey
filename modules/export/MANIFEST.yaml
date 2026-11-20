@@ -90,6 +90,10 @@ dependencies:
     purpose: Renders the summary's Markdown into the HTML page, its raw HTML said as text
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
     exit_strategy: One loop in html() of src/lib.rs; any CommonMark renderer that gives events replaces it.
+  - name: docx-rs
+    purpose: Writes the Word document — its heading styles, paragraphs, runs and table (MIT, without its image feature)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: docx() and paragraphs() in src/lib.rs; any OOXML writer with styles and tables replaces it.
 #  - name:
 #    purpose:
 #    adr:
