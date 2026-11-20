@@ -1195,7 +1195,7 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
     /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
-    /// Shows: a meeting's page, under its summary, as a button (D113). When: a redo replaced a version,
+    /// Shows: a meeting's page, under its summary or its transcript, as a button (D113). When: a redo replaced a version,
     /// kept beside. At most: no limit. Placeholders: {} when that version was made and its model, as the
     /// page's line says them.
     pub previous_back: &'static str,

@@ -12919,7 +12919,7 @@ def main() -> int:
             )
             trash.unlink()
             (WORK / "data" / "Trash-aside").rename(trash)
-            # Refaire… on the transcript: another model of this computer; the transcript there in the trash.
+            # Refaire… on the transcript: another model of this computer; the transcript there kept beside (D113).
             heard = (asked / "transcript.jsonl").read_text()
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
@@ -12931,13 +12931,12 @@ def main() -> int:
                   offered == ["Celui des Réglages\u00a0: Whisper large v3 turbo", "Whisper small"], offered)
             redo_pick(browser, "redo-transcript-panel", "transcription", 1)
             browser.find_element(By.ID, "redo-transcript-do").click()
-            redone = wait_for(browser, lambda b: sorted(trash_files.glob("transcript-before-*.jsonl")), 10)
-            trashed = sorted(trash_files.glob("transcript-before-*.jsonl"))
+            kept = asked / "transcript-previous.jsonl"
+            redone = wait_for(browser, lambda b: kept.is_file() and kept.read_text() == heard, 10)
             check(
-                "the transcript made again with the model picked; the one there in the trash",
+                "the transcript made again with the model picked; the one there kept beside as the previous version (D113)",
                 redone
                 and "Refait avec ggml-small." in (asked / "transcript.jsonl").read_text()
-                and [path.read_text() for path in trashed] == [heard]
                 and not sorted(asked.glob("transcript-before-*")),
                 (asked / "transcript.jsonl").read_text(),
             )
@@ -12965,10 +12964,10 @@ def main() -> int:
                   browser.execute_script(LINES, "#meeting .maker"))
             check("a transcript not made says so on its card in plain words, with a way to try again", unmade and "engine stopped" not in heard_state(browser), heard_state(browser))
             # Tried again as it was asked: made again with the meeting's own model, kept by the Refaire…, not resumed.
-            # Made again — the one there set aside, then in the trash —, never resumed from it.
-            trashed_before = len(sorted(trash_files.glob("transcript-before-*.jsonl")))
+            # Made again — the one there kept beside, the previous one before it in the trash (D113) —, never resumed from it.
+            trashed_before = len(sorted(trash_files.glob("transcript-previous*")))
             press(browser, "transcript-again")
-            tried = wait_for(browser, lambda b: len(sorted(trash_files.glob("transcript-before-*.jsonl"))) == trashed_before + 1, 10)
+            tried = wait_for(browser, lambda b: len(sorted(trash_files.glob("transcript-previous*"))) == trashed_before + 1, 10)
             check("Try again after a Refaire… makes it again with the meeting's own model it kept", tried and "Refait avec ggml-small" in (asked / "transcript.jsonl").read_text(), (asked / "transcript.jsonl").read_text() if (asked / "transcript.jsonl").exists() else "")
             back_ = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 5)
             check("Refaire… is offered again once asked, the panel gone", back_)

@@ -1687,6 +1687,34 @@ function startsOnPage(id, words, command) {
   return go;
 }
 
+// The last version a redo replaced (D113): brought back by one button that names its time and model;
+// the one left becomes the previous, so the same button brings it back.
+function previousBack(words, session, step, previous, model) {
+  const back = element("button", "open");
+  back.type = "button";
+  back.id = `${step}-previous`;
+  const was = [madeOn(words, previous.made), model].filter(Boolean).join(" · ");
+  back.textContent = was ? fill(words.previous_back, was) : words.previous_back.replace(/\s*\(\{\}\)$/, "");
+  const help = element("p", "says", words.previous_help);
+  help.id = `${step}-previous-help`;
+  const failed = element("p", "note warn");
+  failed.hidden = true;
+  back.addEventListener("click", async () => {
+    waiting(back, true);
+    try {
+      await window.__TAURI__.core.invoke("previous_back", { name: nameOf(session), step });
+      await refresh();
+    } catch (why) {
+      failed.textContent = fill(words.previous_failed, why);
+      failed.hidden = false;
+      waiting(back, false);
+    }
+  });
+  const box = element("div", "previous");
+  box.append(back, help, failed);
+  return box;
+}
+
 function minutesCard(read, words, session, transcript, onPage, previous) {
   const card = element("article", "card minutes");
   // Its title, and Refaire… beside it: the state below them never sits under a button.
@@ -1775,33 +1803,7 @@ function minutesCard(read, words, session, transcript, onPage, previous) {
     const [pick, said] = modelOnPage(onPage, words, "minutes", version, go, words.redo_minutes_do, words.redo_title, box);
     card.append(lineWith(maker, pick), said, box);
   } else card.append(element("p", "maker", maker));
-  // The last version a redo replaced (D113): brought back by one button that names its time and model;
-  // the one left becomes the previous, so the same button brings it back.
-  if (previous) {
-    const back = element("button", "open");
-    back.type = "button";
-    back.id = "minutes-previous";
-    const was = [madeOn(words, previous.made), previous.model ? modelSaid(previous.model) : ""].filter(Boolean).join(" · ");
-    back.textContent = was ? fill(words.previous_back, was) : words.previous_back.replace(/\s*\(\{\}\)$/, "");
-    const help = element("p", "says", words.previous_help);
-    help.id = "minutes-previous-help";
-    const failed = element("p", "note warn");
-    failed.hidden = true;
-    back.addEventListener("click", async () => {
-      waiting(back, true);
-      try {
-        await window.__TAURI__.core.invoke("previous_back", { name: nameOf(session), step: "minutes" });
-        await refresh();
-      } catch (why) {
-        failed.textContent = fill(words.previous_failed, why);
-        failed.hidden = false;
-        waiting(back, false);
-      }
-    });
-    const box = element("div", "previous");
-    box.append(back, help, failed);
-    card.append(box);
-  }
+  if (previous) card.append(previousBack(words, session, "minutes", previous, previous.model ? modelSaid(previous.model) : ""));
   // The transcript corrected after they were written (D62): said, and made again only on a click.
   const corrected = transcript.state === "present" ? Math.max(0, ...transcript.segments.map((segment) => Date.parse(segment.edited ?? "") || 0)) : 0;
   if (corrected > (Date.parse(read.made ?? "") || 0)) {
@@ -1963,7 +1965,7 @@ function whoSaid(segment, words) {
   return segment.voice === null ? side : `${side} · ${fill(words.voice, segment.voice)}`;
 }
 
-function transcriptCard(read, words, session, onPage) {
+function transcriptCard(read, words, session, onPage, previous) {
   const card = element("aside", "card transcript");
   card.setAttribute("aria-label", words.transcript_title);
   const top = element("div", "top");
@@ -2052,6 +2054,12 @@ function transcriptCard(read, words, session, onPage) {
     heard.append(lineWith(heardSaid + tookAndCost(read, words), pick), said, box);
   } else heard.append(element("p", "maker", heardSaid + tookAndCost(read, words)));
   card.append(heard);
+  // Its model said as its own line says it: a service's by its host, this computer's by its name.
+  if (previous) {
+    const elsewhere = previous.provider && !["whisper.cpp", "SpeechAnalyzer"].includes(previous.provider);
+    const model = elsewhere ? (previous.model || "—") + fill(words.written_via, previous.provider) : previous.model ? spoken(previous.model) : previous.provider || "";
+    card.append(previousBack(words, session, "transcript", previous, model));
+  }
   if (!read.complete) card.append(element("p", "note", words.being_made));
   if (read.unread > 0) card.append(element("p", "note", fill(words.unread, read.unread)));
   const lines = element("ol", "lines");
@@ -2442,7 +2450,7 @@ function trashedFocused() {
   }
 }
 
-function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, previous_minutes }, words) {
+function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, previous_minutes, previous_transcript }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
   const open = iconButton("folder-open", words.open_folder, "open-folder");
@@ -2511,7 +2519,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
-  columns.append(minutesCard(minutes, words, session, transcript, onPage, previous_minutes), transcriptCard(transcript, words, session, onPage));
+  columns.append(minutesCard(minutes, words, session, transcript, onPage, previous_minutes), transcriptCard(transcript, words, session, onPage, previous_transcript));
   // Shown again when the window comes forward: a search in progress in this meeting is kept.
   const searching = page.dataset.name === nameOf(session) ? (document.getElementById("search")?.value ?? "") : "";
   // A name being typed is kept the same way, with its refusal and where the caret was (D70).

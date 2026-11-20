@@ -1745,6 +1745,8 @@ struct Opened {
     models_gone: Vec<meeting_models::Step>,
     /// The last summary a redo replaced, kept beside it (D113): when it was made, and by what.
     previous_minutes: Option<Previous>,
+    /// The last transcript a redo replaced, the same way (D113).
+    previous_transcript: Option<Previous>,
 }
 
 /// A version kept beside the one shown (D113), as its page names it.
@@ -1782,6 +1784,14 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
             Read::Present(kept) => Some(Previous {
                 made: kept.made,
                 provider: kept.provider,
+                model: kept.model,
+            }),
+            _ => None,
+        },
+        previous_transcript: match meeting::previous(&folder) {
+            Read::Present(kept) => Some(Previous {
+                made: kept.made,
+                provider: kept.engine,
                 model: kept.model,
             }),
             _ => None,
@@ -3956,12 +3966,13 @@ fn previous_back(shell: State<'_, Shell>, name: String, step: String) -> Result<
     let folder = session_folder(&shell, &name)?;
     let (shown, kept) = match step.as_str() {
         "minutes" => (folder.join("minutes.md"), folder.join(minutes::PREVIOUS)),
+        "transcript" => (folder.join("transcript.jsonl"), folder.join(meeting::PREVIOUS)),
         _ => return Err(shell.told(Failure::Unexpected, "no step of that name")),
     };
     if making(&shell, &folder) {
         return Err(shell.told(Failure::Busy, format!("{name} is being made")));
     }
-    let between = folder.join(format!("{}.swap", minutes::PREVIOUS));
+    let between = kept.with_extension("swap");
     let unwritten = |error: std::io::Error| shell.told(Failure::MeetingFile, error);
     std::fs::rename(&kept, &between).map_err(unwritten)?;
     if let Err(error) = std::fs::rename(&shown, &kept) {
@@ -4473,8 +4484,9 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         let here = heard(&shell, &folder, &made, cancel.cancelled());
         drop(running);
         transcribing(&app, false);
-        // Replaced, the earlier transcript goes to the trash — refused, it stays beside, and it is
-        // said; not replaced, it is put back — failing that, it is said where it is.
+        // Replaced, the earlier transcript is kept beside as the previous version, the one kept before
+        // going to the trash (D113) — refused, it stays where it was set aside, and it is said; not
+        // replaced, it is put back — failing that, it is said where it is.
         let mut kept_beside = None;
         let redoing = shell.redoing.lock().unwrap().take();
         // Cancelled with none whole before it: what it began is no version, nor taken up by the
@@ -4486,7 +4498,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
             let name = previous.file_name().map(|name| name.to_string_lossy().into_owned());
             let written = matches!(made, Made::Written(_));
             if let Some(not_put_back) = sessions::settle(&current, &previous, written, |previous| {
-                trash::delete(previous).map_err(std::io::Error::other)
+                keep_previous(&folder, previous, meeting::PREVIOUS)
             }) {
                 kept_beside = name.map(|name| (name, not_put_back));
             }
