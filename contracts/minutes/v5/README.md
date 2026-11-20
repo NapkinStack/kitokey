@@ -46,9 +46,10 @@ writes.
 
 - **The producer places the sections**, in the order of `sections`: their titles are the model's
   words, their order and their number the producer's.
-- **No other line of the body opens on `## `.** A title of second level the model writes inside a
-  section, the producer writes one level down, `### `; a line that opens on `# ` after the front
-  matter is none of the producer's. A consumer cuts the body on `## ` alone.
+- **No other line of the body opens on `## `**, nor any on `# `. An answer of the model holding
+  another number of titles of second level than the structure has sections is not minutes, as v4's
+  holding more than three: the producer writes nothing from it. A consumer cuts the body on `## `
+  alone.
 
 **The section named by `actions`** holds a list; each item says **what**, **who** and **by when**, in
 that order, separated by ` — `, as v4's Actions. Every other section holds a few sentences or a list.
@@ -171,5 +172,4 @@ To refuse: a file without the front matter or naming a `contract` other than `mi
 `minutes/v5`; a line of the front matter that is not `key: value`; a v5 file without `structure` or
 `sections`, with `sections` not an array of one to six objects, an `id` twice or out of its bounds, an `about`
 empty, on two lines or over 200 characters, with `actions` naming no `id`, with another number of
-sections than `sections` has objects — a title of second level the model wrote and the producer did
-not write one level down among them —, or with a line opening on `# ` in its body.
+sections than `sections` has objects, or with a line opening on `# ` in its body.
