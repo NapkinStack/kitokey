@@ -95,7 +95,8 @@ version for it. [`test.schema.json`](./test.schema.json) says what the line is.
 
 - It never rewrites or removes a line while it is made. Once complete, it never removes one, and
   rewrites one only for a person's correction of its `text` — a better transcript by an engine is
-  another file, made again from the audio.
+  another file, made again from the audio. A consumer may keep the last one it replaced beside it
+  as `transcript-previous.jsonl`, which no step reads and this contract does not describe (D113).
 - It never names a person: `me` is whoever recorded, `others` is everyone else, however many
   they are.
 - It never promises that the segments of `me` and `others` do not overlap: people speak at
