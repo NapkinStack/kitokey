@@ -331,6 +331,10 @@ pub fn request_in(segments: &[Segment], context: Option<&str>, structure: Option
                  content goes on the lines below it. What each section holds:\n",
             );
             asked.replace_range(at.., &skeleton);
+            // v4's three titles are not the structure's number.
+            let titles = "the three titles included";
+            let at = asked.find(titles).expect("the request names its titles");
+            asked.replace_range(at..at + titles.len(), "the titles included");
             for (n, section) in structure.sections.iter().enumerate() {
                 asked.push_str(&format!("{}. {}\n", n + 1, section.ask));
             }

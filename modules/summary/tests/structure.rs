@@ -245,6 +245,9 @@ fn in_a_structure_the_model_is_given_the_skeleton_to_copy() {
             structure.name
         );
         assert!(!asked.contains("in this order:"), "{}: {asked}", structure.name);
+        // v4's count of titles is not the structure's: no number of titles but the structure's.
+        assert!(!asked.contains("the three titles"), "{}: {asked}", structure.name);
+        assert!(asked.contains("the titles included"), "{}: {asked}", structure.name);
     }
     // Without a structure, v4's request as before.
     assert!(!kitokey_summary::request(&[], None).contains("<section 1's title>"));
