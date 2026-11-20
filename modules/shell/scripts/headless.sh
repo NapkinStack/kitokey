@@ -9,6 +9,7 @@
 # Every process started carries the run's XDG_RUNTIME_DIR, and is ended by it.
 #
 #     scripts/headless.sh            (scripts/e2e.sh alone runs on the user's desktop, as before)
+#     KITOKEY_SPEED=10 scripts/headless.sh   Kitokey's speed instead, in one session (scripts/speed.sh, D105)
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 # Where its text goes: the module's `.evidence`, or a shard's own folder (scripts/e2e_sharded.sh).
@@ -33,7 +34,7 @@ if [ "${1:-}" != --inside ]; then
   # A full run is cut in shards side by side, each a session of its own like this one (#862): the
   # tray's part, and the window's scenarios balanced by their measured times. KITOKEY_E2E_SHARDS=1
   # runs it whole, in this one session, as before.
-  if [ -z "${KITOKEY_E2E_PART:-}" ] && [ -z "$asked" ] && [ "${KITOKEY_E2E_SHARDS:-3}" -gt 1 ]; then
+  if [ -z "${KITOKEY_SPEED:-}" ] && [ -z "${KITOKEY_E2E_PART:-}" ] && [ -z "$asked" ] && [ "${KITOKEY_E2E_SHARDS:-3}" -gt 1 ]; then
     exec bash "$here/e2e_sharded.sh"
   fi
   root=${XDG_CACHE_HOME:-$HOME/.cache}/kitokey-headless/run-$$
@@ -53,7 +54,7 @@ if [ "${1:-}" != --inside ]; then
   trap ended EXIT
   # Of the user's environment, their tools and caches and NapkinStack's, and the scenarios a partial
   # run plays (KITOKEY_E2E_ONLY, scripts/e2e_only.py); nothing of their desktop.
-  mapfile -t kept < <(env | grep -E '^(NSTACK_[A-Z_]*|CARGO_TARGET_DIR|KITOKEY_SCREENSHOTS|KITOKEY_E2E_ONLY|KITOKEY_E2E_PART|KITOKEY_E2E_OUT)=' || true)
+  mapfile -t kept < <(env | grep -E '^(NSTACK_[A-Z_]*|CARGO_TARGET_DIR|KITOKEY_SCREENSHOTS|KITOKEY_E2E_ONLY|KITOKEY_E2E_PART|KITOKEY_E2E_OUT|KITOKEY_SPEED)=' || true)
   setsid env -i PATH="$PATH" USER="$USER" LOGNAME="$USER" LANG="${LANG:-C.UTF-8}" "${kept[@]}" \
     CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
     UV_CACHE_DIR="${UV_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/uv}" \
@@ -169,7 +170,11 @@ if [ ! -s "$logs/keyboard" ]; then
 fi
 
 status=0
-"$here/e2e.sh" "$@" || status=$?
+if [ -n "${KITOKEY_SPEED:-}" ]; then
+  "$here/speed.sh" || status=$?
+else
+  "$here/e2e.sh" "$@" || status=$?
+fi
 # The session's own log beside the run's evidence, never in it: what GNOME says of a session with
 # no logind nor accounts is no line of Kitokey's, and NapkinStack audits every log there.
 cp "$logs/shell.log" "$out/headless-shell.log" 2>/dev/null || true
