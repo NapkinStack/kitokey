@@ -3783,10 +3783,14 @@ def minutes_copied(now: dt.datetime) -> None:
     (broken / "minutes.md").write_text("pas un compte rendu\n")
     expected = ("## Points saillants\n\nLe budget est validé.\n\n## Actions\n\n- Envoyer le devis — Inès — vendredi\n\n"
                 "## Points clés\n\n- Rien\n")
-    # The clipboard stood in: what the page writes is kept on the page, never the user's own clipboard.
+    # The clipboard stood in: what the page writes is kept on the page, never the user's own clipboard —
+    # each item by its types and their text (D109: rich text and Markdown together).
     stand_in = ("window.__copied = []; const refuse = arguments[0];"
-                "Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: (text) =>"
-                " refuse ? Promise.reject(new Error('refused')) : (window.__copied.push(text), Promise.resolve())}})")
+                "Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {"
+                " writeText: (text) => refuse ? Promise.reject(new Error('refused')) : (window.__copied.push({'text/plain': text}), Promise.resolve()),"
+                " write: async (items) => { if (refuse) throw new Error('refused');"
+                "  for (const item of items) window.__copied.push(Object.fromEntries(await Promise.all("
+                "   item.types.map(async (type) => [type, await (await item.getType(type)).text()])))); }}})")
     status = "return document.getElementById('minutes-copied')?.textContent ?? null"
     with Window(meetings, "fr_FR.UTF-8", "reminder = false\n") as browser:
         browser.execute_script(f"location.hash = '#/meeting/{written.name}'")
@@ -3801,7 +3805,13 @@ def minutes_copied(now: dt.datetime) -> None:
         said = wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
         copied = browser.execute_script("return window.__copied")
         check("clicked: their Markdown copied, without the front matter, titled as the page names them; « Copié » said in place",
-              said and copied == [expected] and browser.find_element(By.ID, "minutes-copied").get_attribute("role") == "status", copied)
+              said and len(copied) == 1 and copied[0].get("text/plain") == expected
+              and browser.find_element(By.ID, "minutes-copied").get_attribute("role") == "status", copied)
+        # With it, the same as rich text, its headings and lists kept where it is pasted (D109).
+        html = copied[0].get("text/html", "") if len(copied) == 1 else ""
+        check("clicked: the same as rich text in one copy, its three headings and its list item, no front matter (D109)",
+              html.count("<h2") == 3 and "<li>Envoyer le devis — Inès — vendredi</li>" in html and "Points saillants" in html and "contract:" not in html,
+              sorted(copied[0]) if len(copied) == 1 else copied)
         gone = wait_for(browser, lambda b: b.execute_script(status) == "", 4)
         check("« Copié » said for a moment", gone, browser.execute_script(status))
         browser.execute_script(stand_in, True)
@@ -3809,6 +3819,18 @@ def minutes_copied(now: dt.datetime) -> None:
         refused = wait_for(browser, lambda b: b.execute_script(status) == "Impossible de copier le compte rendu.", 3)
         check("the clipboard refused: one sentence says so, the minutes as they were",
               refused and browser.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2"), browser.execute_script(status))
+        # The real clipboard, the run's own private session's (WAYLAND_DISPLAY, never the user's): what a
+        # paste elsewhere reads, its two types (D109, the harness proved to read them).
+        browser.execute_script("delete navigator.clipboard")
+        press(browser, "copy-minutes")
+        wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
+        pasted = lambda *how: subprocess.run(["wl-paste", "--no-newline", *how], capture_output=True, text=True, timeout=5)
+        types = pasted("--list-types")
+        rich, plain = pasted("--type", "text/html"), pasted("--type", "text/plain")
+        check("the session's clipboard, read as a paste reads it: text/html with its headings, text/plain its Markdown (D109)",
+              "text/html" in types.stdout.split() and any(t.startswith("text/plain") for t in types.stdout.split())
+              and rich.stdout.count("<h2") == 3 and plain.stdout.strip() == expected.strip(),
+              [types.stdout.split(), types.stderr.strip(), rich.stdout[:80], plain.stdout[:80]])
         for folder, why in ((none_, "without minutes"), (broken, "with minutes that do not read")):
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == folder.name
