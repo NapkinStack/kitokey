@@ -5765,6 +5765,80 @@ def previous_summary_back(now: dt.datetime) -> None:
               gone and (trashed / "minutes-previous.md").is_file(), [meeting.exists(), sorted(p.name for p in trashed.iterdir()) if trashed.exists() else None])
 
 
+def previous_transcript_back(now: dt.datetime) -> None:
+    """CK. D113, criterion 2, the transcript: made again, the one it replaced — the last one only — stays in the
+    meeting's folder as `transcript-previous.jsonl`, which no step reads, in place of going to the trash; the page
+    offers « Revenir à la version précédente » with its time and model, a line saying the same button brings back
+    the one left; pressed, the two swap; the next redo sends the older one to the trash. In French."""
+    print("CK. a transcript made again keeps the one it replaced, the page offering it back with its time and model; going back swaps them (D113)")
+    idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+            " && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)")
+    back = ("const b = document.getElementById('transcript-previous'), h = document.getElementById('transcript-previous-help');"
+            " return b && b.getClientRects().length ? [b.textContent, h ? h.textContent : null] : null")
+    help_said = "La version quittée devient la précédente\u00a0: le même bouton la ramène."
+    meetings = WORK / "previous-transcript"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+    first = ('{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"ggml-tiny-first","language":"fr","context":null}\n'
+             '{"type":"segment","speaker":"me","track":"local","start":0.5,"end":1.5,"text":"La première version."}\n'
+             '{"type":"complete","duration":2.0,"made":"2026-10-18T13:00:00+02:00"}\n')
+    current = meeting / "transcript.jsonl"
+    current.write_text(first)
+    data = WORK / "data-previous-transcript"
+    models = data / "kitokey" / "models"
+    models.mkdir(parents=True)
+    a, b = models / "ggml-tiny-a.bin", models / "ggml-tiny-b.bin"
+    for model in (a, b):
+        model.write_bytes(b"\0" * 16)
+    # No summary follows: the transcript's version alone is judged here; CJ judges the summary's.
+    window = Window(meetings, "fr_FR.UTF-8", f'after = "nothing"\nreminder = false\nmodel = "{a}"\n')
+    window.env.update(XDG_DATA_HOME=str(data))
+    previous = meeting / "transcript-previous.jsonl"
+    asides = lambda: sorted(p.name for p in meeting.iterdir() if p.name.startswith("transcript") and p.name not in ("transcript.jsonl", "transcript-previous.jsonl"))
+    held = lambda path: path.read_text() if path.is_file() else "the file absent"
+    redo = lambda browser, model: browser.execute_script(
+        "window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", meeting.name, str(model))
+    with window as browser:
+        page = lambda: (browser.execute_script("location.hash = '#/'"),
+                        browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}"),
+                        wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .lines") and b.execute_script(idle), 15))
+        page()
+        check("no version replaced yet: nothing offered back (D113)", browser.execute_script(back) is None, browser.execute_script(back))
+        redo(browser, a)
+        made = wait_for(browser, lambda b: "Refait avec ggml-tiny-a." in held(current) and b.execute_script(idle), 15)
+        second = held(current)
+        check("made again: the one replaced stays beside as transcript-previous.jsonl, nothing else set aside (D113)",
+              made and held(previous) == first and asides() == [], [previous.exists(), asides()])
+        page()
+        offered = wait_for(browser, lambda b: b.execute_script(back), 10)
+        got = browser.execute_script(back) or [None, None]
+        check("the page offers « Revenir à la version précédente », with its time and model, and says the same button brings back the one left (D113)",
+              offered and got[0].startswith("Revenir à la version précédente (") and "18 oct." in got[0] and "first" in got[0].lower()
+              and got[1] == help_said, got)
+        # Pressed when it is there; absent, the rows below fail saying so, never raise.
+        if offered:
+            press(browser, "transcript-previous")
+        swapped = offered and wait_for(None, lambda b: held(current) == first and held(previous) == second, 10)
+        shown = wait_for(browser, lambda b: "La première version." in b.execute_script(
+            "return document.querySelector('#meeting .lines')?.textContent ?? ''"), 10)
+        named = wait_for(browser, lambda b: "tiny a" in (b.execute_script(back) or [""])[0].lower(), 10)
+        check("pressed: the two swap, the page shows the one brought back and offers the one left (D113)",
+              swapped and shown and named, [browser.execute_script(back) or "the button absent", asides()])
+        redo(browser, b)
+        again = wait_for(browser, lambda b_: "Refait avec ggml-tiny-b." in held(current) and b_.execute_script(idle), 15)
+        check("the next redo: the one it replaced is the previous one, the older gone from the folder (D113)",
+              again and held(previous) == first and asides() == [], [held(previous)[:80], asides()])
+        # Kept, it is the meeting's: in its text's weight, and in the trash with it.
+        text = browser.execute_script("return window.__TAURI__.core.invoke('listed')"
+                                      ".then((l) => l.sessions.filter((s) => s.folder.endsWith(arguments[0])).map((s) => s.text))", meeting.name)
+        sizes = sum(path.stat().st_size for path in (current, previous) if path.is_file())
+        check("the previous transcript counts in the meeting's text weight (D113)", previous.is_file() and len(text) == 1 and text[0] >= sizes, [text, sizes])
+        browser.execute_script("window.__TAURI__.core.invoke('freed', {names: [arguments[0]], whole: true})", meeting.name)
+        trashed = WORK / "data" / "Trash" / "files" / meeting.name
+        gone = wait_for(None, lambda b_: not meeting.exists(), 10)
+        check("the meeting moved to the trash takes its previous transcript with it (D113)",
+              gone and (trashed / "transcript-previous.jsonl").is_file(), [meeting.exists(), sorted(p.name for p in trashed.iterdir()) if trashed.exists() else None])
+
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
     shows one bar across both steps — the transcript, then its summary —, naming the step, never moving back:
@@ -13426,6 +13500,7 @@ def main() -> int:
     axe_first_surfaces(now)
     keys_first_surfaces(now)
     previous_summary_back(now)
+    previous_transcript_back(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)
