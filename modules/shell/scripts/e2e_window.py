@@ -5435,16 +5435,26 @@ KEY_CONTROLS = (
     "const member = (e) => { const m = e.closest('[role]'); if (!m || !m.parentElement) return null;"
     " const kin = [...m.parentElement.children].filter((o) => o.getAttribute('role') === m.getAttribute('role'));"
     " return kin.length > 1 && kin.some((o) => o.tabIndex < 0) && kin.some((o) => o.tabIndex === 0) ? m : null; };"
+    "const place = (p) => p.id ? `#${p.id}` : `${p.tagName}.${[...p.classList].join('.')}`;"
     "return [...document.querySelectorAll(arguments[0])].filter(shown).map((e) => {"
     " const m = e.type === 'radio' && e.name ? null : member(e);"
-    " if (m) m.parentElement.dataset.ceGroup ??= String(++window.__ce);"
-    " const group = e.type === 'radio' && e.name ? `radio ${e.name}` : m ? `${m.getAttribute('role')} in ${m.parentElement.dataset.ceGroup}` : null;"
+    " const group = e.type === 'radio' && e.name ? `radio ${e.name}` : m ? `${m.getAttribute('role')} in ${place(m.parentElement)}` : null;"
     " return [e.dataset.ce, e.id || `${e.tagName}.${e.className}`, e.tabIndex, group, m === e || e.type === 'radio']; })")
-# From a group's member reached by Tab, an arrow moves the focus to another of its group (APG): the
-# node's mark of what has the focus then, and its group.
-KEY_ARROWED = ("const e = document.activeElement, m = e.closest('[role]');"
-               "return [e.dataset.ce, e.type === 'radio' && e.name ? `radio ${e.name}`"
-               " : m && m.parentElement && m.parentElement.dataset.ceGroup ? `${m.getAttribute('role')} in ${m.parentElement.dataset.ceGroup}` : null]")
+# A group is named by what survives a redraw — its radios' name, or its members' role and their parent's
+# id or classes —: a radio chosen by an arrow can draw its section again (s106ce6). Its one Tab stop is
+# found in the page as it is then — the radio checked, or the member at tabIndex 0 — and focused; none,
+# null, said in the got rather than raised.
+KEY_LEAD = ("const [kind, name] = arguments;"
+            "const lead = kind === 'radio' ? document.querySelector(`input[type=radio][name='${CSS.escape(name)}']:checked`)"
+            " ?? document.querySelector(`input[type=radio][name='${CSS.escape(name)}']`)"
+            " : [...document.querySelectorAll(`[role='${kind}']`)].find((m) => m.tabIndex === 0 && m.parentElement"
+            " && (m.parentElement.id ? `#${m.parentElement.id}` : `${m.parentElement.tagName}.${[...m.parentElement.classList].join('.')}`) === name);"
+            "if (!lead) return null; lead.focus(); lead.dataset.ce ??= 'late ' + String(++window.__ce); return lead.dataset.ce")
+# From that stop, an arrow moves the focus to another of its group (APG): what has the focus then, its
+# mark and its group, named as above.
+KEY_ARROWED = ("const e = document.activeElement, m = e.closest('[role]'), p = m && m.parentElement;"
+               "const place = (q) => q.id ? `#${q.id}` : `${q.tagName}.${[...q.classList].join('.')}`;"
+               "return [e.dataset.ce ?? null, e.type === 'radio' && e.name ? `radio ${e.name}` : p ? `${m.getAttribute('role')} in ${place(p)}` : null]")
 # WCAG 2.5.8, measured as its words have it: each target shown is 24 by 24 CSS px — a hundredth of a
 # pixel left for the sub-pixel rounding —, or a circle of 24 px across, centred on its box, cuts no
 # other target and no other small target's circle. A target in a sentence is the criterion's own
@@ -5537,11 +5547,15 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                     # A group counts once Tab reached one of it and an arrow, from its member reached, goes to another.
                     led = {group: mark for mark, _, _, group, leads in controls if group and leads and mark in reached}
                     unmoved = []
-                    for group, mark in led.items():
-                        browser.execute_script("document.querySelector(`[data-ce='${arguments[0]}']`).focus()", mark)
+                    for group in led:
+                        kind, _, name = group.partition(" ")
+                        lead = browser.execute_script(KEY_LEAD, kind, name.removeprefix("in "))
+                        if lead is None:
+                            unmoved.append((group, "its Tab stop gone from the page"))
+                            continue
                         ActionChains(browser).send_keys(Keys.ARROW_DOWN).perform()
                         to = browser.execute_script(KEY_ARROWED)
-                        if not (to[0] != mark and to[1] == group):
+                        if not (to[0] != lead and to[1] == group):
                             unmoved.append((group, to))
                     moving = {group for group in led if group not in {g for g, _ in unmoved}}
                     # A radio out of Tab's order keeps its tabIndex at 0: the browser leaves it out, the arrows
