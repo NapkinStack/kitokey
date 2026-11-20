@@ -13,8 +13,10 @@ coverage/
 !.env.example
 .DS_Store
 
-# The skills nstack generates from .nstack/playbooks/ are committed (.claude/skills/, .agents/skills/):
-# an agent starting from a fresh clone needs them. Their source is .nstack/playbooks/.
+# The skills nstack generates from .nstack/playbooks/: .agents/skills/ is committed (an agent starting
+# from a fresh clone needs them); .claude/skills/ is not — Claude Code's sandbox protects that path in an
+# agent's session, so a tracked copy stops every merge there. `nstack skills` writes it outside a sandbox.
+.claude/skills/
 
 # Evidence of the end-to-end scenarios: a CI artefact, or an evidence branch — never committed to a change
 .evidence/
