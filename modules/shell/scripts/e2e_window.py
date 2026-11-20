@@ -5516,11 +5516,13 @@ def summaries_to_a_folder(now: dt.datetime) -> None:
                 (WORK / "export-args").unlink(missing_ok=True)
                 browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
                 target = out / f"{plain.name}.md"
+                # Read as a file there or not: a mutant that writes nothing fails the rows, never raises.
+                held = lambda path: path.read_text() if path.is_file() else "the file absent"
                 written = wait_for(browser, lambda b: target.is_file() and b.execute_script(idle), 15)
                 args = (WORK / "export-args").read_text().strip() if (WORK / "export-args").exists() else ""
                 given = json.loads((WORK / "export-input").read_text()) if written else {}
                 check(f"{short}: the summary written is written to the folder too, named by its meeting, its Markdown the minutes' (D109)",
-                      written and target.read_text() == (plain / "minutes.md").read_text(), sorted(p.name for p in out.iterdir()))
+                      written and held(target) == held(plain / "minutes.md"), sorted(p.name for p in out.iterdir()))
                 check(f"{short}: through kitokey-export as exporting/v1 starts it: md, the language, the summary alone; where to write on its input (D109)",
                       args == f"{plain} --format md --lang {short} --without-transcript" and given.get("to") == str(target)
                       and all(given.get(key) for key in ("name", "transcript", "me", "others", "time", "speaker", "text")), [args, given])
@@ -5533,12 +5535,12 @@ def summaries_to_a_folder(now: dt.datetime) -> None:
                       made and told and not (out / f"{secret.name}.md").exists(), [browser.execute_script(said), sorted(p.name for p in out.iterdir())])
                 # A folder that cannot be written: said on the meeting's page, the summary kept in the meeting.
                 (WORK / "export-refuse").touch()
-                before = target.read_text()
+                before = held(target)
                 browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
                 browser.execute_script("location.hash = arguments[0]", f"#/meeting/{plain.name}")
                 refused = wait_for(browser, lambda b: b.execute_script(said) == said_here["failed"], 15)
                 check(f"{short}: a folder that cannot be written is said on the meeting's page, never skipped silently; the summary kept (D109)",
-                      refused and (plain / "minutes.md").is_file() and target.read_text() == before, browser.execute_script(said))
+                      refused and (plain / "minutes.md").is_file() and held(target) == before, browser.execute_script(said))
                 (WORK / "export-refuse").unlink()
                 # « Ne plus exporter »: the folder forgotten, a summary written after it written nowhere else.
                 browser.execute_script("location.hash = '#/settings'")
