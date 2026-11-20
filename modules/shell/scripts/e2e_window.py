@@ -5708,9 +5708,10 @@ def redo_says_what_is_wrong(now: dt.datetime) -> None:
     print("CI. Refaire…: what is wrong said in its panel, its button kept; open across the 840 px break, it stays as it was (D113)")
     idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
             " && m.minutes_waiting.length === 0 && m.transcripts_waiting.length === 0)")
+    # The notes shown: « Avancé » closed holds its own status line, empty and hidden (s113cok).
     note = ("const p = document.getElementById('redo-transcript-panel'); if (!p) return null;"
             " const go = document.getElementById('redo-transcript-do');"
-            " return [!!go && !go.disabled, [...p.querySelectorAll('.note.warn')].map((n) => n.textContent)]")
+            " return [!!go && !go.disabled, [...p.querySelectorAll('.note.warn')].filter((n) => n.getClientRects().length).map((n) => n.textContent)]")
     model = WORK / "redo-wrong-model.bin"
     model.write_bytes(b"\0" * 16)
     for case, settings_model, read_only in (("Settings' model missing", WORK / "redo-wrong-missing.bin", False),
