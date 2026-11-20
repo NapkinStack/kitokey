@@ -34,7 +34,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given the release package on Linux, when the baseline runs alone — in a window the coordinator plans with the queues empty, so that it neither measures their load nor takes D104's attests' machine —, then it records the cold start to the window drawn, the memory at rest — the shell's and its web view's proportional set size —, and the time to open a meeting's page with a transcript of an hour, each the median of ten runs, written with the commit and the machine in a file of the repository"
-      - "Given the baseline, when the budgets are set, then each is the baseline plus a margin said with its reason, set against RAIL's 100 ms response and 1 s load and Apple's 400 ms launch to first frame, each source cited; the measure runs on the release pull request, alone, and fails it when a budget is exceeded; held by that run red on a change slowed on purpose"
+      - "Given the baseline, when the budgets are set, then each is the baseline plus a margin said with its reason, set against RAIL's 100 ms response and Apple's 400 ms launch to first frame, each source cited; the measure runs on the release pull request, alone, and fails it when a budget is exceeded; held by that run red on a change slowed on purpose"
   - id: D106
     title: "The surfaces a buyer sees first pass axe-core's AA rules and a checked list of WCAG 2.2 criteria"
     module: shell
@@ -125,6 +125,13 @@ deliverables:
 > cycle 10's closure (#992): asked « Les restes de D93 et D94 au cycle 11 ? », they answered « ok c11 ». They are
 > what cycle 10 left of D94 and D93 ([cycle 10's *Later*](10-kitokey-ready-when-you-come-back.md#later)); the
 > end date does not move (`framing.md` §4).
+
+> **D105's criterion 2 amended on the decider's word, 2026-11-20**, in their working session with the
+> coordinator: « ok pour l'amendement de D105 ». « 1 s load » is no longer RAIL's: today it asks 5 s for a
+> first load on a mid-range phone over slow 3G, and 2 s after ([web.dev/articles/rail](https://web.dev/articles/rail),
+> read that day), neither a local desktop app's. The start is held against Apple's 400 ms to first frame
+> ([WWDC 2019, session 423](https://developer.apple.com/videos/play/wwdc2019/423/)), a meeting's page against
+> RAIL's 100 ms response; both stay targets until the baseline says where Kitokey is.
 
 ## Goal
 
@@ -240,6 +247,16 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   not « meets WCAG 2.2 AA », and the criteria axe-core cannot judge are held by checks of their own.
 - Buyers' organisations ask for accessibility — EN 301 549 in EU public procurement, Section 508 in the US
   *(framer's assumption, not read)*.
+- What axe-core cannot judge on the list, a meeting's page, Settings and the bar, each held by a check of the shell's
+  e2e (criterion 2):
+
+  | WCAG 2.2 | What is checked | Held by |
+  |---|---|---|
+  | 2.4.7 Focus Visible (AA) | each Tab stop draws a ring, an outline or a shadow, that differs from the same element at rest | CE `keys_first_surfaces`, each language in each theme |
+  | 2.4.11 Focus Not Obscured (Minimum) (AA) | no Tab or Shift+Tab stop is entirely hidden: a point of its box, in the window, has it (or its label) on top, read at each frame until it does, a second at most (WebKit scrolls to a text field after its focus) | CE |
+  | 2.5.7 Dragging Movements (AA) | the shell has no drag (no `pointermove`, `drag*` or `mousemove` handler in `window.js`); the player seeks by one click on the drawing, and by its keys as a slider | `main()`: « a click on who spoke moves the playback there », « the arrows move the playback on the drawing, a slider » |
+  | 2.5.8 Target Size (Minimum) (AA) | each target shown is 24 by 24 CSS px, or a 24 px circle centred on it cuts no other target nor another small target's circle; a target in a sentence (inline, in a block with text of its own) is exempt | CE: axe's `target-size` leaves such cases « incomplete » (s106cdT), so CE measures it |
+  | 2.1.1 Keyboard (A) | every control shown, by a tag or a role that acts, is reached by Tab; in a roving group (WAI-ARIA APG: one member at tabindex 0, the others at -1, under one parent; or radios of one name), the others count once Tab reached its one stop and ArrowDown goes on to another. A control that acts by a click on an element of neither kind (a `div`) is not seen | CE, on a meeting that plays: its transcript's lines are such a group |
 
 ### D107
 

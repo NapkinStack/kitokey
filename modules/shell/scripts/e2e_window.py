@@ -12,6 +12,7 @@ import contextlib
 import datetime as dt
 import hashlib
 import http.server
+import itertools
 import json
 import math
 import os
@@ -476,6 +477,34 @@ def free_port() -> int:
         return probe.getsockname()[1]
 
 
+def descendants(pid: int) -> list[int]:
+    """A process and every process under it, read in /proc: those still there."""
+    found, ahead = [], [pid]
+    while ahead:
+        one = ahead.pop()
+        found.append(one)
+        with contextlib.suppress(OSError):
+            for task in Path(f"/proc/{one}/task").iterdir():
+                ahead += [int(child) for child in (task / "children").read_text().split()]
+    return found
+
+
+def listening(pids: list[int], port: int) -> bool:
+    """Whether one of these processes is the one listening on 127.0.0.1:`port`: its socket, read in
+    /proc, not whoever answers there (#943)."""
+    wanted = f"0100007F:{port:04X}"
+    sockets = {f"socket:[{row.split()[9]}]" for row in Path("/proc/net/tcp").read_text().splitlines()[1:]
+               if row.split()[1] == wanted and row.split()[3] == "0A"}
+    for pid in pids:
+        # A descriptor may close while it is read (the listing's own, at least): skipped, not the process.
+        with contextlib.suppress(OSError):
+            for fd in Path(f"/proc/{pid}/fd").iterdir():
+                with contextlib.suppress(OSError):
+                    if os.readlink(fd) in sockets:
+                        return True
+    return False
+
+
 def session(folder: Path, started: dt.datetime, minutes: float | None, files: dict[str, int], form: str = "v2") -> None:
     folder.mkdir(parents=True)
     record = {"contract": f"session-audio/{form}", "started": started.isoformat(timespec="seconds")}
@@ -614,13 +643,7 @@ class Window:
         until = time.monotonic() + 20
         while (instances() or single_instance_held()) and time.monotonic() < until:
             time.sleep(0.1)
-        port, native = free_port(), free_port()
-        self.driver_process = subprocess.Popen(
-            ["tauri-driver", "--port", str(port), "--native-port", str(native)],
-            env=self.env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        port = self.start_driver()
         options = ArgOptions()
         options.set_capability("browserName", "wry")
         options.set_capability("tauri:options", {"application": str(BINARY), "args": self.args})
@@ -651,6 +674,47 @@ class Window:
         # Whichever window opened: the small one at rest, or the full one's sections named.
         wait_for(self.browser, lambda b: b.find_elements(By.ID, "small-record") or b.execute_script("return (document.getElementById('settings-link').getAttribute('aria-label') || '') !== ''"))
         return self.browser
+
+    def start_driver(self) -> int:
+        """tauri-driver on two ports picked free, then released before it binds them, as Selenium picks
+        them: another run on the machine may take one in between (#943). The driver says so, never by
+        its code: its port taken, it ends, code 0, « can not listen to address »; its native port taken,
+        it stays while its WebKitWebDriver ends, « FATAL: Unable to listen », the port answered by
+        whoever holds it. So its output is kept, and the session asked only once its own processes
+        listen on both ports; else it is started again on fresh ones, said with what it said — a
+        collision the e2e's count sees —, and still taken the third time, the start fails naming it."""
+        taken = []
+        for _ in range(3):
+            port, native = free_port(), free_port()
+            said = WORK / f"tauri-driver-{port}.txt"
+            with said.open("wb") as out:
+                self.driver_process = subprocess.Popen(
+                    ["tauri-driver", "--port", str(port), "--native-port", str(native)],
+                    env=self.env,
+                    stdout=out,
+                    stderr=subprocess.STDOUT,
+                    # Its own group: its WebKitWebDriver, even outliving it, ended with it on a start again.
+                    start_new_session=True,
+                )
+            mine = [self.driver_process.pid]
+            refused = lambda: [line for line in said.read_text(errors="replace").splitlines() if "listen" in line]
+            until = time.monotonic() + 10
+            while time.monotonic() < until and not refused():
+                mine = sorted(set(mine) | set(descendants(self.driver_process.pid)))
+                if self.driver_process.poll() is None and listening(mine, port) and listening(mine, native):
+                    return port
+                time.sleep(0.01)
+            if not refused():
+                # Neither taken nor up in ten seconds: said, then the session's own bounds say what it was (#510).
+                print("    (tauri-driver neither refused nor listening in 10 s: the session asked as before — #943)")
+                return port
+            taken.append(refused()[0])
+            print(f"    (tauri-driver's ports taken, started again on fresh ones: {taken[-1]} — #943)")
+            # Its WebKitWebDriver outlives a driver whose own port was taken: both ended, by their group.
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(self.driver_process.pid, signal.SIGTERM)
+            self.driver_process.wait(timeout=10)
+        raise RuntimeError(f"tauri-driver's ports taken three times, each on fresh ones (#943): {taken}")
 
     def __exit__(self, *_) -> None:
         try:
@@ -733,6 +797,33 @@ def parts_contrast(got: dict | None) -> list[tuple[str, float, float]]:
     return [(part["state"], round(min((contrast(c, got["behind"]) for c in part["colours"]), default=0.0), 2), part["opacity"])
             for part in got["parts"]]
 
+
+# axe-core, vendored for the e2e alone (D106; its README beside it), checked by its SHA-256 before it is
+# injected into the page under test: never one that differs.
+AXE = Path(__file__).resolve().parent / "vendor" / "axe-core-4.14.0" / "axe.min.js"
+AXE_SHA256 = "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878"
+# WCAG 2.2's A and AA rules as axe tags them; its best practices are no failure here.
+AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
+
+
+def axe_violations(browser) -> list:
+    """The page as it is now, by axe-core's WCAG 2.2 A and AA rules: each violation as its rule, its impact,
+    how many nodes, and the first three of them."""
+    source = AXE.read_bytes()
+    if hashlib.sha256(source).hexdigest() != AXE_SHA256:
+        raise RuntimeError(f"{AXE} is not the axe-core pinned by its SHA-256 (D106)")
+    if not browser.execute_script("return typeof axe !== 'undefined'"):
+        browser.execute_script(source.decode())
+    said = lambda kind: (f"r.{kind}.map((v) => [v.id, v.impact, v.nodes.length,"
+                         " v.nodes.slice(0, 3).map((n) => n.target.join(' '))])")
+    result = browser.execute_script(
+        "return axe.run(document, {runOnly: {type: 'tag', values: arguments[0]}, resultTypes: ['violations', 'incomplete']})"
+        f".then((r) => ({{passes: r.passes.length, violations: {said('violations')}, incomplete: {said('incomplete')}}}))",
+        AXE_TAGS)
+    # What axe judged, and what it left to a person (« incomplete »: a contrast over an image or a
+    # gradient, say): a clean page with nothing judged would pass for nothing.
+    print(f"    axe: {result['passes']} rule(s) passed; left to a person: {result['incomplete']}")
+    return result["violations"] if result["passes"] else [("axe judged no rule", None, 0, [])]
 
 # The sidebar's primary actions shown, by their ids: one at a time (D69).
 PRIMARIES = "return [...document.querySelectorAll('#sidebar .primary')].filter(b => b.offsetParent).map(b => b.id)"
@@ -3790,12 +3881,22 @@ def minutes_copied(now: dt.datetime) -> None:
         "---\ncontract: minutes/v1\nmade: 2026-10-28T10:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
         "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
     (broken / "minutes.md").write_text("pas un compte rendu\n")
+    # Two lines, two speakers: the page's own words for each, a voice told in the second (D109).
+    (written / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n'
+        '{"type":"segment","speaker":"others","track":"remote","voice":"2","start":75.0,"end":77.0,"text":"Le devis part vendredi."}\n'
+        '{"type":"complete","duration":77.0}\n')
     expected = ("## Points saillants\n\nLe budget est validé.\n\n## Actions\n\n- Envoyer le devis — Inès — vendredi\n\n"
                 "## Points clés\n\n- Rien\n")
-    # The clipboard stood in: what the page writes is kept on the page, never the user's own clipboard.
+    # The clipboard stood in: what the page writes is kept on the page, never the user's own clipboard —
+    # each item by its types and their text (D109: rich text and Markdown together).
     stand_in = ("window.__copied = []; const refuse = arguments[0];"
-                "Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: (text) =>"
-                " refuse ? Promise.reject(new Error('refused')) : (window.__copied.push(text), Promise.resolve())}})")
+                "Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {"
+                " writeText: (text) => refuse ? Promise.reject(new Error('refused')) : (window.__copied.push({'text/plain': text}), Promise.resolve()),"
+                " write: async (items) => { if (refuse) throw new Error('refused');"
+                "  for (const item of items) window.__copied.push(Object.fromEntries(await Promise.all("
+                "   item.types.map(async (type) => [type, await (await item.getType(type)).text()])))); }}})")
     status = "return document.getElementById('minutes-copied')?.textContent ?? null"
     with Window(meetings, "fr_FR.UTF-8", "reminder = false\n") as browser:
         browser.execute_script(f"location.hash = '#/meeting/{written.name}'")
@@ -3810,7 +3911,13 @@ def minutes_copied(now: dt.datetime) -> None:
         said = wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
         copied = browser.execute_script("return window.__copied")
         check("clicked: their Markdown copied, without the front matter, titled as the page names them; « Copié » said in place",
-              said and copied == [expected] and browser.find_element(By.ID, "minutes-copied").get_attribute("role") == "status", copied)
+              said and len(copied) == 1 and copied[0].get("text/plain") == expected
+              and browser.find_element(By.ID, "minutes-copied").get_attribute("role") == "status", copied)
+        # With it, the same as rich text, its headings and lists kept where it is pasted (D109).
+        html = copied[0].get("text/html", "") if len(copied) == 1 else ""
+        check("clicked: the same as rich text in one copy, its three headings and its list item, no front matter (D109)",
+              html.count("<h2") == 3 and "<li>Envoyer le devis — Inès — vendredi</li>" in html and "Points saillants" in html and "contract:" not in html,
+              sorted(copied[0]) if len(copied) == 1 else copied)
         gone = wait_for(browser, lambda b: b.execute_script(status) == "", 4)
         check("« Copié » said for a moment", gone, browser.execute_script(status))
         browser.execute_script(stand_in, True)
@@ -3818,6 +3925,32 @@ def minutes_copied(now: dt.datetime) -> None:
         refused = wait_for(browser, lambda b: b.execute_script(status) == "Impossible de copier le compte rendu.", 3)
         check("the clipboard refused: one sentence says so, the minutes as they were",
               refused and browser.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2"), browser.execute_script(status))
+        # The transcript copied too, each line with when and who said it, as the page names them (D109).
+        browser.execute_script(stand_in, False)
+        press(browser, "copy-transcript")
+        told = wait_for(browser, lambda b: b.execute_script("return document.getElementById('transcript-copied')?.textContent") == "Copié", 3)
+        lines = browser.execute_script("return window.__copied")
+        check("« Copier la transcription »: each line with its time and who said it, as the page names them; « Copié » said in place (D109)",
+              told and lines == [{"text/plain": "[00:00] Vous\u00a0: Bonjour.\n[01:15] Les autres · voix 2\u00a0: Le devis part vendredi.\n"}], lines)
+        browser.execute_script(stand_in, True)
+        press(browser, "copy-transcript")
+        said_back = "return document.getElementById('transcript-copied')?.textContent"
+        refused = wait_for(browser, lambda b: b.execute_script(said_back) == "Impossible de copier la transcription.", 3)
+        check("the clipboard refused the transcript: one sentence says so (D109)", refused, browser.execute_script(said_back))
+        # The real clipboard, the run's own private session's (WAYLAND_DISPLAY, never the user's): what a
+        # paste elsewhere reads, its two types (D109, the harness proved to read them).
+        browser.execute_script("delete navigator.clipboard")
+        press(browser, "copy-minutes")
+        wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
+        # Each read as bytes, said in UTF-8 as an application asks for it: GTK offers the text in UTF-8 under
+        # `text/plain;charset=utf-8`, and under the bare `text/plain` in its legacy Latin-1 (s109ok).
+        pasted = lambda *how: subprocess.run(["wl-paste", "--no-newline", *how], capture_output=True, timeout=5)
+        said = lambda run: run.stdout.decode("utf-8", errors="replace")
+        types = said(pasted("--list-types")).split()
+        rich, plain = said(pasted("--type", "text/html")), said(pasted("--type", "text/plain;charset=utf-8"))
+        check("the session's clipboard, read as a paste reads it: text/html with its headings, text/plain its Markdown (D109)",
+              "text/html" in types and "text/plain;charset=utf-8" in types and rich.count("<h2") == 3 and plain.strip() == expected.strip(),
+              [types, rich[:80], plain[:80]])
         for folder, why in ((none_, "without minutes"), (broken, "with minutes that do not read")):
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == folder.name
@@ -5330,6 +5463,241 @@ def bar_after_stop(now: dt.datetime) -> None:
                 for gate in gates:
                     gate.unlink(missing_ok=True)
                 (WORK / "fail-minutes").unlink(missing_ok=True)
+
+
+def axe_first_surfaces(now: dt.datetime) -> None:
+    """CD. D106, criterion 1: the surfaces a buyer sees first — the list, a meeting's page, Settings and the bar —
+    in French light and English dark, pass axe-core's WCAG 2.2 A and AA rules: no violation. What axe cannot
+    judge is held by checks of its own."""
+    print("CD. the list, a meeting's page, Settings and the bar: no violation of axe-core's WCAG 2.2 A and AA rules (D106)")
+    # Each language in each theme: axe's colour rules follow the theme, the words and `lang` the language.
+    dark = "return matchMedia('(prefers-color-scheme: dark)').matches"
+    for (language, short), theme in itertools.product((("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")), ("light", "dark")):
+        meetings = WORK / f"axe-{short}-{theme}"
+        meeting = meetings / "2026-10-18_12-00"
+        session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+        (meeting / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+        (meeting / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+        for small in (False, True):
+            window = Window(meetings, language, "reminder = false\n", small=small)
+            # The system's look asked of GTK, as D98's checks ask it, light included: the run's desktop may show the other.
+            window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+            with window as browser:
+                themed = lambda b: b.execute_script(dark) == (theme == "dark")
+                if small:
+                    shown = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+                    found = axe_violations(browser)
+                    check(f"{short}, {theme}: the bar, no violation of axe's WCAG 2.2 A and AA rules (D106)",
+                          shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
+                    continue
+                pages = (("the list", "#/", lambda b: b.find_element(By.ID, "list").is_displayed()),
+                         ("a meeting's page", f"#/meeting/{meeting.name}", lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2")),
+                         ("Settings", "#/settings", lambda b: b.find_element(By.ID, "reminder").is_displayed()))
+                for what, address, drawn in pages:
+                    browser.execute_script("location.hash = arguments[0]", address)
+                    shown = wait_for(browser, drawn, 10)
+                    time.sleep(0.5)
+                    found = axe_violations(browser)
+                    check(f"{short}, {theme}: {what}, no violation of axe's WCAG 2.2 A and AA rules (D106)",
+                          shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
+
+# What acts, by a tag or a role: what CE reaches, marks and measures (WCAG 2.1.1, 2.5.8).
+KEY_ACTING = ("a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=link],"
+              " [role=checkbox], [role=radio], [role=switch], [role=slider], [role=tab], [role=menuitem], [role=textbox]")
+# Each node that acts marked once (`data-ce`), so that a stop and a control are told apart by their
+# node, never by a name two may share (the team's rule, #958).
+KEY_MARK = ("window.__ce ??= 0; for (const e of document.querySelectorAll(arguments[0]))"
+            " if (!e.dataset.ce) e.dataset.ce = String(++window.__ce);")
+# One Tab, or Shift+Tab, and what it reached: its mark, its focus seen — a ring drawn that differs from
+# the same element's at rest, as two_panes measures it —, and whether any of it shows (WCAG 2.4.11): a
+# point of its box, inside the window, where the element on top is it, inside it, or its label. WebKit
+# reveals a text field's caret, and so scrolls to it, after the focus, a frame or several later (s106ceP,
+# s106ce5): the stop is read at each frame until it shows, for a second at most — waited for as its
+# event, bounded (tests.md §5); a stop a header keeps covering still fails. What was seen goes with it:
+# its box, the window's height, what was on top at its centre.
+KEY_STOP = (
+    "const done = arguments[arguments.length - 1];"
+    "const e = document.activeElement, n = e.closest('.choice') ?? e;"
+    "if (e !== document.body && !e.dataset.ce) e.dataset.ce = 'late ' + String(++window.__ce);"
+    "const mine = (h) => !!h && (h === e || n.contains(h) || h.contains(e) || [...(e.labels ?? [])].some((l) => l.contains(h)));"
+    "const bounds = () => { const r = n.getBoundingClientRect(); return [r, Math.max(r.left, 0) + 1, Math.min(r.right, innerWidth) - 1,"
+    " Math.max(r.top, 0) + 1, Math.min(r.bottom, innerHeight) - 1]; };"
+    "const showing = () => { const [, x0, x1, y0, y1] = bounds(); return x0 <= x1 && y0 <= y1"
+    " && [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [(x0 + x1) / 2, (y0 + y1) / 2]].some(([x, y]) => mine(document.elementFromPoint(x, y))); };"
+    "const until = performance.now() + 1000;"
+    "const settle = () => requestAnimationFrame(() => (showing() || performance.now() > until ? measure() : settle()));"
+    "const measure = () => {"
+    "const [r, x0, x1, y0, y1] = bounds(), shows = showing();"
+    "const top = document.elementFromPoint((x0 + x1) / 2, (y0 + y1) / 2);"
+    "const seen = shows || [[r.top, r.bottom].map(Math.round), innerHeight, top ? top.id || `${top.tagName}.${top.className}` : null];"
+    "const look = () => { const s = getComputedStyle(n); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow].join('|'); };"
+    "const focused = look(); e.blur(); const rest = look(); e.focus({focusVisible: true, preventScroll: true});"
+    "const s = getComputedStyle(n), drawn = (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || s.boxShadow !== 'none';"
+    "done([e === document.body ? 'body' : e.dataset.ce, e.id || `${e.tagName}.${e.className}`,"
+    " drawn && focused !== rest && document.activeElement === e, seen]); };"
+    "settle();")
+# Every control shown that acts, as [its mark, its name, its tabIndex, its group, whether it leads it].
+# A group is WAI-ARIA APG's roving tabindex: members of one role under one parent, one at tabIndex 0,
+# the others at -1, reached by the arrows from it — or radios of one name. What sits inside a member (a
+# line's pencil) goes with it (D62).
+KEY_CONTROLS = (
+    "const shown = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[inert]') && !e.disabled;"
+    "const member = (e) => { const m = e.closest('[role]'); if (!m || !m.parentElement) return null;"
+    " const kin = [...m.parentElement.children].filter((o) => o.getAttribute('role') === m.getAttribute('role'));"
+    " return kin.length > 1 && kin.some((o) => o.tabIndex < 0) && kin.some((o) => o.tabIndex === 0) ? m : null; };"
+    "const place = (p) => p.id ? `#${p.id}` : `${p.tagName}.${[...p.classList].join('.')}`;"
+    "return [...document.querySelectorAll(arguments[0])].filter(shown).map((e) => {"
+    " const m = e.type === 'radio' && e.name ? null : member(e);"
+    " const group = e.type === 'radio' && e.name ? `radio ${e.name}` : m ? `${m.getAttribute('role')} in ${place(m.parentElement)}` : null;"
+    " return [e.dataset.ce, e.id || `${e.tagName}.${e.className}`, e.tabIndex, group, m === e || e.type === 'radio']; })")
+# A group is named by what survives a redraw — its radios' name, or its members' role and their parent's
+# id or classes —: a radio chosen by an arrow can draw its section again (s106ce6). Its one Tab stop is
+# found in the page as it is then — the radio checked, or the member at tabIndex 0 — and focused; none,
+# null, said in the got rather than raised.
+KEY_LEAD = ("const [kind, name] = arguments;"
+            "const lead = kind === 'radio' ? document.querySelector(`input[type=radio][name='${CSS.escape(name)}']:checked`)"
+            " ?? document.querySelector(`input[type=radio][name='${CSS.escape(name)}']`)"
+            " : [...document.querySelectorAll(`[role='${kind}']`)].find((m) => m.tabIndex === 0 && m.parentElement"
+            " && (m.parentElement.id ? `#${m.parentElement.id}` : `${m.parentElement.tagName}.${[...m.parentElement.classList].join('.')}`) === name);"
+            "if (!lead) return null; lead.focus(); lead.dataset.ce ??= 'late ' + String(++window.__ce); return lead.dataset.ce")
+# From that stop, an arrow moves the focus to another of its group (APG): what has the focus then, its
+# mark and its group, named as above.
+KEY_ARROWED = ("const e = document.activeElement, m = e.closest('[role]'), p = m && m.parentElement;"
+               "const place = (q) => q.id ? `#${q.id}` : `${q.tagName}.${[...q.classList].join('.')}`;"
+               "return [e.dataset.ce ?? null, e.type === 'radio' && e.name ? `radio ${e.name}` : p ? `${m.getAttribute('role')} in ${place(p)}` : null]")
+# WCAG 2.5.8, measured as its words have it: each target shown is 24 by 24 CSS px — a hundredth of a
+# pixel left for the sub-pixel rounding —, or a circle of 24 px across, centred on its box, cuts no
+# other target and no other small target's circle. A target in a sentence is the criterion's own
+# exception: inline, in a block that holds text of its own besides the targets'. A radio or a box is the
+# label or the `.choice` that takes its click. Those that fail, with their size.
+KEY_TARGETS = (
+    "const acting = arguments[0];"
+    "const shown = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[inert]') && !e.disabled;"
+    "const boxOf = (e) => ['radio', 'checkbox'].includes(e.type) ? e.closest('.choice, label') ?? e : e;"
+    "const inSentence = (e) => { if (getComputedStyle(e).display !== 'inline') return false;"
+    " let b = e.parentElement; while (b && ['inline', 'contents'].includes(getComputedStyle(b).display)) b = b.parentElement;"
+    " if (!b) return false; const walk = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);"
+    " for (let t = walk.nextNode(); t; t = walk.nextNode()) { const owner = t.parentElement.closest(acting);"
+    " if ((!owner || !b.contains(owner)) && t.textContent.trim()) return true; } return false; };"
+    "const targets = [...new Set([...document.querySelectorAll(acting)].filter(shown)"
+    " .filter((e) => !inSentence(e)).map(boxOf))].map((e) => [e, e.getBoundingClientRect()]);"
+    "const centre = (r) => [r.left + r.width / 2, r.top + r.height / 2];"
+    "const small = targets.filter(([, r]) => r.width < 23.99 || r.height < 23.99);"
+    "const near = (c, r) => Math.hypot(Math.max(r.left - c[0], 0, c[0] - r.right), Math.max(r.top - c[1], 0, c[1] - r.bottom));"
+    "return small.filter(([e, r]) => { const c = centre(r);"
+    " return targets.some(([o, q]) => o !== e && !o.contains(e) && !e.contains(o) && near(c, q) < 12)"
+    " || small.some(([o, q]) => o !== e && Math.hypot(...centre(q).map((v, i) => v - c[i])) < 24); })"
+    " .map(([e, r]) => [e.id || `${e.tagName}.${e.className}`, Math.round(r.width * 100) / 100, Math.round(r.height * 100) / 100])")
+
+
+def keys_first_surfaces(now: dt.datetime) -> None:
+    """CE. D106, criterion 2: what axe cannot judge, on the surfaces a buyer sees first — the list, a
+    meeting's page (one it plays, and one it does not, each line then a stop of its own), Settings and the bar —, each language in each theme, the keyboard alone: each Tab
+    stop shows its focus (WCAG 2.4.7); none is entirely hidden, by Tab or by Shift+Tab (2.4.11); every
+    control is reached, a roving group by Tab to its one stop then an arrow to another — the transcript's
+    lines, the meeting played (2.1.1); each target is 24 px or spaced (2.5.8): axe leaves its target-size
+    to a person (s106cdT). 2.5.7 is held elsewhere: the shell has no drag, and a click on the drawing seeks (main())."""
+    print("CE. the list, a meeting's page, Settings and the bar: by the keyboard alone the focus seen, never hidden, every control reached; targets of 24 px (D106)")
+    dark = "return matchMedia('(prefers-color-scheme: dark)').matches"
+    # Each language in each theme: the words move what overflows or hides a stop, the theme the ring's colour.
+    for (language, short), theme in itertools.product((("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")), ("light", "dark")):
+        meetings = WORK / f"keys-{short}-{theme}"
+        meeting = meetings / "2026-10-18_12-00"
+        # A meeting it plays, as the player's scenarios make one: its lines are then one stop, the arrows
+        # going to the others (WAI-ARIA APG's roving tabindex) — the group 2.1.1 must find reached.
+        session(meeting, now - dt.timedelta(hours=1), 40 / 60, {})
+        record = json.loads((meeting / "session.json").read_text())
+        record["tracks"] = {"local": {"device": "Mic"}}
+        (meeting / "session.json").write_text(json.dumps(record))
+        with wave.open(str(meeting / "local.wav"), "wb") as made:
+            made.setnchannels(1)
+            made.setsampwidth(2)
+            made.setframerate(48000)
+            made.writeframes(bytes(2 * 48000 * 40))
+        (meeting / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n')
+        # A transcript longer than the window: its page scrolls, so a stop could go under what stays.
+        (meeting / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            + "".join(f'{{"type":"segment","speaker":"me","track":"local","start":{i}.0,"end":{i}.5,"text":"Ligne {i}."}}\n' for i in range(40))
+            + '{"type":"complete","duration":40.0}\n')
+        (meeting / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+        # An older meeting whose sound this version does not play: each line and its pencil is a Tab stop,
+        # so Shift+Tab brings stops up to the window's top, where a header that stayed would cover them.
+        unplayed = meetings / "2026-10-18_10-00"
+        session(unplayed, now - dt.timedelta(hours=3), 60, {"local.wav": 1000})
+        shutil.copy(meeting / "transcript.jsonl", unplayed / "transcript.jsonl")
+        shutil.copy(meeting / "minutes.md", unplayed / "minutes.md")
+        for small in (False, True):
+            window = Window(meetings, language, "reminder = false\n", small=small)
+            window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+            with window as browser:
+                if small:
+                    surfaces = (("the bar", None, lambda b: b.find_element(By.ID, "small-record").is_displayed()),)
+                else:
+                    browser.set_window_size(1100, 600)
+                    # That meeting's page drawn, its lines there: not the page before it, which has lines too.
+                    drawn_for = lambda name: lambda b: b.execute_script(
+                        "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
+                        " && p.querySelectorAll('.transcript .lines li').length > 0", name)
+                    surfaces = (("the list", "#/", lambda b: b.find_element(By.ID, "list").is_displayed()),
+                                ("a meeting's page", f"#/meeting/{meeting.name}", drawn_for(meeting.name)),
+                                ("a meeting's page not played", f"#/meeting/{unplayed.name}", drawn_for(unplayed.name)),
+                                ("Settings", "#/settings", lambda b: b.find_element(By.ID, "reminder").is_displayed()))
+                for what, address, drawn in surfaces:
+                    if address:
+                        browser.execute_script("location.hash = arguments[0]", address)
+                    shown = wait_for(browser, drawn, 10) and browser.execute_script(dark) == (theme == "dark")
+                    time.sleep(0.5)
+                    browser.execute_script("document.activeElement.blur(); scrollTo(0, 0)")
+                    browser.execute_script(KEY_MARK, KEY_ACTING)
+                    forth, back = [], []
+                    for _ in range(120):
+                        ActionChains(browser).send_keys(Keys.TAB).perform()
+                        stop = browser.execute_async_script(KEY_STOP)
+                        if forth and stop[0] == forth[0][0] or stop[0] == "body":
+                            break
+                        forth.append(stop)
+                    for _ in range(len(forth)):
+                        ActionChains(browser).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+                        back.append(browser.execute_async_script(KEY_STOP))
+                    reached = {mark for mark, _, _, _ in forth}
+                    browser.execute_script(KEY_MARK, KEY_ACTING)
+                    controls = browser.execute_script(KEY_CONTROLS, KEY_ACTING)
+                    # A group counts once Tab reached one of it and an arrow, from its member reached, goes to another.
+                    led = {group: mark for mark, _, _, group, leads in controls if group and leads and mark in reached}
+                    unmoved = []
+                    for group in led:
+                        kind, _, name = group.partition(" ")
+                        lead = browser.execute_script(KEY_LEAD, kind, name.removeprefix("in "))
+                        if lead is None:
+                            unmoved.append((group, "its Tab stop gone from the page"))
+                            continue
+                        ActionChains(browser).send_keys(Keys.ARROW_DOWN).perform()
+                        to = browser.execute_script(KEY_ARROWED)
+                        if not (to[0] != lead and to[1] == group):
+                            unmoved.append((group, to))
+                    moving = {group for group in led if group not in {g for g, _ in unmoved}}
+                    # A radio out of Tab's order keeps its tabIndex at 0: the browser leaves it out, the arrows
+                    # reach it (HTML's radio group), so a radio is credited by its group whatever its tabIndex.
+                    missed = sorted({name for mark, name, tab, group, _ in controls
+                                     if mark not in reached and not (group in moving and (tab < 0 or group.startswith("radio ")))})
+                    unseen = [name for _, name, seen, _ in forth if not seen]
+                    hidden = [("Tab", name, part) for _, name, _, part in forth if part is not True] + [("Shift+Tab", name, part) for _, name, _, part in back if part is not True]
+                    said = f"{short}, {theme}: {what}"
+                    # Which roving groups were credited, said in a green run too: the verifier reads them there.
+                    print(f"    {said}: {len(forth)} Tab stops; groups reached by Tab and an arrow: {sorted(moving)}")
+                    check(f"{said}, each Tab stop shows its focus (WCAG 2.4.7, D106)", shown and forth and unseen == [], (len(forth), unseen))
+                    check(f"{said}, no stop entirely hidden, by Tab or Shift+Tab (WCAG 2.4.11, D106)", shown and forth and hidden == [], hidden)
+                    check(f"{said}, every control reached by the keyboard, a roving group by its arrows (WCAG 2.1.1, D106)",
+                          shown and forth and missed == [] and unmoved == [] and (what != "a meeting's page" or led), (missed, unmoved, sorted(led)))
+                    tight = browser.execute_script(KEY_TARGETS, KEY_ACTING)
+                    check(f"{said}, each target 24 by 24 CSS px, or spaced as the criterion allows (WCAG 2.5.8, D106)", shown and tight == [], tight)
 
 
 def page_one_bar(now: dt.datetime) -> None:
@@ -12988,6 +13356,8 @@ def main() -> int:
     bar_opened(now)
     bar_language(now)
     bar_after_stop(now)
+    axe_first_surfaces(now)
+    keys_first_surfaces(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)
