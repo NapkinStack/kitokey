@@ -5424,13 +5424,32 @@ KEY_CONTROLS = (
     "return [...document.querySelectorAll(acting)].filter(shown).map((e) => [e.id || `${e.tagName}.${e.className}`, group(e)])")
 
 
+# WCAG 2.5.8, measured as its words have it: each target shown is 24 by 24 CSS px, or a circle of 24 px
+# across, centred on its box, cuts no other target and no other small target's circle. A target in a
+# line of text (display inline) is the criterion's own exception. A radio or a box is the label or the
+# `.choice` that takes its click. Those that fail, with their size.
+KEY_TARGETS = (
+    "const acting = 'a[href], button, input:not([type=hidden]), select, textarea, summary,"
+    " [role=button], [role=link], [role=checkbox], [role=radio], [role=switch], [role=slider], [role=tab], [role=menuitem]';"
+    "const shown = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[inert]') && !e.disabled;"
+    "const boxOf = (e) => ['radio', 'checkbox'].includes(e.type) ? e.closest('.choice, label') ?? e : e;"
+    "const targets = [...new Set([...document.querySelectorAll(acting)].filter(shown)"
+    " .filter((e) => getComputedStyle(e).display !== 'inline').map(boxOf))].map((e) => [e, e.getBoundingClientRect()]);"
+    "const centre = (r) => [r.left + r.width / 2, r.top + r.height / 2];"
+    "const small = targets.filter(([, r]) => r.width < 23.5 || r.height < 23.5);"
+    "const near = (c, r) => Math.hypot(Math.max(r.left - c[0], 0, c[0] - r.right), Math.max(r.top - c[1], 0, c[1] - r.bottom));"
+    "return small.filter(([e, r]) => { const c = centre(r);"
+    " return targets.some(([o, q]) => o !== e && !o.contains(e) && !e.contains(o) && near(c, q) < 12)"
+    " || small.some(([o, q]) => o !== e && Math.hypot(...centre(q).map((v, i) => v - c[i])) < 24); })"
+    " .map(([e, r]) => [e.id || `${e.tagName}.${e.className}`, Math.round(r.width), Math.round(r.height)])")
+
 def keys_first_surfaces(now: dt.datetime) -> None:
     """CE. D106, criterion 2: what axe cannot judge, on the surfaces a buyer sees first — the list, a
     meeting's page, Settings and the bar —, each language in each theme, the keyboard alone: each Tab
     stop shows its focus (WCAG 2.4.7); none is entirely hidden, by Tab or by Shift+Tab (2.4.11); every
-    control is reached (2.1.1). 2.5.7 and 2.5.8 are held elsewhere: a click on the drawing seeks (main()),
-    axe's target-size runs in CD."""
-    print("CE. the list, a meeting's page, Settings and the bar by the keyboard alone: the focus seen, never hidden, every control reached (D106)")
+    control is reached (2.1.1); each target is 24 px or spaced (2.5.8): axe leaves its target-size to a
+    person (s106cdT). 2.5.7 is held elsewhere: the shell has no drag, and a click on the drawing seeks (main())."""
+    print("CE. the list, a meeting's page, Settings and the bar: by the keyboard alone the focus seen, never hidden, every control reached; targets of 24 px (D106)")
     dark = "return matchMedia('(prefers-color-scheme: dark)').matches"
     # Each language in each theme: the words move what overflows or hides a stop, the theme the ring's colour.
     for (language, short), theme in itertools.product((("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")), ("light", "dark")):
@@ -5482,6 +5501,8 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                     check(f"{said}, each Tab stop shows its focus (WCAG 2.4.7, D106)", shown and forth and unseen == [], (len(forth), unseen))
                     check(f"{said}, no stop entirely hidden, by Tab or Shift+Tab (WCAG 2.4.11, D106)", shown and forth and hidden == [], hidden)
                     check(f"{said}, every control reached by the keyboard (WCAG 2.1.1, D106)", shown and forth and missed == [], missed)
+                    tight = browser.execute_script(KEY_TARGETS)
+                    check(f"{said}, each target 24 by 24 CSS px, or spaced as the criterion allows (WCAG 2.5.8, D106)", shown and tight == [], tight)
 
 
 def page_one_bar(now: dt.datetime) -> None:
