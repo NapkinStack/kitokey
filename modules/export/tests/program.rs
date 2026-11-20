@@ -214,6 +214,15 @@ fn a_wrong_argument_or_input_is_a_sentence_alone() {
 }
 
 #[test]
+fn without_an_argument_it_says_its_usage_as_the_other_programs_do() {
+    // The package's e2e starts each program bare and reads « <program>: usage » (install's scripts/e2e.sh).
+    let ran = run(&[], "");
+    assert_eq!(ran.code, Some(2));
+    assert!(ran.lines.is_empty());
+    assert!(ran.said.starts_with("kitokey-export: usage: kitokey-export "), "{}", ran.said);
+}
+
+#[test]
 fn it_says_its_version() {
     let output = Command::new(env!("CARGO_BIN_EXE_kitokey-export"))
         .arg("--version")

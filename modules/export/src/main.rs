@@ -71,6 +71,10 @@ fn asked() -> Result<Asked, Refused> {
     for arg in std::env::args_os().skip(1) {
         args.push(arg.into_string().map_err(|_| wrong("an argument is not text"))?);
     }
+    // Started bare, it says its usage alone, as the other programs do.
+    if args.is_empty() {
+        return Err(Refused(USAGE.into(), None));
+    }
     let (mut folder, mut format, mut lang) = (None, None, None);
     let mut include = Include::all();
     let mut args = args.into_iter();
