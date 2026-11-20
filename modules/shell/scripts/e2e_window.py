@@ -5400,24 +5400,24 @@ KEY_MARK = ("window.__ce ??= 0; for (const e of document.querySelectorAll(argume
             " if (!e.dataset.ce) e.dataset.ce = String(++window.__ce);")
 # One Tab, or Shift+Tab, and what it reached: its mark, its focus seen — a ring drawn that differs from
 # the same element's at rest, as two_panes measures it —, and whether any of it shows (WCAG 2.4.11): a
-# point of its box, inside the window, where the element on top is it, inside it, or its label. Read
-# once its box has stayed the same over two frames, at most thirty: WebKit reveals a text field's caret,
-# and so scrolls to it, after the focus (s106ceP) — waited for as an event, never as a duration
-# (tests.md §5). What was seen goes with it: its box, the window's height, what was on top at its centre.
+# point of its box, inside the window, where the element on top is it, inside it, or its label. WebKit
+# reveals a text field's caret, and so scrolls to it, after the focus, a frame or several later (s106ceP,
+# s106ce5): the stop is read at each frame until it shows, for a second at most — waited for as its
+# event, bounded (tests.md §5); a stop a header keeps covering still fails. What was seen goes with it:
+# its box, the window's height, what was on top at its centre.
 KEY_STOP = (
     "const done = arguments[arguments.length - 1];"
     "const e = document.activeElement, n = e.closest('.choice') ?? e;"
     "if (e !== document.body && !e.dataset.ce) e.dataset.ce = 'late ' + String(++window.__ce);"
-    "const box = () => { const r = n.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].join(); };"
-    "let last = box(), frames = 0;"
-    "const settle = () => requestAnimationFrame(() => { const now = box(); frames += 1;"
-    " if (now !== last && frames < 30) { last = now; return settle(); } measure(); });"
-    "const measure = () => {"
-    "const r = n.getBoundingClientRect(), x0 = Math.max(r.left, 0) + 1, x1 = Math.min(r.right, innerWidth) - 1,"
-    " y0 = Math.max(r.top, 0) + 1, y1 = Math.min(r.bottom, innerHeight) - 1;"
     "const mine = (h) => !!h && (h === e || n.contains(h) || h.contains(e) || [...(e.labels ?? [])].some((l) => l.contains(h)));"
-    "const shows = x0 <= x1 && y0 <= y1 && [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [(x0 + x1) / 2, (y0 + y1) / 2]]"
-    " .some(([x, y]) => mine(document.elementFromPoint(x, y)));"
+    "const bounds = () => { const r = n.getBoundingClientRect(); return [r, Math.max(r.left, 0) + 1, Math.min(r.right, innerWidth) - 1,"
+    " Math.max(r.top, 0) + 1, Math.min(r.bottom, innerHeight) - 1]; };"
+    "const showing = () => { const [, x0, x1, y0, y1] = bounds(); return x0 <= x1 && y0 <= y1"
+    " && [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [(x0 + x1) / 2, (y0 + y1) / 2]].some(([x, y]) => mine(document.elementFromPoint(x, y))); };"
+    "const until = performance.now() + 1000;"
+    "const settle = () => requestAnimationFrame(() => (showing() || performance.now() > until ? measure() : settle()));"
+    "const measure = () => {"
+    "const [r, x0, x1, y0, y1] = bounds(), shows = showing();"
     "const top = document.elementFromPoint((x0 + x1) / 2, (y0 + y1) / 2);"
     "const seen = shows || [[r.top, r.bottom].map(Math.round), innerHeight, top ? top.id || `${top.tagName}.${top.className}` : null];"
     "const look = () => { const s = getComputedStyle(n); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow].join('|'); };"
@@ -5439,11 +5439,12 @@ KEY_CONTROLS = (
     " const m = e.type === 'radio' && e.name ? null : member(e);"
     " if (m) m.parentElement.dataset.ceGroup ??= String(++window.__ce);"
     " const group = e.type === 'radio' && e.name ? `radio ${e.name}` : m ? `${m.getAttribute('role')} in ${m.parentElement.dataset.ceGroup}` : null;"
-    " return [e.dataset.ce, e.id || `${e.tagName}.${e.className}`, e.tabIndex, group, m === e]; })")
+    " return [e.dataset.ce, e.id || `${e.tagName}.${e.className}`, e.tabIndex, group, m === e || e.type === 'radio']; })")
 # From a group's member reached by Tab, an arrow moves the focus to another of its group (APG): the
-# group's mark of what has the focus then, and its node's.
+# node's mark of what has the focus then, and its group.
 KEY_ARROWED = ("const e = document.activeElement, m = e.closest('[role]');"
-               "return [e.dataset.ce, m && m.parentElement ? m.parentElement.dataset.ceGroup ?? null : null]")
+               "return [e.dataset.ce, e.type === 'radio' && e.name ? `radio ${e.name}`"
+               " : m && m.parentElement && m.parentElement.dataset.ceGroup ? `${m.getAttribute('role')} in ${m.parentElement.dataset.ceGroup}` : null]")
 # WCAG 2.5.8, measured as its words have it: each target shown is 24 by 24 CSS px — a hundredth of a
 # pixel left for the sub-pixel rounding —, or a circle of 24 px across, centred on its box, cuts no
 # other target and no other small target's circle. A target in a sentence is the criterion's own
@@ -5540,17 +5541,18 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                         browser.execute_script("document.querySelector(`[data-ce='${arguments[0]}']`).focus()", mark)
                         ActionChains(browser).send_keys(Keys.ARROW_DOWN).perform()
                         to = browser.execute_script(KEY_ARROWED)
-                        if not (to[0] != mark and group.endswith(f" in {to[1]}")):
+                        if not (to[0] != mark and to[1] == group):
                             unmoved.append((group, to))
                     moving = {group for group in led if group not in {g for g, _ in unmoved}}
-                    radios = {group for mark, _, _, group, _ in controls if group and group.startswith("radio ") and mark in reached}
+                    # A radio out of Tab's order keeps its tabIndex at 0: the browser leaves it out, the arrows
+                    # reach it (HTML's radio group), so a radio is credited by its group whatever its tabIndex.
                     missed = sorted({name for mark, name, tab, group, _ in controls
-                                     if mark not in reached and not (group and tab < 0 and (group in moving or group in radios))})
+                                     if mark not in reached and not (group in moving and (tab < 0 or group.startswith("radio ")))})
                     unseen = [name for _, name, seen, _ in forth if not seen]
                     hidden = [("Tab", name, part) for _, name, _, part in forth if part is not True] + [("Shift+Tab", name, part) for _, name, _, part in back if part is not True]
                     said = f"{short}, {theme}: {what}"
                     # Which roving groups were credited, said in a green run too: the verifier reads them there.
-                    print(f"    {said}: {len(forth)} Tab stops; groups reached by Tab and an arrow: {sorted(moving)}; radios: {sorted(radios)}")
+                    print(f"    {said}: {len(forth)} Tab stops; groups reached by Tab and an arrow: {sorted(moving)}")
                     check(f"{said}, each Tab stop shows its focus (WCAG 2.4.7, D106)", shown and forth and unseen == [], (len(forth), unseen))
                     check(f"{said}, no stop entirely hidden, by Tab or Shift+Tab (WCAG 2.4.11, D106)", shown and forth and hidden == [], hidden)
                     check(f"{said}, every control reached by the keyboard, a roving group by its arrows (WCAG 2.1.1, D106)",
