@@ -2421,85 +2421,83 @@ pub fn failure(failure: Failure, language: Language) -> String {
     use Language::*;
     match (failure, language) {
         (Failure::Trash(refusal), _) => return audio_trashed(language, &Err(refusal)).body,
-        (Failure::Unexpected, English) => "Kitokey could not do this: try again, and restart it if it happens again.",
-        (Failure::Unexpected, French) => "Kitokey n’a pas pu le faire\u{a0}: réessayez, et redémarrez-le si cela se reproduit.",
-        (Failure::MeetingGone, English) => "this meeting is no longer in the meetings’ folder.",
+        (Failure::Unexpected, English) => "Something went wrong. Try again; if it keeps happening, restart Kitokey.",
+        (Failure::Unexpected, French) => "Une erreur s’est produite. Réessayez\u{202f}; si le problème persiste, redémarrez Kitokey.",
+        (Failure::MeetingGone, English) => "this meeting is no longer in the meetings folder.",
         (Failure::MeetingGone, French) => "cette réunion n’est plus dans le dossier des réunions.",
-        (Failure::NoMeeting, English) => "this meeting is no longer in the meetings’ folder: go back to the list.",
-        (Failure::NoMeeting, French) => "cette réunion n’est plus dans le dossier des réunions\u{a0}: revenez à la liste.",
-        (Failure::Busy, English) => "this meeting is being recorded or made: try again once that is done.",
-        (Failure::Busy, French) => "cette réunion est en cours d’enregistrement ou de préparation\u{a0}: réessayez une fois cela terminé.",
-        (Failure::NotComplete, English) => "its transcript is not complete: make it again first.",
-        (Failure::NotComplete, French) => "sa transcription n’est pas complète\u{a0}: refaites-la d’abord.",
-        (Failure::MeetingFile, English) => {
-            "its folder could not be written to: check that the disk has room and that you may write there, then try again."
-        }
+        (Failure::NoMeeting, English) => "this meeting is no longer in the meetings folder. Go back to the list.",
+        (Failure::NoMeeting, French) => "cette réunion n’est plus dans le dossier des réunions. Revenez à la liste.",
+        (Failure::Busy, English) => "this meeting is being processed. Try again when it’s done.",
+        (Failure::Busy, French) => "cette réunion est en cours de traitement. Réessayez une fois terminé.",
+        (Failure::NotComplete, English) => "its transcript is incomplete. Redo it first.",
+        (Failure::NotComplete, French) => "sa transcription est incomplète. Refaites-la d’abord.",
+        (Failure::MeetingFile, English) => "can’t write to its folder. Check disk space and folder permissions, then try again.",
         (Failure::MeetingFile, French) => {
-            "son dossier n’a pas pu être écrit\u{a0}: vérifiez qu’il reste de la place et que vous pouvez y écrire, puis réessayez."
+            "impossible d’écrire dans son dossier. Vérifiez l’espace disque et vos droits sur ce dossier, puis réessayez."
         }
-        (Failure::Confidential, English) => "this meeting is confidential: nothing is sent.",
+        (Failure::Confidential, English) => "this meeting is confidential, so nothing is sent.",
         (Failure::Confidential, French) => "cette réunion est confidentielle\u{a0}: rien n’est envoyé.",
-        (Failure::NoneChosen, English) => "nothing is chosen yet: choose it in Settings, then try again.",
-        (Failure::NoneChosen, French) => "aucun modèle choisi\u{a0}: choisissez-en un dans les réglages, puis réessayez.",
-        (Failure::NoTranscript, English) => "this meeting has no transcript to send: make it first.",
-        (Failure::NoTranscript, French) => "cette réunion n’a pas de transcription à envoyer\u{a0}: faites-la d’abord.",
-        (Failure::ProviderChanged, English) => "who writes the minutes has changed: look at this page again.",
-        (Failure::ProviderChanged, French) => "le modèle qui rédige le compte rendu a changé\u{a0}: revoyez cette page.",
-        (Failure::ModelUnnamed, English) => "name a model, then try again.",
-        (Failure::ModelUnnamed, French) => "nommez un modèle, puis réessayez.",
-        (Failure::ModelAbsent, English) => "this model is not on this computer: fetch it in Settings.",
-        (Failure::ModelAbsent, French) => "ce modèle n’est pas sur cet ordinateur\u{a0}: téléchargez-le dans les réglages.",
-        (Failure::BadAddress, English) => "this address cannot be used: write it whole, starting with https://.",
-        (Failure::BadAddress, French) => "cette adresse n’est pas utilisable\u{a0}: écrivez-la en entier, en commençant par https://.",
-        (Failure::FolderUnnamed, English) => "name a folder, then try again.",
-        (Failure::FolderUnnamed, French) => "nommez un dossier, puis réessayez.",
-        (Failure::FolderNotWhole, English) => "write the folder’s whole path, from / or from ~.",
-        (Failure::FolderNotWhole, French) => "écrivez le chemin entier du dossier, depuis / ou depuis ~.",
-        (Failure::FolderUnmade, English) => "this folder could not be made: check that you may write there.",
-        (Failure::FolderUnmade, French) => "ce dossier n’a pas pu être créé\u{a0}: vérifiez que vous pouvez y écrire.",
-        (Failure::Autostart, English) => "starting at login could not be changed: check that your home folder can be written to.",
+        (Failure::NoneChosen, English) => "no model chosen. Choose one in Settings, then try again.",
+        (Failure::NoneChosen, French) => "aucun modèle choisi. Choisissez-en un dans les Réglages, puis réessayez.",
+        (Failure::NoTranscript, English) => "this meeting has no transcript yet. Transcribe it first.",
+        (Failure::NoTranscript, French) => "cette réunion n’a pas encore de transcription. Transcrivez-la d’abord.",
+        (Failure::ProviderChanged, English) => "the summary service changed. Review this page again.",
+        (Failure::ProviderChanged, French) => "le service de compte rendu a changé. Vérifiez à nouveau cette page.",
+        (Failure::ModelUnnamed, English) => "enter a model name, then try again.",
+        (Failure::ModelUnnamed, French) => "indiquez un modèle, puis réessayez.",
+        (Failure::ModelAbsent, English) => "this model isn’t installed. Download it in Settings.",
+        (Failure::ModelAbsent, French) => "ce modèle n’est pas installé. Téléchargez-le dans les Réglages.",
+        (Failure::BadAddress, English) => "invalid address. Enter the full address, starting with https://.",
+        (Failure::BadAddress, French) => "adresse invalide. Saisissez l’adresse complète, commençant par https://.",
+        (Failure::FolderUnnamed, English) => "choose a folder, then try again.",
+        (Failure::FolderUnnamed, French) => "choisissez un dossier, puis réessayez.",
+        (Failure::FolderNotWhole, English) => "enter the folder’s full path (starting with / or ~).",
+        (Failure::FolderNotWhole, French) => "indiquez le chemin complet du dossier (commençant par / ou ~).",
+        (Failure::FolderUnmade, English) => "can’t create this folder. Check that you have permission to write there.",
+        (Failure::FolderUnmade, French) => "impossible de créer ce dossier. Vérifiez que vous avez le droit d’y écrire.",
+        (Failure::Autostart, English) => "can’t change the start-at-login setting. Check that your home folder is writable.",
         (Failure::Autostart, French) => {
-            "le démarrage à l’ouverture de session n’a pas pu être changé\u{a0}: vérifiez que votre dossier personnel peut être écrit."
+            "impossible de modifier le lancement automatique. Vérifiez que votre dossier personnel est accessible en écriture."
         }
         // Shows: under a command the window refused, after « not saved: », then the refusal.
         // When: the settings file cannot be read as settings. At most: no limit. Placeholders: {} the refusal.
-        (Failure::SettingsUnread(why), English) => return format!("the settings file cannot be read. {}", refused(&why, language)),
+        (Failure::SettingsUnread(why), English) => return format!("the settings file can’t be read. {}", refused(&why, language)),
         (Failure::SettingsUnread(why), French) => {
-            return format!("le fichier des réglages ne peut pas être lu. {}", refused(&why, language));
+            return format!("le fichier de réglages est illisible. {}", refused(&why, language));
         }
         // Shows: alone on Settings, then the refusal. When: the settings file cannot be read.
         // At most: no limit. Placeholders: {} the refusal.
         (Failure::SettingsLocked(why), English) => {
             return format!(
-                "The settings file cannot be read: Kitokey does not write over it until it is corrected. {}",
+                "The settings file can’t be read. Kitokey won’t change it until it’s fixed. {}",
                 refused(&why, language)
             );
         }
         (Failure::SettingsLocked(why), French) => {
             return format!(
-                "Le fichier des réglages ne peut pas être lu\u{a0}: Kitokey ne l’écrit pas tant qu’il n’est pas corrigé. {}",
+                "Le fichier de réglages est illisible\u{a0}: Kitokey n’y touchera pas tant qu’il n’est pas corrigé. {}",
                 refused(&why, language)
             );
         }
         // Shows: under a command the window refused, after « not saved: », or alone where the page
         // shows it (the folder, the keyboard settings). When: the command named by its arm fails.
         // At most: no limit. Placeholders: none.
-        (Failure::SettingsUnwritten, English) => "the settings file could not be written: check that the disk has room, then try again.",
+        (Failure::SettingsUnwritten, English) => "can’t save the settings file. Check disk space, then try again.",
         (Failure::SettingsUnwritten, French) => {
-            "le fichier des réglages n’a pas pu être écrit\u{a0}: vérifiez qu’il reste de la place, puis réessayez."
+            "impossible d’enregistrer le fichier de réglages. Vérifiez l’espace disque, puis réessayez."
         }
-        (Failure::FolderNotOpened, English) => "The folder could not be opened: open it from your file manager.",
-        (Failure::FolderNotOpened, French) => "Le dossier n’a pas pu être ouvert\u{a0}: ouvrez-le depuis votre gestionnaire de fichiers.",
-        (Failure::KeyboardSettings, English) => "The keyboard settings cannot be opened from here: open them from your system’s settings.",
+        (Failure::FolderNotOpened, English) => "Couldn’t open the folder. Open it from your file manager.",
+        (Failure::FolderNotOpened, French) => "Impossible d’ouvrir le dossier. Ouvrez-le depuis votre gestionnaire de fichiers.",
+        (Failure::KeyboardSettings, English) => "Can’t open keyboard settings from here. Open them from your system settings.",
         (Failure::KeyboardSettings, French) => {
-            "Les réglages du clavier ne s’ouvrent pas d’ici\u{a0}: ouvrez-les depuis ceux de votre système."
+            "Impossible d’ouvrir les réglages du clavier d’ici. Ouvrez-les depuis les paramètres du système."
         }
-        (Failure::Keyring, English) => "the system’s keyring does not answer: unlock it, then try again.",
-        (Failure::Keyring, French) => "le trousseau du système ne répond pas\u{a0}: déverrouillez-le, puis réessayez.",
-        (Failure::ProgramNotStarted, English) => "a program of Kitokey’s could not be started: install Kitokey again.",
-        (Failure::ProgramNotStarted, French) => "un programme de Kitokey n’a pas pu démarrer\u{a0}: réinstallez Kitokey.",
-        (Failure::TestRefused, English) => "check its address, its name and its key, then try again.",
-        (Failure::TestRefused, French) => "vérifiez son adresse, son nom et sa clé, puis réessayez.",
+        (Failure::Keyring, English) => "your system keychain isn’t responding. Unlock it, then try again.",
+        (Failure::Keyring, French) => "le trousseau du système ne répond pas. Déverrouillez-le, puis réessayez.",
+        (Failure::ProgramNotStarted, English) => "part of Kitokey couldn’t start. Reinstall Kitokey.",
+        (Failure::ProgramNotStarted, French) => "un composant de Kitokey n’a pas pu démarrer. Réinstallez Kitokey.",
+        (Failure::TestRefused, English) => "check the address, model name and key, then try again.",
+        (Failure::TestRefused, French) => "vérifiez l’adresse, le nom du modèle et la clé, puis réessayez.",
     }
     .to_string()
 }
@@ -2812,29 +2810,29 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
     let said = |title: &str, body: String| notice(title, body).expect("a trouble is always said");
     let (title, body) = match (trouble, language) {
         (Trouble::NoRecorder(_), English) => (
-            "Kitokey cannot record",
-            "Its recording program could not be started. Installing Kitokey again puts it back.",
+            "Kitokey can’t record",
+            "A recording component is missing or damaged. Reinstall Kitokey to fix it.",
         ),
         (Trouble::NoRecorder(_), French) => (
             "Kitokey ne peut pas enregistrer",
-            "Son programme d’enregistrement n’a pas pu démarrer. Réinstaller Kitokey le remet en place.",
+            "Un composant d’enregistrement est manquant ou endommagé. Réinstallez Kitokey pour le réparer.",
         ),
         // Shows: a notification at a start, its body then the refusal. When: the settings file cannot
         // be read. At most: no limit. Placeholders: {} the refusal.
         (Trouble::Settings(why), English) => {
             return said(
-                "Your settings were not read",
+                "Couldn’t read your settings",
                 format!(
-                    "Kitokey runs with its defaults until the file is corrected. {}",
+                    "Kitokey is using default settings until the file is fixed. {}",
                     refused(why, language)
                 ),
             );
         }
         (Trouble::Settings(why), French) => {
             return said(
-                "Vos réglages n’ont pas été lus",
+                "Vos réglages n’ont pas pu être lus",
                 format!(
-                    "Kitokey fonctionne avec ses réglages par défaut tant que le fichier n’est pas corrigé. {}",
+                    "Kitokey utilise les réglages par défaut jusqu’à ce que le fichier soit corrigé. {}",
                     refused(why, language)
                 ),
             );
@@ -2844,56 +2842,54 @@ pub fn trouble(trouble: &Trouble, language: Language) -> Notice {
         // there to transcribe. At most: the title, 50 characters; the body, no limit. Placeholders:
         // {at} where the model is looked for, or the folder.
         (Trouble::Shortcut(_), English) => (
-            "The keyboard shortcut is not set",
-            "The menu of Kitokey’s icon still starts and stops a recording.",
+            "Keyboard shortcut unavailable",
+            "You can still start and stop recordings from the Kitokey icon.",
         ),
         (Trouble::Shortcut(_), French) => (
-            "Le raccourci clavier n’est pas actif",
-            "Le menu de l’icône Kitokey permet toujours de démarrer et d’arrêter un enregistrement.",
+            "Raccourci clavier indisponible",
+            "Vous pouvez toujours démarrer et arrêter un enregistrement depuis l’icône Kitokey.",
         ),
         (Trouble::NoModel(at), English) => {
             return said(
-                "No transcript: the model is missing",
-                format!("The recording is kept. Place the Whisper model at {at}, then use “Transcribe last recording”."),
+                "Can’t transcribe: model missing",
+                format!("The recording is saved. Put the Whisper model at {at}, then choose “Transcribe last recording”."),
             );
         }
         (Trouble::NoModel(at), French) => {
             return said(
-                "Pas de transcription\u{a0}: le modèle manque",
+                "Transcription impossible\u{a0}: modèle manquant",
                 format!(
-                    "L’enregistrement est conservé. Placez le modèle Whisper à l’emplacement {at}, puis utilisez «\u{a0}Transcrire le dernier enregistrement\u{a0}»."
+                    "L’enregistrement est conservé. Placez le modèle Whisper ici\u{a0}: {at}, puis choisissez «\u{a0}Transcrire le dernier enregistrement\u{a0}»."
                 ),
             );
         }
         (Trouble::NoTranscriber(_), English) => (
-            "Kitokey cannot transcribe",
-            "Its transcription program could not be started. The recording is kept; installing Kitokey again puts the program back.",
+            "Kitokey can’t transcribe",
+            "A transcription component is missing or damaged. The recording is saved; reinstall Kitokey to fix it.",
         ),
         (Trouble::NoFolder(at), English) => {
             return said(
-                "Kitokey cannot record",
-                format!("Its meetings folder cannot be written: {at}. Choose another one in Kitokey’s settings."),
+                "Kitokey can’t record",
+                format!("Can’t write to the meetings folder: {at}. Choose another one in Settings."),
             );
         }
         (Trouble::NoFolder(at), French) => {
             return said(
                 "Kitokey ne peut pas enregistrer",
-                format!(
-                    "Son dossier des réunions ne peut pas être écrit\u{a0}: {at}. Choisissez-en un autre dans les réglages de Kitokey."
-                ),
+                format!("Impossible d’écrire dans le dossier des réunions\u{a0}: {at}. Choisissez-en un autre dans les Réglages."),
             );
         }
         (Trouble::NoSession, English) => (
             "No recording to transcribe",
-            "Record a meeting first: its transcript follows the stop.",
+            "Record a meeting first — it’s transcribed when you stop.",
         ),
         (Trouble::NoSession, French) => (
             "Aucun enregistrement à transcrire",
-            "Enregistrez d’abord une réunion\u{a0}: sa transcription suit l’arrêt.",
+            "Enregistrez d’abord une réunion\u{a0}: elle sera transcrite à l’arrêt.",
         ),
         (Trouble::NoTranscriber(_), French) => (
             "Kitokey ne peut pas transcrire",
-            "Son programme de transcription n’a pas pu démarrer. L’enregistrement est conservé\u{202f}; réinstaller Kitokey remet le programme en place.",
+            "Un composant de transcription est manquant ou endommagé. L’enregistrement est conservé\u{202f}; réinstallez Kitokey pour le réparer.",
         ),
     };
     said(title, body.to_string())
@@ -3338,7 +3334,7 @@ pub fn downloading(language: Language, percent: u64) -> String {
 pub fn fetching(language: Language, held: u64, bytes: u64) -> String {
     if held >= bytes {
         return match language {
-            Language::English => "Checking the model…",
+            Language::English => "Verifying the model…",
             Language::French => "Vérification du modèle…",
         }
         .to_string();
@@ -3492,13 +3488,13 @@ pub fn model_needed(language: Language, size: &str, host: &str) -> Notice {
     let entry = download(language, size, host);
     let (title, body) = match language {
         Language::English => (
-            "The transcription model is needed",
-            format!("It is fetched once, on your word: choose “{entry}” in Kitokey’s menu. The recording is kept."),
+            "Transcription model needed",
+            format!("It downloads once, with your OK: choose “{entry}” in the Kitokey menu. The recording is saved."),
         ),
         Language::French => (
-            "Le modèle de transcription est nécessaire",
+            "Modèle de transcription requis",
             format!(
-                "Il est téléchargé une fois, sur votre accord\u{a0}: choisissez «\u{a0}{entry}\u{a0}» dans le menu de Kitokey. L’enregistrement est conservé."
+                "Il se télécharge une seule fois, avec votre accord\u{a0}: choisissez «\u{a0}{entry}\u{a0}» dans le menu de Kitokey. L’enregistrement est conservé."
             ),
         ),
     };
@@ -3509,15 +3505,18 @@ pub fn model_needed(language: Language, size: &str, host: &str) -> Notice {
 /// offered again (D37).
 pub fn pulled(outcome: &Result<(), String>, model: &str, language: Language) -> Notice {
     let (title, body) = match (outcome, language) {
-        (Ok(()), Language::English) => ("Model ready", format!("{model} is in Ollama: it is offered first for the minutes.")),
+        (Ok(()), Language::English) => (
+            "Model ready",
+            format!("{model} is installed in Ollama and suggested first for summaries."),
+        ),
         (Ok(()), Language::French) => (
             "Modèle prêt",
-            format!("{model} est dans Ollama\u{a0}: il est proposé en premier pour les comptes rendus."),
+            format!("{model} est installé dans Ollama et proposé en premier pour le compte rendu."),
         ),
-        (Err(_), Language::English) => ("The model was not downloaded", "Nothing of it is used. It is offered again.".into()),
+        (Err(_), Language::English) => ("Model download failed", "Nothing was changed. You can try again.".into()),
         (Err(_), Language::French) => (
-            "Le modèle n’a pas été téléchargé",
-            "Rien n’en est utilisé. Il est proposé à nouveau.".into(),
+            "Échec du téléchargement du modèle",
+            "Rien n’a été modifié. Vous pouvez réessayer.".into(),
         ),
     };
     notice(title, body).expect("always said")
@@ -3526,10 +3525,10 @@ pub fn pulled(outcome: &Result<(), String>, model: &str, language: Language) -> 
 /// What a model of Settings' list is good for, as the list says it (D37, D40).
 pub fn offered_good(language: Language, good: Good) -> &'static str {
     match (language, good) {
-        (Language::English, Good::Recommended) => "Recommended: the most exact, quick on a recent computer",
-        (Language::French, Good::Recommended) => "Recommandé\u{a0}: le plus juste, rapide sur un ordinateur récent",
-        (Language::English, Good::Faster) => "Faster, less exact: for a modest computer",
-        (Language::French, Good::Faster) => "Plus rapide, moins juste\u{a0}: pour un ordinateur modeste",
+        (Language::English, Good::Recommended) => "Recommended: most accurate, fast on a recent computer",
+        (Language::French, Good::Recommended) => "Recommandé\u{a0}: le plus précis, rapide sur un ordinateur récent",
+        (Language::English, Good::Faster) => "Faster, less accurate: for older computers",
+        (Language::French, Good::Faster) => "Plus rapide, moins précis\u{a0}: pour un ordinateur plus ancien",
     }
 }
 
@@ -3538,25 +3537,16 @@ pub fn offered_good(language: Language, good: Good) -> &'static str {
 pub fn fetched(outcome: &Result<(), String>, chosen: bool, language: Language) -> Notice {
     use Language::{English, French};
     let (title, body) = match (outcome, chosen, language) {
-        (Ok(()), true, English) => (
-            "Model ready",
-            "Checked against its published fingerprint. The transcript is being made.",
-        ),
-        (Ok(()), true, French) => ("Modèle prêt", "Vérifié par son empreinte publiée. La transcription est en cours."),
+        (Ok(()), true, English) => ("Model ready", "Model verified. Transcription is starting."),
+        (Ok(()), true, French) => ("Modèle prêt", "Modèle vérifié. La transcription démarre."),
         // Another than the one chosen: the choice stays the user's (D37).
-        (Ok(()), false, English) => (
-            "Model ready",
-            "Checked against its published fingerprint. Choose it in Settings for your next transcripts.",
-        ),
+        (Ok(()), false, English) => ("Model ready", "Model verified. Choose it in Settings for your next transcripts."),
         (Ok(()), false, French) => (
             "Modèle prêt",
-            "Vérifié par son empreinte publiée. Choisissez-le dans les Réglages pour vos prochaines transcriptions.",
+            "Modèle vérifié. Choisissez-le dans les Réglages pour vos prochaines transcriptions.",
         ),
-        (Err(_), _, English) => ("The model was not downloaded", "Nothing of it is used. It is offered again."),
-        (Err(_), _, French) => (
-            "Le modèle n’a pas été téléchargé",
-            "Rien n’en est utilisé. Il est proposé à nouveau.",
-        ),
+        (Err(_), _, English) => ("Model download failed", "Nothing was changed. You can try again."),
+        (Err(_), _, French) => ("Échec du téléchargement du modèle", "Rien n’a été modifié. Vous pouvez réessayer."),
     };
     notice(title, body.to_string()).expect("always said")
 }
