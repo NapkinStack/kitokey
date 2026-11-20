@@ -77,8 +77,13 @@ fn asked() -> Result<Asked, Refused> {
     }
     let (mut folder, mut format, mut lang) = (None, None, None);
     let mut include = Include::all();
+    let mut given = std::collections::HashSet::new();
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
+        // An option given twice is a mistake, never the last one winning (as kitokey-summary, #1042).
+        if arg.starts_with("--") && !given.insert(arg.clone()) {
+            return Err(wrong(&format!("{arg} given twice")));
+        }
         match arg.as_str() {
             "--format" => format = Some(args.next().ok_or_else(|| wrong("--format without its value"))?),
             "--lang" => lang = Some(args.next().ok_or_else(|| wrong("--lang without its value"))?),

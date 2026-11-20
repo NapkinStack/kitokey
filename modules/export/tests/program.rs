@@ -175,6 +175,24 @@ fn a_cause_a_person_acts_on_is_its_one_line_and_a_sentence_and_nothing_is_writte
 }
 
 #[test]
+fn a_file_that_cannot_take_its_place_leaves_nothing_beside_it() {
+    // `to` an existing folder: the file is written beside it, and cannot be renamed over a folder.
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    let out = dir.path().join("out");
+    let taken = out.join("taken.md");
+    fs::create_dir_all(&taken).unwrap();
+    let ran = run(
+        &[folder.to_str().unwrap(), "--format", "md", "--lang", "fr"],
+        &words(&taken).to_string(),
+    );
+    assert_eq!(ran.lines, [json!({"event": "failed", "code": "file.unwritable"})]);
+    let left: Vec<_> = fs::read_dir(&out).unwrap().map(|entry| entry.unwrap().file_name()).collect();
+    assert_eq!(left, [taken.file_name().unwrap()], "no file left half written beside it");
+    assert!(fs::read_dir(&taken).unwrap().next().is_none(), "the folder in its place untouched");
+}
+
+#[test]
 fn a_wrong_argument_or_input_is_a_sentence_alone() {
     let dir = tempfile::tempdir().unwrap();
     let folder = meeting(dir.path());
@@ -195,6 +213,8 @@ fn a_wrong_argument_or_input_is_a_sentence_alone() {
             good.to_string(),
         ),
         (vec![folder, "--format", "md", "--lang", "fr\nx"], good.to_string()),
+        // An option given twice, as kitokey-summary refuses it (#1042).
+        (vec![folder, "--format", "md", "--format", "md", "--lang", "fr"], good.to_string()),
         // An option this program does not know, never taken for the folder.
         (vec!["--format", "md", "--lang", "fr", "--without-everything"], good.to_string()),
         (vec![folder, "--format", "md", "--lang", "fr"], "not JSON".into()),
