@@ -5549,6 +5549,8 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                     unseen = [name for _, name, seen, _ in forth if not seen]
                     hidden = [("Tab", name, part) for _, name, _, part in forth if part is not True] + [("Shift+Tab", name, part) for _, name, _, part in back if part is not True]
                     said = f"{short}, {theme}: {what}"
+                    # Which roving groups were credited, said in a green run too: the verifier reads them there.
+                    print(f"    {said}: {len(forth)} Tab stops; groups reached by Tab and an arrow: {sorted(moving)}; radios: {sorted(radios)}")
                     check(f"{said}, each Tab stop shows its focus (WCAG 2.4.7, D106)", shown and forth and unseen == [], (len(forth), unseen))
                     check(f"{said}, no stop entirely hidden, by Tab or Shift+Tab (WCAG 2.4.11, D106)", shown and forth and hidden == [], hidden)
                     check(f"{said}, every control reached by the keyboard, a roving group by its arrows (WCAG 2.1.1, D106)",
