@@ -10,6 +10,9 @@ Each failure is a `failed` line's code (`posting/v1`), said on the meeting's pag
 | Code | Meaning | First action |
 |---|---|---|
 | `address.refused` | Not https, credentials in it, or this computer or a local network | Paste the channel's `https:` webhook address |
+| `meeting.unreadable` | The session's folder, or a file in it, could not be read | Check the folder; nothing was sent |
+| `meeting.confidential` | The meeting is said confidential | Nothing to do: it is never sent (PDR-0007); the page offers no send |
+| `meeting.no_summary` | No minutes, or none it can read | Write the summary first |
 | `network.unreachable` | No connection, the host not found, its certificate refused | Check the connection; nothing was sent |
 | `destination.silent` | Sent, no answer within 30 s | Look in the channel before sending again: it may have arrived |
 | `destination.gone` | 401, 403, 404, 410 | The webhook was deleted or revoked: set the destination up again |
