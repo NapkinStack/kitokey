@@ -224,13 +224,13 @@ FAILED = []
 PLAYING = None
 # What Tester says of each cause its program names (D72), as `src/words.rs` says it in French.
 TEST_CAUSES = [
-    ("provider.refused_key", "Le fournisseur a refusé la clé\u00a0: saisissez-la de nouveau dans les réglages de Kitokey."),
-    ("provider.unknown_model", "Le fournisseur ne connaît pas ce modèle ou cette adresse\u00a0: choisissez-les de nouveau dans les réglages de Kitokey."),
-    ("provider.no_times", "Ce modèle ne donne pas les temps de ce qu’il entend\u00a0: choisissez-en un qui donne ceux de chaque segment dans les réglages de Kitokey."),
-    ("provider.no_credit", "Le fournisseur a refusé faute de crédit\u00a0: ajoutez du crédit chez lui, puis réessayez."),
-    ("provider.too_many", "Le fournisseur refuse pour trop de demandes, ou un quota épuisé\u00a0: patientez, ou vérifiez votre forfait chez lui."),
-    ("provider.down", "Le fournisseur répond qu’il est en panne\u00a0: réessayez plus tard. Sur cet ordinateur, ce modèle est peut-être trop gros pour la mémoire\u00a0: choisissez-en un plus petit."),
-    ("provider.unreachable", "Le fournisseur n’a pas pu être joint\u00a0: vérifiez qu’il tourne, ou le réseau, puis réessayez."),
+    ("provider.refused_key", "Le service a refusé la clé d’API. Saisissez-la à nouveau dans les Réglages."),
+    ("provider.unknown_model", "Le service ne reconnaît pas ce modèle ou cette adresse. Vérifiez-les dans les Réglages."),
+    ("provider.no_times", "Ce modèle ne fournit pas d’horodatage. Choisissez-en un qui en fournit dans les Réglages."),
+    ("provider.no_credit", "Crédit insuffisant chez le service. Rechargez votre compte, puis réessayez."),
+    ("provider.too_many", "Le service limite le nombre de demandes, ou votre quota est atteint. Patientez, ou vérifiez votre abonnement."),
+    ("provider.down", "Le service rencontre un problème. Réessayez plus tard. Si le modèle tourne sur cet ordinateur, il est peut-être trop gros pour sa mémoire\u00a0: choisissez-en un plus petit."),
+    ("provider.unreachable", "Impossible de joindre le service. Vérifiez votre connexion, ou qu’il est bien lancé s’il tourne sur cet ordinateur, puis réessayez."),
 ]
 # Settings in at most three groups (D95): each group's heading, in order — the trial's line is no group; and the group the
 # transcription model's state is said in — no card of its own any more (#782).
@@ -3553,11 +3553,11 @@ def models_advanced(now: dt.datetime) -> None:
                 failed = wait_for(browser, lambda b: "qwen3:14b" in read(writing) and "Le dernier Refaire a échoué" in b.execute_script(failure), 15)
                 told = browser.execute_script(failure)
                 check("Settings' minutes model fails: Settings' wording, no « Avancé »",
-                      failed and "dans les réglages de Kitokey" in told and "Avancé" not in told, told)
+                      failed and "dans les Réglages" in told and "Avancé" not in told, told)
                 heard_settings = wait_for(None, lambda b: "pas pu être refait" in notified.read_text()[since:], 10)
                 said_settings = notified.read_text()[since:]
                 check("and its notification keeps Settings' wording",
-                      heard_settings and "dans les réglages de Kitokey" in said_settings and "Avancé" not in said_settings, said_settings[-500:])
+                      heard_settings and "dans les Réglages" in said_settings and "Avancé" not in said_settings, said_settings[-500:])
             finally:
                 monitor.terminate()
                 (WORK / "fail-minutes").unlink()
@@ -5217,12 +5217,12 @@ def bar_after_stop(now: dt.datetime) -> None:
     for language, short, theme, meeting, stages, not_made in (
         ("fr_FR.UTF-8", "fr", "light", "La réunion du 18 oct. à 12:00",
          (" : transcription en cours", " : compte rendu en cours", " : prête"),
-         " : Le compte rendu n’a pas pu être rédigé. La transcription n’a pas changé. Le modèle n’a pas écrit de compte rendu :"
-         " réessayez, ou choisissez un autre modèle dans les réglages de Kitokey."),
+         " : Le compte rendu n’a pas pu être rédigé. La transcription n’a pas changé. Le modèle n’a pas produit de compte rendu."
+         " Réessayez ou choisissez un autre modèle dans les Réglages."),
         ("en_US.UTF-8", "en", "dark", "The meeting of Oct 18 at 12:00 PM",
          (": transcribing", ": summary being written", ": ready"),
-         ": The summary couldn’t be written. The transcript is unchanged. The model did not write minutes: try again, or choose another"
-         " model in Kitokey’s settings."),
+         ": The summary couldn’t be written. The transcript is unchanged. The model didn’t produce a summary. Try again or choose another"
+         " model in Settings."),
     ):
         hearing, summary, ready = (meeting + stage for stage in stages)
         meetings = WORK / f"after-stop-{short}"
@@ -12276,7 +12276,7 @@ def main() -> int:
               failed and "not minutes" not in state(browser) and "not minutes" not in heard.read_text(), (state(browser), heard.read_text()[-400:]))
         # Its cause named by the program, its gesture said, on the page and in the notice (D29).
         check("the cause the program named is said with its gesture, on the page",
-              "écrit de compte rendu" in state(browser),
+              "produit de compte rendu" in state(browser),
               (state(browser), heard.read_text()[-400:]))
         # The developer mode shows what the program said, under the sentence; never in a notice (D29).
         to_settings()
@@ -12330,7 +12330,7 @@ def main() -> int:
         browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
         plain = wait_for(browser, lambda b: "Le dernier Refaire a échoué" in state(b), 5)
         check("a later failure that names no cause does not show the earlier one's",
-              plain and "écrit de compte rendu" not in state(browser) and "écrit de compte rendu" not in said, (state(browser), said[-300:]))
+              plain and "produit de compte rendu" not in state(browser) and "produit de compte rendu" not in said, (state(browser), said[-300:]))
         time.sleep(3)
         left = sorted(p.name for p in asked.glob("minutes*"))
         check("nothing else is made after, no copy left beside", (asked / "minutes.md").read_text() == before and left == ["minutes.md"], (left, (asked / "minutes.md").read_text()[:80], (WORK / "summary-args").read_text()))
