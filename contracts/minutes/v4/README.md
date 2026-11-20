@@ -53,8 +53,7 @@ the three parts.
 - **Whole or absent.** The file appears under its name only once it is complete; a provider
   that fails leaves the minutes that were there, or none.
 - **Made again replaces.** There is one `minutes.md`; the one before is not kept by this
-  contract, nor its `title`. A consumer may keep the last one it replaced beside it as
-  `minutes-previous.md`, which no step reads and this contract does not describe (D113).
+  contract, nor its `title`.
 - **One key, one line.** The front matter is lines of `key: value`. The producer writes `contract`,
   `made`, `cost`, `currency` and `made_in` bare; `provider`, `model`, `context` and `title` as JSON strings in
   double quotes, so that a `"`, a `:` or a line break stays on its line; `context` may be `null`. A reader takes a
