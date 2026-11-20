@@ -79,6 +79,23 @@ deliverables:
       - "Given `minutes/v4`'s three sections found by their place, when free sections are added, then `minutes/v5` holds a structure's name and its ordered sections — a title, a line saying what goes in it —, added by expand/contract (`.nstack/handbook/03-contracts.md`): the contract's pull request, then summary writing v5, then the shell reading both, v4 still read; held by the contract's tests on both sides"
       - "Given summary, when it writes a summary, then it offers six built-in structures in French and in English — general, one-to-one, stand-up, client call, interview, project review —, each with few sections, a section allowed to say there is nothing rather than invent; held by tests with the e2e's stand-in engine, as `summary` already does: each structure's headings present and in order, and a section left empty saying so. How small local models fill them is a spike: recorded on a played transcript with a named model, each structure's sections filled or said empty, read against a threshold set in D111's section"
       - "Given a meeting's page, when the user chooses another structure beside its summary, then nothing starts until the button that names the making is pressed; the summary is made again in that structure, the previous one kept as D93 keeps it; the default structure is chosen in Settings; held by the e2e"
+  - id: D112
+    title: "Kitokey speaks in one voice, every sentence carrying its guide's comment, the English contracting as its guide says — what is left of cycle 10's D94"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given `src/words.rs`, still the one source of every sentence, when the shell's tests run, then each sentence carries a comment saying where it shows, when, its length limit and its placeholders; each has the same placeholders in French and in English; no straight apostrophe in either; a notification's title holds at most 50 characters and a list's label at most 18; none says a word the guide's lexicon refuses — « fournisseur », « segment », « tu » in French; « provider », « keyring », « minutes » for the summary in English —; the tests that freeze sentences change in the same pull request as them"
+      - "Given `src/words.rs`, when the shell's tests run, then no sentence lacks the comment the criterion above asks: `WITHOUT_COMMENT` is 0, held by its ratchet in `tests/words.rs` — 318 on 2026-11-20 at cycle 10's closure"
+      - "Given the review page of 2026-11-13, when D94's sentences are written, then each is the version the decider ticked there, pasted in D94's acceptance issue, and otherwise the review's Claude version; the sentences no code reads are removed (`ran_online`, `context_edit`, `context_open`, and any other the author's search finds, listed in the sheet)"
+      - "Given the voice guide, when an English sentence could contract — « can't », « doesn't » —, then `voice.md` says whether it does, with an example in each case, and every English sentence follows it, the review's Claude version kept where it already does (#989, #990); held by a test of the guide over `words.rs`"
+  - id: D113
+    title: "Redo says what follows and keeps the current version until the new one is whole, says what is wrong in its panel, and the previous version can come back — what is left of cycle 10's D93"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given a meeting's page, when the user presses the control that opens the redo panel, then nothing starts: the only buttons that start a making name it — « Refaire la transcription », « Refaire le compte rendu » —, and a changed context starts nothing by itself either; before it starts, the panel says in one line what will be made, with which model, what follows it — the summary made again after a transcript — and that the current version stays until the new one is whole; Escape or « Annuler » leaves everything as it was; held by the e2e, no played engine started before the button that names it"
+      - "Given a transcript or a summary replaced by a redo, when the new one is whole, then the one replaced — the last one only — stays in the meeting's folder under a name no step reads, said in one line of prose on the contract's page, in place of going to the trash; the page offers « Revenir à la version précédente » with that version's time and model; going back swaps the two, a person's corrections kept; the next redo sends the older one to the trash, as today. Cut first when the breaker nears, said at the closure"
+      - "Given Settings' model missing, or the meeting's folder not writable, when the redo panel shows, then its start button stays with a model that is there, or the panel says which of the two is wrong and what to do — never a setting the user did not touch (#771); given a redo that failed beside the version kept, then the page says the last redo failed and why, never « non fait » beside what it shows (#772); given the panel open, when the window crosses 840 CSS px either way, then the panel, its choice and the focus stay (#777); held by the e2e"
 ---
 
 # Cycle 11 — Kitokey on sale, and out of the app
@@ -103,6 +120,11 @@ deliverables:
 > be sold*, the submission a dependency with a date; the Store's updater, licence, privacy policy and
 > downloads added; D104's and D111's criteria made meetable; D108's coupling with D111 written; the cut
 > order starts with D111 whole.
+
+> **D112 and D113 entered on the decider's word, 2026-11-20**, in their working session with the coordinator, at
+> cycle 10's closure (#992): asked « Les restes de D93 et D94 au cycle 11 ? », they answered « ok c11 ». They are
+> what cycle 10 left of D94 and D93 ([cycle 10's *Later*](10-kitokey-ready-when-you-come-back.md#later)); the
+> end date does not move (`framing.md` §4).
 
 ## Goal
 
@@ -156,16 +178,17 @@ QA: ines; UI and accessibility: lina; content and summary: sam.
 | D102, D107, D108 | marc |
 | D104, D105 | ines |
 | D106, D109 | lina |
-| D103, D110, D111 | sam |
+| D103, D110, D111, D112 | sam |
+| D113 | lina |
 
 **The order**: D108's Markdown merges first, its model reading sections as a list; D109's export, D110 and
 DOCX then consume it. `minutes/v5` (D111) merges as early as it can, and D108 is tested on it once it lands.
 D105 measures in windows the coordinator plans with the queues empty, so that it neither measures their load
 nor takes D104's machine.
 
-**Cut first, in this order, when the breaker nears**: D111 whole, to cycle 12, if `minutes/v5` is not merged by
+**Cut first, in this order, when the breaker nears**: D113 whole, to cycle 12; then D111 whole, to cycle 12, if `minutes/v5` is not merged by
 the cycle's fifth working day (2026-11-26); then D110's Discord (the generic webhook kept); then D109's folder export; then
-D105's budgets (the baseline kept). Never cut: D102, D104, D106, D108's Markdown, D109's export and copy.
+D105's budgets (the baseline kept); then D112's English contractions (its comments kept). Never cut: D102, D104, D106, D108's Markdown, D109's export and copy.
 D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 
 ### D102
@@ -261,6 +284,23 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   recorded — a refuted spike is a delivered one.
 - **The contract**: three pull requests, in order — `minutes/v5`'s page and schema, summary writing it, the
   shell reading v4 and v5. v4 is never removed in this cycle.
+
+### D112
+
+- What cycle 10 left of D94, as its closure says: #988 and P8b-2 (the troubles, a step's failure), if they merge
+  after this cycle's start; the comments of the page (P2) and of the notifications (P3), written by sam and kept
+  locally on 2026-11-20, down to none without one; the English contractions (#989, #990). None changes a
+  behaviour.
+- The guide decides first (#990), then the sentences follow (#989), in one pull request after P3.
+- Criteria 1 and 4 of cycle 10's D94 were held there (#811, #813) and are not repeated.
+
+### D113
+
+- What cycle 10 left of D93, its criteria taken as they were: the panel's line on what follows and that the
+  current version stays (#779); a missing model or a folder not writable said in the panel (#771); the panel
+  across the 840 px break (#777); going back to the previous version (criterion 3, cut first in cycle 10).
+- Criteria 2 and 5 of cycle 10's D93 were held there (#809, #810, #879, #931) and are not repeated.
+- Cut first in this cycle too: the Store and export come before it.
 
 ## What needs a person
 
