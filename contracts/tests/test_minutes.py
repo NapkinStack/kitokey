@@ -149,4 +149,14 @@ def test_the_six_structures_name_their_sections_and_where_actions_are():
         assert actions in ids, row
         named[cells[0].strip("`")] = ids
     assert set(named) == {"general", "one_to_one", "stand_up", "client_call", "interview", "project_review"}
-    assert named["general"] == ["summary", "actions", "key_points"]
+    # Each structure's ids are a promise of v5. interview's hold « It never judges a person »: an
+    # evaluation of a candidate is high-risk under the AI Act (Annex III, 4(a)), so a section that
+    # judges — strengths, concerns, a score — added to it breaks this test.
+    assert named == {
+        "general": ["summary", "actions", "key_points"],
+        "one_to_one": ["updates", "feedback", "actions"],
+        "stand_up": ["progress", "blockers", "actions"],
+        "client_call": ["needs", "questions", "next_steps"],
+        "interview": ["background", "answers", "questions", "next_steps"],
+        "project_review": ["status", "risks", "decisions", "actions"],
+    }
