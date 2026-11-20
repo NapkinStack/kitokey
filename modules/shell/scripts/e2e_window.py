@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import http.server
+import itertools
 import json
 import math
 import os
@@ -5355,8 +5356,10 @@ def axe_first_surfaces(now: dt.datetime) -> None:
     in French light and English dark, pass axe-core's WCAG 2.2 A and AA rules: no violation. What axe cannot
     judge is held by checks of its own."""
     print("CD. the list, a meeting's page, Settings and the bar: no violation of axe-core's WCAG 2.2 A and AA rules (D106)")
-    for language, short, theme in (("fr_FR.UTF-8", "fr", "light"), ("en_US.UTF-8", "en", "dark")):
-        meetings = WORK / f"axe-{short}"
+    # Each language in each theme: axe's colour rules follow the theme, the words and `lang` the language.
+    dark = "return matchMedia('(prefers-color-scheme: dark)').matches"
+    for (language, short), theme in itertools.product((("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")), ("light", "dark")):
+        meetings = WORK / f"axe-{short}-{theme}"
         meeting = meetings / "2026-10-18_12-00"
         session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
         (meeting / "transcript.jsonl").write_text(
@@ -5367,13 +5370,15 @@ def axe_first_surfaces(now: dt.datetime) -> None:
             "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
         for small in (False, True):
             window = Window(meetings, language, "reminder = false\n", small=small)
-            if theme == "dark":
-                window.env.update(GTK_THEME="Adwaita:dark")
+            # The system's look asked of GTK, as D98's checks ask it, light included: the run's desktop may show the other.
+            window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
             with window as browser:
+                themed = lambda b: b.execute_script(dark) == (theme == "dark")
                 if small:
                     shown = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
                     found = axe_violations(browser)
-                    check(f"{short}, {theme}: the bar, no violation of axe's WCAG 2.2 A and AA rules (D106)", shown and found == [], found)
+                    check(f"{short}, {theme}: the bar, no violation of axe's WCAG 2.2 A and AA rules (D106)",
+                          shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
                     continue
                 pages = (("the list", "#/", lambda b: b.find_element(By.ID, "list").is_displayed()),
                          ("a meeting's page", f"#/meeting/{meeting.name}", lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2")),
@@ -5383,7 +5388,8 @@ def axe_first_surfaces(now: dt.datetime) -> None:
                     shown = wait_for(browser, drawn, 10)
                     time.sleep(0.5)
                     found = axe_violations(browser)
-                    check(f"{short}, {theme}: {what}, no violation of axe's WCAG 2.2 A and AA rules (D106)", shown and found == [], found)
+                    check(f"{short}, {theme}: {what}, no violation of axe's WCAG 2.2 A and AA rules (D106)",
+                          shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
 
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
