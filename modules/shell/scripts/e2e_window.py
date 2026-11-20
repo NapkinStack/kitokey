@@ -5482,7 +5482,7 @@ KEY_TARGETS = (
 
 def keys_first_surfaces(now: dt.datetime) -> None:
     """CE. D106, criterion 2: what axe cannot judge, on the surfaces a buyer sees first — the list, a
-    meeting's page, Settings and the bar —, each language in each theme, the keyboard alone: each Tab
+    meeting's page (one it plays, and one it does not, each line then a stop of its own), Settings and the bar —, each language in each theme, the keyboard alone: each Tab
     stop shows its focus (WCAG 2.4.7); none is entirely hidden, by Tab or by Shift+Tab (2.4.11); every
     control is reached, a roving group by Tab to its one stop then an arrow to another — the transcript's
     lines, the meeting played (2.1.1); each target is 24 px or spaced (2.5.8): axe leaves its target-size
@@ -5513,6 +5513,12 @@ def keys_first_surfaces(now: dt.datetime) -> None:
         (meeting / "minutes.md").write_text(
             "---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
             "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+        # An older meeting whose sound this version does not play: each line and its pencil is a Tab stop,
+        # so Shift+Tab brings stops up to the window's top, where a header that stayed would cover them.
+        unplayed = meetings / "2026-10-18_10-00"
+        session(unplayed, now - dt.timedelta(hours=3), 60, {"local.wav": 1000})
+        shutil.copy(meeting / "transcript.jsonl", unplayed / "transcript.jsonl")
+        shutil.copy(meeting / "minutes.md", unplayed / "minutes.md")
         for small in (False, True):
             window = Window(meetings, language, "reminder = false\n", small=small)
             window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
@@ -5521,8 +5527,13 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                     surfaces = (("the bar", None, lambda b: b.find_element(By.ID, "small-record").is_displayed()),)
                 else:
                     browser.set_window_size(1100, 600)
+                    # That meeting's page drawn, its lines there: not the page before it, which has lines too.
+                    drawn_for = lambda name: lambda b: b.execute_script(
+                        "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
+                        " && p.querySelectorAll('.transcript .lines li').length > 0", name)
                     surfaces = (("the list", "#/", lambda b: b.find_element(By.ID, "list").is_displayed()),
-                                ("a meeting's page", f"#/meeting/{meeting.name}", lambda b: b.find_elements(By.CSS_SELECTOR, ".transcript .lines li")),
+                                ("a meeting's page", f"#/meeting/{meeting.name}", drawn_for(meeting.name)),
+                                ("a meeting's page not played", f"#/meeting/{unplayed.name}", drawn_for(unplayed.name)),
                                 ("Settings", "#/settings", lambda b: b.find_element(By.ID, "reminder").is_displayed()))
                 for what, address, drawn in surfaces:
                     if address:
