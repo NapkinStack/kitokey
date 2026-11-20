@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import os
-import platform
 import statistics
 import subprocess
 import sys
@@ -82,11 +81,13 @@ def hour(meeting: Path) -> int:
 
 def machine() -> dict[str, str]:
     """What the numbers were measured on."""
+    # The CPU and the kernel read from /proc and uname, not Python's `platform`, whose name is a module's
+    # here: the boundary check reads `import platform` as one (nstack 0.33.0).
     cpu = next((line.split(":", 1)[1].strip() for line in Path("/proc/cpuinfo").read_text().splitlines()
-                if line.startswith("model name")), platform.processor())
+                if line.startswith("model name")), "unknown")
     memory = next(line.split()[1] for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemTotal:"))
     webkit = subprocess.run(["rpm", "-q", "--qf", "%{VERSION}", "webkit2gtk4.1"], capture_output=True, text=True).stdout.strip()
-    return {"cpu": cpu, "cores": str(os.cpu_count()), "memory_kib": memory, "kernel": platform.release(), "webkitgtk": webkit or "unknown"}
+    return {"cpu": cpu, "cores": str(os.cpu_count()), "memory_kib": memory, "kernel": os.uname().release, "webkitgtk": webkit or "unknown"}
 
 
 # The page's first contentful paint, as an epoch in ms; none, null.
