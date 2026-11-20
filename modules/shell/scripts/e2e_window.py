@@ -7734,9 +7734,15 @@ def actions_rows(now: dt.datetime) -> None:
         titles = browser.execute_script("return [...document.querySelectorAll('#meeting .minutes .body h2')].map(h => h.textContent)")
         check("minutes in a structure: each section titled as the page names its id (D111)",
               titles == ["État", "Risques", "Décisions", "Actions"], titles)
-        got = wait_for(browser, lambda b: b.execute_script(rows), 5)
+        # The section the table stands in — the last title before it —, then its rows: what the check reads.
+        placed = ("const t = document.querySelector('#meeting .minutes .body table.actions'); if (!t) return null;"
+                  " const h = [...document.querySelectorAll('#meeting .minutes .body h2')]"
+                  ".filter(h => h.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING);"
+                  " return h.length ? h[h.length - 1].textContent : 'before every title'")
+        wait_for(browser, lambda b: b.execute_script(placed), 5)
+        got = [browser.execute_script(placed), browser.execute_script(rows)]
         check("minutes in a structure: the rows are the actions' section, found by its id, never the second section by place (D111)",
-              got == [[["who", "Inès"], ["what", "Relancer le fournisseur"], ["when", "vendredi"]]], got)
+              got == ["Actions", [[["who", "Inès"], ["what", "Relancer le fournisseur"], ["when", "vendredi"]]]], got)
 
 
 def meeting_told_once(now: dt.datetime) -> None:
