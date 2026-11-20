@@ -352,7 +352,7 @@ pub struct Menu {
     /// Placeholders: none.
     pub open: &'static str,
     /// What the tray's icon says of itself while a recording runs.
-    /// Shows: the Kitokey icon's menu, as a menu entry. When: a recording runs: the icon's tooltip.
+    /// Shows: the Kitokey icon, as its tooltip. When: a recording runs, or is told to stop.
     /// At most: about 40 characters. Placeholders: none.
     pub recording: &'static str,
     /// Makes the transcript of the last recording, again when it failed.
