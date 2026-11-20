@@ -600,16 +600,24 @@ fn minutes_before_v5_have_their_actions_in_their_second_section() {
 
 #[test]
 fn a_section_whose_id_the_page_does_not_name_keeps_the_models_title() {
-    let text = v5_example().replace(r#""id": "decisions""#, r#""id": "later_kind""#);
+    // A model's title unlike any of the page's names, so that kept and renamed differ (ines, #1043).
+    let text = v5_example()
+        .replace(r#""id": "decisions""#, r#""id": "later_kind""#)
+        .replace("## Décisions", "## Ce qui a été tranché");
     let Read::Present(minutes) = read_v5(&text) else {
         panic!("not read")
     };
     assert!(
-        minutes.body.contains("<h2>Décisions</h2>"),
-        "the model's own « Décisions », kept: {}",
+        minutes.body.contains("<h2>Ce qui a été tranché</h2>"),
+        "the model's own title, kept: {}",
         minutes.body
     );
-    assert!(minutes.body.contains("<h2>État</h2>"));
+    assert!(!minutes.body.contains("<h2>Décisions</h2>"), "{}", minutes.body);
+    assert!(
+        minutes.body.contains("<h2>État</h2>") && minutes.body.contains("<h2>Actions</h2>"),
+        "{}",
+        minutes.body
+    );
 }
 
 #[test]
