@@ -247,8 +247,9 @@ When you cannot create an App for this repository's owner, `--mine` makes it on 
 asks the owner to approve its installation. What the App gets — set by the command, and read
 by no check afterwards:
 
-- [ ] Permissions: Contents, Pull requests and Issues read and write; Actions and Checks
-      read; Workflows write only when agents maintain CI (`--workflows`); never Administration
+- [ ] Permissions: Contents, Pull requests and Issues read and write; Commit statuses write,
+      for the attested record's status; Actions and Checks read; Workflows write only when
+      agents maintain CI (`--workflows`); never Administration
 - [ ] No webhook; private, unless `--mine`
 - [ ] Its private key stored outside any repository; in CI, the CI's secrets
 - [ ] The agent's session reaches no human credential: `nstack agent run` keeps them out of its
@@ -263,16 +264,24 @@ setting or to rewrite a ruleset:
 nstack settings
 ```
 
-Or have it make them, in one gesture of yours, under a token of yours that you revoke afterwards — a
-fine-grained token limited to the repository, Administration: write and Issues: write. Never
-your agent's: a credential that administers a repository can always give itself the right to
-push, so this gesture stays a person's — it refuses a GitHub App's token, and CI. Run it in
-your own terminal, never through your agent's session, and keep the token out of your
-history:
+Or have it make them, in one gesture of yours, under your own credential. Never your agent's: a
+credential that administers a repository can always give itself the right to push, so this
+gesture stays a person's — it refuses a GitHub App's token, an agent's session and CI, shows
+the plan and the account it would act as, and makes nothing until you confirm at the keyboard.
+Run it in your own terminal. The credential, in this order:
+
+- **a token in `GH_TOKEN`**, when one is set — portable, no `gh` needed: fine-grained, limited to
+  the repository, Administration: write and Issues: write, valid one day. Without a credential,
+  the command prints GitHub's form for it, filled in; you pick the repository there.
+- **otherwise your `gh` login**, as `gh` itself would use it — its token, scope `repo`, is
+  enough. With two accounts logged in, `gh` uses the active one: `gh auth switch` first, and
+  check the account the plan names.
 
 ```bash
-read -rs GH_TOKEN && export GH_TOKEN   # paste the token: it is neither shown nor kept
-nstack settings --apply                # each change printed, then nstack doctor reads the result
+nstack settings --apply                # your gh login: the plan, your yes, each change, then nstack doctor
+
+read -rs GH_TOKEN && export GH_TOKEN   # or a token: paste it, neither shown nor kept
+nstack settings --apply
 unset GH_TOKEN                         # then revoke the token at the forge
 ```
 
@@ -298,6 +307,8 @@ token, limited to the repository, with the **Administration: read** permission �
 no required check shows — and, on a private repository, **Contents: read**, to read GitHub's own
 validation of the code owners file: an owner GitHub does not know, such as an organisation named
 alone, leaves the paths it names with no owner. Without a token, the GitHub part stays "not verified", never compliant.
+It never reads your `gh` login by itself; to have it read with that login, for one run:
+`GH_TOKEN=$(gh auth token) nstack doctor`.
 
 ---
 
@@ -331,10 +342,12 @@ nstack fitness       # manifests + boundaries + skills + plan + hygiene — befo
 nstack discover <idea-file>   # starts a discovery, for your agent
 nstack plan          # what needs a person first; then the discovery, the charter and the cycles (docs/project/), the decisions due at a closure, the project across its cycles, who holds what
 nstack claim D<n> --session <s> --person @<you>   # takes a deliverable before its first change; nstack unclaim gives it back
+                                                  # --take-over: a stale hold, or your own from another session
 nstack deliver D<n> --held '#<pr>' --session <s>   # records a merged deliverable delivered; --write-states at the closure
-nstack agent add <name> · nstack agent run <name> -- <command>   # an agent's own App and clone; add is a person's
+nstack agent add <name> [--clone <dir>] · nstack agent run <name> -- <command>   # an agent's own App and clone; add is a person's
+nstack agent status  # who this agent is — its App, repository, clone, gh and hooks; for a person, this project's agents
 nstack board [--dry-run]   # the cycles shown on GitHub as milestones and issues — CI runs it on every merge; --dry-run previews a proposed cycle
-nstack skills        # generates the Claude Code skills from the playbooks
+nstack skills        # generates the agents' skills from the playbooks
 nstack doctor        # the workstation and the forge's settings, read-only
 nstack settings      # the calls that would bring the forge's settings to the checklist; --apply: yours makes them
 nstack new-module <name> <owner> <criticality> [--user-facing]   # --user-facing: a user sees it, which decides a test sheet
@@ -345,14 +358,19 @@ nstack bootstrap [module]   # commands.bootstrap, when declared
 nstack run <module>     # local start, when commands.run is declared
 nstack e2e [module]     # end-to-end scenarios, when commands.e2e is declared — one run at a time on a machine, unless sealed
 nstack clean [module]   # removes a module's build outputs, when commands.clean is declared
+nstack release [module]   # a module's artefacts into dist/<module>, when commands.release is declared
 nstack pr-check --body-file <file> [--labels a,b]   # test sheet and cycle, as CI reads them from the pull request
                                                     # with a token and one open pull request at the head, its own labels are read
 nstack attest --body-file <file> [--labels a,b]     # the CI's checks run here, recorded on the commit; labels as pr-check takes them
                                                     # module checks kept while what they read is unchanged, 7 days at most (--again runs them)
 nstack attest --void <commit> --reason "<why>"     # a record known unsound: never kept from again, the head attested again
+                                                    # --accept-identity: a first record under an identity the history does not show yet
+nstack pr-scope --base <base>   # one pull request = one module, within the review budget, as CI reads it
+nstack landed [--span <before>..<after>]   # what reached this branch outside a pull request, recorded
 nstack modules --changed-since <base>   # the modules with a file changed, as CI lists them
 nstack modules --changed-since <base> --with-contract-sides   # ... and both sides of a changed contract
 nstack compat [module] --base <base>    # a contract version consumed or stable: the merged proof
+nstack update [--ref <tag>]   # brings the project to another version of NapkinStack; --forge moves it to another forge
 # check, test and run of a module: the `commands` section of its MANIFEST.yaml
 ```
 
@@ -361,13 +379,16 @@ someone move between modules without relearning anything (`.nstack/handbook/09-p
 
 ---
 
-## Claude Code skills
+## Agent skills
 
 The playbooks are exposed as skills, so that loading them on demand becomes the runtime's
-job rather than a kernel instruction.
+job rather than a kernel instruction. One `SKILL.md` per playbook, in the open Agent Skills
+format, written where each tool looks: `.claude/skills/` for Claude Code, `.agents/skills/` for
+Codex and the other tools that read that layout. A tool that reads both may list a skill twice:
+the same bytes, so either one loads the same playbook.
 
 ```bash
-nstack skills           # generates .claude/skills/ from .nstack/playbooks/
+nstack skills           # generates .claude/skills/ and .agents/skills/ from .nstack/playbooks/
 nstack skills --check   # checks they are in sync (runs in CI)
 ```
 

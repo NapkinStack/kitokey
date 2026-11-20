@@ -16,7 +16,7 @@ on:
 
 permissions:
   contents: read        # the head, and the attested record in the remote's notes (A1, A2)
-  pull-requests: read   # whose hand is on the pull request: a person named verifier (T2); each approval's commit (R1)
+  pull-requests: read   # whose hand is on the pull request: a person named verifier (T2); approvals (R1, R2)
 
 # Each event's run reads the description and the head as they were at that event: a later event
 # of the same pull request cancels the earlier run, so the verdict shown is the last one's.

@@ -206,7 +206,7 @@ and leaves a counted trace.
 
 **Two things are read before any rule fires, and neither is declared by whoever is judged.**
 The project's *stage* — unframed until its charter is accepted, framed after — decides
-whether the three rules that bound work inside a cycle apply at all
+whether the rules that bound work inside a cycle — K1 to K3 and K5 — apply at all
 (`.nstack/handbook/project.md`). The module's *criticality* decides which checks a change pays
 for, in either stage. One never stands in for the other.
 
@@ -312,7 +312,8 @@ by a commit with no change of its own — tracked or not. The record says which 
 (`kept_from`), with that run's evidence; what the tree's ignored files, the environment or the tools
 outside it hold is not compared: `nstack attest --again` runs them. They are also kept
 across commits — a merge of the default branch that touched nothing they read: their modules,
-those they consume from, `contracts/`, `platform/` and the files outside the modules — while the
+those they consume from or assemble, `contracts/`, `platform/` and the files outside the modules but the
+project's records (`docs/project/`, `docs/adr/`, `docs/pdr/`) — while the
 digest of what they read is unchanged, for 7 days and 20 default-branch commits at most. A record
 known to be unsound — two runs that shared what a run must not share, a tool found lying — is
 voided: `nstack attest --void <commit> --reason "<why>"` adds a line naming who, why and every
@@ -444,6 +445,14 @@ The forge does the sorting, path by path:
   the fixes and approves, or, still disagreeing, hands the change to a human. A second pass
   raises nothing new but what the fixes broke.
 
+**Copilot's code review is not that agent.** GitHub lets its approval count toward the required
+ones — generally available since 2026-10-28, off by default: *Settings › Copilot › Code review*,
+*Allow Copilot approvals to count toward merge requirements*, which an organization may also
+enforce for every repository. It runs no test sheet and names no session, so leave that toggle
+off, and ask the organization's owner where it is enforced; where an approval of it is the only
+one, `pr-check` says so (R2). Copilot is named in no code owners file, so on every path the file
+names a code owner still approves — GitHub's documentation says nothing otherwise.
+
 **Where the forge cannot guard** — a private repository on a plan that enforces no ruleset —
 neither answer is enforced: the code owners file only asks for reviews, and `doctor` says
 *unguarded*. Who approves is then the team's rule, kept by the people, as every rule there is.
@@ -455,12 +464,13 @@ reported in practice; a project's first cross-approved pull request is its own p
 
 ### The approval is one gesture, not three
 
-Approving and merging are two different acts, and only the first needs a human. With
+Approving and merging are two different acts, and only the first is a judgement. With
 **auto-merge** allowed on the repository, the author arms it on the pull request when opening
 it (`gh pr merge <number> --auto --squash`), and the pull request merges itself the moment it
 is approved and its required checks go green: nobody waits on the reviewer to come back and
 press a button, and no agent is told to merge on their behalf. The barrier is untouched — the approval is still
-required, still human, still dismissed when new commits are pushed.
+required, still a human's or, under `approval: agent`, another agent's (above), still dismissed
+when new commits are pushed, a merge of the default branch included (`05-workflow.md`).
 
 What it removes is the round trip: **the approval message that carries no judgement at
 all**, and exists only to tell an agent that a merge could now happen.
