@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+serde_json = "1.0.154"
 # The one connection of the module, to the address the person set up: rustls, no proxy, no redirect.
 ureq = "3"
 # The address read as a browser reads it: IDNA to punycode, an IPv4 written in hex or decimal.
@@ -12,3 +13,7 @@ url = "2"
 
 [dev-dependencies]
 tempfile = "3"
+
+[[bin]]
+name = "kitokey-send"
+path = "src/main.rs"
