@@ -35,7 +35,11 @@ module:
   #   removal_date: YYYY-MM-DD
 
 # Contracts PROVIDED by this module. `path` holds its document (B7).
-provides: []
+provides:
+  - contract: exporting
+    version: v1
+    path: contracts/exporting/v1
+    stability: experimental
 #  - contract: export-api
 #    version: v1
 #    path: contracts/export-api/v1

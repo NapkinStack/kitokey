@@ -12,6 +12,7 @@ import contextlib
 import datetime as dt
 import hashlib
 import http.server
+import itertools
 import json
 import math
 import os
@@ -796,6 +797,33 @@ def parts_contrast(got: dict | None) -> list[tuple[str, float, float]]:
     return [(part["state"], round(min((contrast(c, got["behind"]) for c in part["colours"]), default=0.0), 2), part["opacity"])
             for part in got["parts"]]
 
+
+# axe-core, vendored for the e2e alone (D106; its README beside it), checked by its SHA-256 before it is
+# injected into the page under test: never one that differs.
+AXE = Path(__file__).resolve().parent / "vendor" / "axe-core-4.14.0" / "axe.min.js"
+AXE_SHA256 = "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878"
+# WCAG 2.2's A and AA rules as axe tags them; its best practices are no failure here.
+AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
+
+
+def axe_violations(browser) -> list:
+    """The page as it is now, by axe-core's WCAG 2.2 A and AA rules: each violation as its rule, its impact,
+    how many nodes, and the first three of them."""
+    source = AXE.read_bytes()
+    if hashlib.sha256(source).hexdigest() != AXE_SHA256:
+        raise RuntimeError(f"{AXE} is not the axe-core pinned by its SHA-256 (D106)")
+    if not browser.execute_script("return typeof axe !== 'undefined'"):
+        browser.execute_script(source.decode())
+    said = lambda kind: (f"r.{kind}.map((v) => [v.id, v.impact, v.nodes.length,"
+                         " v.nodes.slice(0, 3).map((n) => n.target.join(' '))])")
+    result = browser.execute_script(
+        "return axe.run(document, {runOnly: {type: 'tag', values: arguments[0]}, resultTypes: ['violations', 'incomplete']})"
+        f".then((r) => ({{passes: r.passes.length, violations: {said('violations')}, incomplete: {said('incomplete')}}}))",
+        AXE_TAGS)
+    # What axe judged, and what it left to a person (« incomplete »: a contrast over an image or a
+    # gradient, say): a clean page with nothing judged would pass for nothing.
+    print(f"    axe: {result['passes']} rule(s) passed; left to a person: {result['incomplete']}")
+    return result["violations"] if result["passes"] else [("axe judged no rule", None, 0, [])]
 
 # The sidebar's primary actions shown, by their ids: one at a time (D69).
 PRIMARIES = "return [...document.querySelectorAll('#sidebar .primary')].filter(b => b.offsetParent).map(b => b.id)"
@@ -3853,12 +3881,22 @@ def minutes_copied(now: dt.datetime) -> None:
         "---\ncontract: minutes/v1\nmade: 2026-10-28T10:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
         "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
     (broken / "minutes.md").write_text("pas un compte rendu\n")
+    # Two lines, two speakers: the page's own words for each, a voice told in the second (D109).
+    (written / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n'
+        '{"type":"segment","speaker":"others","track":"remote","voice":"2","start":75.0,"end":77.0,"text":"Le devis part vendredi."}\n'
+        '{"type":"complete","duration":77.0}\n')
     expected = ("## Points saillants\n\nLe budget est validé.\n\n## Actions\n\n- Envoyer le devis — Inès — vendredi\n\n"
                 "## Points clés\n\n- Rien\n")
-    # The clipboard stood in: what the page writes is kept on the page, never the user's own clipboard.
+    # The clipboard stood in: what the page writes is kept on the page, never the user's own clipboard —
+    # each item by its types and their text (D109: rich text and Markdown together).
     stand_in = ("window.__copied = []; const refuse = arguments[0];"
-                "Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: (text) =>"
-                " refuse ? Promise.reject(new Error('refused')) : (window.__copied.push(text), Promise.resolve())}})")
+                "Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {"
+                " writeText: (text) => refuse ? Promise.reject(new Error('refused')) : (window.__copied.push({'text/plain': text}), Promise.resolve()),"
+                " write: async (items) => { if (refuse) throw new Error('refused');"
+                "  for (const item of items) window.__copied.push(Object.fromEntries(await Promise.all("
+                "   item.types.map(async (type) => [type, await (await item.getType(type)).text()])))); }}})")
     status = "return document.getElementById('minutes-copied')?.textContent ?? null"
     with Window(meetings, "fr_FR.UTF-8", "reminder = false\n") as browser:
         browser.execute_script(f"location.hash = '#/meeting/{written.name}'")
@@ -3873,7 +3911,13 @@ def minutes_copied(now: dt.datetime) -> None:
         said = wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
         copied = browser.execute_script("return window.__copied")
         check("clicked: their Markdown copied, without the front matter, titled as the page names them; « Copié » said in place",
-              said and copied == [expected] and browser.find_element(By.ID, "minutes-copied").get_attribute("role") == "status", copied)
+              said and len(copied) == 1 and copied[0].get("text/plain") == expected
+              and browser.find_element(By.ID, "minutes-copied").get_attribute("role") == "status", copied)
+        # With it, the same as rich text, its headings and lists kept where it is pasted (D109).
+        html = copied[0].get("text/html", "") if len(copied) == 1 else ""
+        check("clicked: the same as rich text in one copy, its three headings and its list item, no front matter (D109)",
+              html.count("<h2") == 3 and "<li>Envoyer le devis — Inès — vendredi</li>" in html and "Points saillants" in html and "contract:" not in html,
+              sorted(copied[0]) if len(copied) == 1 else copied)
         gone = wait_for(browser, lambda b: b.execute_script(status) == "", 4)
         check("« Copié » said for a moment", gone, browser.execute_script(status))
         browser.execute_script(stand_in, True)
@@ -3881,6 +3925,32 @@ def minutes_copied(now: dt.datetime) -> None:
         refused = wait_for(browser, lambda b: b.execute_script(status) == "Impossible de copier le compte rendu.", 3)
         check("the clipboard refused: one sentence says so, the minutes as they were",
               refused and browser.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2"), browser.execute_script(status))
+        # The transcript copied too, each line with when and who said it, as the page names them (D109).
+        browser.execute_script(stand_in, False)
+        press(browser, "copy-transcript")
+        told = wait_for(browser, lambda b: b.execute_script("return document.getElementById('transcript-copied')?.textContent") == "Copié", 3)
+        lines = browser.execute_script("return window.__copied")
+        check("« Copier la transcription »: each line with its time and who said it, as the page names them; « Copié » said in place (D109)",
+              told and lines == [{"text/plain": "[00:00] Vous\u00a0: Bonjour.\n[01:15] Les autres · voix 2\u00a0: Le devis part vendredi.\n"}], lines)
+        browser.execute_script(stand_in, True)
+        press(browser, "copy-transcript")
+        said_back = "return document.getElementById('transcript-copied')?.textContent"
+        refused = wait_for(browser, lambda b: b.execute_script(said_back) == "Impossible de copier la transcription.", 3)
+        check("the clipboard refused the transcript: one sentence says so (D109)", refused, browser.execute_script(said_back))
+        # The real clipboard, the run's own private session's (WAYLAND_DISPLAY, never the user's): what a
+        # paste elsewhere reads, its two types (D109, the harness proved to read them).
+        browser.execute_script("delete navigator.clipboard")
+        press(browser, "copy-minutes")
+        wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
+        # Each read as bytes, said in UTF-8 as an application asks for it: GTK offers the text in UTF-8 under
+        # `text/plain;charset=utf-8`, and under the bare `text/plain` in its legacy Latin-1 (s109ok).
+        pasted = lambda *how: subprocess.run(["wl-paste", "--no-newline", *how], capture_output=True, timeout=5)
+        said = lambda run: run.stdout.decode("utf-8", errors="replace")
+        types = said(pasted("--list-types")).split()
+        rich, plain = said(pasted("--type", "text/html")), said(pasted("--type", "text/plain;charset=utf-8"))
+        check("the session's clipboard, read as a paste reads it: text/html with its headings, text/plain its Markdown (D109)",
+              "text/html" in types and "text/plain;charset=utf-8" in types and rich.count("<h2") == 3 and plain.strip() == expected.strip(),
+              [types, rich[:80], plain[:80]])
         for folder, why in ((none_, "without minutes"), (broken, "with minutes that do not read")):
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').dataset.name") == folder.name
@@ -5394,6 +5464,46 @@ def bar_after_stop(now: dt.datetime) -> None:
                     gate.unlink(missing_ok=True)
                 (WORK / "fail-minutes").unlink(missing_ok=True)
 
+
+def axe_first_surfaces(now: dt.datetime) -> None:
+    """CD. D106, criterion 1: the surfaces a buyer sees first — the list, a meeting's page, Settings and the bar —
+    in French light and English dark, pass axe-core's WCAG 2.2 A and AA rules: no violation. What axe cannot
+    judge is held by checks of its own."""
+    print("CD. the list, a meeting's page, Settings and the bar: no violation of axe-core's WCAG 2.2 A and AA rules (D106)")
+    # Each language in each theme: axe's colour rules follow the theme, the words and `lang` the language.
+    dark = "return matchMedia('(prefers-color-scheme: dark)').matches"
+    for (language, short), theme in itertools.product((("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")), ("light", "dark")):
+        meetings = WORK / f"axe-{short}-{theme}"
+        meeting = meetings / "2026-10-18_12-00"
+        session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+        (meeting / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+        (meeting / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+        for small in (False, True):
+            window = Window(meetings, language, "reminder = false\n", small=small)
+            # The system's look asked of GTK, as D98's checks ask it, light included: the run's desktop may show the other.
+            window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+            with window as browser:
+                themed = lambda b: b.execute_script(dark) == (theme == "dark")
+                if small:
+                    shown = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+                    found = axe_violations(browser)
+                    check(f"{short}, {theme}: the bar, no violation of axe's WCAG 2.2 A and AA rules (D106)",
+                          shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
+                    continue
+                pages = (("the list", "#/", lambda b: b.find_element(By.ID, "list").is_displayed()),
+                         ("a meeting's page", f"#/meeting/{meeting.name}", lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2")),
+                         ("Settings", "#/settings", lambda b: b.find_element(By.ID, "reminder").is_displayed()))
+                for what, address, drawn in pages:
+                    browser.execute_script("location.hash = arguments[0]", address)
+                    shown = wait_for(browser, drawn, 10)
+                    time.sleep(0.5)
+                    found = axe_violations(browser)
+                    check(f"{short}, {theme}: {what}, no violation of axe's WCAG 2.2 A and AA rules (D106)",
+                          shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
 
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
@@ -13051,6 +13161,7 @@ def main() -> int:
     bar_opened(now)
     bar_language(now)
     bar_after_stop(now)
+    axe_first_surfaces(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)
