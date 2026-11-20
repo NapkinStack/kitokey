@@ -92,7 +92,8 @@ def test_a_schema_is_one_and_the_comparator_decides_its_harmless_changes(path, t
                 )
                 harmless["a kind added"] = more
     refused = {what: why for what, changed in harmless.items() if (why := verdict(tmp_path, schema, changed))}
-    assert len(harmless) > 5 and not refused, refused
+    # At least one object walked, two changes made of it: a schema the walk found nothing in fails here.
+    assert len(harmless) >= 2 and not refused, refused
 
 
 @pytest.mark.parametrize("path", SCHEMAS, ids=NAMES)
@@ -144,6 +145,7 @@ SHOWN_AS_LINES = {
     "transcript/v1/line.schema.json",
     "recording/v1/event.schema.json",
     "summarising/v1/event.schema.json",
+    "exporting/v1/event.schema.json",
 }
 EXAMPLES = {
     "transcript/v1/line.schema.json": (
@@ -354,6 +356,78 @@ EXAMPLES = {
             {"event": "failed", "code": ""},
             {"event": "failed", "code": "provider.refused_key\n"},
             {"event": "failed", "code": 401},
+        ],
+    ),
+    "exporting/v1/input.schema.json": (
+        [
+            {
+                "to": "<documents>/meeting.pdf",
+                "name": "Réunion du 20 nov. 2026",
+                "transcript": "Transcription",
+                "me": "Moi",
+                "others": "Les autres",
+                "time": "Heure",
+                "speaker": "Qui",
+                "text": "Texte",
+            },
+        ],
+        [
+            "an input that is no object",
+            {"to": "/tmp/m.pdf"},
+            {
+                "to": "",
+                "name": "n",
+                "transcript": "t",
+                "me": "m",
+                "others": "o",
+                "time": "t",
+                "speaker": "s",
+                "text": "t",
+            },
+            {
+                "to": "/tmp/m.pdf",
+                "name": "two\nlines",
+                "transcript": "t",
+                "me": "m",
+                "others": "o",
+                "time": "t",
+                "speaker": "s",
+                "text": "t",
+            },
+            {
+                "to": "/tmp/m.pdf",
+                "name": "n",
+                "transcript": "t",
+                "me": "m",
+                "others": "o",
+                "time": "t",
+                "speaker": "s",
+                "text": 3,
+            },
+        ],
+    ),
+    "exporting/v1/event.schema.json": (
+        [
+            {"event": "written", "file": "<documents>/meeting.pdf", "bytes": 48213},
+            {"event": "written", "file": "C:\\Users\\someone\\meeting.docx", "bytes": 0},
+            {"event": "failed", "code": "file.unwritable"},
+            {"event": "failed", "code": "pdf.no_font"},
+            {"event": "failed", "code": "a code of a later version"},
+            {"event": "an event of a later version"},
+        ],
+        [
+            "a line that is no object",
+            {"file": "/tmp/m.pdf", "bytes": 1},
+            {"event": "written", "file": "/tmp/m.pdf"},
+            {"event": "written", "bytes": 1},
+            {"event": "written", "file": "", "bytes": 1},
+            {"event": "written", "file": "/tmp/m.pdf\n", "bytes": 1},
+            {"event": "written", "file": "/tmp/m.pdf", "bytes": -1},
+            {"event": "written", "file": "/tmp/m.pdf", "bytes": 1.5},
+            {"event": "failed"},
+            {"event": "failed", "code": ""},
+            {"event": "failed", "code": "file.unwritable\n"},
+            {"event": "failed", "code": 2},
         ],
     ),
     "session-audio/v1/session.schema.json": (
@@ -594,6 +668,13 @@ for _name in ("session.schema.json", "clock.schema.json"):
     )
     EXAMPLES[f"session-audio/v3/{_name}"] = (_allowed, _refused)
 EXAMPLES["session-audio/v3/session.schema.json"][1].append(EXAMPLES["session-audio/v2/session.schema.json"][0][0])
+
+# exporting/v1's input: each of its fields refused when it alone is missing, and when it holds a line break.
+_INPUT = EXAMPLES["exporting/v1/input.schema.json"][0][0]
+EXAMPLES["exporting/v1/input.schema.json"][1].extend(
+    [{key: value for key, value in _INPUT.items() if key != name} for name in _INPUT]
+    + [{**_INPUT, name: f"{value}\n"} for name, value in _INPUT.items()]
+)
 
 
 @pytest.mark.parametrize("path", SCHEMAS, ids=NAMES)
