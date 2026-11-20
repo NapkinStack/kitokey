@@ -725,6 +725,27 @@ def parts_contrast(got: dict | None) -> list[tuple[str, float, float]]:
             for part in got["parts"]]
 
 
+# axe-core, vendored for the e2e alone (D106; its README beside it), checked by its SHA-256 before it is
+# injected into the page under test: never one that differs.
+AXE = Path(__file__).resolve().parent / "vendor" / "axe-core-4.14.0" / "axe.min.js"
+AXE_SHA256 = "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878"
+# WCAG 2.2's A and AA rules as axe tags them; its best practices are no failure here.
+AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
+
+
+def axe_violations(browser) -> list:
+    """The page as it is now, by axe-core's WCAG 2.2 A and AA rules: each violation as its rule, its impact,
+    how many nodes, and the first three of them."""
+    source = AXE.read_bytes()
+    if hashlib.sha256(source).hexdigest() != AXE_SHA256:
+        raise RuntimeError(f"{AXE} is not the axe-core pinned by its SHA-256 (D106)")
+    if not browser.execute_script("return typeof axe !== 'undefined'"):
+        browser.execute_script(source.decode())
+    return browser.execute_script(
+        "return axe.run(document, {runOnly: {type: 'tag', values: arguments[0]}, resultTypes: ['violations']})"
+        ".then((r) => r.violations.map((v) => [v.id, v.impact, v.nodes.length, v.nodes.slice(0, 3).map((n) => n.target.join(' '))]))",
+        AXE_TAGS)
+
 # The sidebar's primary actions shown, by their ids: one at a time (D69).
 PRIMARIES = "return [...document.querySelectorAll('#sidebar .primary')].filter(b => b.offsetParent).map(b => b.id)"
 LESS_MOTION = "return matchMedia('(prefers-reduced-motion: reduce)').matches"
@@ -5322,6 +5343,41 @@ def bar_after_stop(now: dt.datetime) -> None:
                     gate.unlink(missing_ok=True)
                 (WORK / "fail-minutes").unlink(missing_ok=True)
 
+
+def axe_first_surfaces(now: dt.datetime) -> None:
+    """CD. D106, criterion 1: the surfaces a buyer sees first — the list, a meeting's page, Settings and the bar —
+    in French light and English dark, pass axe-core's WCAG 2.2 A and AA rules: no violation. What axe cannot
+    judge is held by checks of its own."""
+    print("CD. the list, a meeting's page, Settings and the bar: no violation of axe-core's WCAG 2.2 A and AA rules (D106)")
+    for language, short, theme in (("fr_FR.UTF-8", "fr", "light"), ("en_US.UTF-8", "en", "dark")):
+        meetings = WORK / f"axe-{short}"
+        meeting = meetings / "2026-10-18_12-00"
+        session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+        (meeting / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+        (meeting / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+        for small in (False, True):
+            window = Window(meetings, language, "reminder = false\n", small=small)
+            if theme == "dark":
+                window.env.update(GTK_THEME="Adwaita:dark")
+            with window as browser:
+                if small:
+                    shown = wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+                    found = axe_violations(browser)
+                    check(f"{short}, {theme}: the bar, no violation of axe's WCAG 2.2 A and AA rules (D106)", shown and found == [], found)
+                    continue
+                pages = (("the list", "#/", lambda b: b.find_element(By.ID, "list").is_displayed()),
+                         ("a meeting's page", f"#/meeting/{meeting.name}", lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2")),
+                         ("Settings", "#/settings", lambda b: b.find_element(By.ID, "reminder").is_displayed()))
+                for what, address, drawn in pages:
+                    browser.execute_script("location.hash = arguments[0]", address)
+                    shown = wait_for(browser, drawn, 10)
+                    time.sleep(0.5)
+                    found = axe_violations(browser)
+                    check(f"{short}, {theme}: {what}, no violation of axe's WCAG 2.2 A and AA rules (D106)", shown and found == [], found)
 
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
@@ -12961,6 +13017,7 @@ def main() -> int:
     bar_opened(now)
     bar_language(now)
     bar_after_stop(now)
+    axe_first_surfaces(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)
