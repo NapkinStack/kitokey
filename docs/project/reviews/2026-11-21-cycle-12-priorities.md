@@ -20,7 +20,9 @@ round: 1
 ## The ranking, first
 
 *Revised after the challenge (§5), 2026-11-21: the framer's answer is §6a. The first proposal put the live
-recording page first and called sharing weak; both readings changed.*
+recording page first and called sharing weak; both readings changed. Revised again on the decider's answers
+of 2026-11-21 ~06h (§6c): import and voices are one axis, « a long file in, a pertinent summary and a
+transcript with speakers out ».*
 
 ```mermaid
 quadrantChart
@@ -31,13 +33,12 @@ quadrantChart
     quadrant-2 "Do first"
     quadrant-3 "Cheap, little pull"
     quadrant-4 "Defer"
-    "1 Import a recording": [0.55, 0.88]
-    "2 Voices, after import": [0.9, 0.85]
-    "3 Structures, the user's own": [0.42, 0.68]
-    "4 Live recording page": [0.12, 0.38]
-    "5 macOS paid path": [0.88, 0.58]
-    "6 Hand-off, beyond D109-D110": [0.62, 0.55]
-    "7 Store trailer": [0.45, 0.15]
+    "1 Long file in, summary and speakers out": [0.85, 0.95]
+    "2 Structures, the user's own": [0.42, 0.68]
+    "3 Live recording page": [0.12, 0.38]
+    "4 macOS paid path": [0.88, 0.58]
+    "5 Hand-off, beyond D109-D110": [0.62, 0.55]
+    "6 Store trailer": [0.45, 0.15]
 ```
 
 **Legend** — x: the framer's cost estimate, read from the repository (S under two days, M one deliverable,
@@ -47,16 +48,15 @@ data showing no lift. Quadrants are the framer's reading, not a measure.
 
 | # | Candidate | Buyer signal (§2, §5) | Cost | Recommendation for cycle 12 |
 |---|---|---|---|---|
-| 1 | **Import a recording** (spike S2) | **Strong**, from cloud and local users alike: Meetily's « most requested feature on GitHub and Discord »; Fathom's users ask and it is « on our product roadmap »; Otter caps it, a paid gate; Granola « no plans » | **M–L** — spike S2 (symphonia) with five real files first (§5b), an expand of the session-audio contract, the shell's gesture | **First**: what cycle 12 is built around |
-| 2 | **Tell voices apart**, opt-in (spike S1) | **Strong**: the top request at Meetily and Granola (vendors' words), Notion's first complaint, Otter's and Fireflies' too; paid at Meetily, Superwhisper, Anarlog | **L, plus import** — spike S1 opens on the models' licences and downloads (§5b) | **Second, after import**: Kitokey already splits Me / Others by track; voices pay on one track of many voices — an import, a room |
-| 3 | **Structures**: the user's own, beyond D111's six, and the summary's language | Moderate–strong: Meetily #243 (11 👍), four vendors charge for custom templates | **M** — once D111 (#1041–#1043) is merged | **Third**: finish D111 in cycle 11; cycle 12 adds a structure the user writes |
-| 4 | **Live time and levels on a meeting's page while it records** (#1076, #780) | Moderate, indirect — and mostly shipped: capture's silence notice after 10 s and the bar's meters, clock and silent status already exist (§5c) | **S** | **The cycle's small item**: the page made consistent with the bar, and the Store's recording screenshot back (#1073) |
-| 5 | **macOS paid path** (ADR-0017) | Moderate: one-time $49–99 is the niche's norm; no conversion data | **L** — four code deliverables, and the decider's gestures first (FastSpring's quote, KYC, Apple's $99 programme) | **In parallel, gated on the decider's gestures**: revenue, not pull |
-| 6 | **Hand-off** beyond what cycle 11 ships (OAuth: Notion, Slack) | **Strong for cloud buyers** (Granola gates Notion and Zapier on Business), **untested for Kitokey's** (§5c); weak among local-tool users | Nothing to build first: D109's rich copy (#1025) and export, D110's webhooks already hand a summary over without a secret; **OAuth M–L**, with the secret problem | **No build in cycle 12**; a test instead — the Windows colleague pastes a copied summary into Teams, Outlook and OneNote |
-| 7 | **Store trailer and hero art** | **Weak**: Microsoft's only figure is « up to 11 % » from 2018; Apple's own test showed no lift | **M** — the screencast spike in headless GNOME | **Last**, filmed after 1–3 land |
+| 1 | **A long file in, a pertinent summary and a transcript with speakers out**: import an audio **or video** file — the audio track read from the container — then voices, opt-in (spikes S2 and S1) | **Strong**, and now the three users' own: the decider, 2026-11-21 ~06h, « les 3 utilisateur utilise l'import dans leur cadre pro » (§6c). Market: Meetily's « most requested feature »; Fathom « on our product roadmap »; Otter caps it; voices the top request at Meetily, Granola, Notion | **L** — S2 with five real files first, MP4 and MOV among them (§5b); the session-audio contract's expand; S1 opening on the models' licences; the shell's gesture | **First**: what cycle 12 is built around, held by a criterion on a file of more than an hour (§6c) |
+| 2 | **Structures**: the user's own, beyond D111's six, and the summary's language | Moderate–strong: Meetily #243 (11 👍), four vendors charge for custom templates | **M** — once D111 (#1041–#1043) is merged | **Third**: finish D111 in cycle 11; cycle 12 adds a structure the user writes |
+| 3 | **Live time and levels on a meeting's page while it records** (#1076, #780) | Moderate, indirect — and mostly shipped: capture's silence notice after 10 s and the bar's meters, clock and silent status already exist (§5c) | **S** | **The cycle's small item**: the page made consistent with the bar, and the Store's recording screenshot back (#1073) |
+| 4 | **macOS paid path** (ADR-0017) | Moderate: one-time $49–99 is the niche's norm; no conversion data | **L** — four code deliverables, and the decider's gestures first (FastSpring's quote, KYC, Apple's $99 programme) | **In parallel, gated on the decider's gestures**: revenue, not pull |
+| 5 | **Hand-off** beyond what cycle 11 ships (OAuth: Notion, Slack) | **Strong for cloud buyers** (Granola gates Notion and Zapier on Business), **untested for Kitokey's** (§5c); weak among local-tool users | Nothing to build first: D109's rich copy (#1025) and export, D110's webhooks already hand a summary over without a secret; **OAuth M–L**, with the secret problem | **No build in cycle 12**; a test instead — the Windows colleague pastes a copied summary into Teams, Outlook and OneNote |
+| 6 | **Store trailer and hero art** | **Weak**: Microsoft's only figure is « up to 11 % » from 2018; Apple's own test showed no lift | **M** — the screencast spike in headless GNOME | **Last**, filmed after 1–3 land; a long file summarised with its speakers is the scene to film |
 
 **What this changes in the coordinator's working hypothesis** (1 sharing, 2 structures, 3 import, 4 live
-recording page): import comes first, voices second; sharing needs no build in cycle 12 — the secret-free
+recording page): import and voices come first, as one axis; sharing needs no build in cycle 12 — the secret-free
 hand-off a Windows buyer would use (rich copy, export, webhooks) ships in cycle 11, and what is left is to see
 it paste well; the live recording page stays a small item.
 
@@ -381,8 +381,49 @@ trial-to-purchase rate, from Partner Center, once D102 sells, before and after i
    team, one day? (5b.)
 3. **The paste test**: may the Windows colleague paste a summary copied by Kitokey into Teams, Outlook and
    OneNote, and say what holds? Half an hour, no build.
-4. Has FastSpring been asked for its quote, and when? (§1, question 1.)
-5. Do the three users import files today, and from what? (§3, question 3.)
+4. ~~Has FastSpring been asked for its quote, and when?~~ Answered 2026-11-21 ~06h, below.
+5. ~~Do the three users import files today, and from what?~~ Answered 2026-11-21 ~06h, below.
+
+### 6c, answered — the decider, 2026-11-21 ~06h
+
+Relayed verbatim by the coordinator from their working session with the decider; questions 1–3 are still with
+the decider.
+
+- **Question 5**, do the three users import files: « oui les 3 utilisateur utilise l'import dans leur cadre pro
+  et c'est un besoin qu'ils ont qui leur ai tres utiles. exemple pour un avocat qui recoit énormémant de fichier
+  video et audio qui souhaiterai avoir des résumé pertinent et transcription avec locuteur plutot que de regardé
+  ou ecouter > 1h de media »
+- **Question 4**, FastSpring: « encore, on le fera ensemble, non bloquant » — not asked yet, to be done with
+  the decider; it blocks nothing in cycle 12's framing.
+
+**What they change** (the framer's reading):
+
+- **Import and voices are one axis**: a long file in — audio **or video**, the audio track read from the
+  container (MP4, MOV, MKV, WebM among S2's base list) —, a pertinent summary and a transcript with speakers out.
+  Voices without import pay little, Kitokey already splitting Me / Others by track; import without voices
+  leaves an hour of « Others » unread. The ranking at the top merges them.
+- **The need is the three users' own**, by the decider's word — what §3 lacked, and what 5d.1 asked: the
+  three insiders and the stranger now read the same signal. The example is the decider's, not a user's own
+  words: an **assumption** on the persona until one of them says it.
+- **The persona**: a professional who receives hours of recordings that are not theirs to share — a lawyer's
+  clients, a hearing, an interview —, for whom **nothing leaves this computer** is the decisive argument, not a
+  preference: the cloud leaders' caps (§2a) and their training and consent suits (§2b) are what such a reader
+  cannot accept. **I** It strengthens the no-gos on caps, public links and voiceprints; it adds one: **no
+  real client file in a fixture, a test or a capture** — invented recordings only, as the project already
+  holds for meetings.
+- **A success criterion, measurable** *(proposed; the decider sets the thresholds)*: given a file of more than
+  an hour — a video and an audio file, invented for the test, with three voices or more —, when it is imported
+  on the weakest target CPU, then the transcript, with voices labelled as estimated and renamable, and the
+  summary are written; the time from import to the summary is recorded, under **one hour for one hour of
+  media** with the default local models (the plan's own gate: « RTF that does not block a 1-hour meeting on the
+  weakest target CPU »), the transcription's and the voices' shares said apart; a renamed voice is renamed
+  everywhere it appears, and the summary written again names it. Held by a test with the e2e's stand-in
+  engines for the flow, and by a measured run on that CPU for the time.
+- **The value hypothesis, sharpened**: a professional who receives long recordings chooses Kitokey when it
+  turns an hour of someone else's audio or video into a summary and a transcript with speakers, on their own
+  machine, without the file ever leaving it. Refuted if, once it ships, none of the three uses it on a file of
+  their own in the cycle after, or if the time on the weakest target CPU exceeds the threshold the decider
+  sets.
 
 ### 6d. Decision
 
