@@ -5,14 +5,15 @@
   --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
   /* A field's, a list's, a switch's border, 3:1 on each ground (D89); --line divides, and only that. */
   --edge: #808898;
-  /* The word a search found (#1078): the accent, its words in the surface's colour — seen on a selected row too (#1093). */
-  --mark: #2253CF; --mark-ink: #FFFFFF;
+  /* The word a search found (#1078): amber, as find-in-page marks it (browsers, GNOME, macOS) — never the accent,
+     which reads as a selection; 3:1 against a selected row too, its words 4.5:1 on it (#1093, tests/look.rs). */
+  --mark: #B45309; --mark-ink: #FFFFFF;
 }
 @media (prefers-color-scheme: dark) {
   :not([data-theme="light"]):root {
     --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
     --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
-    --edge: #737B8C; --mark: #8AB0FF; --mark-ink: #1E2129;
+    --edge: #737B8C; --mark: #FBBF24; --mark-ink: #1E2129;
   }
 }
 /* The appearance chosen in Settings (D98): light or dark whatever the system says — the same two
@@ -22,7 +23,7 @@
   color-scheme: dark;
   --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
   --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
-  --edge: #737B8C; --mark: #8AB0FF; --mark-ink: #1E2129;
+  --edge: #737B8C; --mark: #FBBF24; --mark-ink: #1E2129;
 }
 * { box-sizing: border-box; }
 ::placeholder { color: var(--soft); opacity: 1; }
