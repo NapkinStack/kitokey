@@ -248,8 +248,10 @@ fn the_program_writes_the_transcript_from_the_service_its_host_in_the_header() {
 }
 
 /// Whether a `made_in` says no more than the run took, as the test measured it around the program.
+/// The program rounds to the nearest hundredth, so the run is rounded the same way: rounding keeps
+/// the order, and a step that took no longer than the run never reads above it.
 fn within_the_run(made_in: f64, took: f64) -> bool {
-    (0.0..=took).contains(&made_in)
+    (0.0..=(took * 100.0).round() / 100.0).contains(&made_in)
 }
 
 /// A run measured at 0.0796 s whose program wrote 0.08 (CI, run 44908069949, #1105): the header
