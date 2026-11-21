@@ -96,7 +96,10 @@ fn a_structure_given_writes_minutes_v5_its_sections_named_by_their_ids() {
 
 #[test]
 fn each_structure_the_contract_names_is_summarys_own_with_the_same_ids() {
-    let page = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/minutes/v5/README.md")).unwrap();
+    // Windows' checkout writes `\r\n` (CI, run 44893481583): the page's paragraphs are found all the same.
+    let page = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/minutes/v5/README.md"))
+        .unwrap()
+        .replace("\r\n", "\n");
     let table = page[page.find("The six structures this version names").unwrap()..]
         .split("\n\n")
         .nth(1)
