@@ -10239,6 +10239,13 @@ def context_written(now: dt.datetime) -> None:
         area.click()
         keys(browser, Keys.END, more)
         changed = wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
+        # D113, criterion 1 (ines' pre-read): a changed context starts nothing by itself — it waits for its button. Judged
+        # first, before any step a making started by itself would break (s1055nctxauto).
+        time.sleep(1.5)
+        still = browser.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+                                       " && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)")
+        check("a changed context starts nothing by itself: no making, the transcript and the summary as they were (D113)",
+              still and ((meeting / "transcript.jsonl").read_text(), (meeting / "minutes.md").read_text()) == made_before, still)
         # Its button names what it starts: the transcript, and its summary after it (D113).
         check("changed after its transcript and minutes, the context's button is offered, naming both, said why",
               changed and (meeting / "context.txt").read_text() == said + more
@@ -10246,12 +10253,6 @@ def context_written(now: dt.datetime) -> None:
               and browser.find_element(By.ID, "context-redo").text == "Refaire la transcription et le compte rendu",
               ((meeting / "context.txt").read_text(), browser.find_element(By.ID, "context-redo").text))
         seen(browser, "d59-4-page-changed-light")
-        # D113, criterion 1 (ines' pre-read): a changed context starts nothing by itself — it waits for its button.
-        time.sleep(1.5)
-        still = browser.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
-                                       " && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)")
-        check("a changed context starts nothing by itself: no making, the transcript and the summary as they were (D113)",
-              still and ((meeting / "transcript.jsonl").read_text(), (meeting / "minutes.md").read_text()) == made_before, still)
         # Made again, slowly: the field closed meanwhile, and said.
         (WORK / "slow-hearing").touch()
         try:
