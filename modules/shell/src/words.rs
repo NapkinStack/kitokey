@@ -1186,8 +1186,9 @@ pub struct Window {
     /// else `redo_transcript_title`. At most: wraps inside the panel. Placeholders: {} the model, as
     /// people say it.
     pub redo_transcript_do: &'static str,
-    /// Shows: the recording bar and Redo…, as a choice of a list. When: appended to a local model's
-    /// name. At most: about 20 characters. Placeholders: none.
+    /// Shows: the recording bar and Redo…, as a choice of a list; a meeting's page, after the model
+    /// of minutes this computer wrote (#1080). When: appended to a local model's name. At most:
+    /// about 20 characters. Placeholders: none.
     pub on_computer: &'static str,
     /// Shows: a meeting's page, its Redo… panel, as a heading. When: redo the transcript. At most:
     /// no limit. Placeholders: none.
@@ -1379,6 +1380,9 @@ pub struct Window {
     /// Shows: Settings, « Modèles », the summary's step, beside « Tester » while it asks. When: the
     /// model is a service's. At most: no limit. Placeholders: {} the host.
     pub test_sends: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, beside « Tester » while it asks. When: the
+    /// model is this computer's Ollama's (#1080): no address said. At most: no limit. Placeholders: none.
+    pub test_sends_here: &'static str,
     /// Shows: Settings, « Modèles », beside « Tester » or a key's test. When: while it asks. At
     /// most: one line. Placeholders: none.
     pub testing: &'static str,
@@ -2033,6 +2037,7 @@ pub fn window(language: Language) -> Window {
             shortcut_open: "Keyboard settings",
             test: "Test",
             test_sends: "The test sends a short sentence to {} — nothing from your meetings.",
+            test_sends_here: "The test sends a short sentence to Ollama, on this computer — nothing from your meetings.",
             testing: "Testing…",
             test_answered: "It works: the model responds.",
             test_failed: "The model isn’t responding: {}",
@@ -2484,6 +2489,7 @@ pub fn window(language: Language) -> Window {
             shortcut_open: "Réglages du clavier",
             test: "Tester",
             test_sends: "Le test envoie une courte phrase à {}, rien de vos réunions.",
+            test_sends_here: "Le test envoie une courte phrase à Ollama, sur cet ordinateur — rien de vos réunions.",
             testing: "Test en cours…",
             test_answered: "Ça fonctionne\u{a0}: le modèle répond.",
             test_failed: "Le modèle ne répond pas\u{a0}: {}",

@@ -28,7 +28,7 @@ loads its playbook (§4). You never verify, challenge or approve your own work.
 and you never approve a pull request — except where the project answers `approval: agent`, as the
 verifier — or, where no sheet is owed, the reviewer — of another agent's change to a
 `prototype` or `standard` module, saying in the approval your session and what you are expert in — one round, never pushing to it, never *request changes* (`.nstack/handbook/07-governance.md` §7). Every commit you make
-carries the trailer `Agent-Session: <an identifier of this session>`; as a verifier, you
+carries the trailer `Agent-Session: <an identifier of this session>` in its last paragraph; as a verifier, you
 sign the sheet `Verifier: session <that identifier>`, and `pr-check` refuses one among the authors.
 
 **Hold.** As the author of a deliverable of the accepted cycle, take it before your first

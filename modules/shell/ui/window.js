@@ -403,7 +403,9 @@ function holdings(session, words, compact = false) {
   }
   if (session.transcript && !compact) holds.append(chip(words.transcript));
   if (session.audio > 0 && !compact) holds.append(chip(fill(words.audio, size(session.audio, words))));
-  if (session.audio === 0) holds.append(chip(words.audio_freed, "gone"));
+  // Freed is said of a meeting no longer recorded: one being recorded may have no track written yet, its
+  // microphone waiting (`session-audio/v2`, a track gained later) — nothing was deleted (#1054).
+  if (session.audio === 0 && session.state !== "recording") holds.append(chip(words.audio_freed, "gone"));
   // What is being made for it, in the background (D25): painted from `makings`.
   const making = chip("", "making");
   making.dataset.name = nameOf(session);
@@ -1761,11 +1763,13 @@ function minutesCard(read, words, session, transcript, onPage) {
   // When they were made first, then who wrote them, the model as people say it (D93); what is not
   // known is left unsaid.
   const when = madeOn(words, read.made);
-  const by = read.model ? modelSaid(read.model) + (read.provider ? fill(words.written_via, read.provider) : "") : "";
+  // Written on this computer (`local`, minutes/v2): said so, never the contract's word (#1080).
+  const from = read.provider === "local" ? `, ${words.on_computer}` : read.provider ? fill(words.written_via, read.provider) : "";
+  const by = read.model ? modelSaid(read.model) + from : "";
   // Its model a list in its place (D93, criterion 5); none named, the line alone.
   const maker = (when
     ? fill(words.minutes_of, when) + (by ? ` · ${IN_LINE}` : "")
-    : read.model ? fill(words.written_by, IN_LINE) : fill(words.written_by, "—") + (read.provider ? fill(words.written_via, read.provider) : "")) + tookAndCost(read, words);
+    : read.model ? fill(words.written_by, IN_LINE) : fill(words.written_by, "—") + from) + tookAndCost(read, words);
   if (by) {
     const go = startsOnPage("page-minutes-do", words, () =>
       window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }));
@@ -2249,6 +2253,8 @@ function playerBar(session, listened, total, words, drawing) {
       player.stop();
       player = null;
     }
+    // Being recorded, no track written yet: nothing to say, and nothing deleted (#1054).
+    if (session.audio === 0 && session.state === "recording") return "";
     // Freed, said so; there and not playable, said so too — never one for the other.
     const freed = element("p", "note", session.audio > 0 ? words.not_playable : words.no_player);
     freed.id = "no-player";
@@ -3002,7 +3008,7 @@ function minutesRow(minutes, words, locked) {
     try {
       host = new URL(minutes.provider).host;
     } catch {}
-    tested.textContent = testing ? words.testing : fill(words.test_sends, host);
+    tested.textContent = testing ? words.testing : minutes.provider === minutes.ollama_address ? words.test_sends_here : fill(words.test_sends, host);
     button.dataset.locked = String(locked);
     button.addEventListener("click", async () => {
       testing = true;
