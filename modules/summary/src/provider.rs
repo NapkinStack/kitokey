@@ -235,6 +235,10 @@ impl Provider {
         let mut body = serde_json::json!({ "model": self.model, "stream": false, "messages": [{ "role": "user", "content": request }] });
         if ollama.is_some() {
             body["options"] = serde_json::json!({ "num_ctx": window(request), "num_predict": WINDOW });
+            // A thinking model's reasoning counts in num_predict: on a long transcript it took all of
+            // it, and the minutes were refused as cut short (#1083). Ollama's own field turns it off,
+            // or down to the model's lowest level where it cannot be turned off.
+            body["think"] = serde_json::Value::Bool(false);
         }
         let mut response = match call.send_json(&body) {
             Ok(response) => response,
