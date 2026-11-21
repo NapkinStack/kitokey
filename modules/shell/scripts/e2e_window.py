@@ -5753,6 +5753,53 @@ def previous_summary_back(now: dt.datetime) -> None:
         again = wait_for(browser, lambda b: held(meeting / "minutes.md") != first and b.execute_script(idle), 15)
         check("the next redo: the one it replaced is the previous one, the older gone from the folder (D113)",
               again and held(previous) == first and asides() == [], [held(previous)[:60], asides()])
+        # ines' pre-read of #1065, the summary's mirrors of #1070's T8 and T9. A redo that fails, or is cancelled, leaves both
+        # versions as they were, nothing set aside, nothing in the trash.
+        trash = WORK / "data" / "Trash" / "files"
+        binned = lambda: sorted(p.name for p in trash.iterdir()) if trash.exists() else []
+        before = (held(meeting / "minutes.md"), held(previous), binned())
+        redo = lambda: browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: null, model: null})", meeting.name)
+        (WORK / "fail-minutes").touch()
+        try:
+            redo()
+            failed = wait_for(browser, lambda b: b.execute_script(idle), 15)
+        finally:
+            (WORK / "fail-minutes").unlink(missing_ok=True)
+        after_failure = (held(meeting / "minutes.md"), held(previous), binned())
+        (WORK / "hold-minutes").touch()
+        try:
+            redo()
+            holding = wait_for(None, lambda b: (WORK / "held-minutes").exists(), 15)
+            browser.execute_script("return window.__TAURI__.core.invoke('making_cancelled', {name: arguments[0]})", meeting.name)
+            cancelled = wait_for(browser, lambda b: b.execute_script(idle), 15)
+        finally:
+            (WORK / "hold-minutes").unlink(missing_ok=True)
+            (WORK / "held-minutes").unlink(missing_ok=True)
+        after_cancel = (held(meeting / "minutes.md"), held(previous), binned())
+        check("a summary's redo that fails or is cancelled leaves both versions as they were, nothing set aside, nothing in the trash (D113)",
+              failed and holding and cancelled and after_failure == before and after_cancel == before and asides() == [],
+              [failed, holding, cancelled, after_failure == before, after_cancel == before, asides()])
+        # A trash that refuses: the older version stays as minutes-previous.md, the one replaced set aside beside it, and it
+        # is said — by its notification, the window away (D92).
+        kept_older = held(previous)
+        trash.mkdir(parents=True, exist_ok=True)
+        notified = WORK / "notified-previous-summary"
+        monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                   stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+        trash.chmod(0o500)
+        try:
+            time.sleep(0.5)
+            away(browser, lambda: (redo(), wait_for(None, lambda b: "n’a pas pu aller à la corbeille" in notified.read_text(), 15)))
+            said_kept = "n’a pas pu aller à la corbeille" in notified.read_text()
+        finally:
+            trash.chmod(0o700)
+            monitor.terminate()
+        aside_now = asides()
+        check("a summary's trash that refuses: the older stays as minutes-previous.md, the one replaced set aside beside it, said (D113)",
+              said_kept and held(previous) == kept_older and len(aside_now) == 1 and aside_now[0] in notified.read_text(),
+              [said_kept, held(previous)[:60], aside_now])
+        for name in aside_now:
+            (meeting / name).unlink()
         # Kept, it is the meeting's: in its text's weight, and in the trash with it (ines, #1062).
         text = browser.execute_script("return window.__TAURI__.core.invoke('listed')"
                                       ".then((l) => l.sessions.filter((s) => s.folder.endsWith(arguments[0])).map((s) => s.text))", meeting.name)
