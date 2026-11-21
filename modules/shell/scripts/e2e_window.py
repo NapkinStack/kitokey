@@ -7618,7 +7618,9 @@ def minutes_checked(now: dt.datetime) -> None:
         check("the agreement before a first sending shows no price", asked and not browser.execute_script(priced_words, "agree"),
               browser.find_element(By.ID, "agree").text)
         send_said = browser.execute_script("return document.getElementById('agree-send')?.textContent ?? null")
-        check("the agreement's button names what leaves and what it starts (#933)", send_said == "Envoyer la transcription et rédiger le compte rendu", send_said)
+        # One line (sam's T5 probe: the long label wrapped at 1100 px): the verbs alone, the page above saying what leaves and
+        # what is written (Microsoft's Writing Style, Apple's HIG).
+        check("the agreement's button names what it does, in a few words: « Envoyer et rédiger » (#933)", send_said == "Envoyer et rédiger", send_said)
     with Window(meetings, "fr_FR.UTF-8", online, small=True) as browser:
         check("the bar at rest shows no price",
               browser.find_elements(By.ID, "small-record") and not browser.execute_script(priced_words, "small"), browser.find_element(By.ID, "small").text)
