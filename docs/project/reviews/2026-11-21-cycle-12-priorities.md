@@ -3,7 +3,7 @@ decision: proposed           # proposed | go | clarify | kill — the decider de
 decider: "@napkinstack-admin"
 decided_on:                  # YYYY-MM-DD, with the decision
 framer: "marc, session 55380109-57c0-43c7-9bc5-045719e62701, 2026-11-21"
-challenger:                  # stage 5: sam's session, named by the coordinator
+challenger: "sam, session wholeheard-sam-a2, 2026-11-21"
 idea: "kitokey-team/cycle-12-candidates.md, item 4 of « Store media and product/market priorities — the plan », the decider's word of 2026-11-21 ~03h30"
 round: 1
 ---
@@ -19,43 +19,46 @@ round: 1
 
 ## The ranking, first
 
+*Revised after the challenge (§5), 2026-11-21: the framer's answer is §6a. The first proposal put the live
+recording page first and called sharing weak; both readings changed.*
+
 ```mermaid
 quadrantChart
-    title Buyer value against cost to Kitokey, 2026-11-21
+    title Buyer value against cost to Kitokey, revised 2026-11-21
     x-axis "Low cost" --> "High cost"
     y-axis "Weak buyer signal" --> "Strong buyer signal"
     quadrant-1 "Worth it, plan it"
     quadrant-2 "Do first"
     quadrant-3 "Cheap, little pull"
     quadrant-4 "Defer"
-    "1 Live recording page": [0.12, 0.62]
-    "2 Import a recording": [0.55, 0.88]
-    "3 Voices, opt-in": [0.82, 0.85]
-    "4 Structures, the user's own": [0.42, 0.68]
+    "1 Import a recording": [0.55, 0.88]
+    "2 Voices, after import": [0.9, 0.85]
+    "3 Structures, the user's own": [0.42, 0.68]
+    "4 Live recording page": [0.12, 0.38]
     "5 macOS paid path": [0.88, 0.58]
-    "6 Sharing, beyond D110": [0.62, 0.25]
+    "6 Hand-off, beyond D109-D110": [0.62, 0.55]
     "7 Store trailer": [0.45, 0.15]
 ```
 
 **Legend** — x: the framer's cost estimate, read from the repository (S under two days, M one deliverable,
-L more). y: the strength of the buyer signal found in §2: strong = a rival says in its own words it is the
-most requested, or several vendors charge for it; weak = requests with no reactions, or a platform's own data
-showing no lift. Quadrants are the framer's reading, not a measure.
+L more). y: the strength of the buyer signal found in §2 and §5: strong = a rival says in its own words it is
+the most requested, or several vendors charge for it; weak = requests with no reactions, or a platform's own
+data showing no lift. Quadrants are the framer's reading, not a measure.
 
-| # | Candidate | Buyer signal (§2) | Cost | Recommendation for cycle 12 |
+| # | Candidate | Buyer signal (§2, §5) | Cost | Recommendation for cycle 12 |
 |---|---|---|---|---|
-| 1 | **Live time and levels on a meeting's page while it records** (#1076, #780) | Moderate, indirect: users never ask for a meter, they report the silent one-sided recording it prevents | **S** — the bar's meters and clock exist (`levels.rs`); the page does not read them | **First**: a trust fix, and it brings back the Store's recording screenshot (#1073) |
-| 2 | **Import a recording** (spike S2) | **Strong**: Meetily's « most requested feature on GitHub and Discord »; Granola « no plans »; Fathom none; Otter caps it at 3 for life on Basic | **M–L** — spike S2 (symphonia), an expand of the session-audio contract, the shell's gesture | **Second**: the strongest differentiator against the cloud leaders, and already in the charter's vocabulary (« a recorded or imported conversation ») |
-| 3 | **Tell voices apart**, opt-in (spike S1) | **Strong**: the top request at Meetily, Granola (vendor's words) and Notion (rival-curated); paywalled at Meetily, Superwhisper, Anarlog | **L** — spike S1, models and their licences, the `voice` field already in transcript/v1 | **Third, after import**: Kitokey already splits Me / Others by track; diarization pays where one track holds many voices — an import, a room |
-| 4 | **Structures**: the user's own, beyond D111's six | Moderate–strong: Meetily #243 (11 👍), four vendors charge for custom templates | **M** — once D111 (#1041–#1043) is merged | **Fourth**: finish D111 in cycle 11; cycle 12 adds a structure the user writes, and the summary's language |
-| 5 | **macOS paid path** (ADR-0017) | Moderate: one-time $49–99 is the niche's norm; no conversion data | **L** — four code deliverables, and the decider's gestures first (FastSpring's quote, KYC, Apple's $99 programme) | **In parallel, gated on the decider's gestures**: revenue, not pull; the code waits for the quote |
-| 6 | **Sharing**, beyond D110's webhooks (OAuth: Notion, Slack) | **Weak** as demand from local-tool users (0 reactions on every request found); moderate as parity with the cloud | **M–L** for OAuth, with a secret problem (cycle 11, *Reaching a channel without a backend*) | **Finish D110 in cycle 11; nothing more in cycle 12** |
-| 7 | **Store trailer and hero art** | **Weak**: Microsoft's only figure is « up to 11 % » from 2018; Apple's own test showed no lift | **M** — the screencast spike in headless GNOME | **Last**, as the plan already says: filmed after 1–3 land |
+| 1 | **Import a recording** (spike S2) | **Strong**, from cloud and local users alike: Meetily's « most requested feature on GitHub and Discord »; Fathom's users ask and it is « on our product roadmap »; Otter caps it, a paid gate; Granola « no plans » | **M–L** — spike S2 (symphonia) with five real files first (§5b), an expand of the session-audio contract, the shell's gesture | **First**: what cycle 12 is built around |
+| 2 | **Tell voices apart**, opt-in (spike S1) | **Strong**: the top request at Meetily and Granola (vendors' words), Notion's first complaint, Otter's and Fireflies' too; paid at Meetily, Superwhisper, Anarlog | **L, plus import** — spike S1 opens on the models' licences and downloads (§5b) | **Second, after import**: Kitokey already splits Me / Others by track; voices pay on one track of many voices — an import, a room |
+| 3 | **Structures**: the user's own, beyond D111's six, and the summary's language | Moderate–strong: Meetily #243 (11 👍), four vendors charge for custom templates | **M** — once D111 (#1041–#1043) is merged | **Third**: finish D111 in cycle 11; cycle 12 adds a structure the user writes |
+| 4 | **Live time and levels on a meeting's page while it records** (#1076, #780) | Moderate, indirect — and mostly shipped: capture's silence notice after 10 s and the bar's meters, clock and silent status already exist (§5c) | **S** | **The cycle's small item**: the page made consistent with the bar, and the Store's recording screenshot back (#1073) |
+| 5 | **macOS paid path** (ADR-0017) | Moderate: one-time $49–99 is the niche's norm; no conversion data | **L** — four code deliverables, and the decider's gestures first (FastSpring's quote, KYC, Apple's $99 programme) | **In parallel, gated on the decider's gestures**: revenue, not pull |
+| 6 | **Hand-off** beyond what cycle 11 ships (OAuth: Notion, Slack) | **Strong for cloud buyers** (Granola gates Notion and Zapier on Business), **untested for Kitokey's** (§5c); weak among local-tool users | Nothing to build first: D109's rich copy (#1025) and export, D110's webhooks already hand a summary over without a secret; **OAuth M–L**, with the secret problem | **No build in cycle 12**; a test instead — the Windows colleague pastes a copied summary into Teams, Outlook and OneNote |
+| 7 | **Store trailer and hero art** | **Weak**: Microsoft's only figure is « up to 11 % » from 2018; Apple's own test showed no lift | **M** — the screencast spike in headless GNOME | **Last**, filmed after 1–3 land |
 
 **What this changes in the coordinator's working hypothesis** (1 sharing, 2 structures, 3 import, 4 live
-recording page): sharing falls to 6 — no buyer signal for it in local tools, and D110 already ships the
-webhooks a local user asks for; the live recording page rises to 1 — cheapest, and it unblocks a Store asset;
-import rises to 2.
+recording page): import comes first, voices second; sharing needs no build in cycle 12 — the secret-free
+hand-off a Windows buyer would use (rich copy, export, webhooks) ships in cycle 11, and what is left is to see
+it paste well; the live recording page stays a small item.
 
 ---
 
@@ -326,5 +329,61 @@ hand-off line of 5c (#6) is sized beside #1 before cycle 12 is framed, and the v
 buyer is the three users, the ranking stands except #1's reason, which becomes « consistency with the bar ».
 
 ## 6. Decision
+
+*Prepared by the framer, 2026-11-21: §5 stands above unchanged; 6a answers it point by point, 6b gives the
+riskiest assumptions and the value hypothesis, 6c what the decider is asked. The decision itself, its reasons
+and its date are the decider's, in 6d.*
+
+### 6a. The framer's answer to §5
+
+| §5 point | Answer | Evidence | What changed |
+|---|---|---|---|
+| 5c #1 — ranked by its cost, not by a buyer's value | **Accepted** | **F** capture announces a silent source after 10 s (`modules/capture/src/main.rs:50`, `SILENT_AFTER`); the shell says « Aucun son de votre micro — Rien depuis 10 secondes. L'enregistrement continue. » and its English, for each side (`modules/shell/src/words.rs`, `Said::Silent`); the bar carries both meters, the clock and a silent status after two minutes (D49, D90). §2c's MacWhisper 15.11 does what Kitokey already does | Rank 1 → 4, « the cycle's small item »; its reason is the page's consistency with the bar and the Store's screenshot |
+| 5c #6 — sharing read on a population biased against it; the legend applied unevenly | **Accepted** for the signal, **refuted** for the build | **F** Granola gates Notion and Zapier on Business (§2c; sam's integrations guide, *search only*): by the legend, strong for cloud buyers. **F** The secret-free hand-off sam proposes already ships: D109's « Copier le compte rendu » puts the summary on the clipboard as `text/html` and as Markdown together, the transcript with its speakers (#1025, merged 2026-11-20, 98ad394; held by the e2e reading the clipboard's two types); D109 exports and D110 sends to a webhook in cycle 11. **U** How that copy pastes into Teams, Outlook and OneNote was never tried | Signal « strong for cloud buyers, untested for ours »; still no build in cycle 12; a paste test on Windows instead (6c) |
+| 5c #2–#3 — the same skew applies to every row | **Refuted** for import and voices | **F** Their strength does not rest on local trackers alone: a Fathom user asks for « easy audio uploads from calls » (Product Hunt, about 2026-04) and Fathom has it « on our product roadmap »; Otter gates imports by plan; Notion's users' first complaint is speaker labels (rival count 24), Otter's (~6) and Fireflies' (~5) next (§2b) — cloud users all | None for the ranks; the skew is said |
+| 5c #3 — S1 costs L **plus** S2 | **Accepted** | S1's value is on one track of many voices: an import, a room | Cost line « L, plus import » |
+| 5b value — the buyer wants hand-off more than local capture | **Accepted as a test** | Not run | Proposed to the decider (6c, 2) |
+| 5b usability — five real files through S2's decoder | **Accepted** | — | It opens spike S2: a Teams MP4, a Zoom M4A, an iPhone voice memo, an Android recording, a WAV, half a day, before any interface; refuted at two failures of five |
+| 5b feasibility — a redistributable diarization model | **Accepted** | The plan already gates S1 on « no licence that forbids sale » | S1's first hour reads each model's licence and download terms at their source |
+| 5b viability — free local rivals give import and voices | **Partly run, here** | **F** Meetily Community gives import free (0.3.0, 2026-03-03); Meetily gives voices **in Pro only** (§2c). **U** Yogurt: users in its thread ask whether it diarizes; not settled. Foresight: not read | Import is not a paid reason against free local tools — only against the cloud's caps; voices still are. To finish at the framing |
+| 5d.1 — ranked for the stranger, tested on three insiders | **Accepted** | — | Each signal gets a stranger's reading (6b); the buyer is the decider's choice (6c, 1) |
+| 5d.2 — the legend applied unevenly | **Accepted** | as 5c #6 | Sharing's row rewritten |
+| 5d.3 — §2c omits Kitokey's own silence notice | **Accepted** | as 5c #1 | Said in the ranking's row 4 |
+| 5d.4 — hypothesis 1 can hardly fail | **Accepted** | — | Hypothesis 1 becomes « the page says what the bar says while it records »: refuted by any state the bar shows and the page does not |
+| 5d.5 — §2d's « the four that rivals charge for » | **Accepted in part** | It is marked **I** in §2d; the viability row above shows import is free at Meetily Community | Read with this row: rivals charge for voices and custom structures; import only in the cloud |
+
+Stages 1–4 are kept as written; the ranking at the top carries the changes.
+
+### 6b. The riskiest assumptions and the value hypothesis
+
+**The value hypothesis, revised.** A person who records meetings will choose Kitokey over a cloud note-taker
+when it does on their own machine, for one price paid once, what the cloud leaders cap or refuse — **taking a
+recording they already have, and telling its voices apart**. Read on the three users: one of them imports a
+file of their own and keeps the result, in the cycle after import ships. Read on the stranger: the Store's
+trial-to-purchase rate, from Partner Center, once D102 sells, before and after import ships.
+
+**The riskiest assumptions**, most decision-changing first:
+
+1. The buyer cycle 12 aims at — the Store's stranger or the three users — wants local capture more than
+   hand-off (5b value; 6c, 1–2).
+2. The files buyers bring decode: Teams' and Zoom's MP4, phones' M4A and AAC (5b usability; S2's first half
+   day).
+3. A diarization model is redistributable in a paid build and runs under real time on a laptop (5b
+   feasibility; S1's first hour).
+4. A one-time price sells against free local rivals on voices and structures, import being free there (5b
+   viability).
+
+### 6c. What the decider is asked
+
+1. **Which buyer** does cycle 12 aim at: the Store's stranger, or the charter's three users? (§1, question 2;
+   5d.1.) The ranking holds for both; the tests differ.
+2. **Run sam's value test** before the framing — two lines of the Store's listing, five people outside the
+   team, one day? (5b.)
+3. **The paste test**: may the Windows colleague paste a summary copied by Kitokey into Teams, Outlook and
+   OneNote, and say what holds? Half an hour, no build.
+4. Has FastSpring been asked for its quote, and when? (§1, question 1.)
+5. Do the three users import files today, and from what? (§3, question 3.)
+
+### 6d. Decision
 
 *The decider's: go, clarify or kill, with the reasons and the date.*
