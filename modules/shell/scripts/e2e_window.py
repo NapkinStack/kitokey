@@ -11342,7 +11342,7 @@ STORE_MEETINGS = {
                         "au second lot. Le devis révisé passe à 21 400 € HT, en deux lots.\n\n"
                         "## 2.\n\n- Envoyer le devis révisé en deux lots — Vous — jeudi [@61]\n"
                         "- Préparer le fichier des 400 fiches produit — Léa (Atelier Lumen) — vendredi [@8]\n"
-                        "- Planifier la formation de l’équipe de la boutique — Hugo — semaine prochaine [@10]\n\n"
+                        "- Planifier la formation de l’équipe de la boutique — Hugo — lundi [@10]\n\n"
                         "## 3.\n\n- La boutique doit être en ligne avant les fêtes. [@3]\n"
                         "- Signature avant la fin du mois si le devis tient à 21 400 €. [@118]\n"),
             "lines": 280,
@@ -11425,7 +11425,7 @@ STORE_MEETINGS = {
                         "second phase. The revised quote comes to $21,400, in two phases.\n\n"
                         "## 2.\n\n- Send the revised quote in two phases — You — Thursday [@61]\n"
                         "- Prepare the file of 400 product pages — Lea (Lumen Studio) — Friday [@8]\n"
-                        "- Schedule the shop team’s training — Hugo — next week [@10]\n\n"
+                        "- Schedule the shop team’s training — Hugo — Monday [@10]\n\n"
                         "## 3.\n\n- The shop must be live before the holidays. [@3]\n"
                         "- They sign before the month ends if the quote holds at $21,400. [@118]\n"),
             "lines": 280,
