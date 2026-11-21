@@ -5201,6 +5201,13 @@ def destinations_kept(now: dt.datetime) -> None:
             check("checked, the destination is listed: its name, its kind, its address as its host and the end of its path",
                   kept and "#équipe" in row and "Slack" in row and "hooks.example" in row and secret not in row and secret[-4:] in row, row)
             check("the address field is emptied once kept", browser.find_element(By.ID, "destination-address").get_attribute("value") == "")
+            # For an eye (lina's): the card with one destination, at the two widths, in both looks.
+            for width in (1100, 420):
+                browser.set_window_size(width, 800)
+                browser.execute_script("document.getElementById('destination-add').scrollIntoView({block: 'center'})")
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d110-destinations-fr-{width}-{theme}", theme)
+            browser.set_window_size(1100, 800)
             check("the address is never written in the settings' file (PDR-0007 §1)",
                   window.file.exists() and secret not in window.file.read_text() and "#équipe" in window.file.read_text())
             judged = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
