@@ -31,6 +31,8 @@ tauri = { version = "2.12.3", features = ["tray-icon", "image-png"] }
 tauri-plugin-notification = "2"
 tauri-plugin-dialog = "2.8.1"
 tauri-plugin-single-instance = "2.5.4"
+# MUTANT, never merged: Tauri's updater registered, for D102's trial to refuse (d102-no-updater-in-the-package).
+tauri-plugin-updater = "2"
 http = "1.5.0"
 toml = "0.9"
 toml_edit = "0.25"
