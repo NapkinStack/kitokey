@@ -1062,8 +1062,8 @@ fn a_confidential_meeting_s_words_are_said_in_both_languages_french_typeset_as_f
         (english.confidential_left_sound, 1),
         (french.confidential_left_transcript, 1),
         (english.confidential_left_transcript, 1),
-        (french.confidential_fetch, 1),
-        (english.confidential_fetch, 1),
+        (french.minutes_fetch_then, 1),
+        (english.minutes_fetch_then, 1),
     ] {
         assert_eq!(said.matches("{}").count(), holes, "{said}");
     }
