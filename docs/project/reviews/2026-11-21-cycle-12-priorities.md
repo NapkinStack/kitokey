@@ -218,8 +218,112 @@ Whether it convinces the decider: to record at stage 6.
 
 ## 5. Challenge
 
-*sam's, in another session (pre-mortem, the four risks, counter-evidence, flaws in stages 1–4). The framer does
-not write here.*
+*sam, session wholeheard-sam-a2, 2026-11-21 — challenger; reads section 1 as written, unconfirmed. Sources
+already in §2 are not repeated; the two read in this round are marked as §2 marks them.*
+
+**In short.** Import at 2 and the no-gos hold. Two rankings do not hold as argued: **#1 is ranked by its cost,
+not by a buyer's value** — most of the trust it claims already ships; and **sharing at 6 rests on a population
+that is biased against sharing** and on the legend applied unevenly. Neither objection blocks a go; both change
+what cycle 12 is built around.
+
+### 5a. Pre-mortem — cycle 12 shipped as ranked; a year later Kitokey sells almost nothing on the Store
+
+| Plausible reason | Risk |
+|---|---|
+| The first item was cheap, not wanted: the page now shows what the bar and the silence notice already showed, and no buyer noticed the difference | value |
+| The Store's buyer is a Windows office worker whose notes must reach Teams, Outlook, OneNote or a CRM; Kitokey hands over a webhook and a folder, and they pick a cloud tool that does it in one click | value |
+| Import shipped, but the files buyers bring are Teams' and Zoom's MP4 recordings and phone M4A/AAC; the decoder or the contract took one format at first, and the first import a stranger tried failed | feasibility |
+| Voices needed a model whose licence, size or gated download did not fit a free Linux build and a paid Store build; it slipped a cycle, and import without voices disappointed on room recordings | feasibility, viability |
+| Every success signal was read on three users who already knew the product; « imported one file » was true and said nothing about a stranger paying | value (test design) |
+| Free local rivals (Meetily Community, Yogurt, Foresight) shipped import and voices first and for free; « paid once » competed with « free » rather than with « capped » | viability |
+
+### 5b. The four risks — the riskiest assumption of each, and the cheapest test that refutes it
+
+| Risk | Riskiest assumption | Cheapest test · how long · refuted if *(threshold proposed, the decider sets it)* |
+|---|---|---|
+| **Value** | The Store's buyer wants local capture more than a hand-off to where their work already is | Two lines on the Store listing's draft — one leading with « takes the recordings you have », one with « sends to Teams/Notion » — read by five people outside the team who use a note-taker at work; **one day**. Refuted if most choose hand-off first |
+| **Usability** | A stranger can import a phone or Teams recording without help | Five real files (Teams MP4, Zoom M4A, iPhone voice memo, an Android recorder, a WAV) through spike S2's decoder before any UI; **half a day**. Refuted if two or more of the five fail to decode |
+| **Feasibility** | A diarization model fits Kitokey's builds: its licence allows redistribution in a paid build, it runs on a laptop CPU in less time than the meeting, it needs no gated download | Spike S1's first hour: read each candidate's licence and download terms at the source, before any code. Refuted if no candidate is redistributable without a per-user acceptance |
+| **Viability** | A buyer pays once for what free local rivals give — the ranking assumes caps are the competition | Price check on the three free local rivals' import and voices, at their pages, the day cycle 12 is framed. Refuted if all three give both free: then the paid reason must be reliability and structures, not import and voices |
+
+### 5c. Counter-evidence and objections, by candidate
+
+**#1, live time and levels on the page — value or cheapness?** Cheapness, as argued.
+
+- **F** Kitokey already does what §2c credits MacWhisper 15.11 with. Capture announces a silent source after 10
+  s (`modules/capture/src/main.rs:50`, `SILENT_AFTER`), and the shell turns it into a notice: « Aucun son de
+  votre micro — Rien depuis 10 secondes. L'enregistrement continue. » (`modules/shell/src/words.rs:264-270`,
+  both sides). The bar shows both meters and the time, and a silent status after two minutes
+  (`words.rs:935-942`, D49, D90). The « silent one-sided recording » that the row says #1 prevents is
+  prevented today by the notice, and seen in the bar.
+- **I** What #1 adds is the same signal in a second place, the meeting's page, and the Store's screenshot
+  (#1073). The screenshot is a listing asset, and §2c rates listing assets **weak** (the trailer). Yet #1 sits
+  at 0.62 on the buyer axis, above structures' paid-step evidence.
+- **Objection.** By the legend's own y-axis, #1 is moderate and indirect, and its argument is the S. Ranking it
+  « first » turns a value-for-cost ratio into a value ranking. Keep it as the cycle's small item — it is a
+  real inconsistency between page and bar, and the decider asked for live meters on 2026-11-06 (#1076) — but
+  not as what cycle 12 is built around. If the trust gap is the point, the smaller test is: did any of the
+  three users ever miss the notice? An answer of « no » leaves only the page's consistency.
+
+**#6, sharing falling 1 → 6 — the right population?** No.
+
+- **I** Every demand row for sharing reads issues of **open-source, local-first** tools (Meetily, OpenWhispr).
+  Their users chose a tool that keeps everything on the machine, mostly free, many self-hosting. Low demand
+  for sending notes out is what that selection predicts, so « 0 reactions » measures the population, not the
+  buyer. §3 says the buyer cycle 12 aims at is the Store's stranger. That buyer is not in those trackers.
+- **F** The legend's **strong** includes « several vendors charge for it ». §2c itself says Granola charges for
+  Notion (Business). Granola's integrations page gates its native integrations **and** Zapier on Business,
+  $14 a user a month ([Granola integrations guide](https://www.granola.ai/blog/granola-integrations-complete-guide-connecting-meeting-tools)
+  *vendor*, search only). Its feature-request page lists automatic export to an integration as a request it
+  is « regularly looking at » ([Granola FAQ](https://docs.granola.ai/help-center/feature-requests) *vendor*,
+  already in §2). By the legend, sharing is strong for the cloud buyer and weak for the local user; the table
+  reports only the second.
+- **F** A vendor survey of 1,000 SaaS users: 87 % would adopt meeting AI if it came inside their current work
+  tools ([Nylas](https://www.nylas.com/blog/state-of-meeting-recordings/) *vendor, a seller of integration
+  APIs*, search only). This is weak alone, but it points the same way.
+- **Objection.** The ranking conflates *demand* with *what to build*. Demand for hand-off is probably real for
+  the Store's buyer (assumption, untested — see 5b *value*). OAuth is still right to defer, for reasons §2
+  already gives better: the secret problem without a backend, and over-sharing as a top complaint. Keep the
+  no-go « No OAuth sharing in cycle 12 ». Replace « weak » with « strong for cloud buyers, untested for ours ».
+  And name the smallest hand-off a Windows buyer would use that needs no secret: a summary copied as rich
+  text, ready to paste into Teams, Outlook or OneNote — a gesture, no key. Size it against #1, which it may
+  beat on value for the same S.
+
+**#2 import, #3 voices.** They hold, with two cautions:
+
+- §2c takes Meetily's GitHub as strong for import and voices, but as a reason to rank sharing low. Its
+  population is consistent across the three: the same skew applies to every row.
+- §2c's « strong » for voices is mostly vendors' own words about their top request (Meetily, Granola). Kitokey
+  already splits Me / Others by track, which §2c credits. The value of S1 therefore depends on import
+  shipping first. The ranking says so; the cost line should too: S1 is L **plus** S2.
+
+**#5 macOS** — no objection. It is gated on the decider's gestures and runs in parallel.
+**#7 trailer** — no objection.
+
+### 5d. Flaws in stages 1–4
+
+1. **§1, open question 2 decides the ranking, and stages 3–4 answer it both ways.** « The ranking assumes the
+   stranger » (§1). But every success signal in §3, and the refutation of the value hypothesis in §4 (« none of
+   the three users imports a file »), is read on the charter's three users. A ranking built for the stranger
+   and tested on three insiders cannot be refuted by its own test. Choose one before the decision, or give each
+   signal a stranger-side reading. One such reading is already proposed in §4: the Store's trial-to-purchase
+   rate, once D102 sells.
+2. **The legend's y-axis is applied unevenly** (5c, #6): « several vendors charge for it » is counted for
+   import, voices and structures, and not for sharing.
+3. **§2c « Live time and levels »** omits Kitokey's own silence notice and bar status. They are the baseline
+   against which #1's value must be read (5c, #1).
+4. **§4's hypothesis 1**, « refuted if a user still reports a one-sided recording they did not notice », can
+   hardly fail. The notice already exists, and three users over two weeks will rarely meet the case. Make it
+   refutable: name the cases the notice misses and the page would catch, or drop the hypothesis to « page
+   consistent with the bar ».
+5. **§2d « Local alone no longer sells; a local tool wins on reliability, voices, import and structures — the
+   four that rivals charge for »**. The rivals named just before (Yogurt, Meetily Community, Foresight) are
+   free. Whether they charge for import and voices is the viability test of 5b. Until it is run, this is an
+   inference (**I**), and the ranking leans on it.
+
+**What would change the decision.** If the decider's buyer is the Store's stranger, two things follow: the
+hand-off line of 5c (#6) is sized beside #1 before cycle 12 is framed, and the value test of 5b is run. If the
+buyer is the three users, the ranking stands except #1's reason, which becomes « consistency with the bar ».
 
 ## 6. Decision
 
