@@ -5865,6 +5865,10 @@ def previous_transcript_back(now: dt.datetime) -> None:
         check("a redo that fails or is cancelled leaves both versions as they were, nothing set aside, nothing in the trash (#1070, T8)",
               failed and holding and cancelled and after_failure == before and after_cancel == before and asides() == [],
               [failed, holding, cancelled, after_failure == before, after_cancel == before, asides()])
+        # T9 starts from versions of its own: what T8 leaves is T8's to judge, never carried into T9 (a failed redo taken as
+        # written, `fail`, would otherwise redden T9 too).
+        current.write_text(second)
+        previous.write_text(first)
         # T9: a trash that refuses — the older version cannot leave — keeps the one set aside where it is, and says so.
         trash.mkdir(parents=True, exist_ok=True)
         notified = WORK / "notified-previous-transcript"
