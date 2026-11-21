@@ -11453,8 +11453,8 @@ def store_pauses(meetings: Path, said: list) -> list[int]:
 
 def store_shots(now: dt.datetime) -> None:
     """CH. D103: the Microsoft Store's screenshots, made here from meetings invented for them, in French then
-    in English, light, in the Store's order — the benefit first (the coordinator, 2026-11-20, from Microsoft's
-    « especially representative » first image): a meeting's page with its minutes and transcript, a meeting's
+    in English, light, in the Store's order — « displayed in your listing in order », Microsoft's page says —, the
+    benefit first (the coordinator, 2026-11-20): a meeting's page with its minutes and transcript, a meeting's
     page while it records, the list with another meeting open, Settings. Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
     its MSIX page read on 2026-11-20 (D103's section) —, written to `store/<fr|en>/` in KITOKEY_SCREENSHOTS'
     folder, or the run's own; then counted: four PNGs a language, each at least 1366 × 768, at most 50 MB."""
@@ -11496,8 +11496,10 @@ def store_shots(now: dt.datetime) -> None:
             (folder / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
             store_audio(folder, meeting["said"], 103 + index)
         window = Window(meetings, language, 'reminder = false\nafter = "nothing"\n')
-        # The recorded meeting is one of today, at a working hour, not the scenarios' fixed one (the recorder stand-in's own folder).
+        # The recorded meeting is of a working hour, never after the run's clock: today's, or yesterday's before it
+        # (lina, 2026-11-21); not the scenarios' fixed one (the recorder stand-in's own folder).
         recorded_at = now.replace(hour=STORE_RECORDED[0], minute=STORE_RECORDED[1], second=0, microsecond=0)
+        recorded_at -= dt.timedelta(days=1) if recorded_at > now else dt.timedelta()
         window.env.update(GTK_THEME="Adwaita", HOME=str(home), KITOKEY_E2E_RECORDED=recorded_at.strftime("%Y-%m-%d_%H-%M"),
                           KITOKEY_E2E_RECORDED_AT=recorded_at.isoformat(timespec="seconds"),
                           KITOKEY_E2E_RECORDED_UNTIL=(recorded_at + dt.timedelta(seconds=5)).isoformat(timespec="seconds"))
@@ -11559,8 +11561,11 @@ def store_shots(now: dt.datetime) -> None:
     check("Settings' screenshot says the meetings' folder in the user's home, never the run's own path (D103)",
           len(settings) == 2 and all(folder and not folder.startswith("/") for folder in settings.values()), settings)
     hours = {shot: store_hours(page["text"]) for shot, page in shown.items()}
+    check("every screenshot dates its meetings (D103)", len(hours) == 8 and all(hours.values()),
+          [shot for shot, said in hours.items() if not said])
     check("every meeting and summary the screenshots date is of the working day, 8 h to 19 h (D103)",
-          all(hours.values()) and all(8 <= hour < 19 for said in hours.values() for hour in said), hours)
+          all(8 <= hour < 19 for said in hours.values() for hour in said),
+          {shot: [hour for hour in said if not 8 <= hour < 19] for shot, said in hours.items() if any(not 8 <= hour < 19 for hour in said)})
     cited = {f"{short}/{kind}": sorted(set(re.findall(r"\[(\d\d:\d\d)\]", meeting["minutes"])) - store_starts(meeting["said"]))
              for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("listed", said.get("listed", {"minutes": "", "said": []})))}
     check("every moment a summary cites is one its transcript starts a line at (D103)",
