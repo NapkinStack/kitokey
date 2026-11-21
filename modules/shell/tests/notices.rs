@@ -106,15 +106,19 @@ fn each_licence_in_the_notices_carries_its_text() {
 
 /// What the window draws that is no crate: Lucide's icons and Montserrat's outlines. Their licences
 /// are written into about.hbs from `ui/LUCIDE-LICENSE` and `ui/MONTSERRAT-OFL.txt`, and must stay
-/// those files, word for word.
+/// those files, word for word — line ends aside: a Windows checkout writes them as \r\n.
 #[test]
 fn the_notices_carry_lucides_and_montserrats_licences_as_their_files_say() {
-    let notices = include_str!("../THIRD-PARTY-NOTICES.html");
+    let notices = include_str!("../THIRD-PARTY-NOTICES.html").replace("\r\n", "\n");
     for (file, text) in [
         ("ui/LUCIDE-LICENSE", include_str!("../ui/LUCIDE-LICENSE")),
         ("ui/MONTSERRAT-OFL.txt", include_str!("../ui/MONTSERRAT-OFL.txt")),
     ] {
-        let escaped = text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+        let escaped = text
+            .replace("\r\n", "\n")
+            .replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;");
         assert!(
             notices.contains(&format!("<pre class=\"licence-text\">{escaped}</pre>")),
             "{file} is not in the notices as it is written: copy it into about.hbs, then make the page again"
