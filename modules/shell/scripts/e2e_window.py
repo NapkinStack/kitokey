@@ -11624,6 +11624,7 @@ def store_shots(now: dt.datetime) -> None:
         " models: shown('#settings h2').filter(h => ['Modèles', 'Models'].includes(h.textContent)).map(h => Math.round(h.getBoundingClientRect().top)),"
         " cut: [...document.querySelectorAll('#groups li *')].filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent),"
         " here: document.getElementById('minutes-here')?.checked ?? null,"
+        " confidential: document.getElementById('confidential-switch')?.checked ?? null,"
         " crossing: [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
         " && e.getBoundingClientRect().top < innerHeight && e.getBoundingClientRect().bottom > innerHeight).map(e => e.textContent.trim() || e.tagName),"
         " above: [...shown('#settings section.card').filter(s => s.getBoundingClientRect().top < 0 && s.getBoundingClientRect().bottom > 0"
@@ -11785,6 +11786,9 @@ def store_shots(now: dt.datetime) -> None:
     unmarked = {shot: lines for shot, lines in marks.items()
                 if not lines or any(not marked or any(fold(m) != fold(shown[shot]["sought"][0 if shot.endswith("2-search.png") else 1]) for m in marked) for marked in lines)}
     check("a search marks the word it found in each line, and each row, it keeps (#1078)", len(marks) == 4 and not unmarked, unmarked)
+    locked = {shot: page["confidential"] for shot, page in shown.items() if shot.endswith("2-search.png")}
+    check("the search shot's meeting, a client's call, shows « Confidentielle » on (the decider, 2026-11-21)",
+          len(locked) == 2 and all(on is True for on in locked.values()), locked)
     listed = {shot: page["rows"] for shot, page in shown.items() if shot.endswith("3-list.png")}
     check("the list shot: a word typed in the list's search, only its meetings shown, at least two (D103)",
           len(listed) == 2 and all(2 <= seen_ < total for seen_, total in listed.values()), listed)
