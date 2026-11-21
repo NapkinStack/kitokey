@@ -10229,10 +10229,12 @@ def context_written(now: dt.datetime) -> None:
         area.click()
         keys(browser, Keys.END, more)
         changed = wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
-        check("changed after its transcript and minutes, Refaire avec ce contexte is offered, said why",
+        # Its button names what it starts: the transcript, and its summary after it (D113).
+        check("changed after its transcript and minutes, the context's button is offered, naming both, said why",
               changed and (meeting / "context.txt").read_text() == said + more
               and browser.find_element(By.CSS_SELECTOR, "#context-changed .says").text == "La transcription et le compte rendu ont été faits avec un autre contexte."
-              and browser.find_element(By.ID, "context-redo").text == "Refaire avec ce contexte", (meeting / "context.txt").read_text())
+              and browser.find_element(By.ID, "context-redo").text == "Refaire la transcription et le compte rendu",
+              ((meeting / "context.txt").read_text(), browser.find_element(By.ID, "context-redo").text))
         seen(browser, "d59-4-page-changed-light")
         # Made again, slowly: the field closed meanwhile, and said.
         (WORK / "slow-hearing").touch()
@@ -10343,6 +10345,8 @@ def context_written(now: dt.datetime) -> None:
         stop_from_small(browser)
         wait_for(browser, lambda b: (meeting / "minutes.md").exists(), 15)
     (meeting / "local.wav").write_bytes(b"\0" * 1000)
+    # No summary yet, the settings making one (`after = "minutes"`): made again, one follows (D113).
+    (meeting / "minutes.md").unlink()
     window = Window(meeting.parent, "en_GB.UTF-8", settings)
     window.env.update(GTK_THEME="Adwaita:dark")
     with window as browser:
@@ -10350,8 +10354,8 @@ def context_written(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "context-text"), 10)
         context_opened(browser).send_keys(Keys.END, " And Lena.")
         changed = wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
-        check("in English, a meeting's page offers Redo with this context", changed
-              and browser.find_element(By.ID, "context-redo").text == "Redo with this context", browser.find_element(By.ID, "context-redo").text)
+        check("in English, a meeting without its summary, the settings making one: the context's button names both", changed
+              and browser.find_element(By.ID, "context-redo").text == "Write the transcript and the summary again", browser.find_element(By.ID, "context-redo").text)
         seen(browser, "d59-4-page-changed-dark")
 
 
