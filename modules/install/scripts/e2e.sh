@@ -37,13 +37,12 @@ if [ -z "$package$copr" ]; then
   made=("$work"/install/*.rpm "$work"/install/*.deb)
   package=${made[0]}
 fi
-# What any package must install, and nothing else: the spec's %files, its macros expanded. The
-# licence is shipped by a package built from source (`from_source`): Copr's must hold it; a package
-# given may — one made from the artefacts does not.
+# What any package must install, and nothing else: the spec's %files, its macros expanded — the
+# notices it owes among them (D102), which a .deb lays in its documentation's folder instead.
 files=$(sed -n '/^%files/,$p' "$here/kitokey.spec" \
-  | sed '1d; /^$/d; /^%if/d; /^%endif/d; s|%{_bindir}|/usr/bin|; s|%{_datadir}|/usr/share|; s|^%license LICENSE$|/usr/share/licenses/kitokey/LICENSE|' | sort)
-licence=/usr/share/licenses/kitokey/LICENSE
-if [ -n "$copr" ]; then optional=; else optional=$licence; files=$(grep -vx "$licence" <<< "$files"); fi
+  | sed '1d; /^$/d; /^%if/d; /^%endif/d; s|%{_bindir}|/usr/bin|; s|%{_datadir}|/usr/share|' | sort)
+case $target in ubuntu-[0-9]*) files=$(sed 's|^/usr/share/licenses/kitokey/|/usr/share/doc/kitokey/|' <<< "$files") ;; esac
+optional=
 expected=$(tr '\n' ' ' <<< "$files")
 # What Kitokey may leave in a user's home on Linux, as docs/privacy.md says it: its Linux paths,
 # in English, then in French — the same, or one of the two pages is wrong.

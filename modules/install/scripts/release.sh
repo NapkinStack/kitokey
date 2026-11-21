@@ -25,9 +25,11 @@ case $target in
   fedora-[0-9]*)
     podman run --rm --security-opt label=disable \
       -v "$artefacts:/artefacts:ro" -v "$here/kitokey.spec:/kitokey.spec:ro" -v "$dist:/out" \
+      -v "$here/../../LICENSE:/LICENSE:ro" -v "$here/notices:/notices:ro" \
       "registry.fedoraproject.org/fedora:${target#fedora-}" bash -euo pipefail -c "
 dnf install -y -q rpm-build >/dev/null
 rpmbuild -bb /kitokey.spec --define 'artefacts /artefacts' --define 'kitokey_version $version' \
+  --define 'licence /LICENSE' --define 'owed /notices' \
   --define '_rpmdir /out' --define '_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm' --quiet
 "
     ls "$dist"/*.rpm
@@ -35,6 +37,7 @@ rpmbuild -bb /kitokey.spec --define 'artefacts /artefacts' --define 'kitokey_ver
   ubuntu-[0-9]*)
     podman run --rm --security-opt label=disable -e version="$version" \
       -v "$artefacts:/artefacts:ro" -v "$here/deb:/deb:ro" -v "$dist:/out" \
+      -v "$here/../../LICENSE:/LICENSE:ro" -v "$here/notices:/notices:ro" \
       "docker.io/library/ubuntu:${target#ubuntu-}" bash -euo pipefail /deb/build.sh
     ls "$dist"/*.deb
     ;;
