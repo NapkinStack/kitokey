@@ -1,7 +1,7 @@
 //! What a package owes the authors of the crates it ships (D102): `THIRD-PARTY-NOTICES.html` names
 //! every crate linked into the program on the systems it is built for, each under its licence's
-//! text, and none that `Cargo.lock` no longer holds. Read offline: a crate added, removed or moved
-//! to another version makes it red, and `about.toml`'s header says how to make it again.
+//! text, and none that `Cargo.lock` no longer holds. A crate added, removed or moved to another
+//! version makes it red, and `about.toml`'s header says how to make it again.
 
 use std::{collections::BTreeSet, process::Command};
 
@@ -26,21 +26,14 @@ fn locked() -> BTreeSet<String> {
         .collect()
 }
 
-/// Each crate linked into the program on those systems, as Cargo resolves it, offline: the normal
-/// dependencies only, since what builds or tests it ships nothing.
+/// Each crate linked into the program on those systems, as Cargo resolves it: the normal
+/// dependencies only, since what builds or tests it ships nothing. Not offline: a build fetches
+/// only its own system's crates, and Cargo reads the others' to resolve them, fetching each once
+/// at the version the lock holds (`--locked`).
 fn shipped() -> BTreeSet<String> {
     let mut tree = Command::new(env!("CARGO"));
-    tree.current_dir(env!("CARGO_MANIFEST_DIR")).args([
-        "tree",
-        "--locked",
-        "--offline",
-        "--edges",
-        "normal",
-        "--prefix",
-        "none",
-        "--format",
-        "{p}",
-    ]);
+    tree.current_dir(env!("CARGO_MANIFEST_DIR"))
+        .args(["tree", "--locked", "--edges", "normal", "--prefix", "none", "--format", "{p}"]);
     for target in TARGETS {
         tree.args(["--target", target]);
     }
