@@ -9415,8 +9415,8 @@ def two_panes(now: dt.datetime) -> None:
         # A transcript whose last line says no `made`: its model alone, no time (D93).
         browser.execute_script(f"location.hash = '#/meeting/{names[-2]}'")
         alone = wait_for(browser, lambda b: shown(b) == names[-2] and makers(b), 10)
-        check("a transcript that does not say when it was made: its model alone, no time (D93)",
-              alone and makers(browser) == ["Transcribed by Whisper large v3 turbo on this computer"], makers(browser))
+        check("a transcript that does not say when it was made: its model alone, no time (D93); « , on this computer » with its comma, as the minutes' line (#1093)",
+              alone and makers(browser) == ["Transcribed by Whisper large v3 turbo, on this computer"], makers(browser))
         line = "Transcribed on Oct 23 at 4:42 AM · Whisper large v3 turbo · in "
         times_taken(browser, {names[-3]: line + "2 min 05 s", names[-4]: line + "1 h 02 min", names[-5]: line + "1 s"})
 
@@ -11581,10 +11581,10 @@ def store_lanes(rects: list) -> tuple[int, int, float]:
     how many bars each lane holds, and the share of the drawn width where both lanes have a bar at once: near
     nothing where people take turns, all of it where two lines are drawn the same."""
     covered = {"local": set(), "remote": set()}
-    for track, x, width in rects:
+    for track, x, width, _ in rects:
         covered.setdefault(track, set()).update(range(int(x), max(int(x) + 1, int(-(-(x + width) // 1)))))
     both, either = covered["local"] & covered["remote"], covered["local"] | covered["remote"]
-    counts = {track: sum(1 for kind, _, _ in rects if kind == track) for track in ("local", "remote")}
+    counts = {track: sum(1 for kind, *_ in rects if kind == track) for track in ("local", "remote")}
     return counts["local"], counts["remote"], round(len(both) / max(1, len(either)), 3)
 
 
@@ -11611,7 +11611,7 @@ def store_shots(now: dt.datetime) -> None:
         "const shown = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent);"
         "return {freed: shown('.chip.gone, #no-player').length,"
         " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText,"
-        " lanes: [...document.querySelectorAll('#meeting svg.relief rect')].map(r => [r.getAttribute('class'), +r.getAttribute('x'), +r.getAttribute('width')]),"
+        " lanes: [...document.querySelectorAll('#meeting svg.relief rect')].map(r => [r.getAttribute('class'), +r.getAttribute('x'), +r.getAttribute('width'), +r.getAttribute('y')]),"
         " sought: [document.getElementById('search')?.value ?? '', document.getElementById('find')?.value ?? ''],"
         " marked: [shown('#meeting .transcript .lines li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent)),"
         " shown('#groups li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent))],"
@@ -11766,6 +11766,12 @@ def store_shots(now: dt.datetime) -> None:
     lanes = {shot: store_lanes(page["lanes"]) for shot, page in shown.items() if shot[3] in "12"}
     check("who spoke, drawn on the meetings' shots, shows the turns: each side's lane at least 4 bars, both lanes drawn at once over a tenth of the width at most (#1077)",
           len(lanes) == 4 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in lanes.values()), lanes)
+    # « Vous » on the upper lane, « Les autres » on the lower, as the transcript's sides read top to bottom (lina, #1093).
+    tops = {shot: (max((y for kind, _, _, y in page["lanes"] if kind == "local"), default=None),
+                   min((y for kind, _, _, y in page["lanes"] if kind == "remote"), default=None))
+            for shot, page in shown.items() if shot[3] in "12"}
+    check("who spoke: « Vous » on the upper lane, every bar of it above every bar of « Les autres » (#1077)",
+          len(tops) == 4 and all(here is not None and others is not None and here < others for here, others in tops.values()), tops)
     lasted = {shot: [store_lasted(row) for row in page["said"]] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
     check("every meeting the list shows lasts as such a meeting does, at least 15 min (D103)",
           len(lasted) == 2 and all(len(rows) == 6 and min(rows) >= 15 for rows in lasted.values()), lasted)
