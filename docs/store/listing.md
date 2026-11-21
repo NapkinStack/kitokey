@@ -6,7 +6,8 @@ and claim only what the product does today. The trial's terms are
 [PDR-0005](../pdr/0005-on-windows-the-trial-ends-without-locking-the-meetings.md)'s, said as
 [Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) §10.8.4
 asks. Privacy policy's URL:
-<https://github.com/NapkinStack/kitokey/blob/main/docs/privacy.md>.
+<https://github.com/NapkinStack/kitokey/blob/main/docs/privacy.md>. Support page's URL:
+<https://github.com/NapkinStack/kitokey/blob/main/docs/support.md>.
 
 ## Screenshots
 
@@ -21,12 +22,17 @@ image « especially representative and appealing » —, and each caption says w
 screen's name (the coordinator's ruling, 2026-11-20). Nothing is added to the images: no logo, no text. What
 matters stays in their top two-thirds, the bottom third being where the Store may lay its own text.
 
+The four shots of D103's criterion 1, as the decider amended it (2026-11-21 ~03:00): meetings a prospect who
+runs back-to-back calls recognises at a glance. Their captions, the decider's « ok, on valide comme tu proposes »
+(2026-11-21 ~03:30), [#1073](https://github.com/NapkinStack/kitokey/pull/1073). No recording shot: while it
+records, the page shows neither its time nor its levels — #1076 brings it back.
+
 | # | File | Caption (English) | Légende (français) |
 |---|---|---|---|
-| 1 | `1-meeting.png` | Minutes and actions written after your meeting — who does what, by when — on your computer, beside a transcript you can listen to. | Le compte rendu et les actions, écrits après votre réunion — qui fait quoi, pour quand — sur votre ordinateur, à côté d'une transcription à réécouter. |
-| 2 | `2-recording.png` | Record any call with no bot in it: from the window, or from a discreet bar above your other windows. | Enregistrez tout appel, sans robot dedans : depuis la fenêtre, ou une barre discrète au-dessus de vos autres fenêtres. |
-| 3 | `3-list.png` | Every meeting kept on your computer, by week, its minutes one click away. | Toutes vos réunions gardées sur votre ordinateur, par semaine, leur compte rendu à un clic. |
-| 4 | `4-settings.png` | On this computer by default. A service only if you choose one, with your own key. | Sur cet ordinateur par défaut. Un service seulement si vous le choisissez, avec votre clé. |
+| 1 | `1-meeting.png` | No bot joins your calls: Kitokey records on your computer, then writes the minutes — decisions, actions, who does what. | Aucun robot ne rejoint vos appels : Kitokey enregistre sur votre ordinateur, puis rédige le compte rendu — décisions, actions, qui fait quoi. |
+| 2 | `2-search.png` | Find what was said, to the second: every line of the transcript keeps its time. | Retrouvez ce qui a été dit, à la seconde : chaque ligne de la transcription garde son heure. |
+| 3 | `3-list.png` | Every meeting with a client, in one search. | Toutes vos réunions avec un client, en une recherche. |
+| 4 | `4-settings.png` | By default, transcription runs on your computer: nothing is sent. An online service stays your choice. | Par défaut, la transcription se fait sur votre ordinateur : rien n'est envoyé. Un service en ligne reste votre choix. |
 
 ## English
 
@@ -51,8 +57,9 @@ you made stays yours: you can still read it, play it, correct it and copy its mi
 
 **What it downloads, before you buy.** To write minutes on your computer, Kitokey uses Ollama, a free
 program you install from ollama.com: Kitokey never installs it. To transcribe on your computer, it downloads
-its speech model, Whisper large-v3-turbo (874 MB), from huggingface.co when you click to get it. Choose a
-service instead, and neither is needed.
+its speech model, Whisper large-v3-turbo (874 MB), from huggingface.co when you click to get it; Ollama
+downloads its model for the minutes, Qwen3 8b (about 5 GB), on your click too. Choose a service instead, and
+neither is needed.
 
 **Features.**
 - Records your microphone and your computer's sound, in any call application
@@ -90,8 +97,9 @@ pouvez toujours les lire, les écouter, les corriger et copier leur compte rendu
 **Ce qu'il télécharge, avant l'achat.** Pour écrire le compte rendu sur votre ordinateur, Kitokey
 utilise Ollama, un programme gratuit que vous installez depuis ollama.com : Kitokey ne l'installe jamais.
 Pour transcrire sur votre ordinateur, il télécharge son modèle de parole, Whisper large-v3-turbo (874 Mo),
-depuis huggingface.co quand vous cliquez pour l'obtenir. Choisissez plutôt un service, et ni l'un ni l'autre
-n'est nécessaire.
+depuis huggingface.co quand vous cliquez pour l'obtenir ; Ollama télécharge son modèle pour le compte rendu,
+Qwen3 8b (environ 5 Go), sur votre clic aussi. Choisissez plutôt un service, et ni l'un ni l'autre n'est
+nécessaire.
 
 **Fonctionnalités.**
 - Enregistre votre micro et le son de votre ordinateur, dans toute application d'appel
@@ -101,6 +109,55 @@ n'est nécessaire.
 - Réécoutez depuis une ligne ; corrigez une ligne de la transcription
 - Compte rendu copié en un clic, à coller là où vous écrivez
 - Une réunion confidentielle reste sur cet ordinateur
+
+## Partner Center — the submission's other fields
+
+Decided on 2026-11-21 by the coordinator as store-listing lead, or by the decider where it says so; Microsoft's
+pages read the same day (ines, D103). Each field is entered in Partner Center, not in the package.
+
+| Field | Value | Why, and its source |
+|---|---|---|
+| Listing languages | English (`en-us`), French (`fr-fr`) | The package's languages (`modules/install/windows/AppxManifest.xml.in`): one listing each |
+| Category | Productivity, no subcategory | [Categories](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/categories-and-subcategories): Productivity has none; « Specifying a category is required » |
+| Privacy policy | <https://github.com/NapkinStack/kitokey/blob/main/docs/privacy.md> | Required: a desktop app « inherently ha[s] access to Personal Information », and Kitokey records the microphone ([Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) 10.5.1) |
+| Website | <https://github.com/NapkinStack/kitokey> | Optional; « a page on your own website, not your app's web listing in the Store » ([support info](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/support-info)) |
+| Support contact | <https://github.com/NapkinStack/kitokey/blob/main/docs/support.md>, which gives `support@kitokey.com` | The decider: « Une page de support »; the address, « Ok on valide support@kitokey.com » (2026-11-21 ~12:05), the same for support and for data requests (`privacy.md`); the mailbox's reception confirmed before submission |
+| System requirements | None declared yet | Optional ([system requirements](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/system-requirements)). Memory and disk come from D105's measure of the release build, once run; the package already asks Windows 10, version 2004 (10.0.19041) or later |
+| « This product has been tested to meet accessibility guidelines » | Not checked | D106 is a first pass by the keyboard, not an audit; checked when a sheet holds it |
+| « This product incorporates generative AI features » | Checked — ines's proposal, the coordinator to confirm | The minutes are written by a language model ([product declarations](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/product-declarations)) |
+| « … make purchases, but does not use the Microsoft Store commerce system » | Not checked | The Store sells the licence (`licence.rs`, `StoreContext`) |
+| Alternate drives; OneDrive backups | Left as Partner Center checks them | Nothing in the product depends on either |
+| Age rating (IARC) | An app, not a game. Users interact with each other: no. Location shared: no. Personal information shared with third parties: **yes** — only with a service the user chooses, with their own key. Unrestricted web access: no. Purchases in the app: none | Honesty first (the coordinator). The questionnaire's questions follow the category answered first ([age ratings](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/age-ratings)); Microsoft shares « your publisher display name and email address with IARC » |
+| Copyright | © 2026 c12c | The decider (company c12c, trade name NapkinStack); 200 characters at most |
+| Licence terms | Microsoft's standard application licence terms | The decider. The Store's binary is distributed by its copyright holder under them while the source stays GPL with a CLA ([PDR-0001](../pdr/0001-wholeheard-open-on-linux-paid-on-macos-and-windows.md)); marc checks no third-party dependency forbids it |
+| Version | 1.0.0 | The decider |
+| Free trial | Unlimited, in the Store | Kitokey's own trial counts days and meetings, which the Store's cannot (the decider, 2026-11-20, cycle 11) |
+| Price, markets, release date | Owed by the decider | [Price and availability](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/price-and-availability) |
+| Visibility | First a **private audience**: the decider and the three users, then public | A smoke test of install, licence and trial from the real Store. Each person given by the email of a *personal* Microsoft account ([visibility](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/visibility-options)) — entered in Partner Center, never here |
+| Seller details (EU) | c12c's, in the account | A trader under the Digital Services Act verifies the company (a DUNS number or a business document) and gives customer contact details ([company verification](https://learn.microsoft.com/en-us/windows/apps/publish/store-business-verification-reqs)): the decider, in Partner Center |
+| Payout and tax profiles | Owed by the decider | Needed before a paid product is submitted |
+
+**Search terms** — seven at most, no pricing term (Store Policies 10.1.3):
+
+| English | Français |
+|---|---|
+| meeting minutes · meeting notes · transcription · call recorder · offline transcription · meeting summary · action items | compte rendu · notes de réunion · transcription · enregistreur d'appel · transcription hors ligne · résumé de réunion · actions de réunion |
+
+**Restricted capability** — Partner Center asks how each one is used ([capability
+declarations](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/app-capability-declarations)):
+
+> `runFullTrust`: Kitokey is a desktop application (Tauri, Win32). It records the microphone and the computer's
+> own sound during a call the user starts, transcribes it with a local speech model, and keeps
+> each meeting as files in the user's Documents folder. These need a full-trust process.
+
+**Notes for certification**:
+
+> Kitokey records a meeting from its window or its bar: « Start recording », then « Stop ». No account is needed.
+> The transcript needs a speech model, offered at first start and downloaded only on a click (874 MB,
+> huggingface.co). The minutes need Ollama, a separate free program Kitokey never installs: without it, the
+> transcript is made and the window says the minutes wait. The trial is Kitokey's own — 14 days and 10
+> meetings, whichever comes last —, shown in Settings; the Store's trial is set to « Unlimited » and the Store
+> sells the licence. Kitokey starts with Windows only when the user turns it on in Settings, once #1085 is merged.
 
 ## What holds each promise
 
