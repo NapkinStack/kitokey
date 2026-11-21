@@ -60,3 +60,14 @@ fn version_beside_another_argument_is_no_question_of_version() {
         assert!(!String::from_utf8_lossy(&output.stdout).contains(VERSION), "{args:?}: {output:?}");
     }
 }
+
+/// The version every package names (`tauri.conf.json`, read by `scripts/release.sh` into `VERSION`)
+/// is Cargo's, and its first part is not 0: the Microsoft Store refuses one (#1086).
+#[test]
+fn the_packages_version_is_cargos_and_the_store_takes_it() {
+    let conf: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+    let packaged = conf["version"].as_str().unwrap();
+    assert_eq!(packaged, env!("CARGO_PKG_VERSION"));
+    let first: u32 = packaged.split('.').next().unwrap().parse().unwrap();
+    assert!(first >= 1, "version {packaged}: the Store refuses a first part 0");
+}

@@ -82,7 +82,8 @@ try {
         }
         $state = ($task | ConvertFrom-Json).state
         Write-Output "  the startup task, as Windows holds it: $state"
-        Check "the startup task's state is one Windows names: $state" ($state -in 'Disabled', 'DisabledByUser', 'Enabled', 'DisabledByPolicy', 'EnabledByPolicy')
+        # Off until the user turns it on in Settings, never by the package (#1085).
+        Check "the startup task is off, as the package declares it: $state" ($state -eq 'Disabled')
         Stop-Process -Id $process.Id -Force
         Wait-For 'its process gone' 30 { -not (Get-Process kitokey -ErrorAction SilentlyContinue) } | Out-Null
     }

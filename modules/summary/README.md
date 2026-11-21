@@ -31,6 +31,10 @@ kitokey-summary <session-folder> --provider https://openrouter.ai/api/v1 --model
 # A model on the machine: nothing leaves it, no key — and, on a laptop, fewer of the actions.
 kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mistral
 
+# In a structure (D111): the sections of a kind of meeting, minutes/v5 — general, one_to_one,
+# stand_up, client_call, interview, project_review. Without --structure, minutes/v4 as above.
+kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mistral --structure stand_up
+
 # Whether a model answers, before any meeting: one sentence of the program's own is sent,
 # `sending` then `answered` said, or why not in one sentence. What the settings' Tester runs.
 kitokey-summary --test --provider http://localhost:11434/v1 --model mistral
@@ -91,6 +95,12 @@ the making the shell passes, so that its lines and the shell's read together.
 The standard verbs — `bootstrap`, `check`, `test`, `run` — are declared in the `commands`
 section of the [manifest](./MANIFEST.yaml), for this module's stack. What each one must do:
 `.nstack/handbook/09-platform.md` §2.
+
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links, under its licence's text. It is made with cargo-about from `about.toml`,
+whose `accepted` list refuses any other licence, GPL among them, and committed; `tests/notices.rs`
+is red once it no longer names `Cargo.lock`'s crates, and `about.toml`'s header gives the two
+commands that make it again.
 
 ## Contracts
 

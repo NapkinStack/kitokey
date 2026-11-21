@@ -28,6 +28,8 @@ if [ -z "$package$copr" ]; then
     mkdir -p "$work/$(dirname "$program")"
     printf '#!/bin/sh\necho "%s: usage: …" >&2\nexit 2\n' "$(basename "$program")" > "$work/$program"
     chmod +x "$work/$program"
+    # The page each module's release leaves beside its program (D102), which every package lays.
+    printf '<p>%s: stand-in notices</p>\n' "$(basename "$program")" > "$work/$(dirname "$program")/THIRD-PARTY-NOTICES.html"
   done
   printf '[Desktop Entry]\nType=Application\nName=Kitokey\nComment[fr]=x\nExec=kitokey\nIcon=com.napkinstack.Kitokey\n' > "$work/shell/com.napkinstack.Kitokey.desktop"
   printf 'png' > "$work/shell/com.napkinstack.Kitokey.png"
@@ -37,13 +39,12 @@ if [ -z "$package$copr" ]; then
   made=("$work"/install/*.rpm "$work"/install/*.deb)
   package=${made[0]}
 fi
-# What any package must install, and nothing else: the spec's %files, its macros expanded. The
-# licence is shipped by a package built from source (`from_source`): Copr's must hold it; a package
-# given may — one made from the artefacts does not.
+# What any package must install, and nothing else: the spec's %files, its macros expanded — the
+# notices it owes among them (D102), which a .deb lays in its documentation's folder instead.
 files=$(sed -n '/^%files/,$p' "$here/kitokey.spec" \
-  | sed '1d; /^$/d; /^%if/d; /^%endif/d; s|%{_bindir}|/usr/bin|; s|%{_datadir}|/usr/share|; s|^%license LICENSE$|/usr/share/licenses/kitokey/LICENSE|' | sort)
-licence=/usr/share/licenses/kitokey/LICENSE
-if [ -n "$copr" ]; then optional=; else optional=$licence; files=$(grep -vx "$licence" <<< "$files"); fi
+  | sed '1d; /^$/d; /^%if/d; /^%endif/d; s|%{_bindir}|/usr/bin|; s|%{_datadir}|/usr/share|' | sort)
+case $target in ubuntu-[0-9]*) files=$(sed 's|^/usr/share/licenses/kitokey/|/usr/share/doc/kitokey/|' <<< "$files") ;; esac
+optional=
 expected=$(tr '\n' ' ' <<< "$files")
 # What Kitokey may leave in a user's home on Linux, as docs/privacy.md says it: its Linux paths,
 # in English, then in French — the same, or one of the two pages is wrong.
@@ -67,7 +68,10 @@ case $target in
   ubuntu-[0-9]*)
     [ -z "$copr" ] || { echo "e2e: Copr builds for Fedora only" >&2; exit 2; }
     image="docker.io/library/ubuntu:${target#ubuntu-}"
-    add='apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/kitokey.deb'
+    # Ubuntu's container image is minimised: its /etc/dpkg/dpkg.cfg.d/excludes has dpkg drop
+    # « /usr/share/doc/* » but copyright files, where the .deb lays its notices (D102); a desktop has no
+    # such file. Removed first, so the package is judged as a user's system installs it.
+    add='rm -f /etc/dpkg/dpkg.cfg.d/excludes && apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/kitokey.deb'
     remove='apt-get remove -y -qq kitokey'; file=/tmp/kitokey.deb
     listed='dpkg -L kitokey'
     scripts='ls /var/lib/dpkg/info/kitokey.preinst /var/lib/dpkg/info/kitokey.postinst /var/lib/dpkg/info/kitokey.prerm /var/lib/dpkg/info/kitokey.postrm'
