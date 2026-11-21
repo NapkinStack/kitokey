@@ -2588,7 +2588,13 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     const now = element("div", "live-now");
     now.append(time, pageLevels(nameOf(session), time, words));
     drawing.append(now);
-  } else drawing.append(relief(said, total, words));
+  } else if (transcript.state === "present") drawing.append(relief(said, total, words));
+  else {
+    // No transcript yet (#1116, the decider): one line says when who spoke will appear, no blank canvas.
+    const later = element("p", "note", words.who_spoke_later);
+    later.id = "who-spoke-later";
+    drawing.append(later);
+  }
   // While it records, the legend's labels stand under their meters; at rest, the legend in its place.
   drawn.append(drawing);
   if (!live) drawn.append(legend);
