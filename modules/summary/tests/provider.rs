@@ -184,6 +184,9 @@ fn ollama_is_asked_on_its_own_route_with_room_for_the_whole_request() {
     // Two bytes to a token at the very least, and room to answer beyond them, in whole steps.
     assert_eq!(body["options"]["num_ctx"], 57_344, "{}", body["options"]);
     assert_eq!(body["options"]["num_predict"], 4096, "{}", body["options"]);
+    // A thinking model asked not to think: its reasoning would fill num_predict on a long
+    // transcript and the minutes be refused as cut short (#1083).
+    assert_eq!(body["think"], false, "{}", body["think"]);
 }
 
 #[test]
@@ -230,6 +233,7 @@ fn a_provider_that_is_not_ollama_is_asked_on_the_openai_route() {
     let (head, body) = received.recv().unwrap();
     assert!(head.starts_with("POST /v1/chat/completions "), "{head}");
     assert!(!body.contains("num_ctx"), "{body}");
+    assert!(!body.contains("\"think\""), "{body}");
 
     let (address, received) = played(Some(r#"{"name":"another"}"#), vec![("200 OK", answering("text", "stop"))]);
     assert_eq!(asking(&address, None).unwrap(), "text");
