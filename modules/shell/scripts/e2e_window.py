@@ -3048,8 +3048,8 @@ def cancelled_at_once(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         # Minutes this computer wrote (`provider: local`) said as a buyer reads it, never the contract's word (#1080).
         here = wait_for(browser, lambda b: "writer first" in makers(b), 10)
-        check("minutes written on this computer: « Writer first — sur cet ordinateur », never « via local » (#1080)",
-              here and "writer first — sur cet ordinateur" in makers(browser) and "via local" not in makers(browser), makers(browser))
+        check("minutes written on this computer: « Writer first, sur cet ordinateur » — as « Transcrit par …, sur cet ordinateur » —, never « via local » (#1080)",
+              here and "writer first, sur cet ordinateur" in makers(browser) and "via local" not in makers(browser), makers(browser))
         for what, file, step, start, (first, second), said_after in steps:
             before, listed = sha(file), sorted(p.name for p in meeting.iterdir())
             held, child = WORK / f"held-{step}", WORK / f"held-{step}-child"
