@@ -355,6 +355,8 @@ fn main() {
         }))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        // MUTANT, never merged: the updater D102's trial must refuse.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // « Vérifier le son »'s window destroyed with the panel open: its listening goes with it, within
         // the second capture promises (D88) — stopped off the window's thread. A window hidden closes
         // the panel itself (`visibilitychange`, `ui/window.js`).
