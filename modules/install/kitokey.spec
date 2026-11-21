@@ -5,6 +5,10 @@
 %if %{undefined artefacts}
 %global artefacts dist
 %global from_source 1
+# Kitokey's LICENSE and install's notices (D102): in the source package; else mounted by
+# scripts/release.sh, which defines both.
+%global licence LICENSE
+%global owed modules/install/notices
 # Built in release mode, without symbols to gather: no debuginfo package.
 %global debug_package %{nil}
 %endif
@@ -61,11 +65,21 @@ install -Dm755 %{artefacts}/summary/kitokey-summary %{buildroot}%{_bindir}/kitok
 for program in %{buildroot}%{_bindir}/*; do strip "$program" 2>/dev/null || :; done
 install -Dm644 %{artefacts}/shell/com.napkinstack.Kitokey.desktop %{buildroot}%{_datadir}/applications/com.napkinstack.Kitokey.desktop
 install -Dm644 %{artefacts}/shell/com.napkinstack.Kitokey.png %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png
+# What the programs owe the authors of what they ship (D102), as windows/notices.py names it.
+install -Dm644 %{licence} %{buildroot}%{_datadir}/licenses/kitokey/LICENSE.txt
+install -Dm644 %{owed}/MPL-SOURCES.txt %{buildroot}%{_datadir}/licenses/kitokey/MPL-SOURCES.txt
+install -Dm644 %{artefacts}/shell/THIRD-PARTY-NOTICES.html %{buildroot}%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey.html
+install -Dm644 %{artefacts}/capture/THIRD-PARTY-NOTICES.html %{buildroot}%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-capture.html
+install -Dm644 %{artefacts}/transcription/THIRD-PARTY-NOTICES.html %{buildroot}%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-transcription.html
+install -Dm644 %{artefacts}/summary/THIRD-PARTY-NOTICES.html %{buildroot}%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-summary.html
 
 %files
-%if 0%{?from_source}
-%license LICENSE
-%endif
+%{_datadir}/licenses/kitokey/LICENSE.txt
+%{_datadir}/licenses/kitokey/MPL-SOURCES.txt
+%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey.html
+%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-capture.html
+%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-transcription.html
+%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-summary.html
 %{_bindir}/kitokey
 %{_bindir}/kitokey-capture
 %{_bindir}/kitokey-transcription
