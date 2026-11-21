@@ -11570,7 +11570,7 @@ def store_shots(now: dt.datetime) -> None:
              for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("listed", said.get("listed", {"minutes": "", "said": []})))}
     check("every moment a summary cites is one its transcript starts a line at (D103)",
           "listed" in STORE_MEETINGS["fr"] and not any(cited.values()), cited)
-    paused = {short: store_pauses(WORK / f"store-{short}", STORE_MEETINGS[short]["said"]) for short in STORE_MEETINGS}
+    paused = {short: store_pauses(WORK / f"store-{short}" / "Kitokey", STORE_MEETINGS[short]["said"]) for short in STORE_MEETINGS}
     check("the opened meeting's sound pauses inside each line, as speech does, never one block (D103)",
           all(paused.values()) and all(count >= 2 for counts in paused.values() for count in counts), paused)
 
