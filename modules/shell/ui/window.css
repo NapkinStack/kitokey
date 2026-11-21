@@ -5,12 +5,14 @@
   --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
   /* A field's, a list's, a switch's border, 3:1 on each ground (D89); --line divides, and only that. */
   --edge: #808898;
+  /* The word a search found (#1078): the accent's tint, under --ink. */
+  --mark: #D3DEF8;
 }
 @media (prefers-color-scheme: dark) {
   :not([data-theme="light"]):root {
     --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
     --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
-    --edge: #737B8C;
+    --edge: #737B8C; --mark: #2E3E66;
   }
 }
 /* The appearance chosen in Settings (D98): light or dark whatever the system says — the same two
@@ -20,7 +22,7 @@
   color-scheme: dark;
   --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
   --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
-  --edge: #737B8C;
+  --edge: #737B8C; --mark: #2E3E66;
 }
 * { box-sizing: border-box; }
 ::placeholder { color: var(--soft); opacity: 1; }
@@ -110,9 +112,11 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .meeting-head .named h1 { min-width: 0; }
 .drawn { padding: 14px 18px 10px; display: flex; flex-direction: column; gap: 8px; }
 .relief { width: 100%; height: 88px; }
-.relief polyline { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
-.relief .local { stroke: var(--accent); }
-.relief .remote { stroke: var(--ok); }
+.relief rect { rx: 2px; }
+/* The word a search found (#1078). */
+mark { background: var(--mark); color: var(--ink); border-radius: 2px; }
+.relief .local { fill: var(--accent); }
+.relief .remote { fill: var(--ok); }
 .drawn .legend .here { color: var(--accent); }
 .drawn .legend .remote { color: var(--ok); }
 /* The minutes, then the transcript; side by side once the pane is 1000 px wide, together as wide as
