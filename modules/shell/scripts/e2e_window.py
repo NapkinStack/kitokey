@@ -89,6 +89,28 @@ SUMMARY.chmod(0o755)
 # kitokey-transcription played here: a whole transcript, naming the model it was given — a
 # service's by its host, as the real one names it; where a scenario stands the service in
 # ($STANDIN, D60), its request is sent to it, as the real one would send the sound there.
+# kitokey-send played here (posting/v1, D110): each call kept beside it — its arguments, and its input,
+# where the address is, a secret — and answered as the real one judges an address: `https:` to a host
+# that is not this computer is checked; anything else refused. It never sends anything anywhere.
+SENDER = WORK / "kitokey-send"
+SENDER.write_text(
+    """#!/usr/bin/env python3
+import json, sys
+from pathlib import Path
+said = sys.stdin.read()
+with open(Path(sys.argv[0]).parent / "send-calls.jsonl", "a") as calls:
+    calls.write(json.dumps({"args": sys.argv[1:], "input": said}) + "\\n")
+address = json.loads(said)["address"]
+host = address.split("://", 1)[-1].split("/", 1)[0]
+if address.startswith("https://") and host not in ("127.0.0.1", "localhost") and not host.startswith("192.168."):
+    print(json.dumps({"event": "checked" if "--check" in sys.argv else "sent"}))
+    sys.exit(0)
+print(json.dumps({"event": "failed", "code": "address.refused"}))
+print("kitokey-send: the address is refused: it is not https, or it points to this computer or its network", file=sys.stderr)
+sys.exit(1)
+"""
+)
+SENDER.chmod(0o755)
 HEARING = WORK / "kitokey-transcription"
 HEARING.write_text(
     """#!/bin/sh
@@ -638,7 +660,7 @@ class Window:
         self.file.write_text(f'sessions = "{sessions}"\n{opened}{greeted}{more}')
         self.env = dict(os.environ, XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
         # An Ollama and a keyring of the scenario's, never the user's own.
-        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER))
+        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER))
 
     def __enter__(self) -> webdriver.Remote:
         # One Kitokey per session: one still leaving takes this start's arguments and this one
@@ -5134,6 +5156,60 @@ def settings_folded(now: dt.datetime) -> None:
         check("drawn again: still unfolded, as the user left it (#782)",
               browser.execute_script(toggle)["list"] and browser.execute_script(toggle)["expanded"] == "true", browser.execute_script(toggle))
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
+
+
+def destinations_kept(now: dt.datetime) -> None:
+    """CK. D110, PDR-0007 §1 and §6: Settings keeps the destinations a summary can be sent to — a kind, a
+    name, the address pasted. The address is judged by kitokey-send --check, given on its input and never
+    as an argument; refused (not https:, or this computer), it is said and nothing is kept; checked, it
+    goes to the keyring and is never shown whole again — its host and the end of its path — nor written
+    in the settings' file. Forgotten, the destination is gone. Addresses here are made up."""
+    print("CK. Settings: a destination added, its address judged then kept in the keyring, never shown whole; forgotten (D110)")
+    calls = WORK / "send-calls.jsonl"
+    calls.unlink(missing_ok=True)
+    meetings = WORK / "destinations"
+    meetings.mkdir(exist_ok=True)
+    secret = "made-up-secret-7f3a"
+    good = f"https://hooks.example/services/T00/B00/{secret}"
+    window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\n')
+    with window as browser:
+        browser.execute_script("location.hash = '#/settings'")
+        drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "destination-add"), 10)
+        card = "const b = document.getElementById('destination-add'); const c = b && b.closest('section.card'); return c ? c.querySelector('h2').textContent : null"
+        check("Settings offer a card where a destination is added (D110)", drawn and browser.execute_script(card) == "Envoi des comptes rendus",
+              browser.execute_script(card) if drawn else None)
+        rows = "return [...document.querySelectorAll('#destinations li')].map(li => li.innerText)"
+        check("none yet: the card says so", drawn and browser.execute_script(rows) == []
+              and "Aucune destination" in browser.find_element(By.ID, "destinations-said").text, browser.execute_script(rows) if drawn else None)
+
+        def add(kind, name, address):
+            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            for field, value in (("destination-name", name), ("destination-address", address)):
+                element = browser.find_element(By.ID, field)
+                element.clear()
+                element.send_keys(value)
+            press(browser, "destination-add")
+
+        if drawn:
+            add("webhook", "#équipe", "http://hooks.example/plain")
+            said = wait_for(browser, lambda b: "https" in b.find_element(By.ID, "destination-said").text, 10)
+            check("an address not https: is refused, said why, nothing kept (PDR-0007 §6)",
+                  said and browser.execute_script(rows) == [], browser.find_element(By.ID, "destination-said").text)
+            add("slack", "#équipe", good)
+            kept = wait_for(browser, lambda b: len(b.execute_script(rows)) == 1, 10)
+            row = browser.execute_script(rows)[0] if kept else ""
+            check("checked, the destination is listed: its name, its kind, its address as its host and the end of its path",
+                  kept and "#équipe" in row and "Slack" in row and "hooks.example" in row and secret not in row and secret[-4:] in row, row)
+            check("the address field is emptied once kept", browser.find_element(By.ID, "destination-address").get_attribute("value") == "")
+            check("the address is never written in the settings' file (PDR-0007 §1)",
+                  window.file.exists() and secret not in window.file.read_text() and "#équipe" in window.file.read_text())
+            judged = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+            check("each address judged by kitokey-send --check, the address on its input, never among its arguments",
+                  len(judged) == 2 and all(call["args"] == ["--check"] and secret not in " ".join(call["args"]) for call in judged)
+                  and json.loads(judged[1]["input"])["address"] == good, [call["args"] for call in judged])
+            press(browser, "destination-forget-0")
+            gone = wait_for(browser, lambda b: b.execute_script(rows) == [], 10)
+            check("forgotten, the destination is gone, from the page and the settings' file", gone and "#équipe" not in window.file.read_text())
 
 
 def settings_narrow_without_model(now: dt.datetime) -> None:
@@ -13929,6 +14005,7 @@ def main() -> int:
     unsaved_choice_kept(now)
     key_kept_to_its_host(now)
     settings_folded(now)
+    destinations_kept(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
     focus_kept(now)
