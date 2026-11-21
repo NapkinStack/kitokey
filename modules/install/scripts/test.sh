@@ -121,15 +121,16 @@ check("the identity named is the one identity.json holds, for x64",
       said.get("Name") == identity["name"] and said.get("Publisher") == identity["publisher"]
       and said.get("ProcessorArchitecture") == "x64", said)
 check("Kitokey is its name", written.findtext("m:Properties/m:DisplayName", namespaces=ns) == "Kitokey")
-# D84: the session starts Kitokey from its package, a startup task Windows turns on at the first start.
+# D84: the session can start Kitokey from its package, a startup task — off until the user turns it on in
+# Settings (#1085): starting with Windows is asked, never assumed.
 uap5 = "{http://schemas.microsoft.com/appx/manifest/uap/windows10/5}"
 tasks = [(extension.attrib, extension.find(f"{uap5}StartupTask"))
          for extension in written.iterfind(f"m:Applications/m:Application/m:Extensions/{uap5}Extension", ns)
          if extension.get("Category") == "windows.startupTask"]
-check("one startup task, for kitokey.exe, on at the first start, named Kitokey",
+check("one startup task, for kitokey.exe, off until the user turns it on, named Kitokey",
       len(tasks) == 1 and tasks[0][0].get("Executable") == "kitokey.exe"
       and tasks[0][0].get("EntryPoint") == "Windows.FullTrustApplication" and tasks[0][1] is not None
-      and tasks[0][1].get("TaskId") == "KitokeyStartupTask" and tasks[0][1].get("Enabled") == "true"
+      and tasks[0][1].get("TaskId") == "KitokeyStartupTask" and tasks[0][1].get("Enabled") == "false"
       and tasks[0][1].get("DisplayName") == "Kitokey", tasks)
 placeholder = {**identity, "placeholder": True}
 check("a placeholder identity is said, and that the package is not to be submitted",
@@ -181,6 +182,22 @@ with tempfile.TemporaryDirectory() as work:
     for path, why in ((broken, "a file that is not the kit's report"), (os.path.join(work, "none.xml"), "no file")):
         got = appcert.said(path)
         check(f"{why}: one line, saying no report was read", len(got) == 1 and got[0].startswith("certification kit: no report read"), got)
+        check(f"{why}: the run fails, no report read (D102)", appcert.verdict(path) == 2)
+# D102: the run fails on a required test failed, or on no report at all; an optional test failed is named, never blocking.
+check("the kit's report with only an optional test failed passes the run",
+      appcert.verdict(os.path.join(os.path.dirname(mac), "tests", "appcert-report.xml")) == 0)
+with tempfile.TemporaryDirectory() as work:
+    report = open(os.path.join(os.path.dirname(mac), "tests", "appcert-report.xml"), encoding="utf-8").read()
+    required = os.path.join(work, "required.xml")
+    open(required, "w", encoding="utf-8").write(report.replace("<RESULT><![CDATA[PASS]]></RESULT>", "<RESULT><![CDATA[FAIL]]></RESULT>", 1))
+    check("a required test failed fails the run", appcert.verdict(required) == 1)
+    unrun = os.path.join(work, "unrun.xml")
+    open(unrun, "w", encoding="utf-8").write(report.replace("<RESULT><![CDATA[PASS]]></RESULT>", "<RESULT><![CDATA[NOT RUN]]></RESULT>", 1))
+    check("a required test not run fails the run, never skipped silently", appcert.verdict(unrun) == 1)
+    check("no report read fails the run: a kit that did not run is never a pass", appcert.verdict(os.path.join(work, "none.xml")) == 2)
+    empty = os.path.join(work, "empty.xml")
+    open(empty, "w", encoding="utf-8").write(re.sub(r"<REQUIREMENTS>.*</REQUIREMENTS>", "<REQUIREMENTS />", report, flags=re.S))
+    check("a report without a test fails the run: a kit that tested nothing is never a pass", appcert.verdict(empty) == 2)
 check("the notes for certification say what stands between the package and a submission, the kit's failure in it",
       "## What stands between the package and a submission" in certification and "Blocked executables" in certification)
 print("test: passed" if not failed else "test: FAILED")

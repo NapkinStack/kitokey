@@ -142,6 +142,13 @@ The standard verbs — `bootstrap`, `check`, `test`, `run` — are declared in t
 section of the [manifest](./MANIFEST.yaml), for this module's stack. What each one must do:
 `.nstack/handbook/09-platform.md` §2.
 
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links, with every feature, under its licence's text — and whisper.cpp's and
+ggml's MIT notice under whisper-rs-sys, which builds them in. It is made with cargo-about from
+`about.toml`, whose `accepted` list refuses any other licence, GPL among them, and committed;
+`tests/notices.rs` is red once it no longer names the crates the program links, and `about.toml`'s
+header gives the two commands that make it again.
+
 ## Contracts
 
 - Provided: [`transcript/v1`](../../contracts/transcript/v1/README.md), `experimental`
