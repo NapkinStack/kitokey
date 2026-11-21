@@ -11381,6 +11381,44 @@ def png_size(file: Path) -> tuple[int, int]:
     return struct.unpack(">II", head[16:24]) if head[:8] == b"\x89PNG\r\n\x1a\n" else (0, 0)
 
 
+def store_hours(text: str) -> list[int]:
+    """The hours a page dates a meeting or a summary at — « · 14:30 », « à 14:30 », « · 2:30 PM », « at 2:30 PM » —,
+    on 24 hours; never a moment of a recording (« 00:45 »), which has neither."""
+    return [int(hour) % 12 + (12 if half == "PM" else 0) if half else int(hour)
+            for hour, half in re.findall(r"(?:· |\bà |\bat )(\d{1,2}):\d\d(?:\s*([AP]M))?", text)]
+
+
+def store_starts(said: list) -> set[str]:
+    """The moments a store meeting's transcript starts its lines at, as a summary cites them: « 00:45 »."""
+    return {f"{int(STORE_EVERY * index + 5) // 60:02d}:{int(STORE_EVERY * index + 5) % 60:02d}" for index in range(len(said))}
+
+
+def store_pauses(meetings: Path, said: list) -> list[int]:
+    """For each line of the opened meeting, how many pauses of at least 0.3 s its speaker's track holds inside it:
+    speech breathes between its phrases; a line drawn as one block reads as a made-up tone."""
+    opened = sorted(folder for folder in meetings.iterdir() if (folder / "transcript.jsonl").exists())[-1:]
+    if not opened:
+        return []
+    counts = []
+    for index, (who, _, _) in enumerate(said):
+        with wave.open(str(opened[0] / ("local.wav" if who == "me" else "remote.wav"))) as track:
+            rate = track.getframerate()
+            track.setpos(int(rate * (STORE_EVERY * index + 5)))
+            frames = track.readframes(int(rate * STORE_SPOKEN))
+        samples = struct.unpack(f"<{len(frames) // 2}h", frames)
+        step = rate // 10
+        loud = [max(map(abs, samples[n:n + step]), default=0) > 300 for n in range(0, len(samples) - step + 1, step)]
+        runs, quiet = 0, 0
+        for window in loud[1:-1] + [True]:
+            if window:
+                runs += quiet >= 3
+                quiet = 0
+            else:
+                quiet += 1
+        counts.append(runs)
+    return counts
+
+
 def store_shots(now: dt.datetime) -> None:
     """CH. D103: the Microsoft Store's screenshots, made here from meetings invented for them, in French then
     in English, light, in the Store's order — the benefit first (the coordinator, 2026-11-20, from Microsoft's
@@ -11391,6 +11429,11 @@ def store_shots(now: dt.datetime) -> None:
     print("CH. the Store's screenshots: four a language, French and English, 1920 × 1080, from meetings invented for them (D103)")
     store = Path(os.environ.get("KITOKEY_SCREENSHOTS") or WORK / "shots") / "store"
     shutil.rmtree(store, ignore_errors=True)
+    # What each shot's page says, read as it is taken: a Store shot says no audio lost, no run's folder, no night hour.
+    shown: dict[str, dict] = {}
+    seen = lambda browser, shot: shown.update({shot: browser.execute_script(
+        "return {freed: [...document.querySelectorAll('.chip.gone, #no-player')].filter(e => e.offsetParent).length,"
+        " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText}")})
     for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
         said = STORE_MEETINGS[short]
         meetings = WORK / f"store-{short}"
@@ -11433,6 +11476,7 @@ def store_shots(now: dt.datetime) -> None:
                 browser.execute_script("scrollTo(0, 0)")
                 time.sleep(0.4)
                 browser.save_screenshot(str(store / short / f"{shot_name}.png"))
+                seen(browser, f"{short}/{shot_name}.png")
             # Recording: the full window's page of the meeting being recorded (the coordinator's choice, 2026-11-20).
             before = {folder.name for folder in meetings.iterdir()}
             live = lambda b: "live" in (b.find_element(By.ID, "record").get_attribute("class") or "")
@@ -11449,6 +11493,7 @@ def store_shots(now: dt.datetime) -> None:
                 browser.execute_script("document.activeElement.blur(); scrollTo(0, 0)")
                 time.sleep(1.5)
                 browser.save_screenshot(str(store / short / "2-recording.png"))
+                seen(browser, f"{short}/2-recording.png")
                 time.sleep(0.6)
                 browser.find_element(By.ID, "record").click()
                 wait_for(browser, lambda b: not live(b), 10)
@@ -11457,6 +11502,7 @@ def store_shots(now: dt.datetime) -> None:
             browser.execute_script("scrollTo(0, 0)")
             time.sleep(0.4)
             browser.save_screenshot(str(store / short / "4-settings.png"))
+            seen(browser, f"{short}/4-settings.png")
     made = sorted(store.glob("*/*.png"))
     sizes = {f"{file.parent.name}/{file.name}": (png_size(file), file.stat().st_size) for file in made}
     check("the Store's screenshots: four a language, French and English, in the Store's order (D103)",
@@ -11465,6 +11511,21 @@ def store_shots(now: dt.datetime) -> None:
     check("each at least 1366 × 768 and at most 50 MB, as Microsoft's page asks (D103)",
           bool(sizes) and all(w >= STORE_LEAST[0] and h >= STORE_LEAST[1] and 0 < size <= STORE_MOST for (w, h), size in sizes.values()),
           sizes)
+    check("no screenshot says an audio deleted or one Kitokey cannot play (D103)",
+          len(shown) == 8 and not any(page["freed"] for page in shown.values()), {shot: page["freed"] for shot, page in shown.items()})
+    settings = {shot: page["folder"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' screenshot says the meetings' folder in the user's home, never the run's own path (D103)",
+          len(settings) == 2 and all(folder and not folder.startswith("/") for folder in settings.values()), settings)
+    hours = {shot: store_hours(page["text"]) for shot, page in shown.items()}
+    check("every meeting and summary the screenshots date is of the working day, 8 h to 19 h (D103)",
+          all(hours.values()) and all(8 <= hour < 19 for said in hours.values() for hour in said), hours)
+    cited = {f"{short}/{kind}": sorted(set(re.findall(r"\[(\d\d:\d\d)\]", meeting["minutes"])) - store_starts(meeting["said"]))
+             for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("listed", said.get("listed", {"minutes": "", "said": []})))}
+    check("every moment a summary cites is one its transcript starts a line at (D103)",
+          "listed" in STORE_MEETINGS["fr"] and not any(cited.values()), cited)
+    paused = {short: store_pauses(WORK / f"store-{short}", STORE_MEETINGS[short]["said"]) for short in STORE_MEETINGS}
+    check("the opened meeting's sound pauses inside each line, as speech does, never one block (D103)",
+          all(paused.values()) and all(count >= 2 for counts in paused.values() for count in counts), paused)
 
 def trial_over(now: dt.datetime) -> None:
     """AV. The trial over on a stand-in licence (PDR-0005, D83): no recording from the window, the
