@@ -22,7 +22,8 @@ round: 1
 *Revised after the challenge (§5), 2026-11-21: the framer's answer is §6a. The first proposal put the live
 recording page first and called sharing weak; both readings changed. Revised again on the decider's answers
 of 2026-11-21 ~06h (§6c): import and voices are one axis, « a long file in, a pertinent summary and a
-transcript with speakers out ».*
+transcript with speakers out ». Candidate 8, dated items to a calendar, entered on the decider's word of
+2026-11-21 ~06h40 (§2e); it ranks 4.*
 
 ```mermaid
 quadrantChart
@@ -36,9 +37,10 @@ quadrantChart
     "1 Long file in, summary and speakers out": [0.85, 0.95]
     "2 Structures, the user's own": [0.42, 0.68]
     "3 Live recording page": [0.12, 0.38]
-    "4 macOS paid path": [0.88, 0.58]
-    "5 Hand-off, beyond D109-D110": [0.62, 0.55]
-    "6 Store trailer": [0.45, 0.15]
+    "4 Dated items to a calendar file": [0.5, 0.45]
+    "5 macOS paid path": [0.88, 0.58]
+    "6 Hand-off, beyond D109-D110": [0.62, 0.55]
+    "7 Store trailer": [0.45, 0.15]
 ```
 
 **Legend** — x: the framer's cost estimate, read from the repository (S under two days, M one deliverable,
@@ -51,14 +53,15 @@ data showing no lift. Quadrants are the framer's reading, not a measure.
 | 1 | **A long file in, a pertinent summary and a transcript with speakers out**: import an audio **or video** file — the audio track read from the container — then voices, opt-in (spikes S2 and S1) | **Strong**, and now the three users' own: the decider, 2026-11-21 ~06h, « les 3 utilisateur utilise l'import dans leur cadre pro » (§6c). Market: Meetily's « most requested feature »; Fathom « on our product roadmap »; Otter caps it; voices the top request at Meetily, Granola, Notion | **L** — S2 with five real files first, MP4 and MOV among them (§5b); the session-audio contract's expand; S1 opening on the models' licences; the shell's gesture | **First**: what cycle 12 is built around, held by a criterion on a file of more than an hour (§6c) |
 | 2 | **Structures**: the user's own, beyond D111's six, and the summary's language | Moderate–strong: Meetily #243 (11 👍), four vendors charge for custom templates | **M** — once D111 (#1041–#1043) is merged | **Third**: finish D111 in cycle 11; cycle 12 adds a structure the user writes |
 | 3 | **Live time and levels on a meeting's page while it records** (#1076, #780) | Moderate, indirect — and mostly shipped: capture's silence notice after 10 s and the bar's meters, clock and silent status already exist (§5c) | **S** | **The cycle's small item**: the page made consistent with the bar, and the Store's recording screenshot back (#1073) |
-| 4 | **macOS paid path** (ADR-0017) | Moderate: one-time $49–99 is the niche's norm; no conversion data | **L** — four code deliverables, and the decider's gestures first (FastSpring's quote, KYC, Apple's $99 programme) | **In parallel, gated on the decider's gestures**: revenue, not pull |
-| 5 | **Hand-off** beyond what cycle 11 ships (OAuth: Notion, Slack) | **Strong for cloud buyers** (Granola gates Notion and Zapier on Business), **untested for Kitokey's** (§5c); weak among local-tool users | Nothing to build first: D109's rich copy (#1025) and export, D110's webhooks already hand a summary over without a secret; **OAuth M–L**, with the secret problem | **No build in cycle 12**; a test instead — the Windows colleague pastes a copied summary into Teams, Outlook and OneNote |
-| 6 | **Store trailer and hero art** | **Weak**: Microsoft's only figure is « up to 11 % » from 2018; Apple's own test showed no lift | **M** — the screencast spike in headless GNOME | **Last**, filmed after 1–3 land; a long file summarised with its speakers is the scene to film |
+| 4 | **Dated items to a calendar file**: the summary's dates — a meeting planned, a deliverable due — proposed one by one, each with its absolute date computed from the meeting's date and its passage `[mm:ss]`, ticked by the user, written as an `.ics` file | **No market demand found**, and no rival does it: they read calendars to join meetings; follow-ups go to task trackers without documented due dates; writing an event is rare and always confirmed (Otter's pre-filled link to « Save »); no `.ics` export anywhere (§2e). Value rests on the persona: a missed deadline is serious for a lawyer — the decider's case | **S** spike, then **M** — the spike measures how a local model's « by when » resolves against the meeting's date on invented French and English transcripts, the date computed in code, « date not said » allowed; then an `.ics` writer in `export` (all-day `VEVENT`s, RFC 5545) and a panel to tick and edit | **Spike in cycle 12** after axis 1; the feature when its error rate is known. Never added to a calendar without the user's tick |
+| 5 | **macOS paid path** (ADR-0017) | Moderate: one-time $49–99 is the niche's norm; no conversion data | **L** — four code deliverables, and the decider's gestures first (FastSpring's quote, KYC, Apple's $99 programme) | **In parallel, gated on the decider's gestures**: revenue, not pull |
+| 6 | **Hand-off** beyond what cycle 11 ships (OAuth: Notion, Slack) | **Strong for cloud buyers** (Granola gates Notion and Zapier on Business), **untested for Kitokey's** (§5c); weak among local-tool users | Nothing to build first: D109's rich copy (#1025) and export, D110's webhooks already hand a summary over without a secret; **OAuth M–L**, with the secret problem | **No build in cycle 12**; a test instead — the Windows colleague pastes a copied summary into Teams, Outlook and OneNote |
+| 7 | **Store trailer and hero art** | **Weak**: Microsoft's only figure is « up to 11 % » from 2018; Apple's own test showed no lift | **M** — the screencast spike in headless GNOME | **Last**, filmed after 1–3 land; a long file summarised with its speakers is the scene to film |
 
 **What this changes in the coordinator's working hypothesis** (1 sharing, 2 structures, 3 import, 4 live
 recording page): import and voices come first, as one axis; sharing needs no build in cycle 12 — the secret-free
 hand-off a Windows buyer would use (rich copy, export, webhooks) ships in cycle 11, and what is left is to see
-it paste well; the live recording page stays a small item.
+it paste well; the live recording page stays a small item; dated items to a calendar file enter at 4, as a spike first.
 
 ---
 
@@ -152,6 +155,59 @@ review site, a forum. *Search only*: seen in a search result, the page not opene
   v. Granola*, *In re Otter.AI*, the BIPA claims against Fireflies) were read only in press and rival pages:
   **assumption** that a stored voiceprint carries a biometric risk, not read at a primary source.
 
+### 2e. Dated items to a calendar — candidate 8
+
+The decider, 2026-11-21 ~06h40, relayed verbatim by the coordinator: « suite a un résumé il peut y avoir des
+choses prévue et daté, ex: une deuxieme reunion prévue, une livrable etc.. est ce qu'on a la possibilité des
+"connecter" un agenda ou de reporté ce genre de chose a un agenda, local, cloud.. comment font les autres ?
+over ingé ? pertinent ? » — then « oui, lance marc sur l'étude agenda ». Read 2026-11-21; help.otter.ai and
+support.read.ai refused automated reads (their lines are *search only*).
+
+| Who | Reads a calendar (to join, to name) | Writes an event from what was said | Tasks with a due date | Source |
+|---|---|---|---|---|
+| Granola | **F** « Granola reads from whichever provider you signed in with (Google Calendar or Outlook) » | Not found | **F** a blog says AI builds an item « with an owner, a deliverable, and a deadline », and « reviewing AI-extracted action items after each meeting is part of the workflow, not an optional step »; trackers via Zapier (Business) | [calendars](https://docs.granola.ai/help-center/getting-started/syncing-your-calendars), [action items](https://www.granola.ai/blog/meeting-action-items-ai-extraction) *vendor* |
+| Otter | **F** to auto-join and auto-share | **F** on a voice request, a **pre-filled Google Calendar link**: « you will need to review and click 'Save' »; « Microsoft Outlook calendar is not supported at this time » | Not found | help centre *search only*; [Engadget, 2025-03-25](https://www.engadget.com/ai/otterais-meeting-agent-can-schedule-calls-and-write-emails-for-you-130048612.html) *secondary* **U** (address as the search recorded it) |
+| Fireflies | **F** to find and join meetings | Not found | **F** « automatically create tasks from action items » in Asana; **due dates not mentioned** | [Asana guide](https://guide.fireflies.ai/articles/1901313269-how-to-integrate-asana-with-fireflies) *vendor* |
+| Fathom | — | Not found | **F** « Action items assigned to you » synced to Asana; due dates not mentioned | [help 7639617](https://help.fathom.video/en/articles/7639617) *vendor* |
+| Microsoft Teams, Facilitator | **I** native | **F** « help participants schedule necessary follow-up meetings » | **F** « Select 'Accept to sync' » to send tasks to Planner — confirmed by the user; due dates not mentioned | [Facilitator](https://support.microsoft.com/en-us/office/facilitator-in-microsoft-teams-meetings-37657f91-39b5-40eb-9421-45141e3ce9f6) *vendor* |
+| Zoom AI Companion | **F** recommended | **F** on request: « when prompted by a user… find and schedule a time » | **F** « Action items from a meeting summary become tasks with owners and deadlines » (blog, 2026-07-30) | Zoom pages *search only* and blog *vendor* |
+| Asana AI Meetings | **F** synced | Not found | **F** « You review each suggestion before it becomes a task » | [asana.com](https://asana.com/features/project-management/meetings) *vendor* |
+| Notion, tl;dv, Read.ai, Jamie, Anarlog, OpenWhispr, Meetily | **F** read only, where at all (Meetily: « Coming Soon ») | Read.ai on request **U**; the others not found | To trackers or CRMs; due dates not documented | as in the research notes |
+
+- **F** An `.ics` export from a summary: **found in none**. **I** Not a convention to follow, an open slot; the
+  convention it borrows from — `.ics` by mail — is decades old.
+- **F** Complaints: a deadline nobody had said, and « "maybe next quarter" » turned into a dated action
+  ([Lilach Bullock](https://www.lilachbullock.com/ai-meeting-notetaker-problem/) *secondary*); advice to write
+  « due date not specified » rather than guess ([GoTranscript, 2026-04-24](https://gotranscript.com/en/blog/red-flags-in-ai-summaries)
+  *secondary*). No complaint found about events created by mistake — **I** few products create any.
+- **F** Models get temporal arithmetic wrong: TimeBench reports « a significant performance gap between the
+  state-of-the-art LLMs and humans » ([arXiv 2311.17667](https://arxiv.org/abs/2311.17667), ACL 2024); Test of
+  Time says they « remain susceptible to errors » ([arXiv 2406.09170](https://arxiv.org/abs/2406.09170)). A 2025
+  framework has the model write code that computes the date ([arXiv 2507.06450](https://arxiv.org/abs/2507.06450)).
+  **Not found**: any measure of small local models on spoken French. **I** The model names the expression and
+  its passage; code computes the date from the meeting's.
+- **F** RFC 5545 (September 2009): an all-day event takes a `DATE` `DTSTART`, and `VTODO`'s `DUE` exists
+  ([RFC 5545](https://www.rfc-editor.org/rfc/rfc5545.txt)); Google Calendar's import ignores `VTODO`s
+  ([Google Groups](https://groups.google.com/g/tasks-backup/c/YVUSYThNtl8) *secondary*, old). **I** Deadlines as
+  all-day `VEVENT`s, a stable `UID` each.
+- **F** Opening the file: new Outlook for Windows does not import an `.ics` reliably on a double-click and
+  cannot undo an import in bulk ([Microsoft Q&A](https://answers.microsoft.com/en-us/outlook_com/forum/all/how-do-you-import-ics-files-with-new-outlook/16db54b1-a3a8-44db-99b6-83683637b496)
+  *secondary, search only*); macOS Calendar imports by « File > Import » ([Apple](https://support.apple.com/guide/calendar/import-or-export-calendars-icl1023/mac)
+  *vendor*); on this Fedora 45, GNOME Calendar 51 opens `text/calendar` (read locally, 2026-11-21).
+- **F** Connecting Google's calendar means OAuth with PKCE, scopes such as `calendar.events`, and Google's
+  verification of sensitive scopes, « can take up to 10 days » ([Google](https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification)
+  *vendor*), an unverified app being capped at 100 users (*search only*); Microsoft Graph's delegated
+  `Calendars.ReadWrite` needs no admin consent ([Graph permissions](https://learn.microsoft.com/en-us/graph/permissions-reference)
+  *vendor*). **I** An app registration per provider, tokens kept on the machine, a user's cloud account made a
+  dependency: against the no-go on OAuth in cycle 12, and over-engineered for a gain no rival shows.
+
+**Reading (I).** The coordinator's working hypothesis holds: dated items proposed from the summary, each with
+its absolute date and its passage, ticked by the user, written as an `.ics`; no calendar connected. Kitokey
+already has half of it: `minutes/v4`'s actions say **what — who — by when**, followed by the passage `[mm:ss]`
+(`contracts/minutes/v4/README.md`); « by when » is the model's words, not a date. The risk is the date itself:
+« jeudi » read against the wrong day is a deadline missed — hence a spike before any build, and the user's
+tick before any file.
+
 ## 3. Define
 
 - **Users.** The charter's three — the decider on Fedora, a colleague on Windows, one on macOS — and, from
@@ -192,6 +248,7 @@ listing's before (the measure exists once D102 sells).
 | 4 | A user writes the structure their own meeting needs once the six built-in ones are there | Nobody writes one; the built-in six suffice |
 | 5 | One price on macOS, with a trial that asks for nothing, sells | No purchase in the weeks after the build ships, with the trial reached |
 | 6 | Sharing beyond a webhook brings buyers | — not proposed for cycle 12 |
+| 8 | A professional keeps the dates a meeting set — in a calendar they already use — once Kitokey proposes them with their source, and corrects few | The user unticks or corrects most proposed dates, or never imports the file |
 | 7 | A trailer converts Store visitors | — measured only if Partner Center shows the listing's conversion before and after |
 
 **A short press release** — *imagined*, dated at a placeholder launch, **2026-12-18**:
@@ -218,6 +275,9 @@ Whether it convinces the decider: to record at stage 6.
 - **No trailer before the features it would show** are merged; no text or UI in the hero art (Microsoft's
   rule).
 - **No OAuth sharing** (Notion, Slack) in cycle 12.
+- **No calendar connected** — no Google or Microsoft sync, no calendar read or write in cycle 12 — and **nothing
+  added to a calendar without the user's tick**; a date the transcript does not say stays « not said », never
+  guessed (§2e).
 
 ## 5. Challenge
 
