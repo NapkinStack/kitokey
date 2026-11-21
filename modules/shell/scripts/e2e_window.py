@@ -7968,10 +7968,14 @@ def renaming(now: dt.datetime) -> None:
                " return {inside: d.contains(t), size: parseFloat(getComputedStyle(t).fontSize), heading: parseFloat(getComputedStyle(h).fontSize),"
                " tabular: getComputedStyle(t).fontVariantNumeric.includes('tabular-nums'),"
                " under: m.length === 2 && m.every(e => d.contains(e) && e.getBoundingClientRect().top >= r.bottom),"
-               " right: document.querySelector('#meeting .legend .range')?.textContent ?? null}")
+               " right: document.querySelector('#meeting .legend .range')?.textContent ?? null,"
+               # Each side's label right under its own meter (Gestalt proximity), within the meter's width.
+               " labels: m.map((e, i) => { const l = e.parentElement.querySelector(i ? ':scope > .remote' : ':scope > .here'); if (!l) return false;"
+               " const a = e.getBoundingClientRect(), b = l.getBoundingClientRect();"
+               " return b.left >= a.left - 1 && b.right <= a.right + 1 && b.top >= a.bottom - 1 && b.top - a.bottom <= 16; })}")
         large = browser.execute_script(big)
-        check("while it records, the time stands large in the who-spoke area, tabular, the meters under it, nothing at the legend's right (#1112)",
-              large is not None and large["inside"] and large["size"] >= large["heading"] and large["tabular"] and large["under"] and large["right"] is None,
+        check("while it records, the time stands large in the who-spoke area, tabular, the meters under it, each side's label under its meter, nothing at the legend's right (#1112)",
+              large is not None and large["inside"] and large["size"] >= large["heading"] and large["tabular"] and large["under"] and large["right"] is None and large["labels"] == [True, True],
               large)
         # Its page while it records, seen (#1076, T4; the source of the Store's recording shot): 420 and 1100 px, light and dark.
         size = browser.get_window_size()
