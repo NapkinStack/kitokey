@@ -11620,7 +11620,11 @@ def store_shots(now: dt.datetime) -> None:
         " here: document.getElementById('minutes-here')?.checked ?? null,"
         " crossing: [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
         " && e.getBoundingClientRect().top < innerHeight && e.getBoundingClientRect().bottom > innerHeight).map(e => e.textContent.trim() || e.tagName),"
-        " above: shown('#settings section.card').filter(s => s.getBoundingClientRect().top < 0 && s.getBoundingClientRect().bottom > 0).length,"
+        " above: [...shown('#settings section.card').filter(s => s.getBoundingClientRect().top < 0 && s.getBoundingClientRect().bottom > 0"
+        " && ![...s.querySelectorAll('h2')].some(h => ['Modèles', 'Models'].includes(h.textContent))).map(s => s.querySelector('h2')?.textContent ?? 'SECTION'),"
+        " ...[...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
+        " && e.getBoundingClientRect().top < 0 && e.getBoundingClientRect().bottom > 0).map(e => e.textContent.trim() || e.tagName)],"
+        " fit: window.storeFit ?? null,"
         " zero: (document.getElementById('settings')?.innerText.match(/\\b0\\s(?:o|B)\\b/g) ?? []).length}")})
     # An Ollama of CH's own, holding the model every meeting's minutes name: Settings says them written on this
     # computer, as the meetings do.
@@ -11767,10 +11771,13 @@ def store_shots(now: dt.datetime) -> None:
     here = {shot: page["here"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
     check("Settings' shot says the minutes written on this computer, as every meeting's are (D103)", len(here) == 2 and all(here.values()), here)
     above = {shot: page["above"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
-    check("Settings' shot cuts no card at its top (D103)", len(above) == 2 and not any(above.values()), above)
+    # Its top may cut the Models card's own padding — a page scrolled —, never the card above nor a line or a control
+    # (the coordinator, 2026-11-21, after #1081's longer Tester line left no offset with the card's top whole).
+    check("Settings' shot cuts no text or control at its top, nor the card above its models (D103)", len(above) == 2 and not any(above.values()), above)
     crossing = {shot: page["crossing"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
     check("Settings' shot: the card under its models goes on past the image's edge between two rows, never through a control or a line of text (D103)",
-          len(crossing) == 2 and not any(crossing.values()), crossing)
+          len(crossing) == 2 and not any(crossing.values()),
+          {shot: {"crossing": crossing[shot], "fit": shown[shot]["fit"]} for shot in crossing})
     # What only a run has — a loopback address, its stand-ins' ports — never on a buyer's screen.
     run = {shot: sorted(set(re.findall(r"127\.0\.0\.1(?::\d+)?|localhost:(?!11434\b)\d+", page["text"]))) for shot, page in shown.items()}
     check("no screenshot shows an address or a port only the run has (D103)", len(run) == 8 and not any(run.values()),
