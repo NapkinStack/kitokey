@@ -10305,6 +10305,13 @@ def context_gaps(now: dt.datetime) -> None:
         kept = wait_for(browser, lambda b: (meeting / "context.txt").exists() and (meeting / "context.txt").read_text() == typed, 3)
         check("the full window's page of the meeting being recorded offers its context: a Cyrillic name and an emoji kept whole",
               open_ and kept, (meeting / "context.txt").read_text() if (meeting / "context.txt").exists() else None)
+        # Being recorded, no track written yet — the stand-in's `"tracks":{}`, as a waiting microphone leaves a real
+        # one (session-audio/v2, a track gained later): nothing says its audio deleted, row or page (#1054).
+        freed = browser.execute_script(
+            "return [...document.querySelectorAll('.chip.gone')].filter((c) => c.offsetParent).map((c) => c.textContent)"
+            ".concat([...document.querySelectorAll('#no-player')].map((p) => p.textContent))")
+        check("a meeting being recorded, no sound file yet: nothing says its audio deleted, on its row or its page (#1054)",
+              freed == [], freed)
         # The button says it at the click now (D68); a press within half a second is the same press.
         time.sleep(0.6)
         browser.find_element(By.ID, "record").click()
