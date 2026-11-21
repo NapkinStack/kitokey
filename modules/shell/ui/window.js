@@ -1574,7 +1574,15 @@ function lineWith(said, pick, kind = "maker") {
   const line = element("p", kind);
   const [before, after] = said.split(IN_LINE);
   line.append(before);
-  if (after !== undefined) line.append(pick, after);
+  if (after === undefined) return line;
+  line.append(pick);
+  // A list drawn as the language's setting's (#1094): its value, Lucide's chevron after it.
+  if (pick.tagName === "SELECT") {
+    const chevron = icon("chevron-down");
+    chevron.classList.add("chevron");
+    line.append(chevron);
+  }
+  line.append(after);
   return line;
 }
 
