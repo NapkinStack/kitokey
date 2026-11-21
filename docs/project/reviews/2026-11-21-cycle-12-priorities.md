@@ -53,7 +53,7 @@ data showing no lift. Quadrants are the framer's reading, not a measure.
 | 1 | **A long file in, a pertinent summary and a transcript with speakers out**: import an audio **or video** file — the audio track read from the container — then voices, opt-in (spikes S2 and S1) | **Strong**, and now the three users' own: the decider, 2026-11-21 ~06h, « les 3 utilisateur utilise l'import dans leur cadre pro » (§6c). Market: Meetily's « most requested feature »; Fathom « on our product roadmap »; Otter caps it; voices the top request at Meetily, Granola, Notion | **L** — S2 with five real files first, MP4 and MOV among them (§5b); the session-audio contract's expand; S1 opening on the models' licences; the shell's gesture | **First**: what cycle 12 is built around, held by a criterion on a file of more than an hour (§6c) |
 | 2 | **Structures**: the user's own, beyond D111's six, and the summary's language | Moderate–strong: Meetily #243 (11 👍), four vendors charge for custom templates | **M** — once D111 (#1041–#1043) is merged | **Third**: finish D111 in cycle 11; cycle 12 adds a structure the user writes |
 | 3 | **Live time and levels on a meeting's page while it records** (#1076, #780) | Moderate, indirect — and mostly shipped: capture's silence notice after 10 s and the bar's meters, clock and silent status already exist (§5c) | **S** | **The cycle's small item**: the page made consistent with the bar, and the Store's recording screenshot back (#1073) |
-| 4 | **Dates mentioned in a meeting**: each date the transcript says — a meeting planned, a deliverable due — listed with its absolute date, the **reference day** it was resolved against (shown and editable: an import has none by default) and its passage `[mm:ss]`, labelled « date mentionnée », never « échéance »; copied with the summary; an `.ics` later | **No market demand found**, and no rival does it: they read calendars to join meetings; follow-ups go to task trackers without documented due dates; writing an event is rare and always confirmed; no `.ics` export anywhere (§2e) — **I** more a choice the leaders made than a gap (§5e). Value rests on the persona, where a **wrong** date costs more than a missed one | **S** spike, then **S** the panel; the `.ics` writer **M**, later | **Spike in cycle 12**, after axis 1 says where an import's day comes from: threshold ≤ 1 wrong date in 50 proposed, apart from « not said »; then the panel, copied with the summary (#1025). The `.ics` only once the three users say where their dates go (§6c, 6) |
+| 4 | **Dates mentioned in a meeting**: each date the transcript says — a meeting planned, a deliverable due — listed with its absolute date, the **reference day** it was resolved against (shown and editable: an import has none by default) and its passage `[mm:ss]`, labelled « date mentionnée », never « échéance »; copied with the summary; an `.ics` later | **No market demand found**, and no rival does it: they read calendars to join meetings; follow-ups go to task trackers without documented due dates; writing an event is rare and always confirmed; no `.ics` export anywhere (§2e) — **I** more a choice the leaders made than a gap (§5e). Value rests on the persona, where a **wrong** date costs more than a missed one | **S** spike, then **S** the panel; the `.ics` writer **M**, later | **Spike in cycle 12**, after axis 1 says where an import's day comes from: threshold ≤ 1 wrong date in 50 proposed, apart from « not said »; then the panel, copied with the summary (#1025); then, for ticked dates, an `.ics` plus one-click links to Google Calendar and Outlook web, no OAuth (§6c, question 6) |
 | 5 | **macOS paid path** (ADR-0017) | Moderate: one-time $49–99 is the niche's norm; no conversion data | **L** — four code deliverables, and the decider's gestures first (FastSpring's quote, KYC, Apple's $99 programme) | **In parallel, gated on the decider's gestures**: revenue, not pull |
 | 6 | **Hand-off** beyond what cycle 11 ships (OAuth: Notion, Slack) | **Strong for cloud buyers** (Granola gates Notion and Zapier on Business), **untested for Kitokey's** (§5c); weak among local-tool users | Nothing to build first: D109's rich copy (#1025) and export, D110's webhooks already hand a summary over without a secret; **OAuth M–L**, with the secret problem | **No build in cycle 12**; a test instead — the Windows colleague pastes a copied summary into Teams, Outlook and OneNote |
 | 7 | **Store trailer and hero art** | **Weak**: Microsoft's only figure is « up to 11 % » from 2018; Apple's own test showed no lift | **M** — the screencast spike in headless GNOME | **Last**, filmed after 1–3 land; a long file summarised with its speakers is the scene to film |
@@ -548,8 +548,8 @@ trial-to-purchase rate, from Partner Center, once D102 sells, before and after i
    clients on Fedora.
 4. ~~Has FastSpring been asked for its quote, and when?~~ Answered 2026-11-21 ~06h, below.
 5. ~~Do the three users import files today, and from what?~~ Answered 2026-11-21 ~06h, below.
-6. **Where do the three users put the dates a meeting set** — a calendar, a task tracker, their firm's case
-   software, nowhere? One message each (§5e, value). It decides whether candidate 8 ever writes an `.ics`.
+6. ~~**Where do the three users put the dates a meeting set**~~ Answered 2026-11-21 ~10h35, below: several
+   calendars, so several destinations, chosen by the market's shares rather than by the three users.
 
 ### 6c, answered — the decider, 2026-11-21 ~06h
 
@@ -607,7 +607,64 @@ te donnerai la main plus tard pour les tests dans chrome ».
 - **Question 3**: the paste test is run in the web clients of Teams, Outlook and OneNote on Fedora, by the
   coordinator in the decider's Chrome when the decider hands it over — a summary copied by Kitokey (#1025),
   what holds of its headings and lists in each. Not yet run.
-- **Question 6** stays open: where the three users put the dates a meeting set.
+- **Question 6**: answered below.
+
+### 6c, answered — question 6, the decider, 2026-11-21 ~10h35
+
+Relayed verbatim by the coordinator: « ils ont des outils de calendrier différents donc comme pour les export
+il faut prévoir plusieurs destinations. ces utilisateurs ne sont que des exemple donc on commence par ce qui ai
+representé par le marché reel des utilisateurs d'outil calendrier ».
+
+```mermaid
+flowchart LR
+    T["dates mentionnées<br/>ticked by the user"]:::step --> I["an .ics file<br/>every calendar imports it"]:::all
+    T --> G["Google Calendar link<br/>documented by Google"]:::one
+    T --> O["Outlook web link<br/>not documented"]:::risk
+    I --> S["the calendar's own screen<br/>the user saves"]:::saved
+    G --> S
+    O --> S
+    classDef step fill:#374151,color:#fff
+    classDef all fill:#065f46,color:#fff
+    classDef one fill:#1e3a8a,color:#fff
+    classDef risk fill:#7c2d12,color:#fff
+    classDef saved fill:#374151,color:#fff
+```
+
+**Legend** — grey: what the user does · green: the universal destination · blue: a one-click link its
+provider documents · red: a one-click link nobody documents. No account, no token: each path ends on the
+provider's own screen, where the user saves.
+
+**Who holds the calendars.** No independent measure of calendar applications' shares was found: the figures
+in search results come from market-report sellers that disagree with one another (67 %, 72 %, 63 % for « the
+big three »), and Gartner's and 6sense's pages refused automated reads. **I** A professional's calendar is
+the one in their mail suite, so the suite is the proxy:
+
+| Where | Microsoft 365 | Google Workspace | Others | Source |
+|---|---|---|---|---|
+| France, 9,046 company domains, first inbound mail server | 22.0 % | 13.7 % | ~64 %, European operators 49.9 % | [CipherCue, 2026-11-17](https://ciphercue.com/blog/europe-email-microsoft-google) *secondary*, MX observed 2026-04-29 → 11-16; « not a random sample »; MX « show where mail is delivered first, not where it is stored » |
+| Europe, 80,361 company domains | 25.2 % | 12.6 % | 62 % neither | same |
+| Enterprise productivity SaaS, worldwide | 77 % | — | — | Gartner, Aug. 2025 (document 6860166), *search only* |
+| Consumers, Australia, mobile calendars used in 12 months | — | Google 25.1 % | Apple 25.4 % | [ECAL](https://ecal.com/70-percent-of-adults-rely-on-digital-calendar/) *vendor*, its own users, undated (**I** ~2018) |
+
+- **I** For the Store's professional buyer in France: Microsoft first, Google second, then a long tail of
+  operators (OVH, Orange, Infomaniak, on-premises Exchange…) whose calendars no link reaches. Apple Calendar
+  matters on the Mac and the phone, not in a firm's suite.
+
+**The one-click links, checked 2026-11-21.**
+
+| Destination | Link | Documented? | Source |
+|---|---|---|---|
+| Google Calendar | `https://calendar.google.com/calendar/r/eventedit?action=TEMPLATE&text=…&dates=…&details=…` — all-day as `YYYYMMDD/YYYYMMDD`, the end the next day | **F** Yes, by Google: « you can provide a link with a pre-filled event for the user to add themselves »; the link « creates a distinct event on the user's calendar »; Otter uses it (§2e) | [Google Calendar API, inviting attendees](https://developers.google.com/workspace/calendar/api/concepts/inviting-attendees-to-events) *vendor*; all-day form [IDF docs, checked 2026-08-19](https://interactiondesignfoundation.github.io/add-event-to-calendar-docs/services/google.html) *secondary* |
+| Outlook on the web, Microsoft 365 | `https://outlook.office.com/calendar/action/compose?rru=addevent&subject=…&startdt=…&enddt=…&allday=true` | **F** **No**: no Microsoft page found; users asked for one and got no staff answer; the earlier path `/calendar/0/deeplink/compose` stopped loading in May 2023, and its replacement was found by users; a black screen reported on mobile web | [Microsoft Community Hub, 2023-05-09 → 16](https://techcommunity.microsoft.com/discussions/outlookgeneral/httpsoutlook-office-comcalendar0deeplinkcompose---fails-to-load-and-redirect/3816442) *secondary*; [Microsoft Q&A, 2025-01-17](https://learn.microsoft.com/en-nz/answers/questions/2148634/deeplinking-to-outlook-calendar-compose-subscribe) *secondary* |
+| Every calendar, Outlook's and Apple's included | an `.ics`, one all-day `VEVENT` per date, a stable `UID` | **F** RFC 5545 (§2e) | [RFC 5545](https://www.rfc-editor.org/rfc/rfc5545.txt) |
+
+**Reading (I).** The smallest design that serves the most: the `.ics` for everyone, the Google link because
+Google documents it, and the Outlook link — the largest professional destination — only as long as it is
+checked by hand: it can break without notice, as it did in 2023, and new Outlook's own `.ics` import is
+unreliable (§2e), so for Microsoft's users neither path is clean. Hence a check before shipping: the
+coordinator opens both links and the `.ics` in the decider's Chrome (Google and Outlook web) and in GNOME
+Calendar, the date pre-filled and the provider's « save » screen shown; the Outlook link is shipped only if it
+does, with the `.ics` beside it, always.
 
 ### 6d. Decision
 
@@ -621,8 +678,11 @@ te donnerai la main plus tard pour les tests dans chrome ».
 2. **Structures**: the user's own, once D111 has merged in cycle 11.
 3. **Live time and levels on a meeting's page while it records** (#1076): the cycle's small item.
 4. **Dates mentioned**: a spike first — at most 1 wrong date in 50, apart from « not said », the reference day
-   shown —; then the « dates mentionnées » panel copied with the summary; an `.ics` only once question 6 is
-   answered and the re-import test is run.
+   shown —; then the « dates mentionnées » panel copied with the summary, each date ticked by the user; then,
+   for the ticked dates, several destinations by market share (§6c, question 6, the decider ~10h35): an
+   `.ics` for every calendar, a Google Calendar link (documented by Google), an Outlook web link (not
+   documented: shipped only once checked by hand, the `.ics` always beside it). No account, no token; each
+   opens the provider's own « save » screen.
 5. **The macOS paid path**, in parallel, gated on the decider's gestures (FastSpring's quote, « on le fera
    ensemble, non bloquant »).
 6. **Hand-off**: no build; the paste test of question 3.
