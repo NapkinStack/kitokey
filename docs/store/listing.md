@@ -167,7 +167,7 @@ by its letter and function), a module's tests, or a decision. A promise nothing 
 
 | Promise | Held by |
 |---|---|
-| Records your microphone and your computer's sound, in any call application | `capture`: `tests/session_audio_v2.rs`, `tests/call.rs`; contract `session-audio` |
+| Records your microphone and your computer's sound, in any call application | `capture`: `tests/session_audio_v2.rs`, `tests/call.rs` (Linux's graph); contract `session-audio`. **On Windows, not yet held**: the default input and the default output's sound through cpal, no test, never seen in a real call — #482, the colleague's Windows 11 trial (cycle 11). Held before submission, or the line changes |
 | No bot in the call, no account | Kitokey records the computer's own sound and joins nothing; it has no account or server ([PDR-0001](../pdr/0001-wholeheard-open-on-linux-paid-on-macos-and-windows.md), [privacy policy](../privacy.md)) |
 | Transcript and minutes on your computer by default | AH `context_gaps` (« in private mode the context goes to Whisper and Ollama on this computer alone »); Y `first_run` (D58) |
 | A service only if you choose it, with your own key; where a meeting goes seen before it is sent | Z `service_named` (its host agreed to first); CB `key_kept_to_its_host` (#964); AG `corrections_gated` |
@@ -176,7 +176,7 @@ by its letter and function), a module's tests, or a decision. A promise nothing 
 | Actions listed by who, what and by when | AK `actions_rows` (D46) |
 | Listen again from any line; correct a line of the transcript | R, in `main()`'s sections (D26); AB `transcript_corrected` (D62) |
 | Minutes copied in one click, to paste where you write | AJ `minutes_copied` (D45, D109) |
-| A free trial of 14 days and 10 meetings, what is left shown in Settings | AW `trial_left` (D83, [PDR-0005](../pdr/0005-on-windows-the-trial-ends-without-locking-the-meetings.md)) |
+| A free trial of 14 days and 10 meetings, what is left shown in Settings | AW `trial_left` (D83, [PDR-0005](../pdr/0005-on-windows-the-trial-ends-without-locking-the-meetings.md)); `tests/trial.rs`; the real Store's licence by `modules/install/windows/trial.ps1` alone, on a person's Windows, and the private audience's first install |
 | After the trial, every meeting still read, played, corrected and copied | AV `trial_over` (D83) |
 | Ollama never installed by Kitokey; the speech model downloaded on a click | V `ollama_pulled` (D37, on the user's click); `model::DEFAULT` (874 MB, `huggingface.co`) |
 | The screenshots: four a language, at Microsoft's size | CH `store_shots` (D103) |
