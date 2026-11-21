@@ -26,6 +26,7 @@ import sys
 import threading
 import time
 import traceback
+import unicodedata
 import urllib.request
 import wave
 from pathlib import Path
@@ -2497,7 +2498,7 @@ def meeting_language(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         own = Select(browser.find_element(By.ID, "meeting-language"))
         check("a meeting's page offers its own language, the settings' by default — the language they name said",
-              own.first_selected_option.text == "Celle des Réglages — English" and not (heard / "language").exists(), own.first_selected_option.text)
+              own.first_selected_option.text == "English, selon les Réglages" and not (heard / "language").exists(), own.first_selected_option.text)
         choose(browser, "meeting-language", "de")
         written = wait_for(browser, lambda b: (heard / "language").exists() and (heard / "language").read_text() == "de\n", 5)
         check("chosen on its page, the meeting's language file holds its code alone", written)
@@ -2529,7 +2530,7 @@ def meeting_language(now: dt.datetime) -> None:
                                      for line in log.read_text(errors="replace").splitlines()
                                      if any(word in line for word in ("language_set", "\"WARN\"", "\"ERROR\"", "panicked"))][-8:]),
             }
-        check("« Celle des Réglages »: the file removed", removed, None if removed else said_then())
+        check("« …, selon les Réglages »: the file removed", removed, None if removed else said_then())
         args.unlink(missing_ok=True)
         browser.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", heard.name, str(model))
         again = wait_for(browser, lambda b: "--language" in told(), 15)
@@ -2552,7 +2553,7 @@ def meeting_language(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         # By script, in one step: the page may be drawn again between finding the list and reading it.
         said = browser.execute_script("const p = document.getElementById('meeting-language'); return p.options[p.selectedIndex].text")
-        check("the settings detecting it, the page says « détectée »", said == "Celle des Réglages — détectée", said)
+        check("the settings detecting it, the page says « Détection automatique », the words Settings use (#1074)", said == "Détection automatique", said)
         # Refused on its page (the shell's refusal stood in for, each refusal its own words): said, and
         # still said once the page is drawn again; a second refusal says its own; a choice saved says
         # none; gone once the page is left (#841, the rule of #655's fix).
@@ -2608,8 +2609,8 @@ def meeting_language(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         offered = [o.text for o in Select(browser.find_element(By.ID, "meeting-language")).options]
-        check("SpeechAnalyzer hearing: the page says the system's language, never « détectée », and offers French and English alone",
-              offered == ["Celle des Réglages — Français", "Français", "English"], offered)
+        check("SpeechAnalyzer hearing: the page says the system's language, never « Détection automatique », and offers French and English alone (#1074)",
+              offered == ["Français, selon les Réglages", "Français", "English"], offered)
     with window as browser:
         press(browser, "settings-link")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meetings-language"), 10)
@@ -5237,7 +5238,7 @@ def appearance_chosen(now: dt.datetime) -> None:
 
 def bar_language(now: dt.datetime) -> None:
     """BR. D99: the bar's options offer the meeting's language — at rest the next meeting's, recording
-    the one in progress' —, the meeting's page's list (D65, D89), « Celle des Réglages » first, and its
+    the one in progress' —, the meeting's page's list (D65, D89), Settings' choice first (#1074), and its
     refusal said as the page says it; by the keyboard alone, in French and in English."""
     print("BR. the bar's options: the meeting's language, the next one's at rest, taken at the start, the one in progress' while recording, refused said — keyboard alone, French and English (D99)")
     focused = "const a = document.activeElement; return a.id || a.className"
@@ -5266,8 +5267,8 @@ def bar_language(now: dt.datetime) -> None:
         keys(browser, Keys.ENTER)
         return wait_for(browser, lambda b: not b.execute_script("return document.getElementById('small-options').hidden"), 3)
     for language, (short, settled, first, refused) in {
-        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Celle des Réglages — Deutsch", "Langue non enregistrée : "),
-        "en_US.UTF-8": ("en", "", "Same as Settings — detected", "Language not saved: "),
+        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Deutsch, selon les Réglages", "Langue non enregistrée : "),
+        "en_US.UTF-8": ("en", "", "Detect automatically", "Language not saved: "),
     }.items():
         taping = WORK / f"bar-language-{short}"
         taping.mkdir()
@@ -9384,9 +9385,9 @@ def two_panes(now: dt.datetime) -> None:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1] and b.find_elements(By.CSS_SELECTOR, ".transcript .lines li"), 10)
         made = makers(browser)
-        check("in English: when each version was made, in local time, then its model, how long, what it cost (D93, D97)",
-              sorted(made) == sorted(["Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo · in 31 min 52 s · $0.012",
-                                      "Summary of Oct 23 at 05:00 AM · Claude Sonnet, via openrouter.ai · in 3 s"]), made)
+        check("in English: when each version was made, in local time — « 4:42 AM », no zero US English does not write (#1075) —, then its model, how long, what it cost (D93, D97)",
+              sorted(made) == sorted(["Transcribed on Oct 23 at 4:42 AM · Whisper large v3 turbo · in 31 min 52 s · $0.012",
+                                      "Summary of Oct 23 at 5:00 AM · Claude Sonnet, via openrouter.ai · in 3 s"]), made)
         english = [browser.find_element(By.ID, "record-said").text] + [
             [browser.find_element(By.ID, i).get_attribute(a) for a in ("aria-label", "title")] for i in ("fold", "unfold", "free-link", "small-link", "settings-link")]
         browser.execute_script("document.activeElement.blur()")
@@ -9414,9 +9415,9 @@ def two_panes(now: dt.datetime) -> None:
         # A transcript whose last line says no `made`: its model alone, no time (D93).
         browser.execute_script(f"location.hash = '#/meeting/{names[-2]}'")
         alone = wait_for(browser, lambda b: shown(b) == names[-2] and makers(b), 10)
-        check("a transcript that does not say when it was made: its model alone, no time (D93)",
-              alone and makers(browser) == ["Transcribed by Whisper large v3 turbo on this computer"], makers(browser))
-        line = "Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo · in "
+        check("a transcript that does not say when it was made: its model alone, no time (D93); « , on this computer » with its comma, as the minutes' line (#1093)",
+              alone and makers(browser) == ["Transcribed by Whisper large v3 turbo, on this computer"], makers(browser))
+        line = "Transcribed on Oct 23 at 4:42 AM · Whisper large v3 turbo · in "
         times_taken(browser, {names[-3]: line + "2 min 05 s", names[-4]: line + "1 h 02 min", names[-5]: line + "1 s"})
 
     empty = WORK / "panes-none"
@@ -11315,7 +11316,7 @@ STORE_MEETINGS = {
     "fr": {
         "titles": ["Point d’équipe hebdo", "Point individuel — Hugo", "Atelier Lumen — cadrage du projet",
                    "Atelier Lumen — devis et planning", "Comité de pilotage — T4", "Revue produit de la semaine"],
-        "minutes": ("## 1.\n\nLa 2.4 sort jeudi comme prévu ; l’export PDF suit la semaine d’après, le temps de couvrir deux cas.\n\n"
+        "minutes": ("## 1.\n\nLa 2.4 sort jeudi comme prévu ; l’export PDF suit la semaine d’après, le temps de couvrir deux cas. Les tickets du support baissent de 15\u00a0% ce mois-ci, la moitié encore sur la connexion SSO ; l’activation passe de 41 à 48\u00a0%.\n\n"
                     "## 2.\n\n- Prévenir le support du report de l’export — Hugo — demain [@190]\n"
                     "- Préparer les notes de version — Camille — mercredi [@192]\n"
                     "- Ouvrir une version de test à Atelier Lumen et à la mutuelle Horizon — Camille — vendredi [@9]\n\n"
@@ -11400,7 +11401,7 @@ STORE_MEETINGS = {
     "en": {
         "titles": ["Weekly team check-in", "1:1 — Hugo", "Lumen Studio — project kickoff",
                    "Lumen Studio — quote call", "Steering committee — Q4", "Weekly product review"],
-        "minutes": ("## 1.\n\n2.4 ships on Thursday as planned; the PDF export follows the week after, to cover two more cases.\n\n"
+        "minutes": ("## 1.\n\n2.4 ships on Thursday as planned; the PDF export follows the week after, to cover two more cases. Support tickets are down 15% this month, half still about SSO sign-in; activation goes from 41 to 48%.\n\n"
                     "## 2.\n\n- Tell support the export is delayed — Hugo — tomorrow [@190]\n"
                     "- Write the release notes — Camille — Wednesday [@192]\n"
                     "- Give Lumen Studio and Horizon Insurance a test version — Camille — Friday [@9]\n\n"
@@ -11575,17 +11576,16 @@ def store_hours(text: str) -> list[int]:
             for hour, half in re.findall(r"(?:· |\bà |\bat )(\d{1,2}):\d\d(?:\s*([AP]M))?", text)]
 
 
-def store_relief(points: str) -> tuple[int, int]:
-    """A track of who spoke as the page draws it (`relief`, 60 sixtieths, each the share of it covered by speech):
-    how many heights it takes, silence apart, and its longest run at full height — a plateau, the mark of lines
-    of one length every few seconds, never of people talking."""
-    shares = [round(abs(float(point.split(",")[1]) - 44) - 2, 1) for point in points.split()]
-    heights = {share for share in shares if share > 0}
-    longest = run = 0
-    for share in shares:
-        run = run + 1 if share == max(heights, default=-1) else 0
-        longest = max(longest, run)
-    return len(heights), longest
+def store_lanes(rects: list) -> tuple[int, int, float]:
+    """Who spoke as the page draws it (#1077): a bar for each segment, yours on one lane, the others' on the other —
+    how many bars each lane holds, and the share of the drawn width where both lanes have a bar at once: near
+    nothing where people take turns, all of it where two lines are drawn the same."""
+    covered = {"local": set(), "remote": set()}
+    for track, x, width, _ in rects:
+        covered.setdefault(track, set()).update(range(int(x), max(int(x) + 1, int(-(-(x + width) // 1)))))
+    both, either = covered["local"] & covered["remote"], covered["local"] | covered["remote"]
+    counts = {track: sum(1 for kind, *_ in rects if kind == track) for track in ("local", "remote")}
+    return counts["local"], counts["remote"], round(len(both) / max(1, len(either)), 3)
 
 
 def store_lasted(row: str) -> int:
@@ -11611,13 +11611,20 @@ def store_shots(now: dt.datetime) -> None:
         "const shown = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent);"
         "return {freed: shown('.chip.gone, #no-player').length,"
         " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText,"
-        " relief: [...document.querySelectorAll('#meeting svg.relief polyline')].map(l => l.getAttribute('points')),"
+        " lanes: [...document.querySelectorAll('#meeting svg.relief rect')].map(r => [r.getAttribute('class'), +r.getAttribute('x'), +r.getAttribute('width'), +r.getAttribute('y')]),"
+        " sought: [document.getElementById('search')?.value ?? '', document.getElementById('find')?.value ?? ''],"
+        " marked: [shown('#meeting .transcript .lines li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent)),"
+        " shown('#groups li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent))],"
+        " writers: shown('#meeting .maker').filter(p => p.querySelector('select')).map(p => { const s = p.querySelector('select');"
+        " let after = s.options[s.selectedIndex]?.textContent ?? '';"
+        " for (let n = p.querySelector('select').nextSibling; n; n = n.nextSibling) after += n.textContent; return after; }),"
         " lines: [shown('#meeting .transcript .lines li').length, document.querySelectorAll('#meeting .transcript .lines li').length],"
         " rows: [shown('#groups li').length, document.querySelectorAll('#groups li').length],"
         " fetch: shown('#model-fetch').length, said: shown('#groups li').map(e => e.innerText),"
         " models: shown('#settings h2').filter(h => ['Modèles', 'Models'].includes(h.textContent)).map(h => Math.round(h.getBoundingClientRect().top)),"
         " cut: [...document.querySelectorAll('#groups li *')].filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent),"
         " here: document.getElementById('minutes-here')?.checked ?? null,"
+        " confidential: document.getElementById('confidential-switch')?.checked ?? null,"
         " crossing: [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
         " && e.getBoundingClientRect().top < innerHeight && e.getBoundingClientRect().bottom > innerHeight).map(e => e.textContent.trim() || e.tagName),"
         " above: [...shown('#settings section.card').filter(s => s.getBoundingClientRect().top < 0 && s.getBoundingClientRect().bottom > 0"
@@ -11663,6 +11670,10 @@ def store_shots(now: dt.datetime) -> None:
             segments = store_segments(store_said(meeting), 103 + index) if meeting else None
             minutes = (segments[-1][4] + 3) / 60 if segments else 25 + 5 * index
             session(folder, starts[index], minutes, {} if segments else {"local.wav": 1000})
+            # A client's meetings said confidential, as their owner would (the decider, 2026-11-21 ~12:50): heard and
+            # written here alone, the lock shown on where it matters; the team's own product review left as it is.
+            if index in (2, 3):
+                (folder / "confidential").write_bytes(b"")
             made = starts[index] + dt.timedelta(minutes=minutes + 4)
             (folder / "minutes.md").write_text(
                 f"---\ncontract: minutes/v2\nmade: {made.isoformat(timespec='seconds')}\nprovider: local\nmodel: qwen3:8b\ncontext: null\n"
@@ -11757,16 +11768,31 @@ def store_shots(now: dt.datetime) -> None:
     cited = {f"{short}/{kind}": [int(n) for n in re.findall(r"\[@(\d+)\]", meeting["minutes"]) if int(n) >= len(store_said(meeting))]
              for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("call", said["call"]), ("kickoff", said["kickoff"]))}
     check("every moment a summary cites is one its transcript starts a line at (D103)", not any(cited.values()), cited)
-    reliefs = {shot: [store_relief(points) for points in page["relief"]] for shot, page in shown.items() if shot[3] in "12"}
-    check("who spoke, drawn on the meetings' shots, rises and falls as people talk: each track at least 4 heights, no plateau over 3 sixtieths (D103)",
-          len(reliefs) == 4 and all(len(drawn) == 2 and all(heights >= 4 and plateau <= 3 for heights, plateau in drawn) for drawn in reliefs.values()),
-          reliefs)
+    lanes = {shot: store_lanes(page["lanes"]) for shot, page in shown.items() if shot[3] in "12"}
+    check("who spoke, drawn on the meetings' shots, shows the turns: each side's lane at least 4 bars, both lanes drawn at once over a tenth of the width at most (#1077)",
+          len(lanes) == 4 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in lanes.values()), lanes)
+    # « Vous » on the upper lane, « Les autres » on the lower, as the transcript's sides read top to bottom (lina, #1093).
+    tops = {shot: (max((y for kind, _, _, y in page["lanes"] if kind == "local"), default=None),
+                   min((y for kind, _, _, y in page["lanes"] if kind == "remote"), default=None))
+            for shot, page in shown.items() if shot[3] in "12"}
+    check("who spoke: « Vous » on the upper lane, every bar of it above every bar of « Les autres » (#1077)",
+          len(tops) == 4 and all(here is not None and others is not None and here < others for here, others in tops.values()), tops)
     lasted = {shot: [store_lasted(row) for row in page["said"]] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
     check("every meeting the list shows lasts as such a meeting does, at least 15 min (D103)",
           len(lasted) == 2 and all(len(rows) == 6 and min(rows) >= 15 for rows in lasted.values()), lasted)
     searched = {shot: page["lines"] for shot, page in shown.items() if shot.endswith("2-search.png")}
     check("the search shot: a word typed in a meeting's transcript, only its lines shown, at least four (D103)",
           len(searched) == 2 and all(4 <= seen_ < total for seen_, total in searched.values()), searched)
+    # The word sought marked where it is found, in each line or row kept (#1078): accents and case aside, as the search.
+    fold = lambda text: "".join(c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)).lower()
+    marks = {shot: [lines for lines in page["marked"][0 if shot.endswith("2-search.png") else 1]]
+             for shot, page in shown.items() if shot.endswith(("2-search.png", "3-list.png"))}
+    unmarked = {shot: lines for shot, lines in marks.items()
+                if not lines or any(not marked or any(fold(m) != fold(shown[shot]["sought"][0 if shot.endswith("2-search.png") else 1]) for m in marked) for marked in lines)}
+    check("a search marks the word it found in each line, and each row, it keeps (#1078)", len(marks) == 4 and not unmarked, unmarked)
+    locked = {shot: page["confidential"] for shot, page in shown.items() if shot.endswith("2-search.png")}
+    check("the search shot's meeting, a client's call, shows « Confidentielle » on (the decider, 2026-11-21)",
+          len(locked) == 2 and all(on is True for on in locked.values()), locked)
     listed = {shot: page["rows"] for shot, page in shown.items() if shot.endswith("3-list.png")}
     check("the list shot: a word typed in the list's search, only its meetings shown, at least two (D103)",
           len(listed) == 2 and all(2 <= seen_ < total for seen_, total in listed.values()), listed)
@@ -11789,6 +11815,20 @@ def store_shots(now: dt.datetime) -> None:
     run = {shot: sorted(set(re.findall(r"127\.0\.0\.1(?::\d+)?|localhost:(?!11434\b)\d+", page["text"]))) for shot, page in shown.items()}
     check("no screenshot shows an address or a port only the run has (D103)", len(run) == 8 and not any(run.values()),
           {shot: said for shot, said in run.items() if said})
+    # Each step's line with a model to choose says where it ran, as the line without one does (#1090): its model
+    # chosen, then what follows it.
+    writers = {shot: page["writers"] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("a meeting's step with its model a list says where it ran, its model chosen then: « Qwen3 8b, sur cet ordinateur » (#1090)",
+          len(writers) == 2 and all(said and all(("sur cet ordinateur" if shot.startswith("fr") else "on this computer") in one for one in said)
+                                    for shot, said in writers.items()), writers)
+    # The minutes say a language model wrote them (Store Policies 11.16, #1092).
+    ai = {shot: ("Rédigé par une IA\u00a0: relisez-le avant de le partager." if shot.startswith("fr") else "Written by AI: read it before you share it.") in page["text"]
+          for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("a meeting's minutes say an AI wrote them (#1092)", len(ai) == 2 and all(ai.values()), ai)
+    # A time as each language writes it (#1075): US English no zero before the hour, French two digits.
+    clocks = {shot: re.findall(r"\b0\d:\d\d\s?[AP]M" if shot.startswith("en") else r"(?<![\d:])\d:\d\d\b", page["text"]) for shot, page in shown.items()}
+    check("times written as each language does: « 2:30 PM », « 09:30 » (#1075)", len(clocks) == 8 and not any(clocks.values()),
+          {shot: found for shot, found in clocks.items() if found})
     zero = {shot: page["zero"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
     check("Settings' shot says the model's size as it is, never « 0 o » (D103)", len(zero) == 2 and not any(zero.values()), zero)
     models = {shot: page["models"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
@@ -12279,13 +12319,17 @@ def main() -> int:
             )
             drawn = browser.execute_script(
                 "const s = document.querySelector('#meeting .relief'); return [s.getAttribute('aria-label'),"
-                " ...['local', 'remote'].map(t => s.querySelector('.' + t).getAttribute('points').split(' ').map(p => +p.split(',')[1]))]"
+                " ...['local', 'remote'].map(t => [...s.querySelectorAll('rect.' + t)].map(r => ['x', 'width', 'y', 'height'].map(a => +r.getAttribute(a))))]"
             )
             label, here, remote = drawn
-            # Speech in the first sixtieth of the meeting, on each side: here rises above the middle, remote falls below.
+            # Each segment a bar on its side's lane (#1077): here above the middle, remote below; speech in the first
+            # sixtieth of the meeting on each side, none of here's in its last.
             check(
-                "who spoke is drawn over the meeting, here above and remote below",
-                label.startswith("Temps de parole") and len(here) == len(remote) == 60 and here[0] < 42 and remote[0] > 46 and here[-1] == 42,
+                "who spoke is drawn over the meeting, each segment a bar: here on the upper lane, remote on the lower (#1077)",
+                label.startswith("Temps de parole") and here and remote
+                and all(y + height <= 44 for _, _, y, height in here) and all(y >= 44 for _, _, y, _ in remote)
+                and min(x for x, *_ in here) < 1100 / 60 and min(x for x, *_ in remote) < 1100 / 60
+                and max(x + width for x, width, *_ in here) < 1100 * 59 / 60,
                 drawn,
             )
             maker = lines_seen(browser, "#meeting .minutes .maker")[0]
