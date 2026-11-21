@@ -96,6 +96,12 @@ The standard verbs — `bootstrap`, `check`, `test`, `run` — are declared in t
 section of the [manifest](./MANIFEST.yaml), for this module's stack. What each one must do:
 `.nstack/handbook/09-platform.md` §2.
 
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links, under its licence's text. It is made with cargo-about from `about.toml`,
+whose `accepted` list refuses any other licence, GPL among them, and committed; `tests/notices.rs`
+is red once it no longer names `Cargo.lock`'s crates, and `about.toml`'s header gives the two
+commands that make it again.
+
 ## Contracts
 
 - Provided: [`minutes/v4`](../../contracts/minutes/v4/README.md) — written, how long the making took said (D97) —, and [`minutes/v3`](../../contracts/minutes/v3/README.md), [`minutes/v2`](../../contracts/minutes/v2/README.md) and [`minutes/v1`](../../contracts/minutes/v1/README.md) — written before, still read —, `experimental`; [`summarising/v1`](../../contracts/summarising/v1/README.md) — how it is started and what it says, `experimental`

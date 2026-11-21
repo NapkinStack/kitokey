@@ -1,0 +1,20 @@
+# The licences a crate of kitokey-export may come under (D102): any other, GPL, LGPL or AGPL among
+# them, and `cargo about generate` refuses to write the notices.
+#
+# THIRD-PARTY-NOTICES.html is made from this file, about.hbs and Cargo.lock, and committed;
+# tests/notices.rs is red when it no longer names Cargo.lock's crates. Make it again, from this
+# folder, with the version pinned here:
+#
+#   cargo install --locked cargo-about --version 0.9.3 --features cli
+#   cargo about generate --locked --fail about.hbs --output-file THIRD-PARTY-NOTICES.html
+accepted = [
+    "Apache-2.0",
+    "MIT",
+]
+# What ships: the crates linked into the program, on the systems it is built for; neither what
+# only builds it nor what only tests it.
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+# kitokey-export itself is the project's, under LICENSE: not a third party.
+private = { ignore = true }
