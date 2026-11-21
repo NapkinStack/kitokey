@@ -11698,11 +11698,19 @@ def store_shots(now: dt.datetime) -> None:
                     browser.execute_script("const f = document.getElementById('find'); f.value = ''; f.dispatchEvent(new Event('input'))")
             browser.execute_script("location.hash = '#/settings'")
             wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 10)
-            # Its models at the top — on this computer, nothing sent —, the card above wholly out of the image (lina and
-            # the coordinator, 2026-11-21); the page's scrollbar, an artefact of the shot's height, hidden for it alone.
+            # Its models at the top — on this computer, nothing sent —, the card above wholly out of the image, the one
+            # under them going on past its edge between two rows (lina and the coordinator, 2026-11-21); the page's
+            # scrollbar, an artefact of the shot's height, hidden for it alone.
+            # The card's top anywhere from 0 to 27 px keeps the one above out (28 px between two cards): the nearest to
+            # 14 where the image's bottom edge crosses no control nor line of text.
             browser.execute_script(
                 "const title = [...document.querySelectorAll('#settings h2')].find(h => ['Modèles', 'Models'].includes(h.textContent));"
-                "scrollTo(0, title.closest('section').getBoundingClientRect().top + scrollY - 14);"
+                "const top = title.closest('section').getBoundingClientRect().top;"
+                "const leaves = [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select')))"
+                "  .map(e => e.getBoundingClientRect());"
+                "const cuts = by => leaves.some(r => r.top - by < innerHeight && r.bottom - by > innerHeight);"
+                "const fits = [...Array(28).keys()].sort((a, b) => Math.abs(a - 14) - Math.abs(b - 14)).find(at => !cuts(top - at)) ?? 14;"
+                "scrollTo(0, scrollY + top - fits);"
                 "document.documentElement.style.overflow = 'hidden'")
             time.sleep(0.4)
             browser.save_screenshot(str(store / short / "4-settings.png"))
