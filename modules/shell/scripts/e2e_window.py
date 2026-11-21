@@ -5828,6 +5828,96 @@ def previous_transcript_back(now: dt.datetime) -> None:
         again = wait_for(browser, lambda b_: "Refait avec ggml-tiny-b." in held(current) and b_.execute_script(idle), 15)
         check("the next redo: the one it replaced is the previous one, the older gone from the folder (D113)",
               again and held(previous) == first and asides() == [], [held(previous)[:80], asides()])
+        # ines' rows of #1070. T7: a person's correction stays with its version, back and then forward.
+        browser.execute_script("return window.__TAURI__.core.invoke('transcript_corrected', {name: arguments[0], track: 'local', start: 0.0,"
+                               " text: 'Corrigé à la main.'})", meeting.name)
+        corrected = wait_for(None, lambda b_: "Corrigé à la main." in held(current), 5)
+        mine = held(current)
+        swaps = []
+        for _ in range(2):
+            page()
+            if wait_for(browser, lambda b_: b_.execute_script(back), 10):
+                press(browser, "transcript-previous")
+            swaps.append(wait_for(None, lambda b_: held(current) == (first if not swaps else mine), 10))
+        check("a correction stays with its version, back and then forward (#1070, T7)",
+              corrected and swaps == [True, True] and held(previous) == first, [corrected, swaps, held(current)[-160:]])
+        # T8: a redo that fails, or is cancelled, leaves both versions as they were, nothing set aside nor trashed.
+        trash = data / "Trash" / "files"
+        binned = lambda: sorted(p.name for p in trash.iterdir()) if trash.exists() else []
+        before = (held(current), held(previous), binned())
+        (WORK / "fail-hearing").touch()
+        try:
+            redo(browser, a)
+            failed = wait_for(browser, lambda b_: b_.execute_script(idle), 15)
+        finally:
+            (WORK / "fail-hearing").unlink(missing_ok=True)
+        after_failure = (held(current), held(previous), binned())
+        (WORK / "hold-hearing").touch()
+        try:
+            redo(browser, a)
+            holding = wait_for(None, lambda b_: (WORK / "held-hearing").exists(), 15)
+            browser.execute_script("return window.__TAURI__.core.invoke('making_cancelled', {name: arguments[0]})", meeting.name)
+            cancelled = wait_for(browser, lambda b_: b_.execute_script(idle), 15)
+        finally:
+            (WORK / "hold-hearing").unlink(missing_ok=True)
+            (WORK / "held-hearing").unlink(missing_ok=True)
+        after_cancel = (held(current), held(previous), binned())
+        check("a redo that fails or is cancelled leaves both versions as they were, nothing set aside, nothing in the trash (#1070, T8)",
+              failed and holding and cancelled and after_failure == before and after_cancel == before and asides() == [],
+              [failed, holding, cancelled, after_failure == before, after_cancel == before, asides()])
+        # T9: a trash that refuses — the older version cannot leave — keeps the one set aside where it is, and says so.
+        trash.mkdir(parents=True, exist_ok=True)
+        notified = WORK / "notified-previous-transcript"
+        monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                   stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+        trash.chmod(0o500)
+        try:
+            time.sleep(0.5)
+            redo(browser, b)
+            redone = wait_for(browser, lambda b_: b_.execute_script(idle) and "Refait avec ggml-tiny-b." in held(current), 15)
+            said = wait_for(None, lambda b_: "Ancienne transcription conservée" in notified.read_text(), 10)
+        finally:
+            trash.chmod(0o700)
+            monitor.terminate()
+        kept_aside = asides()
+        check("a trash that refuses: the older version stays as transcript-previous.jsonl, the one replaced set aside beside it, and it is said (#1070, T9)",
+              redone and said and held(previous) == first and len(kept_aside) == 1 and kept_aside[0] in notified.read_text(),
+              [redone, said, held(previous)[:60], kept_aside])
+        for name in kept_aside:
+            (meeting / name).unlink()
+        # T10 (the coordinator's decision, 2026-11-21): a transcript and the summary made from it are one version.
+        stamp = lambda at, text: ('{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"ggml-' + text + '","language":"fr","context":null}\n'
+                                  '{"type":"segment","speaker":"me","track":"local","start":0.5,"end":1.5,"text":"' + text + '."}\n'
+                                  '{"type":"complete","duration":2.0,"made":"' + at + '"}\n')
+        summary = lambda at, said_: ('---\ncontract: minutes/v4\nmade: ' + at + '\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n'
+                                     '## Points saillants\n\n' + said_ + '\n\n## Actions\n\nAucune.\n\n## Points clés\n\nAucun.\n')
+        minutes_now, minutes_kept = meeting / "minutes.md", meeting / "minutes-previous.md"
+        current.write_text(stamp("2026-10-18T15:00:00+02:00", "deuxieme"))
+        previous.write_text(stamp("2026-10-18T13:00:00+02:00", "premiere"))
+        minutes_now.write_text(summary("2026-10-18T15:05:00+02:00", "Sur la deuxième."))
+        minutes_kept.write_text(summary("2026-10-18T13:05:00+02:00", "Sur la première."))
+        page()
+        if wait_for(browser, lambda b_: b_.execute_script(back), 10):
+            press(browser, "transcript-previous")
+        paired = wait_for(None, lambda b_: "premiere" in held(current) and "Sur la première." in held(minutes_now)
+                          and "deuxieme" in held(previous) and "Sur la deuxième." in held(minutes_kept), 10)
+        check("going back on the transcript brings its summary back with it: the two pairs swap as one version (#1070, T10)",
+              paired, [held(current)[-80:], held(minutes_now)[-120:]])
+        other = ("const o = document.getElementById('minutes-other-version');"
+                 " return o && o.getClientRects().length ? o.textContent : null")
+        minutes_kept.unlink()
+        current.write_text(stamp("2026-10-18T15:00:00+02:00", "deuxieme"))
+        previous.write_text(stamp("2026-10-18T13:00:00+02:00", "premiere"))
+        minutes_now.write_text(summary("2026-10-18T15:05:00+02:00", "Sur la deuxième."))
+        page()
+        alone = browser.execute_script(other) is None
+        if wait_for(browser, lambda b_: b_.execute_script(back), 10):
+            press(browser, "transcript-previous")
+        page()
+        said_other = wait_for(browser, lambda b_: b_.execute_script(other), 10)
+        check("no previous summary: once back, the page says the summary was made on the other version, never as this one's (#1070, T10)",
+              alone and said_other and browser.execute_script(other) == "Compte rendu fait sur l’autre version" and "Sur la deuxième." in held(minutes_now),
+              [alone, browser.execute_script(other)])
         # Kept, it is the meeting's: in its text's weight, and in the trash with it.
         text = browser.execute_script("return window.__TAURI__.core.invoke('listed')"
                                       ".then((l) => l.sessions.filter((s) => s.folder.endsWith(arguments[0])).map((s) => s.text))", meeting.name)
