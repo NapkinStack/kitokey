@@ -136,3 +136,25 @@ fn the_notices_hold_no_gnu_licence() {
         "the notices hold a GNU licence's text: about.toml's clarify, then make the page again"
     );
 }
+
+/// No licence text is source code: cargo-about, when a crate's notice is in no licence file or a
+/// clarify's checksum no longer matches, falls back on reading whole sources (ring, libflac-sys).
+#[test]
+fn the_notices_hold_no_source_code() {
+    let notices = include_str!("../THIRD-PARTY-NOTICES.html");
+    for text in notices.split("<pre class=\"licence-text\">").skip(1) {
+        let text = text.split("</pre>").next().unwrap();
+        let code = text.lines().map(str::trim_start).find(|line| {
+            [
+                "#include", "#define", "#ifdef", "#ifndef", "pub fn ", "fn ", "impl ", "use ", "static ", "extern ",
+            ]
+            .iter()
+            .any(|start| line.starts_with(start))
+        });
+        assert!(
+            code.is_none(),
+            "the notices hold source code, « {} »: a clarify in about.toml, then make the page again",
+            code.unwrap_or_default()
+        );
+    }
+}
