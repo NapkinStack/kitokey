@@ -11713,16 +11713,23 @@ def store_shots(now: dt.datetime) -> None:
             # Its models at the top — on this computer, nothing sent —, the card above wholly out of the image, the one
             # under them going on past its edge between two rows (lina and the coordinator, 2026-11-21); the page's
             # scrollbar, an artefact of the shot's height, hidden for it alone.
-            # The card's top anywhere from 0 to 27 px keeps the one above out (28 px between two cards): the nearest to
-            # 14 where the image's bottom edge crosses no control nor line of text.
+            # The scroll is chosen from the page as drawn, never tuned: the top anywhere from the card above's bottom to
+            # the Models heading's top — the card's own padding may go, a scrolled page (the coordinator, 2026-11-21) —,
+            # the nearest to the card's top at 14 px where neither edge crosses a control or a line of text, and the
+            # page long enough to scroll there. None: `storeFit` names both bands, for the edge check to say.
             browser.execute_script(
+                "const box = e => { const r = e.getBoundingClientRect(); return {top: r.top + scrollY, bottom: r.bottom + scrollY}; };"
+                "const cards = [...document.querySelectorAll('#settings section.card')].filter(e => e.offsetParent);"
                 "const title = [...document.querySelectorAll('#settings h2')].find(h => ['Modèles', 'Models'].includes(h.textContent));"
-                "const top = title.closest('section').getBoundingClientRect().top;"
-                "const leaves = [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select')))"
-                "  .map(e => e.getBoundingClientRect());"
-                "const cuts = by => leaves.some(r => r.top - by < innerHeight && r.bottom - by > innerHeight);"
-                "const fits = [...Array(28).keys()].sort((a, b) => Math.abs(a - 14) - Math.abs(b - 14)).find(at => !cuts(top - at)) ?? 14;"
-                "scrollTo(0, scrollY + top - fits);"
+                "const card = title.closest('section'), before = cards[cards.indexOf(card) - 1];"
+                "const leaves = [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))).map(box);"
+                "const crosses = y => leaves.some(r => r.top < y && r.bottom > y);"
+                "const from = Math.ceil(before ? box(before).bottom : 0), to = Math.min(Math.floor(box(title).top), document.documentElement.scrollHeight - innerHeight);"
+                "const aim = Math.round(box(card).top) - 14;"
+                "const fits = [...Array(Math.max(0, to - from + 1)).keys()].map(i => from + i).sort((a, b) => Math.abs(a - aim) - Math.abs(b - aim))"
+                "  .find(y => !crosses(y) && !crosses(y + innerHeight));"
+                "window.storeFit = fits === undefined ? `no scroll fits: the top in ${from}..${to}, the bottom in ${from + innerHeight}..${to + innerHeight} (page px), every one across a control or a line of text` : null;"
+                "scrollTo(0, fits ?? aim);"
                 "document.documentElement.style.overflow = 'hidden'")
             time.sleep(0.4)
             browser.save_screenshot(str(store / short / "4-settings.png"))
