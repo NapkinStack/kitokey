@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>kitokey-summary — third-party notices</title>
+<style>pre.licence-text { white-space: pre-wrap; }</style>
+</head>
+<body>
+<h1>kitokey-summary — third-party notices</h1>
+<p>kitokey-summary is built from the crates below. Each is listed under the licence it is used under, with that licence's text.</p>
+<h2>Licences</h2>
+<ul>
+{{#each overview}}<li>{{name}}: {{count}}</li>
+{{/each}}</ul>
+{{#each licenses}}
+<h3>{{name}}</h3>
+<ul>
+{{#each used_by}}<li data-crate="{{crate.name}}@{{crate.version}}">{{crate.name}} {{crate.version}}{{#if crate.repository}} — <a href="{{crate.repository}}">{{crate.repository}}</a>{{/if}}</li>
+{{/each}}</ul>
+<pre class="licence-text">{{text}}</pre>
+{{/each}}
+</body>
+</html>
