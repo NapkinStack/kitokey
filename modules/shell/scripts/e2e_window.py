@@ -11316,7 +11316,7 @@ STORE_MEETINGS = {
     "fr": {
         "titles": ["Point d’équipe hebdo", "Point individuel — Hugo", "Atelier Lumen — cadrage du projet",
                    "Atelier Lumen — devis et planning", "Comité de pilotage — T4", "Revue produit de la semaine"],
-        "minutes": ("## 1.\n\nLa 2.4 sort jeudi comme prévu ; l’export PDF suit la semaine d’après, le temps de couvrir deux cas.\n\n"
+        "minutes": ("## 1.\n\nLa 2.4 sort jeudi comme prévu ; l’export PDF suit la semaine d’après, le temps de couvrir deux cas. Les tickets du support baissent de 15\u00a0% ce mois-ci, la moitié encore sur la connexion SSO ; l’activation passe de 41 à 48\u00a0%.\n\n"
                     "## 2.\n\n- Prévenir le support du report de l’export — Hugo — demain [@190]\n"
                     "- Préparer les notes de version — Camille — mercredi [@192]\n"
                     "- Ouvrir une version de test à Atelier Lumen et à la mutuelle Horizon — Camille — vendredi [@9]\n\n"
@@ -11401,7 +11401,7 @@ STORE_MEETINGS = {
     "en": {
         "titles": ["Weekly team check-in", "1:1 — Hugo", "Lumen Studio — project kickoff",
                    "Lumen Studio — quote call", "Steering committee — Q4", "Weekly product review"],
-        "minutes": ("## 1.\n\n2.4 ships on Thursday as planned; the PDF export follows the week after, to cover two more cases.\n\n"
+        "minutes": ("## 1.\n\n2.4 ships on Thursday as planned; the PDF export follows the week after, to cover two more cases. Support tickets are down 15% this month, half still about SSO sign-in; activation goes from 41 to 48%.\n\n"
                     "## 2.\n\n- Tell support the export is delayed — Hugo — tomorrow [@190]\n"
                     "- Write the release notes — Camille — Wednesday [@192]\n"
                     "- Give Lumen Studio and Horizon Insurance a test version — Camille — Friday [@9]\n\n"
