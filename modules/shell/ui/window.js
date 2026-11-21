@@ -2575,14 +2575,18 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const legend = element("div", "legend");
   // While it records (#1076): the time running in place of the range, read as the bar reads it.
   const live = session.state === "recording";
-  const range = element("span", "range", live ? elapsed(0) : `${clock(0)} – ${clock(total)}`);
-  if (live) range.id = "page-time";
-  legend.append(element("span", "here", words.here_described), element("span", "remote", words.remote_described), range);
+  legend.append(element("span", "here", words.here_described), element("span", "remote", words.remote_described));
+  if (!live) legend.append(element("span", "range", `${clock(0)} – ${clock(total)}`));
   const drawing = element("div", "drawing");
-  drawing.append(relief(said, total, words));
-  drawn.append(drawing, legend);
-  if (live) drawn.append(pageLevels(nameOf(session), range, words));
-  drawn.append(playerBar(session, listened, total, words, drawing));
+  if (live) {
+    // Large in the who-spoke area while it records (#1112), as Voice Memos and Granola centre it, the meters under it.
+    const time = element("span", "live-time", elapsed(0));
+    time.id = "page-time";
+    const now = element("div", "live-now");
+    now.append(time, pageLevels(nameOf(session), time, words));
+    drawing.append(now);
+  } else drawing.append(relief(said, total, words));
+  drawn.append(drawing, legend, playerBar(session, listened, total, words, drawing));
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
