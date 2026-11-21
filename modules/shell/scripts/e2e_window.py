@@ -11763,6 +11763,10 @@ def store_shots(now: dt.datetime) -> None:
     crossing = {shot: page["crossing"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
     check("Settings' shot: the card under its models goes on past the image's edge between two rows, never through a control or a line of text (D103)",
           len(crossing) == 2 and not any(crossing.values()), crossing)
+    # What only a run has — a loopback address, its stand-ins' ports — never on a buyer's screen.
+    run = {shot: sorted(set(re.findall(r"127\.0\.0\.1(?::\d+)?|localhost:(?!11434\b)\d+", page["text"]))) for shot, page in shown.items()}
+    check("no screenshot shows an address or a port only the run has (D103)", len(run) == 8 and not any(run.values()),
+          {shot: said for shot, said in run.items() if said})
     zero = {shot: page["zero"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
     check("Settings' shot says the model's size as it is, never « 0 o » (D103)", len(zero) == 2 and not any(zero.values()), zero)
     models = {shot: page["models"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
