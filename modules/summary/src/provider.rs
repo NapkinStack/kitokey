@@ -289,6 +289,17 @@ impl Provider {
                 format!("{host} sent an answer that could not be read to its end"),
             );
         };
+        if ollama.is_some() {
+            // Spike #1083 only: how much of the request Ollama read, and how much it wrote.
+            tracing::info!(
+                prompt_eval_count = answer["prompt_eval_count"].as_u64(),
+                eval_count = answer["eval_count"].as_u64(),
+                num_ctx = window(request),
+                request_bytes = request.len(),
+                done_reason = answer["done_reason"].as_str(),
+                "summary.ollama_counts"
+            );
+        }
         let (reason, said) = if ollama.is_some() {
             (&answer["done_reason"], &answer["message"]["content"])
         } else {
