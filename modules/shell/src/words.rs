@@ -1199,6 +1199,10 @@ pub struct Window {
     /// kept beside. At most: no limit. Placeholders: {} when that version was made and its model, as the
     /// page's line says them.
     pub previous_back: &'static str,
+    /// Shows: a meeting's page, under its summary's line (#1070). When: the summary shown was made on the
+    /// other version of the transcript — gone back to without its own summary. At most: one line.
+    /// Placeholders: none.
+    pub minutes_other_version: &'static str,
     /// Shows: a meeting's page, under « Revenir à la version précédente », as a help line (D113). When:
     /// the button shows. At most: no limit. Placeholders: none.
     pub previous_help: &'static str,
@@ -1983,6 +1987,7 @@ pub fn window(language: Language) -> Window {
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept.",
             previous_back: "Go back to the previous version ({})",
+            minutes_other_version: "Summary made from the other version",
             previous_help: "The version you leave becomes the previous one: the same button brings it back.",
             previous_failed: "Couldn’t go back to the previous version: {}",
             make_minutes: "Write summary",
@@ -2432,6 +2437,7 @@ pub fn window(language: Language) -> Window {
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée.",
             previous_back: "Revenir à la version précédente ({})",
+            minutes_other_version: "Compte rendu fait sur l’autre version",
             previous_help: "La version quittée devient la précédente\u{a0}: le même bouton la ramène.",
             previous_failed: "Impossible de revenir à la version précédente\u{a0}: {}",
             make_minutes: "Rédiger le compte rendu",

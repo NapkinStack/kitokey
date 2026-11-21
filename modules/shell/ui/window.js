@@ -1715,7 +1715,7 @@ function previousBack(words, session, step, previous, model) {
   return box;
 }
 
-function minutesCard(read, words, session, transcript, onPage, previous) {
+function minutesCard(read, words, session, transcript, onPage, previous, otherVersion = false) {
   const card = element("article", "card minutes");
   // Its title, and Refaire… beside it: the state below them never sits under a button.
   const top = element("div", "top");
@@ -1803,6 +1803,12 @@ function minutesCard(read, words, session, transcript, onPage, previous) {
     const [pick, said] = modelOnPage(onPage, words, "minutes", version, go, words.redo_minutes_do, words.redo_title, box);
     card.append(lineWith(maker, pick), said, box);
   } else card.append(element("p", "maker", maker));
+  // Made on the other version of the transcript, not the one shown (#1070): said, never passed off as its own.
+  if (otherVersion) {
+    const other = element("p", "note", words.minutes_other_version);
+    other.id = "minutes-other-version";
+    card.append(other);
+  }
   if (previous) card.append(previousBack(words, session, "minutes", previous, previous.model ? modelSaid(previous.model) : ""));
   // The transcript corrected after they were written (D62): said, and made again only on a click.
   const corrected = transcript.state === "present" ? Math.max(0, ...transcript.segments.map((segment) => Date.parse(segment.edited ?? "") || 0)) : 0;
@@ -2450,7 +2456,7 @@ function trashedFocused() {
   }
 }
 
-function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, previous_minutes, previous_transcript }, words) {
+function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, previous_minutes, previous_transcript, minutes_other_version }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
   const open = iconButton("folder-open", words.open_folder, "open-folder");
@@ -2519,7 +2525,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
-  columns.append(minutesCard(minutes, words, session, transcript, onPage, previous_minutes), transcriptCard(transcript, words, session, onPage, previous_transcript));
+  columns.append(minutesCard(minutes, words, session, transcript, onPage, previous_minutes, minutes_other_version), transcriptCard(transcript, words, session, onPage, previous_transcript));
   // Shown again when the window comes forward: a search in progress in this meeting is kept.
   const searching = page.dataset.name === nameOf(session) ? (document.getElementById("search")?.value ?? "") : "";
   // A name being typed is kept the same way, with its refusal and where the caret was (D70).
