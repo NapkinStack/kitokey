@@ -27,13 +27,22 @@ fn locked() -> BTreeSet<String> {
 }
 
 /// Each crate linked into the program on those systems, as Cargo resolves it: the normal
-/// dependencies only, since what builds or tests it ships nothing. Not offline: a build fetches
+/// dependencies only, neither a procedural macro nor what only it uses: what builds, tests or
+/// runs at compile time ships nothing. Not offline: a build fetches
 /// only its own system's crates, and Cargo reads the others' to resolve them, fetching each once
 /// at the version the lock holds (`--locked`).
 fn shipped() -> BTreeSet<String> {
     let mut tree = Command::new(env!("CARGO"));
-    tree.current_dir(env!("CARGO_MANIFEST_DIR"))
-        .args(["tree", "--locked", "--edges", "normal", "--prefix", "none", "--format", "{p}"]);
+    tree.current_dir(env!("CARGO_MANIFEST_DIR")).args([
+        "tree",
+        "--locked",
+        "--edges",
+        "normal,no-proc-macro",
+        "--prefix",
+        "none",
+        "--format",
+        "{p}",
+    ]);
     for target in TARGETS {
         tree.args(["--target", target]);
     }
@@ -93,4 +102,20 @@ fn each_licence_in_the_notices_carries_its_text() {
     for text in texts {
         assert!(text.trim().len() > 100, "a licence without its text: {text:?}");
     }
+}
+
+/// No GNU licence's text on the page — GPL, LGPL, AGPL, FDL: about.toml accepts none, and a crate's
+/// sources may carry one for parts it does not build (libflac-sys, for FLAC's programs). Each opens
+/// with the sentence below; MPL-2.0, which names the GPL as a Secondary License, does not.
+#[test]
+fn the_notices_hold_no_gnu_licence() {
+    let notices: String = include_str!("../THIRD-PARTY-NOTICES.html")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let gnu = "Everyone is permitted to copy and distribute verbatim copies of this license document";
+    assert!(
+        !notices.contains(gnu),
+        "the notices hold a GNU licence's text: about.toml's clarify, then make the page again"
+    );
 }
