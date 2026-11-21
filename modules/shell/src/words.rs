@@ -1776,7 +1776,7 @@ pub fn window(language: Language) -> Window {
             written_by: "Written by {}",
             written_via: ", via {}",
             at: "at",
-            heard_by: "Transcribed by {} on this computer",
+            heard_by: "Transcribed by {}, on this computer",
             transcribed_on: "Transcribed on {}",
             minutes_of: "Summary of {}",
             made_in: "in {}",
