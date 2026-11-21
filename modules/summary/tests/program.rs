@@ -838,7 +838,14 @@ fn a_provider_on_this_machine_writes_no_cost_even_if_it_says_one() {
 /// where this system lets no user make one: that test then proves nothing, and says so.
 #[cfg(target_os = "linux")]
 fn at_openrouter(answers: Vec<String>) -> Option<(String, Vec<serde_json::Value>)> {
-    let free = std::process::Command::new("unshare").args(["-Urm", "true"]).output();
+    at_openrouter_by("unshare", answers)
+}
+
+/// The same, `unshare` named: a test gives it a program that refuses, as a system without user
+/// namespaces does.
+#[cfg(target_os = "linux")]
+fn at_openrouter_by(unshare: &str, answers: Vec<String>) -> Option<(String, Vec<serde_json::Value>)> {
+    let free = std::process::Command::new(unshare).args(["-Urm", "true"]).output();
     if !free.is_ok_and(|output| output.status.success()) {
         eprintln!("NOT RUN: this system lets no user make a namespace");
         return None;
@@ -849,7 +856,7 @@ fn at_openrouter(answers: Vec<String>) -> Option<(String, Vec<serde_json::Value>
     fs::write(&hosts, "127.0.0.1 openrouter.ai\n").unwrap();
     let (address, received) = providing(answers.into_iter().map(|body| ("200 OK", body)).collect());
     let address = address.replace("127.0.0.1", "openrouter.ai");
-    let output = std::process::Command::new("unshare")
+    let output = std::process::Command::new(unshare)
         .args(["-Urm", "sh", "-c", r#"mount --bind "$1" /etc/hosts && shift && exec "$@""#, "sh"])
         .arg(&hosts)
         .arg(env!("CARGO_BIN_EXE_kitokey-summary"))
@@ -906,6 +913,19 @@ fn openrouters_cost_reaches_the_front_matter_as_it_reported_it() {
     // The cost as reported, then how long the making took, last of the front matter (minutes/v4, D97).
     assert!(minutes.contains("\ncost: 0.2\ncurrency: USD\nmade_in: "), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+/// A system that lets no user make a namespace: the test that needs one cannot run, and must not
+/// pass — it fails, saying why (#918), never returns as if it had checked anything.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_namespace_refused_fails_the_test_never_passes_it() {
+    let refused = std::panic::catch_unwind(|| at_openrouter_by("false", vec![answering(MINUTES, "stop")]));
+    assert!(
+        refused.is_err(),
+        "a namespace refused returned, as if the test had run: {:?}",
+        refused.ok()
+    );
 }
 
 /// A refusal's run with this environment, nothing else of the machine's: where its log went.
