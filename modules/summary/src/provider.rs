@@ -22,8 +22,11 @@ const WINDOW: usize = 4096;
 /// its server, and drops the rest in silence, the rules first (the request is cut from its head).
 /// Two bytes to a token at the very least; French measured 2.7 characters.
 pub fn window(request: &str) -> usize {
-    (request.len() / 2 + WINDOW).div_ceil(WINDOW) * WINDOW
+    (request.len() / 2 + ANSWER).div_ceil(WINDOW) * WINDOW
 }
+
+/// Spike #1083, arm A: thinking left on, and room for it to end — four times today's answer.
+const ANSWER: usize = 16_384;
 
 /// The patience Ollama is given: what any provider gets, and a second for each 20 bytes it has to
 /// read, a laptop's processor taking some 14 tokens a second (measured on `qwen3:8b`, 2026-10-31).
@@ -234,7 +237,7 @@ impl Provider {
         }
         let mut body = serde_json::json!({ "model": self.model, "stream": false, "messages": [{ "role": "user", "content": request }] });
         if ollama.is_some() {
-            body["options"] = serde_json::json!({ "num_ctx": window(request), "num_predict": WINDOW });
+            body["options"] = serde_json::json!({ "num_ctx": window(request), "num_predict": ANSWER });
         }
         let mut response = match call.send_json(&body) {
             Ok(response) => response,
