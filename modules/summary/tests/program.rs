@@ -834,22 +834,23 @@ fn a_provider_on_this_machine_writes_no_cost_even_if_it_says_one() {
 }
 
 /// The program as if the machine's name for OpenRouter led to the stand-in, in a namespace of its
-/// own: the only way a test reaches the host's own rule, no test ever calling the real one. `None`
-/// where this system lets no user make one: that test then proves nothing, and says so.
+/// own: the only way a test reaches the host's own rule, no test ever calling the real one. Where
+/// this system lets no user make one, the test cannot run: it fails, saying so (#918), as a test
+/// that proves nothing is never counted green (`tests.md`). The attest's machine allows it.
 #[cfg(target_os = "linux")]
-fn at_openrouter(answers: Vec<String>) -> Option<(String, Vec<serde_json::Value>)> {
+fn at_openrouter(answers: Vec<String>) -> (String, Vec<serde_json::Value>) {
     at_openrouter_by("unshare", answers)
 }
 
 /// The same, `unshare` named: a test gives it a program that refuses, as a system without user
 /// namespaces does.
 #[cfg(target_os = "linux")]
-fn at_openrouter_by(unshare: &str, answers: Vec<String>) -> Option<(String, Vec<serde_json::Value>)> {
+fn at_openrouter_by(unshare: &str, answers: Vec<String>) -> (String, Vec<serde_json::Value>) {
     let free = std::process::Command::new(unshare).args(["-Urm", "true"]).output();
-    if !free.is_ok_and(|output| output.status.success()) {
-        eprintln!("NOT RUN: this system lets no user make a namespace");
-        return None;
-    }
+    assert!(
+        free.is_ok_and(|output| output.status.success()),
+        "NOT RUN, so not passed: this system lets no user make a namespace (`unshare -Urm`)"
+    );
     let folder = session(None);
     let logs = tempfile::tempdir().unwrap();
     let hosts = folder.path().join("hosts");
@@ -867,49 +868,47 @@ fn at_openrouter_by(unshare: &str, answers: Vec<String>) -> Option<(String, Vec<
         .env_remove("KITOKEY_LOG")
         .output()
         .unwrap();
-    if !output.status.success() && said(&output).1.contains("mount") {
-        eprintln!("NOT RUN: this system lets no user mount: {}", said(&output).1);
-        return None;
-    }
+    assert!(
+        output.status.success() || !said(&output).1.contains("mount"),
+        "NOT RUN, so not passed: this system lets no user mount: {}",
+        said(&output).1
+    );
     assert!(output.status.success(), "{}", said(&output).1);
     received.recv().unwrap();
     let warnings = logged(logs.path()).into_iter().filter(|line| line["level"] == "WARN").collect();
-    Some((fs::read_to_string(folder.path().join("minutes.md")).unwrap(), warnings))
+    (fs::read_to_string(folder.path().join("minutes.md")).unwrap(), warnings)
 }
 
 #[cfg(target_os = "linux")]
 #[test]
 fn openrouters_cost_reaches_the_front_matter_as_it_reported_it() {
     let priced = |usage: &str| answering(MINUTES, "stop").replacen('{', &format!(r#"{{"usage": {usage},"#), 1);
-    let Some((minutes, warnings)) = at_openrouter(vec![priced(
+    let (minutes, warnings) = at_openrouter(vec![priced(
         r#"{"cost": 1.20e-6, "cost_details": {"upstream_inference_cost": null}}"#,
-    )]) else {
-        return;
-    };
+    )]);
     assert!(minutes.contains("\nprovider: \"openrouter.ai\"\n"), "{minutes}");
     // The cost as reported, then how long the making took, last of the front matter (minutes/v4, D97).
     assert!(minutes.contains("\ncost: 1.20e-6\ncurrency: USD\nmade_in: "), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
 
-    let (minutes, warnings) = at_openrouter(vec![priced(r#"{"cost": "0.012"}"#)]).unwrap();
+    let (minutes, warnings) = at_openrouter(vec![priced(r#"{"cost": "0.012"}"#)]);
     assert!(!minutes.contains("\ncost:") && !minutes.contains("\ncurrency:"), "{minutes}");
     assert_eq!(warnings.len(), 1, "{warnings:?}");
     assert_eq!(warnings[0]["message"], "summary.cost_refused");
 
     let (minutes, warnings) = at_openrouter(vec![priced(
         r#"{"cost": 0.001, "cost_details": {"upstream_inference_cost": 0.02}}"#,
-    )])
-    .unwrap();
+    )]);
     assert!(!minutes.contains("\ncost:"), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
 
-    let (minutes, warnings) = at_openrouter(vec![priced(r#"{"cost": 0.001, "is_byok": true}"#)]).unwrap();
+    let (minutes, warnings) = at_openrouter(vec![priced(r#"{"cost": 0.001, "is_byok": true}"#)]);
     assert!(!minutes.contains("\ncost:"), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
 
     // Asked again: the cost of the answer written.
     let refused = answering("une phrase", "stop").replacen('{', r#"{"usage": {"cost": 0.1},"#, 1);
-    let (minutes, warnings) = at_openrouter(vec![refused, priced(r#"{"cost": 0.2}"#)]).unwrap();
+    let (minutes, warnings) = at_openrouter(vec![refused, priced(r#"{"cost": 0.2}"#)]);
     // The cost as reported, then how long the making took, last of the front matter (minutes/v4, D97).
     assert!(minutes.contains("\ncost: 0.2\ncurrency: USD\nmade_in: "), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
