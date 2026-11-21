@@ -2147,6 +2147,8 @@ struct ContextShown {
     text: String,
     /// Its transcript or minutes were made with another: *Refaire avec ce contexte* is offered.
     changed: bool,
+    /// Made again with it, a summary follows the transcript: its button names both (D113).
+    minutes_follow: bool,
 }
 
 fn context_of(shell: &Shell, folder: &Path) -> ContextShown {
@@ -2156,6 +2158,7 @@ fn context_of(shell: &Shell, folder: &Path) -> ContextShown {
     ContextShown {
         changed: context::changed(text.as_deref(), &transcript, &minutes),
         text: text.unwrap_or_default(),
+        minutes_follow: folder.join("minutes.md").is_file() || shell.settings().after == After::Minutes,
     }
 }
 
@@ -4356,7 +4359,9 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         return Err((Failure::ModelAbsent, "no model on this computer".to_string()));
     }
     // Made again with the context: its minutes too, when it had some or the settings make them.
-    let minutes_after = again == Again::Settings && (folder.join("minutes.md").is_file() || settings.after == After::Minutes);
+    // A transcript made again makes its summary again when there is one: a summary of a transcript
+    // replaced would say what was not said (D113); with the context, as the settings make them too.
+    let minutes_after = folder.join("minutes.md").is_file() || again == Again::Settings && settings.after == After::Minutes;
     // Set aside under a name of its own, never written over; put back if the new one is not made.
     let current = folder.join("transcript.jsonl");
     let previous = match sessions::set_aside(&current, true) {

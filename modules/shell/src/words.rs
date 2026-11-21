@@ -1196,6 +1196,16 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
     /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
+    /// Shows: a meeting's page, its Redo… panel's heading, and the context's button (D113). When: the
+    /// meeting has a summary, made again after its transcript. At most: no limit. Placeholders: none.
+    pub redo_both_title: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as its one button that starts (D113). When: the
+    /// meeting has a summary and a transcription model is known. At most: wraps inside the panel.
+    /// Placeholders: {} the transcription's model, as people say it.
+    pub redo_both_do: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as a help line (D113). When: the meeting has a
+    /// summary, made again after its transcript. At most: no limit. Placeholders: none.
+    pub redo_both_note: &'static str,
     /// What a meeting lacks, offered on its page; what is said once asked; where a step ran.
     /// Shows: a meeting's page, as a button. When: meeting lacks minutes. At most: about 30
     /// characters. Placeholders: none.
@@ -1581,9 +1591,6 @@ pub struct Window {
     /// Shows: a meeting's page, as a help line. When: transcript (or + minutes) made with another
     /// context; [transcript only, both]. At most: no limit. Placeholders: none.
     pub context_changed: [&'static str; 2],
-    /// Shows: a meeting's page, as a button. When: redo with new context. At most: about 30
-    /// characters. Placeholders: none.
-    pub context_redo: &'static str,
     /// The language a meeting is spoken in (D65).
     /// Shows: a meeting's page, as a label. When: row: spoken language. At most: about 20
     /// characters. Placeholders: none.
@@ -1976,6 +1983,9 @@ pub fn window(language: Language) -> Window {
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept.",
+            redo_both_title: "Write the transcript and the summary again",
+            redo_both_do: "Write the transcript again with {}, and the summary",
+            redo_both_note: "The current transcript and summary stay until the new ones are finished, then go to the trash. If something goes wrong, they’re kept.",
             make_minutes: "Write summary",
             make_transcript: "Transcribe",
             make_minutes_with: "Write summary with {}",
@@ -2105,7 +2115,6 @@ pub fn window(language: Language) -> Window {
                 "The transcript was made with a different context.",
                 "The transcript and summary were made with a different context.",
             ],
-            context_redo: "Redo with this context",
             language_label: "Spoken language",
             language_default: "Same as Settings",
             language_detected: "Detect automatically",
@@ -2423,6 +2432,9 @@ pub fn window(language: Language) -> Window {
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée.",
+            redo_both_title: "Refaire la transcription et le compte rendu",
+            redo_both_do: "Refaire la transcription avec {} et le compte rendu",
+            redo_both_note: "La transcription et le compte rendu actuels restent en place jusqu’à ce que les nouveaux soient terminés, puis vont à la corbeille. En cas d’échec, ils sont conservés.",
             make_minutes: "Rédiger le compte rendu",
             make_transcript: "Transcrire",
             make_minutes_with: "Rédiger le compte rendu avec {}",
@@ -2561,7 +2573,6 @@ pub fn window(language: Language) -> Window {
                 "La transcription a été faite avec un autre contexte.",
                 "La transcription et le compte rendu ont été faits avec un autre contexte.",
             ],
-            context_redo: "Refaire avec ce contexte",
             language_label: "Langue parlée",
             language_default: "Celle des Réglages",
             language_detected: "Détection automatique",

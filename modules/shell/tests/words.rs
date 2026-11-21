@@ -1009,7 +1009,8 @@ fn the_context_s_words_are_said_in_both_languages_french_typeset_as_french() {
     // The field's name, as D59's criterion says it.
     assert_eq!(french.context_label, "De quoi parle la réunion\u{202f}? Qui y participe\u{202f}?");
     assert_eq!(english.context_label, "What’s the meeting about? Who’s attending?");
-    assert_eq!(french.context_redo, "Refaire avec ce contexte");
+    // Its button names what it starts, as Refaire… does (D113).
+    assert_eq!(french.redo_both_title, "Refaire la transcription et le compte rendu");
     for sentence in [
         french.context_label,
         french.context_example,

@@ -1114,7 +1114,8 @@ function contextCard(session, { context, transcript, minutes }, words, settings,
   said.setAttribute("role", "status");
   const changed = element("div", "context-changed");
   changed.id = "context-changed";
-  const redo = element("button", "open", words.context_redo);
+  // It names what it starts: the transcript, and the summary after it when one follows (D113).
+  const redo = element("button", "open", context.minutes_follow ? words.redo_both_title : words.redo_transcript_title);
   redo.type = "button";
   redo.id = "context-redo";
   redo.addEventListener("click", async () => {
@@ -1526,15 +1527,19 @@ function redoPanel(offered, session, words, button) {
 }
 
 function redoTranscriptPanel(offered, session, words, button, corrected) {
-  const notes = [element("p", "says", words.redo_transcript_note)];
+  // The meeting's summary made again after it, when it has one: said by the button and the note (D113).
+  const both = !!session.minutes;
+  const note = element("p", "says", both ? words.redo_both_note : words.redo_transcript_note);
+  note.id = "redo-transcript-note";
+  const notes = [note];
   // Made again, the transcript is another file: a person's corrections are not in it (ADR-0014).
   if (corrected) {
     const lost = element("p", "note warn", words.redo_loses_corrections);
     lost.id = "redo-loses-corrections";
     notes.push(lost);
   }
-  return redoWith(offered, session, words, button, "redo-transcript-panel", words.redo_transcript_title, notes, () =>
-    window.__TAURI__.core.invoke("transcript_redo_own", { name: nameOf(session) }), "transcription", words.redo_transcript_do);
+  return redoWith(offered, session, words, button, "redo-transcript-panel", both ? words.redo_both_title : words.redo_transcript_title, notes, () =>
+    window.__TAURI__.core.invoke("transcript_redo_own", { name: nameOf(session) }), "transcription", both ? words.redo_both_do : words.redo_transcript_do);
 }
 
 // D93, criterion 5: what a meeting's page offers to make it by — models_offered's answer, read once a
