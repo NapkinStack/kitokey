@@ -11425,30 +11425,17 @@ def store_starts(said: list) -> set[str]:
     return {f"{int(STORE_EVERY * index + 5) // 60:02d}:{int(STORE_EVERY * index + 5) % 60:02d}" for index in range(len(said))}
 
 
-def store_pauses(meetings: Path, said: list) -> list[int]:
-    """For each line of the opened meeting, how many pauses of at least 0.3 s its speaker's track holds inside it:
-    speech breathes between its phrases; a line drawn as one block reads as a made-up tone."""
-    opened = sorted(folder for folder in meetings.iterdir() if (folder / "transcript.jsonl").exists())[-1:]
-    if not opened:
-        return []
-    counts = []
-    for index, (who, _, _) in enumerate(said):
-        with wave.open(str(opened[0] / ("local.wav" if who == "me" else "remote.wav"))) as track:
-            rate = track.getframerate()
-            track.setpos(int(rate * (STORE_EVERY * index + 5)))
-            frames = track.readframes(int(rate * STORE_SPOKEN))
-        samples = struct.unpack(f"<{len(frames) // 2}h", frames)
-        step = rate // 10
-        loud = [max(map(abs, samples[n:n + step]), default=0) > 300 for n in range(0, len(samples) - step + 1, step)]
-        runs, quiet = 0, 0
-        for window in loud[1:-1] + [True]:
-            if window:
-                runs += quiet >= 3
-                quiet = 0
-            else:
-                quiet += 1
-        counts.append(runs)
-    return counts
+def store_relief(points: str) -> tuple[int, int]:
+    """A track of who spoke as the page draws it (`relief`, 60 sixtieths, each the share of it covered by speech):
+    how many heights it takes, silence apart, and its longest run at full height — a plateau, the mark of lines
+    of one length every few seconds, never of people talking."""
+    shares = [round(abs(float(point.split(",")[1]) - 44) - 2, 1) for point in points.split()]
+    heights = {share for share in shares if share > 0}
+    longest = run = 0
+    for share in shares:
+        run = run + 1 if share == max(heights, default=-1) else 0
+        longest = max(longest, run)
+    return len(heights), longest
 
 
 def store_shots(now: dt.datetime) -> None:
@@ -11464,8 +11451,13 @@ def store_shots(now: dt.datetime) -> None:
     # What each shot's page says, read as it is taken: a Store shot says no audio lost, no run's folder, no night hour.
     shown: dict[str, dict] = {}
     seen = lambda browser, shot: shown.update({shot: browser.execute_script(
-        "return {freed: [...document.querySelectorAll('.chip.gone, #no-player')].filter(e => e.offsetParent).length,"
-        " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText}")})
+        "const shown = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent);"
+        "return {freed: shown('.chip.gone, #no-player').length,"
+        " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText,"
+        " relief: [...document.querySelectorAll('#meeting svg.relief polyline')].map(l => l.getAttribute('points')),"
+        " lines: [shown('#meeting .transcript .lines li').length, document.querySelectorAll('#meeting .transcript .lines li').length],"
+        " rows: [shown('#groups li').length, document.querySelectorAll('#groups li').length],"
+        " fetch: shown('#model-fetch').length}")})
     for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
         said = STORE_MEETINGS[short]
         # The meetings' folder is the user's own, in a home of its own: Settings says « Dossier personnel / Kitokey »,
@@ -11551,7 +11543,7 @@ def store_shots(now: dt.datetime) -> None:
     sizes = {f"{file.parent.name}/{file.name}": (png_size(file), file.stat().st_size) for file in made}
     check("the Store's screenshots: four a language, French and English, in the Store's order (D103)",
           [name for name in sizes] == [f"{short}/{n}" for short in ("en", "fr")
-                                       for n in ("1-meeting.png", "2-recording.png", "3-list.png", "4-settings.png")], sorted(sizes))
+                                       for n in ("1-meeting.png", "2-search.png", "3-list.png", "4-settings.png")], sorted(sizes))
     check("each at least 1366 × 768 and at most 50 MB, as Microsoft's page asks (D103)",
           bool(sizes) and all(w >= STORE_LEAST[0] and h >= STORE_LEAST[1] and 0 < size <= STORE_MOST for (w, h), size in sizes.values()),
           sizes)
@@ -11570,9 +11562,19 @@ def store_shots(now: dt.datetime) -> None:
              for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("listed", said.get("listed", {"minutes": "", "said": []})))}
     check("every moment a summary cites is one its transcript starts a line at (D103)",
           "listed" in STORE_MEETINGS["fr"] and not any(cited.values()), cited)
-    paused = {short: store_pauses(WORK / f"store-{short}" / "Kitokey", STORE_MEETINGS[short]["said"]) for short in STORE_MEETINGS}
-    check("the opened meeting's sound pauses inside each line, as speech does, never one block (D103)",
-          all(paused.values()) and all(count >= 2 for counts in paused.values() for count in counts), paused)
+    reliefs = {shot: [store_relief(points) for points in page["relief"]] for shot, page in shown.items() if shot[3] in "12"}
+    check("who spoke, drawn on the meetings' shots, rises and falls as people talk: each track at least 4 heights, no plateau over 3 sixtieths (D103)",
+          len(reliefs) == 4 and all(len(drawn) == 2 and all(heights >= 4 and plateau <= 3 for heights, plateau in drawn) for drawn in reliefs.values()),
+          reliefs)
+    searched = {shot: page["lines"] for shot, page in shown.items() if shot.endswith("2-search.png")}
+    check("the search shot: a word typed in a meeting's transcript, only its lines shown, at least two (D103)",
+          len(searched) == 2 and all(2 <= seen_ < total for seen_, total in searched.values()), searched)
+    listed = {shot: page["rows"] for shot, page in shown.items() if shot.endswith("3-list.png")}
+    check("the list shot: a word typed in the list's search, only its meetings shown, at least two (D103)",
+          len(listed) == 2 and all(2 <= seen_ < total for seen_, total in listed.values()), listed)
+    fetched = {shot: page["fetch"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot shows the transcription's model on this computer, none to download (D103)",
+          len(fetched) == 2 and not any(fetched.values()), fetched)
 
 def trial_over(now: dt.datetime) -> None:
     """AV. The trial over on a stand-in licence (PDR-0005, D83): no recording from the window, the
