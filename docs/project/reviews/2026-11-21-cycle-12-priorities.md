@@ -388,6 +388,95 @@ what cycle 12 is built around.
 hand-off line of 5c (#6) is sized beside #1 before cycle 12 is framed, and the value test of 5b is run. If the
 buyer is the three users, the ranking stands except #1's reason, which becomes « consistency with the bar ».
 
+### 5e. Addendum — candidate 8, dated items to a calendar file (§2e, rank 4)
+
+*sam, session wholeheard-sam-a2, 2026-11-21, on §2e and the ranking's row 4 at 8f8da3a.*
+
+**In short.** The design §2e keeps is the right shape: the model names the expression and its passage, code
+computes the date, « not said » is allowed, the user ticks each item, and no calendar is connected. Three
+things are missing before it can rank above the small item:
+- a threshold that counts **wrong dates** apart from missed ones;
+- a stated meeting date for **imported** files, axis 1's own case;
+- a test of new Outlook, the Windows buyer's calendar.
+
+« Nobody does `.ics` » reads more as a signal than as a gap.
+
+**Pre-mortem — shipped in cycle 12; a year later it is unticked, or worse**
+
+| Plausible reason | Risk |
+|---|---|
+| A lawyer's « quinze jours pour conclure » became the meeting's date + 15. The procedural deadline ran by other rules: a deadline ending on a Saturday, Sunday or public holiday moves to the next working day, and some deadlines are excluded from that rule. The file held the wrong day, and Kitokey's « computed from the meeting's date » read as authority | value, viability |
+| On an imported file, « jeudi prochain » was resolved against the import's day or the file's modification time, not the day it was said: every date was off by days or weeks | feasibility |
+| « Jeudi » said on a Thursday; « fin du mois », « avant les vacances », « la semaine du 12 »: the model gave an expression, code had no rule for it, and it guessed rather than saying « not said » | feasibility |
+| New Outlook on Windows did not open the file on a double-click; the colleague who imported five wrong events by hand could not remove them in bulk and stopped using it | usability |
+| Re-exporting after a correction added a second event beside the first, because the stable `UID` did not update in the calendar that imported it | usability |
+| Users already keep deadlines in a task tracker or the firm's case software; a calendar file was the wrong destination | value |
+
+**The four risks**
+
+| Risk | Riskiest assumption | Cheapest test · how long · refuted if *(threshold proposed, the decider sets it)* |
+|---|---|---|
+| **Value** | The three users would put a meeting's dates in a calendar, rather than in a tracker or case software | Ask each of the three where the last date set in a meeting went; **one message each**. Refuted if none of the three put it in a calendar |
+| **Usability** | The `.ics` opens, imports and updates in the three users' calendars | One hand-written `.ics` holding two all-day `VEVENT`s, imported into new Outlook (the Windows colleague), macOS Calendar and GNOME Calendar. Then the same file with one date changed and the same `UID`, imported again; **an hour**. Refuted if new Outlook cannot import it, or if the second import duplicates rather than replaces in two of the three |
+| **Feasibility** | A small local model, plus code, gives a wrong absolute date rarely enough to be shown | The spike §2e plans, with its count split three ways: **right**, **« not said »**, **wrong**. Its transcripts must include « jeudi » said on a Thursday, « dans quinze jours », « fin du mois », a date said with no year, and one **imported** file whose day of recording must come from somewhere stated. Refuted if more than **1 in 50** proposed dates is wrong. A missed date costs a tick; a wrong one costs a deadline |
+| **Viability** | Kitokey can show a computed deadline to a lawyer without appearing to compute procedural deadlines | Read articles 640–642 of the French Code of civil procedure at Légifrance before the spike's transcripts are written; **half an hour**. Refuted if a deadline as a lawyer would say it in a meeting cannot be told apart from a plain calendar date, in which case only explicitly dated items are proposed |
+
+**Counter-evidence and objections**
+
+- **« Nobody does `.ics` » — a gap, or low demand?** Mostly low demand, or a risk the leaders chose not to
+  take.
+  - **F** The rivals in §2e already **hold calendar access**: Granola, Otter, Fireflies and Zoom read the
+    user's calendar. Writing an event costs them little.
+  - **F** None writes an event from a summary on its own. Otter needs a voice request and a « Save » click;
+    Teams and Asana ask for the user's acceptance. Products that could do it cheaply chose not to, or chose a
+    confirmed gesture.
+  - **F** The complaints found are about **invented** deadlines (§2e, Lilach Bullock, GoTranscript), never
+    about missing calendar entries.
+  - **I** Demand exists for « what was decided, by when » in tasks with owners. A calendar file is one
+    delivery among several, and the less used one.
+  - **Objection.** The row's own words, « no market demand found », say a strength of 0.45 on the buyer axis
+    rests on one persona. Rank it as a spike, as the row does, but put it below #3's S in cost-to-learn order,
+    or beside it. Not as a market pull.
+- **The lawyer persona and date arithmetic.**
+  - **Assumption, not read at the primary source.** French procedural deadlines follow their own computation:
+    a deadline ending on a Saturday, Sunday or public holiday moves to the next working day (art. 642 CPC,
+    second paragraph). The Cour de cassation excluded the « péremption d'instance » from that extension
+    (Civ. 2e, 2020-10-01, n° 19-17.797). Sources: [justice.fr](https://www.justice.fr/fiche/calcule-on-delai-procedure-civile)
+    *government page, search only*; [Dalloz actualité](https://www.dalloz-actualite.fr/document/civ-2e-1er-oct-2020-f-pbi-n-19-17797)
+    *secondary, search only*.
+  - **I** A lawyer will hear « computed from the meeting's date » as a computed **deadline**. The design must
+    not compute legal deadlines.
+  - Proposed no-go: **Kitokey proposes a date only as said** — an explicit date, or a weekday or « dans N
+    jours » resolved against the stated meeting day — **labelled « date mentioned », never « deadline »**,
+    always with its passage. It never applies a procedural rule.
+- **Imports and the meeting's date.**
+  - **F** For a recording, Kitokey knows the day it started. For an import, it does not.
+  - **I** The panel must show the reference day the dates were resolved against, editable before ticking.
+    The spike must count an import's dates against that stated day.
+  - This couples candidate 8 to axis 1: it cannot ship before import says where an imported meeting's day
+    comes from.
+- **New Outlook.**
+  - §2e's Microsoft Q&A line is *search only*. The usability test above is the cheapest way to replace it
+    with a fact, and the only one of the three calendars Kitokey's Store buyer is likeliest to use.
+  - **I** If the second import duplicates, a correction flow built on « re-export » is a trap. The panel must
+    then make the user correct **before** writing, and one file per item is safer than one file for all.
+- **A smaller first step**, for the decider to weigh against the `.ics` writer's M. The panel alone, listing
+  « dates mentioned » with the absolute date, the reference day and the passage, copied with the summary (the
+  rich copy of #1025), needs no file format and no calendar test. The `.ics` comes when the three users say
+  where dates go.
+
+**Flaws in §2e and row 4**
+
+1. **Row 4:** « Value rests on the persona: a missed deadline is serious for a lawyer — the decider's case ».
+   The same seriousness makes a **wrong** date worse than none. The row weighs only the missed case.
+2. **§2e, Reading (I):** « the risk is the date itself ». It names the risk, but no spike threshold separates
+   wrong from not-said. Without one, a 90 % « hit rate » could hide one wrong deadline in ten.
+3. **Hypothesis 8** (§4), « refuted if the user unticks or corrects most proposed dates ». A user who does not
+   notice a wrong date neither unticks nor corrects it: the refutation misses the costly case. Add « or any
+   ticked date is later found wrong ».
+4. **No-go** « a date the transcript does not say stays « not said » ». Good, but « said » needs a reference
+   day for any relative expression, and an import has none by default (see above).
+
 ## 6. Decision
 
 *Prepared by the framer, 2026-11-21: §5 stands above unchanged; 6a answers it point by point, 6b gives the
