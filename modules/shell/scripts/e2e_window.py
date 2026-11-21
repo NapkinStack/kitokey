@@ -1014,6 +1014,11 @@ def model_offered(now: dt.datetime) -> None:
         check("no transcript yet: one line says when who spoke will appear, the area no taller than that line (#1116)",
               no_blank is not None and no_blank["text"] == "Le temps de parole s’affichera après la transcription." and no_blank["inside"]
               and no_blank["height"] <= no_blank["line"] + 24, no_blank)
+        # A legend names what is drawn: with nothing drawn yet, « Vous — votre micro » / « Les autres — … » are not shown;
+        # the range stays, the player's (the coordinator, 2026-11-21).
+        named = browser.execute_script("return [...document.querySelectorAll('#meeting .legend .here, #meeting .legend .remote')].filter(e => e.getClientRects().length).length")
+        ranged = browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? ''")
+        check("no transcript yet: the legend's two names not shown, its range kept (#1116)", named == 0 and "–" in ranged, [named, ranged])
         size = browser.get_window_size()
         for width in (420, 1100):
             browser.set_window_size(width, 800)
