@@ -1,0 +1,9 @@
+Kitokey's programs link crates under the Mozilla Public License 2.0, each named under
+« Mozilla Public License 2.0 » in the THIRD-PARTY-NOTICES pages beside this file.
+
+Each is used unmodified, as crates.io publishes it. Its Source Code Form is at
+https://crates.io/crates/<name>/<version>, the name and version its page gives, and the Mozilla
+Public License 2.0 governs it: https://www.mozilla.org/MPL/2.0/. Whatever terms Kitokey's programs
+come under, they do not limit or alter your rights in that Source Code Form (MPL-2.0, §3.2).
+
+Kitokey's own source is under the GNU General Public License, version 3 (LICENSE).

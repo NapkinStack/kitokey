@@ -50,6 +50,24 @@ flowchart LR
 **Legend** — grey: what the e2e does · green: what it holds. The paths Kitokey may leave are read
 from [`docs/privacy.md`](../../docs/privacy.md)'s Linux line.
 
+## What every package owes its third parties (D102)
+
+Each format lays the same six files beside the programs: Kitokey's `LICENSE`, as `LICENSE.txt`;
+`notices/MPL-SOURCES.txt`, which says where the Mozilla Public License crates' sources are
+(MPL-2.0 §3.2); and each program's `THIRD-PARTY-NOTICES.html`, the page its module's release left
+in `dist/<module>/`, named by the program — `THIRD-PARTY-NOTICES-kitokey.html`,
+`…-kitokey-capture.html`, `…-kitokey-transcription.html`, `…-kitokey-summary.html`.
+
+| Format | Where |
+|---|---|
+| rpm | `/usr/share/licenses/kitokey/` |
+| .deb | `/usr/share/doc/kitokey/` |
+| the Mac's app | `Kitokey.app/Contents/Resources/` |
+| Windows' zip and package | beside `kitokey.exe` |
+
+`windows/notices.py` names them for Windows; `mac/build.sh`, `deb/build.sh` and `kitokey.spec` lay
+the same names, and `scripts/test.sh` reads all five. A module's page missing, no package is made.
+
 ## On Fedora, from Copr (D78)
 
 ```bash
