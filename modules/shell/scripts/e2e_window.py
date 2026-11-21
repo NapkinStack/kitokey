@@ -10235,17 +10235,22 @@ def context_written(now: dt.datetime) -> None:
               and label == "De quoi parle la réunion ? Qui y participe ?", (area.get_attribute("value"), label))
         check("made with it, nothing is offered to make again", not browser.find_element(By.ID, "context-changed").is_displayed())
         more = " Siobhán O’Neill (juridique)."
-        made_before = ((meeting / "transcript.jsonl").read_text(), (meeting / "minutes.md").read_text())
+        made = lambda: tuple((p.read_text(), p.stat().st_mtime_ns) for p in (meeting / "transcript.jsonl", meeting / "minutes.md"))
+        made_before = made()
         area.click()
         keys(browser, Keys.END, more)
         changed = wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
         # D113, criterion 1 (ines' pre-read): a changed context starts nothing by itself — it waits for its button. Judged
-        # first, before any step a making started by itself would break (s1055nctxauto).
+        # first, before any step a making started by itself would break (s1055nctxauto). A making the fakes end within the
+        # wait would leave the same text: it is seen by the files' times, and by the field it closes while typed in
+        # (s1055nctxauto3).
         time.sleep(1.5)
         still = browser.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
                                        " && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)")
         check("a changed context starts nothing by itself: no making, the transcript and the summary as they were (D113)",
-              still and ((meeting / "transcript.jsonl").read_text(), (meeting / "minutes.md").read_text()) == made_before, still)
+              still and made() == made_before and (meeting / "context.txt").read_text() == said + more
+              and browser.find_element(By.ID, "context-text").get_attribute("readonly") is None,
+              [still, made() == made_before, (meeting / "context.txt").read_text()[-40:]])
         # Its button names what it starts: the transcript, and its summary after it (D113).
         check("changed after its transcript and minutes, the context's button is offered, naming both, said why",
               changed and (meeting / "context.txt").read_text() == said + more
