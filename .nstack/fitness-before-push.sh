@@ -12,6 +12,34 @@
 # refs/heads/nstack/hold/…, an attested record in refs/notes/nstack/… — moves no file of the
 # project: a red default branch never stops it being recorded (#427). Every other hook still
 # runs on it, and CI judges every pull request.
+# In an agent's session (nstack agent run), nothing is pushed under another identity than the
+# agent's own (#456): a commit git made up from the machine would publish its user and host name.
+# Read: every commit of the local branches and tags, and of the ref pushed, that the remote does not
+# hold yet — pre-commit names only the first ref of a push of several. What a fetch brought — the
+# remote-tracking branches, the attested records fetched beside them — is the remote's already.
+if [ -n "${NSTACK_AGENT:-}" ]; then
+  MINE=$(git config --global user.email)
+  NAME=$(git config --global user.name)
+  if [ -z "$MINE" ] || [ -z "$NAME" ]; then
+    echo "FAIL [nstack] agent ${NSTACK_AGENT} declares no identity in its own git configuration: nothing is pushed."
+    echo "      Action: nstack agent run ${NSTACK_AGENT} -- <command> writes it; then amend the commits' author."
+    exit 1
+  fi
+  FROM=""
+  case "${PRE_COMMIT_FROM_REF:-}" in ""|*[!0]*) FROM=${PRE_COMMIT_FROM_REF:-} ;; esac
+  COUNT=$(git log --format='%ae%x09%ce%x09%an%x09%cn' --branches --tags ${PRE_COMMIT_TO_REF:+"$PRE_COMMIT_TO_REF"} \
+      --not --remotes --glob='refs/notes/nstack-remote/*' ${FROM:+"$FROM"} 2>/dev/null |
+    awk -F '\t' -v me="$MINE" -v name="$NAME" '$1 != me || $2 != me || $3 != name || $4 != name' | wc -l | tr -d ' ')
+  if [ "${COUNT:-0}" -gt 0 ]; then
+    echo "FAIL [nstack] ${COUNT} commit(s) the remote does not hold yet are not agent ${NSTACK_AGENT}'s identity"
+    echo "      ($NAME <$MINE>) as author or committer: pushed, they would publish another — this machine's"
+    echo "      user and host, or a person's name."
+    echo "      Action: the agent's own commits under a made-up identity: git rebase --exec 'git commit --amend"
+    echo "      --no-edit --reset-author' <their base>. Another's work brought here keeps its author: it is"
+    echo "      pushed from that person's own session, never re-signed."
+    exit 1
+  fi
+fi
 case "${PRE_COMMIT_REMOTE_BRANCH:-}" in
   refs/heads/nstack/hold/*|refs/notes/nstack/*) echo "nstack's own record: no file of the project to judge."; exit 0 ;;
 esac
