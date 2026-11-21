@@ -1,0 +1,38 @@
+# The licences a crate of kitokey-transcription may come under (D102): any other, GPL, LGPL or AGPL among
+# them, and `cargo about generate` refuses to write the notices.
+#
+# THIRD-PARTY-NOTICES.html is made from this file, about.hbs and Cargo.lock, and committed;
+# tests/notices.rs is red when it no longer names Cargo.lock's crates. Make it again, from this
+# folder, with the version pinned here:
+#
+#   cargo install --locked cargo-about --version 0.9.3 --features cli
+#   cargo about generate --locked --all-features --fail about.hbs --output-file THIRD-PARTY-NOTICES.html
+accepted = [
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+]
+# What ships: the crates linked into the program, on the systems it is built for, with every
+# feature, Vulkan's included (Linux's build); neither what only builds it nor what only tests it.
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+# kitokey-transcription itself is the project's, under LICENSE: not a third party.
+private = { ignore = true }
+# ring's licence is in no file cargo-about can read alone; its own workaround reads it.
+workarounds = ["ring"]
+
+# whisper-rs-sys is under the Unlicense, but builds and links whisper.cpp and ggml, under MIT: their
+# notice goes with the program too, read from the file the crate carries.
+[whisper-rs-sys.clarify]
+license = "Unlicense AND MIT"
+
+[[whisper-rs-sys.clarify.files]]
+path = "whisper.cpp/LICENSE"
+license = "MIT"
+checksum = "e562a2ddfaf8280537795ac5ecd34e3012b6582a147ef69ba6a6a5c08c84757d"
