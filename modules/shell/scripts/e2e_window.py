@@ -11610,6 +11610,8 @@ def store_shots(now: dt.datetime) -> None:
         " models: shown('#settings h2').filter(h => ['Modèles', 'Models'].includes(h.textContent)).map(h => Math.round(h.getBoundingClientRect().top)),"
         " cut: [...document.querySelectorAll('#groups li *')].filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent),"
         " here: document.getElementById('minutes-here')?.checked ?? null,"
+        " crossing: [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
+        " && e.getBoundingClientRect().top < innerHeight && e.getBoundingClientRect().bottom > innerHeight).map(e => e.textContent.trim() || e.tagName),"
         " above: shown('#settings section.card').filter(s => s.getBoundingClientRect().top < 0 && s.getBoundingClientRect().bottom > 0).length,"
         " zero: (document.getElementById('settings')?.innerText.match(/\\b0\\s(?:o|B)\\b/g) ?? []).length}")})
     # An Ollama of CH's own, holding the model every meeting's minutes name: Settings says them written on this
@@ -11750,6 +11752,9 @@ def store_shots(now: dt.datetime) -> None:
     check("Settings' shot says the minutes written on this computer, as every meeting's are (D103)", len(here) == 2 and all(here.values()), here)
     above = {shot: page["above"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
     check("Settings' shot cuts no card at its top (D103)", len(above) == 2 and not any(above.values()), above)
+    crossing = {shot: page["crossing"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot: the card under its models goes on past the image's edge between two rows, never through a control or a line of text (D103)",
+          len(crossing) == 2 and not any(crossing.values()), crossing)
     zero = {shot: page["zero"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
     check("Settings' shot says the model's size as it is, never « 0 o » (D103)", len(zero) == 2 and not any(zero.values()), zero)
     models = {shot: page["models"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
