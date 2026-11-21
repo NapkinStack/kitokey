@@ -1,7 +1,7 @@
 ---
-decision: proposed           # proposed | go | clarify | kill — the decider decides
+decision: go                 # proposed | go | clarify | kill — the decider decides
 decider: "@napkinstack-admin"
-decided_on:                  # YYYY-MM-DD, with the decision
+decided_on: 2026-11-21       # YYYY-MM-DD, with the decision
 framer: "marc, session 55380109-57c0-43c7-9bc5-045719e62701, 2026-11-21"
 challenger: "sam, session wholeheard-sam-a2, 2026-11-21"
 idea: "kitokey-team/cycle-12-candidates.md, item 4 of « Store media and product/market priorities — the plan », the decider's word of 2026-11-21 ~03h30"
@@ -611,10 +611,9 @@ te donnerai la main plus tard pour les tests dans chrome ».
 
 ### 6d. Decision
 
-*Proposed by the framer, 2026-11-21, for the decider to approve with this pull request; the front matter's
-`decision` and `decided_on` are written on that approval.*
+*Decided by the decider, 2026-11-21 ~07h, in the coordinator's session; proposed by the framer the same day.*
 
-**Proposed: go** — cycle 12 is framed from this ranking, for the Store's professional buyer:
+**Go** — cycle 12 is framed from this ranking, for the Store's professional buyer:
 
 1. **A long file in, a pertinent summary and a transcript with speakers out**: import an audio or video file
    (spike S2 first, five real files), then voices, opt-in (spike S1 first, the models' licences); held by the
@@ -638,4 +637,8 @@ threshold on wrong dates and a legal no-go (§5e). The riskiest assumptions (§6
 step of the item they bear on: S2's five files, S1's licences, the date spike, and the Store's own figures for
 value.
 
-*The decider's approval, its words and its date: here.*
+**The decider's words**, 2026-11-21 ~07h, relayed verbatim by the coordinator (wholeheard-34), to the question
+« Cycle 12 (#1079) : valides-tu cet ordre ? 1 Fichier long → compte rendu et transcription par locuteur … ·
+2 Structures … · 3 Page d'enregistrement en direct (petit) · 4 Dates mentionnées : spike, puis panneau …, .ics
+seulement après ta réponse sur où vont les dates · 5 macOS en parallèle · 6 Test de collage …, rien à
+construire · 7 Vidéo du Store »: **« Go, ordre validé »**.
