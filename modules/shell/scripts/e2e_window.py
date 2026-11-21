@@ -11523,6 +11523,20 @@ def store_relief(points: str) -> tuple[int, int]:
     return len(heights), longest
 
 
+def store_alone(drawn: list[str]) -> float:
+    """Of the moments who-spoke's drawing says someone spoke, the share where one side spoke alone, the other at most
+    a quarter of it: as a meeting goes, one side up while the other is low."""
+    local, remote = ([round(abs(float(point.split(",")[1]) - 44) - 2, 1) for point in points.split()] for points in drawn)
+    spoken = [(one, other) for one, other in zip(local, remote) if max(one, other) > 0]
+    return round(sum(min(one, other) <= max(one, other) / 4 for one, other in spoken) / len(spoken), 2) if spoken else 0.0
+
+
+def store_lasted(row: str) -> int:
+    """A list row's length, in minutes, as it says it: « 25 min », « 1 h 05 »."""
+    hours, minutes = re.search(r"(\d+)\s*h\b", row), re.search(r"(\d+)\s*min\b", row)
+    return 60 * int(hours[1] if hours else 0) + int(minutes[1] if minutes else 0)
+
+
 def store_shots(now: dt.datetime) -> None:
     """CH. D103: the Microsoft Store's screenshots, made here from meetings invented for them, in French then
     in English, light, in the Store's order — « displayed in your listing in order », Microsoft's page says —, the
@@ -11543,7 +11557,9 @@ def store_shots(now: dt.datetime) -> None:
         " relief: [...document.querySelectorAll('#meeting svg.relief polyline')].map(l => l.getAttribute('points')),"
         " lines: [shown('#meeting .transcript .lines li').length, document.querySelectorAll('#meeting .transcript .lines li').length],"
         " rows: [shown('#groups li').length, document.querySelectorAll('#groups li').length],"
-        " fetch: shown('#model-fetch').length}")})
+        " fetch: shown('#model-fetch').length, said: shown('#groups li').map(e => e.innerText),"
+        " models: shown('#settings h2').filter(h => ['Modèles', 'Models'].includes(h.textContent)).map(h => Math.round(h.getBoundingClientRect().top)),"
+        " zero: (document.getElementById('settings')?.innerText.match(/\\b0\\s(?:o|B)\\b/g) ?? []).length}")})
     for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
         said = STORE_MEETINGS[short]
         # The meetings' folder is the user's own, in a home of its own: Settings says « Dossier personnel / Kitokey »,
@@ -11638,15 +11654,26 @@ def store_shots(now: dt.datetime) -> None:
     check("who spoke, drawn on the meetings' shots, rises and falls as people talk: each track at least 4 heights, no plateau over 3 sixtieths (D103)",
           len(reliefs) == 4 and all(len(drawn) == 2 and all(heights >= 4 and plateau <= 3 for heights, plateau in drawn) for drawn in reliefs.values()),
           reliefs)
+    alone = {shot: [store_alone(page["relief"])] for shot, page in shown.items() if shot[3] in "12"}
+    check("who spoke, drawn on the meetings' shots, one side up while the other is low: one side alone in at least two thirds of the moments spoken (D103)",
+          len(alone) == 4 and all(share >= 0.67 for (share,) in alone.values()), alone)
+    lasted = {shot: [store_lasted(row) for row in page["said"]] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("every meeting the list shows lasts as such a meeting does, at least 15 min (D103)",
+          len(lasted) == 2 and all(len(rows) == 6 and min(rows) >= 15 for rows in lasted.values()), lasted)
     searched = {shot: page["lines"] for shot, page in shown.items() if shot.endswith("2-search.png")}
-    check("the search shot: a word typed in a meeting's transcript, only its lines shown, at least two (D103)",
-          len(searched) == 2 and all(2 <= seen_ < total for seen_, total in searched.values()), searched)
+    check("the search shot: a word typed in a meeting's transcript, only its lines shown, at least four (D103)",
+          len(searched) == 2 and all(4 <= seen_ < total for seen_, total in searched.values()), searched)
     listed = {shot: page["rows"] for shot, page in shown.items() if shot.endswith("3-list.png")}
     check("the list shot: a word typed in the list's search, only its meetings shown, at least two (D103)",
           len(listed) == 2 and all(2 <= seen_ < total for seen_, total in listed.values()), listed)
     fetched = {shot: page["fetch"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
     check("Settings' shot shows the transcription's model on this computer, none to download (D103)",
           len(fetched) == 2 and not any(fetched.values()), fetched)
+    zero = {shot: page["zero"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot says the model's size as it is, never « 0 o » (D103)", len(zero) == 2 and not any(zero.values()), zero)
+    models = {shot: page["models"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot shows its models at the top: their heading in the image's first third — Microsoft's « top two-thirds » for what matters (D103)",
+          len(models) == 2 and all(len(top) == 1 and 0 <= top[0] < 1080 / 3 for top in models.values()), models)
 
 def trial_over(now: dt.datetime) -> None:
     """AV. The trial over on a stand-in licence (PDR-0005, D83): no recording from the window, the
