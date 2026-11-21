@@ -7961,6 +7961,18 @@ def renaming(now: dt.datetime) -> None:
               bool(first_seen) and bool(later) and later["time"] != first_seen["time"] and later["time"].count(":") == 2 and not later["live"]
               and [m[0] for m in later["meters"]] == ["meter", "meter"] and all(m[1] for m in later["meters"]) and all(m[2] > 0 for m in later["meters"]),
               [first_seen, later])
+        # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
+        # left at the legend's right, where the range stands at rest.
+        big = ("const t = document.getElementById('page-time'), d = document.querySelector('#meeting .drawing'), h = document.querySelector('#meeting h1'),"
+               " m = [...document.querySelectorAll('#meeting .page-level')]; if (!t || !d || !h) return null; const r = t.getBoundingClientRect();"
+               " return {inside: d.contains(t), size: parseFloat(getComputedStyle(t).fontSize), heading: parseFloat(getComputedStyle(h).fontSize),"
+               " tabular: getComputedStyle(t).fontVariantNumeric.includes('tabular-nums'),"
+               " under: m.length === 2 && m.every(e => d.contains(e) && e.getBoundingClientRect().top >= r.bottom),"
+               " right: document.querySelector('#meeting .legend .range')?.textContent ?? null}")
+        large = browser.execute_script(big)
+        check("while it records, the time stands large in the who-spoke area, tabular, the meters under it, nothing at the legend's right (#1112)",
+              large is not None and large["inside"] and large["size"] >= large["heading"] and large["tabular"] and large["under"] and large["right"] is None,
+              large)
         # Its page while it records, seen (#1076, T4; the source of the Store's recording shot): 420 and 1100 px, light and dark.
         size = browser.get_window_size()
         for width in (420, 1100):
