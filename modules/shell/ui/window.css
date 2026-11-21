@@ -80,9 +80,10 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }
 /* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
 .open, .search { min-height: 32px; border-radius: 8px; border: 1px solid; color: var(--ink); font: inherit; font-size: 14px; }
-/* A secondary action (#1094, Fluent 2's subtle, GNOME's flat): unframed on the raised ground, a step
-   darker under the pointer, another pressed; the one primary of a view stays the filled accent. */
-.open { padding: 0 12px; font-weight: 600; cursor: pointer; border-color: transparent; background: var(--raised); }
+/* A secondary action (#1094): on the raised ground, on the line, its bottom edged at 3:1 as Windows 11's
+   controls are — a signifier at rest —, a step darker under the pointer, another pressed; the one
+   primary of a view stays the filled accent. */
+.open { padding: 0 12px; font-weight: 600; cursor: pointer; border-color: var(--line); border-bottom-color: var(--edge); background: var(--raised); }
 .open:hover { background: var(--hover); }
 .open:active { background: var(--pressed); }
 /* A field is drawn on the surface (board 2's after); a secondary button on the raised ground. */
