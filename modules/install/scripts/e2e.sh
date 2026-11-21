@@ -68,7 +68,10 @@ case $target in
   ubuntu-[0-9]*)
     [ -z "$copr" ] || { echo "e2e: Copr builds for Fedora only" >&2; exit 2; }
     image="docker.io/library/ubuntu:${target#ubuntu-}"
-    add='apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/kitokey.deb'
+    # Ubuntu's container image is minimised: its /etc/dpkg/dpkg.cfg.d/excludes has dpkg drop
+    # « /usr/share/doc/* » but copyright files, where the .deb lays its notices (D102); a desktop has no
+    # such file. Removed first, so the package is judged as a user's system installs it.
+    add='rm -f /etc/dpkg/dpkg.cfg.d/excludes && apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/kitokey.deb'
     remove='apt-get remove -y -qq kitokey'; file=/tmp/kitokey.deb
     listed='dpkg -L kitokey'
     scripts='ls /var/lib/dpkg/info/kitokey.preinst /var/lib/dpkg/info/kitokey.postinst /var/lib/dpkg/info/kitokey.prerm /var/lib/dpkg/info/kitokey.postrm'
