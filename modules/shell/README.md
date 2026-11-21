@@ -384,6 +384,16 @@ extension or PipeWire, it says `NOT RUN`. `bash scripts/e2e.sh` alone still runs
 itself — the tray, the notifications and the window shown, the run's microphone made the
 system's default meanwhile — for whoever wants to watch it: quit Kitokey first.
 
+## What it owes its crates' authors
+
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links under its licence's text, then what the window draws that is no crate —
+Lucide's icons (`ui/LUCIDE-LICENSE`) and Montserrat's outlines in its name (`ui/MONTSERRAT-OFL.txt`).
+It is made with cargo-about from `about.toml`, whose `accepted` list refuses any other licence, GPL
+among them, and `about.hbs`, which holds the two files' texts; it is committed, and
+`tests/notices.rs` is red once it no longer names the crates the program links, or no longer holds
+either file as written. `about.toml`'s header gives the two commands that make it again.
+
 ## Contracts
 
 - Provided: none
