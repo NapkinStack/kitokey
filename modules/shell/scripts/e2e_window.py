@@ -7991,6 +7991,23 @@ def renaming(now: dt.datetime) -> None:
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
         check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
+        # #1076: stopped from elsewhere — by the shell's own command, as the tray, the shortcut and the bar stop it —, the
+        # window's button is never pressed, and its redraw a moment after a press (`setTimeout(refresh, 1200)`) never
+        # comes: the page's poll alone draws the range back.
+        now_meeting = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('recording_now')"
+                       ".then((n) => done(n.recording && n.meeting ? n.meeting : null), () => done(null))")
+        browser.execute_script("window.__TAURI__.core.invoke('record')")
+        wait_for(browser, lambda b: b.execute_async_script(now_meeting), 10)
+        again = browser.execute_async_script(now_meeting)
+        if again:
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{again}")
+        live_again = bool(again) and wait_for(browser, lambda b: b.execute_script(alive), 10)
+        time.sleep(0.8)
+        browser.execute_script("window.__TAURI__.core.invoke('record')")
+        drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
+            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 5)
+        check("stopped from elsewhere, the window's button not pressed: the page draws its range back by itself (#1076)", drawn_back,
+              [again, live_again, browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
 
 
 def actions_rows(now: dt.datetime) -> None:
