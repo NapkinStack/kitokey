@@ -326,6 +326,42 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   summary model of Settings —, at least 4 of the 6 built-in structures yield every section either filled or said
   empty, over the team's sample of 3 meetings; below that, the structures that fail are cut and the result
   recorded — a refuted spike is a delivered one.
+- **The spike, 2026-11-20** (`kitokey-team/logs/d111-spike*.jsonl`): `qwen3:8b`, the local model Settings
+  recommends, on the bench's played meeting (`modules/platform/bench/meeting.txt`, French, synthesised voices),
+  3 runs per structure, 92 to 361 s an answer. Asked the sections' order in words, as v4 is: 3 of 6 structures
+  held every run — one-to-one, stand-up and interview each failed once, on form (no `## ` line twice, content
+  written as a title once). Given the skeleton to copy — `# <the meeting's title>`, then `## <section n's title>`
+  and `<section n's content>` line by line, each title « a few words naming the section, never its content »:
+  **6 of 6, every run; the threshold is held**, and summary asks it so (#1042). A JSON answer by constrained
+  decoding, the third variant, was not needed. Not met as written: one meeting played three times, not three
+  meetings; and the spike's request lacked summary's paragraph on the recogniser's errors and its times per bullet.
+- **The third spike, 2026-11-21** — what closes those two gaps.
+  - **Setup.** `kitokey-summary` itself was built at 0d365b7 and run as the shell runs it, `--structure <name>`
+    on `qwen3:8b` through Ollama's native route, so the request is the bytes `request_in` builds: rules, the
+    recogniser's errors, the times, the skeleton.
+  - **Sample.** Three meetings, two runs per structure, 36 runs:
+    - a written stand-up;
+    - a written client call;
+    - the bench's meeting recognised by whisper.cpp large-v3-turbo-q8_0, taken as transcript/v1 with the
+      recogniser's own errors.
+  - **Judged on what the program writes** (its one asking again included), as the coordinator decided before
+    the reading. The first answer's count is recorded beside it.
+  - **Result:**
+    - general, stand-up, client call and project review held every run;
+    - one-to-one and interview held 5 of 6;
+    - **4 of 6 structures, every run: the threshold is held.** The first answer's count is the same; nothing
+      was asked again.
+  - **The two failures** came on the recognised meeting: one-to-one run 1 (661 s) and interview run 2 (592 s).
+    Neither was on form. Each time the program refused with « the provider on this computer cut its answer
+    short »: Ollama said `done_reason: length` after the 4,096 tokens `num_predict` allows an answer, its
+    thinking counted (`modules/summary/src/provider.rs`, `WINDOW`). At about 7 tokens a second, that is the
+    590–660 s seen. The program wrote no incomplete minutes, as designed.
+  - **Read:** the structures' form held on every answer that ended. The risk left is a thinking model's length
+    on a longer, noisier transcript, which grows with an hour-long import. That is a follow-up issue, not
+    D111's criterion.
+  - **Evidence:** `kitokey-team/logs/d111-spike3.jsonl` (one line per run, the minutes or the refusal) and
+    `logs/evening/d111-spike3.log` (the table). Spike 3 was run at 0d365b7; `git diff 0d365b7 300c7b5 --
+    modules/summary` is empty, 300c7b5 being main 5553f42 merged in.
 - **The contract**: three pull requests, in order — `minutes/v5`'s page and schema, summary writing it, the
   shell reading v4 and v5. v4 is never removed in this cycle.
 
