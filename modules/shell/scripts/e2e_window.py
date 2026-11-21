@@ -7979,10 +7979,17 @@ def renaming(now: dt.datetime) -> None:
               large)
         # Its page while it records, seen (#1076, T4; the source of the Store's recording shot): 420 and 1100 px, light and dark.
         size = browser.get_window_size()
+        drawn_meters = ("const d = document.querySelector('#meeting .drawing')?.getBoundingClientRect(); if (!d) return null;"
+                        " return [...document.querySelectorAll('#meeting .page-level')].map(e => { const r = e.getBoundingClientRect();"
+                        " return [Math.round(r.width), Math.round(r.height), r.left >= d.left - 1 && r.right <= d.right + 1 && r.top >= d.top - 1 && r.bottom <= d.bottom + 1]; })")
         for width in (420, 1100):
             browser.set_window_size(width, 800)
             time.sleep(0.5)
             browser.execute_script("scrollTo(0, 0)")
+            # #1112: each side's meter drawn, at both widths — wide enough to read, a bar's height, inside the area.
+            meters_seen = browser.execute_script(drawn_meters)
+            check(f"at {width} px, both meters drawn: at least 120 × 4 px, inside the who-spoke area (#1112)",
+                  meters_seen is not None and len(meters_seen) == 2 and all(w >= 120 and h >= 4 and inside for w, h, inside in meters_seen), meters_seen)
             for theme in ("light", "dark"):
                 shot_themed(browser, f"d1076-recording-{width}-{theme}", theme)
         browser.set_window_size(size["width"], size["height"])
