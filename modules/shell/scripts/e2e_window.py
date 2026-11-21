@@ -5214,9 +5214,12 @@ def destinations_kept(now: dt.datetime) -> None:
             check("each address judged by kitokey-send --check, the address on its input, never among its arguments",
                   len(judged) == 2 and all(call["args"] == ["--check"] and secret not in " ".join(call["args"]) for call in judged)
                   and json.loads(judged[1]["input"])["address"] == good, [call["args"] for call in judged])
+            forgetting = browser.execute_script("const b = document.getElementById('destination-forget-0'); return b ? [b.textContent, b.disabled] : null")
             press(browser, "destination-forget-0")
             gone = wait_for(browser, lambda b: b.execute_script(rows) == [], 10)
-            check("forgotten, the destination is gone, from the page and the settings' file", gone and "#équipe" not in window.file.read_text())
+            check("forgotten, the destination is gone from the page", gone, (forgetting, browser.execute_script(rows), browser.find_element(By.ID, "destinations-said").text))
+            check("forgotten, the destination is gone from the settings' file", "#équipe" not in window.file.read_text(),
+                  [line for line in window.file.read_text().splitlines() if "destination" in line or "équipe" in line])
 
 
 def settings_narrow_without_model(now: dt.datetime) -> None:
