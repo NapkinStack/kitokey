@@ -5767,6 +5767,15 @@ def redo_says_what_follows(now: dt.datetime) -> None:
                 time.sleep(1)
                 check(f"{short}, {what}: Escape closes the panel, nothing started (D113)",
                       closed and not hearing.exists() and not writing.exists(), [closed, hearing.exists(), writing.exists()])
+                # « Annuler » as Escape (ines' pre-read: only Escape was pinned): the panel closed, nothing started.
+                press(browser, "redo-transcript")
+                reopened = wait_for(browser, lambda b: b.execute_script(panel) is not None, 5)
+                if reopened:
+                    press(browser, "redo-transcript-panel-cancel")
+                shut = reopened and wait_for(browser, lambda b: b.execute_script(panel) is None, 3)
+                time.sleep(1)
+                check(f"{short}, {what}: « Annuler » closes the panel, nothing started (D113)",
+                      shut and not hearing.exists() and not writing.exists(), [reopened, shut, hearing.exists(), writing.exists()])
                 press(browser, "redo-transcript")
                 wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
                 press(browser, "redo-transcript-do")
@@ -10226,6 +10235,7 @@ def context_written(now: dt.datetime) -> None:
               and label == "De quoi parle la réunion ? Qui y participe ?", (area.get_attribute("value"), label))
         check("made with it, nothing is offered to make again", not browser.find_element(By.ID, "context-changed").is_displayed())
         more = " Siobhán O’Neill (juridique)."
+        made_before = ((meeting / "transcript.jsonl").read_text(), (meeting / "minutes.md").read_text())
         area.click()
         keys(browser, Keys.END, more)
         changed = wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
@@ -10236,6 +10246,12 @@ def context_written(now: dt.datetime) -> None:
               and browser.find_element(By.ID, "context-redo").text == "Refaire la transcription et le compte rendu",
               ((meeting / "context.txt").read_text(), browser.find_element(By.ID, "context-redo").text))
         seen(browser, "d59-4-page-changed-light")
+        # D113, criterion 1 (ines' pre-read): a changed context starts nothing by itself — it waits for its button.
+        time.sleep(1.5)
+        still = browser.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+                                       " && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)")
+        check("a changed context starts nothing by itself: no making, the transcript and the summary as they were (D113)",
+              still and ((meeting / "transcript.jsonl").read_text(), (meeting / "minutes.md").read_text()) == made_before, still)
         # Made again, slowly: the field closed meanwhile, and said.
         (WORK / "slow-hearing").touch()
         try:
