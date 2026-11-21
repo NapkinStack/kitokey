@@ -344,6 +344,11 @@ body.small-window .frame { display: none; }
 .live-now { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 100px; padding: 8px 0; }
 .live-time { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.2; }
 .live-now .page-levels { width: min(100%, 480px); margin-top: 0; }
+.page-meter { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.page-meter .track { flex: none; width: 100%; }
+.page-meter > .here, .page-meter > .remote { font-size: 14px; overflow-wrap: anywhere; }
+.page-meter > .here { color: var(--accent); }
+.page-meter > .remote { color: var(--ok); }
 .page-levels { display: flex; gap: 16px; margin-top: 8px; }
 .page-levels .track { flex: 1 1 0; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
 .page-levels .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }

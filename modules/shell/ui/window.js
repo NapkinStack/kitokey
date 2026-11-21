@@ -1229,6 +1229,8 @@ let pageLive = null;
 function pageLevels(name, time, words) {
   const row = element("div", "page-levels");
   const fills = [words.small_mic, words.small_meeting].map((label, index) => {
+    // Each side's label right under its own meter (#1112): a label sits with what it names.
+    const column = element("div", "page-meter");
     const track = element("span", "track page-level");
     track.setAttribute("role", "meter");
     track.setAttribute("aria-label", label);
@@ -1237,7 +1239,8 @@ function pageLevels(name, time, words) {
     track.setAttribute("aria-valuenow", "0");
     const fill_ = element("span", index === 0 ? "fill here" : "fill remote");
     track.append(fill_);
-    row.append(track);
+    column.append(track, element("span", index === 0 ? "here" : "remote", index === 0 ? words.here_described : words.remote_described));
+    row.append(column);
     return fill_;
   });
   clearInterval(pageLive);
@@ -2586,7 +2589,10 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     now.append(time, pageLevels(nameOf(session), time, words));
     drawing.append(now);
   } else drawing.append(relief(said, total, words));
-  drawn.append(drawing, legend, playerBar(session, listened, total, words, drawing));
+  // While it records, the legend's labels stand under their meters; at rest, the legend in its place.
+  drawn.append(drawing);
+  if (!live) drawn.append(legend);
+  drawn.append(playerBar(session, listened, total, words, drawing));
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
