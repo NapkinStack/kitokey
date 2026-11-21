@@ -2578,7 +2578,8 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const legend = element("div", "legend");
   // While it records (#1076): the time running in place of the range, read as the bar reads it.
   const live = session.state === "recording";
-  legend.append(element("span", "here", words.here_described), element("span", "remote", words.remote_described));
+  // A legend names what is drawn: none before a transcript (#1116); while it records, the labels stand under the meters.
+  if (transcript.state === "present") legend.append(element("span", "here", words.here_described), element("span", "remote", words.remote_described));
   if (!live) legend.append(element("span", "range", `${clock(0)} – ${clock(total)}`));
   const drawing = element("div", "drawing");
   if (live) {
