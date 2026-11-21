@@ -7949,6 +7949,18 @@ def renaming(now: dt.datetime) -> None:
         check("being recorded, Libérer de l'espace names it, its date beside", bool(busy) and busy[0][0] == "En direct" and "·" in busy[0][1], busy)
         browser.execute_script(f"location.hash = '#/meeting/{recording.name}'")
         wait_for(browser, lambda b: head(b) == "En direct", 10)
+        # #1076: while it records, its page shows the time running and both sides' levels, read from what the bar
+        # reads (`recording_now`); neither is a live region, as the bar's are not.
+        alive = ("const t = document.getElementById('page-time'), m = [...document.querySelectorAll('#meeting .page-level')];"
+                 " return t && t.getClientRects().length ? {time: t.textContent, live: t.closest('[aria-live]') !== null || m.some(e => e.closest('[aria-live]') !== null),"
+                 " meters: m.map(e => [e.getAttribute('role'), e.getAttribute('aria-label'), Number(e.getAttribute('aria-valuenow'))])} : null")
+        first_seen = wait_for(browser, lambda b: b.execute_script(alive), 5) and browser.execute_script(alive)
+        time.sleep(1.2)
+        later = browser.execute_script(alive)
+        check("while it records, its page shows the time running and both sides' levels as meters, no live region (#1076)",
+              bool(first_seen) and bool(later) and later["time"] != first_seen["time"] and later["time"].count(":") == 2 and not later["live"]
+              and [m[0] for m in later["meters"]] == ["meter", "meter"] and all(m[1] for m in later["meters"]) and all(m[2] > 0 for m in later["meters"]),
+              [first_seen, later])
         # Pressed once it is the stop gesture, as the shell says it: recording, nothing stopping, no
         # press of the window's still answered — and once the shell's half second has passed since
         # the start's press, which takes a press within it for the same one (D68). 6eb6ce0's red in a
@@ -7971,6 +7983,11 @@ def renaming(now: dt.datetime) -> None:
                "presses reaching the button": [clicks, browser.execute_script("return window.__recordClicks")],
                "pressed, seconds after the start's press": after_start,
                "session.json": (recording / "session.json").read_text()})
+        # #1076: once it stops, the page leaves the live time and meters for the meeting's range, its poll ended.
+        settled = wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
+            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 10)
+        check("stopped: the page shows the meeting's range again, no live time nor meters (#1076)", settled,
+              [browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
         check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
