@@ -309,6 +309,7 @@ Every important piece of information has one identifiable source, and only one.
 | A deliverable's delivery | Its record (`nstack deliver`), read by `nstack plan`, written into the cycle at the closure |
 | Unplanned work | A typed issue: a defect, an architecture question, a debt, a request |
 | What the project must remember | One named issue, the project's log — titled `Log`, opened by whoever writes its first entry; with no forge, `docs/project/log.md`: what was tried, what it cost, what was refused — and what was asked of, promised to, or received from someone outside the team, by any channel |
+| How an agent's tool loads a playbook | The playbook; the skills are generated from it, committed, and checked against it (S3) |
 | Real behaviour | Code and tests |
 | Quality rules | Versioned CI |
 | Infrastructure | Versioned configuration |
