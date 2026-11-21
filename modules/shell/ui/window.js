@@ -3171,6 +3171,96 @@ function showSettings(shown, minutes, words) {
   }
   parts.push(after);
 
+  {
+    // Where a summary can be sent (D110, PDR-0007): each destination by its name, its kind, and its
+    // address as its host and the end of its path — never whole; one added is judged before it is kept.
+    const sending = element("section", "card group");
+    sending.append(element("h2", "", words.destinations_title), element("p", "says", words.destinations_said));
+    const kinds = { webhook: 0, discord: 1, slack: 2 };
+    const kept = element("ul", "lines");
+    kept.id = "destinations";
+    const none = element("p", "says", shown.destinations.length ? "" : words.destinations_none);
+    none.id = "destinations-said";
+    shown.destinations.forEach((destination, index) => {
+      const row = element("li", "row");
+      const rowSaid = element("span", "said");
+      rowSaid.append(element("span", "name", destination.name), element("span", "says", `${words.destination_kinds[kinds[destination.kind]]} · ${destination.shown}`));
+      const forget = element("button", "open", words.destination_forget);
+      forget.type = "button";
+      forget.id = `destination-forget-${index}`;
+      forget.disabled = locked;
+      forget.addEventListener("click", () =>
+        window.__TAURI__.core.invoke("destination_forgotten", { name: destination.name }).then(refresh, (why) => {
+          none.textContent = fill(words.not_saved, why);
+        }),
+      );
+      row.append(rowSaid, forget);
+      kept.append(row);
+    });
+    const adding = element("div", "fields");
+    const field = (id, label, input) => {
+      const wrap = element("label", "said");
+      wrap.htmlFor = id;
+      wrap.append(element("span", "name", label));
+      input.id = id;
+      input.disabled = locked;
+      return [wrap, input];
+    };
+    const kind = element("select");
+    for (const [value, index] of Object.entries(kinds)) {
+      const option = element("option", "", words.destination_kinds[index]);
+      option.value = value;
+      kind.append(option);
+    }
+    const named = element("input");
+    named.type = "text";
+    named.maxLength = 40;
+    named.autocomplete = "off";
+    const address = element("input");
+    address.type = "url";
+    address.autocomplete = "off";
+    address.spellcheck = false;
+    address.setAttribute("aria-describedby", "destination-address-said");
+    const addressSaid = element("p", "says", words.destination_address_said);
+    addressSaid.id = "destination-address-said";
+    const add = element("button", "open", words.destination_add);
+    add.type = "button";
+    add.id = "destination-add";
+    add.disabled = locked;
+    const result = element("p", "says");
+    result.id = "destination-said";
+    result.setAttribute("role", "status");
+    add.addEventListener("click", () => {
+      add.disabled = true;
+      window.__TAURI__.core
+        .invoke("destination_added", { kind: kind.value, name: named.value, address: address.value })
+        .then(
+          () => {
+            // Kept: the address leaves the page at once; the list, drawn again, names it.
+            address.value = "";
+            return refresh().then(() => {
+              const said = document.getElementById("destination-said");
+              if (said) said.textContent = fill(words.destination_added, named.value.trim());
+            });
+          },
+          (why) => {
+            result.textContent = fill(words.destination_not_added, why);
+            add.disabled = locked;
+          },
+        );
+    });
+    adding.append(
+      ...field("destination-kind", words.destination_fields[0], kind),
+      ...field("destination-name", words.destination_fields[1], named),
+      ...field("destination-address", words.destination_fields[2], address),
+      addressSaid,
+      add,
+      result,
+    );
+    sending.append(kept, none, adding);
+    parts.push(sending);
+  }
+
   const models = element("section", "card group");
   models.append(element("h2", "", words.models_title), element("p", "says", words.models_intro));
   // The first run's assistant again, the current setting chosen (D58).

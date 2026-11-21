@@ -161,6 +161,9 @@ pub struct Settings {
     /// The microphone recordings take, as capture names it, and as a person reads it (D74). None: Auto.
     pub microphone: Option<String>,
     pub microphone_description: Option<String>,
+    /// Where a summary can be sent (D110): each by its name and kind, its address shown only as its
+    /// host and the end of its path — the address itself is in the keyring, never here.
+    pub destinations: Vec<crate::destinations::Destination>,
 }
 
 /// The model a transcript is heard with when the settings name none (ADR-0003).
@@ -196,6 +199,7 @@ impl Default for Settings {
             language: None,
             microphone: None,
             microphone_description: None,
+            destinations: Vec::new(),
         }
     }
 }
@@ -271,6 +275,7 @@ struct Written {
     language: Option<String>,
     microphone: Option<String>,
     microphone_description: Option<String>,
+    destinations: Option<Vec<crate::destinations::Destination>>,
 }
 
 /// What in a settings file Kitokey refuses, as the user is told it (#783): which setting, on which
@@ -304,7 +309,7 @@ impl std::fmt::Display for Unread {
 }
 
 /// The keys a settings file may hold: those a refusal names.
-const KEYS: [&str; 26] = [
+const KEYS: [&str; 27] = [
     "reminder",
     "sessions",
     "transcript",
@@ -331,6 +336,7 @@ const KEYS: [&str; 26] = [
     "language",
     "microphone",
     "microphone_description",
+    "destinations",
 ];
 
 /// Reads the settings. No file is no choice made: the defaults. A file that cannot be read as
@@ -403,6 +409,14 @@ pub fn read(path: &Path) -> Result<Settings, Unread> {
     settings.meeting_language = written.meeting_language.as_deref().and_then(crate::spoken::code);
     settings.microphone = written.microphone.filter(|named| !named.trim().is_empty());
     settings.microphone_description = written.microphone_description.filter(|named| !named.trim().is_empty());
+    // Each by a name a person reads, once: one written by hand otherwise is left aside.
+    for destination in written.destinations.unwrap_or_default() {
+        if let Some(name) = crate::destinations::name(&destination.name)
+            && !settings.destinations.iter().any(|kept| kept.name == name)
+        {
+            settings.destinations.push(crate::destinations::Destination { name, ..destination });
+        }
+    }
     settings.minutes_agreed = written.minutes_agreed.filter(|named| !named.trim().is_empty());
     settings.transcription_provider = written.transcription_provider.filter(|named| !named.trim().is_empty());
     settings.transcription_model = written.transcription_model.filter(|named| !named.trim().is_empty());
@@ -561,6 +575,21 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
             }
         }
     }
+    if settings.destinations != before.destinations {
+        if settings.destinations.is_empty() {
+            document.remove("destinations");
+        } else {
+            let mut tables = toml_edit::ArrayOfTables::new();
+            for destination in &settings.destinations {
+                let mut table = toml_edit::Table::new();
+                table["name"] = toml_edit::value(destination.name.as_str());
+                table["kind"] = toml_edit::value(destination.kind.as_str());
+                table["shown"] = toml_edit::value(destination.shown.as_str());
+                tables.push(table);
+            }
+            document["destinations"] = Item::ArrayOfTables(tables);
+        }
+    }
     // Said by `after` now, once `after` is written: the key it replaced would contradict it.
     if document.contains_key("after") {
         document.remove("transcript");
@@ -623,6 +652,7 @@ mod tests {
             language,
             microphone,
             microphone_description,
+            destinations,
         );
         let mut keys = KEYS;
         fields.sort_unstable();
