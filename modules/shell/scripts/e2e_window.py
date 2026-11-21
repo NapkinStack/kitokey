@@ -11174,7 +11174,8 @@ def window_looks(now: dt.datetime) -> None:
         check("fields are drawn on the surface, only edged, as board 2 (D89)", filled == [True, []], filled)
         # #1094, on Settings — the page holding a list, a field and secondary buttons at once (the meeting's page here
         # has no list of its own nor a secondary shown): fields rest on the line, their bottom edged at 3:1 (Fluent 2's
-        # fields); a secondary button rests unframed — on --raised, or on the surface inside a step — and answers the pointer.
+        # fields); a secondary button rests on the line, its bottom edged as Windows 11's controls — on --raised, or on the
+        # surface inside a step — and answers the pointer.
         browser.execute_script("location.hash = '#/settings'")
         wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed() and b.find_elements(By.CSS_SELECTOR, "#settings select"), 10)
         token = ("const token = (v) => { const t = document.createElement('i'); t.style.color = `var(${v})`; document.body.append(t);"
@@ -11188,9 +11189,9 @@ def window_looks(now: dt.datetime) -> None:
         bare = browser.execute_script(
             token + " const all = [...document.querySelectorAll('#settings .open')].filter(e => e.offsetParent);"
             " return [all.length > 0, all.filter(e => { const s = getComputedStyle(e);"
-            " return s.borderTopColor !== 'rgba(0, 0, 0, 0)' || s.backgroundColor !== token(e.closest('.step') ? '--surface' : '--raised'); })"
+            " return s.borderTopColor !== token('--line') || s.borderBottomColor !== token('--edge') || s.backgroundColor !== token(e.closest('.step') ? '--surface' : '--raised'); })"
             ".map(e => e.id || e.className)]")
-        check("secondary buttons rest unframed, on --raised or a step's surface (#1094)", bare == [True, []], bare)
+        check("secondary buttons rest on --line, their bottom edged, on --raised or a step's surface (#1094)", bare == [True, []], bare)
         hovered = next((e for e in browser.find_elements(By.CSS_SELECTOR, "#settings .open") if e.is_displayed()), None)
         if hovered is not None:
             ActionChains(browser).move_to_element(hovered).perform()

@@ -941,12 +941,14 @@ fn declared(style: &str, selector: &str, name: &str) -> Option<String> {
 }
 
 /// #1094: the window's controls in a hierarchy, after Fluent 2's appearances and GNOME's HIG — one
-/// primary filled; a secondary unframed on the raised ground, answering the pointer and the press;
-/// an icon button bare until hovered, pressed too.
+/// primary filled; a secondary on the raised ground, on the line with its bottom edged as Windows 11's
+/// controls are (a signifier at rest: ines' challenge of #1096, NN/g's weak signifiers), answering the
+/// pointer and the press; an icon button bare until hovered, pressed too.
 #[test]
-fn a_secondary_rests_unframed_and_answers_the_pointer_and_the_press() {
+fn a_secondary_rests_on_the_line_its_bottom_edged_and_answers_the_pointer_and_the_press() {
     let missing: Vec<String> = [
-        (".open", "border-color", "transparent"),
+        (".open", "border-color", "var(--line)"),
+        (".open", "border-bottom-color", "var(--edge)"),
         (".open", "background", "var(--raised)"),
         (".open:hover", "background", "var(--hover)"),
         (".open:active", "background", "var(--pressed)"),
