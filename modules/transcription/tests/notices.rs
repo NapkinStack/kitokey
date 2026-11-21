@@ -27,7 +27,8 @@ fn locked() -> BTreeSet<String> {
 }
 
 /// Each crate linked into the program on those systems, as Cargo resolves it with every feature,
-/// Vulkan's included: the normal dependencies only, since what builds or tests it ships nothing. Not offline: a build fetches
+/// Vulkan's included: the normal dependencies only, neither a procedural macro nor what only it uses: what builds, tests or
+/// runs at compile time ships nothing. Not offline: a build fetches
 /// only its own system's crates, and Cargo reads the others' to resolve them, fetching each once
 /// at the version the lock holds (`--locked`).
 fn shipped() -> BTreeSet<String> {
@@ -37,7 +38,7 @@ fn shipped() -> BTreeSet<String> {
         "--locked",
         "--all-features",
         "--edges",
-        "normal",
+        "normal,no-proc-macro",
         "--prefix",
         "none",
         "--format",
@@ -117,5 +118,21 @@ fn the_notices_carry_whisper_cpps_licence_under_the_crate_that_links_it() {
     assert!(
         carried,
         "whisper.cpp's MIT notice is not under whisper-rs-sys: about.toml's clarify, then make the page again"
+    );
+}
+
+/// No GNU licence's text on the page — GPL, LGPL, AGPL, FDL: about.toml accepts none, and a crate's
+/// sources may carry one for parts it does not build (libflac-sys, for FLAC's programs). Each opens
+/// with the sentence below; MPL-2.0, which names the GPL as a Secondary License, does not.
+#[test]
+fn the_notices_hold_no_gnu_licence() {
+    let notices: String = include_str!("../THIRD-PARTY-NOTICES.html")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let gnu = "Everyone is permitted to copy and distribute verbatim copies of this license document";
+    assert!(
+        !notices.contains(gnu),
+        "the notices hold a GNU licence's text: about.toml's clarify, then make the page again"
     );
 }
