@@ -1759,7 +1759,7 @@ function minutesCard(read, words, session, transcript, onPage) {
   // known is left unsaid.
   const when = madeOn(words, read.made);
   // Written on this computer (`local`, minutes/v2): said so, never the contract's word (#1080).
-  const from = read.provider === "local" ? ` — ${words.on_computer}` : read.provider ? fill(words.written_via, read.provider) : "";
+  const from = read.provider === "local" ? `, ${words.on_computer}` : read.provider ? fill(words.written_via, read.provider) : "";
   const by = read.model ? modelSaid(read.model) + from : "";
   // Its model a list in its place (D93, criterion 5); none named, the line alone.
   const maker = (when
