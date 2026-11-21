@@ -1798,7 +1798,9 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
             "Ollama ne répond pas ou n’a aucun modèle. Lancez Ollama, puis téléchargez un modèle.",
         ),
         (french.key, "Clé d’API"),
-        (french.agree_local_write, "Rédiger ici"),
+        (french.agree_local_write, "Rédiger le compte rendu ici"),
+        // #933: a button that starts a making names it, as D113's Refaire… does.
+        (french.agree_local, "Rédiger plutôt le compte rendu sur cet ordinateur"),
     ] {
         assert_eq!(said, wanted);
     }
