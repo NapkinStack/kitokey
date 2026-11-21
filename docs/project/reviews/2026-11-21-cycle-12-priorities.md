@@ -541,12 +541,11 @@ trial-to-purchase rate, from Partner Center, once D102 sells, before and after i
 
 ### 6c. What the decider is asked
 
-1. **Which buyer** does cycle 12 aim at: the Store's stranger, or the charter's three users? (§1, question 2;
-   5d.1.) The ranking holds for both; the tests differ.
-2. **Run sam's value test** before the framing — two lines of the Store's listing, five people outside the
-   team, one day? (5b.)
-3. **The paste test**: may the Windows colleague paste a summary copied by Kitokey into Teams, Outlook and
-   OneNote, and say what holds? Half an hour, no build.
+1. ~~**Which buyer** does cycle 12 aim at: the Store's stranger, or the charter's three users?~~ Answered
+   2026-11-21, below: the Store's stranger, a professional buyer.
+2. ~~**Run sam's value test** before the framing?~~ Answered 2026-11-21, below: no.
+3. ~~**The paste test** into Teams, Outlook and OneNote?~~ Answered 2026-11-21, below: yes, through their web
+   clients on Fedora.
 4. ~~Has FastSpring been asked for its quote, and when?~~ Answered 2026-11-21 ~06h, below.
 5. ~~Do the three users import files today, and from what?~~ Answered 2026-11-21 ~06h, below.
 6. **Where do the three users put the dates a meeting set** — a calendar, a task tracker, their firm's case
@@ -593,6 +592,50 @@ the decider.
   their own in the cycle after, or if the time on the weakest target CPU exceeds the threshold the decider
   sets.
 
+### 6c, answered — questions 1–3, the decider, 2026-11-21
+
+Relayed verbatim by the coordinator from their working session with the decider. To the coordinator's
+proposal « Q1 l'inconnu du Store (acheteur pro), Q2 pas de test à 5 personnes, Q3 test de collage
+Teams/Outlook/OneNote », the decider answered « Q123 ok, pour teams on peut le faire sous fedora ? », then « je
+te donnerai la main plus tard pour les tests dans chrome ».
+
+- **Question 1**: the buyer cycle 12 aims at is **the Store's stranger, a professional**. Each signal is read on
+  that buyer too: the Store's trial-to-purchase rate once D102 sells (§6b); the three users' use stays the
+  earliest reading.
+- **Question 2**: no five-person value test before the framing; the value assumption (6b, 1) is read on the
+  Store once it sells.
+- **Question 3**: the paste test is run in the web clients of Teams, Outlook and OneNote on Fedora, by the
+  coordinator in the decider's Chrome when the decider hands it over — a summary copied by Kitokey (#1025),
+  what holds of its headings and lists in each. Not yet run.
+- **Question 6** stays open: where the three users put the dates a meeting set.
+
 ### 6d. Decision
 
-*The decider's: go, clarify or kill, with the reasons and the date.*
+*Proposed by the framer, 2026-11-21, for the decider to approve with this pull request; the front matter's
+`decision` and `decided_on` are written on that approval.*
+
+**Proposed: go** — cycle 12 is framed from this ranking, for the Store's professional buyer:
+
+1. **A long file in, a pertinent summary and a transcript with speakers out**: import an audio or video file
+   (spike S2 first, five real files), then voices, opt-in (spike S1 first, the models' licences); held by the
+   criterion proposed on a file of more than an hour (§6c, answered).
+2. **Structures**: the user's own, once D111 has merged in cycle 11.
+3. **Live time and levels on a meeting's page while it records** (#1076): the cycle's small item.
+4. **Dates mentioned**: a spike first — at most 1 wrong date in 50, apart from « not said », the reference day
+   shown —; then the « dates mentionnées » panel copied with the summary; an `.ics` only once question 6 is
+   answered and the re-import test is run.
+5. **The macOS paid path**, in parallel, gated on the decider's gestures (FastSpring's quote, « on le fera
+   ensemble, non bloquant »).
+6. **Hand-off**: no build; the paste test of question 3.
+7. **The Store trailer and hero art**, last, filmed once 1–3 have landed.
+
+The no-gos of §4 stand, with those §5 and §5e added.
+
+**Why no objection blocks it.** §5 and §5e changed the ranking and its tests rather than the direction: the
+live page became a small item (5c #1); hand-off's signal was re-read and its secret-free form found shipped
+(5c #6); import and voices were merged on the decider's word (§6c); candidate 8 starts as a spike with a
+threshold on wrong dates and a legal no-go (§5e). The riskiest assumptions (§6b) are each tested by the first
+step of the item they bear on: S2's five files, S1's licences, the date spike, and the Store's own figures for
+value.
+
+*The decider's approval, its words and its date: here.*
