@@ -7996,10 +7996,19 @@ def renaming(now: dt.datetime) -> None:
         # comes: the page's poll alone draws the range back.
         now_meeting = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('recording_now')"
                        ".then((n) => done(n.recording && n.meeting ? n.meeting : null), () => done(null))")
+        # Pressed only once the shell holds no recording nor its stop: before, a press counts as the stop going on, and
+        # is let go (`toggle_recording`) — s1076ok2's red was that press, not the page.
+        idle_header = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('header')"
+                       ".then((h) => done(!h.recording && !h.stopping), () => done(false))")
+        wait_for(browser, lambda b: b.execute_async_script(idle_header), 10)
+        time.sleep(0.6)
         browser.execute_script("window.__TAURI__.core.invoke('record')")
         wait_for(browser, lambda b: b.execute_async_script(now_meeting), 10)
         again = browser.execute_async_script(now_meeting)
         if again:
+            # The same folder as before (the recorder played here names it): the page left, then opened again, so it is
+            # drawn for the recording.
+            browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = arguments[0]", f"#/meeting/{again}")
         live_again = bool(again) and wait_for(browser, lambda b: b.execute_script(alive), 10)
         time.sleep(0.8)
