@@ -11297,101 +11297,191 @@ def pages_seen(now: dt.datetime) -> None:
 
 
 # The meetings the Store's screenshots show (D103): invented for them, nothing of a real one. Each language its
-# own, the last one opened: its minutes — what was said, what follows, who does what by when — and its transcript;
-# the one the list shot opens (`listed`), its own. A summary cites only moments its transcript starts a line at.
+# own; three are kept whole — minutes, transcript, sound —: the one shot 1 opens, the long call shot 2 searches,
+# the one shot 3 finds. A summary cites a line as « [@n] », its n-th line, written as the moment it starts.
 STORE_MEETINGS = {
     "fr": {
         "titles": ["Point d’équipe du lundi", "Entretien — designer produit", "Revue du budget T4",
                    "Appel client — Atelier Lumen", "Comité de pilotage", "Revue produit de la semaine"],
         "minutes": ("## 1.\n\nLa version 2.4 sort jeudi ; l’export PDF passe à la suivante pour finir les tests.\n\n"
-                    "## 2.\n\n- Prévenir le support du report de l’export — Hugo — demain [03:25]\n"
-                    "- Préparer les notes de version — Camille — mercredi [04:05]\n"
-                    "- Sortir la version 2.4 — L’équipe — jeudi [04:45]\n\n"
-                    "## 3.\n\n- Les tests de charge passent depuis la correction du cache. [00:45]\n"
-                    "- Deux clients attendent l’export PDF. [02:45]\n"),
+                    "## 2.\n\n- Prévenir le support du report de l’export — Hugo — demain [@10]\n"
+                    "- Préparer les notes de version — Camille — mercredi [@12]\n"
+                    "- Proposer une version de test aux deux clients — Camille — vendredi [@9]\n\n"
+                    "## 3.\n\n- Les tests de charge passent depuis la correction du cache. [@1]\n"
+                    "- Deux clients attendent l’export PDF. [@5]\n"),
         "said": [("me", None, "On commence par la 2.4 : où en sont les tests ?"),
                  ("others", "1", "Tout passe depuis la correction du cache, les tests de charge aussi."),
                  ("me", None, "Bien. Et l’export PDF, on le garde dans cette version ?"),
                  ("others", "2", "Je préférerais le décaler, il reste deux cas à couvrir."),
+                 ("others", "2", "Les tableaux sur plusieurs pages, et les polices des clients."),
                  ("others", "1", "D’accord pour la suivante, mais deux clients l’attendent."),
+                 ("me", None, "Lesquels ?"),
+                 ("others", "1", "Atelier Lumen et la mutuelle, ils l’ont demandé en septembre."),
+                 ("me", None, "On peut leur proposer une version de test ?"),
+                 ("others", "2", "Oui, vendredi, si les tableaux tiennent."),
                  ("me", None, "Alors Hugo prévient le support dès demain."),
+                 ("others", "1", "Je leur écris aussi, ils préfèrent l’entendre de nous."),
                  ("others", "2", "Je prépare les notes de version pour mercredi."),
+                 ("me", None, "Et la date de sortie ?"),
+                 ("others", "1", "Jeudi matin, comme prévu."),
                  ("me", None, "Parfait, on sort jeudi.")],
-        "listed": {
+        "call": {
             "minutes": ("## 1.\n\nL’Atelier Lumen valide les pages produit ; l’accueil montrera une photo de l’atelier.\n\n"
-                        "## 2.\n\n- Envoyer la nouvelle version de l’accueil — Vous — vendredi [02:05]\n"
-                        "- Renvoyer la facture de l’acompte à la comptabilité — Vous — aujourd’hui [03:25]\n\n"
-                        "## 3.\n\n- Les pages produit sont prêtes. [00:45]\n"
-                        "- Le client préfère une photo de l’atelier à une illustration. [01:25]\n"),
-            "said": [("others", "1", "Bonjour ! On voulait faire le point sur la nouvelle maquette du site."),
-                     ("me", None, "Avec plaisir. Les pages produit sont prêtes, il reste l’accueil."),
-                     ("others", "1", "Pour l’accueil, on aimerait une photo de l’atelier plutôt qu’une illustration."),
-                     ("me", None, "C’est noté : on vous envoie une nouvelle version vendredi."),
-                     ("others", "2", "Et la facture de l’acompte, vous pouvez la renvoyer à la compta ?"),
-                     ("me", None, "Je m’en occupe aujourd’hui.")],
+                        "## 2.\n\n- Réduire le formulaire de contact à trois champs — Vous — vendredi [@6]\n"
+                        "- Organiser la séance photo avec le photographe — Vous — mardi [@61]\n\n"
+                        "## 3.\n\n- Les pages produit sont validées. [@3]\n"
+                        "- La photo des mains sur l’établi reste en accueil. [@118]\n"),
+            "filler": ["Bonjour à tous, merci d’être là.", "On a bien reçu vos retours sur la maquette.",
+                       "Les pages produit vous conviennent ?", "Oui, la navigation est beaucoup plus claire.",
+                       "Pour les couleurs, on garde le vert de l’atelier.", "Le formulaire de contact est trop long, à mon avis.",
+                       "On peut le réduire à trois champs.", "Et sur mobile, le menu tient bien ?",
+                       "Oui, on l’a essayé sur trois téléphones.", "Il faudrait ajouter les horaires d’ouverture.",
+                       "C’est noté, en bas de chaque page.", "Pour le blog, on verra au prochain lot."],
+            "found": {9: ("others", "1", "Pour l’accueil, on aimerait une photo de l’atelier plutôt qu’une illustration."),
+                      61: ("me", None, "Le photographe peut passer mardi pour la photo de l’équipe."),
+                      118: ("others", "2", "Gardez la photo des mains sur l’établi, c’est celle que nos clients retiennent.")},
+            "sought": "photo",
+        },
+        "budget": {
+            "minutes": ("## 1.\n\nLe budget du T4 est tenu à 92 % ; les licences sont renégociées avant leur renouvellement.\n\n"
+                        "## 2.\n\n- Proposer une renégociation des licences — Camille — lundi [@7]\n"
+                        "- Mettre le tableau à jour — Hugo — ce soir [@9]\n\n"
+                        "## 3.\n\n- Les déplacements baissent de 30 %. [@6]\n"
+                        "- Le poste de designer est budgété. [@4]\n"),
+            "said": [("me", None, "On reprend le budget du quatrième trimestre."),
+                     ("others", "1", "Les dépenses sont à 92 % du prévu, surtout à cause des licences."),
+                     ("me", None, "On peut renégocier les licences avant janvier ?"),
+                     ("others", "1", "Oui, le contrat se renouvelle le 15."),
+                     ("others", "2", "Côté recrutement, le poste de designer est budgété."),
+                     ("me", None, "Bien. Et les déplacements ?"),
+                     ("others", "2", "En baisse de 30 %, on fait plus de visio."),
+                     ("others", "1", "Je prépare une proposition pour les licences d’ici lundi."),
+                     ("me", None, "Parfait, on valide le reste en l’état."),
+                     ("others", "2", "Je mets le tableau à jour ce soir.")],
+            "sought": "revue",
         },
     },
     "en": {
         "titles": ["Monday team check-in", "Interview — product designer", "Q4 budget review",
                    "Client call — Lumen Studio", "Steering committee", "Weekly product review"],
         "minutes": ("## 1.\n\nVersion 2.4 ships on Thursday; the PDF export moves to the next one to finish its tests.\n\n"
-                    "## 2.\n\n- Tell support the export is delayed — Hugo — tomorrow [03:25]\n"
-                    "- Write the release notes — Camille — Wednesday [04:05]\n"
-                    "- Ship version 2.4 — The team — Thursday [04:45]\n\n"
-                    "## 3.\n\n- Load tests pass since the cache fix. [00:45]\n"
-                    "- Two customers are waiting for the PDF export. [02:45]\n"),
+                    "## 2.\n\n- Tell support the export is delayed — Hugo — tomorrow [@10]\n"
+                    "- Write the release notes — Camille — Wednesday [@12]\n"
+                    "- Offer both customers a test version — Camille — Friday [@9]\n\n"
+                    "## 3.\n\n- Load tests pass since the cache fix. [@1]\n"
+                    "- Two customers are waiting for the PDF export. [@5]\n"),
         "said": [("me", None, "Let’s start with 2.4: where are the tests?"),
                  ("others", "1", "Everything passes since the cache fix, load tests included."),
                  ("me", None, "Good. And the PDF export, do we keep it in this version?"),
                  ("others", "2", "I’d rather move it, two cases are still uncovered."),
+                 ("others", "2", "Tables over several pages, and the customers’ fonts."),
                  ("others", "1", "Fine for the next one, but two customers are waiting for it."),
+                 ("me", None, "Which ones?"),
+                 ("others", "1", "Lumen Studio and the insurer, they asked in September."),
+                 ("me", None, "Can we offer them a test version?"),
+                 ("others", "2", "Yes, on Friday, if the tables hold."),
                  ("me", None, "Then Hugo tells support tomorrow."),
+                 ("others", "1", "I’ll write to them too, they’d rather hear it from us."),
                  ("others", "2", "I’ll write the release notes for Wednesday."),
+                 ("me", None, "And the release date?"),
+                 ("others", "1", "Thursday morning, as planned."),
                  ("me", None, "Perfect, we ship on Thursday.")],
-        "listed": {
+        "call": {
             "minutes": ("## 1.\n\nLumen Studio approves the product pages; the home page will show a photo of the studio.\n\n"
-                        "## 2.\n\n- Send the new home page — You — Friday [02:05]\n"
-                        "- Resend the deposit invoice to accounting — You — today [03:25]\n\n"
-                        "## 3.\n\n- The product pages are ready. [00:45]\n"
-                        "- The client prefers a photo of the studio to an illustration. [01:25]\n"),
-            "said": [("others", "1", "Hi! We wanted to go over the new website mock-up."),
-                     ("me", None, "Sure. The product pages are ready; the home page is what’s left."),
-                     ("others", "1", "For the home page, we’d like a photo of the studio rather than an illustration."),
-                     ("me", None, "Noted: we’ll send you a new version on Friday."),
-                     ("others", "2", "And could you resend the deposit invoice to accounting?"),
-                     ("me", None, "I’ll do it today.")],
+                        "## 2.\n\n- Cut the contact form to three fields — You — Friday [@6]\n"
+                        "- Book the photo session with the photographer — You — Tuesday [@61]\n\n"
+                        "## 3.\n\n- The product pages are approved. [@3]\n"
+                        "- The photo of hands on the workbench stays on the home page. [@118]\n"),
+            "filler": ["Hello everyone, thanks for joining.", "We got your feedback on the mock-up.",
+                       "Are the product pages working for you?", "Yes, the navigation is much clearer.",
+                       "For the colours, we keep the studio’s green.", "The contact form is too long, I think.",
+                       "We can cut it to three fields.", "And on mobile, does the menu hold up?",
+                       "Yes, we tried it on three phones.", "We should add the opening hours.",
+                       "Noted, at the bottom of every page.", "The blog can wait for the next batch."],
+            "found": {9: ("others", "1", "For the home page, we’d like a photo of the studio rather than an illustration."),
+                      61: ("me", None, "The photographer can come on Tuesday for the team photo."),
+                      118: ("others", "2", "Keep the photo of hands on the workbench, it’s the one our clients remember.")},
+            "sought": "photo",
+        },
+        "budget": {
+            "minutes": ("## 1.\n\nThe Q4 budget is held at 92%; the licences are renegotiated before they renew.\n\n"
+                        "## 2.\n\n- Propose a renegotiation of the licences — Camille — Monday [@7]\n"
+                        "- Update the spreadsheet — Hugo — tonight [@9]\n\n"
+                        "## 3.\n\n- Travel is down 30%. [@6]\n"
+                        "- The designer role is budgeted. [@4]\n"),
+            "said": [("me", None, "Let’s go back over the fourth quarter’s budget."),
+                     ("others", "1", "Spending is at 92% of plan, mostly because of licences."),
+                     ("me", None, "Can we renegotiate the licences before January?"),
+                     ("others", "1", "Yes, the contract renews on the 15th."),
+                     ("others", "2", "On hiring, the designer role is budgeted."),
+                     ("me", None, "Good. And travel?"),
+                     ("others", "2", "Down 30%, we do more video calls."),
+                     ("others", "1", "I’ll prepare a proposal for the licences by Monday."),
+                     ("me", None, "Perfect, we approve the rest as it is."),
+                     ("others", "2", "I’ll update the spreadsheet tonight.")],
+            "sought": "review",
         },
     },
 }
-# What the user types while the meeting records, as they would (D59).
-STORE_CONTEXT = {"fr": "Revue des retours clients avec Camille et Hugo : export PDF, calendrier de la 2.4.",
-                 "en": "Customer feedback review with Camille and Hugo: PDF export, the 2.4 schedule."}
-# Each line of the opened meeting spoken for 32 s, every 40 s: its sound covers the six minutes.
-STORE_EVERY, STORE_SPOKEN, STORE_RATE = 40.0, 32.0, 8000
-# The hour each meeting started, oldest first, and the recording's: a working day's, whenever the e2e runs.
-STORE_HOURS, STORE_RECORDED = [(9, 30), (14, 0), (10, 15), (16, 30), (11, 0), (14, 30)], (10, 0)
+# The long call's lines: its filler, in turn, every speaker's, and its found lines where they fall.
+STORE_CALL_LINES = 150
+# The meeting each shot opens, by its index among the titles: 1 the weekly review, 2 the call searched, 3 the
+# budget review the list's search finds.
+STORE_OPENED = {"1-meeting": 5, "2-search": 3, "3-list": 2}
+STORE_RATE = 8000
+# The hour each meeting started, oldest first: a working day's, whenever the e2e runs.
+STORE_HOURS = [(9, 30), (14, 0), (10, 15), (16, 30), (11, 0), (14, 30)]
 
 
-def store_audio(folder: Path, said: list, seed: int) -> None:
-    """A meeting's two tracks, made here and never kept in the repository: phrases of a few seconds, each its own
-    loudness, a breath between them, where its transcript says each side spoke, silence elsewhere — the same every
-    run (`seed`), so two runs draw the same."""
+def store_said(meeting: dict) -> list:
+    """A kept meeting's lines: its own, or the long call's — its filler in turn, its found lines where they fall."""
+    if "said" in meeting:
+        return meeting["said"]
+    voices = [("me", None), ("others", "1"), ("others", "2")]
+    return [meeting["found"].get(index) or (*voices[index % 3], meeting["filler"][index % len(meeting["filler"])])
+            for index in range(STORE_CALL_LINES)]
+
+
+def store_segments(said: list, seed: int) -> list[tuple]:
+    """Each line's speaker, voice, text, start and end, as people talk: as long as its words take, a breath to a few
+    seconds between two, now and then the next speaker in before the end — the same every run (`seed`)."""
     random = __import__("random").Random(seed)
-    length = int(STORE_RATE * STORE_EVERY * len(said))
+    segments, at = [], 3.0
+    for who, voice, text in said:
+        if segments and segments[-1][0] != who and random.random() < 0.2:
+            at -= random.uniform(0.3, 1.0)
+        lasts = len(text) / 15 + random.uniform(0.8, 3.0)
+        segments.append((who, voice, text, round(at, 1), round(at + lasts, 1)))
+        at += lasts + random.uniform(0.4, 3.0)
+    return segments
+
+
+def store_clock(seconds: float) -> str:
+    """A moment as the page writes it (`clock`): « 02:05 », « 1:02:05 » past an hour."""
+    whole = int(seconds)
+    return ":".join(f"{part:02d}" for part in ([whole // 3600] if whole >= 3600 else []) + [whole % 3600 // 60, whole % 60])
+
+
+def store_minutes(meeting: dict, segments: list) -> str:
+    """A kept meeting's minutes, each « [@n] » written as the moment its n-th line starts."""
+    return re.sub(r"\[@(\d+)\]", lambda cited: f"[{store_clock(segments[int(cited[1])][3])}]", meeting["minutes"])
+
+
+def store_audio(folder: Path, segments: list) -> None:
+    """A kept meeting's two tracks, made here and never kept in the repository: speech-like bursts where its
+    transcript says each side spoke, silence elsewhere — the same every run, so two runs draw the same."""
+    random = __import__("random").Random(103)
+    length = int(STORE_RATE * (segments[-1][4] + 3))
     for track, who in (("local", "me"), ("remote", "others")):
         samples = bytearray(2 * length)
-        for index, (speaker, _, _) in enumerate(said):
+        for speaker, _, _, start, end in segments:
             if speaker != who:
                 continue
-            first, at = int(STORE_RATE * (STORE_EVERY * index + 5)), 0.0
-            while at < STORE_SPOKEN - 1:
-                # A phrase: syllables at about 4 a second, its attack and its end softened; then a breath.
-                phrase, gain = min(random.uniform(1.2, 4.5), STORE_SPOKEN - at), random.uniform(0.35, 1.0)
-                for n in range(int(STORE_RATE * phrase)):
-                    t = n / STORE_RATE
-                    level = gain * (0.55 + 0.45 * math.sin(2 * math.pi * 4.1 * t)) * min(1.0, t / 0.15, (phrase - t) / 0.15)
-                    struct.pack_into("<h", samples, 2 * (first + int(STORE_RATE * at) + n), int(9000 * level * random.uniform(-1, 1)))
-                at += phrase + random.uniform(0.4, 1.3)
+            for n in range(int(STORE_RATE * (end - start))):
+                t = n / STORE_RATE
+                # Syllables at about 4 a second, the attack and the end softened.
+                level = (0.55 + 0.45 * math.sin(2 * math.pi * 4.1 * t)) * min(1.0, t / 0.15, (end - start - t) / 0.15)
+                struct.pack_into("<h", samples, 2 * (int(STORE_RATE * start) + n), int(9000 * level * random.uniform(-1, 1)))
         with wave.open(str(folder / f"{track}.wav"), "wb") as made:
             made.setnchannels(1)
             made.setsampwidth(2)
@@ -11420,11 +11510,6 @@ def store_hours(text: str) -> list[int]:
             for hour, half in re.findall(r"(?:· |\bà |\bat )(\d{1,2}):\d\d(?:\s*([AP]M))?", text)]
 
 
-def store_starts(said: list) -> set[str]:
-    """The moments a store meeting's transcript starts its lines at, as a summary cites them: « 00:45 »."""
-    return {f"{int(STORE_EVERY * index + 5) // 60:02d}:{int(STORE_EVERY * index + 5) % 60:02d}" for index in range(len(said))}
-
-
 def store_relief(points: str) -> tuple[int, int]:
     """A track of who spoke as the page draws it (`relief`, 60 sixtieths, each the share of it covered by speech):
     how many heights it takes, silence apart, and its longest run at full height — a plateau, the mark of lines
@@ -11441,8 +11526,9 @@ def store_relief(points: str) -> tuple[int, int]:
 def store_shots(now: dt.datetime) -> None:
     """CH. D103: the Microsoft Store's screenshots, made here from meetings invented for them, in French then
     in English, light, in the Store's order — « displayed in your listing in order », Microsoft's page says —, the
-    benefit first (the coordinator, 2026-11-20): a meeting's page with its minutes and transcript, a meeting's
-    page while it records, the list with another meeting open, Settings. Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
+    benefit first (the coordinator, 2026-11-20 and 2026-11-21): a meeting's page with its minutes and transcript, a word
+    sought in a long call's transcript, a word sought in the list, Settings with its model on this computer — never a
+    recording, whose page shows neither its time nor its levels yet (the bar does). Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
     its MSIX page read on 2026-11-20 (D103's section) —, written to `store/<fr|en>/` in KITOKEY_SCREENSHOTS'
     folder, or the run's own; then counted: four PNGs a language, each at least 1366 × 768, at most 50 MB."""
     print("CH. the Store's screenshots: four a language, French and English, 1920 × 1080, from meetings invented for them (D103)")
@@ -11461,40 +11547,38 @@ def store_shots(now: dt.datetime) -> None:
     for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
         said = STORE_MEETINGS[short]
         # The meetings' folder is the user's own, in a home of its own: Settings says « Dossier personnel / Kitokey »,
-        # never the run's path.
+        # never the run's path. Its data too: the model there is CH's alone, never the other scenarios'.
         home = WORK / f"store-{short}"
         meetings = home / "Kitokey"
+        model = home / "share" / "kitokey" / "models" / "ggml-large-v3-turbo-q8_0.bin"
+        model.parent.mkdir(parents=True, exist_ok=True)
+        # The model on this computer, as Settings reads it — a file of its name —: the transcription's privacy shown.
+        model.write_bytes(b"")
         starts = [(now - dt.timedelta(days=2 * (len(said["titles"]) - index))).replace(hour=hour, minute=minute, second=0, microsecond=0)
                   for index, (hour, minute) in enumerate(STORE_HOURS)]
         names = [start.strftime("%Y-%m-%d_%H-%M") for start in starts]
-        # The opened meeting and the list's, each with its sound, transcript and minutes; the others, their minutes.
-        kept = {names[-1]: said, names[3]: said["listed"]}
+        kept = {5: said, 3: said["call"], 2: said["budget"]}
         for index, (name, title) in enumerate(zip(names, said["titles"])):
-            folder, meeting = meetings / name, kept.get(name, {"minutes": said["minutes"], "said": None})
-            minutes = STORE_EVERY * len(meeting["said"]) / 60 if meeting["said"] else 25 + 5 * index
-            session(folder, starts[index], minutes, {} if meeting["said"] else {"local.wav": 1000})
+            folder, meeting = meetings / name, kept.get(index)
+            segments = store_segments(store_said(meeting), 103 + index) if meeting else None
+            minutes = (segments[-1][4] + 3) / 60 if segments else 25 + 5 * index
+            session(folder, starts[index], minutes, {} if segments else {"local.wav": 1000})
             made = starts[index] + dt.timedelta(minutes=minutes + 4)
             (folder / "minutes.md").write_text(
                 f"---\ncontract: minutes/v2\nmade: {made.isoformat(timespec='seconds')}\nprovider: local\nmodel: qwen3:8b\ncontext: null\n"
-                f"title: {json.dumps(title, ensure_ascii=False)}\n---\n\n" + meeting["minutes"])
-            if not meeting["said"]:
+                f"title: {json.dumps(title, ensure_ascii=False)}\n---\n\n" + (store_minutes(meeting, segments) if segments else
+                                                                                re.sub(r" \[@\d+\]", "", said["minutes"])))
+            if not segments:
                 continue
             lines = [{"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0",
                       "language": short, "context": None},
                      *({"type": "segment", "speaker": who, "track": "local" if who == "me" else "remote", "voice": voice,
-                        "start": STORE_EVERY * line + 5, "end": STORE_EVERY * line + 5 + STORE_SPOKEN, "text": text}
-                       for line, (who, voice, text) in enumerate(meeting["said"])),
-                     {"type": "complete", "duration": STORE_EVERY * len(meeting["said"])}]
+                        "start": start, "end": end, "text": text} for who, voice, text, start, end in segments),
+                     {"type": "complete", "duration": segments[-1][4] + 3}]
             (folder / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
-            store_audio(folder, meeting["said"], 103 + index)
+            store_audio(folder, segments)
         window = Window(meetings, language, 'reminder = false\nafter = "nothing"\n')
-        # The recorded meeting is of a working hour, never after the run's clock: today's, or yesterday's before it
-        # (lina, 2026-11-21); not the scenarios' fixed one (the recorder stand-in's own folder).
-        recorded_at = now.replace(hour=STORE_RECORDED[0], minute=STORE_RECORDED[1], second=0, microsecond=0)
-        recorded_at -= dt.timedelta(days=1) if recorded_at > now else dt.timedelta()
-        window.env.update(GTK_THEME="Adwaita", HOME=str(home), KITOKEY_E2E_RECORDED=recorded_at.strftime("%Y-%m-%d_%H-%M"),
-                          KITOKEY_E2E_RECORDED_AT=recorded_at.isoformat(timespec="seconds"),
-                          KITOKEY_E2E_RECORDED_UNTIL=(recorded_at + dt.timedelta(seconds=5)).isoformat(timespec="seconds"))
+        window.env.update(GTK_THEME="Adwaita", HOME=str(home), XDG_DATA_HOME=str(home / "share"))
         with window as browser:
             browser.set_window_size(1920, 1080)
             if not wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 3):
@@ -11502,43 +11586,31 @@ def store_shots(now: dt.datetime) -> None:
                 browser.set_window_size(2 * 1920 - browser.execute_script("return innerWidth"), 1080)
                 wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 5)
             (store / short).mkdir(parents=True, exist_ok=True)
-            pages = (("3-list", f"#/meeting/{names[3]}", "#meeting .minutes .body h2"),
-                     ("1-meeting", f"#/meeting/{names[-1]}", "#meeting .transcript .lines li"))
-            for shot_name, address, drawn in pages:
-                browser.execute_script("location.hash = arguments[0]", address)
-                wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, drawn), 10)
-                browser.execute_script("scrollTo(0, 0)")
-                time.sleep(0.4)
+            for shot_name, index in STORE_OPENED.items():
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{names[index]}")
+                wait_for(browser, lambda b: b.execute_script(
+                    "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
+                    " && p.querySelectorAll('.transcript .lines li').length > 0", names[index]), 10)
+                # 2: a word sought in the call's transcript, only its lines left, each at its moment (the coordinator,
+                # 2026-11-21: « retrouver ce qui a été dit, à la seconde »).
+                if shot_name == "2-search":
+                    sought = browser.find_element(By.ID, "search")
+                    sought.send_keys(kept[index]["sought"])
+                # 3: a word sought in the list, only its meetings left (« retrouver n'importe quelle réunion »).
+                if shot_name == "3-list":
+                    browser.find_element(By.ID, "find").send_keys(kept[index]["sought"])
+                browser.execute_script("document.activeElement.blur(); scrollTo(0, 0)")
+                time.sleep(0.6)
                 browser.save_screenshot(str(store / short / f"{shot_name}.png"))
                 seen(browser, f"{short}/{shot_name}.png")
-            # Settings before the recording: the stand-in writes no track, and the meeting it recorded would be said
-            # « Audio supprimé » in Settings' list.
+                if shot_name == "3-list":
+                    browser.execute_script("const f = document.getElementById('find'); f.value = ''; f.dispatchEvent(new Event('input'))")
             browser.execute_script("location.hash = '#/settings'")
             wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 10)
             browser.execute_script("scrollTo(0, 0)")
             time.sleep(0.4)
             browser.save_screenshot(str(store / short / "4-settings.png"))
             seen(browser, f"{short}/4-settings.png")
-            # Recording: the full window's page of the meeting being recorded (the coordinator's choice, 2026-11-20).
-            before = {folder.name for folder in meetings.iterdir()}
-            live = lambda b: "live" in (b.find_element(By.ID, "record").get_attribute("class") or "")
-            browser.find_element(By.ID, "record").click()
-            wait_for(browser, lambda b: live(b) and {f.name for f in meetings.iterdir()} - before, 10)
-            recorded = sorted({f.name for f in meetings.iterdir()} - before)
-            if recorded:
-                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{recorded[0]}")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "context-text")
-                         and b.find_element(By.ID, "context-text").get_attribute("readonly") is None, 10)
-                context_opened(browser).click()
-                ActionChains(browser).send_keys(STORE_CONTEXT[short]).perform()
-                wait_for(browser, lambda b: (meetings / recorded[0] / "context.txt").exists(), 3)
-                browser.execute_script("document.activeElement.blur(); scrollTo(0, 0)")
-                time.sleep(1.5)
-                browser.save_screenshot(str(store / short / "2-recording.png"))
-                seen(browser, f"{short}/2-recording.png")
-                time.sleep(0.6)
-                browser.find_element(By.ID, "record").click()
-                wait_for(browser, lambda b: not live(b), 10)
     made = sorted(store.glob("*/*.png"))
     sizes = {f"{file.parent.name}/{file.name}": (png_size(file), file.stat().st_size) for file in made}
     check("the Store's screenshots: four a language, French and English, in the Store's order (D103)",
@@ -11558,10 +11630,10 @@ def store_shots(now: dt.datetime) -> None:
     check("every meeting and summary the screenshots date is of the working day, 8 h to 19 h (D103)",
           all(8 <= hour < 19 for said in hours.values() for hour in said),
           {shot: [hour for hour in said if not 8 <= hour < 19] for shot, said in hours.items() if any(not 8 <= hour < 19 for hour in said)})
-    cited = {f"{short}/{kind}": sorted(set(re.findall(r"\[(\d\d:\d\d)\]", meeting["minutes"])) - store_starts(meeting["said"]))
-             for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("listed", said.get("listed", {"minutes": "", "said": []})))}
-    check("every moment a summary cites is one its transcript starts a line at (D103)",
-          "listed" in STORE_MEETINGS["fr"] and not any(cited.values()), cited)
+    # Each cited « [@n] » names a line the meeting has.
+    cited = {f"{short}/{kind}": [int(n) for n in re.findall(r"\[@(\d+)\]", meeting["minutes"]) if int(n) >= len(store_said(meeting))]
+             for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("call", said["call"]), ("budget", said["budget"]))}
+    check("every moment a summary cites is one its transcript starts a line at (D103)", not any(cited.values()), cited)
     reliefs = {shot: [store_relief(points) for points in page["relief"]] for shot, page in shown.items() if shot[3] in "12"}
     check("who spoke, drawn on the meetings' shots, rises and falls as people talk: each track at least 4 heights, no plateau over 3 sixtieths (D103)",
           len(reliefs) == 4 and all(len(drawn) == 2 and all(heights >= 4 and plateau <= 3 for heights, plateau in drawn) for drawn in reliefs.values()),
