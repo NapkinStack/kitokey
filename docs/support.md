@@ -56,6 +56,13 @@ again.
 Refunds are made by Microsoft, under its refund policy: ask them from your Microsoft account.
 We cannot refund a purchase made in the Store.
 
+### A summary says something wrong or inappropriate
+
+Kitokey's minutes are written by an AI language model, and it can be wrong. Correct what you need in
+your copy, and tell us at [support@kitokey.com](mailto:support@kitokey.com): say which model wrote it
+(the meeting's page names it) and what was wrong, without the meeting's words if they are private. We
+read every report.
+
 ### How do I report a problem?
 
 1. On the meeting's page, open **More actions**, then **Copy a diagnostic**. It copies the steps
@@ -110,6 +117,13 @@ Store est connecté avec le compte Microsoft qui a acheté Kitokey, puis relance
 
 Les remboursements passent par Microsoft, selon sa politique de remboursement : demandez-les depuis
 votre compte Microsoft. Nous ne pouvons pas rembourser un achat fait dans le Store.
+
+### Un compte rendu dit quelque chose de faux ou d'inapproprié
+
+Le compte rendu de Kitokey est rédigé par un modèle de langage (IA), qui peut se tromper. Corrigez ce
+qu'il faut dans votre copie, et dites-le-nous à [support@kitokey.com](mailto:support@kitokey.com) :
+quel modèle l'a rédigé (la page de la réunion le nomme) et ce qui n'allait pas, sans les mots de la
+réunion s'ils sont privés. Nous lisons chaque signalement.
 
 ### Comment signaler un problème ?
 

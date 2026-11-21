@@ -42,7 +42,8 @@ records, the page shows neither its time nor its levels — #1076 brings it back
 
 **Description.**
 Stay in the conversation: Kitokey records your call, transcribes it and writes its minutes —
-highlights, actions, key points. No bot joins your meeting, and no account is asked for.
+highlights, actions, key points. The minutes are written by an AI language model, on your computer by
+default. No bot joins your meeting, and no account is asked for.
 
 Your meetings stay on your computer. Transcript and minutes are made there by default. If you
 prefer a service you trust, you choose it, with your own key, and you see where a meeting goes
@@ -79,8 +80,9 @@ ordinateur.
 
 **Description.**
 Restez dans la conversation : Kitokey enregistre votre appel, le transcrit et en écrit le compte
-rendu — points saillants, actions, points clés. Aucun robot ne rejoint votre réunion, et aucun
-compte n'est demandé.
+rendu — points saillants, actions, points clés. Le compte rendu est rédigé par un modèle de langage
+(IA), sur votre ordinateur par défaut. Aucun robot ne rejoint votre réunion, et aucun compte n'est
+demandé.
 
 Vos réunions restent sur votre ordinateur. La transcription et le compte rendu s'y font par défaut.
 Si vous préférez un service en qui vous avez confiance, vous le choisissez, avec votre propre clé,
@@ -124,7 +126,7 @@ pages read the same day (ines, D103). Each field is entered in Partner Center, n
 | Support contact | <https://github.com/NapkinStack/kitokey/blob/main/docs/support.md>, which gives `support@kitokey.com` | The decider: « Une page de support »; the address, « Ok on valide support@kitokey.com » (2026-11-21 ~12:05), the same for support and for data requests (`privacy.md`); the mailbox's reception confirmed before submission |
 | System requirements | None declared yet | Optional ([system requirements](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/system-requirements)). Memory and disk come from D105's measure of the release build, once run; the package already asks Windows 10, version 2004 (10.0.19041) or later |
 | « This product has been tested to meet accessibility guidelines » | Not checked | D106 is a first pass by the keyboard, not an audit; checked when a sheet holds it |
-| « This product incorporates generative AI features » | Checked — ines's proposal, the coordinator to confirm | The minutes are written by a language model ([product declarations](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/product-declarations)) |
+| « This product incorporates generative AI features » | Checked | The coordinator, 2026-11-21: an LLM writes the minutes. [Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) 11.16, *Live Generative AI Content*: the use is disclosed in the description (above), and users can report a minutes' content to `support@kitokey.com` ([support](../support.md)) ([product declarations](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/product-declarations)) |
 | « … make purchases, but does not use the Microsoft Store commerce system » | Not checked | The Store sells the licence (`licence.rs`, `StoreContext`) |
 | Alternate drives; OneDrive backups | Left as Partner Center checks them | Nothing in the product depends on either |
 | Age rating (IARC) | An app, not a game. Users interact with each other: no. Location shared: no. Personal information shared with third parties: **yes** — only with a service the user chooses, with their own key. Unrestricted web access: no. Purchases in the app: none | Honesty first (the coordinator). The questionnaire's questions follow the category answered first ([age ratings](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/age-ratings)); Microsoft shares « your publisher display name and email address with IARC » |
@@ -133,7 +135,7 @@ pages read the same day (ines, D103). Each field is entered in Partner Center, n
 | Version | 1.0.0 | The decider |
 | Free trial | Unlimited, in the Store | Kitokey's own trial counts days and meetings, which the Store's cannot (the decider, 2026-11-20, cycle 11) |
 | Price, markets, release date | Owed by the decider | [Price and availability](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/price-and-availability) |
-| Visibility | First a **private audience**: the decider and the three users, then public | A smoke test of install, licence and trial from the real Store. Each person given by the email of a *personal* Microsoft account ([visibility](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/visibility-options)) — entered in Partner Center, never here |
+| Visibility | First a **private audience**: the decider and the three users; public only once [its test](private-audience-test.md) has heard both tracks of a real call on Windows (the coordinator, 2026-11-21) | A smoke test of install, licence and trial from the real Store. Each person given by the email of a *personal* Microsoft account ([visibility](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/visibility-options)) — entered in Partner Center, never here |
 | Seller details (EU) | c12c's, in the account | A trader under the Digital Services Act verifies the company (a DUNS number or a business document) and gives customer contact details ([company verification](https://learn.microsoft.com/en-us/windows/apps/publish/store-business-verification-reqs)): the decider, in Partner Center |
 | Payout and tax profiles | Owed by the decider | Needed before a paid product is submitted |
 
@@ -167,7 +169,7 @@ by its letter and function), a module's tests, or a decision. A promise nothing 
 
 | Promise | Held by |
 |---|---|
-| Records your microphone and your computer's sound, in any call application | `capture`: `tests/session_audio_v2.rs`, `tests/call.rs` (Linux's graph); contract `session-audio`. **On Windows, not yet held**: the default input and the default output's sound through cpal, no test, never seen in a real call — #482, the colleague's Windows 11 trial (cycle 11). Held before submission, or the line changes |
+| Records your microphone and your computer's sound, in any call application | `capture`: `tests/session_audio_v2.rs`, `tests/call.rs` (Linux's graph); contract `session-audio`. **On Windows**: the default input and the default output's sound through cpal, with no automated test — held by the [private audience's test](private-audience-test.md), step 6, a real call recorded from the Store's install, both tracks heard (#482), before Kitokey goes public (the coordinator, 2026-11-21) |
 | No bot in the call, no account | Kitokey records the computer's own sound and joins nothing; it has no account or server ([PDR-0001](../pdr/0001-wholeheard-open-on-linux-paid-on-macos-and-windows.md), [privacy policy](../privacy.md)) |
 | Transcript and minutes on your computer by default | AH `context_gaps` (« in private mode the context goes to Whisper and Ollama on this computer alone »); Y `first_run` (D58) |
 | A service only if you choose it, with your own key; where a meeting goes seen before it is sent | Z `service_named` (its host agreed to first); CB `key_kept_to_its_host` (#964); AG `corrections_gated` |
