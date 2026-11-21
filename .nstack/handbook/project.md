@@ -171,7 +171,7 @@ them never deliver it twice:
 ```bash
 nstack claim D30 --person @alice --session <session>   # held; its first work branch d30-… made, unless one exists
 nstack plan                                             # who holds what, since when; what is stale
-nstack unclaim D30                                      # given back: by its holder's session, the decider, anyone once stale; a record: who made it, the decider
+nstack unclaim D30 --session <session>                 # given back: by its holder's session (its person read from the hold), the decider, anyone once stale; a record: who made it, the decider
 nstack claim D30 --take-over --person @alice            # a hold nobody worked on for hold_days, or your own person's other session
 nstack claim '#14' --person @alice --session <session>  # an issue no cycle plans — a bug, a flaky test: held the same way, work on issue-14-…
 ```
