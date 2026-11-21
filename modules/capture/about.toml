@@ -22,3 +22,24 @@ ignore-dev-dependencies = true
 # kitokey-capture itself is the project's, under LICENSE: not a third party.
 private = { ignore = true }
 
+
+# libflac-sys builds libFLAC and libogg into the program: its notices are its own LICENSE and the
+# two Xiph.Org files, and nothing else of its sources — not their C files, which carry the same
+# notice in comments, nor FLAC's GPL and LGPL texts, for programs and plugins it does not build.
+[libflac-sys.clarify]
+license = "BSD-3-Clause"
+
+[[libflac-sys.clarify.files]]
+path = "LICENSE"
+license = "BSD-3-Clause"
+checksum = "85b7daebe41ecc11f8cfd5fce1f654a73fdadec09f89fd61a9e0b2e3409865eb"
+
+[[libflac-sys.clarify.files]]
+path = "flac/COPYING.Xiph"
+license = "BSD-3-Clause"
+checksum = "7866ee98760fc1f0156b4fe6bf530257e02be487ab3fd94e2b63799dd32d6b2c"
+
+[[libflac-sys.clarify.files]]
+path = "ogg/COPYING"
+license = "BSD-3-Clause"
+checksum = "d2ab5758336489da61c12cc5bb757da5339c4ae9001f9bb0562b4370249af814"
