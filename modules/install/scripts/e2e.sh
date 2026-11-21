@@ -28,6 +28,8 @@ if [ -z "$package$copr" ]; then
     mkdir -p "$work/$(dirname "$program")"
     printf '#!/bin/sh\necho "%s: usage: …" >&2\nexit 2\n' "$(basename "$program")" > "$work/$program"
     chmod +x "$work/$program"
+    # The page each module's release leaves beside its program (D102), which every package lays.
+    printf '<p>%s: stand-in notices</p>\n' "$(basename "$program")" > "$work/$(dirname "$program")/THIRD-PARTY-NOTICES.html"
   done
   printf '[Desktop Entry]\nType=Application\nName=Kitokey\nComment[fr]=x\nExec=kitokey\nIcon=com.napkinstack.Kitokey\n' > "$work/shell/com.napkinstack.Kitokey.desktop"
   printf 'png' > "$work/shell/com.napkinstack.Kitokey.png"
