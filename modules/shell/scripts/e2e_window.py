@@ -11296,137 +11296,183 @@ def pages_seen(now: dt.datetime) -> None:
 
 
 
-# The meetings the Store's screenshots show (D103): invented for them, nothing of a real one. Each language its
-# own; three are kept whole — minutes, transcript, sound —: the one shot 1 opens, the long call shot 2 searches,
-# the one shot 3 finds. A summary cites a line as « [@n] », its n-th line, written as the moment it starts.
+# The meetings the Store's screenshots show (D103): invented for them, nothing of a real one, each a situation the
+# people who buy Kitokey live between two calls — a product review, a client's quote and schedule, a project's
+# kickoff, a check-in, a 1:1, a steering committee (the decider, 2026-11-21: « que ce soit réaliste et que les
+# prospects puissent comprendre de manière intuitive en un coup d'œil »). Each language its own; three are kept
+# whole — minutes, transcript, sound —: the review shot 1 opens, the client's call shot 2 searches for its quote,
+# the kickoff shot 3 finds with that client's name. A summary cites a line as « [@n] », its n-th line, written as
+# the moment it starts. Who spoke is the page's own — « Vous », « Réunion · voix 1 » —: names are said, never labelled.
 STORE_MEETINGS = {
     "fr": {
-        "titles": ["Point d’équipe du lundi", "Entretien — designer produit", "Revue du budget T4",
-                   "Appel client — Atelier Lumen", "Comité de pilotage", "Revue produit de la semaine"],
-        "minutes": ("## 1.\n\nLa version 2.4 sort jeudi ; l’export PDF passe à la suivante pour finir les tests.\n\n"
+        "titles": ["Point d’équipe hebdo", "Point individuel — Hugo", "Atelier Lumen — cadrage du projet",
+                   "Atelier Lumen — devis et planning", "Comité de pilotage — T4", "Revue produit de la semaine"],
+        "minutes": ("## 1.\n\nLa 2.4 sort jeudi comme prévu ; l’export PDF suit la semaine d’après, le temps de couvrir deux cas.\n\n"
                     "## 2.\n\n- Prévenir le support du report de l’export — Hugo — demain [@10]\n"
                     "- Préparer les notes de version — Camille — mercredi [@12]\n"
-                    "- Proposer une version de test aux deux clients — Camille — vendredi [@9]\n\n"
+                    "- Ouvrir une version de test à Atelier Lumen et à la mutuelle Horizon — Camille — vendredi [@9]\n\n"
                     "## 3.\n\n- Les tests de charge passent depuis la correction du cache. [@1]\n"
-                    "- Deux clients attendent l’export PDF. [@5]\n"),
-        "said": [("me", None, "On commence par la 2.4 : où en sont les tests ?"),
+                    "- Deux clients attendent l’export pour leur clôture du mois. [@5]\n"),
+        "said": [("me", None, "On commence par la 2.4 : Hugo, où en sont les tests ?"),
                  ("others", "1", "Tout passe depuis la correction du cache, les tests de charge aussi."),
                  ("me", None, "Bien. Et l’export PDF, on le garde dans cette version ?"),
-                 ("others", "2", "Je préférerais le décaler, il reste deux cas à couvrir."),
-                 ("others", "2", "Les tableaux sur plusieurs pages, et les polices des clients."),
-                 ("others", "1", "D’accord pour la suivante, mais deux clients l’attendent."),
+                 ("others", "2", "Je préférerais le décaler d’une semaine, il reste deux cas à couvrir."),
+                 ("others", "2", "Les tableaux sur plusieurs pages, et les logos des clients."),
+                 ("others", "1", "D’accord, mais deux clients l’attendent pour leur clôture du mois."),
                  ("me", None, "Lesquels ?"),
-                 ("others", "1", "Atelier Lumen et la mutuelle, ils l’ont demandé en septembre."),
-                 ("me", None, "On peut leur proposer une version de test ?"),
-                 ("others", "2", "Oui, vendredi, si les tableaux tiennent."),
+                 ("others", "1", "Atelier Lumen et la mutuelle Horizon, ils l’ont demandé en septembre."),
+                 ("me", None, "On peut leur ouvrir une version de test ?"),
+                 ("others", "2", "Oui, dès vendredi, si les tableaux tiennent."),
                  ("me", None, "Alors Hugo prévient le support dès demain."),
                  ("others", "1", "Je leur écris aussi, ils préfèrent l’entendre de nous."),
-                 ("others", "2", "Je prépare les notes de version pour mercredi."),
-                 ("me", None, "Et la date de sortie ?"),
-                 ("others", "1", "Jeudi matin, comme prévu."),
-                 ("me", None, "Parfait, on sort jeudi.")],
+                 ("others", "2", "Et moi, je prépare les notes de version pour mercredi."),
+                 ("me", None, "La date de sortie ne bouge pas ?"),
+                 ("others", "1", "Non, jeudi matin, comme prévu."),
+                 ("me", None, "Parfait. On sort la 2.4 jeudi, l’export suit la semaine d’après.")],
+        "lines": 200,
+        "filler": ["Côté support, les tickets ont baissé de 15 % ce mois-ci.", "La moitié concerne encore la connexion SSO.",
+                   "On a une piste, c’est le délai d’expiration du jeton.", "Tu peux regarder ça avant la 2.5 ?",
+                   "Oui, je le mets en haut de la liste.", "Pour l’onboarding, les premiers retours sont bons.",
+                   "Le taux d’activation passe de 41 à 48 %.", "Il faudrait le montrer au comité de pilotage.",
+                   "Je prépare deux diapositives pour mardi.", "Et la refonte des notifications, elle avance ?",
+                   "Les maquettes sont prêtes, on les teste lundi avec cinq clients.", "Très bien, on en reparle la semaine prochaine."],
+        "found": {},
         "call": {
-            "minutes": ("## 1.\n\nL’Atelier Lumen valide les pages produit ; l’accueil montrera une photo de l’atelier.\n\n"
-                        "## 2.\n\n- Réduire le formulaire de contact à trois champs — Vous — vendredi [@6]\n"
-                        "- Organiser la séance photo avec le photographe — Vous — mardi [@61]\n\n"
-                        "## 3.\n\n- Les pages produit sont validées. [@3]\n"
-                        "- La photo des mains sur l’établi reste en accueil. [@118]\n"),
-            "filler": ["Bonjour à tous, merci d’être là.", "On a bien reçu vos retours sur la maquette.",
-                       "Les pages produit vous conviennent ?", "Oui, la navigation est beaucoup plus claire.",
-                       "Pour les couleurs, on garde le vert de l’atelier.", "Le formulaire de contact est trop long, à mon avis.",
-                       "On peut le réduire à trois champs.", "Et sur mobile, le menu tient bien ?",
-                       "Oui, on l’a essayé sur trois téléphones.", "Il faudrait ajouter les horaires d’ouverture.",
-                       "C’est noté, en bas de chaque page.", "Pour le blog, on verra au prochain lot."],
-            "found": {9: ("others", "1", "Pour l’accueil, on aimerait une photo de l’atelier plutôt qu’une illustration."),
-                      61: ("me", None, "Le photographe peut passer mardi pour la photo de l’équipe."),
-                      118: ("others", "2", "Gardez la photo des mains sur l’établi, c’est celle que nos clients retiennent.")},
-            "sought": "photo",
+            "minutes": ("## 1.\n\nL’Atelier Lumen valide le périmètre : la boutique en ligne avant les fêtes, le paiement en trois fois "
+                        "au second lot. Le devis révisé passe à 21 400 € HT, en deux lots.\n\n"
+                        "## 2.\n\n- Envoyer le devis révisé en deux lots — Vous — jeudi [@61]\n"
+                        "- Préparer le fichier des 400 fiches produit — Léa (Atelier Lumen) — vendredi [@8]\n"
+                        "- Planifier la formation de l’équipe de la boutique — Hugo — semaine prochaine [@10]\n\n"
+                        "## 3.\n\n- La boutique doit être en ligne avant les fêtes. [@3]\n"
+                        "- Signature avant la fin du mois si le devis tient à 21 400 €. [@118]\n"),
+            "lines": 280,
+            "said": [],
+            "filler": ["Bonjour à tous, merci d’avoir décalé le créneau.", "On a relu le cahier des charges avec l’équipe hier.",
+                       "Le catalogue en ligne reste la priorité pour vous ?", "Oui, il faut qu’il soit prêt pour les fêtes.",
+                       "Le paiement en trois fois, c’est indispensable ?", "Nos clients le demandent souvent, oui.",
+                       "On peut le prévoir dans le second lot.", "Et la reprise des 400 fiches produit, qui s’en charge ?",
+                       "Léa peut préparer le fichier de notre côté.", "Parfait, on l’importera en une fois.",
+                       "Il faudra aussi former l’équipe de la boutique.", "Une demi-journée devrait suffire."],
+            "found": {9: ("others", "1", "Le devis de septembre prévoyait 18 000 €, on peut rester dans cette enveloppe ?"),
+                      61: ("me", None, "Je vous envoie le devis révisé jeudi, avec la livraison en deux lots."),
+                      118: ("others", "2", "Si le devis tient à 21 400 €, on signe avant la fin du mois."),
+                      170: ("me", None, "Dans le devis, la formation de l’équipe est comptée à part."),
+                      236: ("others", "1", "On fait valider le devis par notre associée lundi.")},
+            "sought": "devis",
         },
-        "budget": {
-            "minutes": ("## 1.\n\nLe budget du T4 est tenu à 92 % ; les licences sont renégociées avant leur renouvellement.\n\n"
-                        "## 2.\n\n- Proposer une renégociation des licences — Camille — lundi [@7]\n"
-                        "- Mettre le tableau à jour — Hugo — ce soir [@9]\n\n"
-                        "## 3.\n\n- Les déplacements baissent de 30 %. [@6]\n"
-                        "- Le poste de designer est budgété. [@4]\n"),
-            "said": [("me", None, "On reprend le budget du quatrième trimestre."),
-                     ("others", "1", "Les dépenses sont à 92 % du prévu, surtout à cause des licences."),
-                     ("me", None, "On peut renégocier les licences avant janvier ?"),
-                     ("others", "1", "Oui, le contrat se renouvelle le 15."),
-                     ("others", "2", "Côté recrutement, le poste de designer est budgété."),
-                     ("me", None, "Bien. Et les déplacements ?"),
-                     ("others", "2", "En baisse de 30 %, on fait plus de visio."),
-                     ("others", "1", "Je prépare une proposition pour les licences d’ici lundi."),
-                     ("me", None, "Parfait, on valide le reste en l’état."),
-                     ("others", "2", "Je mets le tableau à jour ce soir.")],
-            "sought": "revue",
+        "kickoff": {
+            "minutes": ("## 1.\n\nL’Atelier Lumen veut une boutique en ligne avant les fêtes : 400 produits, un budget autour de 20 000 €.\n\n"
+                        "## 2.\n\n- Envoyer une proposition chiffrée — Vous — vendredi [@7]\n"
+                        "- Chiffrer à part le paiement en plusieurs fois — Vous — vendredi [@9]\n\n"
+                        "## 3.\n\n- Les fêtes font 40 % des ventes de l’année. [@3]\n"
+                        "- 400 produits, avec leurs déclinaisons de couleur. [@4]\n"),
+            "said": [("me", None, "Merci d’être venus. Racontez-nous ce qui vous amène."),
+                     ("others", "1", "Nos ventes en ligne passent par Instagram, on veut une vraie boutique."),
+                     ("me", None, "Pour quand ?"),
+                     ("others", "1", "Avant les fêtes, c’est là qu’on fait 40 % de l’année."),
+                     ("others", "2", "Et on a 400 produits, avec leurs déclinaisons de couleur."),
+                     ("me", None, "Vous avez une enveloppe en tête ?"),
+                     ("others", "1", "Autour de 20 000 €, un peu plus si ça vaut le coup."),
+                     ("me", None, "Je vous envoie une proposition chiffrée d’ici vendredi."),
+                     ("others", "2", "Pensez au paiement en plusieurs fois, nos clients le demandent."),
+                     ("me", None, "C’est noté, on le chiffre à part.")],
+            "lines": 240,
+            "filler": ["Aujourd’hui, comment vous gérez les commandes ?", "Sur un tableur, et les paiements par virement.",
+                       "Et les stocks, ils sont à jour où ?", "Dans le même tableur, mis à jour le soir.",
+                       "On pourra le relier à la boutique.", "Vous avez déjà des photos des produits ?",
+                       "Oui, pour la plupart, sur fond blanc.", "Parfait, ça nous fera gagner du temps.",
+                       "Qui validera les maquettes chez vous ?", "Moi, avec Léa pour les textes.",
+                       "On vous propose un point toutes les deux semaines.", "Ça nous va très bien."],
+            "found": {},
+            "sought": "lumen",
         },
     },
     "en": {
-        "titles": ["Monday team check-in", "Interview — product designer", "Q4 budget review",
-                   "Client call — Lumen Studio", "Steering committee", "Weekly product review"],
-        "minutes": ("## 1.\n\nVersion 2.4 ships on Thursday; the PDF export moves to the next one to finish its tests.\n\n"
+        "titles": ["Weekly team check-in", "1:1 — Hugo", "Lumen Studio — project kickoff",
+                   "Lumen Studio — quote and schedule", "Steering committee — Q4", "Weekly product review"],
+        "minutes": ("## 1.\n\n2.4 ships on Thursday as planned; the PDF export follows the week after, to cover two more cases.\n\n"
                     "## 2.\n\n- Tell support the export is delayed — Hugo — tomorrow [@10]\n"
                     "- Write the release notes — Camille — Wednesday [@12]\n"
-                    "- Offer both customers a test version — Camille — Friday [@9]\n\n"
+                    "- Give Lumen Studio and Horizon Insurance a test version — Camille — Friday [@9]\n\n"
                     "## 3.\n\n- Load tests pass since the cache fix. [@1]\n"
-                    "- Two customers are waiting for the PDF export. [@5]\n"),
-        "said": [("me", None, "Let’s start with 2.4: where are the tests?"),
+                    "- Two customers need the export for their month-end close. [@5]\n"),
+        "said": [("me", None, "Let’s start with 2.4: Hugo, where are the tests?"),
                  ("others", "1", "Everything passes since the cache fix, load tests included."),
                  ("me", None, "Good. And the PDF export, do we keep it in this version?"),
-                 ("others", "2", "I’d rather move it, two cases are still uncovered."),
-                 ("others", "2", "Tables over several pages, and the customers’ fonts."),
-                 ("others", "1", "Fine for the next one, but two customers are waiting for it."),
+                 ("others", "2", "I’d rather move it a week, two cases are still uncovered."),
+                 ("others", "2", "Tables over several pages, and the customers’ logos."),
+                 ("others", "1", "Fine, but two customers need it for their month-end close."),
                  ("me", None, "Which ones?"),
-                 ("others", "1", "Lumen Studio and the insurer, they asked in September."),
-                 ("me", None, "Can we offer them a test version?"),
-                 ("others", "2", "Yes, on Friday, if the tables hold."),
+                 ("others", "1", "Lumen Studio and Horizon Insurance, they asked in September."),
+                 ("me", None, "Can we give them a test version?"),
+                 ("others", "2", "Yes, from Friday, if the tables hold."),
                  ("me", None, "Then Hugo tells support tomorrow."),
                  ("others", "1", "I’ll write to them too, they’d rather hear it from us."),
-                 ("others", "2", "I’ll write the release notes for Wednesday."),
-                 ("me", None, "And the release date?"),
-                 ("others", "1", "Thursday morning, as planned."),
-                 ("me", None, "Perfect, we ship on Thursday.")],
+                 ("others", "2", "And I’ll write the release notes for Wednesday."),
+                 ("me", None, "The release date doesn’t move?"),
+                 ("others", "1", "No, Thursday morning, as planned."),
+                 ("me", None, "Perfect. 2.4 ships on Thursday, the export the week after.")],
+        "lines": 200,
+        "filler": ["On support, tickets are down 15% this month.", "Half of them are still about SSO sign-in.",
+                   "We have a lead, it’s the token’s expiry time.", "Can you look at it before 2.5?",
+                   "Yes, I’ll put it at the top of the list.", "For onboarding, the first feedback is good.",
+                   "Activation goes from 41 to 48%.", "We should show that at the steering committee.",
+                   "I’ll prepare two slides for Tuesday.", "And the notifications redesign, is it moving?",
+                   "The mock-ups are ready, we test them on Monday with five customers.", "Great, let’s pick it up next week."],
+        "found": {},
         "call": {
-            "minutes": ("## 1.\n\nLumen Studio approves the product pages; the home page will show a photo of the studio.\n\n"
-                        "## 2.\n\n- Cut the contact form to three fields — You — Friday [@6]\n"
-                        "- Book the photo session with the photographer — You — Tuesday [@61]\n\n"
-                        "## 3.\n\n- The product pages are approved. [@3]\n"
-                        "- The photo of hands on the workbench stays on the home page. [@118]\n"),
-            "filler": ["Hello everyone, thanks for joining.", "We got your feedback on the mock-up.",
-                       "Are the product pages working for you?", "Yes, the navigation is much clearer.",
-                       "For the colours, we keep the studio’s green.", "The contact form is too long, I think.",
-                       "We can cut it to three fields.", "And on mobile, does the menu hold up?",
-                       "Yes, we tried it on three phones.", "We should add the opening hours.",
-                       "Noted, at the bottom of every page.", "The blog can wait for the next batch."],
-            "found": {9: ("others", "1", "For the home page, we’d like a photo of the studio rather than an illustration."),
-                      61: ("me", None, "The photographer can come on Tuesday for the team photo."),
-                      118: ("others", "2", "Keep the photo of hands on the workbench, it’s the one our clients remember.")},
-            "sought": "photo",
+            "minutes": ("## 1.\n\nLumen Studio approves the scope: the online shop before the holidays, instalment payments in the "
+                        "second phase. The revised quote comes to $21,400, in two phases.\n\n"
+                        "## 2.\n\n- Send the revised quote in two phases — You — Thursday [@61]\n"
+                        "- Prepare the file of 400 product pages — Lea (Lumen Studio) — Friday [@8]\n"
+                        "- Schedule the shop team’s training — Hugo — next week [@10]\n\n"
+                        "## 3.\n\n- The shop must be live before the holidays. [@3]\n"
+                        "- They sign before the month ends if the quote holds at $21,400. [@118]\n"),
+            "lines": 280,
+            "said": [],
+            "filler": ["Hello everyone, thanks for moving the slot.", "We went through the requirements with the team yesterday.",
+                       "Is the online catalogue still your priority?", "Yes, it has to be ready for the holidays.",
+                       "Are instalment payments a must?", "Our customers ask for them a lot, yes.",
+                       "We can plan them for the second phase.", "And the 400 product pages, who moves them over?",
+                       "Lea can prepare the file on our side.", "Great, we’ll import it in one go.",
+                       "The shop team will need some training too.", "Half a day should be enough."],
+            "found": {9: ("others", "1", "September’s quote said $18,000, can we stay within that budget?"),
+                      61: ("me", None, "I’ll send you the revised quote on Thursday, with delivery in two phases."),
+                      118: ("others", "2", "If the quote holds at $21,400, we sign before the month ends."),
+                      170: ("me", None, "In the quote, the team’s training is priced separately."),
+                      236: ("others", "1", "Our partner signs off the quote on Monday.")},
+            "sought": "quote",
         },
-        "budget": {
-            "minutes": ("## 1.\n\nThe Q4 budget is held at 92%; the licences are renegotiated before they renew.\n\n"
-                        "## 2.\n\n- Propose a renegotiation of the licences — Camille — Monday [@7]\n"
-                        "- Update the spreadsheet — Hugo — tonight [@9]\n\n"
-                        "## 3.\n\n- Travel is down 30%. [@6]\n"
-                        "- The designer role is budgeted. [@4]\n"),
-            "said": [("me", None, "Let’s go back over the fourth quarter’s budget."),
-                     ("others", "1", "Spending is at 92% of plan, mostly because of licences."),
-                     ("me", None, "Can we renegotiate the licences before January?"),
-                     ("others", "1", "Yes, the contract renews on the 15th."),
-                     ("others", "2", "On hiring, the designer role is budgeted."),
-                     ("me", None, "Good. And travel?"),
-                     ("others", "2", "Down 30%, we do more video calls."),
-                     ("others", "1", "I’ll prepare a proposal for the licences by Monday."),
-                     ("me", None, "Perfect, we approve the rest as it is."),
-                     ("others", "2", "I’ll update the spreadsheet tonight.")],
-            "sought": "review",
+        "kickoff": {
+            "minutes": ("## 1.\n\nLumen Studio wants an online shop before the holidays: 400 products, a budget around $20,000.\n\n"
+                        "## 2.\n\n- Send a costed proposal — You — Friday [@7]\n"
+                        "- Price instalment payments separately — You — Friday [@9]\n\n"
+                        "## 3.\n\n- The holidays make 40% of the year’s sales. [@3]\n"
+                        "- 400 products, each in several colours. [@4]\n"),
+            "said": [("me", None, "Thanks for coming in. Tell us what brings you here."),
+                     ("others", "1", "We sell online through Instagram, we want a real shop."),
+                     ("me", None, "By when?"),
+                     ("others", "1", "Before the holidays, that’s 40% of our year."),
+                     ("others", "2", "And we have 400 products, each in several colours."),
+                     ("me", None, "Do you have a budget in mind?"),
+                     ("others", "1", "Around $20,000, a bit more if it’s worth it."),
+                     ("me", None, "I’ll send you a costed proposal by Friday."),
+                     ("others", "2", "Think about instalment payments, our customers ask for them."),
+                     ("me", None, "Noted, we’ll price that separately.")],
+            "lines": 240,
+            "filler": ["How do you handle orders today?", "In a spreadsheet, with payments by bank transfer.",
+                       "And the stock, where is it kept up to date?", "In the same spreadsheet, updated every evening.",
+                       "We can connect it to the shop.", "Do you already have product photos?",
+                       "Yes, most of them, on a white background.", "Great, that will save us time.",
+                       "Who signs off the mock-ups on your side?", "I do, with Lea for the copy.",
+                       "We suggest a check-in every two weeks.", "That works for us."],
+            "found": {},
+            "sought": "lumen",
         },
     },
 }
-# The long call's lines: its filler, in turn, every speaker's, and its found lines where they fall.
-STORE_CALL_LINES = 150
-# The meeting each shot opens, by its index among the titles: 1 the weekly review, 2 the call searched, 3 the
-# budget review the list's search finds.
+# The meeting each shot opens, by its index among the titles: 1 the weekly review, 2 the client's call searched for
+# its quote, 3 that client's kickoff, found with the call by the client's name.
 STORE_OPENED = {"1-meeting": 5, "2-search": 3, "3-list": 2}
 STORE_RATE = 8000
 # The hour each meeting started, oldest first: a working day's, whenever the e2e runs.
@@ -11434,12 +11480,18 @@ STORE_HOURS = [(9, 30), (14, 0), (10, 15), (16, 30), (11, 0), (14, 30)]
 
 
 def store_said(meeting: dict) -> list:
-    """A kept meeting's lines: its own, or the long call's — its filler in turn, its found lines where they fall."""
-    if "said" in meeting:
-        return meeting["said"]
-    voices = [("me", None), ("others", "1"), ("others", "2")]
-    return [meeting["found"].get(index) or (*voices[index % 3], meeting["filler"][index % len(meeting["filler"])])
-            for index in range(STORE_CALL_LINES)]
+    """A kept meeting's lines, as long as such a meeting lasts: what it says first, then its filler in turn, its found
+    lines where they fall; one side holds the floor a few lines, then the other — who spoke rises on one side as it
+    falls on the other —, the same every run."""
+    said, random = list(meeting["said"]), __import__("random").Random(meeting["lines"])
+    side, left = "me", 0
+    for index in range(len(said), meeting["lines"]):
+        if not left:
+            side, left = ("others" if side == "me" else "me"), random.randint(6, 18)
+        left -= 1
+        said.append(meeting["found"].get(index) or (side, None if side == "me" else random.choice("12"),
+                                                    meeting["filler"][index % len(meeting["filler"])]))
+    return said
 
 
 def store_segments(said: list, seed: int) -> list[tuple]:
@@ -11472,16 +11524,18 @@ def store_audio(folder: Path, segments: list) -> None:
     transcript says each side spoke, silence elsewhere — the same every run, so two runs draw the same."""
     random = __import__("random").Random(103)
     length = int(STORE_RATE * (segments[-1][4] + 3))
+    # Syllables at about 4 a second, one take as long as the longest line, each line its start.
+    take = bytearray(2 * int(STORE_RATE * max(end - start for *_, start, end in segments)))
+    for n in range(len(take) // 2):
+        level = 0.55 + 0.45 * math.sin(2 * math.pi * 4.1 * n / STORE_RATE)
+        struct.pack_into("<h", take, 2 * n, int(9000 * level * random.uniform(-1, 1)))
     for track, who in (("local", "me"), ("remote", "others")):
         samples = bytearray(2 * length)
         for speaker, _, _, start, end in segments:
             if speaker != who:
                 continue
-            for n in range(int(STORE_RATE * (end - start))):
-                t = n / STORE_RATE
-                # Syllables at about 4 a second, the attack and the end softened.
-                level = (0.55 + 0.45 * math.sin(2 * math.pi * 4.1 * t)) * min(1.0, t / 0.15, (end - start - t) / 0.15)
-                struct.pack_into("<h", samples, 2 * (int(STORE_RATE * start) + n), int(9000 * level * random.uniform(-1, 1)))
+            at, many = 2 * int(STORE_RATE * start), 2 * int(STORE_RATE * (end - start))
+            samples[at:at + many] = take[:many]
         with wave.open(str(folder / f"{track}.wav"), "wb") as made:
             made.setnchannels(1)
             made.setsampwidth(2)
@@ -11568,12 +11622,14 @@ def store_shots(now: dt.datetime) -> None:
         meetings = home / "Kitokey"
         model = home / "share" / "kitokey" / "models" / "ggml-large-v3-turbo-q8_0.bin"
         model.parent.mkdir(parents=True, exist_ok=True)
-        # The model on this computer, as Settings reads it — a file of its name —: the transcription's privacy shown.
-        model.write_bytes(b"")
+        # The model on this computer, as Settings reads it — a file of its name, its published size, sparse —: the
+        # transcription's privacy shown, its size as it is.
+        with open(model, "wb") as made:
+            made.truncate(874_188_075)
         starts = [(now - dt.timedelta(days=2 * (len(said["titles"]) - index))).replace(hour=hour, minute=minute, second=0, microsecond=0)
                   for index, (hour, minute) in enumerate(STORE_HOURS)]
         names = [start.strftime("%Y-%m-%d_%H-%M") for start in starts]
-        kept = {5: said, 3: said["call"], 2: said["budget"]}
+        kept = {5: said, 3: said["call"], 2: said["kickoff"]}
         for index, (name, title) in enumerate(zip(names, said["titles"])):
             folder, meeting = meetings / name, kept.get(index)
             segments = store_segments(store_said(meeting), 103 + index) if meeting else None
@@ -11593,7 +11649,8 @@ def store_shots(now: dt.datetime) -> None:
                      {"type": "complete", "duration": segments[-1][4] + 3}]
             (folder / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
             store_audio(folder, segments)
-        window = Window(meetings, language, 'reminder = false\nafter = "nothing"\n')
+        # After a recording, the transcript then the minutes: what Kitokey does on its own, chosen as a buyer would.
+        window = Window(meetings, language, 'reminder = false\nafter = "minutes"\n')
         window.env.update(GTK_THEME="Adwaita", HOME=str(home), XDG_DATA_HOME=str(home / "share"))
         with window as browser:
             browser.set_window_size(1920, 1080)
@@ -11623,7 +11680,14 @@ def store_shots(now: dt.datetime) -> None:
                     browser.execute_script("const f = document.getElementById('find'); f.value = ''; f.dispatchEvent(new Event('input'))")
             browser.execute_script("location.hash = '#/settings'")
             wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 10)
-            browser.execute_script("scrollTo(0, 0)")
+            # Its models at the top — on this computer, nothing sent — and nothing cut under them (the coordinator,
+            # 2026-11-21); the page's scrollbar, an artefact of the shot's height, hidden for it alone.
+            browser.execute_script(
+                "const style = document.createElement('style');"
+                "style.textContent = 'html { scrollbar-width: none } ::-webkit-scrollbar { display: none }';"
+                "document.head.append(style);"
+                "const title = [...document.querySelectorAll('#settings h2')].find(h => ['Modèles', 'Models'].includes(h.textContent));"
+                "scrollTo(0, title.closest('section').getBoundingClientRect().top + scrollY - 28)")
             time.sleep(0.4)
             browser.save_screenshot(str(store / short / "4-settings.png"))
             seen(browser, f"{short}/4-settings.png")
@@ -11648,7 +11712,7 @@ def store_shots(now: dt.datetime) -> None:
           {shot: [hour for hour in said if not 8 <= hour < 19] for shot, said in hours.items() if any(not 8 <= hour < 19 for hour in said)})
     # Each cited « [@n] » names a line the meeting has.
     cited = {f"{short}/{kind}": [int(n) for n in re.findall(r"\[@(\d+)\]", meeting["minutes"]) if int(n) >= len(store_said(meeting))]
-             for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("call", said["call"]), ("budget", said["budget"]))}
+             for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("call", said["call"]), ("kickoff", said["kickoff"]))}
     check("every moment a summary cites is one its transcript starts a line at (D103)", not any(cited.values()), cited)
     reliefs = {shot: [store_relief(points) for points in page["relief"]] for shot, page in shown.items() if shot[3] in "12"}
     check("who spoke, drawn on the meetings' shots, rises and falls as people talk: each track at least 4 heights, no plateau over 3 sixtieths (D103)",
