@@ -3785,7 +3785,10 @@ function showSettings(shown, minutes, words) {
     logs.append(logsSaid, openLogs);
     advanced.append(level, logs);
   }
-  more.append(toggle, advanced);
+  // Its last line, for support: the version, as `--version` says it (#1089).
+  const version = element("p", "says", `${words.version_said} ${shown.version}`);
+  version.id = "app-version";
+  more.append(toggle, advanced, version);
   parts.push(more);
   page.replaceChildren(...parts);
   if (focusLanguage) {
