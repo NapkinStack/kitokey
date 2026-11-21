@@ -37,7 +37,7 @@ quadrantChart
     "1 Long file in, summary and speakers out": [0.85, 0.95]
     "2 Structures, the user's own": [0.42, 0.68]
     "3 Live recording page": [0.12, 0.38]
-    "4 Dated items to a calendar file": [0.5, 0.45]
+    "4 Dates mentioned, then a calendar file": [0.3, 0.4]
     "5 macOS paid path": [0.88, 0.58]
     "6 Hand-off, beyond D109-D110": [0.62, 0.55]
     "7 Store trailer": [0.45, 0.15]
@@ -53,7 +53,7 @@ data showing no lift. Quadrants are the framer's reading, not a measure.
 | 1 | **A long file in, a pertinent summary and a transcript with speakers out**: import an audio **or video** file — the audio track read from the container — then voices, opt-in (spikes S2 and S1) | **Strong**, and now the three users' own: the decider, 2026-11-21 ~06h, « les 3 utilisateur utilise l'import dans leur cadre pro » (§6c). Market: Meetily's « most requested feature »; Fathom « on our product roadmap »; Otter caps it; voices the top request at Meetily, Granola, Notion | **L** — S2 with five real files first, MP4 and MOV among them (§5b); the session-audio contract's expand; S1 opening on the models' licences; the shell's gesture | **First**: what cycle 12 is built around, held by a criterion on a file of more than an hour (§6c) |
 | 2 | **Structures**: the user's own, beyond D111's six, and the summary's language | Moderate–strong: Meetily #243 (11 👍), four vendors charge for custom templates | **M** — once D111 (#1041–#1043) is merged | **Third**: finish D111 in cycle 11; cycle 12 adds a structure the user writes |
 | 3 | **Live time and levels on a meeting's page while it records** (#1076, #780) | Moderate, indirect — and mostly shipped: capture's silence notice after 10 s and the bar's meters, clock and silent status already exist (§5c) | **S** | **The cycle's small item**: the page made consistent with the bar, and the Store's recording screenshot back (#1073) |
-| 4 | **Dated items to a calendar file**: the summary's dates — a meeting planned, a deliverable due — proposed one by one, each with its absolute date computed from the meeting's date and its passage `[mm:ss]`, ticked by the user, written as an `.ics` file | **No market demand found**, and no rival does it: they read calendars to join meetings; follow-ups go to task trackers without documented due dates; writing an event is rare and always confirmed (Otter's pre-filled link to « Save »); no `.ics` export anywhere (§2e). Value rests on the persona: a missed deadline is serious for a lawyer — the decider's case | **S** spike, then **M** — the spike measures how a local model's « by when » resolves against the meeting's date on invented French and English transcripts, the date computed in code, « date not said » allowed; then an `.ics` writer in `export` (all-day `VEVENT`s, RFC 5545) and a panel to tick and edit | **Spike in cycle 12** after axis 1; the feature when its error rate is known. Never added to a calendar without the user's tick |
+| 4 | **Dates mentioned in a meeting**: each date the transcript says — a meeting planned, a deliverable due — listed with its absolute date, the **reference day** it was resolved against (shown and editable: an import has none by default) and its passage `[mm:ss]`, labelled « date mentionnée », never « échéance »; copied with the summary; an `.ics` later | **No market demand found**, and no rival does it: they read calendars to join meetings; follow-ups go to task trackers without documented due dates; writing an event is rare and always confirmed; no `.ics` export anywhere (§2e) — **I** more a choice the leaders made than a gap (§5e). Value rests on the persona, where a **wrong** date costs more than a missed one | **S** spike, then **S** the panel; the `.ics` writer **M**, later | **Spike in cycle 12**, after axis 1 says where an import's day comes from: threshold ≤ 1 wrong date in 50 proposed, apart from « not said »; then the panel, copied with the summary (#1025). The `.ics` only once the three users say where their dates go (§6c, 6) |
 | 5 | **macOS paid path** (ADR-0017) | Moderate: one-time $49–99 is the niche's norm; no conversion data | **L** — four code deliverables, and the decider's gestures first (FastSpring's quote, KYC, Apple's $99 programme) | **In parallel, gated on the decider's gestures**: revenue, not pull |
 | 6 | **Hand-off** beyond what cycle 11 ships (OAuth: Notion, Slack) | **Strong for cloud buyers** (Granola gates Notion and Zapier on Business), **untested for Kitokey's** (§5c); weak among local-tool users | Nothing to build first: D109's rich copy (#1025) and export, D110's webhooks already hand a summary over without a secret; **OAuth M–L**, with the secret problem | **No build in cycle 12**; a test instead — the Windows colleague pastes a copied summary into Teams, Outlook and OneNote |
 | 7 | **Store trailer and hero art** | **Weak**: Microsoft's only figure is « up to 11 % » from 2018; Apple's own test showed no lift | **M** — the screencast spike in headless GNOME | **Last**, filmed after 1–3 land; a long file summarised with its speakers is the scene to film |
@@ -61,7 +61,7 @@ data showing no lift. Quadrants are the framer's reading, not a measure.
 **What this changes in the coordinator's working hypothesis** (1 sharing, 2 structures, 3 import, 4 live
 recording page): import and voices come first, as one axis; sharing needs no build in cycle 12 — the secret-free
 hand-off a Windows buyer would use (rich copy, export, webhooks) ships in cycle 11, and what is left is to see
-it paste well; the live recording page stays a small item; dated items to a calendar file enter at 4, as a spike first.
+it paste well; the live recording page stays a small item; dates mentioned enter at 4, as a spike, then a panel copied with the summary; a calendar file waits for the three users' answer.
 
 ---
 
@@ -248,7 +248,7 @@ listing's before (the measure exists once D102 sells).
 | 4 | A user writes the structure their own meeting needs once the six built-in ones are there | Nobody writes one; the built-in six suffice |
 | 5 | One price on macOS, with a trial that asks for nothing, sells | No purchase in the weeks after the build ships, with the trial reached |
 | 6 | Sharing beyond a webhook brings buyers | — not proposed for cycle 12 |
-| 8 | A professional keeps the dates a meeting set — in a calendar they already use — once Kitokey proposes them with their source, and corrects few | The user unticks or corrects most proposed dates, or never imports the file |
+| 8 | A professional keeps the dates a meeting mentioned once Kitokey lists them with their reference day and passage, and finds few wrong | The user unticks or corrects most listed dates, or any ticked date is later found wrong |
 | 7 | A trailer converts Store visitors | — measured only if Partner Center shows the listing's conversion before and after |
 
 **A short press release** — *imagined*, dated at a placeholder launch, **2026-12-18**:
@@ -278,6 +278,10 @@ Whether it convinces the decider: to record at stage 6.
 - **No calendar connected** — no Google or Microsoft sync, no calendar read or write in cycle 12 — and **nothing
   added to a calendar without the user's tick**; a date the transcript does not say stays « not said », never
   guessed (§2e).
+- **A date is « mentionnée », never an « échéance »**: Kitokey proposes a date only as said — explicit, or a
+  weekday or « dans N jours » resolved against the stated reference day —, always with its passage; it never
+  applies a procedural rule. That French procedural deadlines follow rules of their own (art. 642 of the Code de
+  procédure civile) is an **assumption, not read** at Légifrance (§5e).
 
 ## 5. Challenge
 
@@ -503,6 +507,19 @@ and its date are the decider's, in 6d.*
 
 Stages 1–4 are kept as written; the ranking at the top carries the changes.
 
+### 6a, continued — the framer's answer to §5e (candidate 8)
+
+| §5e point | Answer | What changed |
+|---|---|---|
+| Feasibility — a threshold for **wrong** dates apart from « not said » | **Adopted** | The spike counts right, « not said » and wrong apart; refuted above **1 wrong in 50 proposed**; its invented transcripts hold « jeudi » said on a Thursday, « dans quinze jours », « fin du mois », a date with no year, and one imported file |
+| Imports and the reference day | **Adopted** | The reference day is shown and editable before any tick; the spike counts an import's dates against that stated day; candidate 8 waits for axis 1 to say where an imported meeting's day comes from |
+| Usability — new Outlook, macOS Calendar, GNOME Calendar | **Adopted**, before any `.ics` writer | One hand-written `.ics` of two all-day `VEVENT`s imported in each, then the same file with one date changed and the same `UID`: replaced or duplicated? An hour; the Windows colleague for new Outlook. A duplicate in two of three means correcting **before** writing, one file per item |
+| Viability — a computed date read as a legal deadline | **Adopted** as a no-go | « Date mentionnée », never « échéance »; no procedural rule applied; art. 642 CPC stays an assumption, not read |
+| Value — where do the three users' dates go? | **Adopted**, to the decider | §6c, question 6 |
+| « Nobody does `.ics` » — a signal, not a gap | **Accepted** | Row 4 says it; the rank stays 4, below the small item, as a spike, not a market pull |
+| The smallest first step: the panel copied with the summary | **Adopted** | Row 4: spike, then the « dates mentionnées » panel copied with the summary (#1025); the `.ics` only after question 6 |
+| Flaws 1–4 | **Accepted** | Row 4 weighs the wrong date; the threshold above; hypothesis 8 refuted also by any ticked date later found wrong; the no-go on « not said » reads against the stated reference day |
+
 ### 6b. The riskiest assumptions and the value hypothesis
 
 **The value hypothesis, revised.** A person who records meetings will choose Kitokey over a cloud note-taker
@@ -532,6 +549,8 @@ trial-to-purchase rate, from Partner Center, once D102 sells, before and after i
    OneNote, and say what holds? Half an hour, no build.
 4. ~~Has FastSpring been asked for its quote, and when?~~ Answered 2026-11-21 ~06h, below.
 5. ~~Do the three users import files today, and from what?~~ Answered 2026-11-21 ~06h, below.
+6. **Where do the three users put the dates a meeting set** — a calendar, a task tracker, their firm's case
+   software, nowhere? One message each (§5e, value). It decides whether candidate 8 ever writes an `.ics`.
 
 ### 6c, answered — the decider, 2026-11-21 ~06h
 
