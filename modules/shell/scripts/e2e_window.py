@@ -11670,6 +11670,10 @@ def store_shots(now: dt.datetime) -> None:
             segments = store_segments(store_said(meeting), 103 + index) if meeting else None
             minutes = (segments[-1][4] + 3) / 60 if segments else 25 + 5 * index
             session(folder, starts[index], minutes, {} if segments else {"local.wav": 1000})
+            # A client's meetings said confidential, as their owner would (the decider, 2026-11-21 ~12:50): heard and
+            # written here alone, the lock shown on where it matters; the team's own product review left as it is.
+            if index in (2, 3):
+                (folder / "confidential").write_bytes(b"")
             made = starts[index] + dt.timedelta(minutes=minutes + 4)
             (folder / "minutes.md").write_text(
                 f"---\ncontract: minutes/v2\nmade: {made.isoformat(timespec='seconds')}\nprovider: local\nmodel: qwen3:8b\ncontext: null\n"
