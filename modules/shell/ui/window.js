@@ -1758,11 +1758,13 @@ function minutesCard(read, words, session, transcript, onPage) {
   // When they were made first, then who wrote them, the model as people say it (D93); what is not
   // known is left unsaid.
   const when = madeOn(words, read.made);
-  const by = read.model ? modelSaid(read.model) + (read.provider ? fill(words.written_via, read.provider) : "") : "";
+  // Written on this computer (`local`, minutes/v2): said so, never the contract's word (#1080).
+  const from = read.provider === "local" ? `, ${words.on_computer}` : read.provider ? fill(words.written_via, read.provider) : "";
+  const by = read.model ? modelSaid(read.model) + from : "";
   // Its model a list in its place (D93, criterion 5); none named, the line alone.
   const maker = (when
     ? fill(words.minutes_of, when) + (by ? ` · ${IN_LINE}` : "")
-    : read.model ? fill(words.written_by, IN_LINE) : fill(words.written_by, "—") + (read.provider ? fill(words.written_via, read.provider) : "")) + tookAndCost(read, words);
+    : read.model ? fill(words.written_by, IN_LINE) : fill(words.written_by, "—") + from) + tookAndCost(read, words);
   if (by) {
     const go = startsOnPage("page-minutes-do", words, () =>
       window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }));
@@ -3001,7 +3003,7 @@ function minutesRow(minutes, words, locked) {
     try {
       host = new URL(minutes.provider).host;
     } catch {}
-    tested.textContent = testing ? words.testing : fill(words.test_sends, host);
+    tested.textContent = testing ? words.testing : minutes.provider === minutes.ollama_address ? words.test_sends_here : fill(words.test_sends, host);
     button.dataset.locked = String(locked);
     button.addEventListener("click", async () => {
       testing = true;

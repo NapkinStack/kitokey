@@ -3046,6 +3046,10 @@ def cancelled_at_once(now: dt.datetime) -> None:
     )
     with window as browser:
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        # Minutes this computer wrote (`provider: local`) said as a buyer reads it, never the contract's word (#1080).
+        here = wait_for(browser, lambda b: "writer first" in makers(b), 10)
+        check("minutes written on this computer: « Writer first, sur cet ordinateur » — as « Transcrit par …, sur cet ordinateur » —, never « via local » (#1080)",
+              here and "writer first, sur cet ordinateur" in makers(browser) and "via local" not in makers(browser), makers(browser))
         for what, file, step, start, (first, second), said_after in steps:
             before, listed = sha(file), sorted(p.name for p in meeting.iterdir())
             held, child = WORK / f"held-{step}", WORK / f"held-{step}-child"
@@ -8535,6 +8539,10 @@ def unsaved_choice_kept(now: dt.datetime) -> None:
         with window as browser:
             browser.find_element(By.ID, "settings-link").click()
             wait_for(browser, lambda b: b.find_elements(By.ID, "minutes") and b.find_elements(By.ID, "reminder"), 10)
+            # What « Tester » sends and to whom, this computer's Ollama saved: said so, never its address (#1080).
+            sends = browser.execute_script("return document.getElementById('minutes-tested')?.textContent ?? null")
+            check("Tester, this computer's Ollama saved: « … à Ollama, sur cet ordinateur — rien de vos réunions. », no address (#1080)",
+                  sends == "Le test envoie une courte phrase à Ollama, sur cet ordinateur — rien de vos réunions.", sends)
             Select(browser.find_element(By.ID, "minutes")).select_by_visible_text("Mistral 7b")
             unsaid = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-unsaved").is_displayed(), 3)
             # The list as it is, marked in the page: a reference the driver holds is refused once it is gone.
