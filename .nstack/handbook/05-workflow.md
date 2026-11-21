@@ -385,7 +385,9 @@ rows as it read them, and the check compares the description with them: an **exp
 Commit cell moved and whose evidence did not was never explored again, and fails — evidence names
 its run (a link to that screenshot, video or trace), so a new run brings a new one. The commit it
 moved from is the one the first record holding that evidence names: putting it back and confirming
-the head passes, even after a record held the moved cell. A row a record
+the head passes, even after a record held the moved cell — and so does any ancestor of that
+commit, where the row was explored before a record held it; a move to a commit that is not its
+ancestor is said. A row a record
 held and the sheet no longer shows is said. A rebase or a squash drops the records of the commits
 it rewrites, and what they read with them. The approver decides on the sheet; where the project answers
 `approval: agent`, the approver of a `prototype` or `standard` module may be the verifier itself,
