@@ -8,8 +8,10 @@ name: Plan on the forge
 # refuses a call is said in the run's summary, and the run succeeds.
 #
 # When: a merge to the default branch (the plan changed), once a day (a hold changed — a claim
-# pushes a branch holding no file, so no workflow of it can start), and by hand. Whatever
-# triggered it, the run reads the default branch's tip: a re-run never shows an older plan.
+# pushes a branch holding no file, so no workflow of it can start), and by hand — Run workflow
+# here, never `nstack board` beside it: this workflow's runs wait for one another, a command run
+# elsewhere does not, and two at once each make the same issue. Whatever triggered it,
+# the run reads the default branch's tip: a re-run never shows an older plan.
 #
 # Rights: writing issues and milestones, reading pull requests and the code — asked by this job
 # alone; the project's other automation stays read-only (rule G10). The holds are fetched with

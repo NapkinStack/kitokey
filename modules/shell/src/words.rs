@@ -1659,6 +1659,16 @@ pub struct Window {
     /// Shows: a meeting's page, as an error. When: copy failed. At most: no limit. Placeholders:
     /// none.
     pub minutes_not_copied: &'static str,
+    /// Shows: a meeting's page, the transcript's copy button, as its name for a screen reader and its
+    /// tooltip (D109). When: a transcript is there. At most: 24 characters. Placeholders: none.
+    pub copy_transcript: &'static str,
+    /// Shows: a meeting's page, beside the transcript's copy button, in its live region (D109). When:
+    /// the clipboard refused the copy. At most: one line. Placeholders: none.
+    pub transcript_not_copied: &'static str,
+    /// Shows: the clipboard, each line of a transcript copied (D109). When: the transcript's copy
+    /// button is pressed. At most: no limit. Placeholders: `{}` the time it was said at, `{}` who said
+    /// it, as the page names them, `{}` what was said.
+    pub transcript_copied_line: &'static str,
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: warning: corrections lost.
     /// At most: no limit. Placeholders: none.
     pub redo_loses_corrections: &'static str,
@@ -2121,6 +2131,9 @@ pub fn window(language: Language) -> Window {
             copy_minutes: "Copy summary",
             minutes_copied: "Copied",
             minutes_not_copied: "Couldn’t copy the summary.",
+            copy_transcript: "Copy transcript",
+            transcript_not_copied: "Couldn’t copy the transcript.",
+            transcript_copied_line: "[{}] {}: {}",
             redo_loses_corrections: "Your edits to this transcript will be lost.",
             context_not_saved: "Couldn’t save the context.",
             confidential_name: "Confidential meeting",
@@ -2573,6 +2586,9 @@ pub fn window(language: Language) -> Window {
             copy_minutes: "Copier le compte rendu",
             minutes_copied: "Copié",
             minutes_not_copied: "Impossible de copier le compte rendu.",
+            copy_transcript: "Copier la transcription",
+            transcript_not_copied: "Impossible de copier la transcription.",
+            transcript_copied_line: "[{}] {}\u{a0}: {}",
             redo_loses_corrections: "Vos corrections de cette transcription seront perdues.",
             context_not_saved: "Impossible d’enregistrer le contexte.",
             confidential_name: "Réunion confidentielle",
