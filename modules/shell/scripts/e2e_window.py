@@ -11653,7 +11653,7 @@ def store_shots(now: dt.datetime) -> None:
             session(folder, starts[index], minutes, {} if segments else {"local.wav": 1000})
             made = starts[index] + dt.timedelta(minutes=minutes + 4)
             (folder / "minutes.md").write_text(
-                f"---\ncontract: minutes/v2\nmade: {made.isoformat(timespec='seconds')}\nprovider: {ollama}/v1\nmodel: qwen3:8b\ncontext: null\n"
+                f"---\ncontract: minutes/v2\nmade: {made.isoformat(timespec='seconds')}\nprovider: local\nmodel: qwen3:8b\ncontext: null\n"
                 f"title: {json.dumps(title, ensure_ascii=False)}\n---\n\n" + (store_minutes(meeting, segments) if segments else
                                                                                 re.sub(r" \[@\d+\]", "", said["minutes"])))
             if not segments:
