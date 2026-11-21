@@ -31,6 +31,10 @@ kitokey-summary <session-folder> --provider https://openrouter.ai/api/v1 --model
 # A model on the machine: nothing leaves it, no key — and, on a laptop, fewer of the actions.
 kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mistral
 
+# In a structure (D111): the sections of a kind of meeting, minutes/v5 — general, one_to_one,
+# stand_up, client_call, interview, project_review. Without --structure, minutes/v4 as above.
+kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mistral --structure stand_up
+
 # Whether a model answers, before any meeting: one sentence of the program's own is sent,
 # `sending` then `answered` said, or why not in one sentence. What the settings' Tester runs.
 kitokey-summary --test --provider http://localhost:11434/v1 --model mistral
