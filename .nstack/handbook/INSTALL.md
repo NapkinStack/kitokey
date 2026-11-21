@@ -247,7 +247,10 @@ your warm caches, `UV_CACHE_DIR` and `PRE_COMMIT_HOME`, since the sandbox opens 
 builds that write elsewhere, such as Cargo's `~/.cargo`, need that folder in your sandbox's
 `allowWrite` — and sets the clone so
 that `git switch -c <branch> origin/main` and a plain `git push` never write `.git/config`, which
-the sandbox protects. Unix sockets — audio, display, the session bus — stay closed unless the
+the sandbox protects. The sandbox also protects `.claude/skills/` — an agent never rewrites its own
+instructions —, so git could not write the committed skills there: the clone leaves that folder out
+of its working tree (a sparse checkout: still in every commit), and the agent gets the default
+branch's skills from a folder of its own (`--add-dir`), refreshed at each run. Unix sockets — audio, display, the session bus — stay closed unless the
 project answers `agent_sockets: true` (`.nstack/handbook/07-governance.md` §7 says the risk).
 Given your own `--settings`, it adds none and says so. A hook of yours that refuses `gh` — against your own
 account — lets an agent's session through only when its `gh` is the App's
@@ -412,6 +415,9 @@ contributor's — has them. `nstack init` commits them with the project, `nstack
 commit; `.gitattributes` marks them generated, so the forge folds them in a review, and the
 review budget does not count them. A playbook with no entry in `.nstack/skills.yaml`
 fails CI; a skill that drifted from its playbook, or was edited by hand, fails it too (S3).
+Inside an agent's sandbox, `.claude/skills/` cannot be written: an agent that changes a playbook
+regenerates `.agents/skills/` alone, and a person runs `nstack skills` and commits the rest — S3
+says it until then. A change to the agents' instructions passes a person's hands.
 
 This indirection has a reason: a tool is an **adapter**, never a foundation
 (`.nstack/tooling-profile.md`). If the rules existed only as skills, the OS would stop
