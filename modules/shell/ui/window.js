@@ -403,7 +403,9 @@ function holdings(session, words, compact = false) {
   }
   if (session.transcript && !compact) holds.append(chip(words.transcript));
   if (session.audio > 0 && !compact) holds.append(chip(fill(words.audio, size(session.audio, words))));
-  if (session.audio === 0) holds.append(chip(words.audio_freed, "gone"));
+  // Freed is said of a meeting no longer recorded: one being recorded may have no track written yet, its
+  // microphone waiting (`session-audio/v2`, a track gained later) — nothing was deleted (#1054).
+  if (session.audio === 0 && session.state !== "recording") holds.append(chip(words.audio_freed, "gone"));
   // What is being made for it, in the background (D25): painted from `makings`.
   const making = chip("", "making");
   making.dataset.name = nameOf(session);
@@ -2244,6 +2246,8 @@ function playerBar(session, listened, total, words, drawing) {
       player.stop();
       player = null;
     }
+    // Being recorded, no track written yet: nothing to say, and nothing deleted (#1054).
+    if (session.audio === 0 && session.state === "recording") return "";
     // Freed, said so; there and not playable, said so too — never one for the other.
     const freed = element("p", "note", session.audio > 0 ? words.not_playable : words.no_player);
     freed.id = "no-player";
