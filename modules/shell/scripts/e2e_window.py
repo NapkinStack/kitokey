@@ -5214,7 +5214,10 @@ def destinations_kept(now: dt.datetime) -> None:
             check("each address judged by kitokey-send --check, the address on its input, never among its arguments",
                   len(judged) == 2 and all(call["args"] == ["--check"] and secret not in " ".join(call["args"]) for call in judged)
                   and json.loads(judged[1]["input"])["address"] == good, [call["args"] for call in judged])
-            forgetting = browser.execute_script("const b = document.getElementById('destination-forget-0'); return b ? [b.textContent, b.disabled] : null")
+            # Back across 840 px, the page is drawn again (#777): pressed while that drawing runs, the
+            # click lands on a button being replaced and starts nothing (the run at b4321a4) — waited for.
+            settled = wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-forget-0')"), 10)
+            forgetting = browser.execute_script("const b = document.getElementById('destination-forget-0'); return b ? [b.textContent, b.disabled] : null"), settled
             press(browser, "destination-forget-0")
             gone = wait_for(browser, lambda b: b.execute_script(rows) == [], 10)
             check("forgotten, the destination is gone from the page", gone, (forgetting, browser.execute_script(rows), browser.find_element(By.ID, "destinations-said").text))
