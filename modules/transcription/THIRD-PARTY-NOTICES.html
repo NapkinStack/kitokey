@@ -10,9 +10,9 @@
 <p>kitokey-transcription is built from the crates below. Each is listed under the licence it is used under, with that licence's text.</p>
 <h2>Licences</h2>
 <ul>
-<li>Apache License 2.0: 74</li>
-<li>ISC License: 23</li>
-<li>MIT License: 18</li>
+<li>Apache License 2.0: 75</li>
+<li>MIT License: 19</li>
+<li>ISC License: 9</li>
 <li>BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License: 8</li>
 <li>Mozilla Public License 2.0: 5</li>
 <li>The Unlicense: 2</li>
@@ -4245,6 +4245,26 @@ limitations under the License.
 ~~~~
 
 </pre>
+<h3>Apache License 2.0</h3>
+<ul>
+<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
+</ul>
+<pre class="licence-text">The Apache License, Version 2.0 (Apache-2.0)
+
+Copyright 2015-2020 the fiat-crypto authors (see the AUTHORS file)
+
+Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+</pre>
 <h3>BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License</h3>
 <ul>
 <li data-crate="sonora-agc2@0.2.0">sonora-agc2 0.2.0 — <a href="https://github.com/dignifiedquire/sonora">https://github.com/dignifiedquire/sonora</a></li>
@@ -4404,82 +4424,6 @@ insights.
 </pre>
 <h3>ISC License</h3>
 <ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">/* Copyright (c) 2014, Intel Corporation.
- *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
- * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
- * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
- * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. */
-
-#ifndef OPENSSL_HEADER_EC_ECP_NISTZ384_H
-#define OPENSSL_HEADER_EC_ECP_NISTZ384_H
-
-#include &quot;../../limbs/limbs.h&quot;
-
-#define P384_LIMBS (384u / LIMB_BITS)
-
-typedef struct {
-  Limb X[P384_LIMBS];
-  Limb Y[P384_LIMBS];
-  Limb Z[P384_LIMBS];
-} P384_POINT;
-
-typedef struct {
-  Limb X[P384_LIMBS];
-  Limb Y[P384_LIMBS];
-} P384_POINT_AFFINE;
-
-
-#endif // OPENSSL_HEADER_EC_ECP_NISTZ384_H
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2015-2016 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-//! EdDSA Signatures.
-
-use super::ops::ELEM_LEN;
-use crate::digest;
-
-pub mod signing;
-pub mod verification;
-
-/// The length of an Ed25519 public key.
-pub const ED25519_PUBLIC_KEY_LEN: usize &#x3D; ELEM_LEN;
-
-pub fn eddsa_digest(signature_r: &amp;[u8], public_key: &amp;[u8], msg: &amp;[u8]) -&gt; digest::Digest {
-    let mut ctx &#x3D; digest::Context::new(&amp;digest::SHA512);
-    ctx.update(signature_r);
-    ctx.update(public_key);
-    ctx.update(msg);
-    ctx.finish()
-}
-</pre>
-<h3>ISC License</h3>
-<ul>
 <li data-crate="untrusted@0.9.0">untrusted 0.9.0 — <a href="https://github.com/briansmith/untrusted">https://github.com/briansmith/untrusted</a></li>
 </ul>
 <pre class="licence-text">// Copyright 2015-2016 Brian Smith.
@@ -4500,546 +4444,70 @@ pub fn eddsa_digest(signature_r: &amp;[u8], public_key: &amp;[u8], msg: &amp;[u8
 <ul>
 <li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
 </ul>
-<pre class="licence-text">// Copyright 2015-2022 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-use crate::limb::Limb;
-
-#[derive(Clone, Copy)]
-#[repr(transparent)]
-pub struct N0([Limb; 2]);
-
-impl N0 {
-    #[cfg(feature &#x3D; &quot;alloc&quot;)]
-    pub(super) const LIMBS_USED: usize &#x3D; 64 / crate::limb::LIMB_BITS;
-
-    #[inline]
-    pub const fn precalculated(n0: u64) -&gt; Self {
-        #[cfg(target_pointer_width &#x3D; &quot;64&quot;)]
-        {
-            Self([n0, 0])
-        }
-
-        #[cfg(target_pointer_width &#x3D; &quot;32&quot;)]
-        {
-            Self([n0 as Limb, (n0 &gt;&gt; crate::limb::LIMB_BITS) as Limb])
-        }
-    }
-}
-</pre>
+<pre class="licence-text">Copyright (c) 2014, Google Inc.
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+ * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+ * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</pre>
 <h3>ISC License</h3>
 <ul>
 <li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
 </ul>
-<pre class="licence-text">// Copyright 2015-2024 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-#[cfg(target_pointer_width &#x3D; &quot;64&quot;)]
-type CompilerWord &#x3D; u64;
-
-#[cfg(target_pointer_width &#x3D; &quot;32&quot;)]
-type CompilerWord &#x3D; u32;
-
-/// A native word that isn&#x27;t secret.
-///
-/// &#x60;LeakyWord&#x60; supports &#x60;as&#x60; conversions to/from native types.
-///
-/// XXX: This isn&#x27;t the native word size on targets where a pointer isn&#x27;t the
-/// same size as a native word. TODO: Fix this.
-pub(crate) type LeakyWord &#x3D; CompilerWord;
-</pre>
+<pre class="licence-text">Copyright (c) 2014, Intel Corporation.
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+ * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+ * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</pre>
 <h3>ISC License</h3>
 <ul>
 <li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
 </ul>
-<pre class="licence-text">// Copyright 2015-2025 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-use crate::{bb, error};
-
-#[deprecated(
-    note &#x3D; &quot;To be removed. Internal function not intended for external use with no promises regarding side channels.&quot;
-)]
-pub fn verify_slices_are_equal(a: &amp;[u8], b: &amp;[u8]) -&gt; Result&lt;(), error::Unspecified&gt; {
-    bb::verify_slices_are_equal(a, b)
-}
-</pre>
+<pre class="licence-text">Copyright (c) 2015, Google Inc.
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+ * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+ * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</pre>
 <h3>ISC License</h3>
 <ul>
 <li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
 </ul>
-<pre class="licence-text">// Copyright 2016 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-//! Elliptic curve operations and schemes using Curve25519.
-
-pub mod ed25519;
-
-pub mod x25519;
-
-mod ops;
-mod scalar;
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2016-2024 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-use crate::error::{KeyRejected, Unspecified};
-
-impl From&lt;untrusted::EndOfInput&gt; for Unspecified {
-    fn from(source: untrusted::EndOfInput) -&gt; Self {
-        super::erase(source)
-    }
-}
-
-impl From&lt;core::array::TryFromSliceError&gt; for Unspecified {
-    fn from(source: core::array::TryFromSliceError) -&gt; Self {
-        super::erase(source)
-    }
-}
-
-impl From&lt;KeyRejected&gt; for Unspecified {
-    fn from(source: KeyRejected) -&gt; Self {
-        super::erase(source)
-    }
-}
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2018 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-#[cfg(target_arch &#x3D; &quot;x86&quot;)]
-pub fn shift_full_blocks&lt;const BLOCK_LEN: usize&gt;(
-    in_out: super::overlapping::Overlapping&lt;&#x27;_, u8&gt;,
-    mut transform: impl FnMut(&amp;[u8; BLOCK_LEN]) -&gt; [u8; BLOCK_LEN],
-) {
-    let (in_out, src) &#x3D; in_out.into_slice_src_mut();
-    let in_out_len &#x3D; in_out[src.clone()].len();
-
-    for i in (0..in_out_len).step_by(BLOCK_LEN) {
-        let block &#x3D; {
-            let input &#x3D;
-                &lt;&amp;[u8; BLOCK_LEN]&gt;::try_from(&amp;in_out[(src.start + i)..][..BLOCK_LEN]).unwrap();
-            transform(input)
-        };
-        let output &#x3D; &lt;&amp;mut [u8; BLOCK_LEN]&gt;::try_from(&amp;mut in_out[i..][..BLOCK_LEN]).unwrap();
-        *output &#x3D; block;
-    }
-}
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2018 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-//! Serialization and deserialization.
-
-#[doc(hidden)]
-pub mod der;
-
-#[cfg(feature &#x3D; &quot;alloc&quot;)]
-mod writer;
-
-#[cfg(feature &#x3D; &quot;alloc&quot;)]
-pub(crate) mod der_writer;
-
-pub(crate) mod positive;
-
-pub use self::positive::Positive;
-
-#[cfg(feature &#x3D; &quot;alloc&quot;)]
-pub(crate) use self::writer::TooLongError;
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2019-2024 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-use super::BlockLen;
-
-pub(super) use self::{
-    sha2_32::{block_data_order_32, State32, SHA256_BLOCK_LEN},
-    sha2_64::{block_data_order_64, State64, SHA512_BLOCK_LEN},
-};
-
-pub(super) const CHAINING_WORDS: usize &#x3D; 8;
-
-#[cfg(any(
-    all(target_arch &#x3D; &quot;aarch64&quot;, target_endian &#x3D; &quot;little&quot;),
-    all(target_arch &#x3D; &quot;arm&quot;, target_endian &#x3D; &quot;little&quot;),
-    target_arch &#x3D; &quot;x86_64&quot;
-))]
-#[macro_use]
-mod ffi;
-
-pub(super) mod fallback;
-mod sha2_32;
-mod sha2_64;
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2022 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-/// Polyfill for &#x60;Option::unwrap()&#x60; as a const fn; feature &#x60;const_option&#x60;.
-/// https://github.com/rust-lang/rust/issues/67441.
-/// TODO(MSRV): Replace this with &#x60;x.unwrap()&#x60;.
-///
-/// &#x60;T: Copy&#x60; avoids &quot;constant functions cannot evaluate destructors.&quot;
-pub const fn unwrap_const&lt;T&gt;(x: Option&lt;T&gt;) -&gt; T
-where
-    T: Copy,
-{
-    if let Some(x) &#x3D; x {
-        x
-    } else {
-        panic!(&quot;unwrap_const on &#x60;None&#x60;&quot;);
-    }
-}
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2024 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-// TODO(MSRV 1.76): Replace with &#x60;core::ptr::from_mut&#x60;.
-#[allow(dead_code)]
-#[inline(always)]
-pub fn from_mut&lt;T: ?Sized&gt;(r: &amp;mut T) -&gt; *mut T {
-    r
-}
-
-// TODO(MSRV 1.76): Replace with &#x60;core::ptr::from_ref&#x60;.
-#[allow(dead_code)]
-#[inline(always)]
-pub const fn from_ref&lt;T: ?Sized&gt;(r: &amp;T) -&gt; *const T {
-    r
-}
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2024 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-//! Integration tests for non-public APIs.
-
-mod bits_tests;
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2024 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-//! Utilities to make dealing with slices less tediuous.
-
-/// Replaces the first N elements of &#x60;a&#x60; with the first N elements of &#x60;b&#x60;, where
-/// N is &#x60;core::cmp::min(a.len(), b.len())&#x60;, leaving the rest unchanged.
-pub fn overwrite_at_start&lt;T: Copy&gt;(a: &amp;mut [T], b: &amp;[T]) {
-    a.iter_mut().zip(b).for_each(|(a, b)| {
-        *a &#x3D; *b;
-    });
-}
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2024 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-pub use self::{
-    array::Array,
-    base::{IndexError, Overlapping},
-    partial_block::PartialBlock,
-};
-
-mod array;
-mod base;
-mod partial_block;
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2024 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-use crate::testutil;
-use core::{marker::PhantomData, mem::size_of};
-
-/// A ZST that can be added to any type to make the type &#x60;!Send&#x60;.
-#[derive(Clone, Copy)]
-pub struct NotSend(PhantomData&lt;*mut ()&gt;);
-
-impl NotSend {
-    pub const VALUE: Self &#x3D; Self(PhantomData);
-}
-
-#[allow(deprecated)]
-const _: () &#x3D; testutil::compile_time_assert_clone::&lt;NotSend&gt;();
-#[allow(deprecated)]
-const _: () &#x3D; testutil::compile_time_assert_copy::&lt;NotSend&gt;();
-const _: () &#x3D; assert!(size_of::&lt;NotSend&gt;() &#x3D;&#x3D; 0);
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2025 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-#![cfg(all(target_arch &#x3D; &quot;aarch64&quot;, target_endian &#x3D; &quot;little&quot;))]
-
-pub(in super::super) mod mont;
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2025 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-#![cfg(target_arch &#x3D; &quot;x86_64&quot;)]
-
-pub(in super::super::super) mod mont;
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2025 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-mod storage;
-
-pub(super) use self::storage::{AlignedStorage, LIMBS_PER_CHUNK};
-</pre>
-<h3>ISC License</h3>
-<ul>
-<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
-</ul>
-<pre class="licence-text">// Copyright 2025 Brian Smith.
-//
-// Permission to use, copy, modify, and/or distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
-//
-// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-pub(super) mod aarch64;
-pub(super) mod x86_64;
-</pre>
+<pre class="licence-text">Copyright (c) 2019, Google Inc.
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+ * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+ * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</pre>
 <h3>ISC License</h3>
 <ul>
 <li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
@@ -5058,6 +4526,41 @@ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
 OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 </pre>
+<h3>ISC License</h3>
+<ul>
+<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
+</ul>
+<pre class="licence-text">Copyright 2016 David Judd.
+// Copyright 2016 Brian Smith.
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</pre>
+<h3>ISC License</h3>
+<ul>
+<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
+</ul>
+<pre class="licence-text">Copyright 2018 Trent Clarke.
+//
+// Permission to use, copy, modify, and/or distribute this software for any
+// purpose with or without fee is hereby granted, provided that the above
+// copyright notice and this permission notice appear in all copies.
+//
+// THE SOFTWARE IS PROVIDED &quot;AS IS&quot; AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+// SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+// OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</pre>
 <h3>ISC License</h3>
 <ul>
 <li data-crate="rustls-webpki@0.103.16">rustls-webpki 0.103.16 — <a href="https://github.com/rustls/webpki">https://github.com/rustls/webpki</a></li>
@@ -5292,6 +4795,34 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+</pre>
+<h3>MIT License</h3>
+<ul>
+<li data-crate="ring@0.17.14">ring 0.17.14 — <a href="https://github.com/briansmith/ring">https://github.com/briansmith/ring</a></li>
+</ul>
+<pre class="licence-text">Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the &quot;Software&quot;), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHOR OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 </pre>
 <h3>MIT License</h3>
 <ul>
