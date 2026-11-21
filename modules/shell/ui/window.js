@@ -535,18 +535,18 @@ function paintState(said, shown, of) {
     }
   } else if (shown.kind === "model") {
     if (shown.coming) said.replaceChildren(element("span", "what", words.transcript_model_coming));
-    else said.replaceChildren(element("span", "what", words.transcript_model_needed), modelFetch(shown.busy));
+    else said.replaceChildren(element("span", "what", words.transcript_model_needed), modelFetch(shown.busy, words.transcript_fetch_then));
   } else if (shown.kind === "ollama") {
     // Silent: said where to get it, and tried again on a click; holding none: its model offered,
     // as Settings offer it — once it is there, the minutes are made.
     if (shown.silent) {
-      const again = element("button", "open", words.try_again);
+      const again = element("button", "open", of.try_again);
       again.type = "button";
       again.id = of.again;
       again.addEventListener("click", () => askAgain(of, said, again));
       said.replaceChildren(element("span", "what", words.welcome_ollama_silent), again);
     } else {
-      const fetch_ = element("button", "open", fill(words.confidential_fetch, makings.ollama_recommended));
+      const fetch_ = element("button", "open", fill(words.minutes_fetch_then, makings.ollama_recommended));
       fetch_.type = "button";
       fetch_.id = "ollama-fetch";
       fetch_.disabled = shown.busy;
@@ -563,7 +563,7 @@ function paintState(said, shown, of) {
     agree.href = `#/agree/${said.dataset.name}`;
     said.replaceChildren(element("span", "what", fill(words.minutes_awaiting, shown.host)), agree);
   } else {
-    const again = element("button", "open", words.try_again);
+    const again = element("button", "open", of.try_again);
     again.type = "button";
     again.id = of.again;
     again.addEventListener("click", () => askAgain(of, said, again));
@@ -576,8 +576,9 @@ function paintState(said, shown, of) {
 }
 
 // The tray's own fetch of the default model, offered where the window says it is missing (D36).
-function modelFetch(busy = false) {
-  const fetch_ = element("button", "open", fill(words.model_offer, size(makings.model_offer_bytes, words), makings.model_offer_host));
+// On a meeting's page it names what follows, the transcript (#933); in Settings, the download alone.
+function modelFetch(busy = false, said = words.model_offer) {
+  const fetch_ = element("button", "open", fill(said, size(makings.model_offer_bytes, words), makings.model_offer_host));
   fetch_.type = "button";
   fetch_.id = "model-fetch";
   fetch_.disabled = busy;
@@ -670,7 +671,7 @@ function paintMakings() {
   const minutes = document.getElementById("minutes-state");
   if (minutes) {
     paintState(minutes, minutesState(minutes.dataset.name), {
-      offer: "make-minutes", again: "minutes-again", ask: "minutes_again", making: words.minutes_making, stopped: words.minutes_stopped,
+      offer: "make-minutes", again: "minutes-again", try_again: words.minutes_try_again, ask: "minutes_again", making: words.minutes_making, stopped: words.minutes_stopped,
       // The minutes kept (#772): the redo failed, the ones shown are those before it.
       not_made: minutes.dataset.kept === "true" ? words.minutes_redo_failed : words.minutes_not_made,
     });
@@ -685,7 +686,7 @@ function paintMakings() {
   const transcript = document.getElementById("transcript-state");
   if (transcript) {
     paintState(transcript, transcriptState(transcript.dataset.name), {
-      offer: "make-transcript", again: "transcript-again", ask: "transcript_again", making: words.transcript_making, not_made: words.transcript_not_made, stopped: words.transcript_stopped,
+      offer: "make-transcript", again: "transcript-again", try_again: words.transcript_try_again, ask: "transcript_again", making: words.transcript_making, not_made: words.transcript_not_made, stopped: words.transcript_stopped,
     });
   }
   paintContext();
