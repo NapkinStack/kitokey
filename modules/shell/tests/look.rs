@@ -326,7 +326,7 @@ fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
 /// Each pair of colours the theme uses (D89's first round of drawings, *Contrast, both themes*), read
 /// from the file in both themes: text 4.5:1 (WCAG 2.2, 1.4.3), a control's edge or a meter 3:1 (1.4.11).
 /// `--line` is no pair: it divides, and borders no control (the test below).
-const PAIRS: [(&str, &str, f64); 24] = [
+const PAIRS: [(&str, &str, f64); 27] = [
     ("var(--ink)", "var(--ground)", 4.5),
     ("var(--ink)", "var(--surface)", 4.5),
     ("var(--ink)", "var(--raised)", 4.5),
@@ -354,6 +354,12 @@ const PAIRS: [(&str, &str, f64); 24] = [
     // The mark, in the accent, while recording its dot red.
     ("var(--accent)", "var(--surface)", 3.0),
     ("var(--red)", "var(--raised)", 3.0),
+    // The word a search found (#1078): its mark seen where it is, on a row selected too (WCAG 2.2 1.4.11,
+    // lina, #1093) — by its edge, the ink's underline in light under a pale yellow, the amber itself in dark —,
+    // and its words read on it.
+    ("var(--mark-edge)", SELECTED, 3.0),
+    ("var(--mark-edge)", "var(--surface)", 3.0),
+    ("var(--mark-ink)", "var(--mark)", 4.5),
 ];
 /// The selected row's ground, as the sidebar mixes it.
 const SELECTED: &str = "color-mix(in srgb, var(--accent) 13%, var(--surface))";
@@ -388,6 +394,15 @@ fn each_pair_of_the_theme_reaches_its_threshold_in_both_themes() {
             .any(|line| line.starts_with("theme 1: var(--edge)")),
         "a faint edge passed"
     );
+}
+
+#[test]
+fn the_search_mark_draws_its_edge() {
+    // The edge is what a selected row sees of the mark (#1093): the rule that draws the mark draws it.
+    let drawn = rules(STYLE)
+        .into_iter()
+        .any(|(selector, body)| selector.trim() == "mark" && body.contains("var(--mark-edge)"));
+    assert!(drawn, "the mark's rule does not draw var(--mark-edge)");
 }
 
 /// Each rule of the style, its selector and its body, comments aside.

@@ -7,12 +7,16 @@
   --edge: #808898;
   /* A secondary button hovered, then pressed (#1094): a step darker each, the ink still at 4.5:1. */
   --hover: #E3E7EE; --pressed: #D9DDE5;
+  /* The word a search found (#1078): a pale yellow, as find-in-page marks it (browsers, GNOME, macOS), under the
+     ink; seen on a selected row by its edge, the ink's 2 px underline; in dark the amber is its own edge
+     (#1093, tests/look.rs). */
+  --mark: #FDE68A; --mark-ink: #15171C; --mark-edge: #15171C;
 }
 @media (prefers-color-scheme: dark) {
   :not([data-theme="light"]):root {
     --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
     --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
-    --edge: #737B8C; --hover: #313644; --pressed: #3A4050;
+    --edge: #737B8C; --mark: #FBBF24; --mark-ink: #1E2129; --mark-edge: #FBBF24; --hover: #313644; --pressed: #3A4050;
   }
 }
 /* The appearance chosen in Settings (D98): light or dark whatever the system says — the same two
@@ -22,7 +26,7 @@
   color-scheme: dark;
   --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
   --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
-  --edge: #737B8C; --hover: #313644; --pressed: #3A4050;
+  --edge: #737B8C; --mark: #FBBF24; --mark-ink: #1E2129; --mark-edge: #FBBF24; --hover: #313644; --pressed: #3A4050;
 }
 * { box-sizing: border-box; }
 ::placeholder { color: var(--soft); opacity: 1; }
@@ -119,9 +123,11 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .meeting-head .named h1 { min-width: 0; }
 .drawn { padding: 14px 18px 10px; display: flex; flex-direction: column; gap: 8px; }
 .relief { width: 100%; height: 88px; }
-.relief polyline { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
-.relief .local { stroke: var(--accent); }
-.relief .remote { stroke: var(--ok); }
+.relief rect { rx: 2px; }
+/* The word a search found (#1078). */
+mark { background: var(--mark); color: var(--mark-ink); box-shadow: inset 0 -2px 0 var(--mark-edge); border-radius: 2px; }
+.relief .local { fill: var(--accent); }
+.relief .remote { fill: var(--ok); }
 .drawn .legend .here { color: var(--accent); }
 .drawn .legend .remote { color: var(--ok); }
 /* The minutes, then the transcript; side by side once the pane is 1000 px wide, together as wide as
