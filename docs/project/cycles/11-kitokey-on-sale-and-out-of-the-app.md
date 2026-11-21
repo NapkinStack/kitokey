@@ -19,7 +19,7 @@ deliverables:
     module: shell
     state: ready
     acceptance:
-      - "Given the window's e2e, when it runs, then it writes four screenshots per language — the list, a meeting's page with its summary, the bar while recording, Settings — at the size Microsoft's page for Store screenshots asks, that page's address and the day it was read written in D103's section before the first pull request, from meetings made for the e2e with nothing of a real one; held by a test that checks the files' count and size"
+      - "Given the window's e2e, when it runs, then it writes four screenshots per language — a meeting's page with its summary and transcript, a word sought in a meeting's transcript, the list filtered by a search, Settings with its models on this computer — at the size Microsoft's page for Store screenshots asks, that page's address and the day it was read written in D103's section before the first pull request, from meetings made for the e2e with nothing of a real one, each a meeting Kitokey's buyers hold, readable at a glance (amended by the decider, 2026-11-21: D103's section); held by a test that checks the files' count and size"
       - "Given `docs/store/listing.md`, when the screenshots are made, then the listing names them in the order the Store shows them; it links a privacy policy, in the repository, written to the voice guide — the microphone and the system's sound recorded, nothing leaving the computer by default, what leaves when the user chooses a service or a channel, and to whom —; it says before purchase what is downloaded and from where — Ollama, which Kitokey never installs, and the default Whisper model with its size —; and every promise of its text is one the product keeps, each line pointing to the deliverable or test that holds it"
   - id: D104
     title: "The shell's e2e can be trusted: a red names a defect, not the machine"
@@ -239,6 +239,13 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   Desktop « 1366 x 768 pixels or larger » (4K supported), a `.png` of at most 50 MB; one to ten, « at least four »
   suggested; a caption of at most 200 characters; images and captions uploaded for each listing language;
   « displayed in your listing in order »; no logo, icon or marketing message added.
+- **Criterion 1 amended** (the decider, 2026-11-21 around 03:00, relayed by the coordinator), to the coordinator's
+  proposal « D103 crit. 1: amend to 4 shots = meeting page, search in a meeting, list filtered by search, settings
+  with models installed; live time/levels → product issue »: « ok pour 1 mais il faut "simuler" des "contenus" de
+  réunion et autres textes parlant au public concerné, que ce soit réaliste et que les prospects puissent comprendre
+  de manière intuitive en un coup d'œil, il faut que les captures soient pertinentes ». The bar while recording is
+  no longer shot: the meeting's page shows neither the time nor the levels while it records; that is
+  #1076, and its shot comes back with it.
 
 ### D104
 
