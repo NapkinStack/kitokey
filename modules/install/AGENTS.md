@@ -16,7 +16,8 @@
   `mac/words.json`, the sentences macOS shows when it asks for the microphone and the sound the
   Mac plays.
 - `windows-x64`: the zip (`windows/build.py`) and `Kitokey-<version>-x64.msix` (`windows/msix.py`,
-  from `AppxManifest.xml.in`, `identity.json` and `Assets/`), made on Windows. `windows/trial.ps1`,
+  from `AppxManifest.xml.in`, `identity.json` and `Assets/`), made on Windows — refused while `identity.json`
+  holds a placeholder (D102): the identity is Partner Center's, or there is no package. `windows/trial.ps1`,
   run by `windows-app.yml`, signs it for the run and installs, upgrades and removes it; `windows/certify.ps1`
   has the certification kit test it, `windows/appcert.py` says its report — read in `scripts/test.sh` from
   `tests/appcert-report.xml`, cut from a report the kit wrote on the runner.
