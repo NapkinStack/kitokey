@@ -11636,9 +11636,9 @@ STORE_MEETINGS = {
         },
     },
 }
-# The meeting each shot opens, by its index among the titles: 1 the weekly review, 2 the client's call searched for
-# its quote, 3 that client's kickoff, found with the call by the client's name.
-STORE_OPENED = {"1-meeting": 5, "2-search": 3, "3-list": 2}
+# The meeting each shot opens, by its index among the titles: 1 the weekly review, 3 the client's kickoff, found with
+# its call by the client's name. 2 is a meeting recorded as the run takes it (#1126).
+STORE_OPENED = {"1-meeting": 5, "3-list": 2}
 STORE_RATE = 8000
 # The hour each meeting started, oldest first: a working day's, whenever the e2e runs.
 STORE_HOURS = [(9, 30), (14, 0), (10, 15), (16, 30), (11, 0), (14, 30)]
@@ -11749,9 +11749,9 @@ def store_lasted(row: str) -> int:
 def store_shots(now: dt.datetime) -> None:
     """CH. D103: the Microsoft Store's screenshots, made here from meetings invented for them, in French then
     in English, light, in the Store's order — « displayed in your listing in order », Microsoft's page says —, the
-    benefit first (the coordinator, 2026-11-20 and 2026-11-21): a meeting's page with its minutes and transcript, a word
-    sought in a long call's transcript, a word sought in the list, Settings with its model on this computer — never a
-    recording, whose page shows neither its time nor its levels yet (the bar does). Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
+    benefit first (the coordinator, 2026-11-20 and 2026-11-21): a meeting's page with its minutes and transcript, a meeting
+    while it records, its time large and both meters (#1076, #1112, #1126), a word sought in the list, Settings with its
+    model on this computer. Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
     its MSIX page read on 2026-11-20 (D103's section) —, written to `store/<fr|en>/` in KITOKEY_SCREENSHOTS'
     folder, or the run's own; then counted: four PNGs a language, each at least 1366 × 768, at most 50 MB."""
     print("CH. the Store's screenshots: four a language, French and English, 1920 × 1080, from meetings invented for them (D103)")
@@ -11805,6 +11805,12 @@ def store_shots(now: dt.datetime) -> None:
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Ollama)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     ollama = f"http://127.0.0.1:{server.server_address[1]}"
+    # 2 is recorded as the run takes it, at the run's own hour: the window and every meeting are put in a zone where
+    # that hour is 14 h, so the recording dates itself in the working day as the meetings do, whenever the run is
+    # (`Etc/GMT-5` is 5 h east of UTC: tzdata's names count the other way).
+    east = (14 - now.astimezone(dt.timezone.utc).hour) % 24
+    east -= 24 if east > 14 else 0
+    now = now.astimezone(dt.timezone(dt.timedelta(hours=east)))
     for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
         said = STORE_MEETINGS[short]
         # The meetings' folder is the user's own, in a home of its own: Settings says « Dossier personnel / Kitokey »,
@@ -11847,7 +11853,7 @@ def store_shots(now: dt.datetime) -> None:
         # After a recording, the transcript then the minutes: what Kitokey does on its own, chosen as a buyer would.
         window = Window(meetings, language, f'reminder = false\nafter = "minutes"\nminutes_provider = "{ollama}/v1"\nminutes_model = "qwen3:8b"\n',
                         ollama=ollama)
-        window.env.update(GTK_THEME="Adwaita", HOME=str(home), XDG_DATA_HOME=str(home / "share"))
+        window.env.update(GTK_THEME="Adwaita", HOME=str(home), XDG_DATA_HOME=str(home / "share"), TZ=f"Etc/GMT{-east:+d}")
         with window as browser:
             browser.set_window_size(1920, 1080)
             if not wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 3):
@@ -11860,11 +11866,6 @@ def store_shots(now: dt.datetime) -> None:
                 wait_for(browser, lambda b: b.execute_script(
                     "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
                     " && p.querySelectorAll('.transcript .lines li').length > 0", names[index]), 10)
-                # 2: a word sought in the call's transcript, only its lines left, each at its moment (the coordinator,
-                # 2026-11-21: « retrouver ce qui a été dit, à la seconde »).
-                if shot_name == "2-search":
-                    sought = browser.find_element(By.ID, "search")
-                    sought.send_keys(kept[index]["sought"])
                 # 3: a word sought in the list, only its meetings left (« retrouver n'importe quelle réunion »).
                 if shot_name == "3-list":
                     browser.find_element(By.ID, "find").send_keys(kept[index]["sought"])
@@ -11901,6 +11902,32 @@ def store_shots(now: dt.datetime) -> None:
             time.sleep(0.4)
             browser.save_screenshot(str(store / short / "4-settings.png"))
             seen(browser, f"{short}/4-settings.png")
+            browser.execute_script("document.documentElement.style.overflow = ''")
+            # 2: a meeting while it records, from the window's button, named as the team's own meeting: its time large in
+            # the who-spoke area, both meters (#1076, #1112). Taken last, so that no other shot shows it.
+            live = lambda b: "live" in (b.find_element(By.ID, "record").get_attribute("class") or "")
+            press(browser, "record")
+            wait_for(browser, lambda b: live(b) and any(f.name not in names and (f / "session.json").exists() for f in meetings.iterdir()), 10)
+            recording = next(f for f in meetings.iterdir() if f.name not in names)
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{recording.name}")
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting')?.dataset.name") == recording.name
+                     and b.find_elements(By.ID, "rename"), 10)
+            press(browser, "rename")
+            # Its field opens holding what the heading said: selected, so that the name typed replaces it.
+            wait_for(browser, lambda b: b.execute_script("const f = document.getElementById('naming');"
+                                                         " if (f && document.activeElement === f) { f.select(); return true; } return false"), 5)
+            ActionChains(browser).send_keys(said["titles"][0] + Keys.ENTER).perform()
+            wait_for(browser, lambda b: b.execute_script("return document.querySelector('#meeting h1')?.textContent") == said["titles"][0], 5)
+            # Both sides heard a moment, so that each meter shows a level.
+            wait_for(browser, lambda b: b.execute_script("const m = [...document.querySelectorAll('#meeting .page-level')];"
+                                                         " return m.length === 2 && m.every(e => Number(e.getAttribute('aria-valuenow')) > 0)"), 10)
+            browser.execute_script("document.activeElement.blur(); scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
+            time.sleep(0.6)
+            browser.save_screenshot(str(store / short / "2-recording.png"))
+            seen(browser, f"{short}/2-recording.png")
+            browser.execute_script("document.documentElement.style.overflow = ''")
+            press(browser, "record")
+            wait_for(browser, lambda b: "stopped" in (recording / "session.json").read_text() and not live(b), 10)
     made = sorted(store.glob("*/*.png"))
     sizes = {f"{file.parent.name}/{file.name}": (png_size(file), file.stat().st_size) for file in made}
     check("the Store's screenshots: four a language, French and English, in the Store's order (D103)",
