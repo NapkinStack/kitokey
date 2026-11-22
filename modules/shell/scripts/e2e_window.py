@@ -1004,6 +1004,30 @@ def model_offered(now: dt.datetime) -> None:
         # Said once (#775): what it waits for, never « Pas encore de transcription » beside it.
         nones = browser.execute_script("return [...document.querySelectorAll('#meeting .transcript .none')].filter(e => e.offsetParent !== null).map(e => e.textContent)")
         check("a transcript waiting for its model says that alone, not also that there is none (#775)", nones == [], nones)
+        # #1116 (the decider, 2026-11-21 ~19h): no transcript yet, the who-spoke area keeps no blank height — one line says
+        # when it will appear (an empty state says what will come, NN/g), in the soft colour.
+        later = ("const d = document.querySelector('#meeting .drawing'), p = document.getElementById('who-spoke-later');"
+                 " if (!d || !p) return null; const s = getComputedStyle(p);"
+                 " return {text: p.textContent, inside: d.contains(p),"
+                 " height: Math.round(d.getBoundingClientRect().height), line: Math.round(parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.45)}")
+        no_blank = browser.execute_script(later)
+        check("no transcript yet: one line says when who spoke will appear, the area no taller than that line (#1116)",
+              no_blank is not None and no_blank["text"] == "Le temps de parole s’affichera après la transcription." and no_blank["inside"]
+              and no_blank["height"] <= no_blank["line"] + 24, no_blank)
+        # A legend names what is drawn: with nothing drawn yet, « Vous — votre micro » / « Les autres — … » are not shown;
+        # the range stays, the player's (the coordinator, 2026-11-21).
+        named = browser.execute_script("return [...document.querySelectorAll('#meeting .legend .here, #meeting .legend .remote')].filter(e => e.getClientRects().length).length")
+        ranged = browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? ''")
+        check("no transcript yet: the legend's two names not shown, its range kept (#1116)", named == 0 and "–" in ranged, [named, ranged])
+        size = browser.get_window_size()
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            browser.execute_script("scrollTo(0, 0)")
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1116-untranscribed-{width}-{theme}", theme)
+        browser.set_window_size(size["width"], size["height"])
+        time.sleep(0.3)
         # The tray's entry that fetches it follows the language chosen, at once (D64).
         speak = lambda code: browser.execute_script("return window.__TAURI__.core.invoke('settings_saved', {change: {language: arguments[0]}})", code)
         tray = lambda b, said: any(label.startswith(said) for label in tray_labels())
