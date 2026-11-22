@@ -5136,6 +5136,28 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def settings_version(now: dt.datetime) -> None:
+    """CJ. Settings' « Général » says Kitokey's version at its foot (#1089), as `--version` says it: « Version
+    1.0.0 », secondary text a person can select and copy for support, in French and in English."""
+    print("CJ. Settings: « Général » says the version, as --version does, selectable (#1089)")
+    said = subprocess.run([str(BINARY), "--version"], capture_output=True, text=True, timeout=30).stdout.strip()
+    version = said.removeprefix("kitokey ")
+    line = ("const v = document.getElementById('app-version'); const c = v && v.closest('section.card');"
+            " return v ? {text: v.textContent, card: c ? c.querySelector('h2').textContent : null,"
+            " select: getComputedStyle(v).userSelect, shown: v.getClientRects().length > 0,"
+            " last: !!c && c.lastElementChild === v} : null")
+    for locale, card in (("fr_FR.UTF-8", "Général"), ("en_US.UTF-8", "General")):
+        taping = WORK / f"settings-version-{locale[:2]}"
+        taping.mkdir()
+        with Window(taping, locale, 'after = "nothing"\n') as browser:
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.execute_script(line) is not None, 10)
+            got = browser.execute_script(line)
+            check(f"{locale[:2]}: « Version {version} » at the foot of « {card} », shown and selectable (#1089)",
+                  bool(version) and got is not None and got["text"] == f"Version {version}" and got["card"] == card
+                  and got["shown"] and got["last"] and got["select"] not in ("none",), (said, got))
+
+
 def settings_narrow_without_model(now: dt.datetime) -> None:
     """BU. Settings at 420 px on a Kitokey with no model on this computer (#868): the guided step for the
     transcription — its way, the model's state and its offer — inside its card, nothing spilling; « Avancé »
@@ -13929,6 +13951,7 @@ def main() -> int:
     unsaved_choice_kept(now)
     key_kept_to_its_host(now)
     settings_folded(now)
+    settings_version(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
     focus_kept(now)

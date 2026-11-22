@@ -2531,6 +2531,8 @@ struct SettingsShown {
     autostart: bool,
     /// Whether the switch is offered: not on Windows outside a package, which has no task.
     autostart_offered: bool,
+    /// The version this program says, as `--version` does: shown at the foot of « Général » (#1089).
+    version: &'static str,
     /// Who holds the switch when Kitokey cannot move it: the user in Windows, or a policy.
     autostart_held: Option<autostart::Held>,
     keep_audio: KeepAudio,
@@ -2624,6 +2626,7 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
         offer: settings.offer,
         autostart,
         autostart_offered,
+        version: VERSION,
         autostart_held,
         keep_audio: settings.keep_audio,
         model: settings.model,

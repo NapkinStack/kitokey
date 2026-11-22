@@ -111,7 +111,8 @@ Anyway (D38).
 On Windows, `nstack release` also makes `dist/install/Kitokey-<version>-x64.msix`, the package the
 Microsoft Store takes (D54, PDR-0004), unsigned; it needs the Windows SDK. `windows-app.yml` signs it
 for the run with a certificate it throws away, installs it, upgrades it and removes it
-(`windows/trial.ps1`) — at each start, it prints what the Store answers for a package it did
+(`windows/trial.ps1`) — it fails if the installed `kitokey.exe` holds `updater`, the name Tauri's
+updater plugin is routed by, since the Store updates the package (D102); at each start, it prints what the Store answers for a package it did
 not install (`shell.licence_read`, D83), and fails if that read would refuse a recording, and the
 state of Kitokey's startup task as Windows holds it (`shell.startup_task`, D84), and fails unless it is off: the package declares it off, and only the user turns it on, in Settings (#1085) —, has the Windows App Certification Kit test it (`windows/certify.ps1`, each
 failed test named in the run), and keeps it 7 days with the public certificate and the kit's report,
