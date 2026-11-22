@@ -7971,6 +7971,28 @@ def renaming(now: dt.datetime) -> None:
         check("being recorded, Libérer de l'espace names it, its date beside", bool(busy) and busy[0][0] == "En direct" and "·" in busy[0][1], busy)
         browser.execute_script(f"location.hash = '#/meeting/{recording.name}'")
         wait_for(browser, lambda b: head(b) == "En direct", 10)
+        # #1076: while it records, its page shows the time running and both sides' levels, read from what the bar
+        # reads (`recording_now`); neither is a live region, as the bar's are not.
+        alive = ("const t = document.getElementById('page-time'), m = [...document.querySelectorAll('#meeting .page-level')];"
+                 " return t && t.getClientRects().length ? {time: t.textContent, live: t.closest('[aria-live]') !== null || m.some(e => e.closest('[aria-live]') !== null),"
+                 " meters: m.map(e => [e.getAttribute('role'), e.getAttribute('aria-label'), Number(e.getAttribute('aria-valuenow'))])} : null")
+        first_seen = wait_for(browser, lambda b: b.execute_script(alive), 5) and browser.execute_script(alive)
+        time.sleep(1.2)
+        later = browser.execute_script(alive)
+        check("while it records, its page shows the time running and both sides' levels as meters, no live region (#1076)",
+              bool(first_seen) and bool(later) and later["time"] != first_seen["time"] and later["time"].count(":") == 2 and not later["live"]
+              and [m[0] for m in later["meters"]] == ["meter", "meter"] and all(m[1] for m in later["meters"]) and all(m[2] > 0 for m in later["meters"]),
+              [first_seen, later])
+        # Its page while it records, seen (#1076, T4; the source of the Store's recording shot): 420 and 1100 px, light and dark.
+        size = browser.get_window_size()
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            browser.execute_script("scrollTo(0, 0)")
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1076-recording-{width}-{theme}", theme)
+        browser.set_window_size(size["width"], size["height"])
+        time.sleep(0.3)
         # Pressed once it is the stop gesture, as the shell says it: recording, nothing stopping, no
         # press of the window's still answered — and once the shell's half second has passed since
         # the start's press, which takes a press within it for the same one (D68). 6eb6ce0's red in a
@@ -7993,9 +8015,40 @@ def renaming(now: dt.datetime) -> None:
                "presses reaching the button": [clicks, browser.execute_script("return window.__recordClicks")],
                "pressed, seconds after the start's press": after_start,
                "session.json": (recording / "session.json").read_text()})
+        # #1076: once it stops, the page leaves the live time and meters for the meeting's range, its poll ended.
+        settled = wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
+            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 10)
+        check("stopped: the page shows the meeting's range again, no live time nor meters (#1076)", settled,
+              [browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
         check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
+        # #1076: stopped from elsewhere — by the shell's own command, as the tray, the shortcut and the bar stop it —, the
+        # window's button is never pressed, and its redraw a moment after a press (`setTimeout(refresh, 1200)`) never
+        # comes: the page's poll alone draws the range back.
+        now_meeting = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('recording_now')"
+                       ".then((n) => done(n.recording && n.meeting ? n.meeting : null), () => done(null))")
+        # Pressed only once the shell holds no recording nor its stop: before, a press counts as the stop going on, and
+        # is let go (`toggle_recording`) — s1076ok2's red was that press, not the page.
+        idle_header = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('header')"
+                       ".then((h) => done(!h.recording && !h.stopping), () => done(false))")
+        wait_for(browser, lambda b: b.execute_async_script(idle_header), 10)
+        time.sleep(0.6)
+        browser.execute_script("window.__TAURI__.core.invoke('record')")
+        wait_for(browser, lambda b: b.execute_async_script(now_meeting), 10)
+        again = browser.execute_async_script(now_meeting)
+        if again:
+            # The same folder as before (the recorder played here names it): the page left, then opened again, so it is
+            # drawn for the recording.
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{again}")
+        live_again = bool(again) and wait_for(browser, lambda b: b.execute_script(alive), 10)
+        time.sleep(0.8)
+        browser.execute_script("window.__TAURI__.core.invoke('record')")
+        drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
+            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 5)
+        check("stopped from elsewhere, the window's button not pressed: the page draws its range back by itself (#1076)", drawn_back,
+              [again, live_again, browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
 
 
 def actions_rows(now: dt.datetime) -> None:
