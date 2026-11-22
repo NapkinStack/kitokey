@@ -5,7 +5,7 @@ mod common;
 
 use std::{fs, path::Path, process::Output};
 
-use common::{MINUTES, answering, program, provider, providing};
+use common::{MINUTES, answering, answering_natively_having_read, ollama, program, provider, providing};
 
 const TRANSCRIPT: &str = concat!(
     r#"{"type": "header", "contract": "transcript/v1", "engine": "an-engine", "model": "a-model", "language": "fr", "context": null}"#,
@@ -137,6 +137,29 @@ fn a_provider_that_fails_loses_nothing_and_says_why_in_one_sentence() {
         assert_eq!(fs::read_to_string(folder.path().join("transcript.jsonl")).unwrap(), TRANSCRIPT);
         assert_eq!(fs::read_dir(folder.path()).unwrap().count(), 2, "{status}: a file was left behind");
     }
+}
+
+#[test]
+fn an_ollama_that_read_only_part_of_the_request_writes_no_minutes_and_says_so() {
+    let folder = session(None);
+    fs::write(folder.path().join("minutes.md"), "the minutes that were there\n").unwrap();
+    let (address, _received) = ollama(vec![("200 OK", answering_natively_having_read(MINUTES, "stop", 1))]);
+    let output = run(folder.path(), &address, None);
+    let (out, err) = said(&output);
+    assert!(!output.status.success(), "accepted: {out}");
+    assert!(
+        err.contains("read 1 tokens of a request of") && err.trim().lines().count() == 1,
+        "{err}"
+    );
+    assert_eq!(
+        (last(&output)["event"].as_str(), last(&output)["code"].as_str()),
+        (Some("failed"), Some("provider.failed")),
+        "{out}"
+    );
+    assert_eq!(
+        fs::read_to_string(folder.path().join("minutes.md")).unwrap(),
+        "the minutes that were there\n"
+    );
 }
 
 #[test]

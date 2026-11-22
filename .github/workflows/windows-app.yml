@@ -67,9 +67,12 @@ jobs:
           zip=$(ls dist/install/Kitokey-*-windows-x64.zip)
           python - "$zip" <<'PY'
           import sys, zipfile
+          sys.path.insert(0, "modules/install/windows")
+          import notices  # what the programs owe their third parties, by name (D102)
           names = sorted(zipfile.ZipFile(sys.argv[1]).namelist())
           programs = ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary")
-          wanted = sorted(f"Kitokey/{p}.exe" for p in programs)
+          owed = [name for _, name in notices.files("dist")]
+          wanted = sorted([f"Kitokey/{p}.exe" for p in programs] + [f"Kitokey/{name}" for name in owed])
           print(names)
           sys.exit(names != wanted)
           PY

@@ -2535,6 +2535,8 @@ struct SettingsShown {
     autostart_offered: bool,
     /// Where a summary can be sent (D110): names, kinds, addresses as shown — never one whole.
     destinations: Vec<kitokey_shell::destinations::Destination>,
+    /// The version this program says, as `--version` does: shown at the foot of « Général » (#1089).
+    version: &'static str,
     /// Who holds the switch when Kitokey cannot move it: the user in Windows, or a policy.
     autostart_held: Option<autostart::Held>,
     keep_audio: KeepAudio,
@@ -2629,6 +2631,7 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
         autostart,
         autostart_offered,
         destinations: settings.destinations.clone(),
+        version: VERSION,
         autostart_held,
         keep_audio: settings.keep_audio,
         model: settings.model,

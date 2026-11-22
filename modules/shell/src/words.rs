@@ -859,6 +859,11 @@ pub struct Window {
     /// fields, as a status. When: « Ajouter » refused. At most: one line and the failure's.
     /// Placeholders: {} the failure's sentence (lower-case start).
     pub destination_not_added: &'static str,
+    /// Before Kitokey's version, at the foot of « Général », as GNOME's « About » and Windows' Settings
+    /// say it (#1089); the number follows, as `--version` gives it. Shows: Settings, « Général », its
+    /// last line, in secondary text the user can select to copy. When: always. At most: one word.
+    /// Placeholders: none.
+    pub version_said: &'static str,
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, a switch: its name, then its
     /// line under it (D29). When: always. At most: one line for the name, the line wraps.
     /// Placeholders: none.
@@ -1906,6 +1911,7 @@ pub fn window(language: Language) -> Window {
             destination_forget: "Remove",
             destination_added: "Destination {} added.",
             destination_not_added: "Destination not added: {}",
+            version_said: "Version",
             developer: ["Developer mode", "Shows technical details under each error, to help troubleshoot."],
             program_said: "Technical details: {}",
             minutes_sections: ["Highlights", "Actions", "Key points"],
@@ -2357,6 +2363,7 @@ pub fn window(language: Language) -> Window {
             destination_forget: "Supprimer",
             destination_added: "Destination {} ajoutée.",
             destination_not_added: "Destination non ajoutée\u{a0}: {}",
+            version_said: "Version",
             developer: [
                 "Mode développeur",
                 "Affiche le détail technique sous chaque erreur, pour aider au diagnostic.",
