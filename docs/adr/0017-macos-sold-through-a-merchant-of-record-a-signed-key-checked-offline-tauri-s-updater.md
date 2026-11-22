@@ -6,6 +6,7 @@
   approval of #1017 on GitHub, again at efd2932 after main was merged into it). Amended 2026-11-20, on the decider's
   remark that Stripe was not compared: Stripe Managed Payments and Keygen added to the fallback, beside Paddle Billing
   and Keygen (option 2b); Stripe with Stripe Tax set aside (*Rejected alternatives*). FastSpring stays the decision.
+  Reopened for study on 2026-11-21 at the decider's request: [docs/project/reviews/2026-11-21-payments-portfolio.md](../project/reviews/2026-11-21-payments-portfolio.md); the decision stands until the decider decides.
 - **Date**: 2026-11-20
 - **Decision makers**: the decider, `@napkinstack-admin`; proposed by an agent (marc, session 2b57f890-8981-4ce3-92f0-1ca23ed36acf)
 - **Scope**: project — the macOS build, sold; modules `shell` (the licence check, the updater) and `install` (the

@@ -35,7 +35,7 @@
         BackgroundColor="transparent" />
       <Extensions>
         <uap5:Extension Category="windows.startupTask" Executable="kitokey.exe" EntryPoint="Windows.FullTrustApplication">
-          <uap5:StartupTask TaskId="KitokeyStartupTask" Enabled="true" DisplayName="Kitokey" />
+          <uap5:StartupTask TaskId="KitokeyStartupTask" Enabled="false" DisplayName="Kitokey" />
         </uap5:Extension>
       </Extensions>
     </Application>

@@ -5,7 +5,7 @@ mod common;
 
 use std::{fs, path::Path, process::Output};
 
-use common::{MINUTES, answering, program, provider, providing};
+use common::{MINUTES, answering, answering_natively_having_read, ollama, program, provider, providing};
 
 const TRANSCRIPT: &str = concat!(
     r#"{"type": "header", "contract": "transcript/v1", "engine": "an-engine", "model": "a-model", "language": "fr", "context": null}"#,
@@ -137,6 +137,29 @@ fn a_provider_that_fails_loses_nothing_and_says_why_in_one_sentence() {
         assert_eq!(fs::read_to_string(folder.path().join("transcript.jsonl")).unwrap(), TRANSCRIPT);
         assert_eq!(fs::read_dir(folder.path()).unwrap().count(), 2, "{status}: a file was left behind");
     }
+}
+
+#[test]
+fn an_ollama_that_read_only_part_of_the_request_writes_no_minutes_and_says_so() {
+    let folder = session(None);
+    fs::write(folder.path().join("minutes.md"), "the minutes that were there\n").unwrap();
+    let (address, _received) = ollama(vec![("200 OK", answering_natively_having_read(MINUTES, "stop", 1))]);
+    let output = run(folder.path(), &address, None);
+    let (out, err) = said(&output);
+    assert!(!output.status.success(), "accepted: {out}");
+    assert!(
+        err.contains("read 1 tokens of a request of") && err.trim().lines().count() == 1,
+        "{err}"
+    );
+    assert_eq!(
+        (last(&output)["event"].as_str(), last(&output)["code"].as_str()),
+        (Some("failed"), Some("provider.failed")),
+        "{out}"
+    );
+    assert_eq!(
+        fs::read_to_string(folder.path().join("minutes.md")).unwrap(),
+        "the minutes that were there\n"
+    );
 }
 
 #[test]
@@ -834,22 +857,30 @@ fn a_provider_on_this_machine_writes_no_cost_even_if_it_says_one() {
 }
 
 /// The program as if the machine's name for OpenRouter led to the stand-in, in a namespace of its
-/// own: the only way a test reaches the host's own rule, no test ever calling the real one. `None`
-/// where this system lets no user make one: that test then proves nothing, and says so.
+/// own: the only way a test reaches the host's own rule, no test ever calling the real one. Where
+/// this system lets no user make one, the test cannot run: it fails, saying so (#918), as a test
+/// that proves nothing is never counted green (`tests.md`). The attest's machine allows it.
 #[cfg(target_os = "linux")]
-fn at_openrouter(answers: Vec<String>) -> Option<(String, Vec<serde_json::Value>)> {
-    let free = std::process::Command::new("unshare").args(["-Urm", "true"]).output();
-    if !free.is_ok_and(|output| output.status.success()) {
-        eprintln!("NOT RUN: this system lets no user make a namespace");
-        return None;
-    }
+fn at_openrouter(answers: Vec<String>) -> (String, Vec<serde_json::Value>) {
+    at_openrouter_by("unshare", answers)
+}
+
+/// The same, `unshare` named: a test gives it a program that refuses, as a system without user
+/// namespaces does.
+#[cfg(target_os = "linux")]
+fn at_openrouter_by(unshare: &str, answers: Vec<String>) -> (String, Vec<serde_json::Value>) {
+    let free = std::process::Command::new(unshare).args(["-Urm", "true"]).output();
+    assert!(
+        free.is_ok_and(|output| output.status.success()),
+        "NOT RUN, so not passed: this system lets no user make a namespace (`unshare -Urm`)"
+    );
     let folder = session(None);
     let logs = tempfile::tempdir().unwrap();
     let hosts = folder.path().join("hosts");
     fs::write(&hosts, "127.0.0.1 openrouter.ai\n").unwrap();
     let (address, received) = providing(answers.into_iter().map(|body| ("200 OK", body)).collect());
     let address = address.replace("127.0.0.1", "openrouter.ai");
-    let output = std::process::Command::new("unshare")
+    let output = std::process::Command::new(unshare)
         .args(["-Urm", "sh", "-c", r#"mount --bind "$1" /etc/hosts && shift && exec "$@""#, "sh"])
         .arg(&hosts)
         .arg(env!("CARGO_BIN_EXE_kitokey-summary"))
@@ -860,52 +891,63 @@ fn at_openrouter(answers: Vec<String>) -> Option<(String, Vec<serde_json::Value>
         .env_remove("KITOKEY_LOG")
         .output()
         .unwrap();
-    if !output.status.success() && said(&output).1.contains("mount") {
-        eprintln!("NOT RUN: this system lets no user mount: {}", said(&output).1);
-        return None;
-    }
+    assert!(
+        output.status.success() || !said(&output).1.contains("mount"),
+        "NOT RUN, so not passed: this system lets no user mount: {}",
+        said(&output).1
+    );
     assert!(output.status.success(), "{}", said(&output).1);
     received.recv().unwrap();
     let warnings = logged(logs.path()).into_iter().filter(|line| line["level"] == "WARN").collect();
-    Some((fs::read_to_string(folder.path().join("minutes.md")).unwrap(), warnings))
+    (fs::read_to_string(folder.path().join("minutes.md")).unwrap(), warnings)
 }
 
 #[cfg(target_os = "linux")]
 #[test]
 fn openrouters_cost_reaches_the_front_matter_as_it_reported_it() {
     let priced = |usage: &str| answering(MINUTES, "stop").replacen('{', &format!(r#"{{"usage": {usage},"#), 1);
-    let Some((minutes, warnings)) = at_openrouter(vec![priced(
+    let (minutes, warnings) = at_openrouter(vec![priced(
         r#"{"cost": 1.20e-6, "cost_details": {"upstream_inference_cost": null}}"#,
-    )]) else {
-        return;
-    };
+    )]);
     assert!(minutes.contains("\nprovider: \"openrouter.ai\"\n"), "{minutes}");
     // The cost as reported, then how long the making took, last of the front matter (minutes/v4, D97).
     assert!(minutes.contains("\ncost: 1.20e-6\ncurrency: USD\nmade_in: "), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
 
-    let (minutes, warnings) = at_openrouter(vec![priced(r#"{"cost": "0.012"}"#)]).unwrap();
+    let (minutes, warnings) = at_openrouter(vec![priced(r#"{"cost": "0.012"}"#)]);
     assert!(!minutes.contains("\ncost:") && !minutes.contains("\ncurrency:"), "{minutes}");
     assert_eq!(warnings.len(), 1, "{warnings:?}");
     assert_eq!(warnings[0]["message"], "summary.cost_refused");
 
     let (minutes, warnings) = at_openrouter(vec![priced(
         r#"{"cost": 0.001, "cost_details": {"upstream_inference_cost": 0.02}}"#,
-    )])
-    .unwrap();
+    )]);
     assert!(!minutes.contains("\ncost:"), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
 
-    let (minutes, warnings) = at_openrouter(vec![priced(r#"{"cost": 0.001, "is_byok": true}"#)]).unwrap();
+    let (minutes, warnings) = at_openrouter(vec![priced(r#"{"cost": 0.001, "is_byok": true}"#)]);
     assert!(!minutes.contains("\ncost:"), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
 
     // Asked again: the cost of the answer written.
     let refused = answering("une phrase", "stop").replacen('{', r#"{"usage": {"cost": 0.1},"#, 1);
-    let (minutes, warnings) = at_openrouter(vec![refused, priced(r#"{"cost": 0.2}"#)]).unwrap();
+    let (minutes, warnings) = at_openrouter(vec![refused, priced(r#"{"cost": 0.2}"#)]);
     // The cost as reported, then how long the making took, last of the front matter (minutes/v4, D97).
     assert!(minutes.contains("\ncost: 0.2\ncurrency: USD\nmade_in: "), "{minutes}");
     assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+/// A system that lets no user make a namespace: the test that needs one cannot run, and must not
+/// pass — it fails, saying why (#918), never returns as if it had checked anything.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_namespace_refused_fails_the_test_never_passes_it() {
+    let refused = std::panic::catch_unwind(|| at_openrouter_by("false", vec![answering(MINUTES, "stop")]));
+    assert!(
+        refused.is_err(),
+        "a namespace refused returned, as if the test had run: {:?}",
+        refused.ok()
+    );
 }
 
 /// A refusal's run with this environment, nothing else of the machine's: where its log went.
