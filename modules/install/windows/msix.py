@@ -1,5 +1,5 @@
 """Run on Windows by scripts/release.sh, and by trial.ps1 for a later version: Kitokey-<version>-x64.msix,
-made with the Windows SDK's MakeAppx from AppxManifest.xml.in, identity.json, the four programs and
+made with the Windows SDK's MakeAppx from AppxManifest.xml.in, identity.json, the five programs and
 Assets/ (D54). Unsigned: the Store signs what it publishes; outside it, whoever installs it signs it.
 
 Usage: msix.py <artefacts> <version> <out>
@@ -16,7 +16,7 @@ import notices as owed
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROGRAMS = ("shell/kitokey.exe", "capture/kitokey-capture.exe",
-            "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe")
+            "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe", "export/kitokey-export.exe")
 
 
 def four_parts(version):

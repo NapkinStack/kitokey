@@ -24,7 +24,7 @@ version=${KITOKEY_VERSION:-}
 if [ -z "$package$copr" ]; then
   work=$(mktemp -d)
   trap 'rm -rf "$work"' EXIT
-  for program in shell/kitokey capture/kitokey-capture transcription/kitokey-transcription summary/kitokey-summary; do
+  for program in shell/kitokey capture/kitokey-capture transcription/kitokey-transcription summary/kitokey-summary export/kitokey-export; do
     mkdir -p "$work/$(dirname "$program")"
     printf '#!/bin/sh\necho "%s: usage: …" >&2\nexit 2\n' "$(basename "$program")" > "$work/$program"
     chmod +x "$work/$program"
@@ -100,7 +100,7 @@ echo "{}" > $HOME/Kitokey/2026-10-18_10-00/session.json
 check "a Wholeheard 0.2.0 is there before" "eval \"\$old\" >/tmp/old.log 2>&1 || { tail -5 /tmp/old.log; false; }"
 check "installed, every dependency found" "eval \"\$add\" >/tmp/add.log 2>&1 || { tail -5 /tmp/add.log; false; }"
 check "it takes Wholeheard'"'"'s place: Wholeheard removed, its program gone" "eval \"\$gone\" && ! test -e /usr/bin/wholeheard"
-for program in kitokey kitokey-capture kitokey-transcription kitokey-summary; do
+for program in kitokey kitokey-capture kitokey-transcription kitokey-summary kitokey-export; do
   check "$program on the path, every library found" "command -v $program >/dev/null && ! ldd \$(command -v $program) 2>/dev/null | grep -q \"not found\""
   # A program says its usage; the shell, a window with no display here, goes as far as GTK.
   check "$program answers as itself" "{ timeout 10 $program 2>&1 || true; } | grep -qE \"^$program: usage|initialize GTK\""
