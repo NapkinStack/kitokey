@@ -1626,7 +1626,15 @@ function lineWith(said, pick, kind = "maker") {
   const line = element("p", kind);
   const [before, after] = said.split(IN_LINE);
   line.append(before);
-  if (after !== undefined) line.append(pick, after);
+  if (after === undefined) return line;
+  line.append(pick);
+  // A list drawn as the language's setting's (#1094): its value, Lucide's chevron after it.
+  if (pick.tagName === "SELECT") {
+    const chevron = icon("chevron-down");
+    chevron.classList.add("chevron");
+    line.append(chevron);
+  }
+  line.append(after);
   return line;
 }
 
@@ -3898,7 +3906,10 @@ function showSettings(shown, minutes, words) {
     logs.append(logsSaid, openLogs);
     advanced.append(level, logs);
   }
-  more.append(toggle, advanced);
+  // Its last line, for support: the version, as `--version` says it (#1089).
+  const version = element("p", "says", `${words.version_said} ${shown.version}`);
+  version.id = "app-version";
+  more.append(toggle, advanced, version);
   parts.push(more);
   page.replaceChildren(...parts);
   if (focusLanguage) {

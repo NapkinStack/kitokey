@@ -341,7 +341,7 @@ It never reads your `gh` login by itself; to have it read with that login, for o
 | `.nstack/forms/` | The forms a command or a playbook copies: charter, cycle, decision, rules | Agents and commands |
 | `.nstack/handbook/` | **The handbook**: the why behind every rule | Humans, once |
 | `docs/adr/`, `docs/pdr/` | The decisions taken, with their success criterion | Everyone, on demand |
-| `.copier-answers.yml` | The NapkinStack version and the creation answers | `nstack update`, the only thing that changes it |
+| `.copier-answers.yml` | The NapkinStack version and the creation answers | The `_` lines: `nstack update`, never by hand. The answers: the decider, by hand, in a pull request |
 | `.github/` | What makes the rules non-bypassable | GitHub |
 
 > **`.nstack/handbook/` is never loaded into an agent's context.** It is the human reference.

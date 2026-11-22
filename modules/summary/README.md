@@ -74,8 +74,13 @@ D16).
 Ollama's OpenAI route keeps 4096 tokens and drops the rest in silence, the request's rules first:
 a meeting of 45 minutes did not fit (measured on `qwen3:8b`, 2026-10-31). So an address of that
 form, without a key, whose host answers `GET /api/version` as Ollama does, is asked on Ollama's
-own `/api/chat`, with a window sized to the request, an answer of at most 4096 tokens, and a
-patience that grows with what it has to read: 600 s, and a second for each 20 bytes.
+own `/api/chat`, with a window sized to the request, an answer of at most 16 384 tokens, and a
+patience that grows with what it has to read: 600 s, and a second for each 20 bytes. A thinking
+model's thinking counts in its answer: at 4096 tokens it filled the answer on long meetings, and
+16 384 held every run (#1083, measured on `qwen3:8b`, 2026-11-21). Ollama also cuts a request
+longer than its window without a word; it says how many tokens it read. Fewer than one for six
+bytes of the request, or exactly what its cut keeps (Ollama 0.40.16 keeps
+`num_ctx - (num_ctx - 4) / 2`), is refused as a meeting left partly out.
 
 A key, when the provider wants one, is read from `KITOKEY_PROVIDER_KEY` and written nowhere.
 Whatever fails — no network, a refused key, no credit left with the provider, an unknown
