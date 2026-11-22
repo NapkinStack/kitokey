@@ -11854,6 +11854,10 @@ def store_shots(now: dt.datetime) -> None:
         window = Window(meetings, language, f'reminder = false\nafter = "minutes"\nminutes_provider = "{ollama}/v1"\nminutes_model = "qwen3:8b"\n',
                         ollama=ollama)
         window.env.update(GTK_THEME="Adwaita", HOME=str(home), XDG_DATA_HOME=str(home / "share"), TZ=f"Etc/GMT{-east:+d}")
+        # The stand-in for capture dates its meeting as the scenarios' fixed one unless told: told the run's hour.
+        window.env.update(KITOKEY_E2E_RECORDED_AT=now.isoformat(timespec="seconds"),
+                          KITOKEY_E2E_RECORDED_UNTIL=(now + dt.timedelta(seconds=5)).isoformat(timespec="seconds"),
+                          KITOKEY_E2E_RECORDED=now.strftime("%Y-%m-%d_%H-%M"))
         with window as browser:
             browser.set_window_size(1920, 1080)
             if not wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 3):
@@ -11921,6 +11925,8 @@ def store_shots(now: dt.datetime) -> None:
             # Both sides heard a moment, so that each meter shows a level.
             wait_for(browser, lambda b: b.execute_script("const m = [...document.querySelectorAll('#meeting .page-level')];"
                                                          " return m.length === 2 && m.every(e => Number(e.getAttribute('aria-valuenow')) > 0)"), 10)
+            # Its time past 00:00:00, as a recording under way shows it.
+            wait_for(browser, lambda b: re.search(r"[1-9]", b.execute_script("return document.getElementById('page-time')?.textContent || ''")), 10)
             browser.execute_script("document.activeElement.blur(); scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
             time.sleep(0.6)
             browser.save_screenshot(str(store / short / "2-recording.png"))
