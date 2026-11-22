@@ -11784,6 +11784,10 @@ def store_shots(now: dt.datetime) -> None:
         " ...[...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
         " && e.getBoundingClientRect().top < 0 && e.getBoundingClientRect().bottom > 0).map(e => e.textContent.trim() || e.tagName)],"
         " fit: window.storeFit ?? null,"
+        " live: (() => { const t = document.getElementById('page-time'), h = document.querySelector('#meeting h1'),"
+        " m = [...document.querySelectorAll('#meeting .page-level')]; return t && t.getClientRects().length && h ? {time: t.textContent,"
+        " large: parseFloat(getComputedStyle(t).fontSize) >= parseFloat(getComputedStyle(h).fontSize), title: h.textContent,"
+        " meters: m.map(e => Number(e.getAttribute('aria-valuenow')))} : null; })(),"
         " zero: (document.getElementById('settings')?.innerText.match(/\\b0\\s(?:o|B)\\b/g) ?? []).length}")})
     # An Ollama of CH's own, holding the model every meeting's minutes name: Settings says them written on this
     # computer, as the meetings do.
@@ -11901,7 +11905,7 @@ def store_shots(now: dt.datetime) -> None:
     sizes = {f"{file.parent.name}/{file.name}": (png_size(file), file.stat().st_size) for file in made}
     check("the Store's screenshots: four a language, French and English, in the Store's order (D103)",
           [name for name in sizes] == [f"{short}/{n}" for short in ("en", "fr")
-                                       for n in ("1-meeting.png", "2-search.png", "3-list.png", "4-settings.png")], sorted(sizes))
+                                       for n in ("1-meeting.png", "2-recording.png", "3-list.png", "4-settings.png")], sorted(sizes))
     check("each at least 1366 × 768 and at most 50 MB, as Microsoft's page asks (D103)",
           bool(sizes) and all(w >= STORE_LEAST[0] and h >= STORE_LEAST[1] and 0 < size <= STORE_MOST for (w, h), size in sizes.values()),
           sizes)
@@ -11920,31 +11924,31 @@ def store_shots(now: dt.datetime) -> None:
     cited = {f"{short}/{kind}": [int(n) for n in re.findall(r"\[@(\d+)\]", meeting["minutes"]) if int(n) >= len(store_said(meeting))]
              for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("call", said["call"]), ("kickoff", said["kickoff"]))}
     check("every moment a summary cites is one its transcript starts a line at (D103)", not any(cited.values()), cited)
-    lanes = {shot: store_lanes(page["lanes"]) for shot, page in shown.items() if shot[3] in "12"}
-    check("who spoke, drawn on the meetings' shots, shows the turns: each side's lane at least 4 bars, both lanes drawn at once over a tenth of the width at most (#1077)",
-          len(lanes) == 4 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in lanes.values()), lanes)
+    lanes = {shot: store_lanes(page["lanes"]) for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("who spoke, drawn on the meeting's shot, shows the turns: each side's lane at least 4 bars, both lanes drawn at once over a tenth of the width at most (#1077)",
+          len(lanes) == 2 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in lanes.values()), lanes)
     # « Vous » on the upper lane, « Les autres » on the lower, as the transcript's sides read top to bottom (lina, #1093).
     tops = {shot: (max((y for kind, _, _, y in page["lanes"] if kind == "local"), default=None),
                    min((y for kind, _, _, y in page["lanes"] if kind == "remote"), default=None))
-            for shot, page in shown.items() if shot[3] in "12"}
+            for shot, page in shown.items() if shot.endswith("1-meeting.png")}
     check("who spoke: « Vous » on the upper lane, every bar of it above every bar of « Les autres » (#1077)",
-          len(tops) == 4 and all(here is not None and others is not None and here < others for here, others in tops.values()), tops)
+          len(tops) == 2 and all(here is not None and others is not None and here < others for here, others in tops.values()), tops)
     lasted = {shot: [store_lasted(row) for row in page["said"]] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
     check("every meeting the list shows lasts as such a meeting does, at least 15 min (D103)",
           len(lasted) == 2 and all(len(rows) == 6 and min(rows) >= 15 for rows in lasted.values()), lasted)
-    searched = {shot: page["lines"] for shot, page in shown.items() if shot.endswith("2-search.png")}
-    check("the search shot: a word typed in a meeting's transcript, only its lines shown, at least four (D103)",
-          len(searched) == 2 and all(4 <= seen_ < total for seen_, total in searched.values()), searched)
+    # 2: a meeting while it records (#1126): its name, the time running large in the who-spoke area (#1112), both sides'
+    # meters moving (#1076); its hour the working day's, as every shot's (the dates check above).
+    live = {shot: page["live"] for shot, page in shown.items() if shot.endswith("2-recording.png")}
+    check("the recording shot: a meeting named as the team's own, its time running large, both meters moving (#1126)",
+          len(live) == 2 and all(on and re.fullmatch(r"\d+:\d\d:\d\d", on["time"]) and on["large"]
+                                 and on["title"] == STORE_MEETINGS[shot[:2]]["titles"][0]
+                                 and len(on["meters"]) == 2 and all(level > 0 for level in on["meters"]) for shot, on in live.items()), live)
     # The word sought marked where it is found, in each line or row kept (#1078): accents and case aside, as the search.
     fold = lambda text: "".join(c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)).lower()
-    marks = {shot: [lines for lines in page["marked"][0 if shot.endswith("2-search.png") else 1]]
-             for shot, page in shown.items() if shot.endswith(("2-search.png", "3-list.png"))}
+    marks = {shot: page["marked"][1] for shot, page in shown.items() if shot.endswith("3-list.png")}
     unmarked = {shot: lines for shot, lines in marks.items()
-                if not lines or any(not marked or any(fold(m) != fold(shown[shot]["sought"][0 if shot.endswith("2-search.png") else 1]) for m in marked) for marked in lines)}
-    check("a search marks the word it found in each line, and each row, it keeps (#1078)", len(marks) == 4 and not unmarked, unmarked)
-    locked = {shot: page["confidential"] for shot, page in shown.items() if shot.endswith("2-search.png")}
-    check("the search shot's meeting, a client's call, shows « Confidentielle » on (the decider, 2026-11-21)",
-          len(locked) == 2 and all(on is True for on in locked.values()), locked)
+                if not lines or any(not marked or any(fold(m) != fold(shown[shot]["sought"][1]) for m in marked) for marked in lines)}
+    check("a search marks the word it found in each row it keeps (#1078)", len(marks) == 2 and not unmarked, unmarked)
     listed = {shot: page["rows"] for shot, page in shown.items() if shot.endswith("3-list.png")}
     check("the list shot: a word typed in the list's search, only its meetings shown, at least two (D103)",
           len(listed) == 2 and all(2 <= seen_ < total for seen_, total in listed.values()), listed)
