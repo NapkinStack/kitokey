@@ -2599,14 +2599,18 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     drawing.append(now);
   } else if (transcript.state === "present") drawing.append(relief(said, total, words));
   else {
-    // No transcript yet (#1116, the decider): one line says when who spoke will appear, no blank canvas.
+    // No transcript yet (#1116, the decider): one line says when who spoke will appear, no blank canvas. Outside the
+    // drawing (#1134), which is the player's slider once the sound plays: a slider's children are presentational
+    // (WAI-ARIA 1.2). The drawing is then a bare track, as Voice Memos' and Otter's before their transcript.
     const later = element("p", "note", words.who_spoke_later);
     later.id = "who-spoke-later";
-    drawing.append(later);
+    drawn.append(later);
+    drawing.classList.add("bare");
   }
-  // While it records, the legend's labels stand under their meters; at rest, the legend in its place.
+  // While it records, the legend's labels stand under their meters; at rest, the legend in its place — none while
+  // nothing is drawn to name or to scale (#1134): the header says the meeting's length.
   drawn.append(drawing);
-  if (!live) drawn.append(legend);
+  if (!live && transcript.state === "present") drawn.append(legend);
   // No player while it records (#1130), as Voice Memos and Granola play a meeting once it stops: the drawing,
   // made its slider, would make the meters inside it presentational (WAI-ARIA 1.2), and a press on the time a seek.
   if (!live) drawn.append(playerBar(session, listened, total, words, drawing));
