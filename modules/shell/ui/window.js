@@ -1262,7 +1262,6 @@ function pageLevels(name, time, words) {
     if (now === null || !document.contains(time)) return;
     if (!now.recording || now.meeting !== name) {
       clearInterval(pageLive);
-      pageLast = null;
       return refresh();
     }
     pageLast = now;
