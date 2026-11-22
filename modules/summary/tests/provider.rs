@@ -223,6 +223,33 @@ fn ollama_that_read_less_of_the_request_than_it_holds_is_refused_saying_so() {
 }
 
 #[test]
+fn ollama_that_read_exactly_what_its_cut_keeps_is_refused_saying_so() {
+    // Ollama 0.40.16 cuts a request longer than its window to num_ctx - (num_ctx - num_keep) / 2
+    // tokens, num_keep 4, one more with a tokenizer that adds its own first token
+    // (llm/llama_server.go:320-357, api/types.go:1226): the probe read 4098 at 8192 (#1083).
+    // 60 000 bytes ask a window of 49 152: a cut reads 24 578 or 24 579, more than a token for six bytes.
+    let request = "é".repeat(30_000);
+    let asked = |read: usize| {
+        let (address, _received) = ollama(vec![("200 OK", answering_natively_having_read(MINUTES, "stop", read))]);
+        Provider::new(&address, "a-model", None, Duration::from_secs(5))
+            .unwrap()
+            .ask(&request)
+    };
+    for read in [24_578, 24_579] {
+        let refused = asked(read).unwrap_err();
+        assert_eq!(refused.1, Some("provider.failed"), "{}", refused.0);
+        assert!(
+            refused.0.contains(&format!("read {read} tokens of a request of 60000 bytes")),
+            "{}",
+            refused.0
+        );
+    }
+    for read in [24_577, 24_580] {
+        assert_eq!(asked(read).unwrap().text, MINUTES, "{read} tokens read");
+    }
+}
+
+#[test]
 fn ollama_failures_are_called_as_any_providers() {
     for (status, body, code) in [
         ("200 OK", answering_natively("half of", "length"), "answer.cut_short"),
