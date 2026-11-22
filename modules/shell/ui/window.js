@@ -1255,13 +1255,19 @@ function pageLevels(name, time, words) {
     }
   };
   if (pageLast?.meeting === name) paint(pageLast);
+  // The poll ends with the page or the recording, and its reading with it: a meeting deleted frees its name within
+  // the minute (capture's `new_folder`), and a recording under that name must not start from this one's.
+  const end = () => {
+    clearInterval(pageLive);
+    pageLast = null;
+  };
   clearInterval(pageLive);
   pageLive = setInterval(async () => {
-    if (!document.contains(time)) return clearInterval(pageLive);
+    if (!document.contains(time)) return end();
     const now = await window.__TAURI__.core.invoke("recording_now").catch(() => null);
     if (now === null || !document.contains(time)) return;
     if (!now.recording || now.meeting !== name) {
-      clearInterval(pageLive);
+      end();
       return refresh();
     }
     pageLast = now;
