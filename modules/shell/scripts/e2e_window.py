@@ -7468,6 +7468,14 @@ def minutes_checked(now: dt.datetime) -> None:
             browser.execute_script("arguments[0].scrollIntoView({block: 'nearest'})", search)
             search.send_keys("numéro 3,")
             wait_for(browser, lambda b: not b.execute_script(in_view, 50))
+            # Each line the search keeps marks the words it found (#1078): the transcript's own marks, read nowhere else
+            # since the Store's search shot gave way to the recording's (#1126).
+            kept = ("return [...document.querySelectorAll('#meeting .transcript .lines li')].filter(l => l.offsetParent)"
+                    ".map(l => [...l.querySelectorAll('mark')].map(m => m.textContent))")
+            wait_for(browser, lambda b: (lines := b.execute_script(kept)) and all(lines), 3)
+            lines = browser.execute_script(kept)
+            check(f"{short}: a search marks the words it found in each line it keeps (#1078)",
+                  bool(lines) and all(marks and all(m.lower() == "numéro 3," for m in marks) for marks in lines), lines)
             browser.execute_script(links)[0].click()
             check(f"{short}: a passage a search hid is shown, the search given up",
                   wait_for(browser, lambda b: b.execute_script(in_view, 50), 3) and browser.find_element(By.ID, "search").get_attribute("value") == "",
