@@ -14,16 +14,24 @@ use crate::Refused;
 /// How long reaching the provider may take, before any answer is awaited.
 const CONNECT: Duration = Duration::from_secs(15);
 
-/// Ollama's window grows by this, and an answer may take this much of it, its thinking counted:
-/// a model that runs away is cut, and said to be, rather than waited for.
+/// Ollama's window grows in steps of this.
 const WINDOW: usize = 4096;
+
+/// How much of the window an answer may take, its thinking counted: a thinking model's thinking
+/// fills 4096 tokens on a long meeting (#1083, measured 2026-11-21), and 16 384 held every run. A
+/// model that runs away is still cut, and said to be, rather than waited for.
+const ANSWER: usize = 16_384;
 
 /// How much of a window a request needs: Ollama's OpenAI route keeps 4096 tokens unless told at
 /// its server, and drops the rest in silence, the rules first (the request is cut from its head).
 /// Two bytes to a token at the very least; French measured 2.7 characters.
 pub fn window(request: &str) -> usize {
-    (request.len() / 2 + WINDOW).div_ceil(WINDOW) * WINDOW
+    (request.len() / 2 + ANSWER).div_ceil(WINDOW) * WINDOW
 }
+
+/// The most bytes of a request one token holds: French measured 3.1, the English rules 3.6
+/// (#1083). Ollama says how many tokens it read; fewer than this allows, it cut the request.
+const BYTES_A_TOKEN: usize = 6;
 
 /// The patience Ollama is given: what any provider gets, and a second for each 20 bytes it has to
 /// read, a laptop's processor taking some 14 tokens a second (measured on `qwen3:8b`, 2026-10-31).
@@ -234,7 +242,7 @@ impl Provider {
         }
         let mut body = serde_json::json!({ "model": self.model, "stream": false, "messages": [{ "role": "user", "content": request }] });
         if ollama.is_some() {
-            body["options"] = serde_json::json!({ "num_ctx": window(request), "num_predict": WINDOW });
+            body["options"] = serde_json::json!({ "num_ctx": window(request), "num_predict": ANSWER });
         }
         let mut response = match call.send_json(&body) {
             Ok(response) => response,
@@ -302,6 +310,18 @@ impl Provider {
                 );
             }
             _ => return refused("provider.failed", format!("{host} stopped before the end of its answer")),
+        }
+        // Ollama cuts a request longer than its window without a word, and answers what was left
+        // (#1083): only how much it read tells.
+        let read = answer["prompt_eval_count"].as_u64().filter(|_| ollama.is_some());
+        if let Some(read) = read.filter(|&read| (read as usize) * BYTES_A_TOKEN < request.len()) {
+            return refused(
+                "provider.failed",
+                format!(
+                    "{host} read {read} tokens of a request of {} bytes: it left part of the meeting out, the minutes would be incomplete",
+                    request.len()
+                ),
+            );
         }
         match said.as_str() {
             Some(text) if !text.trim().is_empty() => Ok(Answer {
