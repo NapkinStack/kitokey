@@ -548,7 +548,10 @@ fn minutes_v4_read_as_v3_do_and_say_how_long_they_took() {
 
 /// minutes/v5's own example, as its page shows it (D111): the contract read on the consumer's side.
 fn v5_example() -> String {
-    let page = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/minutes/v5/README.md")).unwrap();
+    // A Windows checkout gives the page \r\n: read as the contract writes it (bar.rs:88, #1042).
+    let page = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/minutes/v5/README.md"))
+        .unwrap()
+        .replace("\r\n", "\n");
     let valid = &page[page.find("Valid:").unwrap()..];
     let start = valid.find("```markdown\n").unwrap() + "```markdown\n".len();
     valid[start..start + valid[start..].find("\n```").unwrap()].to_string() + "\n"
