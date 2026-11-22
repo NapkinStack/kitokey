@@ -606,6 +606,9 @@ pub struct Window {
     /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the
     /// speaking-time drawing. At most: no limit. Placeholders: none.
     pub who_spoke: &'static str,
+    /// Shows: a meeting's page, in its who-spoke area (#1116). When: the meeting has no transcript yet. At most:
+    /// one line. Placeholders: none.
+    pub who_spoke_later: &'static str,
     /// Shows: a meeting's page, as a status. When: transcript card, none yet. At most: no limit.
     /// Placeholders: none.
     pub no_transcript: &'static str,
@@ -1791,6 +1794,7 @@ pub fn window(language: Language) -> Window {
             here_described: "You — your microphone",
             remote_described: "Others — the call’s audio",
             who_spoke: "Who spoke when: you on top, others below",
+            who_spoke_later: "Who spoke when appears once it is transcribed.",
             no_transcript: "No transcript yet.",
             no_minutes: "No summary yet.",
             being_made: "Still transcribing — more is on its way.",
@@ -2230,6 +2234,7 @@ pub fn window(language: Language) -> Window {
             here_described: "Vous — votre micro",
             remote_described: "Les autres — le son de l’appel",
             who_spoke: "Temps de parole au fil de la réunion\u{a0}: vous en haut, les autres en bas",
+            who_spoke_later: "Le temps de parole s’affichera après la transcription.",
             no_transcript: "Pas encore de transcription.",
             no_minutes: "Pas encore de compte rendu.",
             being_made: "Transcription en cours\u{a0}: la suite arrive.",

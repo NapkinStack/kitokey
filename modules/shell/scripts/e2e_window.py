@@ -1004,6 +1004,30 @@ def model_offered(now: dt.datetime) -> None:
         # Said once (#775): what it waits for, never « Pas encore de transcription » beside it.
         nones = browser.execute_script("return [...document.querySelectorAll('#meeting .transcript .none')].filter(e => e.offsetParent !== null).map(e => e.textContent)")
         check("a transcript waiting for its model says that alone, not also that there is none (#775)", nones == [], nones)
+        # #1116 (the decider, 2026-11-21 ~19h): no transcript yet, the who-spoke area keeps no blank height — one line says
+        # when it will appear (an empty state says what will come, NN/g), in the soft colour.
+        later = ("const d = document.querySelector('#meeting .drawing'), p = document.getElementById('who-spoke-later');"
+                 " if (!d || !p) return null; const s = getComputedStyle(p);"
+                 " return {text: p.textContent, inside: d.contains(p),"
+                 " height: Math.round(d.getBoundingClientRect().height), line: Math.round(parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.45)}")
+        no_blank = browser.execute_script(later)
+        check("no transcript yet: one line says when who spoke will appear, the area no taller than that line (#1116)",
+              no_blank is not None and no_blank["text"] == "Le temps de parole s’affichera après la transcription." and no_blank["inside"]
+              and no_blank["height"] <= no_blank["line"] + 24, no_blank)
+        # A legend names what is drawn: with nothing drawn yet, « Vous — votre micro » / « Les autres — … » are not shown;
+        # the range stays, the player's (the coordinator, 2026-11-21).
+        named = browser.execute_script("return [...document.querySelectorAll('#meeting .legend .here, #meeting .legend .remote')].filter(e => e.getClientRects().length).length")
+        ranged = browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? ''")
+        check("no transcript yet: the legend's two names not shown, its range kept (#1116)", named == 0 and "–" in ranged, [named, ranged])
+        size = browser.get_window_size()
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            browser.execute_script("scrollTo(0, 0)")
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1116-untranscribed-{width}-{theme}", theme)
+        browser.set_window_size(size["width"], size["height"])
+        time.sleep(0.3)
         # The tray's entry that fetches it follows the language chosen, at once (D64).
         speak = lambda code: browser.execute_script("return window.__TAURI__.core.invoke('settings_saved', {change: {language: arguments[0]}})", code)
         tray = lambda b, said: any(label.startswith(said) for label in tray_labels())
@@ -7468,6 +7492,14 @@ def minutes_checked(now: dt.datetime) -> None:
             browser.execute_script("arguments[0].scrollIntoView({block: 'nearest'})", search)
             search.send_keys("numéro 3,")
             wait_for(browser, lambda b: not b.execute_script(in_view, 50))
+            # Each line the search keeps marks the words it found (#1078): the transcript's own marks, read nowhere else
+            # since the Store's search shot gave way to the recording's (#1126).
+            kept = ("return [...document.querySelectorAll('#meeting .transcript .lines li')].filter(l => l.offsetParent)"
+                    ".map(l => [...l.querySelectorAll('mark')].map(m => m.textContent))")
+            wait_for(browser, lambda b: (lines := b.execute_script(kept)) and all(lines), 3)
+            lines = browser.execute_script(kept)
+            check(f"{short}: a search marks the words it found in each line it keeps (#1078)",
+                  bool(lines) and all(marks and all(m.lower() == "numéro 3," for m in marks) for marks in lines), lines)
             browser.execute_script(links)[0].click()
             check(f"{short}: a passage a search hid is shown, the search given up",
                   wait_for(browser, lambda b: b.execute_script(in_view, 50), 3) and browser.find_element(By.ID, "search").get_attribute("value") == "",
@@ -7971,6 +8003,51 @@ def renaming(now: dt.datetime) -> None:
         check("being recorded, Libérer de l'espace names it, its date beside", bool(busy) and busy[0][0] == "En direct" and "·" in busy[0][1], busy)
         browser.execute_script(f"location.hash = '#/meeting/{recording.name}'")
         wait_for(browser, lambda b: head(b) == "En direct", 10)
+        # #1076: while it records, its page shows the time running and both sides' levels, read from what the bar
+        # reads (`recording_now`); neither is a live region, as the bar's are not.
+        alive = ("const t = document.getElementById('page-time'), m = [...document.querySelectorAll('#meeting .page-level')];"
+                 " return t && t.getClientRects().length ? {time: t.textContent, live: t.closest('[aria-live]') !== null || m.some(e => e.closest('[aria-live]') !== null),"
+                 " meters: m.map(e => [e.getAttribute('role'), e.getAttribute('aria-label'), Number(e.getAttribute('aria-valuenow'))])} : null")
+        first_seen = wait_for(browser, lambda b: b.execute_script(alive), 5) and browser.execute_script(alive)
+        time.sleep(1.2)
+        later = browser.execute_script(alive)
+        check("while it records, its page shows the time running and both sides' levels as meters, no live region (#1076)",
+              bool(first_seen) and bool(later) and later["time"] != first_seen["time"] and later["time"].count(":") == 2 and not later["live"]
+              and [m[0] for m in later["meters"]] == ["meter", "meter"] and all(m[1] for m in later["meters"]) and all(m[2] > 0 for m in later["meters"]),
+              [first_seen, later])
+        # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
+        # left at the legend's right, where the range stands at rest.
+        big = ("const t = document.getElementById('page-time'), d = document.querySelector('#meeting .drawing'), h = document.querySelector('#meeting h1'),"
+               " m = [...document.querySelectorAll('#meeting .page-level')]; if (!t || !d || !h) return null; const r = t.getBoundingClientRect();"
+               " return {inside: d.contains(t), size: parseFloat(getComputedStyle(t).fontSize), heading: parseFloat(getComputedStyle(h).fontSize),"
+               " tabular: getComputedStyle(t).fontVariantNumeric.includes('tabular-nums'),"
+               " under: m.length === 2 && m.every(e => d.contains(e) && e.getBoundingClientRect().top >= r.bottom),"
+               " right: document.querySelector('#meeting .legend .range')?.textContent ?? null,"
+               # Each side's label right under its own meter (Gestalt proximity), within the meter's width.
+               " labels: m.map((e, i) => { const l = e.parentElement.querySelector(i ? ':scope > .remote' : ':scope > .here'); if (!l) return false;"
+               " const a = e.getBoundingClientRect(), b = l.getBoundingClientRect();"
+               " return b.left >= a.left - 1 && b.right <= a.right + 1 && b.top >= a.bottom - 1 && b.top - a.bottom <= 16; })}")
+        large = browser.execute_script(big)
+        check("while it records, the time stands large in the who-spoke area, tabular, the meters under it, each side's label under its meter, nothing at the legend's right (#1112)",
+              large is not None and large["inside"] and large["size"] >= large["heading"] and large["tabular"] and large["under"] and large["right"] is None and large["labels"] == [True, True],
+              large)
+        # Its page while it records, seen (#1076, T4; the source of the Store's recording shot): 420 and 1100 px, light and dark.
+        size = browser.get_window_size()
+        drawn_meters = ("const d = document.querySelector('#meeting .drawing')?.getBoundingClientRect(); if (!d) return null;"
+                        " return [...document.querySelectorAll('#meeting .page-level')].map(e => { const r = e.getBoundingClientRect();"
+                        " return [Math.round(r.width), Math.round(r.height), r.left >= d.left - 1 && r.right <= d.right + 1 && r.top >= d.top - 1 && r.bottom <= d.bottom + 1]; })")
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            browser.execute_script("scrollTo(0, 0)")
+            # #1112: each side's meter drawn, at both widths — wide enough to read, a bar's height, inside the area.
+            meters_seen = browser.execute_script(drawn_meters)
+            check(f"at {width} px, both meters drawn: at least 120 × 4 px, inside the who-spoke area (#1112)",
+                  meters_seen is not None and len(meters_seen) == 2 and all(w >= 120 and h >= 4 and inside for w, h, inside in meters_seen), meters_seen)
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1076-recording-{width}-{theme}", theme)
+        browser.set_window_size(size["width"], size["height"])
+        time.sleep(0.3)
         # Pressed once it is the stop gesture, as the shell says it: recording, nothing stopping, no
         # press of the window's still answered — and once the shell's half second has passed since
         # the start's press, which takes a press within it for the same one (D68). 6eb6ce0's red in a
@@ -7993,9 +8070,64 @@ def renaming(now: dt.datetime) -> None:
                "presses reaching the button": [clicks, browser.execute_script("return window.__recordClicks")],
                "pressed, seconds after the start's press": after_start,
                "session.json": (recording / "session.json").read_text()})
+        # #1076: once it stops, the page leaves the live time and meters for the meeting's range, its poll ended.
+        settled = wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
+            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 10)
+        check("stopped: the page shows the meeting's range again, no live time nor meters (#1076)", settled,
+              [browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
         check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
+        # #1076: stopped from elsewhere — by the shell's own command, as the tray, the shortcut and the bar stop it —, the
+        # window's button is never pressed, and its redraw a moment after a press (`setTimeout(refresh, 1200)`) never
+        # comes: the page's poll alone draws the range back.
+        now_meeting = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('recording_now')"
+                       ".then((n) => done(n.recording && n.meeting ? n.meeting : null), () => done(null))")
+        # Pressed only once the shell holds no recording nor its stop: before, a press counts as the stop going on, and
+        # is let go (`toggle_recording`) — s1076ok2's red was that press, not the page.
+        idle_header = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('header')"
+                       ".then((h) => done(!h.recording && !h.stopping), () => done(false))")
+        wait_for(browser, lambda b: b.execute_async_script(idle_header), 10)
+        time.sleep(0.6)
+        browser.execute_script("window.__TAURI__.core.invoke('record')")
+        wait_for(browser, lambda b: b.execute_async_script(now_meeting), 10)
+        again = browser.execute_async_script(now_meeting)
+        if again:
+            # The same folder as before (the recorder played here names it): the page left, then opened again, so it is
+            # drawn for the recording.
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{again}")
+        live_again = bool(again) and wait_for(browser, lambda b: b.execute_script(alive), 10)
+        # #1130 (sam's review): a track gained while it records (`session-audio/v2`, *A track gained later*), as a real
+        # capture writes it at once: the page offers its sound (`listen`), and a slider's children are presentational
+        # (WAI-ARIA 1.2), so neither meter may stand inside one — nor the time take a press for a seek.
+        if again:
+            folder = recording.parent / again
+            record = json.loads((folder / "session.json").read_text())
+            record["tracks"] = {"local": {"device": "Mic"}}
+            with wave.open(str(folder / "local.wav"), "wb") as made:
+                made.setnchannels(1)
+                made.setsampwidth(2)
+                made.setframerate(48000)
+                made.writeframes(bytes(2 * 48000))
+            (folder / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n')
+            (folder / "session.json").write_text(json.dumps(record))
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{again}")
+        tracked = ("const m = [...document.querySelectorAll('#meeting [role=meter]')], t = document.getElementById('page-time');"
+                   " return t && t.getClientRects().length ? {meters: m.length, in_slider: m.filter(e => e.closest('[role=slider]')).length,"
+                   " time_in_slider: t.closest('[role=slider]') !== null, sliders: document.querySelectorAll('#meeting [role=slider]').length} : null")
+        seen_tracked = bool(again) and wait_for(browser, lambda b: b.execute_script(tracked), 10)
+        got_tracked = browser.execute_script(tracked)
+        check("while it records, a track gained: both meters and the time stand in no slider (#1130)",
+              seen_tracked and got_tracked is not None and got_tracked["meters"] == 2 and got_tracked["in_slider"] == 0 and not got_tracked["time_in_slider"],
+              got_tracked)
+        time.sleep(0.8)
+        browser.execute_script("window.__TAURI__.core.invoke('record')")
+        drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
+            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 5)
+        check("stopped from elsewhere, the window's button not pressed: the page draws its range back by itself (#1076)", drawn_back,
+              [again, live_again, browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
 
 
 def actions_rows(now: dt.datetime) -> None:
@@ -11536,9 +11668,9 @@ STORE_MEETINGS = {
         },
     },
 }
-# The meeting each shot opens, by its index among the titles: 1 the weekly review, 2 the client's call searched for
-# its quote, 3 that client's kickoff, found with the call by the client's name.
-STORE_OPENED = {"1-meeting": 5, "2-search": 3, "3-list": 2}
+# The meeting each shot opens, by its index among the titles: 1 the weekly review, 3 the client's kickoff, found with
+# its call by the client's name. 2 is a meeting recorded as the run takes it (#1126).
+STORE_OPENED = {"1-meeting": 5, "3-list": 2}
 STORE_RATE = 8000
 # The hour each meeting started, oldest first: a working day's, whenever the e2e runs.
 STORE_HOURS = [(9, 30), (14, 0), (10, 15), (16, 30), (11, 0), (14, 30)]
@@ -11649,9 +11781,9 @@ def store_lasted(row: str) -> int:
 def store_shots(now: dt.datetime) -> None:
     """CH. D103: the Microsoft Store's screenshots, made here from meetings invented for them, in French then
     in English, light, in the Store's order — « displayed in your listing in order », Microsoft's page says —, the
-    benefit first (the coordinator, 2026-11-20 and 2026-11-21): a meeting's page with its minutes and transcript, a word
-    sought in a long call's transcript, a word sought in the list, Settings with its model on this computer — never a
-    recording, whose page shows neither its time nor its levels yet (the bar does). Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
+    benefit first (the coordinator, 2026-11-20 and 2026-11-21): a meeting's page with its minutes and transcript, a meeting
+    while it records, its time large and both meters (#1076, #1112, #1126), a word sought in the list, Settings with its
+    model on this computer. Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
     its MSIX page read on 2026-11-20 (D103's section) —, written to `store/<fr|en>/` in KITOKEY_SCREENSHOTS'
     folder, or the run's own; then counted: four PNGs a language, each at least 1366 × 768, at most 50 MB."""
     print("CH. the Store's screenshots: four a language, French and English, 1920 × 1080, from meetings invented for them (D103)")
@@ -11659,6 +11791,10 @@ def store_shots(now: dt.datetime) -> None:
     shutil.rmtree(store, ignore_errors=True)
     # What each shot's page says, read as it is taken: a Store shot says no audio lost, no run's folder, no night hour.
     shown: dict[str, dict] = {}
+    # The recording's shot as read just before it is taken (#1126): its time and both meters, and the list's first
+    # row, the recording itself when it is dated the run's hour. Never read after: the page drawn again just after the
+    # shot shows « 00:00:00 » and empty meters until its next reading, a tenth of a second later (s1126r3time).
+    taken: dict[str, dict] = {}
     seen = lambda browser, shot: shown.update({shot: browser.execute_script(
         "const shown = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent);"
         "return {freed: shown('.chip.gone, #no-player').length,"
@@ -11684,6 +11820,10 @@ def store_shots(now: dt.datetime) -> None:
         " ...[...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
         " && e.getBoundingClientRect().top < 0 && e.getBoundingClientRect().bottom > 0).map(e => e.textContent.trim() || e.tagName)],"
         " fit: window.storeFit ?? null,"
+        " live: (() => { const t = document.getElementById('page-time'), h = document.querySelector('#meeting h1'),"
+        " m = [...document.querySelectorAll('#meeting .page-level')]; return t && t.getClientRects().length && h ? {time: t.textContent,"
+        " large: parseFloat(getComputedStyle(t).fontSize) >= parseFloat(getComputedStyle(h).fontSize), title: h.textContent,"
+        " meters: m.map(e => Number(e.getAttribute('aria-valuenow')))} : null; })(),"
         " zero: (document.getElementById('settings')?.innerText.match(/\\b0\\s(?:o|B)\\b/g) ?? []).length}")})
     # An Ollama of CH's own, holding the model every meeting's minutes name: Settings says them written on this
     # computer, as the meetings do.
@@ -11701,6 +11841,12 @@ def store_shots(now: dt.datetime) -> None:
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Ollama)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     ollama = f"http://127.0.0.1:{server.server_address[1]}"
+    # 2 is recorded as the run takes it, at the run's own hour: the window and every meeting are put in a zone where
+    # that hour is 14 h, so the recording dates itself in the working day as the meetings do, whenever the run is
+    # (`Etc/GMT-5` is 5 h east of UTC: tzdata's names count the other way).
+    east = (14 - now.astimezone(dt.timezone.utc).hour) % 24
+    east -= 24 if east > 14 else 0
+    now = now.astimezone(dt.timezone(dt.timedelta(hours=east)))
     for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
         said = STORE_MEETINGS[short]
         # The meetings' folder is the user's own, in a home of its own: Settings says « Dossier personnel / Kitokey »,
@@ -11743,7 +11889,11 @@ def store_shots(now: dt.datetime) -> None:
         # After a recording, the transcript then the minutes: what Kitokey does on its own, chosen as a buyer would.
         window = Window(meetings, language, f'reminder = false\nafter = "minutes"\nminutes_provider = "{ollama}/v1"\nminutes_model = "qwen3:8b"\n',
                         ollama=ollama)
-        window.env.update(GTK_THEME="Adwaita", HOME=str(home), XDG_DATA_HOME=str(home / "share"))
+        window.env.update(GTK_THEME="Adwaita", HOME=str(home), XDG_DATA_HOME=str(home / "share"), TZ=f"Etc/GMT{-east:+d}")
+        # The stand-in for capture dates its meeting as the scenarios' fixed one unless told: told the run's hour.
+        window.env.update(KITOKEY_E2E_RECORDED_AT=now.isoformat(timespec="seconds"),
+                          KITOKEY_E2E_RECORDED_UNTIL=(now + dt.timedelta(seconds=5)).isoformat(timespec="seconds"),
+                          KITOKEY_E2E_RECORDED=now.strftime("%Y-%m-%d_%H-%M"))
         with window as browser:
             browser.set_window_size(1920, 1080)
             if not wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 3):
@@ -11756,11 +11906,6 @@ def store_shots(now: dt.datetime) -> None:
                 wait_for(browser, lambda b: b.execute_script(
                     "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
                     " && p.querySelectorAll('.transcript .lines li').length > 0", names[index]), 10)
-                # 2: a word sought in the call's transcript, only its lines left, each at its moment (the coordinator,
-                # 2026-11-21: « retrouver ce qui a été dit, à la seconde »).
-                if shot_name == "2-search":
-                    sought = browser.find_element(By.ID, "search")
-                    sought.send_keys(kept[index]["sought"])
                 # 3: a word sought in the list, only its meetings left (« retrouver n'importe quelle réunion »).
                 if shot_name == "3-list":
                     browser.find_element(By.ID, "find").send_keys(kept[index]["sought"])
@@ -11797,11 +11942,44 @@ def store_shots(now: dt.datetime) -> None:
             time.sleep(0.4)
             browser.save_screenshot(str(store / short / "4-settings.png"))
             seen(browser, f"{short}/4-settings.png")
+            browser.execute_script("document.documentElement.style.overflow = ''")
+            # 2: a meeting while it records, from the window's button, named as the team's own meeting: its time large in
+            # the who-spoke area, both meters (#1076, #1112). Taken last, so that no other shot shows it.
+            live = lambda b: "live" in (b.find_element(By.ID, "record").get_attribute("class") or "")
+            press(browser, "record")
+            wait_for(browser, lambda b: live(b) and any(f.name not in names and (f / "session.json").exists() for f in meetings.iterdir()), 10)
+            recording = next(f for f in meetings.iterdir() if f.name not in names)
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{recording.name}")
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting')?.dataset.name") == recording.name
+                     and b.find_elements(By.ID, "rename"), 10)
+            press(browser, "rename")
+            # Its field opens holding what the heading said: selected, so that the name typed replaces it.
+            wait_for(browser, lambda b: b.execute_script("const f = document.getElementById('naming');"
+                                                         " if (f && document.activeElement === f) { f.select(); return true; } return false"), 5)
+            ActionChains(browser).send_keys(said["titles"][0] + Keys.ENTER).perform()
+            wait_for(browser, lambda b: b.execute_script("return document.querySelector('#meeting h1')?.textContent") == said["titles"][0], 5)
+            # Both sides heard a moment, so that each meter shows a level.
+            wait_for(browser, lambda b: b.execute_script("const m = [...document.querySelectorAll('#meeting .page-level')];"
+                                                         " return m.length === 2 && m.every(e => Number(e.getAttribute('aria-valuenow')) > 0)"), 10)
+            # Its time past 00:00:00, as a recording under way shows it.
+            wait_for(browser, lambda b: re.search(r"[1-9]", b.execute_script("return document.getElementById('page-time')?.textContent || ''")), 10)
+            browser.execute_script("document.activeElement.blur(); scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
+            time.sleep(0.6)
+            taken[f"{short}/2-recording.png"] = browser.execute_script(
+                "return {time: document.getElementById('page-time')?.textContent ?? null,"
+                " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow'))),"
+                " first: document.querySelector('#groups .session')?.getAttribute('href') ?? null, name: arguments[0]}",
+                f"#/meeting/{recording.name}")
+            browser.save_screenshot(str(store / short / "2-recording.png"))
+            seen(browser, f"{short}/2-recording.png")
+            browser.execute_script("document.documentElement.style.overflow = ''")
+            press(browser, "record")
+            wait_for(browser, lambda b: "stopped" in (recording / "session.json").read_text() and not live(b), 10)
     made = sorted(store.glob("*/*.png"))
     sizes = {f"{file.parent.name}/{file.name}": (png_size(file), file.stat().st_size) for file in made}
     check("the Store's screenshots: four a language, French and English, in the Store's order (D103)",
           [name for name in sizes] == [f"{short}/{n}" for short in ("en", "fr")
-                                       for n in ("1-meeting.png", "2-search.png", "3-list.png", "4-settings.png")], sorted(sizes))
+                                       for n in ("1-meeting.png", "2-recording.png", "3-list.png", "4-settings.png")], sorted(sizes))
     check("each at least 1366 × 768 and at most 50 MB, as Microsoft's page asks (D103)",
           bool(sizes) and all(w >= STORE_LEAST[0] and h >= STORE_LEAST[1] and 0 < size <= STORE_MOST for (w, h), size in sizes.values()),
           sizes)
@@ -11820,31 +11998,36 @@ def store_shots(now: dt.datetime) -> None:
     cited = {f"{short}/{kind}": [int(n) for n in re.findall(r"\[@(\d+)\]", meeting["minutes"]) if int(n) >= len(store_said(meeting))]
              for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("call", said["call"]), ("kickoff", said["kickoff"]))}
     check("every moment a summary cites is one its transcript starts a line at (D103)", not any(cited.values()), cited)
-    lanes = {shot: store_lanes(page["lanes"]) for shot, page in shown.items() if shot[3] in "12"}
-    check("who spoke, drawn on the meetings' shots, shows the turns: each side's lane at least 4 bars, both lanes drawn at once over a tenth of the width at most (#1077)",
-          len(lanes) == 4 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in lanes.values()), lanes)
+    lanes = {shot: store_lanes(page["lanes"]) for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("who spoke, drawn on the meeting's shot, shows the turns: each side's lane at least 4 bars, both lanes drawn at once over a tenth of the width at most (#1077)",
+          len(lanes) == 2 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in lanes.values()), lanes)
     # « Vous » on the upper lane, « Les autres » on the lower, as the transcript's sides read top to bottom (lina, #1093).
     tops = {shot: (max((y for kind, _, _, y in page["lanes"] if kind == "local"), default=None),
                    min((y for kind, _, _, y in page["lanes"] if kind == "remote"), default=None))
-            for shot, page in shown.items() if shot[3] in "12"}
+            for shot, page in shown.items() if shot.endswith("1-meeting.png")}
     check("who spoke: « Vous » on the upper lane, every bar of it above every bar of « Les autres » (#1077)",
-          len(tops) == 4 and all(here is not None and others is not None and here < others for here, others in tops.values()), tops)
+          len(tops) == 2 and all(here is not None and others is not None and here < others for here, others in tops.values()), tops)
     lasted = {shot: [store_lasted(row) for row in page["said"]] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
     check("every meeting the list shows lasts as such a meeting does, at least 15 min (D103)",
           len(lasted) == 2 and all(len(rows) == 6 and min(rows) >= 15 for rows in lasted.values()), lasted)
-    searched = {shot: page["lines"] for shot, page in shown.items() if shot.endswith("2-search.png")}
-    check("the search shot: a word typed in a meeting's transcript, only its lines shown, at least four (D103)",
-          len(searched) == 2 and all(4 <= seen_ < total for seen_, total in searched.values()), searched)
+    # 2: a meeting while it records (#1126): its name, the time running large in the who-spoke area (#1112), both sides'
+    # meters moving (#1076); its hour the working day's, as every shot's (the dates check above).
+    live = {shot: page["live"] for shot, page in shown.items() if shot.endswith("2-recording.png")}
+    check("the recording shot: a meeting named as the team's own, its time running large (#1126)",
+          len(live) == 2 and all(on and re.fullmatch(r"\d+:\d\d:\d\d", on["time"]) and on["large"]
+                                 and on["title"] == STORE_MEETINGS[shot[:2]]["titles"][0] for shot, on in live.items()), live)
+    # What the image shows, read just before it was taken: a time already past 00:00:00, both meters moving, and the
+    # recording dated as the run takes it — the newest meeting, the list's first row —, whatever the run's hour (#1126).
+    check("the recording shot, as taken: its time past 00:00:00, both meters moving, the recording the list's first row (#1126)",
+          len(taken) == 2 and all(on["time"] and re.fullmatch(r"\d+:\d\d:\d\d", on["time"]) and re.search(r"[1-9]", on["time"])
+                                  and len(on["meters"]) == 2 and all(level > 0 for level in on["meters"])
+                                  and on["first"] == on["name"] for on in taken.values()), taken)
     # The word sought marked where it is found, in each line or row kept (#1078): accents and case aside, as the search.
     fold = lambda text: "".join(c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)).lower()
-    marks = {shot: [lines for lines in page["marked"][0 if shot.endswith("2-search.png") else 1]]
-             for shot, page in shown.items() if shot.endswith(("2-search.png", "3-list.png"))}
+    marks = {shot: page["marked"][1] for shot, page in shown.items() if shot.endswith("3-list.png")}
     unmarked = {shot: lines for shot, lines in marks.items()
-                if not lines or any(not marked or any(fold(m) != fold(shown[shot]["sought"][0 if shot.endswith("2-search.png") else 1]) for m in marked) for marked in lines)}
-    check("a search marks the word it found in each line, and each row, it keeps (#1078)", len(marks) == 4 and not unmarked, unmarked)
-    locked = {shot: page["confidential"] for shot, page in shown.items() if shot.endswith("2-search.png")}
-    check("the search shot's meeting, a client's call, shows « Confidentielle » on (the decider, 2026-11-21)",
-          len(locked) == 2 and all(on is True for on in locked.values()), locked)
+                if not lines or any(not marked or any(fold(m) != fold(shown[shot]["sought"][1]) for m in marked) for marked in lines)}
+    check("a search marks the word it found in each row it keeps (#1078)", len(marks) == 2 and not unmarked, unmarked)
     listed = {shot: page["rows"] for shot, page in shown.items() if shot.endswith("3-list.png")}
     check("the list shot: a word typed in the list's search, only its meetings shown, at least two (D103)",
           len(listed) == 2 and all(2 <= seen_ < total for seen_, total in listed.values()), listed)

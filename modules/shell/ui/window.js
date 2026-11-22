@@ -1215,6 +1215,53 @@ function paintContext() {
   document.getElementById("context-changed").hidden = closed !== null || card.dataset.changed !== "true" || card.dataset.redo !== "true";
 }
 
+// A time running, as the bar says it (D90): hours, minutes and seconds.
+const elapsed = (seconds) => {
+  const whole = Math.floor(seconds);
+  return [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60].map((n) => String(n).padStart(2, "0")).join(":");
+};
+
+// The page of the meeting being recorded (#1076): both sides' levels as the bar's meters, and its time,
+// read from what the bar reads ten times a second (`recording_now`). Neither is a live region — a screen
+// reader would say them ten times a second —, a meter's value is read when it is reached, as the bar's.
+// The poll ends when the page leaves, and when the recording ends: the page is then drawn again, its range back.
+let pageLive = null;
+function pageLevels(name, time, words) {
+  const row = element("div", "page-levels");
+  const fills = [words.small_mic, words.small_meeting].map((label, index) => {
+    // Each side's label right under its own meter (#1112): a label sits with what it names.
+    const column = element("div", "page-meter");
+    const track = element("span", "track page-level");
+    track.setAttribute("role", "meter");
+    track.setAttribute("aria-label", label);
+    track.setAttribute("aria-valuemin", "0");
+    track.setAttribute("aria-valuemax", "100");
+    track.setAttribute("aria-valuenow", "0");
+    const fill_ = element("span", index === 0 ? "fill here" : "fill remote");
+    track.append(fill_);
+    column.append(track, element("span", index === 0 ? "here" : "remote", index === 0 ? words.here_described : words.remote_described));
+    row.append(column);
+    return fill_;
+  });
+  clearInterval(pageLive);
+  pageLive = setInterval(async () => {
+    if (!document.contains(time)) return clearInterval(pageLive);
+    const now = await window.__TAURI__.core.invoke("recording_now").catch(() => null);
+    if (now === null || !document.contains(time)) return;
+    if (!now.recording || now.meeting !== name) {
+      clearInterval(pageLive);
+      return refresh();
+    }
+    time.textContent = elapsed(now.seconds);
+    for (const [index, fill_] of fills.entries()) {
+      const percent = Math.round(now.levels[index] * 100);
+      fill_.style.width = `${percent}%`;
+      fill_.parentElement.setAttribute("aria-valuenow", String(percent));
+    }
+  }, 100);
+  return row;
+}
+
 const clock = (seconds) => {
   const whole = Math.floor(seconds);
   const parts = [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60];
@@ -2537,14 +2584,32 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
   const drawn = element("section", "card drawn");
   const legend = element("div", "legend");
-  legend.append(
-    element("span", "here", words.here_described),
-    element("span", "remote", words.remote_described),
-    element("span", "range", `${clock(0)} – ${clock(total)}`),
-  );
+  // While it records (#1076): the time running in place of the range, read as the bar reads it.
+  const live = session.state === "recording";
+  // A legend names what is drawn: none before a transcript (#1116); while it records, the labels stand under the meters.
+  if (transcript.state === "present") legend.append(element("span", "here", words.here_described), element("span", "remote", words.remote_described));
+  if (!live) legend.append(element("span", "range", `${clock(0)} – ${clock(total)}`));
   const drawing = element("div", "drawing");
-  drawing.append(relief(said, total, words));
-  drawn.append(drawing, legend, playerBar(session, listened, total, words, drawing));
+  if (live) {
+    // Large in the who-spoke area while it records (#1112), as Voice Memos and Granola centre it, the meters under it.
+    const time = element("span", "live-time", elapsed(0));
+    time.id = "page-time";
+    const now = element("div", "live-now");
+    now.append(time, pageLevels(nameOf(session), time, words));
+    drawing.append(now);
+  } else if (transcript.state === "present") drawing.append(relief(said, total, words));
+  else {
+    // No transcript yet (#1116, the decider): one line says when who spoke will appear, no blank canvas.
+    const later = element("p", "note", words.who_spoke_later);
+    later.id = "who-spoke-later";
+    drawing.append(later);
+  }
+  // While it records, the legend's labels stand under their meters; at rest, the legend in its place.
+  drawn.append(drawing);
+  if (!live) drawn.append(legend);
+  // No player while it records (#1130), as Voice Memos and Granola play a meeting once it stops: the drawing,
+  // made its slider, would make the meters inside it presentational (WAI-ARIA 1.2), and a press on the time a seek.
+  if (!live) drawn.append(playerBar(session, listened, total, words, drawing));
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
