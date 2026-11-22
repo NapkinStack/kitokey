@@ -3197,27 +3197,16 @@ function showSettings(shown, minutes, words) {
       row.append(rowSaid, forget);
       kept.append(row);
     });
-    const adding = element("div", "fields");
-    const field = (id, label, input) => {
-      const wrap = element("label", "said");
-      wrap.htmlFor = id;
-      wrap.append(element("span", "name", label));
-      input.id = id;
-      input.disabled = locked;
-      return [wrap, input];
-    };
-    const kind = element("select");
-    for (const [value, index] of Object.entries(kinds)) {
-      const option = element("option", "", words.destination_kinds[index]);
-      option.value = value;
-      kind.append(option);
-    }
-    const named = element("input");
-    named.type = "text";
+    // The add form apart from the list, its fields the Settings' own (guidedField, guidedList); the
+    // address on a whole line, long enough to read back what was pasted.
+    const adding = element("div", "fields adding");
+    const [kindField, kind] = guidedList("destination-kind", words.destination_fields[0], locked);
+    for (const [value, index] of Object.entries(kinds)) guidedOption(kind, value, words.destination_kinds[index]);
+    const [namedField, named] = guidedField("destination-name", words.destination_fields[1], "text", "", locked);
     named.maxLength = 40;
     named.autocomplete = "off";
-    const address = element("input");
-    address.type = "url";
+    const [addressField, address] = guidedField("destination-address", words.destination_fields[2], "url", "", locked);
+    addressField.classList.add("whole");
     address.autocomplete = "off";
     address.spellcheck = false;
     address.setAttribute("aria-describedby", "destination-address-said");
@@ -3250,9 +3239,9 @@ function showSettings(shown, minutes, words) {
         );
     });
     adding.append(
-      ...field("destination-kind", words.destination_fields[0], kind),
-      ...field("destination-name", words.destination_fields[1], named),
-      ...field("destination-address", words.destination_fields[2], address),
+      kindField,
+      namedField,
+      addressField,
       addressSaid,
       add,
       result,
