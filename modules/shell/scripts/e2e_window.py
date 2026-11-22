@@ -5215,6 +5215,8 @@ def destinations_kept(now: dt.datetime) -> None:
                   len(judged) == 2 and all(call["args"] == ["--check"] and secret not in " ".join(call["args"]) for call in judged)
                   and json.loads(judged[1]["input"])["address"] == good, [call["args"] for call in judged])
             # A second destination under a name already kept: said, and refused before any address is judged.
+            # Back across 840 px the page is drawn again (#777): the form is filled once that drawing is done.
+            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-kind')"), 10)
             add("discord", "#équipe", good.replace("T00", "T01"))
             # Read by script: a destination kept by mistake draws the card again, and a node held would be stale.
             said_now = "return document.getElementById('destination-said')?.textContent ?? null"
