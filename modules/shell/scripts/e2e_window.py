@@ -5216,11 +5216,13 @@ def destinations_kept(now: dt.datetime) -> None:
                   and json.loads(judged[1]["input"])["address"] == good, [call["args"] for call in judged])
             # A second destination under a name already kept: said, and refused before any address is judged.
             add("discord", "#équipe", good.replace("T00", "T01"))
-            taken = wait_for(browser, lambda b: "déjà ce nom" in b.find_element(By.ID, "destination-said").text, 10)
+            # Read by script: a destination kept by mistake draws the card again, and a node held would be stale.
+            said_now = "return document.getElementById('destination-said')?.textContent ?? null"
+            taken = wait_for(browser, lambda b: "déjà ce nom" in (b.execute_script(said_now) or ""), 10)
             judged_again = len(calls.read_text().splitlines()) if calls.exists() else 0
             check("a name already kept is refused, said, nothing judged nor kept",
                   taken and len(browser.execute_script(rows)) == 1 and judged_again == 2,
-                  (browser.find_element(By.ID, "destination-said").text, browser.execute_script(rows), judged_again))
+                  (browser.execute_script(said_now), browser.execute_script(rows), judged_again))
             # Back across 840 px, the page is drawn again (#777): pressed while that drawing runs, the
             # click lands on a button being replaced and starts nothing (the run at b4321a4) — waited for.
             settled = wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-forget-0')"), 10)
