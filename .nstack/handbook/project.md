@@ -176,6 +176,10 @@ nstack claim D30 --take-over --person @alice            # a hold nobody worked o
 nstack claim '#14' --person @alice --session <session>  # an issue no cycle plans — a bug, a flaky test: held the same way, work on issue-14-…
 ```
 
+The hold works the same on any forge, and on none. On GitHub, with a token, the claim also opens a
+draft pull request from its first work branch, where people look; on another forge nothing is shown
+there, the claim says so, and `nstack plan` is where the hold is seen.
+
 An issue is held as a deliverable is, in a framed project or not: the forge's assignee says who
 works on it and refuses nobody, the hold does. `nstack plan` lists the issues held. Quote `'#14'`
 — `#` starts a shell comment — or write `14`. Its work merged, its holder gives it back

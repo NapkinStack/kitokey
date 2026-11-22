@@ -32,7 +32,7 @@ a family, a number a rule; a retired rule's number is never reused.
 | `M6` | A deprecated contract with no removal date, or past it | `03-contracts.md` §4 |
 | `M7` | A module holding code and declaring no `check` and `test` | `09-platform.md` §2 |
 | `M8` | A module of criticality high or critical without a runbook | `05-workflow.md` §7 |
-| `M9` | A module missing a file of its envelope | `02-modules.md` §4 |
+| `M9` | A module missing `AGENTS.md`, `README.md`, or `tests/` unless it is a prototype | `02-modules.md` §4 |
 | `M10` | A module that does not say whether a user sees it | `05-workflow.md` §7 |
 | `M11` | `assembles` naming no module of the project, the module itself, or releases that wait for each other | `09-platform.md` §2 |
 | `M12` | An `evidence` declaration that checks nothing: an unknown key; a pattern that is not text, does not compile or matches an empty line; no level or no scenario; `levels` without a group named `level`; a `sealed` that is not true or false | `.nstack/playbooks/tests.md` §1 |
@@ -45,7 +45,7 @@ a family, a number a rule; a retired rule's number is never reused.
 | `B1` | A contract read without being declared | `03-contracts.md` §1 |
 | `B2` | A reference to another module's code | `02-modules.md` §8 |
 | `B3` | A circular dependency between modules | `02-modules.md` §8 |
-| `B4` | *(warning)* A contract declared consumed and never read | `03-contracts.md` §6 |
+| `B4` | *(warning)* A contract declared consumed and never read | `02-modules.md` §5 |
 | `B5` | Direct access to another module's data | `08-quality.md` §8 |
 | `B6` | A consumed contract nobody provides in that version | `03-contracts.md` §4, §6 |
 | `B7` | A provided contract whose document does not exist | `03-contracts.md` §2 |
@@ -57,7 +57,7 @@ a family, a number a rule; a retired rule's number is never reused.
 | Code | Refuses | Why |
 |---|---|---|
 | `S1` | A playbook with no entry in the skills configuration | `INSTALL.md`, "Agent skills" |
-| `S2` | An entry pointing at a playbook that does not exist | `INSTALL.md`, "Agent skills" |
+| `S2` | An entry pointing at a playbook that does not exist, or with no description | `INSTALL.md`, "Agent skills" |
 | `S3` | Generated skills that no longer match their playbooks | `INSTALL.md`, "Agent skills" |
 | `S4` | A skill whose name or description breaks the skills specification | `INSTALL.md`, "Agent skills" |
 
@@ -68,7 +68,7 @@ a family, a number a rule; a retired rule's number is never reused.
 | `C1` | A framing document whose front matter cannot be read | `.nstack/handbook/project.md` |
 | `C2` | A charter with an unknown status, no single decider or no success criterion | `.nstack/handbook/project.md` |
 | `C3` | A cycle with no goal, no appetite, an end that is not its start plus its appetite, or an `accepted_on` that is not a date | `.nstack/handbook/project.md` |
-| `C4` | A deliverable with no id, title or state — or ready without acceptance criteria | `05-workflow.md` §3 |
+| `C4` | A deliverable with no id, title or state — or ready, in progress or accepted without acceptance criteria | `05-workflow.md` §3 |
 | `C5` | Two accepted cycles, or an accepted cycle under a charter that is not | `.nstack/handbook/project.md` |
 | `C6` | A closed or stopped cycle with no outcome or no end date; a success criterion recorded outside a closure, twice in one, outside the charter's filled criteria, in an unknown state, or observed with no day | `.nstack/handbook/project.md` |
 | `C7` | A discovery decided with no decider, date or challenger — or a charter with no go before it | `.nstack/handbook/project.md` |
@@ -97,7 +97,7 @@ a family, a number a rule; a retired rule's number is never reused.
 | `T2` | A sheet with no verifier, a verifier who is an author, a person named verifier with no hand on the pull request — no edit of its description, no review, no comment —, a row left empty, or a row with more cells than its header | `05-workflow.md` §7 |
 | `T3` | A scenario passed with no evidence, or no commit it was verified on | `05-workflow.md` §7 |
 | `T4` | Evidence older than the head commit | `05-workflow.md` §7 |
-| `T5` | A scenario failed, or left not verified | `05-workflow.md` §7 |
+| `T5` | A scenario failed, or left not verified with no `human only — <reason>` | `05-workflow.md` §7 |
 
 ## A — checks attested on a workstation
 

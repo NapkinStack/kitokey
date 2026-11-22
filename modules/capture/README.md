@@ -159,6 +159,15 @@ weigh 33 % (`headset`) to 36 % (the three others) as FLAC, compressed in 1.2 s; 
 times, an hour — 2,063 MB of WAV — weighs 731 MB (35 %), compressed in 14 s: 0.4 % of its length, in
 5 MB of memory. `--as v2` and `--as v1` are never compressed.
 
+## What it owes its crates' authors
+
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links under its licence's text — and libFLAC's and libogg's notices, under
+Xiph.Org's BSD licence, under libflac-sys, which builds them in. It is made with cargo-about from
+`about.toml`, whose `accepted` list refuses any other licence, GPL among them, and committed;
+`tests/notices.rs` is red once it no longer names the crates the program links, and `about.toml`'s
+header gives the two commands that make it again.
+
 ## Contracts
 
 - Provided: [`session-audio/v3`](../../contracts/session-audio/v3/README.md), `experimental`
