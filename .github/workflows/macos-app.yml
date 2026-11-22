@@ -17,6 +17,7 @@ on:
     paths:
       - "modules/capture/**"
       - "modules/summary/**"
+      - "modules/export/**"
       - "modules/transcription/**"
       - "modules/shell/**"
       - "modules/install/**"
@@ -55,7 +56,7 @@ jobs:
           unpacked=$(mktemp -d)
           ditto -x -k "$zip" "$unpacked"
           app=$unpacked/Kitokey.app
-          for program in kitokey kitokey-capture kitokey-transcription kitokey-speech kitokey-summary; do
+          for program in kitokey kitokey-capture kitokey-transcription kitokey-speech kitokey-summary kitokey-export; do
             test -x "$app/Contents/MacOS/$program"
           done
           # What the programs owe their third parties (D102), as modules/install/windows/notices.py names them.
@@ -63,10 +64,13 @@ jobs:
           import sys
           sys.path.insert(0, "modules/install/windows")
           import notices
-          print(" ".join(name for _, name in notices.files("dist")))
+          owed = [name for _, name in notices.files("dist")]
+          # As many as notices.py names, never a number here: a module added adds its page (#1047).
+          # None empty, none split by the shell's words: a failed assert fails the step.
+          assert owed and all(name and not any(c.isspace() for c in name) for name in owed), owed
+          print(" ".join(owed))
           PY
           )
-          test "$(wc -w <<< "$owed")" -eq 6
           for name in $owed; do
             test -s "$app/Contents/Resources/$name"
             echo "Contents/Resources/$name"
