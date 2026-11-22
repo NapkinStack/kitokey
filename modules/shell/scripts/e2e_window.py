@@ -11966,8 +11966,8 @@ def store_shots(now: dt.datetime) -> None:
     # 2: a meeting while it records (#1126): its name, the time running large in the who-spoke area (#1112), both sides'
     # meters moving (#1076); its hour the working day's, as every shot's (the dates check above).
     live = {shot: page["live"] for shot, page in shown.items() if shot.endswith("2-recording.png")}
-    check("the recording shot: a meeting named as the team's own, its time running large, both meters moving (#1126)",
-          len(live) == 2 and all(on and re.fullmatch(r"\d+:\d\d:\d\d", on["time"]) and on["large"]
+    check("the recording shot: a meeting named as the team's own, its time running large and past 00:00:00, both meters moving (#1126)",
+          len(live) == 2 and all(on and re.fullmatch(r"\d+:\d\d:\d\d", on["time"]) and re.search(r"[1-9]", on["time"]) and on["large"]
                                  and on["title"] == STORE_MEETINGS[shot[:2]]["titles"][0]
                                  and len(on["meters"]) == 2 and all(level > 0 for level in on["meters"]) for shot, on in live.items()), live)
     # The word sought marked where it is found, in each line or row kept (#1078): accents and case aside, as the search.
