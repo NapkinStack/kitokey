@@ -2946,7 +2946,7 @@ async fn minutes_saved(
     Ok(not_kept)
 }
 
-/// What `kitokey-send --check` said of an address (`posting/v1`): checked, refused, or no answer.
+/// What `kitokey-send --check` said of an address (`contracts/posting/v1`): checked, refused, or no answer.
 enum Judged {
     Checked,
     Refused,
