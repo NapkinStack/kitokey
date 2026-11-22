@@ -2586,7 +2586,8 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const legend = element("div", "legend");
   // While it records (#1076): the time running in place of the range, read as the bar reads it.
   const live = session.state === "recording";
-  legend.append(element("span", "here", words.here_described), element("span", "remote", words.remote_described));
+  // A legend names what is drawn: none before a transcript (#1116); while it records, the labels stand under the meters.
+  if (transcript.state === "present") legend.append(element("span", "here", words.here_described), element("span", "remote", words.remote_described));
   if (!live) legend.append(element("span", "range", `${clock(0)} – ${clock(total)}`));
   const drawing = element("div", "drawing");
   if (live) {
@@ -2596,7 +2597,13 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     const now = element("div", "live-now");
     now.append(time, pageLevels(nameOf(session), time, words));
     drawing.append(now);
-  } else drawing.append(relief(said, total, words));
+  } else if (transcript.state === "present") drawing.append(relief(said, total, words));
+  else {
+    // No transcript yet (#1116, the decider): one line says when who spoke will appear, no blank canvas.
+    const later = element("p", "note", words.who_spoke_later);
+    later.id = "who-spoke-later";
+    drawing.append(later);
+  }
   // While it records, the legend's labels stand under their meters; at rest, the legend in its place.
   drawn.append(drawing);
   if (!live) drawn.append(legend);
