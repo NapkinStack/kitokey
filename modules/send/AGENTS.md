@@ -11,9 +11,9 @@
 
 ## Business invariants
 
-- **The address is a secret**: never in an argument, a sentence, a line or a log. `Refusal`'s sentences
-  hold none of it; the program's tests check every run's output for it (D110's next pull request).
-- **A confidential meeting is never sent**, judged before the address (the program, next pull request).
+- **The address is a secret**: never in an argument, a sentence, a line or a log (`tests/program.rs`
+  checks every run's output for it).
+- **A confidential meeting is never sent**, judged before the address (`tests/program.rs`).
 - **Every resolved address is judged, the connection made to those**: `Judging`, the resolver ureq is
   given, refuses a name whose addresses hold one local address; there is no second resolution
   (`tests/address.rs`, `tests/server.rs`).

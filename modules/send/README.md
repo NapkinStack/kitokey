@@ -20,15 +20,20 @@ flowchart LR
 
 ## Getting started
 
-`cargo test --locked`: the addresses judged (`tests/address.rs`) and the one POST against a server on this
-computer, reached through the library with a test's policy (`tests/server.rs`) — the program never
-reaches this computer. The program, `kitokey-send`, what it reads of a meeting and what each kind
-receives come with D110's next pull request.
+`cargo test --locked`: the addresses judged (`tests/address.rs`), the bodies (`tests/bodies.rs`), the
+program's lines and exits (`tests/program.rs`), and the one POST against a server on this computer,
+reached through the library with a test's policy (`tests/server.rs`) — the program never reaches this
+computer.
+
+```sh
+echo '{"address": "https://discord.com/api/webhooks/<id>/<token>", "name": "Réunion"}' \
+  | kitokey-send <meetings>/2026-11-20_09-30 --kind discord
+```
 
 ## Contracts
 
-- Provided: [`posting/v1`](../../contracts/posting/v1/README.md), once its program is delivered.
-- Consumed, by the program: `session-audio` (its `confidential`), `minutes` v1 to v4 — v5 once it is merged.
+- Provided: [`posting/v1`](../../contracts/posting/v1/README.md).
+- Consumed: `session-audio` (its `confidential`), `minutes` v1 to v4 — v5 once it is merged.
 
 ## Decisions
 
