@@ -2689,9 +2689,10 @@ echo '{{"available":true,"installed":true,"supported":true}}'
                                stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
     try:
         with window as browser:
-            menu = wait_for(browser, lambda b: tray_labels() == french, 10)
-            check("started in French, the system's: the window and the tray's menu speak it",
-                  menu and sections(browser) == ["Réglages", "fr"], (tray_labels(), sections(browser)))
+            # The menu and the page, both: the window's first drawing can come after the tray's labels (#1131).
+            spoken = wait_for(browser, lambda b: tray_labels() == french and sections(b) == ["Réglages", "fr"], 10)
+            check("started in French, the system's: the window and the tray's menu speak it", spoken,
+                  (tray_labels(), sections(browser)))
             press(browser, "settings-link")
             wait_for(browser, lambda b: b.find_elements(By.ID, "app-language"), 10)
             pick = Select(browser.find_element(By.ID, "app-language"))
