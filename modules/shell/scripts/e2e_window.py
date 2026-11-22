@@ -8104,11 +8104,20 @@ def renaming(now: dt.datetime) -> None:
         browser.execute_script("window.__TAURI__.core.invoke('record')")
         wait_for(browser, lambda b: b.execute_async_script(now_meeting), 10)
         again = browser.execute_async_script(now_meeting)
+        first_drawn = None
         if again:
             # The same folder as before (the recorder played here names it): the page left, then opened again, so it is
-            # drawn for the recording.
+            # drawn for the recording. Its first drawing read as it is put in (#1133).
             browser.execute_script("location.hash = '#/'")
-            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{again}")
+            first_drawn = browser.execute_async_script(
+                "const done = arguments[arguments.length - 1], seen = new MutationObserver(() => {"
+                " const t = document.getElementById('page-time'); if (t) { seen.disconnect(); done(t.textContent); } });"
+                " seen.observe(document.body, {childList: true, subtree: true}); location.hash = arguments[0];"
+                " setTimeout(() => { seen.disconnect(); done(null); }, 5000);", f"#/meeting/{again}")
+        # #1133 (marc's review): a meeting recorded again under the same name — a deleted one's name is free again in the
+        # same minute (capture's `new_folder`) — never starts from the last recording's reading: the time never goes back.
+        check("recorded again under the same name: its page starts at « 00:00:00 », not at the last recording's time (#1133)",
+              first_drawn == "00:00:00", [again, first_drawn])
         live_again = bool(again) and wait_for(browser, lambda b: b.execute_script(alive), 10)
         # #1130 (sam's review): a track gained while it records (`session-audio/v2`, *A track gained later*), as a real
         # capture writes it at once: the page offers its sound (`listen`), and a slider's children are presentational
