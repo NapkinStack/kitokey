@@ -354,11 +354,20 @@ body.small-window .frame { display: none; }
 /* A thin meter for each side in the row (D90, board 5): its icon, a 4 px track; a side silent two
    minutes, or with nothing to record, dashed and its icon crossed, said in a grey line under the row. */
 #small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; margin-left: 8px; }
-/* A meeting's page while it records (#1076): its two sides' levels, the bar's meters, under the legend. */
-.page-levels { display: flex; gap: 16px; margin-top: 8px; }
-.page-levels .track { flex: 1 1 0; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
-.page-levels .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }
-.page-levels .fill.remote { background: var(--ok); }
+/* A meeting's page while it records (#1076, #1112): in the who-spoke area, its time large at the centre, as Voice
+   Memos and Granola show a live meeting, the two sides' levels — the bar's meters — under it. */
+.live-now { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 100px; padding: 8px 0; }
+.live-time { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.2; }
+/* Two columns, each its meter over its label: the meter a block of its column's width and 4 px — never a flex item of
+   the column, whose basis would take its height (#1112, 3600377's shots). */
+.page-levels { display: flex; gap: 16px; width: min(100%, 480px); }
+.page-meter { flex: 1 1 0; min-width: 120px; display: flex; flex-direction: column; gap: 6px; }
+.page-meter > .page-level { display: block; flex: none; width: 100%; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+.page-level > .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }
+.page-level > .fill.remote { background: var(--ok); }
+.page-meter > .here, .page-meter > .remote { font-size: 14px; overflow-wrap: anywhere; }
+.page-meter > .here { color: var(--accent); }
+.page-meter > .remote { color: var(--ok); }
 #small .meter { display: flex; align-items: center; gap: 6px; color: var(--soft); }
 #small .meter .track { flex: 1 1 auto; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
 #small .meter .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }

@@ -61,7 +61,7 @@ in `dist/<module>/`, named by the program — `THIRD-PARTY-NOTICES-kitokey.html`
 | Format | Where |
 |---|---|
 | rpm | `/usr/share/licenses/kitokey/` |
-| .deb | `/usr/share/doc/kitokey/` |
+| .deb | `/usr/share/doc/kitokey/`, with its `copyright` file (Debian Policy 12.5, DEP-5 form, `deb/copyright`) naming the others: a minimised Ubuntu keeps that file alone |
 | the Mac's app | `Kitokey.app/Contents/Resources/` |
 | Windows' zip and package | beside `kitokey.exe` |
 
