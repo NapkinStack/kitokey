@@ -33,6 +33,14 @@ pub fn window(request: &str) -> usize {
 /// (#1083). Ollama says how many tokens it read; fewer than this allows, it cut the request.
 const BYTES_A_TOKEN: usize = 6;
 
+/// Whether Ollama read what its cut keeps of a request longer than its window: Ollama 0.40.16
+/// keeps `num_ctx - (num_ctx - num_keep) / 2` tokens, `num_keep` 4, one more when the tokenizer
+/// adds a first token of its own (llm/llama_server.go:320-357, api/types.go:1226; the probe read
+/// 4098 at 8192, #1083). Whatever the language, unlike the bytes a token.
+fn cut_by_its_window(read: usize, window: usize) -> bool {
+    [4, 5].iter().any(|keep| read == window - (window - keep) / 2)
+}
+
 /// The patience Ollama is given: what any provider gets, and a second for each 20 bytes it has to
 /// read, a laptop's processor taking some 14 tokens a second (measured on `qwen3:8b`, 2026-10-31).
 pub fn patience(given: Duration, request: &str) -> Duration {
@@ -314,7 +322,8 @@ impl Provider {
         // Ollama cuts a request longer than its window without a word, and answers what was left
         // (#1083): only how much it read tells.
         let read = answer["prompt_eval_count"].as_u64().filter(|_| ollama.is_some());
-        if let Some(read) = read.filter(|&read| (read as usize) * BYTES_A_TOKEN < request.len()) {
+        let cut = |read: u64| (read as usize) * BYTES_A_TOKEN < request.len() || cut_by_its_window(read as usize, window(request));
+        if let Some(read) = read.filter(|&read| cut(read)) {
             return refused(
                 "provider.failed",
                 format!(
