@@ -826,6 +826,11 @@ pub struct Window {
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, its heading; and a step's «
     /// Avancé » in Settings, « Modèles ». When: always. At most: one line. Placeholders: none.
     pub advanced_title: &'static str,
+    /// Before Kitokey's version, at the foot of « Général », as GNOME's « About » and Windows' Settings
+    /// say it (#1089); the number follows, as `--version` gives it. Shows: Settings, « Général », its
+    /// last line, in secondary text the user can select to copy. When: always. At most: one word.
+    /// Placeholders: none.
+    pub version_said: &'static str,
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, a switch: its name, then its
     /// line under it (D29). When: always. At most: one line for the name, the line wraps.
     /// Placeholders: none.
@@ -1186,8 +1191,9 @@ pub struct Window {
     /// else `redo_transcript_title`. At most: wraps inside the panel. Placeholders: {} the model, as
     /// people say it.
     pub redo_transcript_do: &'static str,
-    /// Shows: the recording bar and Redo…, as a choice of a list. When: appended to a local model's
-    /// name. At most: about 20 characters. Placeholders: none.
+    /// Shows: the recording bar and Redo…, as a choice of a list; a meeting's page, after the model
+    /// of minutes this computer wrote (#1080). When: appended to a local model's name. At most:
+    /// about 20 characters. Placeholders: none.
     pub on_computer: &'static str,
     /// Shows: a meeting's page, its Redo… panel, as a heading. When: redo the transcript. At most:
     /// no limit. Placeholders: none.
@@ -1210,6 +1216,10 @@ pub struct Window {
     /// one shown (D93). When: another model is chosen in its line. At most: no limit. Placeholders: {}
     /// the model, as its line says it.
     pub minutes_made_with: &'static str,
+    /// Shows: a meeting's page, under the summary's line: a language model wrote it ([Store
+    /// Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) 11.16, #1092).
+    /// When: a summary is shown. At most: one line. Placeholders: none.
+    pub minutes_ai: &'static str,
     /// Shows: a meeting's page, above the button that makes the transcript again, the model that made
     /// the one shown (D93). When: another model is chosen in its line. At most: no limit.
     /// Placeholders: {} the model, as its line says it.
@@ -1369,6 +1379,9 @@ pub struct Window {
     /// Shows: Settings, « Modèles », the summary's step, beside « Tester » while it asks. When: the
     /// model is a service's. At most: no limit. Placeholders: {} the host.
     pub test_sends: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, beside « Tester » while it asks. When: the
+    /// model is this computer's Ollama's (#1080): no address said. At most: no limit. Placeholders: none.
+    pub test_sends_here: &'static str,
     /// Shows: Settings, « Modèles », beside « Tester » or a key's test. When: while it asks. At
     /// most: one line. Placeholders: none.
     pub testing: &'static str,
@@ -1584,8 +1597,9 @@ pub struct Window {
     /// Shows: a meeting's page, as a label. When: row: spoken language. At most: about 20
     /// characters. Placeholders: none.
     pub language_label: &'static str,
-    /// Shows: a meeting's page, as a choice of a list: its first, followed by « — » and the language
-    /// Settings name. When: always. At most: about 30 characters. Placeholders: none.
+    /// Shows: a meeting's page, as a choice of a list: its first, when Settings name a language —
+    /// detecting it, `language_detected` says it as Settings do (#1074). When: always. At most:
+    /// about 30 characters. Placeholders: {} the language Settings name.
     pub language_default: &'static str,
     /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
     /// first choice. When: Whisper or a service hears. At most: one line. Placeholders: none.
@@ -1605,9 +1619,6 @@ pub struct Window {
     /// Shows: a meeting's page, as an error. When: always. At most: no limit. Placeholders: {}
     /// failure sentence.
     pub name_not_saved: &'static str,
-    /// Shows: a meeting's page, as a choice of a list. When: appended "detected". At most: about 12
-    /// characters. Placeholders: none.
-    pub language_detected_short: &'static str,
     /// SpeechAnalyzer's language when the settings name none: the system's, never the app's (D64).
     /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
     /// first choice. When: Apple's SpeechAnalyzer hears (D64). At most: one line. Placeholders:
@@ -1770,7 +1781,7 @@ pub fn window(language: Language) -> Window {
             written_by: "Written by {}",
             written_via: ", via {}",
             at: "at",
-            heard_by: "Transcribed by {} on this computer",
+            heard_by: "Transcribed by {}, on this computer",
             transcribed_on: "Transcribed on {}",
             minutes_of: "Summary of {}",
             made_in: "in {}",
@@ -1857,6 +1868,7 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "General",
             advanced_title: "Advanced",
+            version_said: "Version",
             developer: ["Developer mode", "Shows technical details under each error, to help troubleshoot."],
             program_said: "Technical details: {}",
             minutes_sections: ["Highlights", "Actions", "Key points"],
@@ -1976,6 +1988,7 @@ pub fn window(language: Language) -> Window {
             make_transcript: "Transcribe",
             make_minutes_with: "Write summary with {}",
             minutes_made_with: "This summary was written with {}.",
+            minutes_ai: "Written by AI: read it before you share it.",
             transcript_made_with: "This transcript was made with {}.",
             minutes_making: "Writing summary",
             minutes_waiting: "Queued · {} ahead",
@@ -2023,6 +2036,7 @@ pub fn window(language: Language) -> Window {
             shortcut_open: "Keyboard settings",
             test: "Test",
             test_sends: "The test sends a short sentence to {} — nothing from your meetings.",
+            test_sends_here: "The test sends a short sentence to Ollama, on this computer — nothing from your meetings.",
             testing: "Testing…",
             test_answered: "It works: the model responds.",
             test_failed: "The model isn’t responding: {}",
@@ -2102,14 +2116,13 @@ pub fn window(language: Language) -> Window {
             ],
             context_redo: "Redo with this context",
             language_label: "Spoken language",
-            language_default: "Same as Settings",
+            language_default: "{}, from Settings",
             language_detected: "Detect automatically",
             meetings_language: "Meeting language",
             language_not_saved: "Language not saved: {}",
             rename_meeting: "Rename this meeting",
             name_meeting: "Name this meeting",
             name_not_saved: "Name not saved: {}",
-            language_detected_short: "detected",
             language_as_system: "System language",
             language_heard_as: "{} — SpeechAnalyzer transcribes in {}",
             app_language: [
@@ -2297,6 +2310,7 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "Général",
             advanced_title: "Avancé",
+            version_said: "Version",
             developer: [
                 "Mode développeur",
                 "Affiche le détail technique sous chaque erreur, pour aider au diagnostic.",
@@ -2422,6 +2436,7 @@ pub fn window(language: Language) -> Window {
             make_transcript: "Transcrire",
             make_minutes_with: "Rédiger le compte rendu avec {}",
             minutes_made_with: "Ce compte rendu a été fait avec {}.",
+            minutes_ai: "Rédigé par une IA\u{a0}: relisez-le avant de le partager.",
             transcript_made_with: "Cette transcription a été faite avec {}.",
             minutes_making: "Rédaction du compte rendu",
             minutes_waiting: "En attente · {} avant",
@@ -2472,6 +2487,7 @@ pub fn window(language: Language) -> Window {
             shortcut_open: "Réglages du clavier",
             test: "Tester",
             test_sends: "Le test envoie une courte phrase à {}, rien de vos réunions.",
+            test_sends_here: "Le test envoie une courte phrase à Ollama, sur cet ordinateur — rien de vos réunions.",
             testing: "Test en cours…",
             test_answered: "Ça fonctionne\u{a0}: le modèle répond.",
             test_failed: "Le modèle ne répond pas\u{a0}: {}",
@@ -2557,14 +2573,13 @@ pub fn window(language: Language) -> Window {
             ],
             context_redo: "Refaire avec ce contexte",
             language_label: "Langue parlée",
-            language_default: "Celle des Réglages",
+            language_default: "{}, selon les Réglages",
             language_detected: "Détection automatique",
             meetings_language: "Langue des réunions",
             language_not_saved: "Langue non enregistrée\u{a0}: {}",
             rename_meeting: "Renommer cette réunion",
             name_meeting: "Nommer cette réunion",
             name_not_saved: "Nom non enregistré\u{a0}: {}",
-            language_detected_short: "détectée",
             language_as_system: "Celle du système",
             language_heard_as: "{} — SpeechAnalyzer transcrit en {}",
             app_language: [

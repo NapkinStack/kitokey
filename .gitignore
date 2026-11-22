@@ -13,9 +13,8 @@ coverage/
 !.env.example
 .DS_Store
 
-# Skills generated from .nstack/playbooks/ — the source of truth is .nstack/playbooks/
-.claude/skills/
-.agents/skills/
+# The skills nstack generates from .nstack/playbooks/ are committed (.claude/skills/, .agents/skills/):
+# an agent starting from a fresh clone needs them. Their source is .nstack/playbooks/.
 
 # Evidence of the end-to-end scenarios: a CI artefact, or an evidence branch — never committed to a change
 .evidence/
