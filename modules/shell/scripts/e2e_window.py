@@ -2775,9 +2775,9 @@ echo '{{"available":true,"installed":true,"supported":true}}'
         window.file.write_text(window.file.read_text().replace('engine = "speechanalyzer"', 'engine = "service"')
                                + 'transcription_provider = "http://127.0.0.1:9/v1"\ntranscription_model = "hears"\n')
         with window as browser:
-            menu = wait_for(browser, lambda b: tray_labels() == english, 10)
-            check("started again, the system still French: it speaks the one chosen", menu and sections(browser) == ["Settings", "en"],
-                  (tray_labels(), sections(browser)))
+            # The menu and the page, both: the window's first drawing can come after the tray's labels (#1131).
+            spoken = wait_for(browser, lambda b: tray_labels() == english and sections(b) == ["Settings", "en"], 10)
+            check("started again, the system still French: it speaks the one chosen", spoken, (tray_labels(), sections(browser)))
             press(browser, "settings-link")
             wait_for(browser, lambda b: b.find_elements(By.ID, "app-language"), 10)
             kept = Select(browser.find_element(By.ID, "app-language")).first_selected_option.text
