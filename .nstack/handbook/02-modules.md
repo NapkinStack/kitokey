@@ -146,6 +146,10 @@ modules/<name>/
 └── tests/
 ```
 
+M9 refuses a module without `AGENTS.md`, `README.md` or, unless it is a prototype, `tests/`;
+M8 asks for the runbook at criticality high or critical. The rest is where things go when
+the module has them.
+
 The contracts a module provides live in the project's `contracts/` module, one folder per
 contract and version (`03-contracts.md` §2), and its manifest points at them
 (`provides[].path`).
