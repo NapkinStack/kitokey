@@ -1229,6 +1229,8 @@ let pageLive = null;
 function pageLevels(name, time, words) {
   const row = element("div", "page-levels");
   const fills = [words.small_mic, words.small_meeting].map((label, index) => {
+    // Each side's label right under its own meter (#1112): a label sits with what it names.
+    const column = element("div", "page-meter");
     const track = element("span", "track page-level");
     track.setAttribute("role", "meter");
     track.setAttribute("aria-label", label);
@@ -1237,7 +1239,8 @@ function pageLevels(name, time, words) {
     track.setAttribute("aria-valuenow", "0");
     const fill_ = element("span", index === 0 ? "fill here" : "fill remote");
     track.append(fill_);
-    row.append(track);
+    column.append(track, element("span", index === 0 ? "here" : "remote", index === 0 ? words.here_described : words.remote_described));
+    row.append(column);
     return fill_;
   });
   clearInterval(pageLive);
@@ -2583,14 +2586,23 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const legend = element("div", "legend");
   // While it records (#1076): the time running in place of the range, read as the bar reads it.
   const live = session.state === "recording";
-  const range = element("span", "range", live ? elapsed(0) : `${clock(0)} – ${clock(total)}`);
-  if (live) range.id = "page-time";
-  legend.append(element("span", "here", words.here_described), element("span", "remote", words.remote_described), range);
+  legend.append(element("span", "here", words.here_described), element("span", "remote", words.remote_described));
+  if (!live) legend.append(element("span", "range", `${clock(0)} – ${clock(total)}`));
   const drawing = element("div", "drawing");
-  drawing.append(relief(said, total, words));
-  drawn.append(drawing, legend);
-  if (live) drawn.append(pageLevels(nameOf(session), range, words));
-  drawn.append(playerBar(session, listened, total, words, drawing));
+  if (live) {
+    // Large in the who-spoke area while it records (#1112), as Voice Memos and Granola centre it, the meters under it.
+    const time = element("span", "live-time", elapsed(0));
+    time.id = "page-time";
+    const now = element("div", "live-now");
+    now.append(time, pageLevels(nameOf(session), time, words));
+    drawing.append(now);
+  } else drawing.append(relief(said, total, words));
+  // While it records, the legend's labels stand under their meters; at rest, the legend in its place.
+  drawn.append(drawing);
+  if (!live) drawn.append(legend);
+  // No player while it records (#1130), as Voice Memos and Granola play a meeting once it stops: the drawing,
+  // made its slider, would make the meters inside it presentational (WAI-ARIA 1.2), and a press on the time a seek.
+  if (!live) drawn.append(playerBar(session, listened, total, words, drawing));
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
