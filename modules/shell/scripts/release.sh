@@ -9,6 +9,8 @@ dist=${NSTACK_DIST:?run through nstack release, which names this module\'s artef
 target=${KITOKEY_TARGET:-}
 # Windows names a program with its .exe (D53).
 exe=; [ "${OS:-}" = Windows_NT ] && exe=.exe
+# What the program owes its crates' authors goes beside it, for the package to ship (D102).
+cp "$here/THIRD-PARTY-NOTICES.html" "$dist/"
 if [ -z "$target" ]; then
   (cd "$here" && cargo build --locked --release)
   built=${CARGO_TARGET_DIR:-$here/target}/release

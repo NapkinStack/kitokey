@@ -9,6 +9,8 @@ import os
 import sys
 import zipfile
 
+import notices as owed
+
 PROGRAMS = ("shell/kitokey.exe", "capture/kitokey-capture.exe",
             "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe")
 
@@ -17,4 +19,7 @@ path = os.path.join(out, f"Kitokey-{version}-windows-x64.zip")
 with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
     for program in PROGRAMS:
         archive.write(os.path.join(artefacts, program), f"Kitokey/{program.split('/')[1]}")
+    # What the programs owe the authors of what they ship, beside them (D102).
+    for source, name in owed.files(artefacts):
+        archive.write(source, f"Kitokey/{name}")
 print(path)

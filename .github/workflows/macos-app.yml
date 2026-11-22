@@ -58,6 +58,19 @@ jobs:
           for program in kitokey kitokey-capture kitokey-transcription kitokey-speech kitokey-summary; do
             test -x "$app/Contents/MacOS/$program"
           done
+          # What the programs owe their third parties (D102), as modules/install/windows/notices.py names them.
+          owed=$(python3 - <<'PY'
+          import sys
+          sys.path.insert(0, "modules/install/windows")
+          import notices
+          print(" ".join(name for _, name in notices.files("dist")))
+          PY
+          )
+          test "$(wc -w <<< "$owed")" -eq 6
+          for name in $owed; do
+            test -s "$app/Contents/Resources/$name"
+            echo "Contents/Resources/$name"
+          done
           read_key() { plutil -extract "$1" raw "$app/Contents/Info.plist"; }
           for key in CFBundleName NSMicrophoneUsageDescription NSAudioCaptureUsageDescription; do
             value=$(read_key "$key")

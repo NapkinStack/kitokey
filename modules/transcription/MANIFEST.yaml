@@ -121,6 +121,14 @@ dependencies:
     purpose: A file a day
     adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
     exit_strategy: One function, start in src/log.rs.
+  - name: cargo-about
+    purpose: >-
+      Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
+      never run by a build or a release (D102)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >-
+      Its output is a committed HTML page, about.hbs its template; any generator that lists the
+      crates with their licence texts replaces it, and tests/notices.rs judges the result.
 #  - name:
 #    purpose:
 #    adr:

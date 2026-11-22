@@ -5,7 +5,7 @@ it is asked whether a model answers: one line of text per event, for whoever sta
 
 ```mermaid
 flowchart LR
-    S["shell — or a script,<br/>a terminal"]:::consumer -->|"starts: kitokey-summary <session-folder> --provider <address> --model <name>"| M["summary"]:::producer
+    S["shell — or a script,<br/>a terminal"]:::consumer -->|"starts: kitokey-summary <session-folder> --provider <address> --model <name> [--structure <name>]"| M["summary"]:::producer
     S -->|"or: kitokey-summary --test --provider <address> --model <name>"| M
     S -.->|"its environment: KITOKEY_PROVIDER_KEY, when the provider wants a key; KITOKEY_TRACE, its log's id"| M
     M -->|"its output: one JSON object per line"| S
@@ -29,9 +29,14 @@ order of the events, and what each means, are said here and nowhere else.
 
 ## How it is started
 
-- **Minutes**: `kitokey-summary <session-folder> --provider <address> --model <name>`, the two
-  options in either order. It reads the folder's `transcript.jsonl` (`transcript/v1`) and its
-  `context.txt`, when there is one, and writes the folder's `minutes.md` (`minutes/v1`).
+- **Minutes**: `kitokey-summary <session-folder> --provider <address> --model <name>`, the
+  options in any order. It reads the folder's `transcript.jsonl` (`transcript/v1`) and its
+  `context.txt`, when there is one, and writes the folder's `minutes.md` (`minutes/v4`).
+- **Minutes in a structure** (D111): the same, with `--structure <name>`, one of the six structures
+  `minutes/v5` names — `general`, `one_to_one`, `stand_up`, `client_call`, `interview`,
+  `project_review`. It then writes `minutes/v5` in that structure. A name it does not know is a
+  wrong argument: nothing is written, and the error stream says so. Without `--structure`, it writes
+  `minutes/v4` as before, so that a consumer that does not read v5 never receives it.
 - **A test**: `kitokey-summary --test --provider <address> --model <name>`, the options in either
   order. It sends one sentence of its own — nothing of a meeting — and writes nothing.
 - **The key**, when the provider wants one, is in its environment as `KITOKEY_PROVIDER_KEY`,
