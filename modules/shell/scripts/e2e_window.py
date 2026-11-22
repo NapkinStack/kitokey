@@ -1030,10 +1030,11 @@ def model_offered(now: dt.datetime) -> None:
         bare = ("const s = document.querySelector('#meeting [role=slider]'), p = document.getElementById('who-spoke-later');"
                 " return {slider: !!s, play: !!document.getElementById('play'), line_in: !!(s && p && s.contains(p)),"
                 " text: s ? s.textContent.trim() : null, height: s ? Math.round(s.getBoundingClientRect().height) : 0,"
+                " rail: s ? Math.round(s.getBoundingClientRect().height - parseFloat(getComputedStyle(s).paddingTop) - parseFloat(getComputedStyle(s).paddingBottom)) : 0,"
                 " width: s ? Math.round(s.getBoundingClientRect().width) : 0}")
         track = browser.execute_script(bare)
-        check("no transcript yet, its sound playable: the player offered, its slider a bare track of at least 4 px, the line outside it (#1134)",
-              track["slider"] and track["play"] and not track["line_in"] and track["text"] == "" and track["height"] >= 4 and track["width"] >= 200, track)
+        check("no transcript yet, its sound playable: the player offered, its slider a bare rail of 4 to 8 px in a 24 px target, the line outside it (#1134)",
+              track["slider"] and track["play"] and not track["line_in"] and track["text"] == "" and track["height"] >= 24 and 4 <= track["rail"] <= 8 and track["width"] >= 200, track)
         # A legend names and scales what is drawn: nothing drawn yet, no legend — the header says the meeting's length (#1134).
         legends = browser.execute_script("return [...document.querySelectorAll('#meeting .legend')].filter(e => e.getClientRects().length).map(e => e.textContent)")
         check("no transcript yet: no legend, nothing drawn to name or to scale (#1134)", legends == [], legends)
@@ -8084,7 +8085,7 @@ def renaming(now: dt.datetime) -> None:
         # or, with no transcript yet, the line saying when who spoke will appear (#1134: no legend while nothing is drawn).
         resting = ("return document.querySelector('#meeting .legend .range')?.textContent"
                    " ?? document.getElementById('who-spoke-later')?.textContent ?? ''")
-        at_rest = lambda b: (lambda r: "–" in r or "transcription" in r)(b.execute_script(resting))
+        at_rest = lambda b: "–" in b.execute_script(resting) or bool(b.find_elements(By.ID, "who-spoke-later"))
         settled = wait_for(browser, lambda b: b.execute_script(alive) is None and at_rest(b), 10)
         check("stopped: the page at rest again, its range or its line before a transcript, no live time nor meters (#1076, #1134)", settled,
               [browser.execute_script(alive), browser.execute_script(resting)])
