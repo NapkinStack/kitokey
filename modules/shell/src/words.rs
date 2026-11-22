@@ -826,6 +826,11 @@ pub struct Window {
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, its heading; and a step's «
     /// Avancé » in Settings, « Modèles ». When: always. At most: one line. Placeholders: none.
     pub advanced_title: &'static str,
+    /// Before Kitokey's version, at the foot of « Général », as GNOME's « About » and Windows' Settings
+    /// say it (#1089); the number follows, as `--version` gives it. Shows: Settings, « Général », its
+    /// last line, in secondary text the user can select to copy. When: always. At most: one word.
+    /// Placeholders: none.
+    pub version_said: &'static str,
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, a switch: its name, then its
     /// line under it (D29). When: always. At most: one line for the name, the line wraps.
     /// Placeholders: none.
@@ -1863,6 +1868,7 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "General",
             advanced_title: "Advanced",
+            version_said: "Version",
             developer: ["Developer mode", "Shows technical details under each error, to help troubleshoot."],
             program_said: "Technical details: {}",
             minutes_sections: ["Highlights", "Actions", "Key points"],
@@ -2304,6 +2310,7 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "Général",
             advanced_title: "Avancé",
+            version_said: "Version",
             developer: [
                 "Mode développeur",
                 "Affiche le détail technique sous chaque erreur, pour aider au diagnostic.",
