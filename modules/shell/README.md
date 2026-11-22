@@ -102,8 +102,8 @@ meetings in a sidebar of 280 px with the recording, a search over what each row 
 freeing space and the agreements in the pane beside it, as wide as the window leaves it; under 840 px,
 one at a time, the pane with a way back. A meeting opens from the list: its minutes as written, with
 who wrote them and where; its transcript in the meeting's order, each line with its side and
-voice, searched over what was said — the two side by side once the pane is 1000 px wide, their text
-75 characters at most; who spoke over the meeting; its folder, opened in the
+voice, searched over what was said, the word found marked (#1078) — the two side by side once the pane is 1000 px wide, their text
+75 characters at most; who spoke over the meeting, each segment a bar on its side's lane (#1077); its folder, opened in the
 system's file manager. *Réglages* sets what follows a recording, the transcription's model among
 those on this computer, the reminder and how long the audio is kept — each choice saved at once
 in the settings file; one Kitokey could not read is said, and not written over. Audio kept
@@ -383,6 +383,16 @@ keyboard, without which GTK is never told it has the focus. Missing GNOME Shell,
 extension or PipeWire, it says `NOT RUN`. `bash scripts/e2e.sh` alone still runs on the desktop
 itself — the tray, the notifications and the window shown, the run's microphone made the
 system's default meanwhile — for whoever wants to watch it: quit Kitokey first.
+
+## What it owes its crates' authors
+
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links under its licence's text, then what the window draws that is no crate —
+Lucide's icons (`ui/LUCIDE-LICENSE`) and Montserrat's outlines in its name (`ui/MONTSERRAT-OFL.txt`).
+It is made with cargo-about from `about.toml`, whose `accepted` list refuses any other licence, GPL
+among them, and `about.hbs`, which holds the two files' texts; it is committed, and
+`tests/notices.rs` is red once it no longer names the crates the program links, or no longer holds
+either file as written. `about.toml`'s header gives the two commands that make it again.
 
 ## Contracts
 
