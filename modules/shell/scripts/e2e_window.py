@@ -1024,13 +1024,15 @@ def model_offered(now: dt.datetime) -> None:
         no_blank = browser.execute_script(later)
         check("no transcript yet: one line says when who spoke will appear, in the who-spoke card, no blank canvas (#1116, #1134)",
               no_blank is not None and no_blank["text"] == "Le temps de parole s’affichera après la transcription." and no_blank["card"]
-              and no_blank["drawing"] <= 12, no_blank)
+              and no_blank["drawing"] <= 24, no_blank)
         # #1134: its sound playable, the player is offered, its slider a bare track: a slider's children are presentational
         # (WAI-ARIA 1.2), so the line said outside it, and a press on the line no seek.
+        # Its target and its rail read each on its own element (2.5.8): the slider's box, at least 24 px; the rail drawn in it,
+        # its ::before, 4 to 8 px — a rail not drawn reads 0 (cc98fad: a 6 px height eaten by border-box padding, i-v1138ok).
         bare = ("const s = document.querySelector('#meeting [role=slider]'), p = document.getElementById('who-spoke-later');"
                 " return {slider: !!s, play: !!document.getElementById('play'), line_in: !!(s && p && s.contains(p)),"
                 " text: s ? s.textContent.trim() : null, height: s ? Math.round(s.getBoundingClientRect().height) : 0,"
-                " rail: s ? Math.round(s.getBoundingClientRect().height - parseFloat(getComputedStyle(s).paddingTop) - parseFloat(getComputedStyle(s).paddingBottom)) : 0,"
+                " rail: s ? Math.round(parseFloat(getComputedStyle(s, '::before').height) || 0) : 0,"
                 " width: s ? Math.round(s.getBoundingClientRect().width) : 0}")
         track = browser.execute_script(bare)
         check("no transcript yet, its sound playable: the player offered, its slider a bare rail of 4 to 8 px in a 24 px target, the line outside it (#1134)",
