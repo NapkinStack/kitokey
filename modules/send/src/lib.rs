@@ -1,11 +1,15 @@
-//! `kitokey-send`'s core, as `posting/v1` says: which addresses are refused, and the one POST. The
-//! program uses [`Policy::strict`] alone; a test injects its own policy through this library to reach a
+//! `kitokey-send`'s core, as `posting/v1` says: which addresses are refused, what a meeting is sent as,
+//! and the one POST. The program (`src/main.rs`) uses [`Policy::strict`] alone; a test injects its own policy through this library to reach a
 //! server on this computer, never through the program.
 
 use std::fmt;
+use std::fs;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::path::Path;
 use std::time::Duration;
+
+use serde_json::{Value, json};
 
 use ureq::Agent;
 use ureq::unversioned::resolver::{DefaultResolver, ResolvedSocketAddrs, Resolver};
@@ -292,4 +296,279 @@ fn failed(error: &ureq::Error) -> Outcome {
         }
         _ => Outcome::Silent,
     }
+}
+
+// ---------------------------------------------------------------------------------------------------
+// The meeting
+
+/// What of a meeting leaves: its title, its sections, its actions. Never the audio, never the transcript.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Meeting {
+    /// The minutes' `title`, within `minutes`' bounds.
+    pub title: Option<String>,
+    /// The sections, in their order: each its `## ` title and its body.
+    pub sections: Vec<(String, String)>,
+    /// The section that holds the actions: v1–v4's second, v5's named by `actions`.
+    pub actions: Option<usize>,
+}
+
+/// Why a meeting is not sent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Unsent {
+    Unreadable,
+    Confidential,
+    NoSummary,
+}
+
+impl Meeting {
+    /// Reads a session's folder: `session-audio`'s `confidential` first, then `minutes.md` (v1 to v5).
+    pub fn read(folder: &Path) -> Result<Meeting, Unsent> {
+        match fs::metadata(folder.join("confidential")) {
+            Ok(_) => return Err(Unsent::Confidential),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(_) => return Err(Unsent::Unreadable),
+        }
+        if !folder.is_dir() {
+            return Err(Unsent::Unreadable);
+        }
+        let minutes = match fs::read_to_string(folder.join("minutes.md")) {
+            Ok(text) => text,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Err(Unsent::NoSummary),
+            Err(_) => return Err(Unsent::Unreadable),
+        };
+        let meeting = minutes_read(&minutes);
+        if meeting.sections.is_empty() {
+            return Err(Unsent::NoSummary);
+        }
+        Ok(meeting)
+    }
+
+    /// The items of the actions' section, each without its bullet.
+    pub fn action_items(&self) -> Vec<String> {
+        let Some((_, body)) = self.actions.and_then(|at| self.sections.get(at)) else {
+            return Vec::new();
+        };
+        body.lines()
+            .filter_map(|line| line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")))
+            .map(|item| item.trim().to_string())
+            .filter(|item| !item.is_empty())
+            .collect()
+    }
+}
+
+/// `minutes`: a front matter of `key: value` lines, then sections of second level.
+fn minutes_read(text: &str) -> Meeting {
+    let mut meeting = Meeting::default();
+    let mut lines = text.lines();
+    let (mut contract, mut ids, mut actions) = (None, None, None);
+    if lines.next() == Some("---") {
+        for line in lines.by_ref().take_while(|line| *line != "---") {
+            let Some((key, value)) = line.split_once(':') else { continue };
+            let value = value.trim();
+            match key {
+                "contract" => contract = Some(value.to_string()),
+                "title" => {
+                    let title = if value.starts_with('"') {
+                        serde_json::from_str::<String>(value).ok()
+                    } else {
+                        Some(value.to_string())
+                    };
+                    meeting.title = title
+                        .filter(|title| !title.trim().is_empty() && !title.chars().any(char::is_control) && title.chars().count() <= 80);
+                }
+                "sections" => {
+                    ids = serde_json::from_str::<Vec<Value>>(value).ok().map(|sections| {
+                        sections
+                            .iter()
+                            .map(|section| section["id"].as_str().unwrap_or_default().to_string())
+                            .collect::<Vec<_>>()
+                    })
+                }
+                "actions" => actions = Some(value.to_string()),
+                _ => {}
+            }
+        }
+    } else {
+        lines = text.lines();
+    }
+    for line in lines {
+        if let Some(title) = line.strip_prefix("## ") {
+            meeting.sections.push((title.trim().to_string(), String::new()));
+        } else if let Some((_, body)) = meeting.sections.last_mut() {
+            body.push_str(line);
+            body.push('\n');
+        }
+    }
+    for (_, body) in &mut meeting.sections {
+        *body = body.trim().to_string();
+    }
+    meeting.actions = if contract.as_deref() == Some("minutes/v5") {
+        actions.and_then(|id| ids?.iter().position(|each| *each == id))
+    } else {
+        (meeting.sections.len() >= 2).then_some(1)
+    };
+    meeting
+}
+
+// ---------------------------------------------------------------------------------------------------
+// What each kind receives
+
+/// The destination's kind: what the address is, and so what it is sent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Webhook,
+    Discord,
+    Slack,
+}
+
+/// Discord's `content`, in characters.
+pub const DISCORD_CONTENT: usize = 2000;
+/// Discord's file, by default, in bytes.
+pub const DISCORD_FILE: usize = 20 * 1024 * 1024;
+/// Past this, Slack truncates a message's `text`, in characters.
+pub const SLACK_TEXT: usize = 40_000;
+
+/// The summary's sections as Markdown, each opening on its `## ` title.
+pub fn summary(meeting: &Meeting) -> String {
+    let mut out = String::new();
+    for (number, (title, body)) in meeting.sections.iter().enumerate() {
+        if number > 0 {
+            out.push('\n');
+        }
+        out += &format!("## {title}\n\n");
+        if !body.is_empty() {
+            out += body;
+            out.push('\n');
+        }
+    }
+    out
+}
+
+/// What `kind` receives of a meeting named `title`, its file named after the session's folder; none when
+/// it does not fit within the destination's bounds (`summary.too_large`).
+pub fn body(kind: Kind, meeting: &Meeting, title: &str, folder_name: &str) -> Option<Body> {
+    let summary = summary(meeting);
+    match kind {
+        Kind::Webhook => Some(Body {
+            content_type: "application/json".into(),
+            bytes: json!({"title": title, "summary": summary, "actions": meeting.action_items()})
+                .to_string()
+                .into_bytes(),
+        }),
+        Kind::Discord => {
+            let file = format!("# {title}\n\n{summary}");
+            if file.len() > DISCORD_FILE {
+                return None;
+            }
+            let content = discord_content(title, &summary);
+            let payload = json!({"content": content, "allowed_mentions": {"parse": []}}).to_string();
+            Some(multipart(&payload, &format!("{folder_name}.md"), file.as_bytes()))
+        }
+        Kind::Slack => {
+            let text = format!("*{}*\n\n{}", mrkdwn_escaped(title), mrkdwn(&summary));
+            if text.chars().count() > SLACK_TEXT {
+                return None;
+            }
+            Some(Body {
+                content_type: "application/json".into(),
+                bytes: json!({"text": text}).to_string().into_bytes(),
+            })
+        }
+    }
+}
+
+/// The title in bold, then the summary's first lines, cut at a line's end within Discord's bound.
+fn discord_content(title: &str, summary: &str) -> String {
+    let mut content = format!("**{title}**");
+    if content.chars().count() > DISCORD_CONTENT {
+        return content.chars().take(DISCORD_CONTENT).collect();
+    }
+    let mut first = true;
+    for line in summary.lines() {
+        let added = if first { format!("\n\n{line}") } else { format!("\n{line}") };
+        if content.chars().count() + added.chars().count() > DISCORD_CONTENT {
+            break;
+        }
+        content += &added;
+        first = false;
+    }
+    content
+}
+
+/// A `multipart/form-data` body of `payload_json` and one file, as Discord's *Execute Webhook* takes it.
+fn multipart(payload: &str, file_name: &str, file: &[u8]) -> Body {
+    let boundary = boundary(&[payload.as_bytes(), file]);
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(
+        format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"payload_json\"\r\n\
+             Content-Type: application/json\r\n\r\n{payload}\r\n\
+             --{boundary}\r\nContent-Disposition: form-data; name=\"files[0]\"; filename=\"{file_name}\"\r\n\
+             Content-Type: text/markdown; charset=utf-8\r\n\r\n"
+        )
+        .as_bytes(),
+    );
+    bytes.extend_from_slice(file);
+    bytes.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+    Body {
+        content_type: format!("multipart/form-data; boundary={boundary}"),
+        bytes,
+    }
+}
+
+/// A boundary drawn for each send and absent from every part, as RFC 2046 asks: a meeting's text can
+/// never close a part, whatever line ending a server's parser accepts.
+fn boundary(parts: &[&[u8]]) -> String {
+    use std::hash::{BuildHasher, Hasher};
+    loop {
+        let drawn = || std::collections::hash_map::RandomState::new().build_hasher().finish();
+        let boundary = format!("kitokey-send-{:016x}{:016x}", drawn(), drawn());
+        if !parts
+            .iter()
+            .any(|part| part.windows(boundary.len()).any(|window| window == boundary.as_bytes()))
+        {
+            return boundary;
+        }
+    }
+}
+
+/// `&`, `<` and `>` escaped, as Slack's mrkdwn asks: a summary's `<!channel>` is text, never a mention.
+fn mrkdwn_escaped(text: &str) -> String {
+    text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+/// Markdown as Slack's mrkdwn: headings in bold, `**bold**` as `*bold*`, `[text](url)` as `<url|text>`.
+pub fn mrkdwn(markdown: &str) -> String {
+    let mut out = Vec::new();
+    for line in markdown.lines() {
+        let line = mrkdwn_escaped(line);
+        let heading = line.trim_start_matches('#');
+        let line = if heading.len() < line.len() && heading.starts_with(' ') {
+            format!("*{}*", heading.trim())
+        } else {
+            line
+        };
+        out.push(links(&line.replace("**", "*")));
+    }
+    out.join("\n") + "\n"
+}
+
+/// `[text](url)` as `<url|text>`, for a url that is `http:` or `https:`; anything else left as written.
+fn links(line: &str) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(open) = rest.find('[') {
+        let after = &rest[open + 1..];
+        let Some(close) = after.find("](") else { break };
+        let Some(end) = after[close + 2..].find(')') else { break };
+        let (text, url) = (&after[..close], &after[close + 2..close + 2 + end]);
+        out += &rest[..open];
+        if (url.starts_with("http://") || url.starts_with("https://")) && !url.contains(['|', ' ']) {
+            out += &format!("<{url}|{text}>");
+        } else {
+            out += &rest[open..open + 1 + close + 2 + end + 1];
+        }
+        rest = &after[close + 2 + end + 1..];
+    }
+    out + rest
 }
