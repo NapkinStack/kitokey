@@ -8080,11 +8080,14 @@ def renaming(now: dt.datetime) -> None:
                "presses reaching the button": [clicks, browser.execute_script("return window.__recordClicks")],
                "pressed, seconds after the start's press": after_start,
                "session.json": (recording / "session.json").read_text()})
-        # #1076: once it stops, the page leaves the live time and meters for the meeting's range, its poll ended.
-        settled = wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
-            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 10)
-        check("stopped: the page shows the meeting's range again, no live time nor meters (#1076)", settled,
-              [browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
+        # #1076: once it stops, the page leaves the live time and meters for its rest, its poll ended: the meeting's range,
+        # or, with no transcript yet, the line saying when who spoke will appear (#1134: no legend while nothing is drawn).
+        resting = ("return document.querySelector('#meeting .legend .range')?.textContent"
+                   " ?? document.getElementById('who-spoke-later')?.textContent ?? ''")
+        at_rest = lambda b: (lambda r: "–" in r or "transcription" in r)(b.execute_script(resting))
+        settled = wait_for(browser, lambda b: b.execute_script(alive) is None and at_rest(b), 10)
+        check("stopped: the page at rest again, its range or its line before a transcript, no live time nor meters (#1076, #1134)", settled,
+              [browser.execute_script(alive), browser.execute_script(resting)])
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
         check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
@@ -8134,10 +8137,9 @@ def renaming(now: dt.datetime) -> None:
               got_tracked)
         time.sleep(0.8)
         browser.execute_script("window.__TAURI__.core.invoke('record')")
-        drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
-            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 5)
-        check("stopped from elsewhere, the window's button not pressed: the page draws its range back by itself (#1076)", drawn_back,
-              [again, live_again, browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
+        drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and at_rest(b), 5)
+        check("stopped from elsewhere, the window's button not pressed: the page draws its rest back by itself (#1076, #1134)", drawn_back,
+              [again, live_again, browser.execute_script(alive), browser.execute_script(resting)])
 
 
 def actions_rows(now: dt.datetime) -> None:
