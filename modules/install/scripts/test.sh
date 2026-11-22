@@ -17,6 +17,14 @@ installed = {expand(m) for m in re.findall(r"^install -D\S* \S+ (\S+)$", spec, r
 files = {expand(line.strip()) for line in spec.split("%files", 1)[1].splitlines()
          if line.strip() and not line.startswith(("%if", "%endif", "%license"))}
 failed = 0
+# What every package owes the authors of what it ships, by its name there (D102): windows/notices.py.
+OWED = ["LICENSE.txt", "MPL-SOURCES.txt"] + [f"THIRD-PARTY-NOTICES-{program}.html" for program in
+        ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary")]
+def pages(artefacts):
+    """A fixture's pages, as each module's release leaves its own."""
+    for module in ("shell", "capture", "transcription", "summary"):
+        os.makedirs(os.path.join(artefacts, module), exist_ok=True)
+        open(os.path.join(artefacts, module, "THIRD-PARTY-NOTICES.html"), "w").write(f"<p>{module}'s crates</p>")
 def check(what, held, got=""):
     global failed
     print(f"  {'ok  ' if held else 'FAIL'}  {what}" + ("" if held else f"\n        got: {got}"))
@@ -27,9 +35,9 @@ for program in ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-
 check("the desktop entry is named as the application's id", "/usr/share/applications/com.napkinstack.Kitokey.desktop" in files)
 check("its icon, under the same name", "/usr/share/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png" in files)
 check("nothing outside /usr: the user's meetings and settings are never the package's", all(f.startswith("/usr/") for f in files), files)
-check("its licence is the repository's, GPL-3.0, and a package built from source ships it (D78)",
-      re.search(r"^License:\s+GPL-3\.0-only$", spec, re.M) is not None
-      and re.search(r"^%if 0%\{\?from_source\}\n%license LICENSE\n%endif$", spec, re.M) is not None)
+check("its licence is the repository's, GPL-3.0", re.search(r"^License:\s+GPL-3\.0-only$", spec, re.M) is not None)
+check("what it owes its third parties is in its licences' folder, from source or not (D102)",
+      all(f"/usr/share/licenses/kitokey/{name}" in files for name in OWED), sorted(files))
 check("pw-metadata required: capture runs it, no library names it", re.search(r"^Requires:\s+pipewire-utils$", spec, re.M) is not None)
 check("the tray's library required: the shell opens it at run time, no link names it",
       re.search(r"^Requires:.*\blib(ayatana-)?appindicator-gtk3\b", spec, re.M) is not None)
@@ -45,6 +53,30 @@ check("pw-metadata and the tray's library named in its dependencies: run and ope
       re.search(r"pipewire-bin, libayatana-appindicator3-1 \| libappindicator3-1", build) is not None)
 check("its control names the package, its version and its dependencies as computed",
       all(f"{field}: @" in control for field in ("Version", "Architecture", "Depends")) and "Package: kitokey" in control)
+check("the .deb lays the same notices in its documentation's folder (D102)",
+      all(re.search(rf'^install -Dm644 \S+ "\$root/usr/share/doc/kitokey/{re.escape(name)}"$', build, re.M) for name in OWED), build)
+# Its copyright file (#1118): Debian Policy 12.5 — /usr/share/doc/kitokey/copyright, a plain file in UTF-8,
+# saying where the sources are, the GPL referred to /usr/share/common-licenses —, in DEP-5 1.0's form.
+# A minimised Ubuntu keeps it alone of that folder: it points to the notices beside it.
+check("the .deb lays its copyright file, a plain file, in its documentation's folder (Debian Policy 12.5)",
+      re.search(r'^install -Dm644 /deb/copyright "\$root/usr/share/doc/kitokey/copyright"$', build, re.M) is not None, build)
+copyright_path = os.path.join(os.path.dirname(sys.argv[3]), "copyright")
+try:
+    copyright = open(copyright_path, encoding="utf-8").read()
+except (OSError, UnicodeDecodeError) as error:
+    copyright = ""
+    print(f"        {copyright_path}: {error}")
+stanzas = [dict(re.findall(r"^([A-Za-z-]+):[ \t]*(.*)$", stanza, re.M)) for stanza in copyright.strip().split("\n\n")] if copyright else [{}]
+check("it is DEP-5 1.0: its Format line first, then a Files stanza with Copyright and License",
+      copyright.startswith("Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\n")
+      and any(s.get("Files") == "*" and s.get("Copyright") and s.get("License") for s in stanzas[1:]), stanzas)
+check("it says where the sources are: the repository",
+      stanzas[0].get("Source") == "https://github.com/NapkinStack/kitokey", stanzas[0])
+check("Kitokey's licence, the GPL-3.0 only, referred to /usr/share/common-licenses/GPL-3",
+      any(s.get("Files") == "*" and s.get("License") == "GPL-3" for s in stanzas)
+      and "/usr/share/common-licenses/GPL-3" in copyright, stanzas)
+check("it names each notice laid beside it, which carries its third parties' licences",
+      all(f"/usr/share/doc/kitokey/{name}" in copyright for name in OWED if name != "LICENSE.txt"), copyright)
 scripts = [f for f in os.listdir(os.path.dirname(sys.argv[3])) if f in ("preinst", "postinst", "prerm", "postrm", "triggers")]
 check("no maintainer script: installing and removing touch nothing but the package's files", not scripts, scripts)
 check("the graphics card's Vulkan driver recommended by both: the transcript is made there",
@@ -63,6 +95,9 @@ for program in ("shell/kitokey", "capture/kitokey-capture", "transcription/kitok
                 # Apple's SpeechAnalyzer, through transcription's Swift program (D42, ADR-0012).
                 "transcription/kitokey-speech"):
     check(f"{program.split('/')[1]} in Contents/MacOS, beside the others", program in macbuild)
+check("the Mac's app lays the same notices in its resources, before its seal (D102)",
+      all(re.search(rf'^install -m644 \S+ "\$app/Contents/Resources/{re.escape(name)}"$', macbuild, re.M) for name in OWED)
+      and all(macbuild.index(f'"$app/Contents/Resources/{name}"') < macbuild.index('codesign --force --sign - "$app"') for name in OWED))
 each, bundle = "codesign --force --sign - \"$program\"", "codesign --force --sign - \"$app\""
 check("signed ad hoc, each program then the bundle, last of all: its seal covers what is in it",
       each in macbuild and bundle in macbuild and macbuild.index(each) < macbuild.index(bundle)
@@ -91,13 +126,16 @@ with tempfile.TemporaryDirectory() as work:
     for name in names:
         os.makedirs(os.path.join(artefacts, os.path.dirname(name)), exist_ok=True)
         open(os.path.join(artefacts, name), "wb").write(name.encode())
+    pages(artefacts)
     os.makedirs(out)
     subprocess.run([sys.executable, windows, artefacts, "1.2.3", out], check=True, stdout=subprocess.DEVNULL)
     made = os.listdir(out)
     check("Windows' zip is named by its version and processor", made == ["Kitokey-1.2.3-windows-x64.zip"], made)
     inside = sorted(zipfile.ZipFile(os.path.join(out, made[0])).namelist()) if made else []
-    check("the four programs side by side in one folder, where the shell looks for them",
-          inside == sorted(f"Kitokey/{name.split('/')[1]}" for name in names), inside)
+    check("the four programs side by side in one folder, where the shell looks for them, and what they owe beside them",
+          inside == sorted([f"Kitokey/{name.split('/')[1]}" for name in names] + [f"Kitokey/{owed}" for owed in OWED]), inside)
+    shell_page = zipfile.ZipFile(os.path.join(out, made[0])).read("Kitokey/THIRD-PARTY-NOTICES-kitokey.html") if made else b""
+    check("each program's page is its module's, as its release left it", shell_page == b"<p>shell's crates</p>", shell_page)
 # Windows' package (D54): made on Windows by windows/msix.py; its manifest and what it holds, read here.
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.join(os.path.dirname(mac), "windows"))
@@ -121,15 +159,16 @@ check("the identity named is the one identity.json holds, for x64",
       said.get("Name") == identity["name"] and said.get("Publisher") == identity["publisher"]
       and said.get("ProcessorArchitecture") == "x64", said)
 check("Kitokey is its name", written.findtext("m:Properties/m:DisplayName", namespaces=ns) == "Kitokey")
-# D84: the session starts Kitokey from its package, a startup task Windows turns on at the first start.
+# D84: the session can start Kitokey from its package, a startup task — off until the user turns it on in
+# Settings (#1085): starting with Windows is asked, never assumed.
 uap5 = "{http://schemas.microsoft.com/appx/manifest/uap/windows10/5}"
 tasks = [(extension.attrib, extension.find(f"{uap5}StartupTask"))
          for extension in written.iterfind(f"m:Applications/m:Application/m:Extensions/{uap5}Extension", ns)
          if extension.get("Category") == "windows.startupTask"]
-check("one startup task, for kitokey.exe, on at the first start, named Kitokey",
+check("one startup task, for kitokey.exe, off until the user turns it on, named Kitokey",
       len(tasks) == 1 and tasks[0][0].get("Executable") == "kitokey.exe"
       and tasks[0][0].get("EntryPoint") == "Windows.FullTrustApplication" and tasks[0][1] is not None
-      and tasks[0][1].get("TaskId") == "KitokeyStartupTask" and tasks[0][1].get("Enabled") == "true"
+      and tasks[0][1].get("TaskId") == "KitokeyStartupTask" and tasks[0][1].get("Enabled") == "false"
       and tasks[0][1].get("DisplayName") == "Kitokey", tasks)
 placeholder = {**identity, "placeholder": True}
 check("a placeholder identity is said, and that the package is not to be submitted",
@@ -155,10 +194,22 @@ with tempfile.TemporaryDirectory() as work:
     for name in names:
         os.makedirs(os.path.join(artefacts, os.path.dirname(name)), exist_ok=True)
         open(os.path.join(artefacts, name), "wb").write(name.encode())
+    pages(artefacts)
     msix.stage(artefacts, "1.2.3", stage)
     held = {os.path.relpath(os.path.join(folder, file), stage).replace(os.sep, "/") for folder, _, files in os.walk(stage) for file in files}
-    check("the four programs, the manifest and its logos are what it holds, and no more",
-          held == {name.split("/")[1] for name in names} | {"AppxManifest.xml"} | {logo.replace("\\", "/") for logo in sizes}, held)
+    check("the four programs, the manifest, its logos and what they owe are what it holds, and no more",
+          held == {name.split("/")[1] for name in names} | {"AppxManifest.xml"} | {logo.replace("\\", "/") for logo in sizes} | set(OWED), held)
+    licence = open(os.path.join(stage, "LICENSE.txt"), encoding="utf-8").read()
+    check("Kitokey's own licence among them, the GPL-3.0", "GNU GENERAL PUBLIC LICENSE" in licence and "Version 3" in licence)
+    mpl = open(os.path.join(stage, "MPL-SOURCES.txt"), encoding="utf-8").read()
+    check("where the MPL crates' sources are, and that their licence governs them (MPL-2.0 §3.2)",
+          "https://crates.io/crates/" in mpl and "Mozilla Public License 2.0" in mpl and "3.2" in mpl, mpl)
+    os.remove(os.path.join(artefacts, "capture", "THIRD-PARTY-NOTICES.html"))
+    try:
+        msix.stage(artefacts, "1.2.3", os.path.join(work, "again"))
+        check("a module's page missing, no package is made", False)
+    except (FileNotFoundError, SystemExit) as refused:
+        check("a module's page missing, no package is made", "capture" in str(refused), refused)
     for logo, side in sizes.items():
         head = open(os.path.join(stage, logo.replace("\\", "/")), "rb").read(24) if logo else b""
         check(f"{logo} is a PNG of {side}x{side}", head[:8] == b"\x89PNG\r\n\x1a\n"
@@ -181,6 +232,22 @@ with tempfile.TemporaryDirectory() as work:
     for path, why in ((broken, "a file that is not the kit's report"), (os.path.join(work, "none.xml"), "no file")):
         got = appcert.said(path)
         check(f"{why}: one line, saying no report was read", len(got) == 1 and got[0].startswith("certification kit: no report read"), got)
+        check(f"{why}: the run fails, no report read (D102)", appcert.verdict(path) == 2)
+# D102: the run fails on a required test failed, or on no report at all; an optional test failed is named, never blocking.
+check("the kit's report with only an optional test failed passes the run",
+      appcert.verdict(os.path.join(os.path.dirname(mac), "tests", "appcert-report.xml")) == 0)
+with tempfile.TemporaryDirectory() as work:
+    report = open(os.path.join(os.path.dirname(mac), "tests", "appcert-report.xml"), encoding="utf-8").read()
+    required = os.path.join(work, "required.xml")
+    open(required, "w", encoding="utf-8").write(report.replace("<RESULT><![CDATA[PASS]]></RESULT>", "<RESULT><![CDATA[FAIL]]></RESULT>", 1))
+    check("a required test failed fails the run", appcert.verdict(required) == 1)
+    unrun = os.path.join(work, "unrun.xml")
+    open(unrun, "w", encoding="utf-8").write(report.replace("<RESULT><![CDATA[PASS]]></RESULT>", "<RESULT><![CDATA[NOT RUN]]></RESULT>", 1))
+    check("a required test not run fails the run, never skipped silently", appcert.verdict(unrun) == 1)
+    check("no report read fails the run: a kit that did not run is never a pass", appcert.verdict(os.path.join(work, "none.xml")) == 2)
+    empty = os.path.join(work, "empty.xml")
+    open(empty, "w", encoding="utf-8").write(re.sub(r"<REQUIREMENTS>.*</REQUIREMENTS>", "<REQUIREMENTS />", report, flags=re.S))
+    check("a report without a test fails the run: a kit that tested nothing is never a pass", appcert.verdict(empty) == 2)
 check("the notes for certification say what stands between the package and a submission, the kit's failure in it",
       "## What stands between the package and a submission" in certification and "Blocked executables" in certification)
 print("test: passed" if not failed else "test: FAILED")

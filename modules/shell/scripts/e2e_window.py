@@ -1004,6 +1004,30 @@ def model_offered(now: dt.datetime) -> None:
         # Said once (#775): what it waits for, never « Pas encore de transcription » beside it.
         nones = browser.execute_script("return [...document.querySelectorAll('#meeting .transcript .none')].filter(e => e.offsetParent !== null).map(e => e.textContent)")
         check("a transcript waiting for its model says that alone, not also that there is none (#775)", nones == [], nones)
+        # #1116 (the decider, 2026-11-21 ~19h): no transcript yet, the who-spoke area keeps no blank height — one line says
+        # when it will appear (an empty state says what will come, NN/g), in the soft colour.
+        later = ("const d = document.querySelector('#meeting .drawing'), p = document.getElementById('who-spoke-later');"
+                 " if (!d || !p) return null; const s = getComputedStyle(p);"
+                 " return {text: p.textContent, inside: d.contains(p),"
+                 " height: Math.round(d.getBoundingClientRect().height), line: Math.round(parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.45)}")
+        no_blank = browser.execute_script(later)
+        check("no transcript yet: one line says when who spoke will appear, the area no taller than that line (#1116)",
+              no_blank is not None and no_blank["text"] == "Le temps de parole s’affichera après la transcription." and no_blank["inside"]
+              and no_blank["height"] <= no_blank["line"] + 24, no_blank)
+        # A legend names what is drawn: with nothing drawn yet, « Vous — votre micro » / « Les autres — … » are not shown;
+        # the range stays, the player's (the coordinator, 2026-11-21).
+        named = browser.execute_script("return [...document.querySelectorAll('#meeting .legend .here, #meeting .legend .remote')].filter(e => e.getClientRects().length).length")
+        ranged = browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? ''")
+        check("no transcript yet: the legend's two names not shown, its range kept (#1116)", named == 0 and "–" in ranged, [named, ranged])
+        size = browser.get_window_size()
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            browser.execute_script("scrollTo(0, 0)")
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1116-untranscribed-{width}-{theme}", theme)
+        browser.set_window_size(size["width"], size["height"])
+        time.sleep(0.3)
         # The tray's entry that fetches it follows the language chosen, at once (D64).
         speak = lambda code: browser.execute_script("return window.__TAURI__.core.invoke('settings_saved', {change: {language: arguments[0]}})", code)
         tray = lambda b, said: any(label.startswith(said) for label in tray_labels())
@@ -5136,6 +5160,28 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def settings_version(now: dt.datetime) -> None:
+    """CJ. Settings' « Général » says Kitokey's version at its foot (#1089), as `--version` says it: « Version
+    1.0.0 », secondary text a person can select and copy for support, in French and in English."""
+    print("CJ. Settings: « Général » says the version, as --version does, selectable (#1089)")
+    said = subprocess.run([str(BINARY), "--version"], capture_output=True, text=True, timeout=30).stdout.strip()
+    version = said.removeprefix("kitokey ")
+    line = ("const v = document.getElementById('app-version'); const c = v && v.closest('section.card');"
+            " return v ? {text: v.textContent, card: c ? c.querySelector('h2').textContent : null,"
+            " select: getComputedStyle(v).userSelect, shown: v.getClientRects().length > 0,"
+            " last: !!c && c.lastElementChild === v} : null")
+    for locale, card in (("fr_FR.UTF-8", "Général"), ("en_US.UTF-8", "General")):
+        taping = WORK / f"settings-version-{locale[:2]}"
+        taping.mkdir()
+        with Window(taping, locale, 'after = "nothing"\n') as browser:
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.execute_script(line) is not None, 10)
+            got = browser.execute_script(line)
+            check(f"{locale[:2]}: « Version {version} » at the foot of « {card} », shown and selectable (#1089)",
+                  bool(version) and got is not None and got["text"] == f"Version {version}" and got["card"] == card
+                  and got["shown"] and got["last"] and got["select"] not in ("none",), (said, got))
+
+
 def settings_narrow_without_model(now: dt.datetime) -> None:
     """BU. Settings at 420 px on a Kitokey with no model on this computer (#868): the guided step for the
     transcription — its way, the model's state and its offer — inside its card, nothing spilling; « Avancé »
@@ -7949,6 +7995,51 @@ def renaming(now: dt.datetime) -> None:
         check("being recorded, Libérer de l'espace names it, its date beside", bool(busy) and busy[0][0] == "En direct" and "·" in busy[0][1], busy)
         browser.execute_script(f"location.hash = '#/meeting/{recording.name}'")
         wait_for(browser, lambda b: head(b) == "En direct", 10)
+        # #1076: while it records, its page shows the time running and both sides' levels, read from what the bar
+        # reads (`recording_now`); neither is a live region, as the bar's are not.
+        alive = ("const t = document.getElementById('page-time'), m = [...document.querySelectorAll('#meeting .page-level')];"
+                 " return t && t.getClientRects().length ? {time: t.textContent, live: t.closest('[aria-live]') !== null || m.some(e => e.closest('[aria-live]') !== null),"
+                 " meters: m.map(e => [e.getAttribute('role'), e.getAttribute('aria-label'), Number(e.getAttribute('aria-valuenow'))])} : null")
+        first_seen = wait_for(browser, lambda b: b.execute_script(alive), 5) and browser.execute_script(alive)
+        time.sleep(1.2)
+        later = browser.execute_script(alive)
+        check("while it records, its page shows the time running and both sides' levels as meters, no live region (#1076)",
+              bool(first_seen) and bool(later) and later["time"] != first_seen["time"] and later["time"].count(":") == 2 and not later["live"]
+              and [m[0] for m in later["meters"]] == ["meter", "meter"] and all(m[1] for m in later["meters"]) and all(m[2] > 0 for m in later["meters"]),
+              [first_seen, later])
+        # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
+        # left at the legend's right, where the range stands at rest.
+        big = ("const t = document.getElementById('page-time'), d = document.querySelector('#meeting .drawing'), h = document.querySelector('#meeting h1'),"
+               " m = [...document.querySelectorAll('#meeting .page-level')]; if (!t || !d || !h) return null; const r = t.getBoundingClientRect();"
+               " return {inside: d.contains(t), size: parseFloat(getComputedStyle(t).fontSize), heading: parseFloat(getComputedStyle(h).fontSize),"
+               " tabular: getComputedStyle(t).fontVariantNumeric.includes('tabular-nums'),"
+               " under: m.length === 2 && m.every(e => d.contains(e) && e.getBoundingClientRect().top >= r.bottom),"
+               " right: document.querySelector('#meeting .legend .range')?.textContent ?? null,"
+               # Each side's label right under its own meter (Gestalt proximity), within the meter's width.
+               " labels: m.map((e, i) => { const l = e.parentElement.querySelector(i ? ':scope > .remote' : ':scope > .here'); if (!l) return false;"
+               " const a = e.getBoundingClientRect(), b = l.getBoundingClientRect();"
+               " return b.left >= a.left - 1 && b.right <= a.right + 1 && b.top >= a.bottom - 1 && b.top - a.bottom <= 16; })}")
+        large = browser.execute_script(big)
+        check("while it records, the time stands large in the who-spoke area, tabular, the meters under it, each side's label under its meter, nothing at the legend's right (#1112)",
+              large is not None and large["inside"] and large["size"] >= large["heading"] and large["tabular"] and large["under"] and large["right"] is None and large["labels"] == [True, True],
+              large)
+        # Its page while it records, seen (#1076, T4; the source of the Store's recording shot): 420 and 1100 px, light and dark.
+        size = browser.get_window_size()
+        drawn_meters = ("const d = document.querySelector('#meeting .drawing')?.getBoundingClientRect(); if (!d) return null;"
+                        " return [...document.querySelectorAll('#meeting .page-level')].map(e => { const r = e.getBoundingClientRect();"
+                        " return [Math.round(r.width), Math.round(r.height), r.left >= d.left - 1 && r.right <= d.right + 1 && r.top >= d.top - 1 && r.bottom <= d.bottom + 1]; })")
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            browser.execute_script("scrollTo(0, 0)")
+            # #1112: each side's meter drawn, at both widths — wide enough to read, a bar's height, inside the area.
+            meters_seen = browser.execute_script(drawn_meters)
+            check(f"at {width} px, both meters drawn: at least 120 × 4 px, inside the who-spoke area (#1112)",
+                  meters_seen is not None and len(meters_seen) == 2 and all(w >= 120 and h >= 4 and inside for w, h, inside in meters_seen), meters_seen)
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1076-recording-{width}-{theme}", theme)
+        browser.set_window_size(size["width"], size["height"])
+        time.sleep(0.3)
         # Pressed once it is the stop gesture, as the shell says it: recording, nothing stopping, no
         # press of the window's still answered — and once the shell's half second has passed since
         # the start's press, which takes a press within it for the same one (D68). 6eb6ce0's red in a
@@ -7971,9 +8062,64 @@ def renaming(now: dt.datetime) -> None:
                "presses reaching the button": [clicks, browser.execute_script("return window.__recordClicks")],
                "pressed, seconds after the start's press": after_start,
                "session.json": (recording / "session.json").read_text()})
+        # #1076: once it stops, the page leaves the live time and meters for the meeting's range, its poll ended.
+        settled = wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
+            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 10)
+        check("stopped: the page shows the meeting's range again, no live time nor meters (#1076)", settled,
+              [browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
         check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
+        # #1076: stopped from elsewhere — by the shell's own command, as the tray, the shortcut and the bar stop it —, the
+        # window's button is never pressed, and its redraw a moment after a press (`setTimeout(refresh, 1200)`) never
+        # comes: the page's poll alone draws the range back.
+        now_meeting = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('recording_now')"
+                       ".then((n) => done(n.recording && n.meeting ? n.meeting : null), () => done(null))")
+        # Pressed only once the shell holds no recording nor its stop: before, a press counts as the stop going on, and
+        # is let go (`toggle_recording`) — s1076ok2's red was that press, not the page.
+        idle_header = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('header')"
+                       ".then((h) => done(!h.recording && !h.stopping), () => done(false))")
+        wait_for(browser, lambda b: b.execute_async_script(idle_header), 10)
+        time.sleep(0.6)
+        browser.execute_script("window.__TAURI__.core.invoke('record')")
+        wait_for(browser, lambda b: b.execute_async_script(now_meeting), 10)
+        again = browser.execute_async_script(now_meeting)
+        if again:
+            # The same folder as before (the recorder played here names it): the page left, then opened again, so it is
+            # drawn for the recording.
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{again}")
+        live_again = bool(again) and wait_for(browser, lambda b: b.execute_script(alive), 10)
+        # #1130 (sam's review): a track gained while it records (`session-audio/v2`, *A track gained later*), as a real
+        # capture writes it at once: the page offers its sound (`listen`), and a slider's children are presentational
+        # (WAI-ARIA 1.2), so neither meter may stand inside one — nor the time take a press for a seek.
+        if again:
+            folder = recording.parent / again
+            record = json.loads((folder / "session.json").read_text())
+            record["tracks"] = {"local": {"device": "Mic"}}
+            with wave.open(str(folder / "local.wav"), "wb") as made:
+                made.setnchannels(1)
+                made.setsampwidth(2)
+                made.setframerate(48000)
+                made.writeframes(bytes(2 * 48000))
+            (folder / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n')
+            (folder / "session.json").write_text(json.dumps(record))
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{again}")
+        tracked = ("const m = [...document.querySelectorAll('#meeting [role=meter]')], t = document.getElementById('page-time');"
+                   " return t && t.getClientRects().length ? {meters: m.length, in_slider: m.filter(e => e.closest('[role=slider]')).length,"
+                   " time_in_slider: t.closest('[role=slider]') !== null, sliders: document.querySelectorAll('#meeting [role=slider]').length} : null")
+        seen_tracked = bool(again) and wait_for(browser, lambda b: b.execute_script(tracked), 10)
+        got_tracked = browser.execute_script(tracked)
+        check("while it records, a track gained: both meters and the time stand in no slider (#1130)",
+              seen_tracked and got_tracked is not None and got_tracked["meters"] == 2 and got_tracked["in_slider"] == 0 and not got_tracked["time_in_slider"],
+              got_tracked)
+        time.sleep(0.8)
+        browser.execute_script("window.__TAURI__.core.invoke('record')")
+        drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
+            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 5)
+        check("stopped from elsewhere, the window's button not pressed: the page draws its range back by itself (#1076)", drawn_back,
+              [again, live_again, browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
 
 
 def actions_rows(now: dt.datetime) -> None:
@@ -8832,6 +8978,12 @@ def models_on_the_page(now: dt.datetime) -> None:
                   and got["transcription"]["label"] == "Modèle de transcription"
                   and any(line.startswith("Compte rendu du 18 oct. à ") and line.endswith(" · Qwen3 14b") for line in lines)
                   and any(line.startswith("Transcrit le 18 oct. à ") and line.endswith(" · Whisper page settings") for line in lines), (got, lines))
+            # #1094: each list on its line quiet — no frame, no ground until hovered —, Lucide's chevron after it.
+            quiet = browser.execute_script(
+                "return [...document.querySelectorAll('#meeting .maker .page-model')].map(s => { const c = getComputedStyle(s), n = s.nextElementSibling;"
+                " return [c.borderTopColor, c.backgroundColor, !!n && n.matches('svg.glyph.chevron'), getComputedStyle(s.parentElement).fontFamily.includes('monospace')]; })")
+            check("each model list on its line is quiet, a chevron after it, the line in the text's face (#1094)",
+                  len(quiet) == 2 and all(q == ["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)", True, False] for q in quiet), quiet)
             if not shown:
                 return
             # Drawn again — refresh(), as a focus does —: the models already read are not asked again.
@@ -11162,16 +11314,40 @@ def window_looks(now: dt.datetime) -> None:
             "return [...document.querySelectorAll('.primary, .open, .icon-button, select, .search, .field input, .setting')]"
             ".filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select')).map(e => [e.id || e.className, e.getBoundingClientRect().height]).filter(([, h]) => h !== 32)")
         check("every control shown is 32 px high (D89)", tall == [], tall)
-        edged = browser.execute_script(
-            "const t = document.createElement('i'); t.style.color = 'var(--edge)'; document.body.append(t); const edge = getComputedStyle(t).color; t.remove();"
-            " const all = [...document.querySelectorAll('.open, select, .search, .field input, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
-            " return [all.length > 0, all.filter(e => getComputedStyle(e).borderTopColor !== edge).map(e => e.id || e.className)]")
-        check("fields and secondary buttons are bordered with --edge (D89)", edged == [True, []], edged)
         filled = browser.execute_script(
             "const t = document.createElement('i'); t.style.background = 'var(--surface)'; document.body.append(t); const surface = getComputedStyle(t).backgroundColor; t.remove();"
-            " const all = [...document.querySelectorAll('select, .search, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
+            " const all = [...document.querySelectorAll('select, .search, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select, .page-model'));"
             " return [all.length > 0, all.filter(e => getComputedStyle(e).backgroundColor !== surface).map(e => e.id || e.className)]")
         check("fields are drawn on the surface, only edged, as board 2 (D89)", filled == [True, []], filled)
+        # #1094, on Settings — the page holding a list, a field and secondary buttons at once (the meeting's page here
+        # has no list of its own nor a secondary shown): fields rest on the line, their bottom edged at 3:1 (Fluent 2's
+        # fields); a secondary button rests on the line, its bottom edged as Windows 11's controls — on --raised, or on the
+        # surface inside a step — and answers the pointer.
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed() and b.find_elements(By.CSS_SELECTOR, "#settings select"), 10)
+        token = ("const token = (v) => { const t = document.createElement('i'); t.style.color = `var(${v})`; document.body.append(t);"
+                 " const c = getComputedStyle(t).color; t.remove(); return c; };")
+        edged = browser.execute_script(
+            token + " const all = [...document.querySelectorAll('select, .search, .field input, .setting')].filter(e => e.offsetParent && !e.closest('#small')"
+            " && !e.matches('.setting select, .page-model'));"
+            " return [all.filter(e => e.matches('select')).length > 0, all.filter(e => { const s = getComputedStyle(e);"
+            " return s.borderTopColor !== token('--line') || s.borderBottomColor !== token('--edge'); }).map(e => e.id || e.className)]")
+        check("fields rest on --line, their bottom edged with --edge (#1094)", edged == [True, []], edged)
+        bare = browser.execute_script(
+            token + " const all = [...document.querySelectorAll('#settings .open')].filter(e => e.offsetParent);"
+            " return [all.length > 0, all.filter(e => { const s = getComputedStyle(e);"
+            " return s.borderTopColor !== token('--line') || s.borderBottomColor !== token('--edge') || s.backgroundColor !== token(e.closest('.step') ? '--surface' : '--raised'); })"
+            ".map(e => e.id || e.className)]")
+        check("secondary buttons rest on --line, their bottom edged, on --raised or a step's surface (#1094)", bare == [True, []], bare)
+        hovered = next((e for e in browser.find_elements(By.CSS_SELECTOR, "#settings .open") if e.is_displayed()), None)
+        if hovered is not None:
+            ActionChains(browser).move_to_element(hovered).perform()
+            time.sleep(0.3)
+        answered = hovered is not None and browser.execute_script(token + " return getComputedStyle(arguments[0]).backgroundColor === token('--hover')", hovered)
+        check("a secondary button hovered takes --hover (#1094)", answered, hovered.get_attribute("id") or hovered.text if hovered is not None else None)
+        ActionChains(browser).move_to_element(browser.find_element(By.CSS_SELECTOR, ".brand")).perform()
+        browser.execute_script(f"location.hash = '#/meeting/{made.name}'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
         # The trial over (D83): buying holds it in the recording's place, then gives it back.
         swapped = [browser.execute_script(f"paintRefused({state}); return arguments[0]", None) or browser.execute_script(PRIMARIES) for state in ("true", "false")]
         check("the trial over, one primary still: « Acheter Kitokey », then the recording's again", swapped == [["buy"], ["record"]], swapped)
@@ -13899,6 +14075,7 @@ def main() -> int:
     unsaved_choice_kept(now)
     key_kept_to_its_host(now)
     settings_folded(now)
+    settings_version(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
     focus_kept(now)

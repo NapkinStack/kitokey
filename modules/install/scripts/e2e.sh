@@ -28,6 +28,8 @@ if [ -z "$package$copr" ]; then
     mkdir -p "$work/$(dirname "$program")"
     printf '#!/bin/sh\necho "%s: usage: …" >&2\nexit 2\n' "$(basename "$program")" > "$work/$program"
     chmod +x "$work/$program"
+    # The page each module's release leaves beside its program (D102), which every package lays.
+    printf '<p>%s: stand-in notices</p>\n' "$(basename "$program")" > "$work/$(dirname "$program")/THIRD-PARTY-NOTICES.html"
   done
   printf '[Desktop Entry]\nType=Application\nName=Kitokey\nComment[fr]=x\nExec=kitokey\nIcon=com.napkinstack.Kitokey\n' > "$work/shell/com.napkinstack.Kitokey.desktop"
   printf 'png' > "$work/shell/com.napkinstack.Kitokey.png"
@@ -37,13 +39,13 @@ if [ -z "$package$copr" ]; then
   made=("$work"/install/*.rpm "$work"/install/*.deb)
   package=${made[0]}
 fi
-# What any package must install, and nothing else: the spec's %files, its macros expanded. The
-# licence is shipped by a package built from source (`from_source`): Copr's must hold it; a package
-# given may — one made from the artefacts does not.
+# What any package must install, and nothing else: the spec's %files, its macros expanded — the
+# notices it owes among them (D102), which a .deb lays in its documentation's folder instead.
 files=$(sed -n '/^%files/,$p' "$here/kitokey.spec" \
-  | sed '1d; /^$/d; /^%if/d; /^%endif/d; s|%{_bindir}|/usr/bin|; s|%{_datadir}|/usr/share|; s|^%license LICENSE$|/usr/share/licenses/kitokey/LICENSE|' | sort)
-licence=/usr/share/licenses/kitokey/LICENSE
-if [ -n "$copr" ]; then optional=; else optional=$licence; files=$(grep -vx "$licence" <<< "$files"); fi
+  | sed '1d; /^$/d; /^%if/d; /^%endif/d; s|%{_bindir}|/usr/bin|; s|%{_datadir}|/usr/share|' | sort)
+# A .deb also lays its copyright file there (Debian Policy 12.5, #1118).
+case $target in ubuntu-[0-9]*) files=$(sed 's|^/usr/share/licenses/kitokey/|/usr/share/doc/kitokey/|' <<< "$files"; echo /usr/share/doc/kitokey/copyright) ;; esac
+optional=
 expected=$(tr '\n' ' ' <<< "$files")
 # What Kitokey may leave in a user's home on Linux, as docs/privacy.md says it: its Linux paths,
 # in English, then in French — the same, or one of the two pages is wrong.
@@ -67,7 +69,12 @@ case $target in
   ubuntu-[0-9]*)
     [ -z "$copr" ] || { echo "e2e: Copr builds for Fedora only" >&2; exit 2; }
     image="docker.io/library/ubuntu:${target#ubuntu-}"
-    add='apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/kitokey.deb'
+    # Ubuntu's container image is minimised: its /etc/dpkg/dpkg.cfg.d/excludes has dpkg drop
+    # « /usr/share/doc/* » but copyright files, where the .deb lays its notices (D102); a desktop install,
+    # assumed — none was read —, has no such file. First installed so, its copyright file must stay
+    # (#1118), then purged; the file removed, so the package is judged as a user's system installs it.
+    minimised='apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/kitokey.deb && test -f /etc/dpkg/dpkg.cfg.d/excludes && test -f /usr/share/doc/kitokey/copyright && ! test -L /usr/share/doc/kitokey/copyright && ! test -e /usr/share/doc/kitokey/LICENSE.txt && dpkg --purge kitokey'
+    add='rm -f /etc/dpkg/dpkg.cfg.d/excludes && apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/kitokey.deb'
     remove='apt-get remove -y -qq kitokey'; file=/tmp/kitokey.deb
     listed='dpkg -L kitokey'
     scripts='ls /var/lib/dpkg/info/kitokey.preinst /var/lib/dpkg/info/kitokey.postinst /var/lib/dpkg/info/kitokey.prerm /var/lib/dpkg/info/kitokey.postrm'
@@ -80,13 +87,15 @@ esac
 given=(); [ -z "$package" ] || given=(-v "$package:$file:ro")
 podman run --rm --security-opt label=disable ${given[@]+"${given[@]}"} -v "$here/scripts/judge-installed.sh:/judge.sh:ro" \
   -v "$here/scripts/removal.sh:/removal.sh:ro" -v "$here/scripts/as-user.sh:/as-user.sh:ro" -v "$here/scripts/start-as-user.py:/start-as-user.py:ro" \
-  -e add="$add" -e remove="$remove" -e listed="$listed" -e scripts="$scripts" -e expected="$expected" -e optional="$optional" -e old="$old" -e gone="$gone" \
+  -e minimised="${minimised:-}" -e add="$add" -e remove="$remove" -e listed="$listed" -e scripts="$scripts" -e expected="$expected" -e optional="$optional" -e old="$old" -e gone="$gone" \
   -e real="$real" -e copr="$copr" -e version="$version" -e kept="$kept" -e kept_fr="$kept_fr" -e tools="$tools" -e driver="$driver" "$image" bash -euo pipefail -c '
 failed=0
 check() { if eval "$2"; then echo "  ok    $1"; else echo "  FAIL  $1"; failed=1; fi; }
 mkdir -p $HOME/.config/kitokey $HOME/Kitokey/2026-10-18_10-00
 echo "sessions = \"$HOME/Kitokey\"" > $HOME/.config/kitokey/settings.toml
 echo "{}" > $HOME/Kitokey/2026-10-18_10-00/session.json
+# On a minimised Ubuntu, dpkg keeps only copyright files of /usr/share/doc: the .deb copyright stays (#1118).
+[ -z "$minimised" ] || check "on a minimised image, dpkg keeps the copyright file alone of its documentation (Debian Policy 12.5)" "eval \"\$minimised\" >/tmp/minimised.log 2>&1 || { tail -5 /tmp/minimised.log; false; }"
 # Wholeheard there first, as a user of it has it (D86): a stand-in of its last version.
 check "a Wholeheard 0.2.0 is there before" "eval \"\$old\" >/tmp/old.log 2>&1 || { tail -5 /tmp/old.log; false; }"
 check "installed, every dependency found" "eval \"\$add\" >/tmp/add.log 2>&1 || { tail -5 /tmp/add.log; false; }"

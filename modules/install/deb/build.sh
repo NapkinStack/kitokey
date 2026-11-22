@@ -14,6 +14,16 @@ done
 for program in "$root"/usr/bin/*; do strip --strip-unneeded "$program" 2>/dev/null || :; done
 install -Dm644 /artefacts/shell/com.napkinstack.Kitokey.desktop "$root/usr/share/applications/com.napkinstack.Kitokey.desktop"
 install -Dm644 /artefacts/shell/com.napkinstack.Kitokey.png "$root/usr/share/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png"
+# What the programs owe the authors of what they ship (D102), as windows/notices.py names it:
+# Kitokey's LICENSE and install's notices, mounted by scripts/release.sh, and each module's page.
+install -Dm644 /LICENSE "$root/usr/share/doc/kitokey/LICENSE.txt"
+install -Dm644 /notices/MPL-SOURCES.txt "$root/usr/share/doc/kitokey/MPL-SOURCES.txt"
+install -Dm644 /artefacts/shell/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey.html"
+install -Dm644 /artefacts/capture/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-capture.html"
+install -Dm644 /artefacts/transcription/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-transcription.html"
+install -Dm644 /artefacts/summary/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-summary.html"
+# Its copyright file (Debian Policy 12.5, DEP-5): the one notice a minimised Ubuntu keeps, naming the others.
+install -Dm644 /deb/copyright "$root/usr/share/doc/kitokey/copyright"
 # dpkg-shlibdeps reads a source package's control file where it runs: one is made for it.
 mkdir -p /tmp/shlibs/debian
 printf 'Source: kitokey\n\nPackage: kitokey\nArchitecture: any\n' > /tmp/shlibs/debian/control

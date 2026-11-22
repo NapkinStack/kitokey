@@ -606,6 +606,9 @@ pub struct Window {
     /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the
     /// speaking-time drawing. At most: no limit. Placeholders: none.
     pub who_spoke: &'static str,
+    /// Shows: a meeting's page, in its who-spoke area (#1116). When: the meeting has no transcript yet. At most:
+    /// one line. Placeholders: none.
+    pub who_spoke_later: &'static str,
     /// Shows: a meeting's page, as a status. When: transcript card, none yet. At most: no limit.
     /// Placeholders: none.
     pub no_transcript: &'static str,
@@ -826,6 +829,11 @@ pub struct Window {
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, its heading; and a step's «
     /// Avancé » in Settings, « Modèles ». When: always. At most: one line. Placeholders: none.
     pub advanced_title: &'static str,
+    /// Before Kitokey's version, at the foot of « Général », as GNOME's « About » and Windows' Settings
+    /// say it (#1089); the number follows, as `--version` gives it. Shows: Settings, « Général », its
+    /// last line, in secondary text the user can select to copy. When: always. At most: one word.
+    /// Placeholders: none.
+    pub version_said: &'static str,
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, a switch: its name, then its
     /// line under it (D29). When: always. At most: one line for the name, the line wraps.
     /// Placeholders: none.
@@ -1786,6 +1794,7 @@ pub fn window(language: Language) -> Window {
             here_described: "You — your microphone",
             remote_described: "Others — the call’s audio",
             who_spoke: "Who spoke when: you on top, others below",
+            who_spoke_later: "Who spoke when appears once it is transcribed.",
             no_transcript: "No transcript yet.",
             no_minutes: "No summary yet.",
             being_made: "Still transcribing — more is on its way.",
@@ -1863,6 +1872,7 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "General",
             advanced_title: "Advanced",
+            version_said: "Version",
             developer: ["Developer mode", "Shows technical details under each error, to help troubleshoot."],
             program_said: "Technical details: {}",
             minutes_sections: ["Highlights", "Actions", "Key points"],
@@ -2224,6 +2234,7 @@ pub fn window(language: Language) -> Window {
             here_described: "Vous — votre micro",
             remote_described: "Les autres — le son de l’appel",
             who_spoke: "Temps de parole au fil de la réunion\u{a0}: vous en haut, les autres en bas",
+            who_spoke_later: "Le temps de parole s’affichera après la transcription.",
             no_transcript: "Pas encore de transcription.",
             no_minutes: "Pas encore de compte rendu.",
             being_made: "Transcription en cours\u{a0}: la suite arrive.",
@@ -2304,6 +2315,7 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "Général",
             advanced_title: "Avancé",
+            version_said: "Version",
             developer: [
                 "Mode développeur",
                 "Affiche le détail technique sous chaque erreur, pour aider au diagnostic.",
