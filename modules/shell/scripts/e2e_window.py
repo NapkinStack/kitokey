@@ -11759,8 +11759,9 @@ def store_shots(now: dt.datetime) -> None:
     shutil.rmtree(store, ignore_errors=True)
     # What each shot's page says, read as it is taken: a Store shot says no audio lost, no run's folder, no night hour.
     shown: dict[str, dict] = {}
-    # The recording's shot as read just before it is taken (#1126): its time — the clock only goes on, so the image
-    # shows at least that — and the list's first row, the recording itself when it is dated the run's hour.
+    # The recording's shot as read just before it is taken (#1126): its time and both meters, and the list's first
+    # row, the recording itself when it is dated the run's hour. Never read after: the page drawn again just after the
+    # shot shows « 00:00:00 » and empty meters until its next reading, a tenth of a second later (s1126r3time).
     taken: dict[str, dict] = {}
     seen = lambda browser, shot: shown.update({shot: browser.execute_script(
         "const shown = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent);"
@@ -11934,6 +11935,7 @@ def store_shots(now: dt.datetime) -> None:
             time.sleep(0.6)
             taken[f"{short}/2-recording.png"] = browser.execute_script(
                 "return {time: document.getElementById('page-time')?.textContent ?? null,"
+                " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow'))),"
                 " first: document.querySelector('#groups .session')?.getAttribute('href') ?? null, name: arguments[0]}",
                 f"#/meeting/{recording.name}")
             browser.save_screenshot(str(store / short / "2-recording.png"))
@@ -11979,14 +11981,14 @@ def store_shots(now: dt.datetime) -> None:
     # 2: a meeting while it records (#1126): its name, the time running large in the who-spoke area (#1112), both sides'
     # meters moving (#1076); its hour the working day's, as every shot's (the dates check above).
     live = {shot: page["live"] for shot, page in shown.items() if shot.endswith("2-recording.png")}
-    check("the recording shot: a meeting named as the team's own, its time running large and past 00:00:00, both meters moving (#1126)",
-          len(live) == 2 and all(on and re.fullmatch(r"\d+:\d\d:\d\d", on["time"]) and re.search(r"[1-9]", on["time"]) and on["large"]
-                                 and on["title"] == STORE_MEETINGS[shot[:2]]["titles"][0]
-                                 and len(on["meters"]) == 2 and all(level > 0 for level in on["meters"]) for shot, on in live.items()), live)
-    # What the image shows, read before it was taken: a time already past 00:00:00, and the recording dated as the run
-    # takes it — the newest meeting, the list's first row —, whatever the hour the run is (#1126).
-    check("the recording shot, as taken: its time past 00:00:00, the recording the list's first row (#1126)",
+    check("the recording shot: a meeting named as the team's own, its time running large (#1126)",
+          len(live) == 2 and all(on and re.fullmatch(r"\d+:\d\d:\d\d", on["time"]) and on["large"]
+                                 and on["title"] == STORE_MEETINGS[shot[:2]]["titles"][0] for shot, on in live.items()), live)
+    # What the image shows, read just before it was taken: a time already past 00:00:00, both meters moving, and the
+    # recording dated as the run takes it — the newest meeting, the list's first row —, whatever the run's hour (#1126).
+    check("the recording shot, as taken: its time past 00:00:00, both meters moving, the recording the list's first row (#1126)",
           len(taken) == 2 and all(on["time"] and re.fullmatch(r"\d+:\d\d:\d\d", on["time"]) and re.search(r"[1-9]", on["time"])
+                                  and len(on["meters"]) == 2 and all(level > 0 for level in on["meters"])
                                   and on["first"] == on["name"] for on in taken.values()), taken)
     # The word sought marked where it is found, in each line or row kept (#1078): accents and case aside, as the search.
     fold = lambda text: "".join(c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)).lower()
