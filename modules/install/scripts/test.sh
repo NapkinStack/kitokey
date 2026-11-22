@@ -55,6 +55,28 @@ check("its control names the package, its version and its dependencies as comput
       all(f"{field}: @" in control for field in ("Version", "Architecture", "Depends")) and "Package: kitokey" in control)
 check("the .deb lays the same notices in its documentation's folder (D102)",
       all(re.search(rf'^install -Dm644 \S+ "\$root/usr/share/doc/kitokey/{re.escape(name)}"$', build, re.M) for name in OWED), build)
+# Its copyright file (#1118): Debian Policy 12.5 — /usr/share/doc/kitokey/copyright, a plain file in UTF-8,
+# saying where the sources are, the GPL referred to /usr/share/common-licenses —, in DEP-5 1.0's form.
+# A minimised Ubuntu keeps it alone of that folder: it points to the notices beside it.
+check("the .deb lays its copyright file, a plain file, in its documentation's folder (Debian Policy 12.5)",
+      re.search(r'^install -Dm644 /deb/copyright "\$root/usr/share/doc/kitokey/copyright"$', build, re.M) is not None, build)
+copyright_path = os.path.join(os.path.dirname(sys.argv[3]), "copyright")
+try:
+    copyright = open(copyright_path, encoding="utf-8").read()
+except (OSError, UnicodeDecodeError) as error:
+    copyright = ""
+    print(f"        {copyright_path}: {error}")
+stanzas = [dict(re.findall(r"^([A-Za-z-]+):[ \t]*(.*)$", stanza, re.M)) for stanza in copyright.strip().split("\n\n")] if copyright else [{}]
+check("it is DEP-5 1.0: its Format line first, then a Files stanza with Copyright and License",
+      copyright.startswith("Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\n")
+      and any(s.get("Files") == "*" and s.get("Copyright") and s.get("License") for s in stanzas[1:]), stanzas)
+check("it says where the sources are: the repository",
+      stanzas[0].get("Source") == "https://github.com/NapkinStack/kitokey", stanzas[0])
+check("Kitokey's licence, the GPL-3.0 only, referred to /usr/share/common-licenses/GPL-3",
+      any(s.get("Files") == "*" and s.get("License") == "GPL-3" for s in stanzas)
+      and "/usr/share/common-licenses/GPL-3" in copyright, stanzas)
+check("it names each notice laid beside it, which carries its third parties' licences",
+      all(f"/usr/share/doc/kitokey/{name}" in copyright for name in OWED if name != "LICENSE.txt"), copyright)
 scripts = [f for f in os.listdir(os.path.dirname(sys.argv[3])) if f in ("preinst", "postinst", "prerm", "postrm", "triggers")]
 check("no maintainer script: installing and removing touch nothing but the package's files", not scripts, scripts)
 check("the graphics card's Vulkan driver recommended by both: the transcript is made there",
