@@ -62,7 +62,7 @@ desktop's tools leave it (`Hidden`, `X-GNOME-Autostart-enabled`). `autostart` in
 file says Kitokey wrote it once: turned off, it is never written again by itself.
 
 **On Windows** (D84), the package declares a startup task, `KitokeyStartupTask` (`install`'s
-manifest), that Windows turns on at the first start; nothing is written under
+manifest), off until the user turns it on with Settings' switch (#1085); nothing is written under
 `AppData\Roaming\autostart`. The same switch reads and changes the task through `StartupTask`
 (`src/autostart.rs`): turned off by the user in Windows' Startup settings, or set by a policy, it is
 shown as Windows holds it, disabled, with the sentence saying why. The zip has no task: the switch

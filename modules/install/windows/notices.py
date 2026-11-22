@@ -11,7 +11,8 @@ LICENSE = os.path.join(HERE, "..", "..", "..", "LICENSE")
 MPL = os.path.join(HERE, "..", "notices", "MPL-SOURCES.txt")
 # Each module's page, by the program it ships.
 PAGES = (("shell", "kitokey"), ("capture", "kitokey-capture"),
-         ("transcription", "kitokey-transcription"), ("summary", "kitokey-summary"))
+         ("transcription", "kitokey-transcription"), ("summary", "kitokey-summary"),
+         ("export", "kitokey-export"))
 
 
 def files(artefacts):
