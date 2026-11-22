@@ -1226,6 +1226,9 @@ const elapsed = (seconds) => {
 // reader would say them ten times a second —, a meter's value is read when it is reached, as the bar's.
 // The poll ends when the page leaves, and when the recording ends: the page is then drawn again, its range back.
 let pageLive = null;
+// The last reading of the meeting being recorded (#1133): a new drawing of its page starts from it, never from
+// « 00:00:00 » and empty meters until the next reading.
+let pageLast = null;
 function pageLevels(name, time, words) {
   const row = element("div", "page-levels");
   const fills = [words.small_mic, words.small_meeting].map((label, index) => {
@@ -1243,21 +1246,32 @@ function pageLevels(name, time, words) {
     row.append(column);
     return fill_;
   });
-  clearInterval(pageLive);
-  pageLive = setInterval(async () => {
-    if (!document.contains(time)) return clearInterval(pageLive);
-    const now = await window.__TAURI__.core.invoke("recording_now").catch(() => null);
-    if (now === null || !document.contains(time)) return;
-    if (!now.recording || now.meeting !== name) {
-      clearInterval(pageLive);
-      return refresh();
-    }
+  const paint = (now) => {
     time.textContent = elapsed(now.seconds);
     for (const [index, fill_] of fills.entries()) {
       const percent = Math.round(now.levels[index] * 100);
       fill_.style.width = `${percent}%`;
       fill_.parentElement.setAttribute("aria-valuenow", String(percent));
     }
+  };
+  if (pageLast?.meeting === name) paint(pageLast);
+  // The poll ends with the page or the recording, and its reading with it: a meeting deleted frees its name within
+  // the minute (capture's `new_folder`), and a recording under that name must not start from this one's.
+  const end = () => {
+    clearInterval(pageLive);
+    pageLast = null;
+  };
+  clearInterval(pageLive);
+  pageLive = setInterval(async () => {
+    if (!document.contains(time)) return end();
+    const now = await window.__TAURI__.core.invoke("recording_now").catch(() => null);
+    if (now === null || !document.contains(time)) return;
+    if (!now.recording || now.meeting !== name) {
+      end();
+      return refresh();
+    }
+    pageLast = now;
+    paint(now);
   }, 100);
   return row;
 }
