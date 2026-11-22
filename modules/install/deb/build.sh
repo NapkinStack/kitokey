@@ -22,6 +22,8 @@ install -Dm644 /artefacts/shell/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/ki
 install -Dm644 /artefacts/capture/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-capture.html"
 install -Dm644 /artefacts/transcription/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-transcription.html"
 install -Dm644 /artefacts/summary/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-summary.html"
+# Its copyright file (Debian Policy 12.5, DEP-5): the one notice a minimised Ubuntu keeps, naming the others.
+install -Dm644 /deb/copyright "$root/usr/share/doc/kitokey/copyright"
 # dpkg-shlibdeps reads a source package's control file where it runs: one is made for it.
 mkdir -p /tmp/shlibs/debian
 printf 'Source: kitokey\n\nPackage: kitokey\nArchitecture: any\n' > /tmp/shlibs/debian/control
