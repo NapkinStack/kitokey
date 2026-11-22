@@ -26,6 +26,7 @@ import sys
 import threading
 import time
 import traceback
+import unicodedata
 import urllib.request
 import wave
 from pathlib import Path
@@ -170,8 +171,10 @@ if [ "$1" = listen ]; then
   done
 fi
 printf '%s\\n' "$*" > "$here/recorder-args"
-folder="$2/2026-10-18_12-00"; mkdir -p "$folder"
-printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","tracks":{}}' > "$folder/session.json"
+# Its meeting's folder and times: the scenarios' fixed ones, or another a scenario names (D103's screenshots).
+at=${KITOKEY_E2E_RECORDED_AT:-2026-10-18T12:00:00+02:00}; until=${KITOKEY_E2E_RECORDED_UNTIL:-2026-10-18T12:00:05+02:00}
+folder="$2/${KITOKEY_E2E_RECORDED:-2026-10-18_12-00}"; mkdir -p "$folder"
+printf '{"contract":"session-audio/v2","started":"%s","tracks":{}}' "$at" > "$folder/session.json"
 # As recording/v1 says, where the scenario asks it (`faithful-recorder`, CC): its reader gone, it goes on
 # (#773); its input closed stops nothing; a termination signal stops it as `stop` does — `session.json` says
 # `stopped`, and it ends well. Unasked, it dies with its reader, as every other scenario has it (s961b2).
@@ -181,7 +184,7 @@ if [ -e "$2/faithful-recorder" ]; then
   faithful=true
   trap '' PIPE
   echo $$ > "$here/recorder-pid"
-  stopped() { printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"; echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'; exit 0; }
+  stopped() { printf '{"contract":"session-audio/v2","started":"%s","stopped":"%s","tracks":{}}' "$at" "$until" > "$folder/session.json"; echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'; exit 0; }
   trap stopped TERM INT
 fi
 me='"Mic"'
@@ -216,7 +219,7 @@ while :; do
   # Another device that reads as the one chosen, which is not back.
   if [ -e "$2/mic-same" ]; then d=$(cat "$2/mic-same"); rm "$2/mic-same"; echo '{"event":"device","source":"me","device":"'"$d"'"}'; fi
 done
-printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"
+printf '{"contract":"session-audio/v2","started":"%s","stopped":"%s","tracks":{}}' "$at" "$until" > "$folder/session.json"
 echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'
 """
 )
@@ -2495,7 +2498,7 @@ def meeting_language(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         own = Select(browser.find_element(By.ID, "meeting-language"))
         check("a meeting's page offers its own language, the settings' by default — the language they name said",
-              own.first_selected_option.text == "Celle des Réglages — English" and not (heard / "language").exists(), own.first_selected_option.text)
+              own.first_selected_option.text == "English, selon les Réglages" and not (heard / "language").exists(), own.first_selected_option.text)
         choose(browser, "meeting-language", "de")
         written = wait_for(browser, lambda b: (heard / "language").exists() and (heard / "language").read_text() == "de\n", 5)
         check("chosen on its page, the meeting's language file holds its code alone", written)
@@ -2527,7 +2530,7 @@ def meeting_language(now: dt.datetime) -> None:
                                      for line in log.read_text(errors="replace").splitlines()
                                      if any(word in line for word in ("language_set", "\"WARN\"", "\"ERROR\"", "panicked"))][-8:]),
             }
-        check("« Celle des Réglages »: the file removed", removed, None if removed else said_then())
+        check("« …, selon les Réglages »: the file removed", removed, None if removed else said_then())
         args.unlink(missing_ok=True)
         browser.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", heard.name, str(model))
         again = wait_for(browser, lambda b: "--language" in told(), 15)
@@ -2550,7 +2553,7 @@ def meeting_language(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         # By script, in one step: the page may be drawn again between finding the list and reading it.
         said = browser.execute_script("const p = document.getElementById('meeting-language'); return p.options[p.selectedIndex].text")
-        check("the settings detecting it, the page says « détectée »", said == "Celle des Réglages — détectée", said)
+        check("the settings detecting it, the page says « Détection automatique », the words Settings use (#1074)", said == "Détection automatique", said)
         # Refused on its page (the shell's refusal stood in for, each refusal its own words): said, and
         # still said once the page is drawn again; a second refusal says its own; a choice saved says
         # none; gone once the page is left (#841, the rule of #655's fix).
@@ -2606,8 +2609,8 @@ def meeting_language(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         offered = [o.text for o in Select(browser.find_element(By.ID, "meeting-language")).options]
-        check("SpeechAnalyzer hearing: the page says the system's language, never « détectée », and offers French and English alone",
-              offered == ["Celle des Réglages — Français", "Français", "English"], offered)
+        check("SpeechAnalyzer hearing: the page says the system's language, never « Détection automatique », and offers French and English alone (#1074)",
+              offered == ["Français, selon les Réglages", "Français", "English"], offered)
     with window as browser:
         press(browser, "settings-link")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meetings-language"), 10)
@@ -3046,6 +3049,10 @@ def cancelled_at_once(now: dt.datetime) -> None:
     )
     with window as browser:
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        # Minutes this computer wrote (`provider: local`) said as a buyer reads it, never the contract's word (#1080).
+        here = wait_for(browser, lambda b: "writer first" in makers(b), 10)
+        check("minutes written on this computer: « Writer first, sur cet ordinateur » — as « Transcrit par …, sur cet ordinateur » —, never « via local » (#1080)",
+              here and "writer first, sur cet ordinateur" in makers(browser) and "via local" not in makers(browser), makers(browser))
         for what, file, step, start, (first, second), said_after in steps:
             before, listed = sha(file), sorted(p.name for p in meeting.iterdir())
             held, child = WORK / f"held-{step}", WORK / f"held-{step}-child"
@@ -5129,6 +5136,28 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def settings_version(now: dt.datetime) -> None:
+    """CJ. Settings' « Général » says Kitokey's version at its foot (#1089), as `--version` says it: « Version
+    1.0.0 », secondary text a person can select and copy for support, in French and in English."""
+    print("CJ. Settings: « Général » says the version, as --version does, selectable (#1089)")
+    said = subprocess.run([str(BINARY), "--version"], capture_output=True, text=True, timeout=30).stdout.strip()
+    version = said.removeprefix("kitokey ")
+    line = ("const v = document.getElementById('app-version'); const c = v && v.closest('section.card');"
+            " return v ? {text: v.textContent, card: c ? c.querySelector('h2').textContent : null,"
+            " select: getComputedStyle(v).userSelect, shown: v.getClientRects().length > 0,"
+            " last: !!c && c.lastElementChild === v} : null")
+    for locale, card in (("fr_FR.UTF-8", "Général"), ("en_US.UTF-8", "General")):
+        taping = WORK / f"settings-version-{locale[:2]}"
+        taping.mkdir()
+        with Window(taping, locale, 'after = "nothing"\n') as browser:
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.execute_script(line) is not None, 10)
+            got = browser.execute_script(line)
+            check(f"{locale[:2]}: « Version {version} » at the foot of « {card} », shown and selectable (#1089)",
+                  bool(version) and got is not None and got["text"] == f"Version {version}" and got["card"] == card
+                  and got["shown"] and got["last"] and got["select"] not in ("none",), (said, got))
+
+
 def settings_narrow_without_model(now: dt.datetime) -> None:
     """BU. Settings at 420 px on a Kitokey with no model on this computer (#868): the guided step for the
     transcription — its way, the model's state and its offer — inside its card, nothing spilling; « Avancé »
@@ -5231,7 +5260,7 @@ def appearance_chosen(now: dt.datetime) -> None:
 
 def bar_language(now: dt.datetime) -> None:
     """BR. D99: the bar's options offer the meeting's language — at rest the next meeting's, recording
-    the one in progress' —, the meeting's page's list (D65, D89), « Celle des Réglages » first, and its
+    the one in progress' —, the meeting's page's list (D65, D89), Settings' choice first (#1074), and its
     refusal said as the page says it; by the keyboard alone, in French and in English."""
     print("BR. the bar's options: the meeting's language, the next one's at rest, taken at the start, the one in progress' while recording, refused said — keyboard alone, French and English (D99)")
     focused = "const a = document.activeElement; return a.id || a.className"
@@ -5260,8 +5289,8 @@ def bar_language(now: dt.datetime) -> None:
         keys(browser, Keys.ENTER)
         return wait_for(browser, lambda b: not b.execute_script("return document.getElementById('small-options').hidden"), 3)
     for language, (short, settled, first, refused) in {
-        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Celle des Réglages — Deutsch", "Langue non enregistrée : "),
-        "en_US.UTF-8": ("en", "", "Same as Settings — detected", "Language not saved: "),
+        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Deutsch, selon les Réglages", "Langue non enregistrée : "),
+        "en_US.UTF-8": ("en", "", "Detect automatically", "Language not saved: "),
     }.items():
         taping = WORK / f"bar-language-{short}"
         taping.mkdir()
@@ -5504,6 +5533,201 @@ def axe_first_surfaces(now: dt.datetime) -> None:
                     found = axe_violations(browser)
                     check(f"{short}, {theme}: {what}, no violation of axe's WCAG 2.2 A and AA rules (D106)",
                           shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
+
+# What acts, by a tag or a role: what CE reaches, marks and measures (WCAG 2.1.1, 2.5.8).
+KEY_ACTING = ("a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=link],"
+              " [role=checkbox], [role=radio], [role=switch], [role=slider], [role=tab], [role=menuitem], [role=textbox]")
+# Each node that acts marked once (`data-ce`), so that a stop and a control are told apart by their
+# node, never by a name two may share (the team's rule, #958).
+KEY_MARK = ("window.__ce ??= 0; for (const e of document.querySelectorAll(arguments[0]))"
+            " if (!e.dataset.ce) e.dataset.ce = String(++window.__ce);")
+# One Tab, or Shift+Tab, and what it reached: its mark, its focus seen — a ring drawn that differs from
+# the same element's at rest, as two_panes measures it —, and whether any of it shows (WCAG 2.4.11): a
+# point of its box, inside the window, where the element on top is it, inside it, or its label. WebKit
+# reveals a text field's caret, and so scrolls to it, after the focus, a frame or several later (s106ceP,
+# s106ce5): the stop is read at each frame until it shows, for a second at most — waited for as its
+# event, bounded (tests.md §5); a stop a header keeps covering still fails. What was seen goes with it:
+# its box, the window's height, what was on top at its centre.
+KEY_STOP = (
+    "const done = arguments[arguments.length - 1];"
+    "const e = document.activeElement, n = e.closest('.choice') ?? e;"
+    "if (e !== document.body && !e.dataset.ce) e.dataset.ce = 'late ' + String(++window.__ce);"
+    "const mine = (h) => !!h && (h === e || n.contains(h) || h.contains(e) || [...(e.labels ?? [])].some((l) => l.contains(h)));"
+    "const bounds = () => { const r = n.getBoundingClientRect(); return [r, Math.max(r.left, 0) + 1, Math.min(r.right, innerWidth) - 1,"
+    " Math.max(r.top, 0) + 1, Math.min(r.bottom, innerHeight) - 1]; };"
+    "const showing = () => { const [, x0, x1, y0, y1] = bounds(); return x0 <= x1 && y0 <= y1"
+    " && [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [(x0 + x1) / 2, (y0 + y1) / 2]].some(([x, y]) => mine(document.elementFromPoint(x, y))); };"
+    "const until = performance.now() + 1000;"
+    "const settle = () => requestAnimationFrame(() => (showing() || performance.now() > until ? measure() : settle()));"
+    "const measure = () => {"
+    "const [r, x0, x1, y0, y1] = bounds(), shows = showing();"
+    "const top = document.elementFromPoint((x0 + x1) / 2, (y0 + y1) / 2);"
+    "const seen = shows || [[r.top, r.bottom].map(Math.round), innerHeight, top ? top.id || `${top.tagName}.${top.className}` : null];"
+    "const look = () => { const s = getComputedStyle(n); return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow].join('|'); };"
+    "const focused = look(); e.blur(); const rest = look(); e.focus({focusVisible: true, preventScroll: true});"
+    "const s = getComputedStyle(n), drawn = (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || s.boxShadow !== 'none';"
+    "done([e === document.body ? 'body' : e.dataset.ce, e.id || `${e.tagName}.${e.className}`,"
+    " drawn && focused !== rest && document.activeElement === e, seen]); };"
+    "settle();")
+# Every control shown that acts, as [its mark, its name, its tabIndex, its group, whether it leads it].
+# A group is WAI-ARIA APG's roving tabindex: members of one role under one parent, one at tabIndex 0,
+# the others at -1, reached by the arrows from it — or radios of one name. What sits inside a member (a
+# line's pencil) goes with it (D62).
+KEY_CONTROLS = (
+    "const shown = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[inert]') && !e.disabled;"
+    "const member = (e) => { const m = e.closest('[role]'); if (!m || !m.parentElement) return null;"
+    " const kin = [...m.parentElement.children].filter((o) => o.getAttribute('role') === m.getAttribute('role'));"
+    " return kin.length > 1 && kin.some((o) => o.tabIndex < 0) && kin.some((o) => o.tabIndex === 0) ? m : null; };"
+    "const place = (p) => p.id ? `#${p.id}` : `${p.tagName}.${[...p.classList].join('.')}`;"
+    "return [...document.querySelectorAll(arguments[0])].filter(shown).map((e) => {"
+    " const m = e.type === 'radio' && e.name ? null : member(e);"
+    " const group = e.type === 'radio' && e.name ? `radio ${e.name}` : m ? `${m.getAttribute('role')} in ${place(m.parentElement)}` : null;"
+    " return [e.dataset.ce, e.id || `${e.tagName}.${e.className}`, e.tabIndex, group, m === e || e.type === 'radio']; })")
+# A group is named by what survives a redraw — its radios' name, or its members' role and their parent's
+# id or classes —: a radio chosen by an arrow can draw its section again (s106ce6). Its one Tab stop is
+# found in the page as it is then — the radio checked, or the member at tabIndex 0 — and focused; none,
+# null, said in the got rather than raised.
+KEY_LEAD = ("const [kind, name] = arguments;"
+            "const lead = kind === 'radio' ? document.querySelector(`input[type=radio][name='${CSS.escape(name)}']:checked`)"
+            " ?? document.querySelector(`input[type=radio][name='${CSS.escape(name)}']`)"
+            " : [...document.querySelectorAll(`[role='${kind}']`)].find((m) => m.tabIndex === 0 && m.parentElement"
+            " && (m.parentElement.id ? `#${m.parentElement.id}` : `${m.parentElement.tagName}.${[...m.parentElement.classList].join('.')}`) === name);"
+            "if (!lead) return null; lead.focus(); lead.dataset.ce ??= 'late ' + String(++window.__ce); return lead.dataset.ce")
+# From that stop, an arrow moves the focus to another of its group (APG): what has the focus then, its
+# mark and its group, named as above.
+KEY_ARROWED = ("const e = document.activeElement, m = e.closest('[role]'), p = m && m.parentElement;"
+               "const place = (q) => q.id ? `#${q.id}` : `${q.tagName}.${[...q.classList].join('.')}`;"
+               "return [e.dataset.ce ?? null, e.type === 'radio' && e.name ? `radio ${e.name}` : p ? `${m.getAttribute('role')} in ${place(p)}` : null]")
+# WCAG 2.5.8, measured as its words have it: each target shown is 24 by 24 CSS px — a hundredth of a
+# pixel left for the sub-pixel rounding —, or a circle of 24 px across, centred on its box, cuts no
+# other target and no other small target's circle. A target in a sentence is the criterion's own
+# exception: inline, in a block that holds text of its own besides the targets'. A radio or a box is the
+# label or the `.choice` that takes its click. Those that fail, with their size.
+KEY_TARGETS = (
+    "const acting = arguments[0];"
+    "const shown = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[inert]') && !e.disabled;"
+    "const boxOf = (e) => ['radio', 'checkbox'].includes(e.type) ? e.closest('.choice, label') ?? e : e;"
+    "const inSentence = (e) => { if (getComputedStyle(e).display !== 'inline') return false;"
+    " let b = e.parentElement; while (b && ['inline', 'contents'].includes(getComputedStyle(b).display)) b = b.parentElement;"
+    " if (!b) return false; const walk = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);"
+    " for (let t = walk.nextNode(); t; t = walk.nextNode()) { const owner = t.parentElement.closest(acting);"
+    " if ((!owner || !b.contains(owner)) && t.textContent.trim()) return true; } return false; };"
+    "const targets = [...new Set([...document.querySelectorAll(acting)].filter(shown)"
+    " .filter((e) => !inSentence(e)).map(boxOf))].map((e) => [e, e.getBoundingClientRect()]);"
+    "const centre = (r) => [r.left + r.width / 2, r.top + r.height / 2];"
+    "const small = targets.filter(([, r]) => r.width < 23.99 || r.height < 23.99);"
+    "const near = (c, r) => Math.hypot(Math.max(r.left - c[0], 0, c[0] - r.right), Math.max(r.top - c[1], 0, c[1] - r.bottom));"
+    "return small.filter(([e, r]) => { const c = centre(r);"
+    " return targets.some(([o, q]) => o !== e && !o.contains(e) && !e.contains(o) && near(c, q) < 12)"
+    " || small.some(([o, q]) => o !== e && Math.hypot(...centre(q).map((v, i) => v - c[i])) < 24); })"
+    " .map(([e, r]) => [e.id || `${e.tagName}.${e.className}`, Math.round(r.width * 100) / 100, Math.round(r.height * 100) / 100])")
+
+
+def keys_first_surfaces(now: dt.datetime) -> None:
+    """CE. D106, criterion 2: what axe cannot judge, on the surfaces a buyer sees first — the list, a
+    meeting's page (one it plays, and one it does not, each line then a stop of its own), Settings and the bar —, each language in each theme, the keyboard alone: each Tab
+    stop shows its focus (WCAG 2.4.7); none is entirely hidden, by Tab or by Shift+Tab (2.4.11); every
+    control is reached, a roving group by Tab to its one stop then an arrow to another — the transcript's
+    lines, the meeting played (2.1.1); each target is 24 px or spaced (2.5.8): axe leaves its target-size
+    to a person (s106cdT). 2.5.7 is held elsewhere: the shell has no drag, and a click on the drawing seeks (main())."""
+    print("CE. the list, a meeting's page, Settings and the bar: by the keyboard alone the focus seen, never hidden, every control reached; targets of 24 px (D106)")
+    dark = "return matchMedia('(prefers-color-scheme: dark)').matches"
+    # Each language in each theme: the words move what overflows or hides a stop, the theme the ring's colour.
+    for (language, short), theme in itertools.product((("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")), ("light", "dark")):
+        meetings = WORK / f"keys-{short}-{theme}"
+        meeting = meetings / "2026-10-18_12-00"
+        # A meeting it plays, as the player's scenarios make one: its lines are then one stop, the arrows
+        # going to the others (WAI-ARIA APG's roving tabindex) — the group 2.1.1 must find reached.
+        session(meeting, now - dt.timedelta(hours=1), 40 / 60, {})
+        record = json.loads((meeting / "session.json").read_text())
+        record["tracks"] = {"local": {"device": "Mic"}}
+        (meeting / "session.json").write_text(json.dumps(record))
+        with wave.open(str(meeting / "local.wav"), "wb") as made:
+            made.setnchannels(1)
+            made.setsampwidth(2)
+            made.setframerate(48000)
+            made.writeframes(bytes(2 * 48000 * 40))
+        (meeting / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n')
+        # A transcript longer than the window: its page scrolls, so a stop could go under what stays.
+        (meeting / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            + "".join(f'{{"type":"segment","speaker":"me","track":"local","start":{i}.0,"end":{i}.5,"text":"Ligne {i}."}}\n' for i in range(40))
+            + '{"type":"complete","duration":40.0}\n')
+        (meeting / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+        # An older meeting whose sound this version does not play: each line and its pencil is a Tab stop,
+        # so Shift+Tab brings stops up to the window's top, where a header that stayed would cover them.
+        unplayed = meetings / "2026-10-18_10-00"
+        session(unplayed, now - dt.timedelta(hours=3), 60, {"local.wav": 1000})
+        shutil.copy(meeting / "transcript.jsonl", unplayed / "transcript.jsonl")
+        shutil.copy(meeting / "minutes.md", unplayed / "minutes.md")
+        for small in (False, True):
+            window = Window(meetings, language, "reminder = false\n", small=small)
+            window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+            with window as browser:
+                if small:
+                    surfaces = (("the bar", None, lambda b: b.find_element(By.ID, "small-record").is_displayed()),)
+                else:
+                    browser.set_window_size(1100, 600)
+                    # That meeting's page drawn, its lines there: not the page before it, which has lines too.
+                    drawn_for = lambda name: lambda b: b.execute_script(
+                        "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
+                        " && p.querySelectorAll('.transcript .lines li').length > 0", name)
+                    surfaces = (("the list", "#/", lambda b: b.find_element(By.ID, "list").is_displayed()),
+                                ("a meeting's page", f"#/meeting/{meeting.name}", drawn_for(meeting.name)),
+                                ("a meeting's page not played", f"#/meeting/{unplayed.name}", drawn_for(unplayed.name)),
+                                ("Settings", "#/settings", lambda b: b.find_element(By.ID, "reminder").is_displayed()))
+                for what, address, drawn in surfaces:
+                    if address:
+                        browser.execute_script("location.hash = arguments[0]", address)
+                    shown = wait_for(browser, drawn, 10) and browser.execute_script(dark) == (theme == "dark")
+                    time.sleep(0.5)
+                    browser.execute_script("document.activeElement.blur(); scrollTo(0, 0)")
+                    browser.execute_script(KEY_MARK, KEY_ACTING)
+                    forth, back = [], []
+                    for _ in range(120):
+                        ActionChains(browser).send_keys(Keys.TAB).perform()
+                        stop = browser.execute_async_script(KEY_STOP)
+                        if forth and stop[0] == forth[0][0] or stop[0] == "body":
+                            break
+                        forth.append(stop)
+                    for _ in range(len(forth)):
+                        ActionChains(browser).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+                        back.append(browser.execute_async_script(KEY_STOP))
+                    reached = {mark for mark, _, _, _ in forth}
+                    browser.execute_script(KEY_MARK, KEY_ACTING)
+                    controls = browser.execute_script(KEY_CONTROLS, KEY_ACTING)
+                    # A group counts once Tab reached one of it and an arrow, from its member reached, goes to another.
+                    led = {group: mark for mark, _, _, group, leads in controls if group and leads and mark in reached}
+                    unmoved = []
+                    for group in led:
+                        kind, _, name = group.partition(" ")
+                        lead = browser.execute_script(KEY_LEAD, kind, name.removeprefix("in "))
+                        if lead is None:
+                            unmoved.append((group, "its Tab stop gone from the page"))
+                            continue
+                        ActionChains(browser).send_keys(Keys.ARROW_DOWN).perform()
+                        to = browser.execute_script(KEY_ARROWED)
+                        if not (to[0] != lead and to[1] == group):
+                            unmoved.append((group, to))
+                    moving = {group for group in led if group not in {g for g, _ in unmoved}}
+                    # A radio out of Tab's order keeps its tabIndex at 0: the browser leaves it out, the arrows
+                    # reach it (HTML's radio group), so a radio is credited by its group whatever its tabIndex.
+                    missed = sorted({name for mark, name, tab, group, _ in controls
+                                     if mark not in reached and not (group in moving and (tab < 0 or group.startswith("radio ")))})
+                    unseen = [name for _, name, seen, _ in forth if not seen]
+                    hidden = [("Tab", name, part) for _, name, _, part in forth if part is not True] + [("Shift+Tab", name, part) for _, name, _, part in back if part is not True]
+                    said = f"{short}, {theme}: {what}"
+                    # Which roving groups were credited, said in a green run too: the verifier reads them there.
+                    print(f"    {said}: {len(forth)} Tab stops; groups reached by Tab and an arrow: {sorted(moving)}")
+                    check(f"{said}, each Tab stop shows its focus (WCAG 2.4.7, D106)", shown and forth and unseen == [], (len(forth), unseen))
+                    check(f"{said}, no stop entirely hidden, by Tab or Shift+Tab (WCAG 2.4.11, D106)", shown and forth and hidden == [], hidden)
+                    check(f"{said}, every control reached by the keyboard, a roving group by its arrows (WCAG 2.1.1, D106)",
+                          shown and forth and missed == [] and unmoved == [] and (what != "a meeting's page" or led), (missed, unmoved, sorted(led)))
+                    tight = browser.execute_script(KEY_TARGETS, KEY_ACTING)
+                    check(f"{said}, each target 24 by 24 CSS px, or spaced as the criterion allows (WCAG 2.5.8, D106)", shown and tight == [], tight)
+
 
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
@@ -8340,6 +8564,10 @@ def unsaved_choice_kept(now: dt.datetime) -> None:
         with window as browser:
             browser.find_element(By.ID, "settings-link").click()
             wait_for(browser, lambda b: b.find_elements(By.ID, "minutes") and b.find_elements(By.ID, "reminder"), 10)
+            # What « Tester » sends and to whom, this computer's Ollama saved: said so, never its address (#1080).
+            sends = browser.execute_script("return document.getElementById('minutes-tested')?.textContent ?? null")
+            check("Tester, this computer's Ollama saved: « … à Ollama, sur cet ordinateur — rien de vos réunions. », no address (#1080)",
+                  sends == "Le test envoie une courte phrase à Ollama, sur cet ordinateur — rien de vos réunions.", sends)
             Select(browser.find_element(By.ID, "minutes")).select_by_visible_text("Mistral 7b")
             unsaid = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-unsaved").is_displayed(), 3)
             # The list as it is, marked in the page: a reference the driver holds is refused once it is gone.
@@ -8626,6 +8854,12 @@ def models_on_the_page(now: dt.datetime) -> None:
                   and got["transcription"]["label"] == "Modèle de transcription"
                   and any(line.startswith("Compte rendu du 18 oct. à ") and line.endswith(" · Qwen3 14b") for line in lines)
                   and any(line.startswith("Transcrit le 18 oct. à ") and line.endswith(" · Whisper page settings") for line in lines), (got, lines))
+            # #1094: each list on its line quiet — no frame, no ground until hovered —, Lucide's chevron after it.
+            quiet = browser.execute_script(
+                "return [...document.querySelectorAll('#meeting .maker .page-model')].map(s => { const c = getComputedStyle(s), n = s.nextElementSibling;"
+                " return [c.borderTopColor, c.backgroundColor, !!n && n.matches('svg.glyph.chevron'), getComputedStyle(s.parentElement).fontFamily.includes('monospace')]; })")
+            check("each model list on its line is quiet, a chevron after it, the line in the text's face (#1094)",
+                  len(quiet) == 2 and all(q == ["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)", True, False] for q in quiet), quiet)
             if not shown:
                 return
             # Drawn again — refresh(), as a focus does —: the models already read are not asked again.
@@ -9179,9 +9413,9 @@ def two_panes(now: dt.datetime) -> None:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1] and b.find_elements(By.CSS_SELECTOR, ".transcript .lines li"), 10)
         made = makers(browser)
-        check("in English: when each version was made, in local time, then its model, how long, what it cost (D93, D97)",
-              sorted(made) == sorted(["Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo · in 31 min 52 s · $0.012",
-                                      "Summary of Oct 23 at 05:00 AM · Claude Sonnet, via openrouter.ai · in 3 s"]), made)
+        check("in English: when each version was made, in local time — « 4:42 AM », no zero US English does not write (#1075) —, then its model, how long, what it cost (D93, D97)",
+              sorted(made) == sorted(["Transcribed on Oct 23 at 4:42 AM · Whisper large v3 turbo · in 31 min 52 s · $0.012",
+                                      "Summary of Oct 23 at 5:00 AM · Claude Sonnet, via openrouter.ai · in 3 s"]), made)
         english = [browser.find_element(By.ID, "record-said").text] + [
             [browser.find_element(By.ID, i).get_attribute(a) for a in ("aria-label", "title")] for i in ("fold", "unfold", "free-link", "small-link", "settings-link")]
         browser.execute_script("document.activeElement.blur()")
@@ -9209,9 +9443,9 @@ def two_panes(now: dt.datetime) -> None:
         # A transcript whose last line says no `made`: its model alone, no time (D93).
         browser.execute_script(f"location.hash = '#/meeting/{names[-2]}'")
         alone = wait_for(browser, lambda b: shown(b) == names[-2] and makers(b), 10)
-        check("a transcript that does not say when it was made: its model alone, no time (D93)",
-              alone and makers(browser) == ["Transcribed by Whisper large v3 turbo on this computer"], makers(browser))
-        line = "Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo · in "
+        check("a transcript that does not say when it was made: its model alone, no time (D93); « , on this computer » with its comma, as the minutes' line (#1093)",
+              alone and makers(browser) == ["Transcribed by Whisper large v3 turbo, on this computer"], makers(browser))
+        line = "Transcribed on Oct 23 at 4:42 AM · Whisper large v3 turbo · in "
         times_taken(browser, {names[-3]: line + "2 min 05 s", names[-4]: line + "1 h 02 min", names[-5]: line + "1 s"})
 
     empty = WORK / "panes-none"
@@ -10108,6 +10342,13 @@ def context_gaps(now: dt.datetime) -> None:
         kept = wait_for(browser, lambda b: (meeting / "context.txt").exists() and (meeting / "context.txt").read_text() == typed, 3)
         check("the full window's page of the meeting being recorded offers its context: a Cyrillic name and an emoji kept whole",
               open_ and kept, (meeting / "context.txt").read_text() if (meeting / "context.txt").exists() else None)
+        # Being recorded, no track written yet — the stand-in's `"tracks":{}`, as a waiting microphone leaves a real
+        # one (session-audio/v2, a track gained later): nothing says its audio deleted, row or page (#1054).
+        freed = browser.execute_script(
+            "return [...document.querySelectorAll('.chip.gone')].filter((c) => c.offsetParent).map((c) => c.textContent)"
+            ".concat([...document.querySelectorAll('#no-player')].map((p) => p.textContent))")
+        check("a meeting being recorded, no sound file yet: nothing says its audio deleted, on its row or its page (#1054)",
+              freed == [], freed)
         # The button says it at the click now (D68); a press within half a second is the same press.
         time.sleep(0.6)
         browser.find_element(By.ID, "record").click()
@@ -10949,16 +11190,40 @@ def window_looks(now: dt.datetime) -> None:
             "return [...document.querySelectorAll('.primary, .open, .icon-button, select, .search, .field input, .setting')]"
             ".filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select')).map(e => [e.id || e.className, e.getBoundingClientRect().height]).filter(([, h]) => h !== 32)")
         check("every control shown is 32 px high (D89)", tall == [], tall)
-        edged = browser.execute_script(
-            "const t = document.createElement('i'); t.style.color = 'var(--edge)'; document.body.append(t); const edge = getComputedStyle(t).color; t.remove();"
-            " const all = [...document.querySelectorAll('.open, select, .search, .field input, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
-            " return [all.length > 0, all.filter(e => getComputedStyle(e).borderTopColor !== edge).map(e => e.id || e.className)]")
-        check("fields and secondary buttons are bordered with --edge (D89)", edged == [True, []], edged)
         filled = browser.execute_script(
             "const t = document.createElement('i'); t.style.background = 'var(--surface)'; document.body.append(t); const surface = getComputedStyle(t).backgroundColor; t.remove();"
-            " const all = [...document.querySelectorAll('select, .search, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
+            " const all = [...document.querySelectorAll('select, .search, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select, .page-model'));"
             " return [all.length > 0, all.filter(e => getComputedStyle(e).backgroundColor !== surface).map(e => e.id || e.className)]")
         check("fields are drawn on the surface, only edged, as board 2 (D89)", filled == [True, []], filled)
+        # #1094, on Settings — the page holding a list, a field and secondary buttons at once (the meeting's page here
+        # has no list of its own nor a secondary shown): fields rest on the line, their bottom edged at 3:1 (Fluent 2's
+        # fields); a secondary button rests on the line, its bottom edged as Windows 11's controls — on --raised, or on the
+        # surface inside a step — and answers the pointer.
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed() and b.find_elements(By.CSS_SELECTOR, "#settings select"), 10)
+        token = ("const token = (v) => { const t = document.createElement('i'); t.style.color = `var(${v})`; document.body.append(t);"
+                 " const c = getComputedStyle(t).color; t.remove(); return c; };")
+        edged = browser.execute_script(
+            token + " const all = [...document.querySelectorAll('select, .search, .field input, .setting')].filter(e => e.offsetParent && !e.closest('#small')"
+            " && !e.matches('.setting select, .page-model'));"
+            " return [all.filter(e => e.matches('select')).length > 0, all.filter(e => { const s = getComputedStyle(e);"
+            " return s.borderTopColor !== token('--line') || s.borderBottomColor !== token('--edge'); }).map(e => e.id || e.className)]")
+        check("fields rest on --line, their bottom edged with --edge (#1094)", edged == [True, []], edged)
+        bare = browser.execute_script(
+            token + " const all = [...document.querySelectorAll('#settings .open')].filter(e => e.offsetParent);"
+            " return [all.length > 0, all.filter(e => { const s = getComputedStyle(e);"
+            " return s.borderTopColor !== token('--line') || s.borderBottomColor !== token('--edge') || s.backgroundColor !== token(e.closest('.step') ? '--surface' : '--raised'); })"
+            ".map(e => e.id || e.className)]")
+        check("secondary buttons rest on --line, their bottom edged, on --raised or a step's surface (#1094)", bare == [True, []], bare)
+        hovered = next((e for e in browser.find_elements(By.CSS_SELECTOR, "#settings .open") if e.is_displayed()), None)
+        if hovered is not None:
+            ActionChains(browser).move_to_element(hovered).perform()
+            time.sleep(0.3)
+        answered = hovered is not None and browser.execute_script(token + " return getComputedStyle(arguments[0]).backgroundColor === token('--hover')", hovered)
+        check("a secondary button hovered takes --hover (#1094)", answered, hovered.get_attribute("id") or hovered.text if hovered is not None else None)
+        ActionChains(browser).move_to_element(browser.find_element(By.CSS_SELECTOR, ".brand")).perform()
+        browser.execute_script(f"location.hash = '#/meeting/{made.name}'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
         # The trial over (D83): buying holds it in the recording's place, then gives it back.
         swapped = [browser.execute_script(f"paintRefused({state}); return arguments[0]", None) or browser.execute_script(PRIMARIES) for state in ("true", "false")]
         check("the trial over, one primary still: « Acheter Kitokey », then the recording's again", swapped == [["buy"], ["record"]], swapped)
@@ -11090,6 +11355,537 @@ def pages_seen(now: dt.datetime) -> None:
                     time.sleep(0.4)
                     shot_themed(browser, f"d89-{page}-{width}-{theme}", theme)
 
+
+
+# The meetings the Store's screenshots show (D103): invented for them, nothing of a real one, each a situation the
+# people who buy Kitokey live between two calls — a product review, a client's quote and schedule, a project's
+# kickoff, a check-in, a 1:1, a steering committee (the decider, 2026-11-21: « que ce soit réaliste et que les
+# prospects puissent comprendre de manière intuitive en un coup d'œil »). Each language its own; three are kept
+# whole — minutes, transcript, sound —: the review shot 1 opens, the client's call shot 2 searches for its quote,
+# the kickoff shot 3 finds with that client's name. A summary cites a line as « [@n] », its n-th line, written as
+# the moment it starts. Who spoke is the page's own — « Vous », « Réunion · voix 1 » —: names are said, never labelled.
+STORE_MEETINGS = {
+    "fr": {
+        "titles": ["Point d’équipe hebdo", "Point individuel — Hugo", "Atelier Lumen — cadrage du projet",
+                   "Atelier Lumen — devis et planning", "Comité de pilotage — T4", "Revue produit de la semaine"],
+        "minutes": ("## 1.\n\nLa 2.4 sort jeudi comme prévu ; l’export PDF suit la semaine d’après, le temps de couvrir deux cas. Les tickets du support baissent de 15\u00a0% ce mois-ci, la moitié encore sur la connexion SSO ; l’activation passe de 41 à 48\u00a0%.\n\n"
+                    "## 2.\n\n- Prévenir le support du report de l’export — Hugo — demain [@190]\n"
+                    "- Préparer les notes de version — Camille — mercredi [@192]\n"
+                    "- Ouvrir une version de test à Atelier Lumen et à la mutuelle Horizon — Camille — vendredi [@9]\n\n"
+                    "## 3.\n\n- Les tests de charge passent depuis la correction du cache. [@1]\n"
+                    "- Deux clients attendent l’export pour leur clôture du mois. [@5]\n"),
+        "said": [("me", None, "On commence par la 2.4 : Hugo, où en sont les tests ?"),
+                 ("others", "1", "Tout passe depuis la correction du cache, les tests de charge aussi."),
+                 ("me", None, "Bien. Et l’export PDF, on le garde dans cette version ?"),
+                 ("others", "2", "Je préférerais le décaler d’une semaine, il reste deux cas à couvrir."),
+                 ("others", "2", "Les tableaux sur plusieurs pages, et les logos des clients."),
+                 ("others", "1", "D’accord, mais deux clients l’attendent pour leur clôture du mois."),
+                 ("me", None, "Lesquels ?"),
+                 ("others", "1", "Atelier Lumen et la mutuelle Horizon, ils l’ont demandé en septembre."),
+                 ("me", None, "On peut leur ouvrir une version de test ?"),
+                 ("others", "2", "Oui, dès vendredi, si les tableaux tiennent."),
+],
+        "lines": 196,
+        "filler": ["Côté support, les tickets ont baissé de 15 % ce mois-ci.", "La moitié concerne encore la connexion SSO.",
+                   "On a une piste, c’est le délai d’expiration du jeton.", "Tu peux regarder ça avant la 2.5 ?",
+                   "Oui, je le mets en haut de la liste.", "Pour l’onboarding, les premiers retours sont bons.",
+                   "Le taux d’activation passe de 41 à 48 %.", "Il faudrait le montrer au comité de pilotage.",
+                   "Je prépare deux diapositives pour mardi.", "Et la refonte des notifications, elle avance ?",
+                   "Les maquettes sont prêtes, on les teste lundi avec cinq clients.", "Très bien, on en reparle la semaine prochaine."],
+        # Its end: who does what, and the date said again.
+        "found": {190: ("me", None, "Pour l’export, Hugo prévient le support dès demain."),
+                  191: ("others", "1", "Je leur écris aussi, ils préfèrent l’entendre de nous."),
+                  192: ("others", "2", "Et moi, je prépare les notes de version pour mercredi."),
+                  193: ("me", None, "La date de sortie ne bouge pas ?"),
+                  194: ("others", "1", "Non, jeudi matin, comme prévu."),
+                  195: ("me", None, "Parfait. On sort la 2.4 jeudi, l’export suit la semaine d’après.")},
+        "call": {
+            "minutes": ("## 1.\n\nL’Atelier Lumen valide le périmètre : la boutique en ligne avant les fêtes, le paiement en trois fois "
+                        "au second lot. Le devis révisé passe à 21 400 € HT, en deux lots.\n\n"
+                        "## 2.\n\n- Envoyer le devis révisé en deux lots — Vous — jeudi [@61]\n"
+                        "- Préparer le fichier des 400 fiches produit — Léa — vendredi [@8]\n"
+                        "- Planifier la formation de l’équipe de la boutique — Hugo — lundi [@10]\n\n"
+                        "## 3.\n\n- La boutique doit être en ligne avant les fêtes. [@3]\n"
+                        "- Signature avant la fin du mois si le devis tient à 21 400 €. [@118]\n"),
+            "lines": 280,
+            "said": [],
+            "filler": ["Bonjour à tous, merci d’avoir décalé le créneau.", "On a relu le cahier des charges avec l’équipe hier.",
+                       "Le catalogue en ligne reste la priorité pour vous ?", "Oui, il faut qu’il soit prêt pour les fêtes.",
+                       "Le paiement en trois fois, c’est indispensable ?", "Nos clients le demandent souvent, oui.",
+                       "On peut le prévoir dans le second lot.", "Et la reprise des 400 fiches produit, qui s’en charge ?",
+                       "Léa peut préparer le fichier de notre côté.", "Parfait, on l’importera en une fois.",
+                       "Il faudra aussi former l’équipe de la boutique.", "Une demi-journée devrait suffire."],
+            "found": {9: ("others", "1", "Le devis de septembre prévoyait 18 000 €, on peut rester dans cette enveloppe ?"),
+                      61: ("me", None, "Je vous envoie le devis révisé jeudi, avec la livraison en deux lots."),
+                      118: ("others", "2", "Si le devis tient à 21 400 €, on signe avant la fin du mois."),
+                      170: ("me", None, "Dans le devis, la formation de l’équipe est comptée à part."),
+                      236: ("others", "1", "On fait valider le devis par notre associée lundi.")},
+            "sought": "devis",
+        },
+        "kickoff": {
+            "minutes": ("## 1.\n\nL’Atelier Lumen veut une boutique en ligne avant les fêtes : 400 produits, un budget autour de 20 000 €.\n\n"
+                        "## 2.\n\n- Envoyer une proposition chiffrée — Vous — vendredi [@236]\n"
+                        "- Chiffrer à part le paiement en plusieurs fois — Vous — vendredi [@238]\n\n"
+                        "## 3.\n\n- Les fêtes font 40 % des ventes de l’année. [@3]\n"
+                        "- 400 produits, avec leurs déclinaisons de couleur. [@4]\n"),
+            "said": [("me", None, "Merci d’être venus. Racontez-nous ce qui vous amène."),
+                     ("others", "1", "Nos ventes en ligne passent par Instagram, on veut une vraie boutique."),
+                     ("me", None, "Pour quand ?"),
+                     ("others", "1", "Avant les fêtes, c’est là qu’on fait 40 % de l’année."),
+                     ("others", "2", "Et on a 400 produits, avec leurs déclinaisons de couleur."),
+                     ("me", None, "Vous avez une enveloppe en tête ?"),
+                     ("others", "1", "Autour de 20 000 €, un peu plus si ça vaut le coup."),
+],
+            "lines": 239,
+            "filler": ["Aujourd’hui, comment vous gérez les commandes ?", "Sur un tableur, et les paiements par virement.",
+                       "Et les stocks, ils sont à jour où ?", "Dans le même tableur, mis à jour le soir.",
+                       "On pourra le relier à la boutique.", "Vous avez déjà des photos des produits ?",
+                       "Oui, pour la plupart, sur fond blanc.", "Parfait, ça nous fera gagner du temps.",
+                       "Qui validera les maquettes chez vous ?", "Moi, avec Léa pour les textes.",
+                       "On vous propose un point toutes les deux semaines.", "Ça nous va très bien."],
+            # Its end: what follows, and when.
+            "found": {236: ("me", None, "Je vous envoie une proposition chiffrée d’ici vendredi."),
+                      237: ("others", "2", "Pensez au paiement en plusieurs fois, nos clients le demandent."),
+                      238: ("me", None, "C’est noté, on le chiffre à part.")},
+            "sought": "lumen",
+        },
+    },
+    "en": {
+        "titles": ["Weekly team check-in", "1:1 — Hugo", "Lumen Studio — project kickoff",
+                   "Lumen Studio — quote call", "Steering committee — Q4", "Weekly product review"],
+        "minutes": ("## 1.\n\n2.4 ships on Thursday as planned; the PDF export follows the week after, to cover two more cases. Support tickets are down 15% this month, half still about SSO sign-in; activation goes from 41 to 48%.\n\n"
+                    "## 2.\n\n- Tell support the export is delayed — Hugo — tomorrow [@190]\n"
+                    "- Write the release notes — Camille — Wednesday [@192]\n"
+                    "- Give Lumen Studio and Horizon Insurance a test version — Camille — Friday [@9]\n\n"
+                    "## 3.\n\n- Load tests pass since the cache fix. [@1]\n"
+                    "- Two customers need the export for their month-end close. [@5]\n"),
+        "said": [("me", None, "Let’s start with 2.4: Hugo, where are the tests?"),
+                 ("others", "1", "Everything passes since the cache fix, load tests included."),
+                 ("me", None, "Good. And the PDF export, do we keep it in this version?"),
+                 ("others", "2", "I’d rather move it a week, two cases are still uncovered."),
+                 ("others", "2", "Tables over several pages, and the customers’ logos."),
+                 ("others", "1", "Fine, but two customers need it for their month-end close."),
+                 ("me", None, "Which ones?"),
+                 ("others", "1", "Lumen Studio and Horizon Insurance, they asked in September."),
+                 ("me", None, "Can we give them a test version?"),
+                 ("others", "2", "Yes, from Friday, if the tables hold."),
+],
+        "lines": 196,
+        "filler": ["On support, tickets are down 15% this month.", "Half of them are still about SSO sign-in.",
+                   "We have a lead, it’s the token’s expiry time.", "Can you look at it before 2.5?",
+                   "Yes, I’ll put it at the top of the list.", "For onboarding, the first feedback is good.",
+                   "Activation goes from 41 to 48%.", "We should show that at the steering committee.",
+                   "I’ll prepare two slides for Tuesday.", "And the notifications redesign, is it moving?",
+                   "The mock-ups are ready, we test them on Monday with five customers.", "Great, let’s pick it up next week."],
+        # Its end: who does what, and the date said again.
+        "found": {190: ("me", None, "For the export, Hugo tells support tomorrow."),
+                  191: ("others", "1", "I’ll write to them too, they’d rather hear it from us."),
+                  192: ("others", "2", "And I’ll write the release notes for Wednesday."),
+                  193: ("me", None, "The release date doesn’t move?"),
+                  194: ("others", "1", "No, Thursday morning, as planned."),
+                  195: ("me", None, "Perfect. 2.4 ships on Thursday, the export the week after.")},
+        "call": {
+            "minutes": ("## 1.\n\nLumen Studio approves the scope: the online shop before the holidays, instalment payments in the "
+                        "second phase. The revised quote comes to $21,400, in two phases.\n\n"
+                        "## 2.\n\n- Send the revised quote in two phases — You — Thursday [@61]\n"
+                        "- Prepare the file of 400 product pages — Léa — Friday [@8]\n"
+                        "- Schedule the shop team’s training — Hugo — Monday [@10]\n\n"
+                        "## 3.\n\n- The shop must be live before the holidays. [@3]\n"
+                        "- They sign before the month ends if the quote holds at $21,400. [@118]\n"),
+            "lines": 280,
+            "said": [],
+            "filler": ["Hello everyone, thanks for moving the slot.", "We went through the requirements with the team yesterday.",
+                       "Is the online catalogue still your priority?", "Yes, it has to be ready for the holidays.",
+                       "Are instalment payments a must?", "Our customers ask for them a lot, yes.",
+                       "We can plan them for the second phase.", "And the 400 product pages, who moves them over?",
+                       "Léa can prepare the file on our side.", "Great, we’ll import it in one go.",
+                       "The shop team will need some training too.", "Half a day should be enough."],
+            "found": {9: ("others", "1", "September’s quote said $18,000, can we stay within that budget?"),
+                      61: ("me", None, "I’ll send you the revised quote on Thursday, with delivery in two phases."),
+                      118: ("others", "2", "If the quote holds at $21,400, we sign before the month ends."),
+                      170: ("me", None, "In the quote, the team’s training is priced separately."),
+                      236: ("others", "1", "Our partner signs off the quote on Monday.")},
+            "sought": "quote",
+        },
+        "kickoff": {
+            "minutes": ("## 1.\n\nLumen Studio wants an online shop before the holidays: 400 products, a budget around $20,000.\n\n"
+                        "## 2.\n\n- Send a costed proposal — You — Friday [@236]\n"
+                        "- Price instalment payments separately — You — Friday [@238]\n\n"
+                        "## 3.\n\n- The holidays make 40% of the year’s sales. [@3]\n"
+                        "- 400 products, each in several colours. [@4]\n"),
+            "said": [("me", None, "Thanks for coming in. Tell us what brings you here."),
+                     ("others", "1", "We sell online through Instagram, we want a real shop."),
+                     ("me", None, "By when?"),
+                     ("others", "1", "Before the holidays, that’s 40% of our year."),
+                     ("others", "2", "And we have 400 products, each in several colours."),
+                     ("me", None, "Do you have a budget in mind?"),
+                     ("others", "1", "Around $20,000, a bit more if it’s worth it."),
+],
+            "lines": 239,
+            "filler": ["How do you handle orders today?", "In a spreadsheet, with payments by bank transfer.",
+                       "And the stock, where is it kept up to date?", "In the same spreadsheet, updated every evening.",
+                       "We can connect it to the shop.", "Do you already have product photos?",
+                       "Yes, most of them, on a white background.", "Great, that will save us time.",
+                       "Who signs off the mock-ups on your side?", "I do, with Léa for the copy.",
+                       "We suggest a check-in every two weeks.", "That works for us."],
+            # Its end: what follows, and when.
+            "found": {236: ("me", None, "I’ll send you a costed proposal by Friday."),
+                      237: ("others", "2", "Think about instalment payments, our customers ask for them."),
+                      238: ("me", None, "Noted, we’ll price that separately.")},
+            "sought": "lumen",
+        },
+    },
+}
+# The meeting each shot opens, by its index among the titles: 1 the weekly review, 2 the client's call searched for
+# its quote, 3 that client's kickoff, found with the call by the client's name.
+STORE_OPENED = {"1-meeting": 5, "2-search": 3, "3-list": 2}
+STORE_RATE = 8000
+# The hour each meeting started, oldest first: a working day's, whenever the e2e runs.
+STORE_HOURS = [(9, 30), (14, 0), (10, 15), (16, 30), (11, 0), (14, 30)]
+
+
+def store_said(meeting: dict) -> list:
+    """A kept meeting's lines, as long as such a meeting lasts: what it says first, then its filler in turn, its found
+    lines where they fall; one side holds the floor a few lines, then the other, the same every run."""
+    said, random = list(meeting["said"]), __import__("random").Random(meeting["lines"])
+    side, left = "me", 0
+    for index in range(len(said), meeting["lines"]):
+        if not left:
+            side, left = ("others" if side == "me" else "me"), random.randint(6, 18)
+        left -= 1
+        said.append(meeting["found"].get(index) or (side, None if side == "me" else random.choice("12"),
+                                                    meeting["filler"][index % len(meeting["filler"])]))
+    return said
+
+
+def store_segments(said: list, seed: int) -> list[tuple]:
+    """Each line's speaker, voice, text, start and end, as people talk: as long as its words take, a breath to a few
+    seconds between two, now and then the next speaker in before the end — the same every run (`seed`)."""
+    random = __import__("random").Random(seed)
+    segments, at = [], 3.0
+    for who, voice, text in said:
+        if segments and segments[-1][0] != who and random.random() < 0.2:
+            at -= random.uniform(0.3, 1.0)
+        lasts = len(text) / 15 + random.uniform(0.8, 3.0)
+        segments.append((who, voice, text, round(at, 1), round(at + lasts, 1)))
+        at += lasts + random.uniform(0.4, 3.0)
+    return segments
+
+
+def store_clock(seconds: float) -> str:
+    """A moment as the page writes it (`clock`): « 02:05 », « 1:02:05 » past an hour."""
+    whole = int(seconds)
+    return ":".join(f"{part:02d}" for part in ([whole // 3600] if whole >= 3600 else []) + [whole % 3600 // 60, whole % 60])
+
+
+def store_minutes(meeting: dict, segments: list) -> str:
+    """A kept meeting's minutes, each « [@n] » written as the moment its n-th line starts."""
+    return re.sub(r"\[@(\d+)\]", lambda cited: f"[{store_clock(segments[int(cited[1])][3])}]", meeting["minutes"])
+
+
+def store_audio(folder: Path, segments: list) -> None:
+    """A kept meeting's two tracks, made here and never kept in the repository: speech-like bursts where its
+    transcript says each side spoke, silence elsewhere — the same every run, so two runs draw the same."""
+    random = __import__("random").Random(103)
+    length = int(STORE_RATE * (segments[-1][4] + 3))
+    # Syllables at about 4 a second, one take as long as the longest line, each line its start.
+    take = bytearray(2 * int(STORE_RATE * max(end - start for *_, start, end in segments)))
+    for n in range(len(take) // 2):
+        level = 0.55 + 0.45 * math.sin(2 * math.pi * 4.1 * n / STORE_RATE)
+        struct.pack_into("<h", take, 2 * n, int(9000 * level * random.uniform(-1, 1)))
+    for track, who in (("local", "me"), ("remote", "others")):
+        samples = bytearray(2 * length)
+        for speaker, _, _, start, end in segments:
+            if speaker != who:
+                continue
+            at, many = 2 * int(STORE_RATE * start), 2 * int(STORE_RATE * (end - start))
+            samples[at:at + many] = take[:many]
+        with wave.open(str(folder / f"{track}.wav"), "wb") as made:
+            made.setnchannels(1)
+            made.setsampwidth(2)
+            made.setframerate(STORE_RATE)
+            made.writeframes(bytes(samples))
+    record = json.loads((folder / "session.json").read_text())
+    record["tracks"] = {"local": {"device": "Mic"}, "remote": {"device": "Speaker"}}
+    (folder / "session.json").write_text(json.dumps(record))
+    (folder / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n{"track":"remote","sample":0,"at":0.0}\n')
+
+
+# Microsoft's least for a desktop screenshot: « 1366 x 768 pixels or larger », a .png of at most 50 MB (D103).
+STORE_LEAST, STORE_MOST = (1366, 768), 50 * 1024 * 1024
+
+
+def png_size(file: Path) -> tuple[int, int]:
+    """A PNG's width and height, read from its header; (0, 0) when it is no PNG."""
+    head = file.read_bytes()[:24]
+    return struct.unpack(">II", head[16:24]) if head[:8] == b"\x89PNG\r\n\x1a\n" else (0, 0)
+
+
+def store_hours(text: str) -> list[int]:
+    """The hours a page dates a meeting or a summary at — « · 14:30 », « à 14:30 », « · 2:30 PM », « at 2:30 PM » —,
+    on 24 hours; never a moment of a recording (« 00:45 »), which has neither."""
+    return [int(hour) % 12 + (12 if half == "PM" else 0) if half else int(hour)
+            for hour, half in re.findall(r"(?:· |\bà |\bat )(\d{1,2}):\d\d(?:\s*([AP]M))?", text)]
+
+
+def store_lanes(rects: list) -> tuple[int, int, float]:
+    """Who spoke as the page draws it (#1077): a bar for each segment, yours on one lane, the others' on the other —
+    how many bars each lane holds, and the share of the drawn width where both lanes have a bar at once: near
+    nothing where people take turns, all of it where two lines are drawn the same."""
+    covered = {"local": set(), "remote": set()}
+    for track, x, width, _ in rects:
+        covered.setdefault(track, set()).update(range(int(x), max(int(x) + 1, int(-(-(x + width) // 1)))))
+    both, either = covered["local"] & covered["remote"], covered["local"] | covered["remote"]
+    counts = {track: sum(1 for kind, *_ in rects if kind == track) for track in ("local", "remote")}
+    return counts["local"], counts["remote"], round(len(both) / max(1, len(either)), 3)
+
+
+def store_lasted(row: str) -> int:
+    """A list row's length, in minutes, as it says it: « 25 min », « 1 h 05 »."""
+    hours, minutes = re.search(r"(\d+)\s*h\b", row), re.search(r"(\d+)\s*min\b", row)
+    return 60 * int(hours[1] if hours else 0) + int(minutes[1] if minutes else 0)
+
+
+def store_shots(now: dt.datetime) -> None:
+    """CH. D103: the Microsoft Store's screenshots, made here from meetings invented for them, in French then
+    in English, light, in the Store's order — « displayed in your listing in order », Microsoft's page says —, the
+    benefit first (the coordinator, 2026-11-20 and 2026-11-21): a meeting's page with its minutes and transcript, a word
+    sought in a long call's transcript, a word sought in the list, Settings with its model on this computer — never a
+    recording, whose page shows neither its time nor its levels yet (the bar does). Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
+    its MSIX page read on 2026-11-20 (D103's section) —, written to `store/<fr|en>/` in KITOKEY_SCREENSHOTS'
+    folder, or the run's own; then counted: four PNGs a language, each at least 1366 × 768, at most 50 MB."""
+    print("CH. the Store's screenshots: four a language, French and English, 1920 × 1080, from meetings invented for them (D103)")
+    store = Path(os.environ.get("KITOKEY_SCREENSHOTS") or WORK / "shots") / "store"
+    shutil.rmtree(store, ignore_errors=True)
+    # What each shot's page says, read as it is taken: a Store shot says no audio lost, no run's folder, no night hour.
+    shown: dict[str, dict] = {}
+    seen = lambda browser, shot: shown.update({shot: browser.execute_script(
+        "const shown = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent);"
+        "return {freed: shown('.chip.gone, #no-player').length,"
+        " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText,"
+        " lanes: [...document.querySelectorAll('#meeting svg.relief rect')].map(r => [r.getAttribute('class'), +r.getAttribute('x'), +r.getAttribute('width'), +r.getAttribute('y')]),"
+        " sought: [document.getElementById('search')?.value ?? '', document.getElementById('find')?.value ?? ''],"
+        " marked: [shown('#meeting .transcript .lines li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent)),"
+        " shown('#groups li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent))],"
+        " writers: shown('#meeting .maker').filter(p => p.querySelector('select')).map(p => { const s = p.querySelector('select');"
+        " let after = s.options[s.selectedIndex]?.textContent ?? '';"
+        " for (let n = p.querySelector('select').nextSibling; n; n = n.nextSibling) after += n.textContent; return after; }),"
+        " lines: [shown('#meeting .transcript .lines li').length, document.querySelectorAll('#meeting .transcript .lines li').length],"
+        " rows: [shown('#groups li').length, document.querySelectorAll('#groups li').length],"
+        " fetch: shown('#model-fetch').length, said: shown('#groups li').map(e => e.innerText),"
+        " models: shown('#settings h2').filter(h => ['Modèles', 'Models'].includes(h.textContent)).map(h => Math.round(h.getBoundingClientRect().top)),"
+        " cut: [...document.querySelectorAll('#groups li *')].filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent),"
+        " here: document.getElementById('minutes-here')?.checked ?? null,"
+        " confidential: document.getElementById('confidential-switch')?.checked ?? null,"
+        " crossing: [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
+        " && e.getBoundingClientRect().top < innerHeight && e.getBoundingClientRect().bottom > innerHeight).map(e => e.textContent.trim() || e.tagName),"
+        " above: [...shown('#settings section.card').filter(s => s.getBoundingClientRect().top < 0 && s.getBoundingClientRect().bottom > 0"
+        " && ![...s.querySelectorAll('h2')].some(h => ['Modèles', 'Models'].includes(h.textContent))).map(s => s.querySelector('h2')?.textContent ?? 'SECTION'),"
+        " ...[...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
+        " && e.getBoundingClientRect().top < 0 && e.getBoundingClientRect().bottom > 0).map(e => e.textContent.trim() || e.tagName)],"
+        " fit: window.storeFit ?? null,"
+        " zero: (document.getElementById('settings')?.innerText.match(/\\b0\\s(?:o|B)\\b/g) ?? []).length}")})
+    # An Ollama of CH's own, holding the model every meeting's minutes name: Settings says them written on this
+    # computer, as the meetings do.
+    class Ollama(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"models": [{"name": "qwen3:8b"}]}).encode()
+            self.send_response(200)
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Ollama)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    ollama = f"http://127.0.0.1:{server.server_address[1]}"
+    for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
+        said = STORE_MEETINGS[short]
+        # The meetings' folder is the user's own, in a home of its own: Settings says « Dossier personnel / Kitokey »,
+        # never the run's path. Its data too: the model there is CH's alone, never the other scenarios'.
+        home = WORK / f"store-{short}"
+        meetings = home / "Kitokey"
+        model = home / "share" / "kitokey" / "models" / "ggml-large-v3-turbo-q8_0.bin"
+        model.parent.mkdir(parents=True, exist_ok=True)
+        # The model on this computer, as Settings reads it — a file of its name, its published size, sparse —: the
+        # transcription's privacy shown, its size as it is.
+        with open(model, "wb") as made:
+            made.truncate(874_188_075)
+        starts = [(now - dt.timedelta(days=2 * (len(said["titles"]) - index))).replace(hour=hour, minute=minute, second=0, microsecond=0)
+                  for index, (hour, minute) in enumerate(STORE_HOURS)]
+        names = [start.strftime("%Y-%m-%d_%H-%M") for start in starts]
+        kept = {5: said, 3: said["call"], 2: said["kickoff"]}
+        for index, (name, title) in enumerate(zip(names, said["titles"])):
+            folder, meeting = meetings / name, kept.get(index)
+            segments = store_segments(store_said(meeting), 103 + index) if meeting else None
+            minutes = (segments[-1][4] + 3) / 60 if segments else 25 + 5 * index
+            session(folder, starts[index], minutes, {} if segments else {"local.wav": 1000})
+            # A client's meetings said confidential, as their owner would (the decider, 2026-11-21 ~12:50): heard and
+            # written here alone, the lock shown on where it matters; the team's own product review left as it is.
+            if index in (2, 3):
+                (folder / "confidential").write_bytes(b"")
+            made = starts[index] + dt.timedelta(minutes=minutes + 4)
+            (folder / "minutes.md").write_text(
+                f"---\ncontract: minutes/v2\nmade: {made.isoformat(timespec='seconds')}\nprovider: local\nmodel: qwen3:8b\ncontext: null\n"
+                f"title: {json.dumps(title, ensure_ascii=False)}\n---\n\n" + (store_minutes(meeting, segments) if segments else
+                                                                                re.sub(r" \[@\d+\]", "", said["minutes"])))
+            if not segments:
+                continue
+            lines = [{"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0",
+                      "language": short, "context": None},
+                     *({"type": "segment", "speaker": who, "track": "local" if who == "me" else "remote", "voice": voice,
+                        "start": start, "end": end, "text": text} for who, voice, text, start, end in segments),
+                     {"type": "complete", "duration": segments[-1][4] + 3}]
+            (folder / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
+            store_audio(folder, segments)
+        # After a recording, the transcript then the minutes: what Kitokey does on its own, chosen as a buyer would.
+        window = Window(meetings, language, f'reminder = false\nafter = "minutes"\nminutes_provider = "{ollama}/v1"\nminutes_model = "qwen3:8b"\n',
+                        ollama=ollama)
+        window.env.update(GTK_THEME="Adwaita", HOME=str(home), XDG_DATA_HOME=str(home / "share"))
+        with window as browser:
+            browser.set_window_size(1920, 1080)
+            if not wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 3):
+                # The window's frame took its share of what was asked: asked again, by what was missing.
+                browser.set_window_size(2 * 1920 - browser.execute_script("return innerWidth"), 1080)
+                wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 5)
+            (store / short).mkdir(parents=True, exist_ok=True)
+            for shot_name, index in STORE_OPENED.items():
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{names[index]}")
+                wait_for(browser, lambda b: b.execute_script(
+                    "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
+                    " && p.querySelectorAll('.transcript .lines li').length > 0", names[index]), 10)
+                # 2: a word sought in the call's transcript, only its lines left, each at its moment (the coordinator,
+                # 2026-11-21: « retrouver ce qui a été dit, à la seconde »).
+                if shot_name == "2-search":
+                    sought = browser.find_element(By.ID, "search")
+                    sought.send_keys(kept[index]["sought"])
+                # 3: a word sought in the list, only its meetings left (« retrouver n'importe quelle réunion »).
+                if shot_name == "3-list":
+                    browser.find_element(By.ID, "find").send_keys(kept[index]["sought"])
+                browser.execute_script("document.activeElement.blur(); scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
+                time.sleep(0.6)
+                browser.save_screenshot(str(store / short / f"{shot_name}.png"))
+                browser.execute_script("document.documentElement.style.overflow = ''")
+                seen(browser, f"{short}/{shot_name}.png")
+                if shot_name == "3-list":
+                    browser.execute_script("const f = document.getElementById('find'); f.value = ''; f.dispatchEvent(new Event('input'))")
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 10)
+            # Its models at the top — on this computer, nothing sent —, the card above wholly out of the image, the one
+            # under them going on past its edge between two rows (lina and the coordinator, 2026-11-21); the page's
+            # scrollbar, an artefact of the shot's height, hidden for it alone.
+            # The scroll is chosen from the page as drawn, never tuned: the top anywhere from the card above's bottom to
+            # the Models heading's top — the card's own padding may go, a scrolled page (the coordinator, 2026-11-21) —,
+            # the nearest to the card's top at 14 px where neither edge crosses a control or a line of text, and the
+            # page long enough to scroll there. None: `storeFit` names both bands, for the edge check to say.
+            browser.execute_script(
+                "const box = e => { const r = e.getBoundingClientRect(); return {top: r.top + scrollY, bottom: r.bottom + scrollY}; };"
+                "const cards = [...document.querySelectorAll('#settings section.card')].filter(e => e.offsetParent);"
+                "const title = [...document.querySelectorAll('#settings h2')].find(h => ['Modèles', 'Models'].includes(h.textContent));"
+                "const card = title.closest('section'), before = cards[cards.indexOf(card) - 1];"
+                "const leaves = [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))).map(box);"
+                "const crosses = y => leaves.some(r => r.top < y && r.bottom > y);"
+                "const from = Math.ceil(before ? box(before).bottom : 0), to = Math.min(Math.floor(box(title).top), document.documentElement.scrollHeight - innerHeight);"
+                "const aim = Math.round(box(card).top) - 14;"
+                "const fits = [...Array(Math.max(0, to - from + 1)).keys()].map(i => from + i).sort((a, b) => Math.abs(a - aim) - Math.abs(b - aim))"
+                "  .find(y => !crosses(y) && !crosses(y + innerHeight));"
+                "window.storeFit = fits === undefined ? `no scroll fits: the top in ${from}..${to}, the bottom in ${from + innerHeight}..${to + innerHeight} (page px), every one across a control or a line of text` : null;"
+                "scrollTo(0, fits ?? aim);"
+                "document.documentElement.style.overflow = 'hidden'")
+            time.sleep(0.4)
+            browser.save_screenshot(str(store / short / "4-settings.png"))
+            seen(browser, f"{short}/4-settings.png")
+    made = sorted(store.glob("*/*.png"))
+    sizes = {f"{file.parent.name}/{file.name}": (png_size(file), file.stat().st_size) for file in made}
+    check("the Store's screenshots: four a language, French and English, in the Store's order (D103)",
+          [name for name in sizes] == [f"{short}/{n}" for short in ("en", "fr")
+                                       for n in ("1-meeting.png", "2-search.png", "3-list.png", "4-settings.png")], sorted(sizes))
+    check("each at least 1366 × 768 and at most 50 MB, as Microsoft's page asks (D103)",
+          bool(sizes) and all(w >= STORE_LEAST[0] and h >= STORE_LEAST[1] and 0 < size <= STORE_MOST for (w, h), size in sizes.values()),
+          sizes)
+    check("no screenshot says an audio deleted or one Kitokey cannot play (D103)",
+          len(shown) == 8 and not any(page["freed"] for page in shown.values()), {shot: page["freed"] for shot, page in shown.items()})
+    settings = {shot: page["folder"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' screenshot says the meetings' folder in the user's home, never the run's own path (D103)",
+          len(settings) == 2 and all(folder and not folder.startswith("/") for folder in settings.values()), settings)
+    hours = {shot: store_hours(page["text"]) for shot, page in shown.items()}
+    check("every screenshot dates its meetings (D103)", len(hours) == 8 and all(hours.values()),
+          [shot for shot, said in hours.items() if not said])
+    check("every meeting and summary the screenshots date is of the working day, 8 h to 19 h (D103)",
+          all(8 <= hour < 19 for said in hours.values() for hour in said),
+          {shot: [hour for hour in said if not 8 <= hour < 19] for shot, said in hours.items() if any(not 8 <= hour < 19 for hour in said)})
+    # Each cited « [@n] » names a line the meeting has.
+    cited = {f"{short}/{kind}": [int(n) for n in re.findall(r"\[@(\d+)\]", meeting["minutes"]) if int(n) >= len(store_said(meeting))]
+             for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("call", said["call"]), ("kickoff", said["kickoff"]))}
+    check("every moment a summary cites is one its transcript starts a line at (D103)", not any(cited.values()), cited)
+    lanes = {shot: store_lanes(page["lanes"]) for shot, page in shown.items() if shot[3] in "12"}
+    check("who spoke, drawn on the meetings' shots, shows the turns: each side's lane at least 4 bars, both lanes drawn at once over a tenth of the width at most (#1077)",
+          len(lanes) == 4 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in lanes.values()), lanes)
+    # « Vous » on the upper lane, « Les autres » on the lower, as the transcript's sides read top to bottom (lina, #1093).
+    tops = {shot: (max((y for kind, _, _, y in page["lanes"] if kind == "local"), default=None),
+                   min((y for kind, _, _, y in page["lanes"] if kind == "remote"), default=None))
+            for shot, page in shown.items() if shot[3] in "12"}
+    check("who spoke: « Vous » on the upper lane, every bar of it above every bar of « Les autres » (#1077)",
+          len(tops) == 4 and all(here is not None and others is not None and here < others for here, others in tops.values()), tops)
+    lasted = {shot: [store_lasted(row) for row in page["said"]] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("every meeting the list shows lasts as such a meeting does, at least 15 min (D103)",
+          len(lasted) == 2 and all(len(rows) == 6 and min(rows) >= 15 for rows in lasted.values()), lasted)
+    searched = {shot: page["lines"] for shot, page in shown.items() if shot.endswith("2-search.png")}
+    check("the search shot: a word typed in a meeting's transcript, only its lines shown, at least four (D103)",
+          len(searched) == 2 and all(4 <= seen_ < total for seen_, total in searched.values()), searched)
+    # The word sought marked where it is found, in each line or row kept (#1078): accents and case aside, as the search.
+    fold = lambda text: "".join(c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)).lower()
+    marks = {shot: [lines for lines in page["marked"][0 if shot.endswith("2-search.png") else 1]]
+             for shot, page in shown.items() if shot.endswith(("2-search.png", "3-list.png"))}
+    unmarked = {shot: lines for shot, lines in marks.items()
+                if not lines or any(not marked or any(fold(m) != fold(shown[shot]["sought"][0 if shot.endswith("2-search.png") else 1]) for m in marked) for marked in lines)}
+    check("a search marks the word it found in each line, and each row, it keeps (#1078)", len(marks) == 4 and not unmarked, unmarked)
+    locked = {shot: page["confidential"] for shot, page in shown.items() if shot.endswith("2-search.png")}
+    check("the search shot's meeting, a client's call, shows « Confidentielle » on (the decider, 2026-11-21)",
+          len(locked) == 2 and all(on is True for on in locked.values()), locked)
+    listed = {shot: page["rows"] for shot, page in shown.items() if shot.endswith("3-list.png")}
+    check("the list shot: a word typed in the list's search, only its meetings shown, at least two (D103)",
+          len(listed) == 2 and all(2 <= seen_ < total for seen_, total in listed.values()), listed)
+    fetched = {shot: page["fetch"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot shows the transcription's model on this computer, none to download (D103)",
+          len(fetched) == 2 and not any(fetched.values()), fetched)
+    cut = {shot: page["cut"] for shot, page in shown.items() if page["cut"]}
+    check("no screenshot cuts a meeting's title or line in the list (D103)", len(shown) == 8 and not cut, cut)
+    here = {shot: page["here"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot says the minutes written on this computer, as every meeting's are (D103)", len(here) == 2 and all(here.values()), here)
+    above = {shot: page["above"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    # Its top may cut the Models card's own padding — a page scrolled —, never the card above nor a line or a control
+    # (the coordinator, 2026-11-21, after #1081's longer Tester line left no offset with the card's top whole).
+    check("Settings' shot cuts no text or control at its top, nor the card above its models (D103)", len(above) == 2 and not any(above.values()), above)
+    crossing = {shot: page["crossing"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot: the card under its models goes on past the image's edge between two rows, never through a control or a line of text (D103)",
+          len(crossing) == 2 and not any(crossing.values()),
+          {shot: {"crossing": crossing[shot], "fit": shown[shot]["fit"]} for shot in crossing})
+    # What only a run has — a loopback address, its stand-ins' ports — never on a buyer's screen.
+    run = {shot: sorted(set(re.findall(r"127\.0\.0\.1(?::\d+)?|localhost:(?!11434\b)\d+", page["text"]))) for shot, page in shown.items()}
+    check("no screenshot shows an address or a port only the run has (D103)", len(run) == 8 and not any(run.values()),
+          {shot: said for shot, said in run.items() if said})
+    # Each step's line with a model to choose says where it ran, as the line without one does (#1090): its model
+    # chosen, then what follows it.
+    writers = {shot: page["writers"] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("a meeting's step with its model a list says where it ran, its model chosen then: « Qwen3 8b, sur cet ordinateur » (#1090)",
+          len(writers) == 2 and all(said and all(("sur cet ordinateur" if shot.startswith("fr") else "on this computer") in one for one in said)
+                                    for shot, said in writers.items()), writers)
+    # The minutes say a language model wrote them (Store Policies 11.16, #1092).
+    ai = {shot: ("Rédigé par une IA\u00a0: relisez-le avant de le partager." if shot.startswith("fr") else "Written by AI: read it before you share it.") in page["text"]
+          for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("a meeting's minutes say an AI wrote them (#1092)", len(ai) == 2 and all(ai.values()), ai)
+    # A time as each language writes it (#1075): US English no zero before the hour, French two digits.
+    clocks = {shot: re.findall(r"\b0\d:\d\d\s?[AP]M" if shot.startswith("en") else r"(?<![\d:])\d:\d\d\b", page["text"]) for shot, page in shown.items()}
+    check("times written as each language does: « 2:30 PM », « 09:30 » (#1075)", len(clocks) == 8 and not any(clocks.values()),
+          {shot: found for shot, found in clocks.items() if found})
+    zero = {shot: page["zero"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot says the model's size as it is, never « 0 o » (D103)", len(zero) == 2 and not any(zero.values()), zero)
+    models = {shot: page["models"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot shows its models at the top: their heading in the image's first third — Microsoft's « top two-thirds » for what matters (D103)",
+          len(models) == 2 and all(len(top) == 1 and 0 <= top[0] < 1080 / 3 for top in models.values()), models)
 
 def trial_over(now: dt.datetime) -> None:
     """AV. The trial over on a stand-in licence (PDR-0005, D83): no recording from the window, the
@@ -11575,13 +12371,17 @@ def main() -> int:
             )
             drawn = browser.execute_script(
                 "const s = document.querySelector('#meeting .relief'); return [s.getAttribute('aria-label'),"
-                " ...['local', 'remote'].map(t => s.querySelector('.' + t).getAttribute('points').split(' ').map(p => +p.split(',')[1]))]"
+                " ...['local', 'remote'].map(t => [...s.querySelectorAll('rect.' + t)].map(r => ['x', 'width', 'y', 'height'].map(a => +r.getAttribute(a))))]"
             )
             label, here, remote = drawn
-            # Speech in the first sixtieth of the meeting, on each side: here rises above the middle, remote falls below.
+            # Each segment a bar on its side's lane (#1077): here above the middle, remote below; speech in the first
+            # sixtieth of the meeting on each side, none of here's in its last.
             check(
-                "who spoke is drawn over the meeting, here above and remote below",
-                label.startswith("Temps de parole") and len(here) == len(remote) == 60 and here[0] < 42 and remote[0] > 46 and here[-1] == 42,
+                "who spoke is drawn over the meeting, each segment a bar: here on the upper lane, remote on the lower (#1077)",
+                label.startswith("Temps de parole") and here and remote
+                and all(y + height <= 44 for _, _, y, height in here) and all(y >= 44 for _, _, y, _ in remote)
+                and min(x for x, *_ in here) < 1100 / 60 and min(x for x, *_ in remote) < 1100 / 60
+                and max(x + width for x, width, *_ in here) < 1100 * 59 / 60,
                 drawn,
             )
             maker = lines_seen(browser, "#meeting .minutes .maker")[0]
@@ -13138,6 +13938,7 @@ def main() -> int:
     gestures_answer(now)
     window_looks(now)
     pages_seen(now)
+    store_shots(now)
     actions_rows(now)
     announced(now)
     heard_checked(now)
@@ -13150,6 +13951,7 @@ def main() -> int:
     unsaved_choice_kept(now)
     key_kept_to_its_host(now)
     settings_folded(now)
+    settings_version(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
     focus_kept(now)
@@ -13162,6 +13964,7 @@ def main() -> int:
     bar_language(now)
     bar_after_stop(now)
     axe_first_surfaces(now)
+    keys_first_surfaces(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)

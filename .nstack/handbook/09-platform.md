@@ -71,6 +71,12 @@ holds only its description: its verbs report that there is nothing to run yet, a
 `nstack fitness` asks for `check` and `test` with its first other file. `contracts` and
 `migrate` are reserved names, to declare when a module needs them.
 
+What a module's checks need from the CI machine — a kernel setting, a system package — is its
+`bootstrap`'s, which `Module checks` runs before `check` and `test`: the manifest is the
+project's, and `nstack update` keeps it. Never a step added to the framework's workflow, which
+the next update rewrites, nor one asked of every project for one module's need. Guard it to CI
+(`GITHUB_ACTIONS`) so that a developer's machine is left as it is.
+
 **What ships is assembled from artefacts, never from another module's folder.** `nstack
 release <module>` runs the module's `release` with `NSTACK_DIST` naming its own folder of the
 project's `dist/` — emptied first, outside every module, never committed — and passes what

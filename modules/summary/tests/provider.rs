@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use common::{MINUTES, answering, answering_natively, ollama, played, provider};
+use common::{MINUTES, answering, answering_natively, answering_natively_having_read, ollama, played, provider};
 use kitokey_summary::{
     Refused,
     provider::{Provider, patience},
@@ -182,13 +182,14 @@ fn ollama_is_asked_on_its_own_route_with_room_for_the_whole_request() {
         (Some("a-model"), Some(false), Some(request.as_str()))
     );
     // Two bytes to a token at the very least, and room to answer beyond them, in whole steps.
-    assert_eq!(body["options"]["num_ctx"], 57_344, "{}", body["options"]);
-    assert_eq!(body["options"]["num_predict"], 4096, "{}", body["options"]);
+    // A thinking model's thinking is counted in its answer: 16 384 tokens of room (#1083).
+    assert_eq!(body["options"]["num_ctx"], 69_632, "{}", body["options"]);
+    assert_eq!(body["options"]["num_predict"], 16_384, "{}", body["options"]);
 }
 
 #[test]
 fn ollama_room_grows_with_the_request_and_a_short_one_still_can_answer() {
-    for (bytes, room) in [(0, 4096), (10, 8192), (8192, 8192), (8194, 12_288), (16_384, 12_288)] {
+    for (bytes, room) in [(0, 16_384), (10, 20_480), (8192, 20_480), (8194, 24_576), (16_384, 24_576)] {
         let (address, received) = ollama(vec![("200 OK", answering_natively("text", "stop"))]);
         Provider::new(&address, "m", None, Duration::from_secs(5))
             .unwrap()
@@ -197,6 +198,54 @@ fn ollama_room_grows_with_the_request_and_a_short_one_still_can_answer() {
         received.recv().unwrap();
         let body: serde_json::Value = serde_json::from_str(&received.recv().unwrap().1).unwrap();
         assert_eq!(body["options"]["num_ctx"], room, "{bytes} bytes");
+    }
+}
+
+#[test]
+fn ollama_that_read_less_of_the_request_than_it_holds_is_refused_saying_so() {
+    // 60 000 bytes: no tokenizer packs six of them in one token, so fewer than 10 000 read is a cut.
+    // Ollama cuts a request longer than its window in silence, and says only how much it read (#1083).
+    let request = "é".repeat(30_000);
+    let asked = |read: usize| {
+        let (address, _received) = ollama(vec![("200 OK", answering_natively_having_read(MINUTES, "stop", read))]);
+        Provider::new(&address, "a-model", None, Duration::from_secs(5))
+            .unwrap()
+            .ask(&request)
+    };
+    let refused = asked(9_999).unwrap_err();
+    assert_eq!(refused.1, Some("provider.failed"), "{}", refused.0);
+    assert!(refused.0.contains("read 9999 tokens of a request of 60000 bytes"), "{}", refused.0);
+    assert!(refused.0.contains("the minutes would be incomplete"), "{}", refused.0);
+    // Read whole, or as much as six bytes a token: the minutes are kept.
+    for read in [10_000, 20_000] {
+        assert_eq!(asked(read).unwrap().text, MINUTES, "{read} tokens read");
+    }
+}
+
+#[test]
+fn ollama_that_read_exactly_what_its_cut_keeps_is_refused_saying_so() {
+    // Ollama 0.40.16 cuts a request longer than its window to num_ctx - (num_ctx - num_keep) / 2
+    // tokens, num_keep 4, one more with a tokenizer that adds its own first token
+    // (llm/llama_server.go:320-357, api/types.go:1226): the probe read 4098 at 8192 (#1083).
+    // 60 000 bytes ask a window of 49 152: a cut reads 24 578 or 24 579, more than a token for six bytes.
+    let request = "é".repeat(30_000);
+    let asked = |read: usize| {
+        let (address, _received) = ollama(vec![("200 OK", answering_natively_having_read(MINUTES, "stop", read))]);
+        Provider::new(&address, "a-model", None, Duration::from_secs(5))
+            .unwrap()
+            .ask(&request)
+    };
+    for read in [24_578, 24_579] {
+        let refused = asked(read).unwrap_err();
+        assert_eq!(refused.1, Some("provider.failed"), "{}", refused.0);
+        assert!(
+            refused.0.contains(&format!("read {read} tokens of a request of 60000 bytes")),
+            "{}",
+            refused.0
+        );
+    }
+    for read in [24_577, 24_580] {
+        assert_eq!(asked(read).unwrap().text, MINUTES, "{read} tokens read");
     }
 }
 

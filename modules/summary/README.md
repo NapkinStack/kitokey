@@ -31,6 +31,10 @@ kitokey-summary <session-folder> --provider https://openrouter.ai/api/v1 --model
 # A model on the machine: nothing leaves it, no key — and, on a laptop, fewer of the actions.
 kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mistral
 
+# In a structure (D111): the sections of a kind of meeting, minutes/v5 — general, one_to_one,
+# stand_up, client_call, interview, project_review. Without --structure, minutes/v4 as above.
+kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mistral --structure stand_up
+
 # Whether a model answers, before any meeting: one sentence of the program's own is sent,
 # `sending` then `answered` said, or why not in one sentence. What the settings' Tester runs.
 kitokey-summary --test --provider http://localhost:11434/v1 --model mistral
@@ -70,8 +74,13 @@ D16).
 Ollama's OpenAI route keeps 4096 tokens and drops the rest in silence, the request's rules first:
 a meeting of 45 minutes did not fit (measured on `qwen3:8b`, 2026-10-31). So an address of that
 form, without a key, whose host answers `GET /api/version` as Ollama does, is asked on Ollama's
-own `/api/chat`, with a window sized to the request, an answer of at most 4096 tokens, and a
-patience that grows with what it has to read: 600 s, and a second for each 20 bytes.
+own `/api/chat`, with a window sized to the request, an answer of at most 16 384 tokens, and a
+patience that grows with what it has to read: 600 s, and a second for each 20 bytes. A thinking
+model's thinking counts in its answer: at 4096 tokens it filled the answer on long meetings, and
+16 384 held every run (#1083, measured on `qwen3:8b`, 2026-11-21). Ollama also cuts a request
+longer than its window without a word; it says how many tokens it read. Fewer than one for six
+bytes of the request, or exactly what its cut keeps (Ollama 0.40.16 keeps
+`num_ctx - (num_ctx - 4) / 2`), is refused as a meeting left partly out.
 
 A key, when the provider wants one, is read from `KITOKEY_PROVIDER_KEY` and written nowhere.
 Whatever fails — no network, a refused key, no credit left with the provider, an unknown
@@ -91,6 +100,12 @@ the making the shell passes, so that its lines and the shell's read together.
 The standard verbs — `bootstrap`, `check`, `test`, `run` — are declared in the `commands`
 section of the [manifest](./MANIFEST.yaml), for this module's stack. What each one must do:
 `.nstack/handbook/09-platform.md` §2.
+
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links, under its licence's text. It is made with cargo-about from `about.toml`,
+whose `accepted` list refuses any other licence, GPL among them, and committed; `tests/notices.rs`
+is red once it no longer names `Cargo.lock`'s crates, and `about.toml`'s header gives the two
+commands that make it again.
 
 ## Contracts
 
