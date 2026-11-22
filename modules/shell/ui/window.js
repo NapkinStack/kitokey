@@ -2607,7 +2607,9 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   // While it records, the legend's labels stand under their meters; at rest, the legend in its place.
   drawn.append(drawing);
   if (!live) drawn.append(legend);
-  drawn.append(playerBar(session, listened, total, words, drawing));
+  // No player while it records (#1130), as Voice Memos and Granola play a meeting once it stops: the drawing,
+  // made its slider, would make the meters inside it presentational (WAI-ARIA 1.2), and a press on the time a seek.
+  if (!live) drawn.append(playerBar(session, listened, total, words, drawing));
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
