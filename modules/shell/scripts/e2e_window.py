@@ -8016,6 +8016,18 @@ def renaming(now: dt.datetime) -> None:
               bool(first_seen) and bool(later) and later["time"] != first_seen["time"] and later["time"].count(":") == 2 and not later["live"]
               and [m[0] for m in later["meters"]] == ["meter", "meter"] and all(m[1] for m in later["meters"]) and all(m[2] > 0 for m in later["meters"]),
               [first_seen, later])
+        # #1133: the page drawn again while it records (a focus, a change of address, a gesture) starts from what it last
+        # read, never from « 00:00:00 » and empty meters until its next reading: read the very drawing, as it is put in.
+        redrawn = ("const done = arguments[arguments.length - 1], old = document.getElementById('page-time');"
+                   " const seen = new MutationObserver(() => { const t = document.getElementById('page-time');"
+                   " if (t && t !== old) { seen.disconnect(); done({time: t.textContent,"
+                   " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow')))}); } });"
+                   " seen.observe(document.body, {childList: true, subtree: true}); refresh();"
+                   " setTimeout(() => { seen.disconnect(); done(null); }, 4000);")
+        drawn_again = browser.execute_async_script(redrawn)
+        check("while it records, drawn again: the page starts from its last reading, never « 00:00:00 » nor an empty meter (#1133)",
+              bool(drawn_again) and drawn_again["time"] != "00:00:00" and len(drawn_again["meters"]) == 2 and all(m > 0 for m in drawn_again["meters"]),
+              drawn_again)
         # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
         # left at the legend's right, where the range stands at rest.
         big = ("const t = document.getElementById('page-time'), d = document.querySelector('#meeting .drawing'), h = document.querySelector('#meeting h1'),"
@@ -8093,11 +8105,20 @@ def renaming(now: dt.datetime) -> None:
         browser.execute_script("window.__TAURI__.core.invoke('record')")
         wait_for(browser, lambda b: b.execute_async_script(now_meeting), 10)
         again = browser.execute_async_script(now_meeting)
+        first_drawn = None
         if again:
             # The same folder as before (the recorder played here names it): the page left, then opened again, so it is
-            # drawn for the recording.
+            # drawn for the recording. Its first drawing read as it is put in (#1133).
             browser.execute_script("location.hash = '#/'")
-            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{again}")
+            first_drawn = browser.execute_async_script(
+                "const done = arguments[arguments.length - 1], seen = new MutationObserver(() => {"
+                " const t = document.getElementById('page-time'); if (t) { seen.disconnect(); done(t.textContent); } });"
+                " seen.observe(document.body, {childList: true, subtree: true}); location.hash = arguments[0];"
+                " setTimeout(() => { seen.disconnect(); done(null); }, 5000);", f"#/meeting/{again}")
+        # #1133 (marc's review): a meeting recorded again under the same name — a deleted one's name is free again in the
+        # same minute (capture's `new_folder`) — never starts from the last recording's reading: the time never goes back.
+        check("recorded again under the same name: its page starts at « 00:00:00 », not at the last recording's time (#1133)",
+              first_drawn == "00:00:00", [again, first_drawn])
         live_again = bool(again) and wait_for(browser, lambda b: b.execute_script(alive), 10)
         # #1130 (sam's review): a track gained while it records (`session-audio/v2`, *A track gained later*), as a real
         # capture writes it at once: the page offers its sound (`listen`), and a slider's children are presentational
