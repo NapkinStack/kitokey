@@ -90,3 +90,39 @@ fn the_settings_file_keeps_each_destination_by_name_and_kind_and_never_its_addre
     settings::write(&file, &none).unwrap();
     assert!(!std::fs::read_to_string(&file).unwrap().contains("destinations"));
 }
+
+#[test]
+fn a_name_already_kept_is_refused_its_address_untouched_and_one_removed_leaves_the_keyring_first() {
+    // #1129: settings and keyring through the same two functions as the window's commands.
+    use kitokey_shell::destinations::{Destination, NotAdded};
+    keyring_core::set_default_store(keyring_core::mock::Store::new().unwrap());
+    let one = |name: &str| Destination {
+        name: name.into(),
+        kind: Kind::Discord,
+        shown: "hooks.example/…7f3a".into(),
+    };
+    let mut kept = Vec::new();
+    destinations::add(&mut kept, one("#kept"), "https://hooks.example/first").unwrap();
+    assert_eq!(
+        destinations::add(&mut kept, one("#kept"), "https://hooks.example/second"),
+        Err(NotAdded::Named)
+    );
+    assert_eq!(
+        destinations::address("#kept").unwrap().as_deref(),
+        Some("https://hooks.example/first")
+    );
+    assert_eq!(kept.len(), 1);
+    // The keyring refusing the removal: still listed, to be removed again; never a secret left unseen.
+    destinations::add(&mut kept, one("#stuck"), "https://hooks.example/stuck").unwrap();
+    let stuck = keyring_core::Entry::new("com.napkinstack.Kitokey", "destination:#stuck").unwrap();
+    let mock: &keyring_core::mock::Cred = stuck.as_any().downcast_ref().unwrap();
+    mock.set_error(keyring_core::Error::NoStorageAccess("locked".into()));
+    assert!(destinations::remove(&mut kept, "#stuck").is_err());
+    assert_eq!(kept.iter().map(|one| one.name.as_str()).collect::<Vec<_>>(), ["#kept", "#stuck"]);
+    destinations::remove(&mut kept, "#kept").unwrap();
+    destinations::remove(&mut kept, "#stuck").unwrap();
+    assert_eq!(
+        (kept.len(), destinations::address("#kept"), destinations::address("#stuck")),
+        (0, Ok(None), Ok(None))
+    );
+}

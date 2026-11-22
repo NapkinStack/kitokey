@@ -3017,47 +3017,52 @@ async fn destination_added(app: AppHandle, shell: State<'_, Shell>, kind: String
         Ok(Judged::Failed(why)) => return Err(shell.told(Failure::ProgramNotStarted, why)),
         Err(error) => return Err(shell.told(Failure::Unexpected, error)),
     }
-    let shown = destinations::shown(&address);
-    let keeping = name.clone();
-    let kept = tauri::async_runtime::spawn_blocking(move || destinations::keep(&keeping, &address)).await;
-    kept.map_err(|error| error.to_string())
-        .and_then(|kept| kept)
-        .map_err(|why| shell.told(Failure::Keyring, why))?;
-    {
+    let destination = Destination {
+        name: name.clone(),
+        kind,
+        shown: destinations::shown(&address),
+    };
+    // Under the settings' lock, the name looked at again before the keyring is written: two adds
+    // of one name never write over each other's address (#1129).
+    let adding = app.clone();
+    let added = tauri::async_runtime::spawn_blocking(move || {
+        let shell = adding.state::<Shell>();
         let _saving = shell.saving.lock().unwrap();
         let mut settings = shell.read_or_told()?;
-        settings.destinations.push(Destination {
-            name: name.clone(),
-            kind,
-            shown,
-        });
+        destinations::add(&mut settings.destinations, destination, &address).map_err(|not| match not {
+            destinations::NotAdded::Named => shell.told(Failure::DestinationNamed, "a destination already has this name"),
+            destinations::NotAdded::Keyring(why) => shell.told(Failure::Keyring, why),
+        })?;
         if let Err(told) = shell.write_or_told(&settings) {
             // Not named in the file: not kept in the keyring either.
             let _ = destinations::forget(&name);
             return Err(told);
         }
         *shell.settings.lock().unwrap() = settings;
-    }
+        Ok(())
+    })
+    .await;
+    added.map_err(|error| shell.told(Failure::Unexpected, error))??;
     look_again(&app);
     Ok(())
 }
 
-/// Forgets a destination: out of the settings, its address out of the keyring.
+/// Forgets a destination: its address out of the keyring first, then out of the settings; the
+/// keyring refusing, it stays listed, to be removed again (#1129).
 #[tauri::command]
 async fn destination_forgotten(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
-    {
+    let forgetting = app.clone();
+    let forgotten = tauri::async_runtime::spawn_blocking(move || {
+        let shell = forgetting.state::<Shell>();
         let _saving = shell.saving.lock().unwrap();
         let mut settings = shell.read_or_told()?;
-        settings.destinations.retain(|kept| kept.name != name);
+        kitokey_shell::destinations::remove(&mut settings.destinations, &name).map_err(|why| shell.told(Failure::Keyring, why))?;
         shell.write_or_told(&settings)?;
         *shell.settings.lock().unwrap() = settings;
-    }
-    let forgetting = name.clone();
-    let forgotten = tauri::async_runtime::spawn_blocking(move || kitokey_shell::destinations::forget(&forgetting)).await;
-    forgotten
-        .map_err(|error| error.to_string())
-        .and_then(|forgotten| forgotten)
-        .map_err(|why| shell.told(Failure::Keyring, why))?;
+        Ok(())
+    })
+    .await;
+    forgotten.map_err(|error| shell.told(Failure::Unexpected, error))??;
     look_again(&app);
     Ok(())
 }

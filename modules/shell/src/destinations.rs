@@ -97,3 +97,31 @@ pub fn forget(name: &str) -> Result<(), String> {
         Err(error) => Err(error.to_string()),
     }
 }
+
+/// Why a destination was not added.
+#[derive(Debug, PartialEq, Eq)]
+pub enum NotAdded {
+    /// A destination already has its name.
+    Named,
+    /// The keyring refused the address.
+    Keyring(String),
+}
+
+/// Adds a destination to those kept, its address to the keyring. Refused, the keyring untouched,
+/// when a destination already has its name: never written over another's address (#1129).
+pub fn add(kept: &mut Vec<Destination>, destination: Destination, address: &str) -> Result<(), NotAdded> {
+    if kept.iter().any(|one| one.name == destination.name) {
+        return Err(NotAdded::Named);
+    }
+    keep(&destination.name, address).map_err(NotAdded::Keyring)?;
+    kept.push(destination);
+    Ok(())
+}
+
+/// Forgets a destination: its address out of the keyring first, then out of those kept. The
+/// keyring refusing, the destination stays listed, to be removed again: no secret left unseen (#1129).
+pub fn remove(kept: &mut Vec<Destination>, name: &str) -> Result<(), String> {
+    forget(name)?;
+    kept.retain(|one| one.name != name);
+    Ok(())
+}
