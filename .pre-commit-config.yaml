@@ -18,9 +18,13 @@ repos:
       - id: detect-private-key
       - id: check-added-large-files
         stages: [pre-commit]  # its own default adds the push
-        # One file, by its path: axe-core's 637 KB, a test asset vendored for the shell's e2e (D106), pinned by
-        # its SHA-256 and checked before it is injected, never shipped. Every other file keeps the limit.
-        exclude: ^modules/shell/scripts/vendor/axe-core-4\.14\.0/axe\.min\.js$
+        # Two files, each by its path; every other file keeps the limit.
+        # - axe-core's 637 KB, a test asset vendored for the shell's e2e (D106), pinned by its SHA-256 and
+        #   checked before it is injected, never shipped.
+        # - The shell's THIRD-PARTY-NOTICES.html, about 800 KB (D102): text made by cargo-about from Cargo.lock,
+        #   480 crates each under its licence's text, held true by modules/shell/tests/notices.rs. Apache-2.0's
+        #   51 copies differ by the copyright lines they carry, so none can be dropped.
+        exclude: ^modules/shell/(scripts/vendor/axe-core-4\.14\.0/axe\.min\.js|THIRD-PARTY-NOTICES\.html)$
       # Also outside a git merge: Copier writes its update conflicts straight into the
       # files. The configuration its documentation recommends.
       - id: check-merge-conflict
