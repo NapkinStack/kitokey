@@ -28,6 +28,10 @@ Puts Kitokey's four steps in the user's hands: a tray, a global shortcut, notifi
 - Nothing crosses the network before the user was shown what and where, and agreed.
 - A log line holds steps, ids, hosts, models and failures — never a word of a meeting, a key, nor
   a session's path beyond its folder's name (`tests/log.rs`, the e2e).
+- No self-update runs from a package (D102): a Store package is updated by the Store, and its
+  files are not Kitokey's to rewrite. An updater, when one comes (ADR-0017's, for the Mac), starts
+  only where `licence::read` answers `NotFromStore`; there is none today
+  (`tests/self_updater.rs`; the Windows trial, #1082).
 
 ## Known traps
 
