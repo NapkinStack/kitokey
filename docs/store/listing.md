@@ -24,13 +24,14 @@ matters stays in their top two-thirds, the bottom third being where the Store ma
 
 The four shots of D103's criterion 1, as the decider amended it (2026-11-21 ~03:00): meetings a prospect who
 runs back-to-back calls recognises at a glance. Their captions, the decider's « ok, on valide comme tu proposes »
-(2026-11-21 ~03:30), [#1073](https://github.com/NapkinStack/kitokey/pull/1073). No recording shot: while it
-records, the page shows neither its time nor its levels — #1076 brings it back.
+(2026-11-21 ~03:30), [#1073](https://github.com/NapkinStack/kitokey/pull/1073). Shot 2 is a meeting while it
+records, its time large and both sides' levels (#1076, #1112, #1126); its caption, the coordinator's acceptance
+(2026-11-22), for the decider.
 
 | # | File | Caption (English) | Légende (français) |
 |---|---|---|---|
 | 1 | `1-meeting.png` | No bot joins your calls: Kitokey records on your computer, then writes the minutes — decisions, actions, who does what. | Aucun robot ne rejoint vos appels : Kitokey enregistre sur votre ordinateur, puis rédige le compte rendu — décisions, actions, qui fait quoi. |
-| 2 | `2-search.png` | Find what was said, to the second: every line of the transcript keeps its time. | Retrouvez ce qui a été dit, à la seconde : chaque ligne de la transcription garde son heure. |
+| 2 | `2-recording.png` | Records any call, in any app: your voice and the others', each heard on its own. You see it recording — the time and both levels. | Enregistre n'importe quel appel, dans n'importe quelle application : votre voix et celle des autres, chacune à part. Vous le voyez enregistrer — le temps et les deux niveaux. |
 | 3 | `3-list.png` | Every meeting with a client, in one search. | Toutes vos réunions avec un client, en une recherche. |
 | 4 | `4-settings.png` | By default, transcription runs on your computer: nothing is sent. An online service stays your choice. | Par défaut, la transcription se fait sur votre ordinateur : rien n'est envoyé. Un service en ligne reste votre choix. |
 
