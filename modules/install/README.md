@@ -50,6 +50,24 @@ flowchart LR
 **Legend** — grey: what the e2e does · green: what it holds. The paths Kitokey may leave are read
 from [`docs/privacy.md`](../../docs/privacy.md)'s Linux line.
 
+## What every package owes its third parties (D102)
+
+Each format lays the same six files beside the programs: Kitokey's `LICENSE`, as `LICENSE.txt`;
+`notices/MPL-SOURCES.txt`, which says where the Mozilla Public License crates' sources are
+(MPL-2.0 §3.2); and each program's `THIRD-PARTY-NOTICES.html`, the page its module's release left
+in `dist/<module>/`, named by the program — `THIRD-PARTY-NOTICES-kitokey.html`,
+`…-kitokey-capture.html`, `…-kitokey-transcription.html`, `…-kitokey-summary.html`.
+
+| Format | Where |
+|---|---|
+| rpm | `/usr/share/licenses/kitokey/` |
+| .deb | `/usr/share/doc/kitokey/` |
+| the Mac's app | `Kitokey.app/Contents/Resources/` |
+| Windows' zip and package | beside `kitokey.exe` |
+
+`windows/notices.py` names them for Windows; `mac/build.sh`, `deb/build.sh` and `kitokey.spec` lay
+the same names, and `scripts/test.sh` reads all five. A module's page missing, no package is made.
+
 ## On Fedora, from Copr (D78)
 
 ```bash
@@ -93,7 +111,8 @@ Anyway (D38).
 On Windows, `nstack release` also makes `dist/install/Kitokey-<version>-x64.msix`, the package the
 Microsoft Store takes (D54, PDR-0004), unsigned; it needs the Windows SDK. `windows-app.yml` signs it
 for the run with a certificate it throws away, installs it, upgrades it and removes it
-(`windows/trial.ps1`) — at each start, it prints what the Store answers for a package it did
+(`windows/trial.ps1`) — it fails if the installed `kitokey.exe` holds `updater`, the name Tauri's
+updater plugin is routed by, since the Store updates the package (D102); at each start, it prints what the Store answers for a package it did
 not install (`shell.licence_read`, D83), and fails if that read would refuse a recording, and the
 state of Kitokey's startup task as Windows holds it (`shell.startup_task`, D84), and fails unless it is off: the package declares it off, and only the user turns it on, in Settings (#1085) —, has the Windows App Certification Kit test it (`windows/certify.ps1`, each
 failed test named in the run), and keeps it 7 days with the public certificate and the kit's report,

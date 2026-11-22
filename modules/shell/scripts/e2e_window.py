@@ -5136,6 +5136,28 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def settings_version(now: dt.datetime) -> None:
+    """CJ. Settings' « Général » says Kitokey's version at its foot (#1089), as `--version` says it: « Version
+    1.0.0 », secondary text a person can select and copy for support, in French and in English."""
+    print("CJ. Settings: « Général » says the version, as --version does, selectable (#1089)")
+    said = subprocess.run([str(BINARY), "--version"], capture_output=True, text=True, timeout=30).stdout.strip()
+    version = said.removeprefix("kitokey ")
+    line = ("const v = document.getElementById('app-version'); const c = v && v.closest('section.card');"
+            " return v ? {text: v.textContent, card: c ? c.querySelector('h2').textContent : null,"
+            " select: getComputedStyle(v).userSelect, shown: v.getClientRects().length > 0,"
+            " last: !!c && c.lastElementChild === v} : null")
+    for locale, card in (("fr_FR.UTF-8", "Général"), ("en_US.UTF-8", "General")):
+        taping = WORK / f"settings-version-{locale[:2]}"
+        taping.mkdir()
+        with Window(taping, locale, 'after = "nothing"\n') as browser:
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.execute_script(line) is not None, 10)
+            got = browser.execute_script(line)
+            check(f"{locale[:2]}: « Version {version} » at the foot of « {card} », shown and selectable (#1089)",
+                  bool(version) and got is not None and got["text"] == f"Version {version}" and got["card"] == card
+                  and got["shown"] and got["last"] and got["select"] not in ("none",), (said, got))
+
+
 def settings_narrow_without_model(now: dt.datetime) -> None:
     """BU. Settings at 420 px on a Kitokey with no model on this computer (#868): the guided step for the
     transcription — its way, the model's state and its offer — inside its card, nothing spilling; « Avancé »
@@ -8908,6 +8930,12 @@ def models_on_the_page(now: dt.datetime) -> None:
                   and got["transcription"]["label"] == "Modèle de transcription"
                   and any(line.startswith("Compte rendu du 18 oct. à ") and line.endswith(" · Qwen3 14b") for line in lines)
                   and any(line.startswith("Transcrit le 18 oct. à ") and line.endswith(" · Whisper page settings") for line in lines), (got, lines))
+            # #1094: each list on its line quiet — no frame, no ground until hovered —, Lucide's chevron after it.
+            quiet = browser.execute_script(
+                "return [...document.querySelectorAll('#meeting .maker .page-model')].map(s => { const c = getComputedStyle(s), n = s.nextElementSibling;"
+                " return [c.borderTopColor, c.backgroundColor, !!n && n.matches('svg.glyph.chevron'), getComputedStyle(s.parentElement).fontFamily.includes('monospace')]; })")
+            check("each model list on its line is quiet, a chevron after it, the line in the text's face (#1094)",
+                  len(quiet) == 2 and all(q == ["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)", True, False] for q in quiet), quiet)
             if not shown:
                 return
             # Drawn again — refresh(), as a focus does —: the models already read are not asked again.
@@ -11238,16 +11266,40 @@ def window_looks(now: dt.datetime) -> None:
             "return [...document.querySelectorAll('.primary, .open, .icon-button, select, .search, .field input, .setting')]"
             ".filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select')).map(e => [e.id || e.className, e.getBoundingClientRect().height]).filter(([, h]) => h !== 32)")
         check("every control shown is 32 px high (D89)", tall == [], tall)
-        edged = browser.execute_script(
-            "const t = document.createElement('i'); t.style.color = 'var(--edge)'; document.body.append(t); const edge = getComputedStyle(t).color; t.remove();"
-            " const all = [...document.querySelectorAll('.open, select, .search, .field input, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
-            " return [all.length > 0, all.filter(e => getComputedStyle(e).borderTopColor !== edge).map(e => e.id || e.className)]")
-        check("fields and secondary buttons are bordered with --edge (D89)", edged == [True, []], edged)
         filled = browser.execute_script(
             "const t = document.createElement('i'); t.style.background = 'var(--surface)'; document.body.append(t); const surface = getComputedStyle(t).backgroundColor; t.remove();"
-            " const all = [...document.querySelectorAll('select, .search, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
+            " const all = [...document.querySelectorAll('select, .search, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select, .page-model'));"
             " return [all.length > 0, all.filter(e => getComputedStyle(e).backgroundColor !== surface).map(e => e.id || e.className)]")
         check("fields are drawn on the surface, only edged, as board 2 (D89)", filled == [True, []], filled)
+        # #1094, on Settings — the page holding a list, a field and secondary buttons at once (the meeting's page here
+        # has no list of its own nor a secondary shown): fields rest on the line, their bottom edged at 3:1 (Fluent 2's
+        # fields); a secondary button rests on the line, its bottom edged as Windows 11's controls — on --raised, or on the
+        # surface inside a step — and answers the pointer.
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed() and b.find_elements(By.CSS_SELECTOR, "#settings select"), 10)
+        token = ("const token = (v) => { const t = document.createElement('i'); t.style.color = `var(${v})`; document.body.append(t);"
+                 " const c = getComputedStyle(t).color; t.remove(); return c; };")
+        edged = browser.execute_script(
+            token + " const all = [...document.querySelectorAll('select, .search, .field input, .setting')].filter(e => e.offsetParent && !e.closest('#small')"
+            " && !e.matches('.setting select, .page-model'));"
+            " return [all.filter(e => e.matches('select')).length > 0, all.filter(e => { const s = getComputedStyle(e);"
+            " return s.borderTopColor !== token('--line') || s.borderBottomColor !== token('--edge'); }).map(e => e.id || e.className)]")
+        check("fields rest on --line, their bottom edged with --edge (#1094)", edged == [True, []], edged)
+        bare = browser.execute_script(
+            token + " const all = [...document.querySelectorAll('#settings .open')].filter(e => e.offsetParent);"
+            " return [all.length > 0, all.filter(e => { const s = getComputedStyle(e);"
+            " return s.borderTopColor !== token('--line') || s.borderBottomColor !== token('--edge') || s.backgroundColor !== token(e.closest('.step') ? '--surface' : '--raised'); })"
+            ".map(e => e.id || e.className)]")
+        check("secondary buttons rest on --line, their bottom edged, on --raised or a step's surface (#1094)", bare == [True, []], bare)
+        hovered = next((e for e in browser.find_elements(By.CSS_SELECTOR, "#settings .open") if e.is_displayed()), None)
+        if hovered is not None:
+            ActionChains(browser).move_to_element(hovered).perform()
+            time.sleep(0.3)
+        answered = hovered is not None and browser.execute_script(token + " return getComputedStyle(arguments[0]).backgroundColor === token('--hover')", hovered)
+        check("a secondary button hovered takes --hover (#1094)", answered, hovered.get_attribute("id") or hovered.text if hovered is not None else None)
+        ActionChains(browser).move_to_element(browser.find_element(By.CSS_SELECTOR, ".brand")).perform()
+        browser.execute_script(f"location.hash = '#/meeting/{made.name}'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
         # The trial over (D83): buying holds it in the recording's place, then gives it back.
         swapped = [browser.execute_script(f"paintRefused({state}); return arguments[0]", None) or browser.execute_script(PRIMARIES) for state in ("true", "false")]
         check("the trial over, one primary still: « Acheter Kitokey », then the recording's again", swapped == [["buy"], ["record"]], swapped)
@@ -13975,6 +14027,7 @@ def main() -> int:
     unsaved_choice_kept(now)
     key_kept_to_its_host(now)
     settings_folded(now)
+    settings_version(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
     focus_kept(now)

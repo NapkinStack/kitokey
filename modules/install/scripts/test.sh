@@ -17,6 +17,14 @@ installed = {expand(m) for m in re.findall(r"^install -D\S* \S+ (\S+)$", spec, r
 files = {expand(line.strip()) for line in spec.split("%files", 1)[1].splitlines()
          if line.strip() and not line.startswith(("%if", "%endif", "%license"))}
 failed = 0
+# What every package owes the authors of what it ships, by its name there (D102): windows/notices.py.
+OWED = ["LICENSE.txt", "MPL-SOURCES.txt"] + [f"THIRD-PARTY-NOTICES-{program}.html" for program in
+        ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary")]
+def pages(artefacts):
+    """A fixture's pages, as each module's release leaves its own."""
+    for module in ("shell", "capture", "transcription", "summary"):
+        os.makedirs(os.path.join(artefacts, module), exist_ok=True)
+        open(os.path.join(artefacts, module, "THIRD-PARTY-NOTICES.html"), "w").write(f"<p>{module}'s crates</p>")
 def check(what, held, got=""):
     global failed
     print(f"  {'ok  ' if held else 'FAIL'}  {what}" + ("" if held else f"\n        got: {got}"))
@@ -27,9 +35,9 @@ for program in ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-
 check("the desktop entry is named as the application's id", "/usr/share/applications/com.napkinstack.Kitokey.desktop" in files)
 check("its icon, under the same name", "/usr/share/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png" in files)
 check("nothing outside /usr: the user's meetings and settings are never the package's", all(f.startswith("/usr/") for f in files), files)
-check("its licence is the repository's, GPL-3.0, and a package built from source ships it (D78)",
-      re.search(r"^License:\s+GPL-3\.0-only$", spec, re.M) is not None
-      and re.search(r"^%if 0%\{\?from_source\}\n%license LICENSE\n%endif$", spec, re.M) is not None)
+check("its licence is the repository's, GPL-3.0", re.search(r"^License:\s+GPL-3\.0-only$", spec, re.M) is not None)
+check("what it owes its third parties is in its licences' folder, from source or not (D102)",
+      all(f"/usr/share/licenses/kitokey/{name}" in files for name in OWED), sorted(files))
 check("pw-metadata required: capture runs it, no library names it", re.search(r"^Requires:\s+pipewire-utils$", spec, re.M) is not None)
 check("the tray's library required: the shell opens it at run time, no link names it",
       re.search(r"^Requires:.*\blib(ayatana-)?appindicator-gtk3\b", spec, re.M) is not None)
@@ -45,6 +53,8 @@ check("pw-metadata and the tray's library named in its dependencies: run and ope
       re.search(r"pipewire-bin, libayatana-appindicator3-1 \| libappindicator3-1", build) is not None)
 check("its control names the package, its version and its dependencies as computed",
       all(f"{field}: @" in control for field in ("Version", "Architecture", "Depends")) and "Package: kitokey" in control)
+check("the .deb lays the same notices in its documentation's folder (D102)",
+      all(re.search(rf'^install -Dm644 \S+ "\$root/usr/share/doc/kitokey/{re.escape(name)}"$', build, re.M) for name in OWED), build)
 scripts = [f for f in os.listdir(os.path.dirname(sys.argv[3])) if f in ("preinst", "postinst", "prerm", "postrm", "triggers")]
 check("no maintainer script: installing and removing touch nothing but the package's files", not scripts, scripts)
 check("the graphics card's Vulkan driver recommended by both: the transcript is made there",
@@ -63,6 +73,9 @@ for program in ("shell/kitokey", "capture/kitokey-capture", "transcription/kitok
                 # Apple's SpeechAnalyzer, through transcription's Swift program (D42, ADR-0012).
                 "transcription/kitokey-speech"):
     check(f"{program.split('/')[1]} in Contents/MacOS, beside the others", program in macbuild)
+check("the Mac's app lays the same notices in its resources, before its seal (D102)",
+      all(re.search(rf'^install -m644 \S+ "\$app/Contents/Resources/{re.escape(name)}"$', macbuild, re.M) for name in OWED)
+      and all(macbuild.index(f'"$app/Contents/Resources/{name}"') < macbuild.index('codesign --force --sign - "$app"') for name in OWED))
 each, bundle = "codesign --force --sign - \"$program\"", "codesign --force --sign - \"$app\""
 check("signed ad hoc, each program then the bundle, last of all: its seal covers what is in it",
       each in macbuild and bundle in macbuild and macbuild.index(each) < macbuild.index(bundle)
@@ -91,13 +104,16 @@ with tempfile.TemporaryDirectory() as work:
     for name in names:
         os.makedirs(os.path.join(artefacts, os.path.dirname(name)), exist_ok=True)
         open(os.path.join(artefacts, name), "wb").write(name.encode())
+    pages(artefacts)
     os.makedirs(out)
     subprocess.run([sys.executable, windows, artefacts, "1.2.3", out], check=True, stdout=subprocess.DEVNULL)
     made = os.listdir(out)
     check("Windows' zip is named by its version and processor", made == ["Kitokey-1.2.3-windows-x64.zip"], made)
     inside = sorted(zipfile.ZipFile(os.path.join(out, made[0])).namelist()) if made else []
-    check("the four programs side by side in one folder, where the shell looks for them",
-          inside == sorted(f"Kitokey/{name.split('/')[1]}" for name in names), inside)
+    check("the four programs side by side in one folder, where the shell looks for them, and what they owe beside them",
+          inside == sorted([f"Kitokey/{name.split('/')[1]}" for name in names] + [f"Kitokey/{owed}" for owed in OWED]), inside)
+    shell_page = zipfile.ZipFile(os.path.join(out, made[0])).read("Kitokey/THIRD-PARTY-NOTICES-kitokey.html") if made else b""
+    check("each program's page is its module's, as its release left it", shell_page == b"<p>shell's crates</p>", shell_page)
 # Windows' package (D54): made on Windows by windows/msix.py; its manifest and what it holds, read here.
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.join(os.path.dirname(mac), "windows"))
@@ -156,10 +172,22 @@ with tempfile.TemporaryDirectory() as work:
     for name in names:
         os.makedirs(os.path.join(artefacts, os.path.dirname(name)), exist_ok=True)
         open(os.path.join(artefacts, name), "wb").write(name.encode())
+    pages(artefacts)
     msix.stage(artefacts, "1.2.3", stage)
     held = {os.path.relpath(os.path.join(folder, file), stage).replace(os.sep, "/") for folder, _, files in os.walk(stage) for file in files}
-    check("the four programs, the manifest and its logos are what it holds, and no more",
-          held == {name.split("/")[1] for name in names} | {"AppxManifest.xml"} | {logo.replace("\\", "/") for logo in sizes}, held)
+    check("the four programs, the manifest, its logos and what they owe are what it holds, and no more",
+          held == {name.split("/")[1] for name in names} | {"AppxManifest.xml"} | {logo.replace("\\", "/") for logo in sizes} | set(OWED), held)
+    licence = open(os.path.join(stage, "LICENSE.txt"), encoding="utf-8").read()
+    check("Kitokey's own licence among them, the GPL-3.0", "GNU GENERAL PUBLIC LICENSE" in licence and "Version 3" in licence)
+    mpl = open(os.path.join(stage, "MPL-SOURCES.txt"), encoding="utf-8").read()
+    check("where the MPL crates' sources are, and that their licence governs them (MPL-2.0 §3.2)",
+          "https://crates.io/crates/" in mpl and "Mozilla Public License 2.0" in mpl and "3.2" in mpl, mpl)
+    os.remove(os.path.join(artefacts, "capture", "THIRD-PARTY-NOTICES.html"))
+    try:
+        msix.stage(artefacts, "1.2.3", os.path.join(work, "again"))
+        check("a module's page missing, no package is made", False)
+    except (FileNotFoundError, SystemExit) as refused:
+        check("a module's page missing, no package is made", "capture" in str(refused), refused)
     for logo, side in sizes.items():
         head = open(os.path.join(stage, logo.replace("\\", "/")), "rb").read(24) if logo else b""
         check(f"{logo} is a PNG of {side}x{side}", head[:8] == b"\x89PNG\r\n\x1a\n"

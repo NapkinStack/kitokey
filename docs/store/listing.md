@@ -159,7 +159,7 @@ declarations](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/
 > huggingface.co). The minutes need Ollama, a separate free program Kitokey never installs: without it, the
 > transcript is made and the window says the minutes wait. The trial is Kitokey's own — 14 days and 10
 > meetings, whichever comes last —, shown in Settings; the Store's trial is set to « Unlimited » and the Store
-> sells the licence. Kitokey starts with Windows only when the user turns it on in Settings, once #1085 is merged.
+> sells the licence. Kitokey starts with Windows only when the user turns it on in Settings.
 
 ## What holds each promise
 
