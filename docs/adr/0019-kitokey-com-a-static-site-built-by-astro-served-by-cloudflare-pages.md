@@ -30,6 +30,8 @@ third party and no cost?
 - No request to another domain — no analytics, no CDN font, no embed: the charter's local-first promise, which
   the site must not contradict on the page that states it.
 - One source for the policy: `docs/privacy.md`.
+- This repository is public: what is pushed is published. The decider chose it for the site, in a module of
+  its own that can leave it, with nothing published before its time (2026-11-23).
 - Written in English in the repository (`rules/always.md` 1); the site's sentences in French and English, to the
   voice guide.
 - Closed to the public and not indexed until the decider validates it (D114, criterion 6), with nothing more
@@ -83,7 +85,9 @@ Option 1. A module `site`, `criticality: prototype`, `user_facing: true`: it hol
 moves no money and collects nobody's data (`.nstack/handbook/05-workflow.md` §7); the decider set the lightest criticality, 2026-11-23. Astro
 with its static output and no adapter; its sitemap integration; Lighthouse CI and axe-core in its tests, run in
 the workstation's Chromium. No analytics and no third party: `Content-Security-Policy: default-src 'self'` in
-`_headers`. Served by Cloudflare Pages from `modules/site`, main built as a preview behind the project's access
+`_headers`. Everything under `modules/site/`, its own `package.json` and lockfile, nothing imported from another module,
+`docs/privacy.md` read through one configuration value, so that `git subtree split` takes it out whole.
+Served by Cloudflare Pages from `modules/site`, main built as a preview behind the project's access
 policy until the decider opens it (cycle 11, D114's section and *What needs a person*).
 
 The versions are pinned in the module's lockfile at its first pull request; on 2026-11-23 the registry gave
@@ -113,7 +117,8 @@ copied once, which may drift from `modules/shell/ui/window.css`.
 shell's e2e wrote (D103's screenshots) into itself; neither is a contract.
 
 **Rule to automate:** the module's tests: no request to another domain, the policy equal to its source,
-noindex until the opening, axe-core AA, Lighthouse at least 95.
+noindex until the opening, axe-core AA, Lighthouse at least 95, no path out of the module but the policy's,
+no landing sentence without the deliverable that keeps it.
 
 ---
 
@@ -125,3 +130,4 @@ noindex until the opening, axe-core AA, Lighthouse at least 95.
 | Analytics, even cookieless | The decider ruled out advertising, 2026-11-23; the charter: nothing leaves without the user's choice; the page stating that cannot break it |
 | Zero Trust's application on the production address for the closed phase | Five steps for what one setting does on previews (the decider asked for the simplest access control, 2026-11-23) |
 | GitHub Pages | The domain and its DNS are Cloudflare's; the decider chose Pages |
+| A private repository for the site | Weighed so that drafts stay unread before validation. Set aside by the decider, 2026-11-23: one repository is simpler, keeps `docs/privacy.md` the single source, and the same guards hold here — no price before it is announced, no promise without a merged deliverable, screenshots of invented meetings only, no key or analytics identifier, the hooks' secret scan. The way out stays open: `git subtree split --prefix=modules/site` gives a repository that builds alone |
