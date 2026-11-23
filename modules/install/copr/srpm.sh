@@ -19,7 +19,7 @@ work=$(mktemp -d)
 trap 'podman unshare rm -rf "$work"' EXIT
 top=$work/kitokey-$version
 mkdir -p "$top"
-git -C "$root" archive --format=tar "$ref" LICENSE $(printf 'modules/%s ' $assembled) | tar -x -C "$top"
+git -C "$root" archive --format=tar "$ref" LICENSE modules/install/notices $(printf 'modules/%s ' $assembled) | tar -x -C "$top"
 # Each module's release, as its manifest declares it, run from its folder into dist/<module>.
 {
   echo '# Each module this package assembles, released as its manifest says (copr/srpm.sh).'

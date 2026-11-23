@@ -30,7 +30,7 @@ use kitokey_shell::microphone;
 use kitokey_shell::{
     autostart,
     confidential::{self, Left, Wait, What},
-    context, correction, desktop, keys,
+    context, correction, desktop, exporting, keys,
     licence::{self, Licence},
     log,
     meeting::{self, Read, Transcript},
@@ -139,6 +139,8 @@ struct Shell {
     /// that a later failure never shows an earlier one's cause (D29); and the model, when it was the
     /// meeting's own (D91): its gesture is then in *Refaire…*, not in Settings.
     minutes_failed: Mutex<HashMap<PathBuf, MinutesFailed>>,
+    /// The meetings whose summary could not be written to the export folder, and why (D109).
+    not_exported: Mutex<HashMap<PathBuf, String>>,
     /// The loopback server the opened meeting is played from, started with the first (D26).
     served: Mutex<Option<player::Served>>,
     /// How many times each meeting's minutes were written since the start: a page drawn with
@@ -371,6 +373,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             listed,
+            destination_added,
+            destination_forgotten,
             microphones_listed,
             microphone_chosen,
             sound_check_open,
@@ -563,6 +567,7 @@ fn main() {
                 minutes_waiting: Mutex::new(VecDeque::new()),
                 awaiting: Mutex::new(Vec::new()),
                 minutes_failed: Mutex::new(HashMap::new()),
+                not_exported: Mutex::new(HashMap::new()),
                 served: Mutex::new(None),
                 minutes_made: Mutex::new(HashMap::new()),
                 minutes_tried: Mutex::new(HashMap::new()),
@@ -2522,6 +2527,8 @@ struct SettingsShown {
     sessions: PathBuf,
     /// The same, as people write it: from their home, with a tilde.
     sessions_said: String,
+    /// The folder every summary is written to too, said so; none, none (D109).
+    export_said: Option<String>,
     after: After,
     reminder: bool,
     /// A call another application starts is offered to be recorded (D30).
@@ -2531,6 +2538,10 @@ struct SettingsShown {
     autostart: bool,
     /// Whether the switch is offered: not on Windows outside a package, which has no task.
     autostart_offered: bool,
+    /// Where a summary can be sent (D110): names, kinds, addresses as shown — never one whole.
+    destinations: Vec<kitokey_shell::destinations::Destination>,
+    /// The version this program says, as `--version` does: shown at the foot of « Général » (#1089).
+    version: &'static str,
     /// Who holds the switch when Kitokey cannot move it: the user in Windows, or a policy.
     autostart_held: Option<autostart::Held>,
     keep_audio: KeepAudio,
@@ -2613,17 +2624,16 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
     Ok(SettingsShown {
         shortcut: shell.shortcut.lock().unwrap().clone(),
         shortcut_settings: keyboard_settings().is_some(),
-        sessions_said: match dirs::home_dir().and_then(|home| settings.sessions.strip_prefix(home).ok().map(PathBuf::from)) {
-            Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
-            Some(rest) => format!("~/{}", rest.display()),
-            None => settings.sessions.display().to_string(),
-        },
+        sessions_said: from_home_said(&settings.sessions),
+        export_said: settings.export.as_deref().map(from_home_said),
         sessions: settings.sessions,
         after: settings.after,
         reminder: settings.reminder,
         offer: settings.offer,
         autostart,
         autostart_offered,
+        destinations: settings.destinations.clone(),
+        version: VERSION,
         autostart_held,
         keep_audio: settings.keep_audio,
         model: settings.model,
@@ -2656,6 +2666,15 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
     })
 }
 
+/// A folder as people write it: from their home, with a tilde.
+fn from_home_said(folder: &Path) -> String {
+    match dirs::home_dir().and_then(|home| folder.strip_prefix(home).ok().map(PathBuf::from)) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+        Some(rest) => format!("~/{}", rest.display()),
+        None => folder.display().to_string(),
+    }
+}
+
 /// One choice the page changed.
 #[derive(serde::Deserialize)]
 struct Change {
@@ -2678,6 +2697,8 @@ struct Change {
     language: Option<String>,
     /// Every window's look (D98).
     appearance: Option<Appearance>,
+    /// The folder every summary is written to too (D109): a path, or empty for none.
+    export: Option<String>,
 }
 
 /// Writes a change to the settings file, then holds it: the next recording follows it. Nothing
@@ -2699,6 +2720,20 @@ fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Re
         }
         std::fs::create_dir_all(&sessions).map_err(|error| shell.told(Failure::FolderUnmade, error))?;
         settings.sessions = sessions;
+    }
+    // The export folder (D109): a whole path, made when it is not there yet; empty, none.
+    if let Some(export) = change.export {
+        settings.export = match export.trim() {
+            "" => None,
+            written => {
+                let folder = settings::from_home(PathBuf::from(written));
+                if !folder.is_absolute() {
+                    return Err(shell.told(Failure::FolderNotWhole, "no whole path, from the root or from ~"));
+                }
+                std::fs::create_dir_all(&folder).map_err(|error| shell.told(Failure::FolderUnmade, error))?;
+                Some(folder)
+            }
+        };
     }
     if let Some(after) = change.after {
         settings.after = after;
@@ -2936,6 +2971,130 @@ async fn minutes_saved(
     };
     look_again(&app);
     Ok(not_kept)
+}
+
+/// What `kitokey-send --check` said of an address (`contracts/posting/v1`): checked, refused, or no answer.
+enum Judged {
+    Checked,
+    Refused,
+    Failed(String),
+}
+
+/// Asks `kitokey-send --check` whether an address would be refused: the address on its input,
+/// never among its arguments, which every user of the machine can read (`posting/v1`).
+fn judged(address: &str, name: &str) -> Judged {
+    use std::io::Write as _;
+    let started = std::process::Command::new(program("kitokey-send", "KITOKEY_SEND"))
+        .arg("--check")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn();
+    let mut child = match started {
+        Ok(child) => child,
+        Err(error) => return Judged::Failed(format!("kitokey-send could not start ({error})")),
+    };
+    let input = serde_json::json!({ "address": address, "name": name }).to_string();
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(input.as_bytes());
+    }
+    let Ok(output) = child.wait_with_output() else {
+        return Judged::Failed("kitokey-send could not be waited for".into());
+    };
+    let last = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .last()
+        .unwrap_or_default()
+        .to_string();
+    let event: serde_json::Value = serde_json::from_str(&last).unwrap_or_default();
+    match (event["event"].as_str(), event["code"].as_str()) {
+        (Some("checked"), _) if output.status.success() => Judged::Checked,
+        (Some("failed"), Some("address.refused")) => Judged::Refused,
+        // Its sentence never holds the address (`posting/v1`): it may go to the log.
+        _ => Judged::Failed(
+            String::from_utf8_lossy(&output.stderr)
+                .lines()
+                .last()
+                .unwrap_or("kitokey-send said nothing")
+                .to_string(),
+        ),
+    }
+}
+
+/// Adds a destination (D110, PDR-0007 §1, §6): its name a person reads, once; its address judged by
+/// kitokey-send first — refused, nothing is kept —, then kept in the keyring, then the settings name
+/// it, its address shown only as its host and the end of its path. The address is never logged.
+#[tauri::command]
+async fn destination_added(app: AppHandle, shell: State<'_, Shell>, kind: String, name: String, address: String) -> Result<(), Told> {
+    use kitokey_shell::destinations::{self, Destination, Kind};
+    let kind = Kind::named(&kind).ok_or_else(|| shell.told(Failure::Unexpected, "no destination's kind"))?;
+    let name = destinations::name(&name).ok_or_else(|| shell.told(Failure::DestinationUnnamed, "no destination's name"))?;
+    let address = address.trim().to_string();
+    if address.is_empty() || address.contains(['\n', '\r']) {
+        return Err(shell.told(Failure::DestinationRefused, "no address"));
+    }
+    if shell.settings().destinations.iter().any(|kept| kept.name == name) {
+        return Err(shell.told(Failure::DestinationNamed, "a destination already has this name"));
+    }
+    if let Some(why) = shell.keyring.lock().unwrap().clone() {
+        return Err(shell.told(Failure::Keyring, format!("the system's keyring could not be opened ({why})")));
+    }
+    // Away from the window's thread: the program, then the keyring, which may ask the user first.
+    let (judging, named) = (address.clone(), name.clone());
+    match tauri::async_runtime::spawn_blocking(move || judged(&judging, &named)).await {
+        Ok(Judged::Checked) => {}
+        Ok(Judged::Refused) => return Err(shell.told(Failure::DestinationRefused, "the address is refused")),
+        Ok(Judged::Failed(why)) => return Err(shell.told(Failure::ProgramNotStarted, why)),
+        Err(error) => return Err(shell.told(Failure::Unexpected, error)),
+    }
+    let destination = Destination {
+        name: name.clone(),
+        kind,
+        shown: destinations::shown(&address),
+    };
+    // Under the settings' lock, the name looked at again before the keyring is written: two adds
+    // of one name never write over each other's address (#1129).
+    let adding = app.clone();
+    let added = tauri::async_runtime::spawn_blocking(move || {
+        let shell = adding.state::<Shell>();
+        let _saving = shell.saving.lock().unwrap();
+        let mut settings = shell.read_or_told()?;
+        destinations::add(&mut settings.destinations, destination, &address).map_err(|not| match not {
+            destinations::NotAdded::Named => shell.told(Failure::DestinationNamed, "a destination already has this name"),
+            destinations::NotAdded::Keyring(why) => shell.told(Failure::Keyring, why),
+        })?;
+        if let Err(told) = shell.write_or_told(&settings) {
+            // Not named in the file: not kept in the keyring either.
+            let _ = destinations::forget(&name);
+            return Err(told);
+        }
+        *shell.settings.lock().unwrap() = settings;
+        Ok(())
+    })
+    .await;
+    added.map_err(|error| shell.told(Failure::Unexpected, error))??;
+    look_again(&app);
+    Ok(())
+}
+
+/// Forgets a destination: its address out of the keyring first, then out of the settings; the
+/// keyring refusing, it stays listed, to be removed again (#1129).
+#[tauri::command]
+async fn destination_forgotten(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let forgetting = app.clone();
+    let forgotten = tauri::async_runtime::spawn_blocking(move || {
+        let shell = forgetting.state::<Shell>();
+        let _saving = shell.saving.lock().unwrap();
+        let mut settings = shell.read_or_told()?;
+        kitokey_shell::destinations::remove(&mut settings.destinations, &name).map_err(|why| shell.told(Failure::Keyring, why))?;
+        shell.write_or_told(&settings)?;
+        *shell.settings.lock().unwrap() = settings;
+        Ok(())
+    })
+    .await;
+    forgotten.map_err(|error| shell.told(Failure::Unexpected, error))??;
+    look_again(&app);
+    Ok(())
 }
 
 /// A service set up for the summary, with every model it lists (D96).
@@ -3376,6 +3535,9 @@ struct Makings {
     /// The minutes left of a meeting's making, by its name, from the speeds measured here: none
     /// measured for one of its steps, or thirty seconds or less, none (D92).
     left: HashMap<String, u64>,
+    /// Every summary is written to a folder too (D109); those not written there, by their meeting.
+    export: bool,
+    not_exported: Vec<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -3521,6 +3683,8 @@ fn makings(shell: State<'_, Shell>) -> Makings {
             .map(|(folder, what)| (named(folder), *what))
             .collect(),
         left,
+        export: settings.export.is_some(),
+        not_exported: shell.not_exported.lock().unwrap().keys().map(|folder| named(folder)).collect(),
     }
 }
 
@@ -3893,6 +4057,9 @@ fn write_minutes_from(
                 cancel: Cancel::default(),
             });
         }
+        if matches!(made, summarising::Made::Written(_)) {
+            export_written(&shell, &folder);
+        }
         minutes_ended(
             &app,
             &folder,
@@ -3916,6 +4083,47 @@ fn write_minutes_from(
         // where no window of Kitokey has the focus (D92).
         tell_made(&app, &words::minutes(&said, shell.language()), &folder, written);
     });
+}
+
+/// « Exporter chaque compte rendu » (D109): the summary just written, written to the folder chosen
+/// too, by `kitokey-export` (`exporting/v1`), named by its meeting's folder; never a confidential
+/// meeting's, a folder chosen being one a service may copy (D60). Not written there, it is said on
+/// its page until it is.
+fn export_written(shell: &Shell, folder: &Path) {
+    let Some(chosen) = shell.settings().export else {
+        return;
+    };
+    if confidential::marked(folder) {
+        return;
+    }
+    let language = shell.language();
+    let said = words::exported(language);
+    let name = meeting_said(folder, language);
+    let to = chosen.join(format!("{}.md", named(folder)));
+    let input = exporting::Input {
+        to: &to,
+        name: &name,
+        transcript: said.transcript,
+        me: said.me,
+        others: said.others,
+        time: said.time,
+        speaker: said.speaker,
+        text: said.text,
+    };
+    let tag = match language {
+        Language::French => "fr",
+        Language::English => "en",
+    };
+    match exporting::markdown(&program("kitokey-export", "KITOKEY_EXPORT"), folder, tag, &input) {
+        Ok(()) => {
+            tracing::info!("shell.exported");
+            shell.not_exported.lock().unwrap().remove(folder);
+        }
+        Err(why) => {
+            tracing::warn!(detail = %why, "shell.export_failed");
+            shell.not_exported.lock().unwrap().insert(folder.to_path_buf(), why);
+        }
+    }
 }
 
 /// The minutes' entry while they are written, and after.

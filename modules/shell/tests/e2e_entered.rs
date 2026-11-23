@@ -48,6 +48,11 @@ scope = {"os": os, "signal": signal, "time": time, "sys": sys, "FAILED": FAILED,
          "BINARY": pathlib.Path("/kitokey"), "Path": pathlib.Path}
 klass = ast.fix_missing_locations(ast.Module(body=[ast.ClassDef(name="Window", bases=[], keywords=[], body=methods, decorator_list=[], type_params=[])], type_ignores=[]))
 exec(compile(klass, "e2e_window.py", "exec"), scope)
+# The driver's ports are #943's, played in `tests/e2e_ports.rs`: here it is started as it was.
+def start_driver(self):
+    self.driver_process = Popen()
+    return 0
+scope["Window"].start_driver = start_driver
 w = scope["Window"].__new__(scope["Window"])
 w.env, w.args = {}, []
 out, raised = io.StringIO(), None

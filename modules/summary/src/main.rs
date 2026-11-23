@@ -1,6 +1,6 @@
 //! `kitokey-summary` — writes the minutes of a session from its transcript, with no window.
 //!
-//!     kitokey-summary <session-folder> --provider <address> --model <name>
+//!     kitokey-summary <session-folder> --provider <address> --model <name> [--structure <name>]
 //!     kitokey-summary --test --provider <address> --model <name>
 //!
 //! The second asks the provider one sentence of its own, nothing of a meeting, and says
@@ -23,7 +23,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use kitokey_summary::{Made, Refused, TEST, log, minutes, provider::Provider, read_transcript, reported, request, write_minutes};
+use kitokey_summary::{
+    Made, Refused, Structure, TEST, log, minutes_in, provider::Provider, read_transcript, reported, request_in, structure, write_minutes,
+};
 use serde_json::json;
 use tracing::{error, info, warn};
 
@@ -47,15 +49,15 @@ fn main() -> ExitCode {
     let outcome = match args.iter().map(String::as_str).collect::<Vec<_>>()[..] {
         _ if !all_text => Err(Refused("an argument is not text".into(), None)),
         ["--test", "--provider", address, "--model", model] | ["--test", "--model", model, "--provider", address] => test(address, model),
-        [folder, "--provider", address, "--model", model] | [folder, "--model", model, "--provider", address] => {
-            summarise(Path::new(folder), address, model)
-        }
-        _ => Err(Refused(
-            "usage: kitokey-summary <session-folder> --provider <address> --model <name>, \
-             or kitokey-summary --test --provider <address> --model <name>"
-                .into(),
-            None,
-        )),
+        [folder, ref options @ ..] if !folder.starts_with("--") => match options_of(options) {
+            Some((address, model, None)) => summarise(Path::new(folder), address, model, None),
+            Some((address, model, Some(name))) => match structure(name) {
+                Some(structure) => summarise(Path::new(folder), address, model, Some(structure)),
+                None => Err(Refused(format!("{name} is not a structure: {USAGE}"), None)),
+            },
+            None => Err(Refused(USAGE.into(), None)),
+        },
+        _ => Err(Refused(USAGE.into(), None)),
     };
     match outcome {
         Ok(()) => ExitCode::SUCCESS,
@@ -104,7 +106,30 @@ fn key() -> Result<Option<String>, Refused> {
     }
 }
 
-fn summarise(folder: &Path, address: &str, model: &str) -> Result<(), Refused> {
+/// What the program is given, said when it is given anything else.
+const USAGE: &str = "usage: kitokey-summary <session-folder> --provider <address> --model <name> [--structure <name>], \
+     or kitokey-summary --test --provider <address> --model <name>";
+
+/// The minutes' options, in any order, each once: the provider, the model, and the structure
+/// when there is one (`summarising/v1`, D111).
+fn options_of<'a>(options: &[&'a str]) -> Option<(&'a str, &'a str, Option<&'a str>)> {
+    let (mut provider, mut model, mut structure) = (None, None, None);
+    for pair in options.chunks(2) {
+        let [option, value] = pair else { return None };
+        let slot = match *option {
+            "--provider" => &mut provider,
+            "--model" => &mut model,
+            "--structure" => &mut structure,
+            _ => return None,
+        };
+        if slot.replace(*value).is_some() {
+            return None;
+        }
+    }
+    Some((provider?, model?, structure))
+}
+
+fn summarise(folder: &Path, address: &str, model: &str, structure: Option<&Structure>) -> Result<(), Refused> {
     // The making's start, for how long it took (D97): the minutes are written right after.
     let began = Instant::now();
     // The folder's name, never its path: the path says whose meetings and where.
@@ -137,7 +162,7 @@ fn summarise(folder: &Path, address: &str, model: &str) -> Result<(), Refused> {
             ));
         }
     };
-    let asked = request(&segments, context.as_deref());
+    let asked = request_in(&segments, context.as_deref(), structure);
     info!(segments = segments.len(), context = context.is_some(), "summary.read");
 
     let key = key()?;
@@ -178,7 +203,7 @@ fn summarise(folder: &Path, address: &str, model: &str) -> Result<(), Refused> {
             made_in: Some(began.elapsed().as_secs_f64()),
             segments: &segments,
         };
-        match minutes(&answer, &made) {
+        match minutes_in(&answer, &made, structure) {
             Err(Refused(why, Some("answer.not_minutes"))) if std::mem::take(&mut again) => {
                 info!(detail = %why, "summary.asked_again");
             }

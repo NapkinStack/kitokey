@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A line of the exporting program's output",
+  "description": "exporting/v1 — one JSON object a line. What a schema cannot say is on the contract's page: `written` or `failed` is the last line, and the only one.",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "written"
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "event",
+        "file",
+        "bytes"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "event": {
+          "const": "failed"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        }
+      },
+      "required": [
+        "event",
+        "code"
+      ]
+    },
+    {
+      "description": "An event this version does not name: a consumer ignores it.",
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string",
+          "not": {
+            "enum": [
+              "written",
+              "failed"
+            ]
+          }
+        }
+      },
+      "required": [
+        "event"
+      ]
+    }
+  ]
+}
