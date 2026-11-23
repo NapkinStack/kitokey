@@ -118,6 +118,15 @@ deliverables:
       - "Given ticked items, when the user saves them as an `.ics`, then `export` writes one all-day `VEVENT` per item — `DTSTART;VALUE=DATE`, `DTEND` the next day, `DTSTAMP` in UTC, a `UID` stable for the meeting and the item, `SUMMARY` the action's what and who, `DESCRIPTION` its passage and the meeting's name —, lines ended by CRLF, folded at 75 octets, text escaped as RFC 5545 §3.3.11 says; held by `export`'s tests, the file parsed back by an independent parser and checked against RFC 5545's required properties, a name with commas, semicolons, a newline and non-Latin letters among them. `exporting/v1` gains the format `ics` and an optional field of its input, the dates — an additive change, v1 extended in place and no consumer broken (`.nstack/handbook/03-contracts.md`), held by the project's comparator (`contracts/scripts/compat.py`) passing the new v1 against the one before and by the contract's schema tests, consumed by the shell alone"
       - "Given a ticked item, when the user chooses Google Calendar or Outlook, then the shell opens the system's browser on the provider's own screen, the event pre-filled and unsaved — Google's link as Google's page documents it, an all-day event as `YYYYMMDD/YYYYMMDD` ending the next day; Outlook on the web's as checked by hand (*What needs a person*) —, every value percent-encoded; nothing is sent before that click; held by the shell's unit tests of each link and the e2e reading the address handed to the opener, never opening it. The Outlook link ships only once the hand check has passed, the `.ics` always beside it"
       - "Given a confidential meeting, when its dates are offered, then only the `.ics`, written on this computer, is offered: no link carries its words to Google or Microsoft, as no channel takes it (PDR-0007); held by the shell's e2e"
+  - id: D116
+    title: "A summary can be sent to a Notion database the user shared, through a key they created, never a confidential one"
+    module: send
+    state: ready
+    acceptance:
+      - "Given PDR-0007, when this deliverable starts, then the PDR holds a fourth kind of destination, Notion, reached through an internal integration's key the user creates in their own workspace and pastes — no OAuth, no secret of Kitokey's —, kept in the system's keyring as a webhook's address is (ADR-0013), every other rule of the PDR unchanged: a gesture each time, what leaves said once before the first send, each send recorded, a confidential meeting never sent; the decider accepts the amendment by approving the pull request that proposes it, the forge recording its day, before any sending to Notion is merged"
+      - "Given `posting/v1`, when the kind `notion` is added, then the change is additive — v1 extended in place, no consumer broken, held by the project's comparator (`contracts/scripts/compat.py`) against the v1 before —; kitokey-send started with `--kind notion` reads the key and the database on its input only, never among its arguments, and creates one page per send in the database: its title the meeting's, the summary's sections as heading, paragraph and list blocks, each action a `to_do` block left unticked; within Notion's documented limits, cited in the contract with the day they were read — at most 2000 characters in a rich text object's `content`, a longer text split over several, at most 100 per array; at most 100 blocks in a request's `children`; at most two levels of nesting; 500 KB per request —, its `Notion-Version` header pinned to the one version the contract names; a summary that does not fit one page's request is `summary.too_large` and nothing is created; held by send's tests: `tests/bodies.rs` for the blocks and each limit, `tests/server.rs` for the requests against a local server — their paths, their headers, their bodies, one page created and never a second"
+      - "Given a send to Notion, when Notion refuses it or cannot be reached, then each case has its code in `posting/v1` and its sentence on the meeting's page with what to do: the key refused (401: paste a new key), the database not shared with the integration or gone (404: share it from the database's « ••• » menu, *Connections*), the integration not allowed to insert content (403), too many requests (429: the `Retry-After` it gave), the page refused (400), Notion failing (5xx), no network; nothing is retried, as `posting/v1` says; held by send's tests against a local server playing each status, and by the shell's e2e through the kitokey-send stand-in"
+      - "Given Settings' destinations, when the user adds a Notion destination, then Settings say in two lines how to make the key and share the database, the user pastes the key and the database's link and names it, kitokey-send checks both before anything is kept — a key refused or a database not shared said there, nothing kept —, and the key goes to the keyring, never shown whole again nor written in the settings' file; a meeting's page then offers « Envoyer à « <name> » » as for the other kinds — the first-send notice, the record, nothing offered for a confidential meeting; held by the shell's e2e, in French and in English, by keyboard alone"
 ---
 
 # Cycle 11 — Kitokey on sale, and out of the app
@@ -129,6 +138,13 @@ deliverables:
 > its spike first and its destinations as the decider set them that day: an `.ics`, Google Calendar's documented
 > link, Outlook on the web's link once checked by hand, no OAuth. The end date does not move (`framing.md` §4);
 > D115's links are cut first (*Deliverables*).
+
+> **D116 entered by the decider, 2026-11-23**, through the coordinator: Notion joins cycle 11, so that the
+> product's presentation on kitokey.com can name it. The decider set the way the same day: an internal
+> integration's key the user pastes, kept in the keyring as a webhook's address is, the user sharing one
+> database with it, one page per send — no OAuth, which needs a secret Kitokey cannot hold. It amends PDR-0007,
+> which this pull request proposes and the decider's approval accepts. The end date does not move
+> (`framing.md` §4); D116 is cut before D113 (*Deliverables*).
 
 > **D114 entered by the decider, 2026-11-23**, in their working session with the coordinator: the Store needs a
 > public privacy policy, and kitokey.com is the product's shop window. Requirements: professional and modern,
@@ -228,7 +244,7 @@ QA: ines; UI and accessibility: lina; content and summary: sam.
 | D102, D107, D108 | marc |
 | D104, D105 | ines |
 | D106, D109 | lina |
-| D103, D110, D111, D112, D114 | sam |
+| D103, D110, D111, D112, D114, D116 | sam |
 | D113 | lina |
 | D115 | ines |
 
@@ -237,7 +253,7 @@ DOCX then consume it. `minutes/v5` (D111) merges as early as it can, and D108 is
 D105 measures in windows the coordinator plans with the queues empty, so that it neither measures their load
 nor takes D104's machine.
 
-**Cut first, in this order, when the breaker nears**: D115's Outlook link, then its Google Calendar link (the `.ics` kept); then D114's animations and its Lighthouse threshold (its axe-core check kept), to cycle 12; then D115's panel and `.ics`, to cycle 12 (its spike and its resolver kept: what they record is cycle 12's start); then D113 whole, to cycle 12; then D111 whole, to cycle 12, if `minutes/v5` is not merged by
+**Cut first, in this order, when the breaker nears**: D115's Outlook link, then its Google Calendar link (the `.ics` kept); then D114's animations and its Lighthouse threshold (its axe-core check kept), to cycle 12; then D115's panel and `.ics`, to cycle 12 (its spike and its resolver kept: what they record is cycle 12's start); then D116 whole, to cycle 12 (PDR-0007's amendment kept); then D113 whole, to cycle 12; then D111 whole, to cycle 12, if `minutes/v5` is not merged by
 the cycle's fifth working day (2026-11-26); then D110's Discord (the generic webhook kept); then D109's folder export; then
 D105's budgets (the baseline kept); then D112's English contractions (its comments kept). Never cut: D102, D104, D106, D108's Markdown, D109's export and copy, D114's privacy policy and its closed phase.
 D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
@@ -523,6 +539,68 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 - **Holder**: ines. Cut first in this cycle: its links, then its panel and `.ics`; its spike and resolver are
   never cut.
 
+### D116
+
+- **What it is**: a fourth destination beside D110's three, of another shape. A webhook takes one POST to an
+  address; Notion takes a key and a database, and its page is built of blocks. The rules stay PDR-0007's: the
+  user's gesture each time, what leaves said once before the first send, each send recorded, never a
+  confidential meeting.
+- **Which module carries what, by contract**, the contract first:
+
+  ```mermaid
+  flowchart LR
+      ST["Settings<br/>a key pasted · a database's link"]:::shell -->|"posting/v1 --check"| K["kitokey-send<br/>--kind notion"]:::send
+      ST -->|"the key"| KR["the system's keyring"]:::keep
+      P["a meeting's page<br/>« Envoyer à « Notes » »"]:::shell -->|"posting/v1: the key and the database on its input"| K
+      K -->|"HTTPS, Notion-Version pinned"| N["Notion's API<br/>one page in the shared database"]:::out
+      classDef shell fill:#1e3a8a,color:#fff
+      classDef send fill:#065f46,color:#fff
+      classDef keep fill:#374151,color:#fff
+      classDef out fill:#7c2d12,color:#fff
+  ```
+
+  **Legend** — blue: `shell`, the setting and the gesture · green: `send`, the deliverable's module · grey: the
+  key's one place · red: outside the computer, on the user's gesture only.
+
+  Three pull requests, in this order: `posting/v1` gains the kind `notion` and its codes, additively (the
+  comparator's proof, `.nstack/handbook/03-contracts.md`); `send` writes the blocks and makes the request;
+  `shell` takes the key and offers the gesture.
+- **Why a key the user pastes**: Notion's public OAuth needs a client secret, which an app with no backend
+  cannot keep — the cycle's *Out of scope*. An internal integration's key is the user's own, made in their
+  workspace, and reaches only what they share with it: as a webhook's address, it is a secret, kept in the
+  keyring and never shown whole again (ADR-0013). Notion lets only a workspace owner create one; Settings say
+  so.
+- **The version pinned**: Notion's API asks a `Notion-Version` header on every request and keeps older versions
+  ([*Versioning*](https://developers.notion.com/reference/versioning)); the latest named on the day read is
+  `2026-03-11`. Since `2025-09-03`, a page created in a database has a *data source* for its parent
+  ([upgrade guide](https://developers.notion.com/guides/get-started/upgrade-guide-2025-09-03)): the check at
+  setup reads it from the database's link, with the database's title property. The contract's pull request
+  names the version and pins it; a later one is a change of the contract.
+- **One request per page, so that a send is once**: a page and its blocks go in one request. Notion takes at
+  most 100 blocks in `children`, two levels of nesting and 500 KB
+  ([*Request limits*](https://developers.notion.com/reference/request-limits)); a summary larger than that would
+  need a second request, which could fail after the first and leave half a page. A meeting's summary is far
+  below it; past it, `summary.too_large`, nothing created.
+- **What each refusal means** ([*Status codes*](https://developers.notion.com/reference/status-codes)): 401
+  `unauthorized`, the key is not valid; 404 `object_not_found`, the database does not exist **or is not shared
+  with the integration** — Notion gives no other code for that, hence the sentence that names both; 403
+  `restricted_resource`, the integration lacks a capability; 429 `rate_limited`, with `Retry-After` in seconds
+  — 3 requests a second on average per integration, 10 on Business and Enterprise, which one send by gesture
+  never nears; 400 `validation_error`, a limit or a property refused.
+- **Prior art**: the market connects Notion through OAuth, with a backend of its own (an assumption: not read
+  again for this framing). Zapier's and n8n's flows reach it from D110's generic webhook today, through a third
+  party (PDR-0007's options). Kept: Notion's own internal integration, which its documentation offers for
+  one's own workspace ([*Authorization*](https://developers.notion.com/docs/authorization)). Left out: OAuth,
+  to cycle 12 (*Later*).
+- **Sources for the criteria**, read 2026-11-23: [*Request limits*](https://developers.notion.com/reference/request-limits),
+  [*Versioning*](https://developers.notion.com/reference/versioning),
+  [*Status codes*](https://developers.notion.com/reference/status-codes),
+  [*Create a page*](https://developers.notion.com/reference/post-page),
+  [*Block*](https://developers.notion.com/reference/block) (`to_do`, `heading_2`, `paragraph`,
+  `bulleted_list_item`), [*Authorization*](https://developers.notion.com/docs/authorization). None of these
+  pages shows the day it was last changed.
+- **Holder**: sam. Cut before D113, whole, to cycle 12; PDR-0007's amendment is kept.
+
 ## What needs a person
 
 | Deliverable | Who | The literal gesture |
@@ -543,6 +621,7 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 | D115 | The coordinator, in the decider's browser | Once the shell's pull request has its links: open the Google Calendar link and the Outlook link that D115's e2e writes in its log. Each shows the event on the provider's own screen, the right day, all day, unsaved: say so in D115's issue, or which one does not. The Outlook link ships only if it passes |
 | D115 | The decider | Open the `.ics` attached to D115's issue in GNOME Calendar: say whether its two events show, all day, on their days |
 | D115 | The colleague on Windows 11 | An issue an agent opens with a two-event `.ics` and its second version (one date changed, the same `UID`s): import the first in new Outlook, then the second; answer there whether the second replaced or duplicated the events |
+| D116 | The decider, in a Notion workspace they own | Once the shell's pull request is merged, from the package an agent built: in Notion's developer portal (its [*Authorization*](https://developers.notion.com/docs/authorization) page says where), create an internal integration; share a test database with it from the database's « ••• » menu, *Connections*; in Kitokey's Settings, paste its key and the database's link; send one of the e2e's invented meetings. Say in D116's issue whether the page shows its title, its sections and its actions as to-dos, or what differs. It holds no criterion: the tests do; its answer is recorded at the closure |
 
 ## Dependency with a date
 
@@ -573,7 +652,7 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 
 - **Cycle 12 — « Kitokey can be bought on macOS, and sends where the team works »**: macOS signed, notarised,
   with its trial and licence, sold through D107's merchant; OAuth destinations — Slack (PKCE), Google Drive
-  (`drive.file`), Notion — the charter's first destination — through its hosted MCP or a token the user pastes, its REST OAuth needing a secret — each after a spike; the template
+  (`drive.file`), Notion's OAuth — the charter's first destination, reached in this cycle through a key the user pastes (D116); its hosted MCP, or its REST OAuth needing a secret — each after a spike; the template
   editor (create, duplicate, edit, delete; templates as files to import and export); bulk export; a local
   read-only MCP or CLI over the meetings' folders. They cost the user least to wait for: each has a manual way
   today (a copy, a file).
