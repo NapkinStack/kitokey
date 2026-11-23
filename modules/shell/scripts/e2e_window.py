@@ -6264,6 +6264,92 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                     check(f"{said}, each target 24 by 24 CSS px, or spaced as the criterion allows (WCAG 2.5.8, D106)", shown and tight == [], tight)
 
 
+def redo_says_what_follows(now: dt.datetime) -> None:
+    """CG. D113, criterion 1, as the decider settled it on 2026-11-18 (#804: the summary is kept):
+    « Refaire… » opened starts nothing; its one button names the transcript and its model, never the
+    summary; where the meeting has a summary, the panel says it is kept; the context's button names what it starts — the transcript, and the
+    summary after it when one follows; Escape and « Annuler » leave everything as it was; pressed, the
+    transcript alone is made again, its summary kept as it was. In French and in English."""
+    print("CG. Refaire… starts nothing; it makes the transcript alone, the summary kept and said so; the context's button names what it starts (D113)")
+    words_of = {
+        "fr": {"do": "Refaire la transcription avec ", "summary": "compte rendu",
+               "both": "Refaire la transcription et le compte rendu", "alone": "Refaire la transcription",
+               "keeps": "Le compte rendu actuel est gardé\u202f; refaites-le ensuite si besoin.",
+               "note": "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée."},
+        "en": {"do": "Write the transcript again with ", "summary": "summary",
+               "both": "Write the transcript and the summary again", "alone": "Write the transcript again",
+               "keeps": "The current summary is kept; write it again afterwards if needed.",
+               "note": "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept."},
+    }
+    model = WORK / "redo-follows-model.bin"
+    model.write_bytes(b"\0" * 16)
+    settings = (f'after = "nothing"\nreminder = false\nmodel = "{model}"\n'
+                'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n')
+    idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+            " && m.minutes_waiting.length === 0 && m.transcripts_waiting.length === 0)")
+    panel = ("const p = document.getElementById('redo-transcript-panel'); if (!p) return null;"
+             " const go = document.getElementById('redo-transcript-do'), note = document.getElementById('redo-transcript-note'),"
+             " kept = document.getElementById('redo-keeps-minutes');"
+             " return [go ? go.textContent : null, note ? note.textContent : null, p.querySelector('h3').textContent, kept ? kept.textContent : null]")
+    hearing, writing = WORK / "hearing-args", WORK / "summary-args"
+    for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
+        said = words_of[short]
+        meetings = WORK / f"redo-follows-{short}"
+        both, alone = meetings / "2026-10-18_12-00", meetings / "2026-10-18_13-00"
+        for folder in (both, alone):
+            session(folder, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+            (folder / "transcript.jsonl").write_text(
+                '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+                '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+        (both / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: mistral\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
+        with Window(meetings, language, settings) as browser:
+            for meeting, summarised, what in ((both, True, "with a summary"), (alone, False, "without one")):
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript") and b.execute_script(idle), 15)
+                hearing.unlink(missing_ok=True)
+                writing.unlink(missing_ok=True)
+                summary = lambda: (meeting / "minutes.md").read_bytes() if (meeting / "minutes.md").exists() else None
+                summary_before = summary()
+                press(browser, "redo-transcript")
+                opened = wait_for(browser, lambda b: b.execute_script(panel) is not None, 5)
+                time.sleep(1.5)
+                got = browser.execute_script(panel) or [None, None, None, None]
+                quiet = not hearing.exists() and not writing.exists()
+                named = bool(got[0]) and got[0].startswith(said["do"]) and said["summary"] not in got[0]
+                check(f"{short}, {what}: Refaire… opened starts nothing; its button names the transcript and its model, never the summary (D113)",
+                      opened and quiet and named and got[1] == said["note"] and got[2] == said["alone"], [got, quiet])
+                check(f"{short}, {what}: " + ("the panel says the summary is kept (D113, the decider 2026-11-18)" if summarised else "no summary, none said kept (D113)"),
+                      got[3] == (said["keeps"] if summarised else None), got[3])
+                # Settings make none after a transcript: the context's button names the summary only where there is one.
+                context = browser.execute_script("const c = document.getElementById('context-redo'); return c ? c.textContent : null")
+                check(f"{short}, {what}: the context's button names what it starts (D113)",
+                      context == (said["both"] if summarised else said["alone"]), context)
+                ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+                closed = wait_for(browser, lambda b: b.execute_script(panel) is None, 3)
+                time.sleep(1)
+                check(f"{short}, {what}: Escape closes the panel, nothing started (D113)",
+                      closed and not hearing.exists() and not writing.exists(), [closed, hearing.exists(), writing.exists()])
+                # « Annuler » as Escape (ines' pre-read: only Escape was pinned): the panel closed, nothing started.
+                press(browser, "redo-transcript")
+                reopened = wait_for(browser, lambda b: b.execute_script(panel) is not None, 5)
+                if reopened:
+                    press(browser, "redo-transcript-panel-cancel")
+                shut = reopened and wait_for(browser, lambda b: b.execute_script(panel) is None, 3)
+                time.sleep(1)
+                check(f"{short}, {what}: « Annuler » closes the panel, nothing started (D113)",
+                      shut and not hearing.exists() and not writing.exists(), [reopened, shut, hearing.exists(), writing.exists()])
+                press(browser, "redo-transcript")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
+                press(browser, "redo-transcript-do")
+                heard = wait_for(None, lambda b: hearing.exists(), 15)
+                done = heard and wait_for(browser, lambda b: b.execute_script(idle), 20)
+                time.sleep(1)
+                check(f"{short}, {what}: pressed, the transcript alone is made again, no summary written, the one there kept as it was (D113)",
+                      heard and done and not writing.exists() and summary() == summary_before, [heard, done, writing.exists(), summary() == summary_before])
+
+
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
     shows one bar across both steps — the transcript, then its summary —, naming the step, never moving back:
@@ -10352,9 +10438,9 @@ def transcript_corrected(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         offered = wait_for(browser, lambda b: b.find_elements(By.ID, "corrected-since"), 10)
-        check("the minutes written before it say the transcript was corrected since, and offer « Refaire avec les corrections »",
+        check("the minutes written before it say the transcript was corrected since, and offer « Refaire le compte rendu avec les corrections »",
               offered and "corrigée depuis la rédaction de ce compte rendu" in browser.find_element(By.ID, "corrected-since").text
-              and browser.find_element(By.ID, "redo-corrections").text == "Refaire avec les corrections")
+              and browser.find_element(By.ID, "redo-corrections").text == "Refaire le compte rendu avec les corrections")
         time.sleep(2)
         check("nothing is made again without that click", (heard / "minutes.md").read_text() == minutes)
         # Refaire… of a corrected transcript says its corrections will not be kept.
@@ -10381,7 +10467,7 @@ def transcript_corrected(now: dt.datetime) -> None:
         finally:
             (WORK / "slow-minutes").unlink()
         remade = wait_for(browser, lambda b: (heard / "minutes.md").read_text() != minutes, 10)
-        check("« Refaire avec les corrections »: the minutes made again by whoever the settings name, from the corrected transcript",
+        check("« Refaire le compte rendu avec les corrections »: the minutes made again by whoever the settings name, from the corrected transcript",
               remade and "model: mistral" in (heard / "minutes.md").read_text(), (heard / "minutes.md").read_text()[:200])
         # Asked while the transcript is made again: refused — one writer at a time.
         (WORK / "slow-hearing").touch()
@@ -10409,7 +10495,7 @@ def transcript_corrected(now: dt.datetime) -> None:
 
 
 def corrections_gated(now: dt.datetime) -> None:
-    """AG. « Refaire avec les corrections » through Refaire…'s own gate (D62): a service not agreed to
+    """AG. « Refaire le compte rendu avec les corrections » through Refaire…'s own gate (D62): a service not agreed to
     asks first, in the pane (D61); a meeting said confidential is made here (D60)."""
     print("AG. the minutes made again with the corrections: the agreement asked in the pane, a confidential meeting made here (D62, D61)")
     ollama = {"held": ["qwen3:8b"]}
@@ -10462,7 +10548,7 @@ def corrections_gated(now: dt.datetime) -> None:
             asked = wait_for(browser, lambda b: b.execute_script("return location.hash") == f"#/agree/{opened.name}"
                              and b.find_elements(By.ID, "agree-send"), 10)
             time.sleep(2)
-            check("a service not agreed to: « Refaire avec les corrections » asks first, as Refaire… does — the step not started, two seconds on",
+            check("a service not agreed to: « Refaire le compte rendu avec les corrections » asks first, as Refaire… does — the step not started, two seconds on",
                   asked and not args.exists() and (opened / "minutes.md").read_text() == minutes, browser.execute_script("return location.hash"))
             check("the agreement opens in the pane, the sidebar kept beside it (D61)", browser.execute_script(
                 "return document.getElementById('pane').contains(document.getElementById('agree'))")
@@ -10894,13 +10980,28 @@ def context_written(now: dt.datetime) -> None:
               and label == "De quoi parle la réunion ? Qui y participe ?", (area.get_attribute("value"), label))
         check("made with it, nothing is offered to make again", not browser.find_element(By.ID, "context-changed").is_displayed())
         more = " Siobhán O’Neill (juridique)."
+        made = lambda: tuple((p.read_text(), p.stat().st_mtime_ns) for p in (meeting / "transcript.jsonl", meeting / "minutes.md"))
+        made_before = made()
         area.click()
         keys(browser, Keys.END, more)
         changed = wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
-        check("changed after its transcript and minutes, Refaire avec ce contexte is offered, said why",
+        # D113, criterion 1 (ines' pre-read): a changed context starts nothing by itself — it waits for its button. Judged
+        # first, before any step a making started by itself would break (s1055nctxauto). A making the fakes end within the
+        # wait would leave the same text: it is seen by the files' times, and by the field it closes while typed in
+        # (s1055nctxauto3).
+        time.sleep(1.5)
+        still = browser.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+                                       " && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)")
+        check("a changed context starts nothing by itself: no making, the transcript and the summary as they were (D113)",
+              still and made() == made_before and (meeting / "context.txt").read_text() == said + more
+              and browser.find_element(By.ID, "context-text").get_attribute("readonly") is None,
+              [still, made() == made_before, (meeting / "context.txt").read_text()[-40:]])
+        # Its button names what it starts: the transcript, and its summary after it (D113).
+        check("changed after its transcript and minutes, the context's button is offered, naming both, said why",
               changed and (meeting / "context.txt").read_text() == said + more
               and browser.find_element(By.CSS_SELECTOR, "#context-changed .says").text == "La transcription et le compte rendu ont été faits avec un autre contexte."
-              and browser.find_element(By.ID, "context-redo").text == "Refaire avec ce contexte", (meeting / "context.txt").read_text())
+              and browser.find_element(By.ID, "context-redo").text == "Refaire la transcription et le compte rendu",
+              ((meeting / "context.txt").read_text(), browser.find_element(By.ID, "context-redo").text))
         seen(browser, "d59-4-page-changed-light")
         # Made again, slowly: the field closed meanwhile, and said.
         (WORK / "slow-hearing").touch()
@@ -11013,6 +11114,8 @@ def context_written(now: dt.datetime) -> None:
         stop_from_small(browser)
         wait_for(browser, lambda b: (meeting / "minutes.md").exists(), 15)
     (meeting / "local.wav").write_bytes(b"\0" * 1000)
+    # No summary yet, the settings making one (`after = "minutes"`): made again, one follows (D113).
+    (meeting / "minutes.md").unlink()
     window = Window(meeting.parent, "en_GB.UTF-8", settings)
     window.env.update(GTK_THEME="Adwaita:dark")
     with window as browser:
@@ -11020,9 +11123,25 @@ def context_written(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "context-text"), 10)
         context_opened(browser).send_keys(Keys.END, " And Lena.")
         changed = wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
-        check("in English, a meeting's page offers Redo with this context", changed
-              and browser.find_element(By.ID, "context-redo").text == "Redo with this context", browser.find_element(By.ID, "context-redo").text)
+        check("in English, a meeting without its summary, the settings making one: the context's button names both", changed
+              and browser.find_element(By.ID, "context-redo").text == "Write the transcript and the summary again", browser.find_element(By.ID, "context-redo").text)
         seen(browser, "d59-4-page-changed-dark")
+    # And Settings making none after a transcript (D113, from D93's 1f31a6d): the button names what will be
+    # made, not what is there — the transcript alone.
+    alone = WORK / "context-no-minutes"
+    bare = alone / "2026-10-18_12-00"
+    session(bare, now - dt.timedelta(hours=1), 3, {"local.wav": 1000})
+    (bare / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n'
+    )
+    (bare / "context.txt").write_text("Point budget.")
+    with Window(alone, "fr_FR.UTF-8", settings.replace('after = "minutes"', 'after = "transcript"')) as browser:
+        browser.execute_script(f"location.hash = '#/meeting/{bare.name}'")
+        offered = wait_for(browser, lambda b: b.find_elements(By.ID, "context-changed") and b.find_element(By.ID, "context-changed").is_displayed(), 10)
+        label = browser.find_element(By.ID, "context-redo").text if offered else None
+        check("no summary, Settings' after = transcript: the context's button names what will be made, « Refaire la transcription » (D113)",
+              offered and label == "Refaire la transcription" and not (bare / "minutes.md").exists(), label)
 
 
 def context_gaps(now: dt.datetime) -> None:
@@ -14746,6 +14865,7 @@ def main() -> int:
     summaries_to_a_folder(now)
     axe_first_surfaces(now)
     keys_first_surfaces(now)
+    redo_says_what_follows(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)

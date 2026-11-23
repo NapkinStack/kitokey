@@ -300,8 +300,8 @@ impl Shell {
 }
 
 /// How a transcript is made again: with the Whisper model a *Refaire…* picked, this time only;
-/// or by whoever the settings name to hear, its minutes after it — *Refaire avec ce contexte*
-/// (D59).
+/// or by whoever the settings name to hear, its minutes after it — *Refaire la transcription et le
+/// compte rendu*, the context's button (D59, D113).
 #[derive(Clone, PartialEq)]
 enum Again {
     Model(PathBuf),
@@ -2152,8 +2152,16 @@ fn confidential_set(app: AppHandle, shell: State<'_, Shell>, name: String, on: b
 #[derive(serde::Serialize)]
 struct ContextShown {
     text: String,
-    /// Its transcript or minutes were made with another: *Refaire avec ce contexte* is offered.
+    /// Its transcript or minutes were made with another: *Refaire la transcription* is offered.
     changed: bool,
+    /// Made again with it, its minutes follow the transcript: its button names them too (D113).
+    minutes_after: bool,
+}
+
+/// Whether a transcript made again with the context brings minutes after it: when the meeting has
+/// some, or the settings make them (D59) — what the context's button names (D113).
+fn minutes_after(folder: &Path, after: After) -> bool {
+    folder.join("minutes.md").is_file() || after == After::Minutes
 }
 
 fn context_of(shell: &Shell, folder: &Path) -> ContextShown {
@@ -2163,6 +2171,7 @@ fn context_of(shell: &Shell, folder: &Path) -> ContextShown {
     ContextShown {
         changed: context::changed(text.as_deref(), &transcript, &minutes),
         text: text.unwrap_or_default(),
+        minutes_after: minutes_after(folder, shell.settings().after),
     }
 }
 
@@ -2261,9 +2270,9 @@ fn next_context_kept(shell: State<'_, Shell>, text: String) -> Result<(), Told> 
     Ok(())
 }
 
-/// *Refaire avec ce contexte* (D59): the transcript made again by whoever the settings name to
-/// hear, then the minutes by whoever they name to write — each kept in place until the new one
-/// is whole, put back if it is not.
+/// The context's button, *Refaire la transcription* (D59, D113): the transcript made again by whoever
+/// the settings name to hear, then the minutes by whoever they name to write — each kept in place until
+/// the new one is whole, put back if it is not.
 #[tauri::command]
 fn context_redo(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
     let folder = session_folder(&shell, &name)?;
@@ -4742,7 +4751,9 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         return Err((Failure::ModelAbsent, "no model on this computer".to_string()));
     }
     // Made again with the context: its minutes too, when it had some or the settings make them.
-    let minutes_after = again == Again::Settings && (folder.join("minutes.md").is_file() || settings.after == After::Minutes);
+    // Made again with the context: its minutes too, when it had some or the settings make them. Made
+    // again by Refaire…, the transcript alone: its summary is kept, as the panel says (the decider, D113).
+    let minutes_after = again == Again::Settings && minutes_after(&folder, settings.after);
     // Set aside under a name of its own, never written over; put back if the new one is not made.
     let current = folder.join("transcript.jsonl");
     let previous = match sessions::set_aside(&current, true) {
