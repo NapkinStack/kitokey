@@ -4942,6 +4942,8 @@ function showSmall(words) {
     }
     if (heard?.kind === "stopped" || minutes?.kind === "stopped") return { said: words.bar_last_stopped, open: true };
     if (minutes) return { said: words.bar_last_summary };
+    // Written, but not to the export folder (D109): said as its page says it.
+    if (makings?.not_exported.includes(last.name)) return { said: words.bar_last_failed, why: words.export_failed, open: true };
     return { said: words.bar_last_ready, open: true };
   };
   // Painted with each reading of the makings, and as a recording starts or ends (`recording`, below).

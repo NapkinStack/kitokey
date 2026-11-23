@@ -5559,8 +5559,8 @@ def bar_after_stop(now: dt.datetime) -> None:
     """BV. D92, criterion 1: a recording stopped from the bar, the bar at rest names its meeting and its
     stage — the transcript, then the summary, then ready with « Ouvrir » to its page —, in a polite live
     region that says each stage once; until its page is opened or another recording starts. A step that
-    fails is said there in one line, its cause as the page says it, with « Ouvrir ». By the keyboard alone,
-    in French and in English, light then dark."""
+    fails is said there in one line, its cause as the page says it, with « Ouvrir »; so is a summary written but
+    not to the export folder (D109). By the keyboard alone, in French and in English, light then dark."""
     print("BV. after the stop, the bar names the meeting and its stage, ready with Ouvrir; a failure said with its cause (D92)")
     focused = "return document.activeElement ? document.activeElement.id : ''"
     said = "const s = document.getElementById('small-last-said'); return s && s.getClientRects().length ? s.textContent : ''"
@@ -5692,10 +5692,23 @@ def bar_after_stop(now: dt.datetime) -> None:
                       ended and failed and line[0] == 1 and line[1] <= 20 and line[2] == line[3] == meeting + not_made,
                       [ended, browser.execute_script(said), browser.execute_script(shown), line])
                 shot_themed(browser, f"d92-bar-failed-{short}-{theme}", theme)
+                # D109: a summary written, but not to the export folder that refuses it: said here too, as its page says it.
+                refused = {"fr": "Impossible d’écrire le compte rendu dans le dossier d’export. Choisissez un autre dossier dans les Réglages.",
+                           "en": "Kitokey could not write the summary to the export folder. Choose another folder in Settings."}[short]
+                folder = WORK / f"bar-export-{short}-{theme}"
+                folder.mkdir()
+                browser.execute_script("return window.__TAURI__.core.invoke('settings_saved', {change: {export: arguments[0]}})", str(folder))
+                (WORK / "fail-minutes").unlink()
+                (WORK / "export-refuse").touch()
+                noted = record() and stop() and wait_for(
+                    browser, lambda b: b.execute_script(said).endswith(refused) and b.execute_script(shown), 20)
+                check(f"{short}: its summary written, not to the export folder: the bar says so as its page does, « Ouvrir » beside it (D109)",
+                      noted and not any(folder.iterdir()), [browser.execute_script(said), browser.execute_script(shown)])
             finally:
                 for gate in gates:
                     gate.unlink(missing_ok=True)
                 (WORK / "fail-minutes").unlink(missing_ok=True)
+                (WORK / "export-refuse").unlink(missing_ok=True)
 
 
 def summaries_to_a_folder(now: dt.datetime) -> None:
