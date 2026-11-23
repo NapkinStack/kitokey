@@ -415,6 +415,10 @@ evidence:
     - pattern: '^(?=.*"message":"shell\.summary_not_sent")(?=.*"code":"network\.unreachable")'
       level: warning
       scenario: CL
+    # The window's CL: a send's record made unwritable on purpose; the send said all the same.
+    - pattern: '^(?=.*"message":"shell\.send_unrecorded")'
+      level: warning
+      scenario: CL
     # A failure of the page's own, thrown then rejected; any other kind of the page's is not provoked.
     - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioI")'
       level: error

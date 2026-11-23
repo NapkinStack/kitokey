@@ -5406,6 +5406,18 @@ def summary_sent(now: dt.datetime) -> None:
               len(again_said) == 5 and any("« #muet »" in s and "regardez dans le canal" in s for s in again_said)
               and any("« #saturé »" in s and "Réessayez plus tard" in s for s in again_said)
               and not any("#équipe" in s for s in again_said), again_said)
+        # The record made unwritable (its file written beside first: a folder there): a send that left is said sent
+        # all the same, never « could not leave », which would have it sent twice. Not recorded, so not listed.
+        record = Path(window.env["XDG_CONFIG_HOME"]) / "kitokey" / "sends.json"
+        beside = record.with_suffix(".json.part")
+        beside.mkdir()
+        try:
+            send("#équipe")
+            said = browser.find_element(By.ID, "send-said").text.replace("\xa0", " ")
+            check("the record unwritable: a send that left is still said sent, never « n'a pas pu partir »",
+                  said.startswith("Envoyé à « #équipe »") and len(calls.read_text().splitlines()) == 8, said)
+        finally:
+            beside.rmdir()
         page_text = browser.execute_script("return document.body.innerText")
         check("the address appears nowhere on the page", secret not in page_text, "")
         listed = "return [...document.querySelectorAll('#sends li')].map(li => li.textContent)"
