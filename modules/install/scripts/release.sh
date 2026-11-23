@@ -2,7 +2,7 @@
 # What a user installs, for the system KITOKEY_TARGET names — as the programs were built for it
 # (D27): `fedora-*`, an rpm made with rpmbuild; `ubuntu-*`, a .deb made with dpkg; `macos-arm64`,
 # Kitokey.app zipped, made on a Mac (D38); unset, the package of the system it runs on. One
-# package of the five programs, made in a container of that system — a Mac's on the Mac — so that
+# package of the six programs, made in a container of that system — a Mac's on the Mac — so that
 # the libraries each program links are read there and required by their packages.
 # Reads what the assembled modules' releases left beside this one's folder ($NSTACK_DIST/..).
 set -euo pipefail
