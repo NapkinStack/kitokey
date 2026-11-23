@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run on a Mac by scripts/release.sh: Kitokey.app from the artefacts each module's release
-# left — the five programs side by side in Contents/MacOS, where the shell looks for them, and
+# left — the six programs side by side in Contents/MacOS, where the shell looks for them, and
 # transcription's kitokey-speech beside its own (D42) —, its
 # Info.plist and icon, signed ad hoc (an Apple chip runs nothing unsigned), zipped as macOS keeps a
 # bundle whole. Usage: build.sh <artefacts> <version> <out>
@@ -12,7 +12,7 @@ trap 'rm -rf "$work"' EXIT
 app=$work/Kitokey.app
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 for program in shell/kitokey capture/kitokey-capture transcription/kitokey-transcription transcription/kitokey-speech \
-  summary/kitokey-summary export/kitokey-export; do
+  summary/kitokey-summary export/kitokey-export send/kitokey-send; do
   install -m755 "$artefacts/$program" "$app/Contents/MacOS/${program#*/}"
 done
 python3 "$here/info.py" "$app" "$version"
@@ -32,6 +32,7 @@ install -m644 "$artefacts/capture/THIRD-PARTY-NOTICES.html" "$app/Contents/Resou
 install -m644 "$artefacts/transcription/THIRD-PARTY-NOTICES.html" "$app/Contents/Resources/THIRD-PARTY-NOTICES-kitokey-transcription.html"
 install -m644 "$artefacts/summary/THIRD-PARTY-NOTICES.html" "$app/Contents/Resources/THIRD-PARTY-NOTICES-kitokey-summary.html"
 install -m644 "$artefacts/export/THIRD-PARTY-NOTICES.html" "$app/Contents/Resources/THIRD-PARTY-NOTICES-kitokey-export.html"
+install -m644 "$artefacts/send/THIRD-PARTY-NOTICES.html" "$app/Contents/Resources/THIRD-PARTY-NOTICES-kitokey-send.html"
 # Each program, then the bundle: its seal covers the Info.plist and the resources added above.
 for program in "$app"/Contents/MacOS/kitokey-*; do codesign --force --sign - "$program"; done
 codesign --force --sign - "$app"

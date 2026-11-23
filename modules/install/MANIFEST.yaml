@@ -56,7 +56,7 @@ consumes:
 
 # Data owned. Nobody else accesses it directly.
 # The modules whose release artefacts this one's release assembles (dist/<module>/).
-assembles: [shell, capture, transcription, summary, export]
+assembles: [shell, capture, transcription, summary, export, send]
 
 data:
   owns: []

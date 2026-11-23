@@ -19,10 +19,10 @@ files = {expand(line.strip()) for line in spec.split("%files", 1)[1].splitlines(
 failed = 0
 # What every package owes the authors of what it ships, by its name there (D102): windows/notices.py.
 OWED = ["LICENSE.txt", "MPL-SOURCES.txt"] + [f"THIRD-PARTY-NOTICES-{program}.html" for program in
-        ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary", "kitokey-export")]
+        ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary", "kitokey-export", "kitokey-send")]
 def pages(artefacts):
     """A fixture's pages, as each module's release leaves its own."""
-    for module in ("shell", "capture", "transcription", "summary", "export"):
+    for module in ("shell", "capture", "transcription", "summary", "export", "send"):
         os.makedirs(os.path.join(artefacts, module), exist_ok=True)
         open(os.path.join(artefacts, module, "THIRD-PARTY-NOTICES.html"), "w").write(f"<p>{module}'s crates</p>")
 def check(what, held, got=""):
@@ -30,7 +30,7 @@ def check(what, held, got=""):
     print(f"  {'ok  ' if held else 'FAIL'}  {what}" + ("" if held else f"\n        got: {got}"))
     failed |= not held
 check("what is installed is what %files lists", installed == files, installed ^ files)
-for program in ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary", "kitokey-export"):
+for program in ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary", "kitokey-export", "kitokey-send"):
     check(f"{program} in /usr/bin, beside the others", f"/usr/bin/{program}" in files)
 check("the desktop entry is named as the application's id", "/usr/share/applications/com.napkinstack.Kitokey.desktop" in files)
 check("its icon, under the same name", "/usr/share/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png" in files)
@@ -42,7 +42,7 @@ check("pw-metadata required: capture runs it, no library names it", re.search(r"
 check("the tray's library required: the shell opens it at run time, no link names it",
       re.search(r"^Requires:.*\blib(ayatana-)?appindicator-gtk3\b", spec, re.M) is not None)
 pairs = re.findall(r"^install -D\S* %\{artefacts\}/\S+/(\S+) %\{buildroot\}%\{_bindir\}/(\S+)$", spec, re.M)
-check("each program installs its own artefact", len(pairs) == 5 and all(a == b for a, b in pairs), pairs)
+check("each program installs its own artefact", len(pairs) == 6 and all(a == b for a, b in pairs), pairs)
 scriptlets = re.findall(r"^%(pre|post|preun|postun|pretrans|posttrans|trigger\w*)\b", spec, re.M)
 check("no scriptlet: installing and removing touch nothing but the package's files", not scriptlets, scriptlets)
 # The .deb (D27): made by deb/build.sh from the same artefacts — what it installs is judged on the
@@ -93,6 +93,7 @@ mac = sys.argv[4]
 macbuild = open(os.path.join(mac, "build.sh"), encoding="utf-8").read()
 for program in ("shell/kitokey", "capture/kitokey-capture", "transcription/kitokey-transcription", "summary/kitokey-summary",
                 "export/kitokey-export",
+                "send/kitokey-send",
                 # Apple's SpeechAnalyzer, through transcription's Swift program (D42, ADR-0012).
                 "transcription/kitokey-speech"):
     check(f"{program.split('/')[1]} in Contents/MacOS, beside the others", program in macbuild)
@@ -123,7 +124,7 @@ windows = os.path.join(os.path.dirname(mac), "windows", "build.py")
 with tempfile.TemporaryDirectory() as work:
     artefacts, out = os.path.join(work, "artefacts"), os.path.join(work, "out")
     names = ("shell/kitokey.exe", "capture/kitokey-capture.exe",
-             "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe", "export/kitokey-export.exe")
+             "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe", "export/kitokey-export.exe", "send/kitokey-send.exe")
     for name in names:
         os.makedirs(os.path.join(artefacts, os.path.dirname(name)), exist_ok=True)
         open(os.path.join(artefacts, name), "wb").write(name.encode())
@@ -133,7 +134,7 @@ with tempfile.TemporaryDirectory() as work:
     made = os.listdir(out)
     check("Windows' zip is named by its version and processor", made == ["Kitokey-1.2.3-windows-x64.zip"], made)
     inside = sorted(zipfile.ZipFile(os.path.join(out, made[0])).namelist()) if made else []
-    check("the five programs side by side in one folder, where the shell looks for them, and what they owe beside them",
+    check("the six programs side by side in one folder, where the shell looks for them, and what they owe beside them",
           inside == sorted([f"Kitokey/{name.split('/')[1]}" for name in names] + [f"Kitokey/{owed}" for owed in OWED]), inside)
     shell_page = zipfile.ZipFile(os.path.join(out, made[0])).read("Kitokey/THIRD-PARTY-NOTICES-kitokey.html") if made else b""
     check("each program's page is its module's, as its release left it", shell_page == b"<p>shell's crates</p>", shell_page)
@@ -198,7 +199,7 @@ with tempfile.TemporaryDirectory() as work:
     pages(artefacts)
     msix.stage(artefacts, "1.2.3", stage)
     held = {os.path.relpath(os.path.join(folder, file), stage).replace(os.sep, "/") for folder, _, files in os.walk(stage) for file in files}
-    check("the five programs, the manifest, its logos and what they owe are what it holds, and no more",
+    check("the six programs, the manifest, its logos and what they owe are what it holds, and no more",
           held == {name.split("/")[1] for name in names} | {"AppxManifest.xml"} | {logo.replace("\\", "/") for logo in sizes} | set(OWED), held)
     licence = open(os.path.join(stage, "LICENSE.txt"), encoding="utf-8").read()
     check("Kitokey's own licence among them, the GPL-3.0", "GNU GENERAL PUBLIC LICENSE" in licence and "Version 3" in licence)
