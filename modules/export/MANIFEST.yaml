@@ -102,6 +102,10 @@ dependencies:
     exit_strategy: >-
       Its output is a committed HTML page, about.hbs its template; any generator that lists the
       crates with their licence texts replaces it, and tests/notices.rs judges the result.
+  - name: docx-rs
+    purpose: Writes the Word document — its heading styles, paragraphs, runs and table (MIT, without its image feature)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: docx() and paragraphs() in src/lib.rs; any OOXML writer with styles and tables replaces it.
 #  - name:
 #    purpose:
 #    adr:

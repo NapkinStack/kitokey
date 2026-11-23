@@ -337,3 +337,141 @@ fn text(said: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
 }
+
+/// The meeting as a Word document: Word's heading styles — « heading 1 » the meeting, « heading 2 » each
+/// section and the transcript, « heading 3 » a model's own headings —, the summary's Markdown as
+/// paragraphs and runs, the transcript a table its head in bold. As in the page, a model's raw HTML,
+/// links and images are said as their words.
+pub fn docx(meeting: &Meeting, include: Include, labels: &Labels, name: &str) -> io::Result<Vec<u8>> {
+    use docx_rs::{Docx, Paragraph, Run, Style, StyleType, Table, TableCell, TableRow};
+    // Each heading style at its outline level: what Word's navigation pane and a document's outline read.
+    let heading = |id: &str, name: &str, size: usize, level: usize| {
+        Style::new(id, StyleType::Paragraph).name(name).bold().size(size).outline_lvl(level)
+    };
+    let mut doc = Docx::new()
+        .add_style(heading("Heading1", "heading 1", 32, 0))
+        .add_style(heading("Heading2", "heading 2", 26, 1))
+        .add_style(heading("Heading3", "heading 3", 24, 2))
+        .add_style(
+            Style::new("ListBullet", StyleType::Paragraph)
+                .name("List Bullet")
+                .indent(Some(360), None, None, None),
+        );
+    let line = |style: &str, said: &str| Paragraph::new().style(style).add_run(Run::new().add_text(said));
+    doc = doc.add_paragraph(line("Heading1", meeting.title.as_deref().unwrap_or(name)));
+    if include.summary {
+        for section in &meeting.sections {
+            doc = doc.add_paragraph(line("Heading2", &section.title));
+            for paragraph in paragraphs(&section.body) {
+                doc = doc.add_paragraph(paragraph);
+            }
+        }
+    }
+    if include.transcript && !meeting.segments.is_empty() {
+        doc = doc.add_paragraph(line("Heading2", &labels.transcript));
+        let cell = |said: &str, bold: bool| {
+            let run = Run::new().add_text(said);
+            TableCell::new().add_paragraph(Paragraph::new().add_run(if bold { run.bold() } else { run }))
+        };
+        let mut head = vec![];
+        if include.times {
+            head.push(cell(&labels.time, true));
+        }
+        if include.speakers {
+            head.push(cell(&labels.speaker, true));
+        }
+        head.push(cell(&labels.text, true));
+        let mut rows = vec![TableRow::new(head)];
+        for segment in &meeting.segments {
+            let mut cells = vec![];
+            if include.times {
+                cells.push(cell(&time(segment.start), false));
+            }
+            if include.speakers {
+                cells.push(cell(
+                    match segment.speaker {
+                        Speaker::Me => &labels.me,
+                        Speaker::Others => &labels.others,
+                    },
+                    false,
+                ));
+            }
+            cells.push(cell(&segment.text, false));
+            rows.push(TableRow::new(cells));
+        }
+        doc = doc.add_table(Table::new(rows));
+    }
+    let mut built = doc.build();
+    // The transcript's head declared its table's header row (`w:tblHeader`): bold alone tells a screen
+    // reader nothing. docx-rs 0.4.22 has no such mark, so it goes into the part it writes, on the one
+    // table's first row.
+    let document = String::from_utf8(built.document).map_err(io::Error::other)?;
+    built.document = document
+        .replacen("<w:tr><w:trPr />", "<w:tr><w:trPr><w:tblHeader /></w:trPr>", 1)
+        .into_bytes();
+    let mut out = io::Cursor::new(vec![]);
+    built.pack(&mut out).map_err(io::Error::other)?;
+    Ok(out.into_inner())
+}
+
+/// A section's Markdown as Word's paragraphs: a list item a « List Bullet » paragraph, a heading a
+/// « heading 3 », bold and italics kept as runs; raw HTML, links and images said as their words.
+fn paragraphs(markdown: &str) -> Vec<docx_rs::Paragraph> {
+    use docx_rs::{Paragraph, Run};
+    use pulldown_cmark::{Event, Tag, TagEnd};
+    let (mut out, mut runs, mut style): (Vec<Paragraph>, Vec<Run>, Option<&str>) = (vec![], vec![], None);
+    let (mut bold, mut italic, mut items) = (0, 0, vec![]);
+    let flush = |out: &mut Vec<Paragraph>, runs: &mut Vec<Run>, style: Option<&str>| {
+        if !runs.is_empty() {
+            let mut paragraph = Paragraph::new();
+            if let Some(style) = style {
+                paragraph = paragraph.style(style);
+            }
+            out.push(runs.drain(..).fold(paragraph, Paragraph::add_run));
+        }
+    };
+    for event in pulldown_cmark::Parser::new(markdown) {
+        match event {
+            Event::Start(Tag::Heading { .. }) => style = Some("Heading3"),
+            Event::Start(Tag::List(first)) => items.push(first),
+            Event::End(TagEnd::List(_)) => {
+                items.pop();
+            }
+            Event::Start(Tag::Item) => {
+                style = Some("ListBullet");
+                let mark = match items.last_mut() {
+                    Some(Some(n)) => {
+                        *n += 1;
+                        format!("{}. ", *n - 1)
+                    }
+                    _ => "• ".to_string(),
+                };
+                runs.push(Run::new().add_text(mark));
+            }
+            Event::Start(Tag::Strong) => bold += 1,
+            Event::End(TagEnd::Strong) => bold -= 1,
+            Event::Start(Tag::Emphasis) => italic += 1,
+            Event::End(TagEnd::Emphasis) => italic -= 1,
+            Event::End(TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::Item | TagEnd::CodeBlock) => {
+                flush(&mut out, &mut runs, style);
+                if items.is_empty() {
+                    style = None;
+                }
+            }
+            Event::Text(said) | Event::Code(said) | Event::Html(said) | Event::InlineHtml(said) => {
+                let mut run = Run::new().add_text(said.as_ref());
+                if bold > 0 {
+                    run = run.bold();
+                }
+                if italic > 0 {
+                    run = run.italic();
+                }
+                runs.push(run);
+            }
+            Event::SoftBreak | Event::HardBreak => runs.push(Run::new().add_text(" ")),
+            _ => {}
+        }
+    }
+    flush(&mut out, &mut runs, style);
+    out
+}

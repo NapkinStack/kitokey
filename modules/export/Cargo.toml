@@ -5,12 +5,14 @@ edition = "2024"
 publish = false
 
 [dependencies]
+docx-rs = { version = "0.4.22", default-features = false }
 pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html"] }
 serde_json = "1.0.154"
 
 [dev-dependencies]
 quick-xml = "0.42.0"
 tempfile = "3"
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 
 [[bin]]
 name = "kitokey-export"

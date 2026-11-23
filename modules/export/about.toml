@@ -9,7 +9,10 @@
 #   cargo about generate --locked --fail about.hbs --output-file THIRD-PARTY-NOTICES.html
 accepted = [
     "Apache-2.0",
+    "BSD-3-Clause",
     "MIT",
+    "Unicode-3.0",
+    "Zlib",
 ]
 # What ships: the crates linked into the program, on the systems it is built for; neither what
 # only builds it nor what only tests it.
