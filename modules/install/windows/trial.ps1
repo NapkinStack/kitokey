@@ -91,7 +91,7 @@ try {
     Add-AppxPackage -Path $first
     $installed = Get-AppxPackage -Name $identity.name
     Check "installed, version $version.0" ($installed.Version -eq "$version.0")
-    foreach ($program in 'kitokey', 'kitokey-capture', 'kitokey-transcription', 'kitokey-summary', 'kitokey-export') {
+    foreach ($program in 'kitokey', 'kitokey-capture', 'kitokey-transcription', 'kitokey-summary', 'kitokey-export', 'kitokey-send') {
         Check "$program.exe inside it" (Test-Path (Join-Path $installed.InstallLocation "$program.exe"))
     }
     # The Store updates the package; nothing in it updates itself (D102, criterion 2). A Tauri plugin is
