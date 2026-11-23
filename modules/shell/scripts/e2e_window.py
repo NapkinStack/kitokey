@@ -116,7 +116,8 @@ EXPORTER.chmod(0o755)
 # ($STANDIN, D60), its request is sent to it, as the real one would send the sound there.
 # kitokey-send played here (posting/v1, D110): each call kept beside it — its arguments, and its input,
 # where the address is, a secret — and answered as the real one judges an address: `https:` to a host
-# that is not this computer is checked; anything else refused. It never sends anything anywhere.
+# that is not this computer is checked; anything else refused. It never sends anything anywhere: a send's
+# outcome is played by the address's host (gone, busy, offline, silent; any other: sent).
 SENDER = WORK / "kitokey-send"
 SENDER.write_text(
     """#!/usr/bin/env python3
@@ -128,6 +129,14 @@ with open(Path(sys.argv[0]).parent / "send-calls.jsonl", "a") as calls:
 address = json.loads(said)["address"]
 host = address.split("://", 1)[-1].split("/", 1)[0]
 if address.startswith("https://") and host not in ("127.0.0.1", "localhost") and not host.startswith("192.168."):
+    # A send (not --check): the destination's answer played by its host, as posting/v1 names each outcome.
+    played = {"gone.example": ("destination.gone", None), "busy.example": ("destination.busy", 30), "later.example": ("destination.busy", None),
+              "offline.example": ("network.unreachable", None), "silent.example": ("destination.silent", None)}
+    if "--check" not in sys.argv and host in played:
+        code, after = played[host]
+        print(json.dumps({"event": "failed", "code": code, **({"retry_after": after} if after else {})}))
+        print("kitokey-send: the destination did not take it", file=sys.stderr)
+        sys.exit(1)
     print(json.dumps({"event": "checked" if "--check" in sys.argv else "sent"}))
     sys.exit(0)
 print(json.dumps({"event": "failed", "code": "address.refused"}))
@@ -5277,6 +5286,174 @@ def settings_folded(now: dt.datetime) -> None:
               browser.execute_script(toggle)["list"] and browser.execute_script(toggle)["expanded"] == "true", browser.execute_script(toggle))
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
+
+
+def summary_sent(now: dt.datetime) -> None:
+    """CL. D110, PDR-0007 §2–§6, posting/v1: a meeting's summary sent to a destination set up in Settings, on the
+    user's gesture each time. No « Envoyer… » without a destination, on a confidential meeting, or without a
+    summary. Before a destination's first send the page says what leaves and where — its name, never its address —;
+    the next goes at once. kitokey-send is started with the meeting's folder and the destination's kind, the address
+    and the meeting's name on its input only. Each outcome is said on the page with what to do; the address appears
+    nowhere. A send is recorded and listed, kept when the meeting is renamed; marked confidential after, the switch
+    says where the summary already went. Addresses here are made up; kitokey-send is played (it refuses this
+    computer's addresses by design: its own tests post to a local server)."""
+    print("CL. a summary sent to a destination on the user's gesture: offered only when it may be, what leaves said first, each outcome said (D110)")
+    calls = WORK / "send-calls.jsonl"
+    calls.unlink(missing_ok=True)
+    meetings = WORK / "sending"
+    written, secret_one, unwritten = (meetings / name for name in ("2026-11-20_09-00", "2026-11-20_10-00", "2026-11-20_11-00"))
+    for folder in (written, secret_one, unwritten):
+        session(folder, now - dt.timedelta(days=3), 30, {"local.wav": 1000})
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+    for folder in (written, secret_one):
+        (folder / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-11-20T10:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+    (secret_one / "confidential").write_text("")
+    secret = "made-up-secret-9c21"
+    destinations = [("discord", "#équipe", f"https://discord.example/api/webhooks/1/{secret}"),
+                    ("webhook", "#parti", f"https://gone.example/hook/{secret}"),
+                    ("slack", "#occupé", f"https://busy.example/services/T0/B0/{secret}"),
+                    ("webhook", "#horsligne", f"https://offline.example/hook/{secret}"),
+                    ("webhook", "#muet", f"https://silent.example/hook/{secret}"),
+                    ("webhook", "#saturé", f"https://later.example/hook/{secret}")]
+    offered = "return !!document.getElementById('send-open')"
+    window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\n')
+    with window as browser:
+        def page(folder):
+            browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+            return wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed()
+                            and b.execute_script("return !!document.querySelector('.card.minutes')"), 10)
+        page(written)
+        check("no destination set up: the summary offers no « Envoyer… » (PDR-0007 §2)",
+              not browser.execute_script(offered), browser.execute_script(offered))
+        # The destinations, set up as a person does: in Settings, each address judged then kept in the keyring.
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
+        press(browser, "destination-open")
+        rows = "return document.querySelectorAll('#destinations li').length"
+        for kind, name, address in destinations:
+            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            for field, value in (("destination-name", name), ("destination-address", address)):
+                element = browser.find_element(By.ID, field)
+                element.clear()
+                element.send_keys(value)
+            had = browser.execute_script(rows)
+            press(browser, "destination-add")
+            wait_for(browser, lambda b: b.execute_script(rows) == had + 1, 10)
+        check("six destinations set up for this scenario", browser.execute_script(rows) == 6, browser.execute_script(rows))
+        calls.unlink(missing_ok=True)
+        page(secret_one)
+        check("a confidential meeting offers no send (PDR-0007 §4)", not browser.execute_script(offered), browser.execute_script(offered))
+        page(unwritten)
+        check("a meeting without its summary offers no send", not browser.execute_script(offered), browser.execute_script(offered))
+        page(written)
+        check("a summary, destinations set up, not confidential: « Envoyer… » among its actions",
+              browser.execute_script(offered) and browser.execute_script(
+                  "return !!document.getElementById('send-open').closest('.minutes-actions')"), browser.execute_script(offered))
+        # By keyboard alone: the button reached and pressed by Enter, the panel's first destination focused.
+        browser.execute_script("document.getElementById('send-open').focus()")
+        ActionChains(browser).send_keys(Keys.ENTER).perform()
+        listed = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#send-panel button.send-to"), 5)
+        names = browser.execute_script("return [...document.querySelectorAll('#send-panel button.send-to')].map(b => b.textContent)") if listed else []
+        check("the panel offers each destination by its name, « Envoyer à « #équipe » », by keyboard alone",
+              names[:1] == ["Envoyer à «\xa0#équipe\xa0»"] and len(names) == 6
+              and browser.execute_script("return document.activeElement.classList.contains('send-to')"), names)
+        ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+        closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "send-panel"), 5)
+        check("Escape closes the panel, nothing sent, the focus back on « Envoyer… »",
+              closed and not calls.exists() and browser.execute_script("return document.activeElement.id") == "send-open",
+              browser.execute_script("return document.activeElement.id"))
+
+        described = []
+
+        def send(name, confirm=True):
+            press(browser, "send-open")
+            wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#send-panel button.send-to"), 5)
+            browser.execute_script("[...document.querySelectorAll('#send-panel button.send-to')].find(b => b.dataset.destination === arguments[0]).click()", name)
+            said_now = "return document.getElementById('send-said')?.textContent ?? ''"
+            wait_for(browser, lambda b: b.find_elements(By.ID, "send-notice") or b.execute_script(said_now), 5)
+            shown = browser.find_element(By.ID, "send-notice").text if browser.find_elements(By.ID, "send-notice") else None
+            if shown is not None:
+                described.append(browser.execute_script("const c = document.getElementById('send-confirm');"
+                                                        " return [c.getAttribute('aria-describedby'), document.getElementById(c.getAttribute('aria-describedby'))?.textContent]"))
+            if shown is not None and confirm:
+                press(browser, "send-confirm")
+            if confirm:
+                # Its outcome, not « Envoi vers … », which is said while kitokey-send runs.
+                wait_for(browser, lambda b: b.execute_script(said_now) and not b.execute_script(said_now).endswith("…"), 15)
+            return shown
+
+        first = send("#équipe")
+        check("before a destination's first send, the page says what leaves and where: its name, never its address (PDR-0007 §3)",
+              first is not None and "#équipe" in first and "compte rendu" in first and "transcription" in first and "son" in first
+              and secret not in first and "discord.example" not in first, first)
+        check("and that a summary sent cannot be taken back (PDR-0007, expected behaviour, step 3)",
+              first is not None and "ne peut pas être repris" in first, first)
+        check("« Envoyer » is described by the notice: a screen reader says what leaves before it is pressed",
+              described[:1] and described[0][0] == "send-notice" and "ne peut pas être repris" in (described[0][1] or ""), described)
+        # Selenium's text gives U+00A0 as a space: each read below compares with spaces.
+        said = browser.find_element(By.ID, "send-said").text
+        check("sent: said on the page, the destination by its name", said.replace("\xa0", " ").startswith("Envoyé à « #équipe »"), said)
+        made = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+        check("kitokey-send started with the meeting's folder and --kind discord; the address and the name on its input only (posting/v1)",
+              len(made) == 1 and made[0]["args"][0].endswith(written.name) and made[0]["args"][1:] == ["--kind", "discord"]
+              and json.loads(made[0]["input"]).get("address", "").endswith(secret) and "name" in json.loads(made[0]["input"])
+              and all(secret not in arg for arg in made[0]["args"]), made)
+        again = send("#équipe")
+        check("the next send to that destination goes at once, its gesture still asked: no notice again",
+              again is None and len(calls.read_text().splitlines()) == 2, again)
+        for name, words_said in (("#parti", "configurez"), ("#occupé", "30 s"), ("#saturé", "Réessayez plus tard"),
+                                 ("#horsligne", "connexion"), ("#muet", "regardez dans le canal")):
+            send(name)
+            said = browser.find_element(By.ID, "send-said").text
+            check(f"{name}: the outcome said with what to do (posting/v1)", words_said in said.replace("\xa0", " ") and secret not in said, said)
+        saturated = browser.execute_script("return [...document.querySelectorAll('#send-last p')].map(p => p.textContent).find(s => s.includes('#saturé')) ?? ''")
+        check("busy with no delay given: no delay made up", "plus tard" in saturated and " s." not in saturated.replace("\xa0", " "), saturated)
+        # The page drawn again — as when the window comes back after a look in the channel: each failure still said,
+        # from the record, « perhaps arrived » first of all.
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: not b.find_elements(By.ID, "send-said"), 10)
+        page(written)
+        wait_for(browser, lambda b: b.execute_script("return document.getElementById('send-last')?.childElementCount") == 5, 10)
+        again_said = [s.replace("\xa0", " ") for s in browser.execute_script("return [...document.querySelectorAll('#send-last p')].map(p => p.textContent)")]
+        check("drawn again, each destination's last failed send still said, from the record: « #muet » may have arrived",
+              len(again_said) == 5 and any("« #muet »" in s and "regardez dans le canal" in s for s in again_said)
+              and any("« #saturé »" in s and "Réessayez plus tard" in s for s in again_said)
+              and not any("#équipe" in s for s in again_said), again_said)
+        # The record made unwritable (its file written beside first: a folder there): a send that left is said sent
+        # all the same, never « could not leave », which would have it sent twice. Not recorded, so not listed.
+        record = Path(window.env["XDG_CONFIG_HOME"]) / "kitokey" / "sends.json"
+        beside = record.with_suffix(".json.part")
+        beside.mkdir()
+        try:
+            send("#équipe")
+            said = browser.find_element(By.ID, "send-said").text.replace("\xa0", " ")
+            check("the record unwritable: a send that left is still said sent, never « n'a pas pu partir »",
+                  said.startswith("Envoyé à « #équipe »") and len(calls.read_text().splitlines()) == 8, said)
+        finally:
+            beside.rmdir()
+        page_text = browser.execute_script("return document.body.innerText")
+        check("the address appears nowhere on the page", secret not in page_text, "")
+        listed = "return [...document.querySelectorAll('#sends li')].map(li => li.textContent)"
+        sends = browser.execute_script(listed)
+        check("each send recorded and listed on the page: « Envoyé à « #équipe » », twice; a failure not listed",
+              len(sends) == 2 and all("#équipe" in s for s in sends), sends)
+        # Renamed: the folder keeps its name, so the record stays (title.txt, session-audio).
+        browser.execute_script("return window.__TAURI__.core.invoke('title_saved', {name: arguments[0], title: 'Point budget'})", written.name)
+        page(written)
+        check("renamed, the meeting keeps its sends", len(browser.execute_script(listed)) == 2, browser.execute_script(listed))
+        # Marked confidential after: the switch says where the summary already went; no send offered.
+        browser.find_element(By.ID, "confidential-switch").click()
+        wait_for(browser, lambda b: "#équipe" in b.find_element(By.ID, "confidential-left").text, 10)
+        left = browser.find_element(By.ID, "confidential-left").text
+        check("marked confidential after a send: the switch says where the summary already went (PDR-0007 §4)",
+              "le compte rendu à « #équipe »" in left.replace("\xa0", " "), left)
+        check("and offers no send any more", wait_for(browser, lambda b: not b.execute_script(offered), 5), browser.execute_script(offered))
+    logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and secret in f.read_text(errors="ignore")]
+    check("the address in no log nor state file of Kitokey (ADR-0007, PDR-0007 §1)", logged == [], logged)
 
 def destinations_kept(now: dt.datetime) -> None:
     """CK. D110, PDR-0007 §1 and §6: Settings keeps the destinations a summary can be sent to — a kind, a
@@ -14553,6 +14730,7 @@ def main() -> int:
     key_kept_to_its_host(now)
     settings_folded(now)
     destinations_kept(now)
+    summary_sent(now)
     settings_version(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)

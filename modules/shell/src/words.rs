@@ -943,6 +943,71 @@ pub struct Window {
     /// fields, as a status. When: « Ajouter » refused. At most: one line and the failure's.
     /// Placeholders: {} the failure's sentence (lower-case start).
     pub destination_not_added: &'static str,
+    /// The button that opens the send panel (D110). Shows: a meeting's page, the summary's actions. When: a
+    /// summary, a destination set up, the meeting not confidential. At most: one word. Placeholders: none.
+    pub send_open: &'static str,
+    /// Each destination's button in the send panel (PDR-0007 §2). Shows: a meeting's page, the send panel. When:
+    /// the panel is open. At most: four words. Placeholders: {} the destination's name.
+    pub send_to: &'static str,
+    /// Before a destination's first send, what leaves and where, by its name, and that it cannot be taken back
+    /// (PDR-0007 §3). Shows: a meeting's page, the send panel. When: the destination was never sent to. At most:
+    /// three lines. Placeholders: {} the destination's name.
+    pub send_notice: &'static str,
+    /// The button that sends after the notice. Shows: a meeting's page, the send panel. When: the notice is shown.
+    /// At most: one word. Placeholders: none.
+    pub send_confirm: &'static str,
+    /// The button that closes the panel, nothing sent. Shows: a meeting's page, the send panel. When: the panel is
+    /// open. At most: one word. Placeholders: none.
+    pub send_cancel: &'static str,
+    /// While kitokey-send runs. Shows: a meeting's page, as a status. When: a send was asked. At most: one line.
+    /// Placeholders: {} the destination's name.
+    pub send_sending: &'static str,
+    /// A send that arrived. Shows: a meeting's page, as a status. When: kitokey-send said sent. At most: one line.
+    /// Placeholders: {} the destination's name, {} the time.
+    pub send_done: &'static str,
+    /// Each send recorded, listed under the summary (PDR-0007 §5). Shows: a meeting's page, a list item. When: the
+    /// meeting was sent. At most: one line. Placeholders: {} the destination's name, {} the day and time.
+    pub send_listed: &'static str,
+    /// posting/v1's address.refused: what to do. Shows: a meeting's page, as a status. When: a send refused before
+    /// it left. At most: two lines. Placeholders: {} the destination's name.
+    pub send_address_refused: &'static str,
+    /// posting/v1's meeting.unreadable. Shows: a meeting's page, as a status. When: a send failed. At most: one
+    /// line. Placeholders: none.
+    pub send_unreadable: &'static str,
+    /// posting/v1's meeting.confidential. Shows: a meeting's page, as a status. When: a send asked of a
+    /// confidential meeting. At most: one line. Placeholders: none.
+    pub send_confidential: &'static str,
+    /// posting/v1's meeting.no_summary. Shows: a meeting's page, as a status. When: a send failed. At most: one
+    /// line. Placeholders: none.
+    pub send_no_summary: &'static str,
+    /// posting/v1's summary.too_large: send it as a file instead. Shows: a meeting's page, as a status. When: a
+    /// send failed. At most: one line. Placeholders: {} the destination's name.
+    pub send_too_large: &'static str,
+    /// posting/v1's network.unreachable: nothing left. Shows: a meeting's page, as a status. When: a send failed.
+    /// At most: one line. Placeholders: none.
+    pub send_offline: &'static str,
+    /// posting/v1's destination.silent: it may have arrived, look before sending again. Shows: a meeting's page, as
+    /// a status. When: no answer in time. At most: two lines. Placeholders: {} the destination's name.
+    pub send_silent: &'static str,
+    /// posting/v1's destination.gone: set it up again. Shows: a meeting's page, as a status. When: the webhook is
+    /// deleted or revoked. At most: two lines. Placeholders: {} the destination's name.
+    pub send_gone: &'static str,
+    /// posting/v1's destination.busy: wait, then send again. Shows: a meeting's page, as a status. When: the
+    /// destination said 429. At most: one line. Placeholders: {} the destination's name, {} seconds.
+    pub send_busy: &'static str,
+    /// posting/v1's destination.busy when the destination said no delay: wait, then send again. Shows: a meeting's
+    /// page, as a status. When: the destination said 429 without Retry-After. At most: one line. Placeholders: {}
+    /// the destination's name.
+    pub send_busy_later: &'static str,
+    /// posting/v1's destination.refused: the kind may not match. Shows: a meeting's page, as a status. When:
+    /// another 3xx or 4xx. At most: two lines. Placeholders: {} the destination's name.
+    pub send_refused: &'static str,
+    /// posting/v1's destination.failed: try later. Shows: a meeting's page, as a status. When: a 5xx. At most: one
+    /// line. Placeholders: {} the destination's name.
+    pub send_failed: &'static str,
+    /// A send that failed without a code a person acts on. Shows: a meeting's page, as a status. When: kitokey-send
+    /// failed otherwise. At most: one line. Placeholders: none.
+    pub send_not_sent: &'static str,
     /// Before Kitokey's version, at the foot of « Général », as GNOME's « About » and Windows' Settings
     /// say it (#1089); the number follows, as `--version` gives it. Shows: Settings, « Général », its
     /// last line, in secondary text the user can select to copy. When: always. At most: one word.
@@ -1859,6 +1924,9 @@ pub struct Window {
     /// Shows: a meeting's page, as a status. When: list item. At most: no limit. Placeholders: {}
     /// host.
     pub confidential_left_transcript: &'static str,
+    /// Shows: a meeting's page, as a status. When: list item, its summary sent to a destination (D110,
+    /// PDR-0007 §4). At most: no limit. Placeholders: {} the destination's name.
+    pub confidential_left_summary: &'static str,
     /// Shows: a meeting's page, as an error. When: switch not saved. At most: no limit.
     /// Placeholders: none.
     pub confidential_not_saved: &'static str,
@@ -2029,6 +2097,27 @@ pub fn window(language: Language) -> Window {
             destination_forget: "Remove",
             destination_added: "Destination {} added.",
             destination_not_added: "Destination not added: {}",
+            send_open: "Send…",
+            send_to: "Send to “{}”",
+            send_notice: "The title, the summary and its actions go to “{}”. Never the audio, never the transcript. A summary sent cannot be taken back.",
+            send_confirm: "Send",
+            send_cancel: "Cancel",
+            send_sending: "Sending to “{}”…",
+            send_done: "Sent to “{}” at {}.",
+            send_listed: "Sent to “{}” on {}",
+            send_address_refused: "The address of “{}” is refused. Remove it, then add the channel’s https webhook address in Settings.",
+            send_unreadable: "Kitokey couldn’t read this meeting. Check its folder, then try again.",
+            send_confidential: "This meeting is confidential: it’s never sent.",
+            send_no_summary: "There’s no summary to send yet.",
+            send_too_large: "The summary is too long for “{}”. Export it as a file instead.",
+            send_offline: "No connection: nothing was sent. Check your connection, then try again.",
+            send_silent: "“{}” didn’t answer: the summary may have arrived; look in the channel before sending again.",
+            send_gone: "“{}” no longer exists or was revoked. Set the destination up again, with a new address.",
+            send_busy: "“{}” is receiving too many sends. Try again in {} s.",
+            send_busy_later: "“{}” is receiving too many sends. Try again later.",
+            send_refused: "“{}” refused it. Check that the destination’s kind matches its address.",
+            send_failed: "“{}” has a problem. Try again later.",
+            send_not_sent: "The summary couldn’t be sent. Try again.",
             version_said: "Version",
             developer: ["Developer mode", "Shows technical details under each error, to help troubleshoot."],
             program_said: "Technical details: {}",
@@ -2342,6 +2431,7 @@ pub fn window(language: Language) -> Window {
             confidential_left: "Already sent earlier: {}.",
             confidential_left_sound: "the audio to {}",
             confidential_left_transcript: "the transcript to {}",
+            confidential_left_summary: "the summary to “{}”",
             confidential_not_saved: "Couldn’t mark the meeting as confidential. Try again.",
             confidential_ollama_empty: "Ollama has no model on this computer, so the summary will wait.",
         },
@@ -2508,6 +2598,27 @@ pub fn window(language: Language) -> Window {
             destination_forget: "Supprimer",
             destination_added: "Destination {} ajoutée.",
             destination_not_added: "Destination non ajoutée\u{a0}: {}",
+            send_open: "Envoyer…",
+            send_to: "Envoyer à « {} »",
+            send_notice: "Le titre, le compte rendu et ses actions partent vers « {} ». Jamais le son, jamais la transcription. Un compte rendu envoyé ne peut pas être repris.",
+            send_confirm: "Envoyer",
+            send_cancel: "Annuler",
+            send_sending: "Envoi vers « {} »…",
+            send_done: "Envoyé à « {} » à {}.",
+            send_listed: "Envoyé à « {} » le {}",
+            send_address_refused: "L’adresse de « {} » est refusée. Retirez-la, puis ajoutez l’adresse https du webhook du canal dans les Réglages.",
+            send_unreadable: "Kitokey n’a pas pu lire cette réunion. Vérifiez son dossier, puis réessayez.",
+            send_confidential: "Réunion confidentielle : elle n’est jamais envoyée.",
+            send_no_summary: "Pas encore de compte rendu à envoyer.",
+            send_too_large: "Compte rendu trop long pour « {} ». Exportez-le en fichier à la place.",
+            send_offline: "Pas de connexion : rien n’est parti. Vérifiez la connexion, puis réessayez.",
+            send_silent: "« {} » n’a pas répondu : le compte rendu est peut-être arrivé ; regardez dans le canal avant de renvoyer.",
+            send_gone: "« {} » n’existe plus ou a été révoqué. Reconfigurez la destination avec une nouvelle adresse.",
+            send_busy: "« {} » reçoit trop d’envois. Réessayez dans {} s.",
+            send_busy_later: "« {} » reçoit trop d’envois. Réessayez plus tard.",
+            send_refused: "« {} » a refusé l’envoi. Vérifiez que le type de la destination correspond à son adresse.",
+            send_failed: "« {} » a un problème. Réessayez plus tard.",
+            send_not_sent: "Le compte rendu n’a pas pu partir. Réessayez.",
             version_said: "Version",
             developer: [
                 "Mode développeur",
@@ -2836,6 +2947,7 @@ pub fn window(language: Language) -> Window {
             confidential_left: "Déjà envoyé auparavant\u{a0}: {}.",
             confidential_left_sound: "le son à {}",
             confidential_left_transcript: "la transcription à {}",
+            confidential_left_summary: "le compte rendu à « {} »",
             confidential_not_saved: "Impossible de marquer la réunion comme confidentielle. Réessayez.",
             confidential_ollama_empty: "Ollama n’a aucun modèle sur cet ordinateur\u{a0}: le compte rendu attendra.",
         },
