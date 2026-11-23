@@ -86,9 +86,56 @@ echo '{"event": "answered"}'
 """
 )
 SUMMARY.chmod(0o755)
+# kitokey-export played here, as exporting/v1 says it (D108, D109): its arguments and its input
+# kept beside it; the file asked for written whole at `to` — the meeting's minutes, as an md would
+# hold them —, then `written`; with `export-refuse` there, `failed` with `file.unwritable`, nothing written.
+EXPORTER = WORK / "kitokey-export"
+EXPORTER.write_text(
+    """#!/bin/sh
+here=$(dirname "$0")
+printf '%s\\n' "$*" > "$here/export-args"
+cat > "$here/export-input"
+if [ -e "$here/export-refuse" ]; then
+  echo '{"event": "failed", "code": "file.unwritable"}'
+  echo "kitokey-export: the file could not be written" >&2
+  exit 1
+fi
+python3 - "$1" "$here/export-input" <<'END'
+import json, pathlib, sys
+to = pathlib.Path(json.loads(pathlib.Path(sys.argv[2]).read_text())["to"])
+written = to.with_name(to.name + ".part")
+written.write_text((pathlib.Path(sys.argv[1]) / "minutes.md").read_text())
+written.replace(to)
+print(json.dumps({"event": "written", "file": str(to), "bytes": to.stat().st_size}))
+END
+"""
+)
+EXPORTER.chmod(0o755)
 # kitokey-transcription played here: a whole transcript, naming the model it was given — a
 # service's by its host, as the real one names it; where a scenario stands the service in
 # ($STANDIN, D60), its request is sent to it, as the real one would send the sound there.
+# kitokey-send played here (posting/v1, D110): each call kept beside it — its arguments, and its input,
+# where the address is, a secret — and answered as the real one judges an address: `https:` to a host
+# that is not this computer is checked; anything else refused. It never sends anything anywhere.
+SENDER = WORK / "kitokey-send"
+SENDER.write_text(
+    """#!/usr/bin/env python3
+import json, sys
+from pathlib import Path
+said = sys.stdin.read()
+with open(Path(sys.argv[0]).parent / "send-calls.jsonl", "a") as calls:
+    calls.write(json.dumps({"args": sys.argv[1:], "input": said}) + "\\n")
+address = json.loads(said)["address"]
+host = address.split("://", 1)[-1].split("/", 1)[0]
+if address.startswith("https://") and host not in ("127.0.0.1", "localhost") and not host.startswith("192.168."):
+    print(json.dumps({"event": "checked" if "--check" in sys.argv else "sent"}))
+    sys.exit(0)
+print(json.dumps({"event": "failed", "code": "address.refused"}))
+print("kitokey-send: the address is refused: it is not https, or it points to this computer or its network", file=sys.stderr)
+sys.exit(1)
+"""
+)
+SENDER.chmod(0o755)
 HEARING = WORK / "kitokey-transcription"
 HEARING.write_text(
     """#!/bin/sh
@@ -638,7 +685,7 @@ class Window:
         self.file.write_text(f'sessions = "{sessions}"\n{opened}{greeted}{more}')
         self.env = dict(os.environ, XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
         # An Ollama and a keyring of the scenario's, never the user's own.
-        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER))
+        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_EXPORT=str(EXPORTER), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER))
 
     def __enter__(self) -> webdriver.Remote:
         # One Kitokey per session: one still leaving takes this start's arguments and this one
@@ -1012,6 +1059,10 @@ def model_offered(now: dt.datetime) -> None:
         waits = "return document.getElementById('transcript-state')?.innerText || ''"
         offered = wait_for(browser, lambda b: "En attente du modèle de transcription" in b.execute_script(waits) and b.find_elements(By.CSS_SELECTOR, "#transcript-state #model-fetch"))
         check("a meeting waiting for the model offers it on its page", offered, browser.execute_script(waits))
+        # #933: the offer names what follows it, the transcript (as D113's Refaire… names what it starts).
+        fetch_said = browser.execute_script("return document.querySelector('#transcript-state #model-fetch')?.textContent ?? null")
+        check("on a meeting's page, the model's offer names what follows: « … et transcrire » (#933)",
+              fetch_said == f"Télécharger le modèle (300 ko, {host}) et transcrire", fetch_said)
         # Said once (#775): what it waits for, never « Pas encore de transcription » beside it.
         nones = browser.execute_script("return [...document.querySelectorAll('#meeting .transcript .none')].filter(e => e.offsetParent !== null).map(e => e.textContent)")
         check("a transcript waiting for its model says that alone, not also that there is none (#775)", nones == [], nones)
@@ -5182,6 +5233,113 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+def destinations_kept(now: dt.datetime) -> None:
+    """CK. D110, PDR-0007 §1 and §6: Settings keeps the destinations a summary can be sent to — a kind, a
+    name, the address pasted. The address is judged by kitokey-send --check, given on its input and never
+    as an argument; refused (not https:, or this computer), it is said and nothing is kept; checked, it
+    goes to the keyring and is never shown whole again — its host and the end of its path — nor written
+    in the settings' file. Forgotten, the destination is gone. Addresses here are made up."""
+    print("CK. Settings: a destination added, its address judged then kept in the keyring, never shown whole; forgotten (D110)")
+    calls = WORK / "send-calls.jsonl"
+    calls.unlink(missing_ok=True)
+    meetings = WORK / "destinations"
+    meetings.mkdir(exist_ok=True)
+    secret = "made-up-secret-7f3a"
+    good = f"https://hooks.example/services/T00/B00/{secret}"
+    window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\n')
+    with window as browser:
+        browser.execute_script("location.hash = '#/settings'")
+        drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
+        # A part of « Après un enregistrement », not a group of its own: Settings keep their three (D95).
+        card = ("const b = document.getElementById('destination-open'); const p = b && b.closest('.sending'); const c = b && b.closest('section.card');"
+                " return p && c ? [c.querySelector('h2').textContent, p.querySelector('h3').textContent] : null")
+        check("Settings offer, in « Après un enregistrement », a part where a destination is added (D110, D95)",
+              drawn and browser.execute_script(card) == ["Après un enregistrement", "Envoi des comptes rendus"],
+              browser.execute_script(card) if drawn else None)
+        # Folded at first, no address asked (E5); unfolded by its button (ARIA APG Disclosure), the focus in its first field.
+        folded = ("const o = document.getElementById('destination-open'), a = document.getElementById('destination-address');"
+                  " return [o.getAttribute('aria-expanded'), o.getAttribute('aria-controls'), a.getClientRects().length > 0, document.activeElement.id]")
+        before = browser.execute_script(folded) if drawn else None
+        if drawn:
+            # For an eye (lina's): the part as first seen, folded — the group's heading, the rule, its own
+            # heading, the list and the closed button — at the two widths, in both looks.
+            group = "document.getElementById('destination-open').closest('section.card')"
+            # At 420 px the group is taller than 800 px: a taller window, for the heading and the button in one image.
+            for width, height in ((1100, 800), (420, 1040)):
+                browser.set_window_size(width, height)
+                browser.execute_script(f"{group}.scrollIntoView({{block: 'start'}})")
+                print("        folded part, its group's box and the button's (top, bottom) at", width, "px:",
+                      browser.execute_script(f"const g = {group}.getBoundingClientRect(), o = document.getElementById('destination-open').getBoundingClientRect();"
+                                             " return [[Math.round(g.top), Math.round(g.bottom)], [Math.round(o.top), Math.round(o.bottom)], innerHeight]"))
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d110-destinations-folded-fr-{width}-{theme}", theme)
+            browser.set_window_size(1100, 800)
+            # Back across 840 px the page is drawn again (#777): pressed during that drawing, a click starts nothing.
+            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-open')"), 10)
+            press(browser, "destination-open")
+        opened = drawn and wait_for(browser, lambda b: b.execute_script(folded)[0] == "true", 5)
+        after = browser.execute_script(folded) if drawn else None
+        check("folded at first, no address shown; « Ajouter une destination » unfolds it, the focus in its first field (E5, ARIA APG)",
+              before is not None and before[:3] == ["false", "destination-adding", False]
+              and opened and after == ["true", "destination-adding", True, "destination-kind"], (before, after))
+        rows = "return [...document.querySelectorAll('#destinations li')].map(li => li.innerText)"
+        check("none yet: the card says so", drawn and browser.execute_script(rows) == []
+              and "Aucune destination" in browser.find_element(By.ID, "destinations-said").text, browser.execute_script(rows) if drawn else None)
+
+        def add(kind, name, address):
+            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            for field, value in (("destination-name", name), ("destination-address", address)):
+                element = browser.find_element(By.ID, field)
+                element.clear()
+                element.send_keys(value)
+            press(browser, "destination-add")
+
+        if drawn:
+            add("webhook", "#équipe", "http://hooks.example/plain")
+            said = wait_for(browser, lambda b: "https" in b.find_element(By.ID, "destination-said").text, 10)
+            check("an address not https: is refused, said why, nothing kept (PDR-0007 §6)",
+                  said and browser.execute_script(rows) == [], browser.find_element(By.ID, "destination-said").text)
+            add("slack", "#équipe", good)
+            kept = wait_for(browser, lambda b: len(b.execute_script(rows)) == 1, 10)
+            row = browser.execute_script(rows)[0] if kept else ""
+            check("checked, the destination is listed: its name, its kind, its address as its host and the end of its path",
+                  kept and "#équipe" in row and "Slack" in row and "hooks.example" in row and secret not in row and secret[-4:] in row, row)
+            check("the address field is emptied once kept", browser.find_element(By.ID, "destination-address").get_attribute("value") == "")
+            # For an eye (lina's): the card with one destination, at the two widths, in both looks.
+            for width in (1100, 420):
+                browser.set_window_size(width, 800)
+                browser.execute_script("document.getElementById('destination-add').scrollIntoView({block: 'center'})")
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d110-destinations-fr-{width}-{theme}", theme)
+            browser.set_window_size(1100, 800)
+            check("the address is never written in the settings' file (PDR-0007 §1)",
+                  window.file.exists() and secret not in window.file.read_text() and "#équipe" in window.file.read_text())
+            judged = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+            check("each address judged by kitokey-send --check, the address on its input, never among its arguments",
+                  len(judged) == 2 and all(call["args"] == ["--check"] and secret not in " ".join(call["args"]) for call in judged)
+                  and json.loads(judged[1]["input"])["address"] == good, [call["args"] for call in judged])
+            # A second destination under a name already kept: said, and refused before any address is judged.
+            # Back across 840 px the page is drawn again (#777): the form is filled once that drawing is done.
+            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-kind')"), 10)
+            add("discord", "#équipe", good.replace("T00", "T01"))
+            # Read by script: a destination kept by mistake draws the card again, and a node held would be stale.
+            said_now = "return document.getElementById('destination-said')?.textContent ?? null"
+            taken = wait_for(browser, lambda b: "déjà ce nom" in (b.execute_script(said_now) or ""), 10)
+            judged_again = len(calls.read_text().splitlines()) if calls.exists() else 0
+            check("a name already kept is refused, said, nothing judged nor kept",
+                  taken and len(browser.execute_script(rows)) == 1 and judged_again == 2,
+                  (browser.execute_script(said_now), browser.execute_script(rows), judged_again))
+            # Back across 840 px, the page is drawn again (#777): pressed while that drawing runs, the
+            # click lands on a button being replaced and starts nothing (the run at b4321a4) — waited for.
+            settled = wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-forget-0')"), 10)
+            forgetting = browser.execute_script("const b = document.getElementById('destination-forget-0'); return b ? [b.textContent, b.disabled] : null"), settled
+            press(browser, "destination-forget-0")
+            gone = wait_for(browser, lambda b: b.execute_script(rows) == [], 10)
+            check("forgotten, the destination is gone from the page", gone, (forgetting, browser.execute_script(rows), browser.find_element(By.ID, "destinations-said").text))
+            check("forgotten, the destination is gone from the settings' file", "#équipe" not in window.file.read_text(),
+                  [line for line in window.file.read_text().splitlines() if "destination" in line or "équipe" in line])
+
+
 def settings_version(now: dt.datetime) -> None:
     """CJ. Settings' « Général » says Kitokey's version at its foot (#1089), as `--version` says it: « Version
     1.0.0 », secondary text a person can select and copy for support, in French and in English."""
@@ -5401,8 +5559,8 @@ def bar_after_stop(now: dt.datetime) -> None:
     """BV. D92, criterion 1: a recording stopped from the bar, the bar at rest names its meeting and its
     stage — the transcript, then the summary, then ready with « Ouvrir » to its page —, in a polite live
     region that says each stage once; until its page is opened or another recording starts. A step that
-    fails is said there in one line, its cause as the page says it, with « Ouvrir ». By the keyboard alone,
-    in French and in English, light then dark."""
+    fails is said there in one line, its cause as the page says it, with « Ouvrir »; so is a summary written but
+    not to the export folder (D109). By the keyboard alone, in French and in English, light then dark."""
     print("BV. after the stop, the bar names the meeting and its stage, ready with Ouvrir; a failure said with its cause (D92)")
     focused = "return document.activeElement ? document.activeElement.id : ''"
     said = "const s = document.getElementById('small-last-said'); return s && s.getClientRects().length ? s.textContent : ''"
@@ -5534,10 +5692,119 @@ def bar_after_stop(now: dt.datetime) -> None:
                       ended and failed and line[0] == 1 and line[1] <= 20 and line[2] == line[3] == meeting + not_made,
                       [ended, browser.execute_script(said), browser.execute_script(shown), line])
                 shot_themed(browser, f"d92-bar-failed-{short}-{theme}", theme)
+                # D109: a summary written, but not to the export folder that refuses it: said here too, as its page says it.
+                refused = {"fr": "Impossible d’écrire le compte rendu dans le dossier d’export. Choisissez un autre dossier dans les Réglages.",
+                           "en": "Kitokey could not write the summary to the export folder. Choose another folder in Settings."}[short]
+                folder = WORK / f"bar-export-{short}-{theme}"
+                folder.mkdir()
+                browser.execute_script("return window.__TAURI__.core.invoke('settings_saved', {change: {export: arguments[0]}})", str(folder))
+                (WORK / "fail-minutes").unlink()
+                (WORK / "export-refuse").touch()
+                noted = record() and stop() and wait_for(
+                    browser, lambda b: b.execute_script(said).endswith(refused) and b.execute_script(shown), 20)
+                check(f"{short}: its summary written, not to the export folder: the bar says so as its page does, « Ouvrir » beside it (D109)",
+                      noted and not any(folder.iterdir()), [browser.execute_script(said), browser.execute_script(shown)])
             finally:
                 for gate in gates:
                     gate.unlink(missing_ok=True)
                 (WORK / "fail-minutes").unlink(missing_ok=True)
+                (WORK / "export-refuse").unlink(missing_ok=True)
+
+
+def summaries_to_a_folder(now: dt.datetime) -> None:
+    """CF. D109, criterion 3: a folder chosen in Settings for « Exporter chaque compte rendu »; each
+    summary written from then on is written there too, in Markdown, named by the meeting's date and
+    time, through `kitokey-export` as exporting/v1 starts it; a confidential meeting never (D60), its
+    page saying so; a folder that cannot be written said on the meeting's page, the summary kept in the
+    meeting; « Ne plus exporter » ends it. In French and in English."""
+    print("CF. every new summary written to the folder chosen, in Markdown, named by its meeting; never a confidential one; a refusal said (D109)")
+    words_of = {
+        "fr": {"none": "Aucun dossier", "help": "Chaque nouveau compte rendu est aussi écrit dans ce dossier, en Markdown, nommé par la date et l’heure de la réunion. Refaire un compte rendu remplace son fichier dans le dossier.",
+               "confidential": "Confidentielle\u00a0: pas exportée.",
+               "failed": "Impossible d’écrire le compte rendu dans le dossier d’export. Choisissez un autre dossier dans les Réglages."},
+        "en": {"none": "No folder", "help": "Each new summary is also written to this folder, in Markdown, named by the meeting’s date and time. Redoing a summary replaces its file in the folder.",
+               "confidential": "Confidential: not exported.",
+               "failed": "Kitokey could not write the summary to the export folder. Choose another folder in Settings."},
+    }
+    settings = 'after = "nothing"\nreminder = false\nminutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n'
+    idle = "return window.__TAURI__.core.invoke('makings').then(m => m.minutes === null)"
+    said = "const s = document.getElementById('export-said'); return s && s.getClientRects().length ? s.textContent : ''"
+    shown = lambda b, id_: bool(b.find_elements(By.ID, id_)) and b.find_element(By.ID, id_).is_displayed()
+    for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
+        said_here = words_of[short]
+        meetings = WORK / f"to-folder-{short}"
+        plain, secret = meetings / "2026-10-18_12-00", meetings / "2026-10-18_13-00"
+        for folder in (plain, secret):
+            session(folder, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+            (folder / "transcript.jsonl").write_text(
+                '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+                '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+        (secret / "confidential").touch()
+        out = WORK / f"exported-{short}"
+        out.mkdir()
+        window = Window(meetings, language, settings)
+        kept = lambda: window.file.read_text()
+        try:
+            with window as browser:
+                # Settings: no folder yet; the help says what goes there, how it is named, and that a redo replaces.
+                browser.execute_script("location.hash = '#/settings'")
+                offered = wait_for(browser, lambda b: shown(b, "export-shown"), 10)
+                got = [browser.find_element(By.ID, "export-shown").text if offered else None,
+                       browser.find_element(By.ID, "export-help").text if shown(browser, "export-help") else None, shown(browser, "export-stop")]
+                check(f"{short}: Settings offer « Exporter chaque compte rendu », no folder yet, its help said (D109)",
+                      got == [said_here["none"], said_here["help"], False], got)
+                # A folder typed where its path shows, as the meetings' folder is: kept by the settings.
+                if offered:
+                    browser.find_element(By.ID, "export-shown").click()
+                    field = wait_for(browser, lambda b: shown(b, "export-folder"), 5) and browser.find_element(By.ID, "export-folder")
+                    if field:
+                        field.send_keys(str(out), Keys.ENTER)
+                chosen = wait_for(browser, lambda b: f'export = "{out}"' in kept() and shown(b, "export-stop"), 5)
+                check(f"{short}: the folder typed is kept by the settings, « Ne plus exporter » offered (D109)", chosen, kept())
+                # A summary written: written to the folder too, named by its meeting, through kitokey-export.
+                (WORK / "export-args").unlink(missing_ok=True)
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
+                target = out / f"{plain.name}.md"
+                # Read as a file there or not: a mutant that writes nothing fails the rows, never raises.
+                held = lambda path: path.read_text() if path.is_file() else "the file absent"
+                written = wait_for(browser, lambda b: target.is_file() and b.execute_script(idle), 15)
+                args = (WORK / "export-args").read_text().strip() if (WORK / "export-args").exists() else ""
+                given = json.loads((WORK / "export-input").read_text()) if written else {}
+                check(f"{short}: the summary written is written to the folder too, named by its meeting, its Markdown the minutes' (D109)",
+                      written and held(target) == held(plain / "minutes.md"), sorted(p.name for p in out.iterdir()))
+                check(f"{short}: through kitokey-export as exporting/v1 starts it: md, the language, the summary alone; where to write on its input (D109)",
+                      args == f"{plain} --format md --lang {short} --without-transcript" and given.get("to") == str(target)
+                      and all(given.get(key) for key in ("name", "transcript", "me", "others", "time", "speaker", "text")), [args, given])
+                # A confidential meeting: its summary written in it, never to the folder; its page says so.
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", secret.name)
+                made = wait_for(browser, lambda b: (secret / "minutes.md").is_file() and b.execute_script(idle), 15)
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{secret.name}")
+                told = wait_for(browser, lambda b: b.execute_script(said) == said_here["confidential"], 10)
+                check(f"{short}: a confidential meeting's summary never goes to the folder, its page says so (D60, D109)",
+                      made and told and not (out / f"{secret.name}.md").exists(), [browser.execute_script(said), sorted(p.name for p in out.iterdir())])
+                # A folder that cannot be written: said on the meeting's page, the summary kept in the meeting.
+                (WORK / "export-refuse").touch()
+                before = held(target)
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{plain.name}")
+                refused = wait_for(browser, lambda b: b.execute_script(said) == said_here["failed"], 15)
+                check(f"{short}: a folder that cannot be written is said on the meeting's page, never skipped silently; the summary kept (D109)",
+                      refused and (plain / "minutes.md").is_file() and held(target) == before, browser.execute_script(said))
+                (WORK / "export-refuse").unlink()
+                # « Ne plus exporter »: the folder forgotten, a summary written after it written nowhere else.
+                browser.execute_script("location.hash = '#/settings'")
+                stop = wait_for(browser, lambda b: shown(b, "export-stop"), 10) and browser.find_element(By.ID, "export-stop")
+                if stop:
+                    stop.click()
+                forgot = wait_for(browser, lambda b: "export =" not in kept() and b.find_element(By.ID, "export-shown").text == said_here["none"], 5)
+                (WORK / "export-args").unlink(missing_ok=True)
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
+                again = wait_for(browser, lambda b: b.execute_script(idle) and (plain / "minutes.md").is_file(), 15)
+                time.sleep(1)
+                check(f"{short}: « Ne plus exporter » forgets the folder; a summary written after it goes nowhere else (D109)",
+                      forgot and again and not (WORK / "export-args").exists(), kept())
+        finally:
+            (WORK / "export-refuse").unlink(missing_ok=True)
 
 
 def axe_first_surfaces(now: dt.datetime) -> None:
@@ -7689,6 +7956,24 @@ def minutes_checked(now: dt.datetime) -> None:
         asked = wait_for(browser, lambda b: b.find_elements(By.ID, "agree-send"), 10)
         check("the agreement before a first sending shows no price", asked and not browser.execute_script(priced_words, "agree"),
               browser.find_element(By.ID, "agree").text)
+        send_said = browser.execute_script("return document.getElementById('agree-send')?.textContent ?? null")
+        # One line (sam's T5 probe: the long label wrapped at 1100 px): the verbs alone, the page above saying what leaves and
+        # what is written (Microsoft's Writing Style, Apple's HIG).
+        check("the agreement's button names what it does, in a few words: « Envoyer et rédiger » (#933)", send_said == "Envoyer et rédiger", send_said)
+        # #1114 (the decider, 2026-11-21 ~19h): what stays shows a lock — the glyph of « Confidentielle », one meaning
+        # everywhere: it stays on this computer —, never a × that reads as cancel; in the text's colour, the size of the →.
+        stays = ("const s = document.querySelector('#agree .stays .sign svg'), l = document.querySelector('#agree .leaves .sign svg');"
+                 " const ink = getComputedStyle(document.body).color;"
+                 " return s && l ? {lock: s.innerHTML === icon('lock').innerHTML, colour: getComputedStyle(s).color === ink,"
+                 " size: Math.round(s.getBoundingClientRect().width) === Math.round(l.getBoundingClientRect().width)} : null")
+        locked = browser.execute_script(stays)
+        check("what stays shows Confidentielle's lock, in the ink, the size of the arrow (#1114)",
+              locked == {"lock": True, "colour": True, "size": True}, locked)
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1114-agreement-{width}-{theme}", theme)
     with Window(meetings, "fr_FR.UTF-8", online, small=True) as browser:
         check("the bar at rest shows no price",
               browser.find_elements(By.ID, "small-record") and not browser.execute_script(priced_words, "small"), browser.find_element(By.ID, "small").text)
@@ -8228,6 +8513,32 @@ def actions_rows(now: dt.datetime) -> None:
         browser.execute_script("document.querySelector('#meeting .minutes').scrollIntoView({block: 'start'})")
         time.sleep(0.3)
         shot(browser, "d46-actions-rows")
+        # In a structure (minutes/v5, D111): the actions are the section their id names — the fourth
+        # here, never the second by place —, each section titled as the page names its id.
+        structured = meetings / "2026-10-29_10-00"
+        session(structured, now - dt.timedelta(hours=20), 10, {"local.wav": 1000})
+        (structured / "transcript.jsonl").write_text((folder / "transcript.jsonl").read_text())
+        sections = json.dumps([{"id": i, "about": "One line."} for i in ("status", "risks", "decisions", "actions")])
+        (structured / "minutes.md").write_text(
+            "---\ncontract: minutes/v5\nmade: 2026-10-29T11:00:00+01:00\nprovider: \"local\"\nmodel: \"qwen3:8b\"\ncontext: null\n"
+            f"structure: project_review\nsections: {sections}\nactions: actions\n---\n\n"
+            "## Où on en est\n\nLa recette commence lundi.\n\n## Risques et problèmes\n\n- Le serveur — non livré — vendredi\n\n"
+            "## Ce qu'on a décidé\n\n- Le lot 3 est reporté\n\n## À faire\n\n- Relancer le fournisseur — Inès — vendredi\n")
+        browser.execute_script(f"location.hash = '#/meeting/{structured.name}'")
+        wait_for(browser, lambda b: b.execute_script(
+            "return [...document.querySelectorAll('#meeting .minutes .body h2')].length === 4"), 10)
+        titles = browser.execute_script("return [...document.querySelectorAll('#meeting .minutes .body h2')].map(h => h.textContent)")
+        check("minutes in a structure: each section titled as the page names its id (D111)",
+              titles == ["État", "Risques", "Décisions", "Actions"], titles)
+        # The section the table stands in — the last title before it —, then its rows: what the check reads.
+        placed = ("const t = document.querySelector('#meeting .minutes .body table.actions'); if (!t) return null;"
+                  " const h = [...document.querySelectorAll('#meeting .minutes .body h2')]"
+                  ".filter(h => h.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING);"
+                  " return h.length ? h[h.length - 1].textContent : 'before every title'")
+        wait_for(browser, lambda b: b.execute_script(placed), 5)
+        got = [browser.execute_script(placed), browser.execute_script(rows)]
+        check("minutes in a structure: the rows are the actions' section, found by its id, never the second section by place (D111)",
+              got == ["Actions", [[["who", "Inès"], ["what", "Relancer le fournisseur"], ["when", "vendredi"]]]], got)
 
 
 def meeting_told_once(now: dt.datetime) -> None:
@@ -10410,6 +10721,8 @@ def context_written(now: dt.datetime) -> None:
             failed = wait_for(browser, lambda b: b.find_elements(By.ID, "transcript-again"), 10)
         finally:
             (WORK / "fail-hearing").unlink()
+        retry_said = browser.execute_script("return document.getElementById('transcript-again')?.textContent ?? null")
+        check("the transcript's retry names what it starts: « Réessayer la transcription » (#933)", retry_said == "Réessayer la transcription", retry_said)
         check("failing, the transcript and the minutes made with the earlier context are put back",
               failed and ((meeting / "transcript.jsonl").read_text(), (meeting / "minutes.md").read_text()) == before
               and not list(meeting.glob("transcript-before-*")), sorted(p.name for p in meeting.iterdir()))
@@ -10790,11 +11103,13 @@ def confidential_kept(now: dt.datetime) -> None:
         check("Ollama silent: the minutes wait, said where to get it, nothing asked nor sent",
               silent and browser.find_elements(By.ID, "minutes-again") and counted["write"] == 1
               and not (waiting / "wait" / "minutes.md").exists(), browser.execute_script(state))
+        retry_said = browser.execute_script("return document.getElementById('minutes-again')?.textContent ?? null")
+        check("the summary's retry names what it starts: « Réessayer le compte rendu » (#933)", retry_said == "Réessayer le compte rendu", retry_said)
         ollama["silent"] = False
         press(browser, "minutes-again")
         empty = wait_for(browser, lambda b: "Ollama n’a aucun modèle sur cet ordinateur" in b.execute_script(state), 10)
         offered = browser.find_elements(By.ID, "ollama-fetch")
-        check("holding no model: said, its recommended model offered", empty and offered and offered[0].text == "Télécharger qwen3:8b",
+        check("holding no model: said, its recommended model offered", empty and offered and offered[0].text == "Télécharger qwen3:8b et rédiger le compte rendu",
               browser.execute_script(state))
         seen(browser, "d60-6-ollama-empty-light")
         press(browser, "ollama-fetch")
@@ -14179,6 +14494,7 @@ def main() -> int:
     unsaved_choice_kept(now)
     key_kept_to_its_host(now)
     settings_folded(now)
+    destinations_kept(now)
     settings_version(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
@@ -14191,6 +14507,7 @@ def main() -> int:
     bar_opened(now)
     bar_language(now)
     bar_after_stop(now)
+    summaries_to_a_folder(now)
     axe_first_surfaces(now)
     keys_first_surfaces(now)
     page_one_bar(now)
