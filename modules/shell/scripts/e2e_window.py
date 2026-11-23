@@ -963,7 +963,18 @@ def model_offered(now: dt.datetime) -> None:
     threading.Thread(target=server.serve_forever, daemon=True).start()
     host = f"127.0.0.1:{server.server_address[1]}"
     meetings, data = WORK / "fetching", WORK / "data-fetching"
-    session(meetings / "2026-10-25_10-00", now - dt.timedelta(hours=1), 5, {"local.wav": 2000})
+    session(meetings / "2026-10-25_10-00", now - dt.timedelta(hours=1), 5, {})
+    # Its sound playable, as a meeting just recorded has it (#1134): the page offers its player before any transcript.
+    waiting = meetings / "2026-10-25_10-00"
+    record = json.loads((waiting / "session.json").read_text())
+    record["tracks"] = {"local": {"device": "Mic"}}
+    (waiting / "session.json").write_text(json.dumps(record))
+    with wave.open(str(waiting / "local.wav"), "wb") as made:
+        made.setnchannels(1)
+        made.setsampwidth(2)
+        made.setframerate(48000)
+        made.writeframes(bytes(2 * 48000 * 2))
+    (waiting / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n')
     heard = meetings / "2026-10-25_10-00" / "transcript.jsonl"
     fetched = data / "kitokey" / "models" / "ggml-large-v3-turbo-q8_0.bin"
     window = Window(meetings, "fr_FR.UTF-8")
@@ -1005,20 +1016,30 @@ def model_offered(now: dt.datetime) -> None:
         nones = browser.execute_script("return [...document.querySelectorAll('#meeting .transcript .none')].filter(e => e.offsetParent !== null).map(e => e.textContent)")
         check("a transcript waiting for its model says that alone, not also that there is none (#775)", nones == [], nones)
         # #1116 (the decider, 2026-11-21 ~19h): no transcript yet, the who-spoke area keeps no blank height — one line says
-        # when it will appear (an empty state says what will come, NN/g), in the soft colour.
-        later = ("const d = document.querySelector('#meeting .drawing'), p = document.getElementById('who-spoke-later');"
-                 " if (!d || !p) return null; const s = getComputedStyle(p);"
-                 " return {text: p.textContent, inside: d.contains(p),"
-                 " height: Math.round(d.getBoundingClientRect().height), line: Math.round(parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.45)}")
+        # when it will appear (an empty state says what will come, NN/g), in the soft colour. #1134: the line stands in the
+        # who-spoke card, never in the drawing, which is the player's slider once the sound plays.
+        later = ("const c = document.querySelector('#meeting .drawn'), d = document.querySelector('#meeting .drawing'),"
+                 " p = document.getElementById('who-spoke-later'); if (!c || !p) return null;"
+                 " return {text: p.textContent, card: c.contains(p), drawing: d ? Math.round(d.getBoundingClientRect().height) : 0}")
         no_blank = browser.execute_script(later)
-        check("no transcript yet: one line says when who spoke will appear, the area no taller than that line (#1116)",
-              no_blank is not None and no_blank["text"] == "Le temps de parole s’affichera après la transcription." and no_blank["inside"]
-              and no_blank["height"] <= no_blank["line"] + 24, no_blank)
-        # A legend names what is drawn: with nothing drawn yet, « Vous — votre micro » / « Les autres — … » are not shown;
-        # the range stays, the player's (the coordinator, 2026-11-21).
-        named = browser.execute_script("return [...document.querySelectorAll('#meeting .legend .here, #meeting .legend .remote')].filter(e => e.getClientRects().length).length")
-        ranged = browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? ''")
-        check("no transcript yet: the legend's two names not shown, its range kept (#1116)", named == 0 and "–" in ranged, [named, ranged])
+        check("no transcript yet: one line says when who spoke will appear, in the who-spoke card, no blank canvas (#1116, #1134)",
+              no_blank is not None and no_blank["text"] == "Le temps de parole s’affichera après la transcription." and no_blank["card"]
+              and no_blank["drawing"] <= 24, no_blank)
+        # #1134: its sound playable, the player is offered, its slider a bare track: a slider's children are presentational
+        # (WAI-ARIA 1.2), so the line said outside it, and a press on the line no seek.
+        # Its target and its rail read each on its own element (2.5.8): the slider's box, at least 24 px; the rail drawn in it,
+        # its ::before, 4 to 8 px — a rail not drawn reads 0 (cc98fad: a 6 px height eaten by border-box padding, i-v1138ok).
+        bare = ("const s = document.querySelector('#meeting [role=slider]'), p = document.getElementById('who-spoke-later');"
+                " return {slider: !!s, play: !!document.getElementById('play'), line_in: !!(s && p && s.contains(p)),"
+                " text: s ? s.textContent.trim() : null, height: s ? Math.round(s.getBoundingClientRect().height) : 0,"
+                " rail: s ? Math.round(parseFloat(getComputedStyle(s, '::before').height) || 0) : 0,"
+                " width: s ? Math.round(s.getBoundingClientRect().width) : 0}")
+        track = browser.execute_script(bare)
+        check("no transcript yet, its sound playable: the player offered, its slider a bare rail of 4 to 8 px in a 24 px target, the line outside it (#1134)",
+              track["slider"] and track["play"] and not track["line_in"] and track["text"] == "" and track["height"] >= 24 and 4 <= track["rail"] <= 8 and track["width"] >= 200, track)
+        # A legend names and scales what is drawn: nothing drawn yet, no legend — the header says the meeting's length (#1134).
+        legends = browser.execute_script("return [...document.querySelectorAll('#meeting .legend')].filter(e => e.getClientRects().length).map(e => e.textContent)")
+        check("no transcript yet: no legend, nothing drawn to name or to scale (#1134)", legends == [], legends)
         size = browser.get_window_size()
         for width in (420, 1100):
             browser.set_window_size(width, 800)
@@ -8083,11 +8104,14 @@ def renaming(now: dt.datetime) -> None:
                "presses reaching the button": [clicks, browser.execute_script("return window.__recordClicks")],
                "pressed, seconds after the start's press": after_start,
                "session.json": (recording / "session.json").read_text()})
-        # #1076: once it stops, the page leaves the live time and meters for the meeting's range, its poll ended.
-        settled = wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
-            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 10)
-        check("stopped: the page shows the meeting's range again, no live time nor meters (#1076)", settled,
-              [browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
+        # #1076: once it stops, the page leaves the live time and meters for its rest, its poll ended: the meeting's range,
+        # or, with no transcript yet, the line saying when who spoke will appear (#1134: no legend while nothing is drawn).
+        resting = ("return document.querySelector('#meeting .legend .range')?.textContent"
+                   " ?? document.getElementById('who-spoke-later')?.textContent ?? ''")
+        at_rest = lambda b: "–" in b.execute_script(resting) or bool(b.find_elements(By.ID, "who-spoke-later"))
+        settled = wait_for(browser, lambda b: b.execute_script(alive) is None and at_rest(b), 10)
+        check("stopped: the page at rest again, its range or its line before a transcript, no live time nor meters (#1076, #1134)", settled,
+              [browser.execute_script(alive), browser.execute_script(resting)])
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
         check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
@@ -8146,10 +8170,9 @@ def renaming(now: dt.datetime) -> None:
               got_tracked)
         time.sleep(0.8)
         browser.execute_script("window.__TAURI__.core.invoke('record')")
-        drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and "–" in b.execute_script(
-            "return document.querySelector('#meeting .legend .range')?.textContent ?? ''"), 5)
-        check("stopped from elsewhere, the window's button not pressed: the page draws its range back by itself (#1076)", drawn_back,
-              [again, live_again, browser.execute_script(alive), browser.execute_script("return document.querySelector('#meeting .legend .range')?.textContent ?? null")])
+        drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and at_rest(b), 5)
+        check("stopped from elsewhere, the window's button not pressed: the page draws its rest back by itself (#1076, #1134)", drawn_back,
+              [again, live_again, browser.execute_script(alive), browser.execute_script(resting)])
 
 
 def actions_rows(now: dt.datetime) -> None:
