@@ -1062,8 +1062,8 @@ fn a_confidential_meeting_s_words_are_said_in_both_languages_french_typeset_as_f
         (english.confidential_left_sound, 1),
         (french.confidential_left_transcript, 1),
         (english.confidential_left_transcript, 1),
-        (french.confidential_fetch, 1),
-        (english.confidential_fetch, 1),
+        (french.minutes_fetch_then, 1),
+        (english.minutes_fetch_then, 1),
     ] {
         assert_eq!(said.matches("{}").count(), holes, "{said}");
     }
@@ -1240,7 +1240,7 @@ const STILL_WRONG: &str = include_str!("words_still_wrong.txt");
 
 /// The sentences still without their comment, counted: 602 keys would be three review budgets.
 /// The number only goes down, as the list does.
-const WITHOUT_COMMENT: usize = 193;
+const WITHOUT_COMMENT: usize = 12;
 
 /// A sentence of `src/words.rs`, as the file arranges it.
 #[derive(Debug)]
@@ -1798,7 +1798,9 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
             "Ollama ne répond pas ou n’a aucun modèle. Lancez Ollama, puis téléchargez un modèle.",
         ),
         (french.key, "Clé d’API"),
-        (french.agree_local_write, "Rédiger ici"),
+        (french.agree_local_write, "Rédiger le compte rendu ici"),
+        // #933: a button that starts a making names it, as D113's Refaire… does.
+        (french.agree_local, "Rédiger plutôt le compte rendu sur cet ordinateur"),
     ] {
         assert_eq!(said, wanted);
     }

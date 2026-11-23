@@ -535,18 +535,18 @@ function paintState(said, shown, of) {
     }
   } else if (shown.kind === "model") {
     if (shown.coming) said.replaceChildren(element("span", "what", words.transcript_model_coming));
-    else said.replaceChildren(element("span", "what", words.transcript_model_needed), modelFetch(shown.busy));
+    else said.replaceChildren(element("span", "what", words.transcript_model_needed), modelFetch(shown.busy, words.transcript_fetch_then));
   } else if (shown.kind === "ollama") {
     // Silent: said where to get it, and tried again on a click; holding none: its model offered,
     // as Settings offer it — once it is there, the minutes are made.
     if (shown.silent) {
-      const again = element("button", "open", words.try_again);
+      const again = element("button", "open", of.try_again);
       again.type = "button";
       again.id = of.again;
       again.addEventListener("click", () => askAgain(of, said, again));
       said.replaceChildren(element("span", "what", words.welcome_ollama_silent), again);
     } else {
-      const fetch_ = element("button", "open", fill(words.confidential_fetch, makings.ollama_recommended));
+      const fetch_ = element("button", "open", fill(words.minutes_fetch_then, makings.ollama_recommended));
       fetch_.type = "button";
       fetch_.id = "ollama-fetch";
       fetch_.disabled = shown.busy;
@@ -563,7 +563,7 @@ function paintState(said, shown, of) {
     agree.href = `#/agree/${said.dataset.name}`;
     said.replaceChildren(element("span", "what", fill(words.minutes_awaiting, shown.host)), agree);
   } else {
-    const again = element("button", "open", words.try_again);
+    const again = element("button", "open", of.try_again);
     again.type = "button";
     again.id = of.again;
     again.addEventListener("click", () => askAgain(of, said, again));
@@ -576,8 +576,9 @@ function paintState(said, shown, of) {
 }
 
 // The tray's own fetch of the default model, offered where the window says it is missing (D36).
-function modelFetch(busy = false) {
-  const fetch_ = element("button", "open", fill(words.model_offer, size(makings.model_offer_bytes, words), makings.model_offer_host));
+// On a meeting's page it names what follows, the transcript (#933); in Settings, the download alone.
+function modelFetch(busy = false, said = words.model_offer) {
+  const fetch_ = element("button", "open", fill(said, size(makings.model_offer_bytes, words), makings.model_offer_host));
   fetch_.type = "button";
   fetch_.id = "model-fetch";
   fetch_.disabled = busy;
@@ -670,10 +671,19 @@ function paintMakings() {
   const minutes = document.getElementById("minutes-state");
   if (minutes) {
     paintState(minutes, minutesState(minutes.dataset.name), {
-      offer: "make-minutes", again: "minutes-again", ask: "minutes_again", making: words.minutes_making, stopped: words.minutes_stopped,
+      offer: "make-minutes", again: "minutes-again", try_again: words.minutes_try_again, ask: "minutes_again", making: words.minutes_making, stopped: words.minutes_stopped,
       // The minutes kept (#772): the redo failed, the ones shown are those before it.
       not_made: minutes.dataset.kept === "true" ? words.minutes_redo_failed : words.minutes_not_made,
     });
+  }
+  // The summary not written to the export folder, or a confidential meeting's never (D109, D60).
+  const exported = document.getElementById("export-said");
+  if (exported) {
+    const failed = makings?.not_exported.includes(exported.dataset.name);
+    const kept = makings?.export && exported.dataset.confidential === "true";
+    const text = failed ? words.export_failed : kept ? words.export_confidential : "";
+    if (exported.textContent !== text) exported.textContent = text;
+    exported.hidden = text === "";
   }
   // No line corrected while the transcript is made or waits to be (D62): its pencils hidden.
   for (const pencil of document.querySelectorAll("#meeting .lines .edit")) {
@@ -685,7 +695,7 @@ function paintMakings() {
   const transcript = document.getElementById("transcript-state");
   if (transcript) {
     paintState(transcript, transcriptState(transcript.dataset.name), {
-      offer: "make-transcript", again: "transcript-again", ask: "transcript_again", making: words.transcript_making, not_made: words.transcript_not_made, stopped: words.transcript_stopped,
+      offer: "make-transcript", again: "transcript-again", try_again: words.transcript_try_again, ask: "transcript_again", making: words.transcript_making, not_made: words.transcript_not_made, stopped: words.transcript_stopped,
     });
   }
   paintContext();
@@ -1778,6 +1788,14 @@ function minutesCard(read, words, session, transcript, onPage) {
   state.setAttribute("role", "status");
   state.hidden = true;
   card.append(state);
+  // Whether its summary went to the export folder too (D109): said when it did not, painted below.
+  const exported = element("p", "note warn");
+  exported.id = "export-said";
+  exported.dataset.name = nameOf(session);
+  exported.dataset.confidential = String(!!session.confidential);
+  exported.setAttribute("role", "status");
+  exported.hidden = true;
+  card.append(exported);
   if (read.state !== "present") {
     card.append(element("p", "none", read.state === "absent" ? words.no_minutes : words.unreadable));
     if (read.state === "absent" && transcript.state === "present" && transcript.complete) {
@@ -3892,6 +3910,57 @@ function showSettings(shown, minutes, words) {
     if (chosen !== null) save({ sessions: chosen });
   });
   where.append(whereSaid, folderShown, path, choose);
+  // Every new summary written to a folder too (D109), typed or chosen as the meetings' folder is;
+  // none, nowhere else. « Ne plus exporter » forgets it.
+  const exporting = element("div", "row folder");
+  const exportSaid = element("label", "said");
+  exportSaid.htmlFor = "export-folder";
+  exportSaid.id = "export-label";
+  const exportHelp = element("span", "says", words.export_folder[1]);
+  exportHelp.id = "export-help";
+  exportSaid.append(element("span", "name", words.export_folder[0]), exportHelp);
+  const exportPath = element("input");
+  exportPath.id = "export-folder";
+  exportPath.type = "text";
+  exportPath.value = shown.export_said ?? "";
+  exportPath.disabled = locked;
+  exportPath.spellcheck = false;
+  exportPath.hidden = true;
+  const exportAs = (shown.export_said ?? "").replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
+  const exportShown = element(
+    "button",
+    "path",
+    shown.export_said === null ? words.export_none : shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs,
+  );
+  exportShown.type = "button";
+  exportShown.id = "export-shown";
+  exportShown.setAttribute("aria-labelledby", "export-label export-shown");
+  exportShown.disabled = locked;
+  exportShown.addEventListener("click", () => {
+    exportShown.hidden = true;
+    exportPath.hidden = false;
+    exportPath.focus();
+    exportPath.select();
+  });
+  exportPath.addEventListener("change", () => save({ export: exportPath.value.trim() }));
+  exportPath.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") exportPath.blur();
+  });
+  const exportChoose = element("button", "open", words.choose);
+  exportChoose.type = "button";
+  exportChoose.id = "choose-export";
+  exportChoose.disabled = locked;
+  exportChoose.addEventListener("click", async () => {
+    const chosen = await window.__TAURI__.core.invoke("choose_folder");
+    if (chosen !== null) save({ export: chosen });
+  });
+  const exportStop = element("button", "open", words.export_stop);
+  exportStop.type = "button";
+  exportStop.id = "export-stop";
+  exportStop.disabled = locked;
+  exportStop.hidden = shown.export_said === null;
+  exportStop.addEventListener("click", () => save({ export: "" }));
+  exporting.append(exportSaid, exportShown, exportPath, exportChoose, exportStop);
   // The shortcut: the desktop's to grant and to change; the page says which keys, and where.
   const keys = element("div", "row");
   const keysSaid = element("span", "said");
@@ -3964,7 +4033,7 @@ function showSettings(shown, minutes, words) {
   // Outside Windows' package, no startup task: nothing offered (D84).
   more.append(speaks, looks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
   // What becomes of a recording: where it goes and how long its sound stays, after what is made.
-  after.append(where, keep, sending);
+  after.append(where, exporting, keep, sending);
 
   // Last, for whoever looks into a failure: the developer mode (D29), folded at the bottom of
   // « Général » (D95) — a disclosure (ARIA APG), as the redo panel's « Avancé ».
@@ -4060,7 +4129,8 @@ function showAgreement(name, agreement, words, session) {
     const said = element("div", "");
     said.append(element("strong", "", title), element("span", "says", fill(says, ...values)));
     const sign = element("span", "sign");
-    sign.append(icon(mark === "leaves" ? "arrow-right" : "x"));
+    // What stays, Confidentielle's lock: one meaning everywhere, it stays on this computer (#1114, the decider).
+    sign.append(icon(mark === "leaves" ? "arrow-right" : "lock"));
     line.append(sign, said);
     return line;
   };
@@ -4875,6 +4945,8 @@ function showSmall(words) {
     }
     if (heard?.kind === "stopped" || minutes?.kind === "stopped") return { said: words.bar_last_stopped, open: true };
     if (minutes) return { said: words.bar_last_summary };
+    // Written, but not to the export folder (D109): said as its page says it.
+    if (makings?.not_exported.includes(last.name)) return { said: words.bar_last_failed, why: words.export_failed, open: true };
     return { said: words.bar_last_ready, open: true };
   };
   // Painted with each reading of the makings, and as a recording starts or ends (`recording`, below).

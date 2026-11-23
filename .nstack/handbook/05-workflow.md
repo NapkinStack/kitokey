@@ -113,6 +113,11 @@ is in the automation backlog. It covers:
 These values are starting points to calibrate, not truths. The principle matters more
 than the number: **the batch must be reviewable in one session of attention**.
 
+`nstack pr-scope` leaves out lock files and generated names (`*.generated.*`, `generated/`, the
+skills), and every path the project's `.gitattributes` marks `linguist-generated` (any value but
+`false`), which GitHub also folds in its diffs. A tool's output that no name gives away is declared there, as the licence notices a
+dependency tool writes; the line that declares it is in the diff a reviewer reads.
+
 **Going over.** The check reports, it does not block automatically (except for modules
 touched, where it does block). A justified overrun — code generation, a mechanical
 migration, a mass rename — goes through an explicit label. What matters is that the
@@ -349,7 +354,8 @@ the change, and the stricter applies:
     checks` run catches what was missed once it runs that module. A commit with no passing record
     of its own is the case to know: `pr-check`'s T4 says so — `nstack attest` with that commit checked out, and
     its rows stand without running them again —, as it says a digest that differs or a run past
-    its bound;
+    its bound. The forge's run, made at the push, comes before the head's record: where the
+    ruleset requires `nstack / local checks`, it leaves a row that waits only for the head's record to that status, and says so;
   - one **explored** by hand keeps the commit its evidence was produced on, and the verifier
     adds a **`Confirmed`** column on the head commit saying **what moved since and why it leaves
     the result standing**. Reading three fixes is not the same work as driving six scenarios
