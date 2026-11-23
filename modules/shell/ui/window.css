@@ -252,6 +252,11 @@ select:hover, select:focus { border-color: var(--edge); }
 .fields > .disclose-advanced { justify-content: flex-start; }
 /* The destinations' add form (D110): apart from the list above it, the address on its own line. */
 .fields.adding { padding-top: 14px; border-top: 1px solid var(--line); }
+/* …a part of « Après un enregistrement » (D95's three groups), its heading as the redo panel's, its
+   disclosure on a line of its own. */
+.sending { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
+.sending h3 { margin: 0; font-size: 15px; }
+.sending > .disclose-advanced { align-self: flex-start; }
 .fields > .field.whole { flex-basis: 100%; }
 .tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); }
 .path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; }

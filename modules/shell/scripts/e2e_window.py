@@ -5220,10 +5220,24 @@ def destinations_kept(now: dt.datetime) -> None:
     window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\n')
     with window as browser:
         browser.execute_script("location.hash = '#/settings'")
-        drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "destination-add"), 10)
-        card = "const b = document.getElementById('destination-add'); const c = b && b.closest('section.card'); return c ? c.querySelector('h2').textContent : null"
-        check("Settings offer a card where a destination is added (D110)", drawn and browser.execute_script(card) == "Envoi des comptes rendus",
+        drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
+        # A part of « Après un enregistrement », not a group of its own: Settings keep their three (D95).
+        card = ("const b = document.getElementById('destination-open'); const p = b && b.closest('.sending'); const c = b && b.closest('section.card');"
+                " return p && c ? [c.querySelector('h2').textContent, p.querySelector('h3').textContent] : null")
+        check("Settings offer, in « Après un enregistrement », a part where a destination is added (D110, D95)",
+              drawn and browser.execute_script(card) == ["Après un enregistrement", "Envoi des comptes rendus"],
               browser.execute_script(card) if drawn else None)
+        # Folded at first, no address asked (E5); unfolded by its button (ARIA APG Disclosure), the focus in its first field.
+        folded = ("const o = document.getElementById('destination-open'), a = document.getElementById('destination-address');"
+                  " return [o.getAttribute('aria-expanded'), o.getAttribute('aria-controls'), a.getClientRects().length > 0, document.activeElement.id]")
+        before = browser.execute_script(folded) if drawn else None
+        if drawn:
+            press(browser, "destination-open")
+        opened = drawn and wait_for(browser, lambda b: b.execute_script(folded)[0] == "true", 5)
+        after = browser.execute_script(folded) if drawn else None
+        check("folded at first, no address shown; « Ajouter une destination » unfolds it, the focus in its first field (E5, ARIA APG)",
+              before is not None and before[:3] == ["false", "destination-adding", False]
+              and opened and after == ["true", "destination-adding", True, "destination-kind"], (before, after))
         rows = "return [...document.querySelectorAll('#destinations li')].map(li => li.innerText)"
         check("none yet: the card says so", drawn and browser.execute_script(rows) == []
               and "Aucune destination" in browser.find_element(By.ID, "destinations-said").text, browser.execute_script(rows) if drawn else None)

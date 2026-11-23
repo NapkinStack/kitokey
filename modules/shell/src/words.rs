@@ -829,11 +829,11 @@ pub struct Window {
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, its heading; and a step's «
     /// Avancé » in Settings, « Modèles ». When: always. At most: one line. Placeholders: none.
     pub advanced_title: &'static str,
-    /// Settings' card of the destinations a summary can be sent to (D110, PDR-0007), its heading.
-    /// Shows: Settings, a heading. When: always. At most: a few words. Placeholders: none.
+    /// The part of « Après un enregistrement » holding the destinations a summary can be sent to
+    /// (D110, PDR-0007), its heading. Shows: Settings, a sub-heading. When: always. At most: a few words. Placeholders: none.
     pub destinations_title: &'static str,
     /// Under that heading: what the card is for, and that nothing leaves without a gesture.
-    /// Shows: Settings, « Envoi des comptes rendus », secondary text. When: always. At most: two lines.
+    /// Shows: Settings, « Après un enregistrement », « Envoi des comptes rendus », secondary text. When: always. At most: two lines.
     /// Placeholders: none.
     pub destinations_said: &'static str,
     /// The same card with no destination yet. Shows: Settings, in place of the list. When: none is
@@ -852,6 +852,10 @@ pub struct Window {
     /// The button that adds it. Shows: Settings, a button. When: always. At most: one word.
     /// Placeholders: none.
     pub destination_add: &'static str,
+    /// The disclosure that unfolds the form adding a destination, folded at first (E5: no address
+    /// asked in the common case). Shows: Settings, « Envoi des comptes rendus », a button. When:
+    /// always. At most: three words. Placeholders: none.
+    pub destination_open: &'static str,
     /// Each destination's button that forgets it, its address out of the keychain. Shows: Settings,
     /// a button on each row. When: a destination is set up. At most: one word. Placeholders: none.
     pub destination_forget: &'static str,
@@ -1912,6 +1916,7 @@ pub fn window(language: Language) -> Window {
             destination_fields: ["Kind", "Name", "Webhook address"],
             destination_address_said: "Paste the channel’s webhook address. It’s kept in your system keychain and never shown in full again.",
             destination_add: "Add",
+            destination_open: "Add a destination",
             destination_forget: "Remove",
             destination_added: "Destination {} added.",
             destination_not_added: "Destination not added: {}",
@@ -2365,6 +2370,7 @@ pub fn window(language: Language) -> Window {
             destination_fields: ["Type", "Nom", "Adresse du webhook"],
             destination_address_said: "Collez l’adresse du webhook du canal. Elle est gardée dans le trousseau du système et n’est plus jamais affichée en entier.",
             destination_add: "Ajouter",
+            destination_open: "Ajouter une destination",
             destination_forget: "Supprimer",
             destination_added: "Destination {} ajoutée.",
             destination_not_added: "Destination non ajoutée\u{a0}: {}",

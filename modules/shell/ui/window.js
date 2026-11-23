@@ -2812,6 +2812,9 @@ let testing = false;
 let generalAdvanced = false;
 // « Modèles à télécharger » unfolded by the user, kept over the page's drawings (#782).
 let offeredOpen = false;
+// The form adding a destination unfolded (D110): folded at first, no address asked in the common
+// case (E5); kept while Settings are drawn again, as a destination added redraws them.
+let destinationOpen = false;
 // Each guided path's own (D95), the summary's and the transcription's: « Avancé » unfolded, kept
 // while Settings are drawn again; each service's last answer to « Vérifier la clé », by its place
 // in the list — what it refused, or the models it listed —, and where and which service chosen,
@@ -3254,11 +3257,12 @@ function showSettings(shown, minutes, words) {
   }
   parts.push(after);
 
+  // Where a summary can be sent (D110, PDR-0007), a part of « Après un enregistrement » — Settings keep
+  // their three groups (D95): each destination by its name, its kind, and its address as its host and
+  // the end of its path — never whole; one added is judged before it is kept.
+  const sending = element("div", "sending");
   {
-    // Where a summary can be sent (D110, PDR-0007): each destination by its name, its kind, and its
-    // address as its host and the end of its path — never whole; one added is judged before it is kept.
-    const sending = element("section", "card group");
-    sending.append(element("h2", "", words.destinations_title), element("p", "says", words.destinations_said));
+    sending.append(element("h3", "", words.destinations_title), element("p", "says", words.destinations_said));
     const kinds = { webhook: 0, discord: 1, slack: 2 };
     const kept = element("ul", "lines");
     kept.id = "destinations";
@@ -3283,6 +3287,7 @@ function showSettings(shown, minutes, words) {
     // The add form apart from the list, its fields the Settings' own (guidedField, guidedList); the
     // address on a whole line, long enough to read back what was pasted.
     const adding = element("div", "fields adding");
+    adding.id = "destination-adding";
     const [kindField, kind] = guidedList("destination-kind", words.destination_fields[0], locked);
     for (const [value, index] of Object.entries(kinds)) guidedOption(kind, value, words.destination_kinds[index]);
     const [namedField, named] = guidedField("destination-name", words.destination_fields[1], "text", "", locked);
@@ -3329,8 +3334,25 @@ function showSettings(shown, minutes, words) {
       add,
       result,
     );
-    sending.append(kept, none, adding);
-    parts.push(sending);
+    // Folded at first: a disclosure (ARIA APG), as « Avancé »; unfolded by a click, the focus goes to
+    // its first field. Escape does not fold it: a half-filled form is not lost by a key.
+    const opening = element("button", "disclose-advanced");
+    opening.type = "button";
+    opening.id = "destination-open";
+    opening.setAttribute("aria-controls", "destination-adding");
+    opening.append(icon("chevron-right"), element("span", "", words.destination_open));
+    const unfoldAdding = (now) => {
+      destinationOpen = now;
+      opening.setAttribute("aria-expanded", String(now));
+      opening.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
+      adding.hidden = !now;
+    };
+    opening.addEventListener("click", () => {
+      unfoldAdding(!destinationOpen);
+      if (destinationOpen) kind.focus();
+    });
+    unfoldAdding(destinationOpen);
+    sending.append(kept, none, opening, adding);
   }
 
   const models = element("section", "card group");
@@ -3942,7 +3964,7 @@ function showSettings(shown, minutes, words) {
   // Outside Windows' package, no startup task: nothing offered (D84).
   more.append(speaks, looks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
   // What becomes of a recording: where it goes and how long its sound stays, after what is made.
-  after.append(where, keep);
+  after.append(where, keep, sending);
 
   // Last, for whoever looks into a failure: the developer mode (D29), folded at the bottom of
   // « Général » (D95) — a disclosure (ARIA APG), as the redo panel's « Avancé ».
