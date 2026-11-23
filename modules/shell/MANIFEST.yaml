@@ -80,6 +80,10 @@ consumes:
   - contract: posting
     version: v1
     module: send
+  # D109: `kitokey-export` writes each summary to the folder chosen in Settings.
+  - contract: exporting
+    version: v1
+    module: export
 #  - contract: identity-api
 #    version: v1
 #    module: identity
