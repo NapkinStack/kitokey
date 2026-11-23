@@ -1,5 +1,5 @@
 """Run on Windows by scripts/release.sh: Kitokey-<version>-windows-x64.zip from the artefacts
-each module's release left — the four programs side by side in one folder, where the shell looks
+each module's release left — the five programs side by side in one folder, where the shell looks
 for them (D53). No installer, no signature: the colleague unpacks it and opens kitokey.exe; the
 Store's package is msix.py's (D54).
 
@@ -9,12 +9,17 @@ import os
 import sys
 import zipfile
 
+import notices as owed
+
 PROGRAMS = ("shell/kitokey.exe", "capture/kitokey-capture.exe",
-            "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe")
+            "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe", "export/kitokey-export.exe")
 
 artefacts, version, out = sys.argv[1:4]
 path = os.path.join(out, f"Kitokey-{version}-windows-x64.zip")
 with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
     for program in PROGRAMS:
         archive.write(os.path.join(artefacts, program), f"Kitokey/{program.split('/')[1]}")
+    # What the programs owe the authors of what they ship, beside them (D102).
+    for source, name in owed.files(artefacts):
+        archive.write(source, f"Kitokey/{name}")
 print(path)
