@@ -2,8 +2,8 @@
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
-- **Status**: Accepted — by the decider's approval of the framing pull request (#1143), 2026-11-23; proposed by
-  sam (session wholeheard-sam-a2), framer of D114, the same day
+- **Status**: Accepted by the decider with D114's framing (#1143), 2026-11-23; proposed by sam (session
+  wholeheard-sam-a2), framer of D114, the same day
 - **Date**: 2026-11-23
 - **Decision makers**: the decider, `@napkinstack-admin`; the host decided by them, 2026-11-23
 - **Scope**: module `site` — its creation, its stack, its host, its criticality
