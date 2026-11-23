@@ -11717,7 +11717,8 @@ def window_looks(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{made.name}'")
         wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
         # The trial over (D83): buying holds it in the recording's place, then gives it back.
-        swapped = [browser.execute_script(f"paintRefused({state}); return arguments[0]", None) or browser.execute_script(PRIMARIES) for state in ("true", "false")]
+        # #1147: read past one header poll (1.5 s): the page shows what the shell says, not what was painted.
+        swapped = [browser.execute_script(f"paintRefused({state}); return arguments[0]", None) or time.sleep(1.6) or browser.execute_script(PRIMARIES) for state in ("true", "false")]
         check("the trial over, one primary still: « Acheter Kitokey », then the recording's again", swapped == [["buy"], ["record"]], swapped)
         for theme in ("light", "dark"):
             shot_themed(browser, f"d69-full-{theme}", theme)
