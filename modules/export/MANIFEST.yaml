@@ -90,6 +90,14 @@ dependencies:
     purpose: Reads the session's started, the transcript's lines, the minutes' quoted values; writes front matter values
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
     exit_strategy: Meeting::read and markdown in src/lib.rs; any JSON library replaces it.
+  - name: cargo-about
+    purpose: >-
+      Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
+      never run by a build or a release (D102)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >-
+      Its output is a committed HTML page, about.hbs its template; any generator that lists the
+      crates with their licence texts replaces it, and tests/notices.rs judges the result.
 #  - name:
 #    purpose:
 #    adr:
@@ -100,8 +108,9 @@ dependencies:
 # No stack is imposed. check and test are required once the module holds more than its
 # description (fitness M7): declare them before its first file of code.
 commands:
-  check: cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
+  check: bash -n scripts/release.sh && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
   test: cargo test --locked
+  release: bash scripts/release.sh
 #  bootstrap:                    # optional: make the module usable from a fresh clone
 #  run:                          # optional: local start, with doubles for the dependencies
 #  e2e:                          # optional: end-to-end scenarios; evidence written to .evidence/

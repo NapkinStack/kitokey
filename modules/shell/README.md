@@ -62,7 +62,7 @@ desktop's tools leave it (`Hidden`, `X-GNOME-Autostart-enabled`). `autostart` in
 file says Kitokey wrote it once: turned off, it is never written again by itself.
 
 **On Windows** (D84), the package declares a startup task, `KitokeyStartupTask` (`install`'s
-manifest), that Windows turns on at the first start; nothing is written under
+manifest), off until the user turns it on with Settings' switch (#1085); nothing is written under
 `AppData\Roaming\autostart`. The same switch reads and changes the task through `StartupTask`
 (`src/autostart.rs`): turned off by the user in Windows' Startup settings, or set by a policy, it is
 shown as Windows holds it, disabled, with the sentence saying why. The zip has no task: the switch
@@ -383,6 +383,16 @@ keyboard, without which GTK is never told it has the focus. Missing GNOME Shell,
 extension or PipeWire, it says `NOT RUN`. `bash scripts/e2e.sh` alone still runs on the desktop
 itself — the tray, the notifications and the window shown, the run's microphone made the
 system's default meanwhile — for whoever wants to watch it: quit Kitokey first.
+
+## What it owes its crates' authors
+
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links under its licence's text, then what the window draws that is no crate —
+Lucide's icons (`ui/LUCIDE-LICENSE`) and Montserrat's outlines in its name (`ui/MONTSERRAT-OFL.txt`).
+It is made with cargo-about from `about.toml`, whose `accepted` list refuses any other licence, GPL
+among them, and `about.hbs`, which holds the two files' texts; it is committed, and
+`tests/notices.rs` is red once it no longer names the crates the program links, or no longer holds
+either file as written. `about.toml`'s header gives the two commands that make it again.
 
 ## Contracts
 

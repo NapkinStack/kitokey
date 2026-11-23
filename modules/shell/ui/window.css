@@ -5,6 +5,8 @@
   --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
   /* A field's, a list's, a switch's border, 3:1 on each ground (D89); --line divides, and only that. */
   --edge: #808898;
+  /* A secondary button hovered, then pressed (#1094): a step darker each, the ink still at 4.5:1. */
+  --hover: #E3E7EE; --pressed: #D9DDE5;
   /* The word a search found (#1078): a pale yellow, as find-in-page marks it (browsers, GNOME, macOS), under the
      ink; seen on a selected row by its edge, the ink's 2 px underline; in dark the amber is its own edge
      (#1093, tests/look.rs). */
@@ -14,7 +16,7 @@
   :not([data-theme="light"]):root {
     --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
     --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
-    --edge: #737B8C; --mark: #FBBF24; --mark-ink: #1E2129; --mark-edge: #FBBF24;
+    --edge: #737B8C; --mark: #FBBF24; --mark-ink: #1E2129; --mark-edge: #FBBF24; --hover: #313644; --pressed: #3A4050;
   }
 }
 /* The appearance chosen in Settings (D98): light or dark whatever the system says — the same two
@@ -24,7 +26,7 @@
   color-scheme: dark;
   --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
   --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
-  --edge: #737B8C; --mark: #FBBF24; --mark-ink: #1E2129; --mark-edge: #FBBF24;
+  --edge: #737B8C; --mark: #FBBF24; --mark-ink: #1E2129; --mark-edge: #FBBF24; --hover: #313644; --pressed: #3A4050;
 }
 * { box-sizing: border-box; }
 ::placeholder { color: var(--soft); opacity: 1; }
@@ -81,10 +83,17 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .menu-item:hover, .menu-item:focus { background: var(--raised); }
 .back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }
 /* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
-.open, .search { min-height: 32px; border-radius: 8px; border: 1px solid var(--edge); background: var(--raised); color: var(--ink); font: inherit; font-size: 14px; }
-.open { padding: 0 12px; font-weight: 600; cursor: pointer; }
-/* A field is drawn on the surface, only edged (board 2's after); a button is raised. */
-.search { padding: 0 12px; min-width: 200px; background: var(--surface); }
+.open, .search { min-height: 32px; border-radius: 8px; border: 1px solid; color: var(--ink); font: inherit; font-size: 14px; }
+/* A secondary action (#1094): on the raised ground, on the line, its bottom edged at 3:1 as Windows 11's
+   controls are — a signifier at rest —, a step darker under the pointer, another pressed; the one
+   primary of a view stays the filled accent. */
+.open { padding: 0 12px; font-weight: 600; cursor: pointer; border-color: var(--line); border-bottom-color: var(--edge); background: var(--raised); }
+.open:hover { background: var(--hover); }
+.open:active { background: var(--pressed); }
+/* A field is drawn on the surface (board 2's after); a secondary button on the raised ground. */
+.search { padding: 0 12px; min-width: 200px; background: var(--surface); border-color: var(--line); border-bottom-color: var(--edge); }
+/* A field (#1094, Fluent 2's): on the line at rest, its bottom edge at 3:1; edged all round when reached. */
+.search:hover, .search:focus { border-color: var(--edge); }
 /* In the transcript's head, the search takes the room the title leaves, Refaire… at its right
    (D89, board 4). */
 .top > .finding { flex: 1 1 200px; max-width: 320px; margin-left: auto; }
@@ -174,6 +183,8 @@ mark { background: var(--mark); color: var(--mark-ink); box-shadow: inset 0 -2px
 #settings .group h2 { font-size: 17px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--ink); margin: 0; }
 .step { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--raised); }
 .step select, .step .open, .step input { background: var(--surface); }
+.step .open:hover { background: var(--hover); }
+.step .open:active { background: var(--pressed); }
 .status { margin: 0; font-size: 13.5px; color: var(--soft); display: flex; align-items: center; gap: 8px; }
 .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--soft); flex: none; }
 .status.here::before { background: var(--ok); }
@@ -181,7 +192,7 @@ mark { background: var(--mark); color: var(--mark-ink); box-shadow: inset 0 -2px
 .status.online::before { background: var(--accent); }
 #settings .group > .row + .row, .general-advanced > .row + .row { border-top: 1px solid var(--line); padding-top: 14px; }
 .picks { display: flex; gap: 8px; align-items: center; }
-.picks input { width: 96px; min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
+.picks input { width: 96px; min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid; border-color: var(--line); border-bottom-color: var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
 #settings .state { flex-direction: row; align-items: center; justify-content: space-between; }
 .ready { color: var(--ok); font-weight: 700; white-space: nowrap; }
 /* The models to download (D37): a row each, its state at its end. */
@@ -194,7 +205,8 @@ mark { background: var(--mark); color: var(--mark-ink); box-shadow: inset 0 -2px
 .said .name, .row > .name { font-weight: 600; }
 .says { color: var(--soft); font-size: 14px; margin: 0; }
 .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
-select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--ink); font: inherit; }
+select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid; border-color: var(--line); border-bottom-color: var(--edge); background: var(--surface); color: var(--ink); font: inherit; }
+select:hover, select:focus { border-color: var(--edge); }
 .warn { padding: 12px 16px; color: var(--ink); }
 /* The settings unreadable (#770): a strip above the page, its sentence and the way to Settings, as GNOME's banner. */
 .banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; margin: 16px 24px 0; padding: 12px 16px; border-radius: 12px; background: var(--raised); color: var(--ink); }
@@ -206,7 +218,7 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 .keys { padding: 6px 10px; border-radius: 8px; background: var(--raised); font: 13.5px ui-monospace, monospace; }
 .folder input { flex: 1 1 240px; min-width: 0; min-height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; }
 .folder input:hover, .folder input:focus { border-color: var(--edge); background: var(--ground); color: var(--ink); }
-.field input { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
+.field input { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid; border-color: var(--line); border-bottom-color: var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
 
 /* The agreement before a meeting first leaves (D11's fifth board). */
 #agree { align-items: center; }
@@ -238,6 +250,14 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 /* The summary's guided steps (D95): a step's sentence, its « Avancé » and its fields each on a line. */
 .fields > .fields, .fields > .says, .fields > .disclose-advanced { flex-basis: 100%; }
 .fields > .disclose-advanced { justify-content: flex-start; }
+/* The destinations' add form (D110): apart from the list above it, the address on its own line. */
+.fields.adding { padding-top: 14px; border-top: 1px solid var(--line); }
+/* …a part of « Après un enregistrement » (D95's three groups), its heading as the redo panel's, its
+   disclosure on a line of its own. */
+.sending { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
+.sending h3 { margin: 0; font-size: 15px; }
+.sending > .disclose-advanced { align-self: flex-start; }
+.fields > .field.whole { flex-basis: 100%; }
 .tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); }
 .path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; }
 .path:hover { border-color: var(--edge); color: var(--ink); }
@@ -260,6 +280,13 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 .drawn .legend .range { margin-left: auto; font: 12.5px ui-monospace, monospace; color: var(--soft); }
 /* The player (D26): the drawing is its control, a line marks where the playback is. */
 .drawn .drawing { position: relative; cursor: pointer; }
+/* Nothing drawn yet (#1134): the player's slider a bare track, as a scrubber; with no player, no track. */
+/* Its target 24 px high (WCAG 2.2, 2.5.8), taking the 14 px the 6 px rail took before; the rail drawn 6 px at its
+   centre, its own box; the playhead on the rail alone. */
+.drawn .drawing.bare { height: 24px; margin: -5px 0; }
+.drawn .drawing.bare::before { content: ""; position: absolute; left: 0; right: 0; top: 9px; height: 6px; border-radius: 3px; background: var(--edge); }
+.drawn .drawing.bare .playhead { top: 9px; bottom: 9px; }
+.drawn .drawing.bare:not([role="slider"]) { display: none; }
 .drawn .playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.7; pointer-events: none; }
 .drawn .player { display: flex; align-items: center; gap: 12px; }
 .drawn .player .at { font: 12.5px ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
@@ -273,11 +300,14 @@ select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px soli
 .lines .correcting { width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
 .corrected-since { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 8px; }
 .corrected-since .note { margin: 0; }
-.maker, .make-with { font: 12.5px ui-monospace, monospace; color: var(--soft); overflow-wrap: anywhere; }
+.maker, .make-with { font-size: 13px; color: var(--soft); overflow-wrap: anywhere; }
 .minutes > .primary, .transcript > .primary { align-self: flex-start; }
 /* A version's model, a list in its line (D93): the line's own size, a long name cut at the card's width,
    said whole in its tooltip; under the line, which model made the version, then the button that makes it again. */
-.maker .page-model, .make-with .page-model { min-height: 0; max-width: 100%; padding: 0 4px; border-radius: 6px; font: inherit; text-overflow: ellipsis; vertical-align: baseline; }
+.maker .page-model, .make-with .page-model { min-height: 0; max-width: 100%; padding: 0 4px; border-radius: 6px; font: inherit; text-overflow: ellipsis; vertical-align: baseline; appearance: none; -webkit-appearance: none; border-color: transparent; background: transparent; color: var(--ink); font-weight: 600; cursor: pointer; }
+/* A step's model on its line (#1094): a quiet list, its value and Lucide's chevron, a ground under the pointer. */
+.maker .page-model:hover, .make-with .page-model:hover { background: var(--raised); }
+.maker .chevron, .make-with .chevron { margin-left: -4px; color: var(--soft); pointer-events: none; }
 .made > .maker { min-width: 0; }
 .made > .note { flex-basis: 100%; }
 .page-redo { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -339,6 +369,20 @@ body.small-window .frame { display: none; }
 /* A thin meter for each side in the row (D90, board 5): its icon, a 4 px track; a side silent two
    minutes, or with nothing to record, dashed and its icon crossed, said in a grey line under the row. */
 #small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; margin-left: 8px; }
+/* A meeting's page while it records (#1076, #1112): in the who-spoke area, its time large at the centre, as Voice
+   Memos and Granola show a live meeting, the two sides' levels — the bar's meters — under it. */
+.live-now { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 100px; padding: 8px 0; }
+.live-time { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.2; }
+/* Two columns, each its meter over its label: the meter a block of its column's width and 4 px — never a flex item of
+   the column, whose basis would take its height (#1112, 3600377's shots). */
+.page-levels { display: flex; gap: 16px; width: min(100%, 480px); }
+.page-meter { flex: 1 1 0; min-width: 120px; display: flex; flex-direction: column; gap: 6px; }
+.page-meter > .page-level { display: block; flex: none; width: 100%; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+.page-level > .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }
+.page-level > .fill.remote { background: var(--ok); }
+.page-meter > .here, .page-meter > .remote { font-size: 14px; overflow-wrap: anywhere; }
+.page-meter > .here { color: var(--accent); }
+.page-meter > .remote { color: var(--ok); }
 #small .meter { display: flex; align-items: center; gap: 6px; color: var(--soft); }
 #small .meter .track { flex: 1 1 auto; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
 #small .meter .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }
@@ -474,8 +518,8 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 /* A meeting's settings (D89, board 4): one row of 32 px controls, their sentences under it. */
 .settings { display: flex; flex-direction: column; gap: 8px; }
 .settings-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.setting { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; min-width: 0; max-width: 100%; overflow: hidden; padding: 0 10px; border-radius: 8px; border: 1px solid var(--edge); background: var(--surface); color: var(--soft); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: pointer; }
-.setting:hover { background: var(--raised); }
+.setting { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; min-width: 0; max-width: 100%; overflow: hidden; padding: 0 10px; border-radius: 8px; border: 1px solid; border-color: var(--line); border-bottom-color: var(--edge); background: var(--surface); color: var(--soft); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: pointer; }
+.setting:hover { background: var(--raised); border-color: var(--edge); }
 .setting .value { min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-weight: 500; }
 .setting select { appearance: none; -webkit-appearance: none; min-width: 0; min-height: 0; max-width: 28ch; padding: 0 4px 0 0; border: 0; background: transparent; color: var(--ink); font-size: 13.5px; font-weight: 500; cursor: pointer; }
 .setting select:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
@@ -546,6 +590,8 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .sidebar .session .line { display: flex; align-items: flex-end; gap: 8px; }
 /* What a meeting holds, at its row's end: an icon each, 16 px (boards 2 and 4). */
 .marks { display: inline-flex; gap: 6px; color: var(--soft); font-size: 16px; line-height: 1; }
+/* Lighter than a control's glyph (#1094): a mark says what is there, it is not a button. */
+.marks .glyph { stroke-width: 1.75; }
 .sidebar .holds:not(:has(> :not([hidden]))) { display: none; }
 .sidebar .session .when { flex: 1 1 auto; }
 .sidebar .session .day { font-size: 14px; }
@@ -580,6 +626,7 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 /* An icon button has no border (GNOME HIG, header bars): its tooltip and its name say it (D89). */
 .icon-button { display: inline-grid; place-items: center; width: 32px; min-height: 32px; padding: 0; border-radius: 8px; border: 0; background: transparent; color: var(--soft); font-size: 16px; cursor: pointer; }
 .icon-button:hover { background: var(--raised); color: var(--ink); }
+.icon-button:active { background: var(--pressed); color: var(--ink); }
 .pane > #unfold { display: none; margin: 14px 0 0 16px; }
 @media (min-width: 840px) {
   body.folded .sidebar { display: none; }
@@ -651,7 +698,7 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .check-actions button { font-size: 13px; padding: 0 10px; white-space: nowrap; }
 .with-icon { display: inline-flex; align-items: center; gap: 8px; }
 .check-actions .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.check-actions .open:disabled { border-style: dashed; color: var(--soft); cursor: default; }
+.check-actions .open:disabled { border-style: dashed; border-color: var(--edge); color: var(--soft); cursor: default; }
 .check-note { margin-top: 12px; margin-bottom: 16px; font-size: 12.5px; color: var(--soft); }
 /* A meeting to the trash, asked in place under its page's actions (D100). */
 .trash-ask { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding: 14px 18px; }
