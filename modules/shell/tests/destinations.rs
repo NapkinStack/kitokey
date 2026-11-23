@@ -4,6 +4,10 @@
 
 use kitokey_shell::destinations::{self, Kind};
 
+/// The keyring's store is the process's own, and cargo runs a binary's tests side by side: a test that
+/// sets it holds this lock, or another's store replaces its own mid-test (the attest at 91e48ac).
+static KEYRING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn an_address_is_shown_as_its_host_and_the_end_of_its_path_never_whole() {
     let address = "https://hooks.example/services/T00/B00/made-up-secret-7f3a";
@@ -43,6 +47,7 @@ fn its_kind_is_one_the_posting_contract_names() {
 
 #[test]
 fn its_address_is_kept_in_the_keyring_by_its_name_never_by_a_host() {
+    let _keyring = KEYRING.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     keyring_core::set_default_store(keyring_core::mock::Store::new().unwrap());
     destinations::keep("#équipe", "https://hooks.example/made-up").unwrap();
     assert_eq!(
@@ -95,6 +100,7 @@ fn the_settings_file_keeps_each_destination_by_name_and_kind_and_never_its_addre
 fn a_name_already_kept_is_refused_its_address_untouched_and_one_removed_leaves_the_keyring_first() {
     // #1129: settings and keyring through the same two functions as the window's commands.
     use kitokey_shell::destinations::{Destination, NotAdded};
+    let _keyring = KEYRING.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     keyring_core::set_default_store(keyring_core::mock::Store::new().unwrap());
     let one = |name: &str| Destination {
         name: name.into(),
