@@ -232,6 +232,11 @@ pub fn admitted(addresses: &[SocketAddr], reachable: fn(IpAddr) -> bool) -> bool
 
 /// Sends `body` once to `address`, judged first ([`judged`]): no proxy, no redirect, within the bound.
 /// Only the answer's status, and its `Retry-After`, are read; never its body.
+///
+/// The connection, its TLS handshake included, has a third of the bound: one not made by then ends as a
+/// connection timeout, read [`Outcome::Unreachable`] — nothing left —, never as the whole's, which would say
+/// « may have arrived » (#1167). Windows retries a refused connection's SYN for about 2 s (curl's maintainer,
+/// daniel.haxx.se, 2024-08-14): within the program's third, 10 s.
 pub fn post(address: &Url, body: &Body, policy: Policy) -> Outcome {
     let config = Agent::config_builder()
         .proxy(None)
@@ -239,6 +244,7 @@ pub fn post(address: &Url, body: &Body, policy: Policy) -> Outcome {
         .http_status_as_error(false)
         .https_only(policy.https_only)
         .timeout_global(Some(policy.bound))
+        .timeout_connect(Some(policy.bound / 3))
         .build();
     let agent = Agent::with_parts(
         config,
