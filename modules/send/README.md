@@ -30,6 +30,12 @@ echo '{"address": "https://discord.com/api/webhooks/<id>/<token>", "name": "Réu
   | kitokey-send <meetings>/2026-11-20_09-30 --kind discord
 ```
 
+`THIRD-PARTY-NOTICES.html` is what the program owes its crates' authors, for the package to ship
+(D102): each crate it links, under its licence's text. It is made with cargo-about from
+`about.toml`, whose `accepted` list refuses any other licence, GPL among them, and committed;
+`tests/notices.rs` is red once it no longer names the crates the program links, and `about.toml`'s
+header gives the two commands that make it again. `release` puts it beside the program.
+
 ## Contracts
 
 - Provided: [`posting/v1`](../../contracts/posting/v1/README.md).
