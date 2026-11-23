@@ -103,7 +103,7 @@ deliverables:
     acceptance:
       - "Given the module `site`, when it is created, then its `MANIFEST.yaml` (`criticality: prototype`, `user_facing: true`), its `AGENTS.md` and ADR-0019 are written, and `astro build` writes static HTML alone — no server code, no adapter; held by the fitness functions and the module's check"
       - "Given `docs/privacy.md`, the one source, given a section on the site itself — hosted by Cloudflare Pages, no cookie, no tracker, no script from another domain — when the site is built, then `/en/privacy/` and `/fr/privacy/` hold its English and its French half; held by a test of the build that fails when a page's text differs from its half of the source"
-      - "Given the landing in French and in English, when it is built, then it shows the promise, D103's four screenshots of its language, the price said « à venir » / « coming soon » until the decider has said it, the Microsoft Store download — said « bientôt » / « soon » until the Store gives its link —, and Linux free through Copr; its sentences follow `modules/shell/docs/voice.md`, its colours and type the app's, in both themes; no advertising and no script or font from another domain: held by a test that opens every built page in a headless Chromium and fails on any request to a host other than the site's, and by `Content-Security-Policy: default-src 'self'` in its `_headers`, read by the same test"
+      - "Given the landing in French and in English, when it is built, then it shows the promise, D103's four screenshots of its language, the price said to be coming until the decider has set it, the Microsoft Store download — said to be coming soon until the Store gives its link —, and Linux free through Copr; its sentences follow `modules/shell/docs/voice.md`, its colours and type the app's, in both themes; no advertising and no script or font from another domain: held by a test that opens every built page in a headless Chromium and fails on any request to a host other than the site's, and by `Content-Security-Policy: default-src 'self'` in its `_headers`, read by the same test"
       - "Given the landing, when it is shown, then a few CSS animations play the journey — a meeting recorded, its transcript, its summary —, none of which runs under `prefers-reduced-motion: reduce`; and axe-core reports no violation of its WCAG 2.2 AA rules on every page, both languages, both themes; held by the module's tests, the reduced-motion case asserting that no animation runs"
       - "Given the build, when it is read, then each page has its own `title` and description, Open Graph tags and an image, `hreflang` for `en`, `fr` and `x-default` both ways; `sitemap.xml` lists every page with its alternates; a JSON-LD `SoftwareApplication` names the app, its systems and its category, its `offers` added once the price is said, never a rating or a review that does not exist; and Lighthouse scores at least 95 in performance, accessibility, best practices and SEO, mobile and desktop, on the built pages served locally — SEO on the opening's build, without noindex; held by the module's tests, run by the attest and by CI"
       - "Given the build before the opening, then `robots.txt` says `Disallow: /` and every page carries `<meta name=\"robots\" content=\"noindex\">`, held by a test; the opening removes both in one commit that changes that test with them. Given the Pages project set as *What needs a person* says, when main's first deployment is up, then an anonymous request to `main.<project>.pages.dev` gets no page but a redirect to Cloudflare Access, and `<project>.pages.dev` serves nothing; the verifier records each response's status and `Location` at that first deployment"
@@ -113,15 +113,13 @@ deliverables:
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
-> **D114 entered on the decider's word, 2026-11-23**, in their working session with the coordinator: the Store
-> asks a privacy policy at a public address, and the decider wants it on kitokey.com, Kitokey's shop window:
-> « il faut bien sûr que le site soit sérieux, moderne, ludique, sans pub, peut-être animé pour la landing, c'est
-> notre page d'atterrissage et la vitrine, donc référençable ». Hosting decided the same day: Cloudflare Pages, the
-> domain's registrar and DNS being Cloudflare already, no server, 0 €. Around 11:30, on its criticality and its
-> opening: « "leger", dans un premier temps il faut que c12c soit les seules a pouvoir y acceder durant la
-> validation de la mise en page etc.. on ouvre au public une fois validé », then « il nous faut un acces limité
-> sans over ingé, juste que ce ne soit pas ouvert au public ou referencé avant que tout soit pret ». The end date
-> does not move (`framing.md` §4); D114's cut comes first (*Deliverables*).
+> **D114 entered by the decider, 2026-11-23**, in their working session with the coordinator: the Store needs a
+> public privacy policy, and kitokey.com is the product's shop window. Requirements: professional and modern,
+> playful, no advertising, an animated landing, indexable by search engines. Hosting: Cloudflare Pages — the
+> domain's registrar and DNS are Cloudflare already —, no server, no cost. The same day, the decider set its
+> criticality to the lightest one, and kept the site closed to the public and unindexed until they validate it,
+> with the simplest access control available. The end date does not move (`framing.md` §4); D114's cut comes
+> first (*Deliverables*).
 
 > **Started on 2026-11-20**, at cycle 10's closure, early, on the decider's word that day in their working
 > session with the coordinator: « on termine le cycle en cours ». `start` and `end` move to that day, as this
@@ -405,13 +403,13 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 
 ### D114
 
-- **Why now**: Partner Center asks « the privacy policy URL » at submission ([Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies)
+- **Why now**: Partner Center asks for the privacy policy's URL at submission ([Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies)
   10.5.1, read 2026-11-23). The submission does not wait on the site: `docs/store/listing.md` already links
   [`docs/privacy.md`](../../privacy.md) on GitHub, public since PDR-0002. Once the site opens, the listing's line
   points to `https://kitokey.com/<lang>/privacy/` instead, in the opening's pull request.
 - **The module** `site`, `prototype`: it holds no key, places no order, moves no money and touches nobody's
-  personal data — it collects nothing —, so `.nstack/handbook/05-workflow.md` §7 asks no more; the decider's
-  « léger ». At `prototype` no test sheet is owed: each criterion is held by the module's tests, and criterion 6's
+  personal data — it collects nothing —, so `.nstack/handbook/05-workflow.md` §7 asks no more; the decider set
+  the lightest criticality, 2026-11-23. At `prototype` no test sheet is owed: each criterion is held by the module's tests, and criterion 6's
   second half by the verifier's record of the first deployment. Its stack and its host: [ADR-0019](../../adr/0019-kitokey-com-a-static-site-built-by-astro-served-by-cloudflare-pages.md).
 - **One source** for the policy: the site reads `docs/privacy.md` at build time and splits it at its two
   language headings; the site's own section is written there, in both languages, so the app's policy and the
@@ -436,9 +434,9 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 - **Lighthouse** runs from `@lhci/cli` on the static build (`staticDistDir`, [Lighthouse CI, *Getting started*](https://github.com/GoogleChrome/lighthouse-ci/blob/main/docs/getting-started.md))
   with the workstation's Chromium. Its SEO category fails on a page that asks not to be indexed (its
   `is-crawlable` audit), so SEO is scored on the build without noindex, the one the opening merges.
-- **Closed until validated**, with no more than the Pages project's own settings (the decider: « sans over
-  ingé »). Its « Enable access policy » protects preview deployments alone: « Note that this will only protect
-  your preview deployments », and restricts them to the Cloudflare account's members
+- **Closed until validated**, with no more than the Pages project's own settings (the decider, 2026-11-23: the simplest access control
+  available). Its *Enable access policy* protects preview deployments alone — "Note that this will only protect
+  your preview deployments" —, and restricts them to the Cloudflare account's members
   ([Cloudflare Pages, *Preview deployments*](https://developers.cloudflare.com/pages/configuration/preview-deployments/),
   read 2026-11-23). So main is built as a preview — the production branch is `site-live`, which an agent creates
   first at a commit without `modules/site`, so that a production build has nothing to serve
@@ -466,7 +464,7 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 | Cycle 09's D53, D84 | The colleague on Windows 11 | [#482](https://github.com/NapkinStack/kitokey/issues/482) and [#795](https://github.com/NapkinStack/kitokey/issues/795), updated first by an agent with the package's link: install it, record a real call of five minutes, then sign out and in again; answer there |
 | D114, before the Pages project | An agent | Push the branch `site-live` at a commit of main from before the module's first pull request, so that it has no `modules/site` |
 | D114, the Pages project | The decider | In the Cloudflare dashboard, in this order: **1.** *Workers & Pages* › *Create* › *Pages* › *Connect to Git*: the repository `NapkinStack/kitokey`; *Production branch* `site-live`; *Framework preset* Astro; *Build command* `npm run build`; *Build output directory* `dist`; *Root directory* `modules/site`; *Save and Deploy*. **2.** The project › *Settings* › *General* › *Enable access policy*. **3.** *Settings* › *Builds & deployments* › *Preview branch control* › *Custom branches*: include `main`, exclude `*`. **4.** *Settings* › *Build* › *Build watch paths*: include `modules/site/*`, `docs/privacy.md`. Then say in D114's issue the project's name |
-| D114, validation | The decider | Signed in to Cloudflare, read `https://main.<project>.pages.dev/fr/` and `/en/`; say « site validé », or what changes |
+| D114, validation | The decider | Signed in to Cloudflare, read `https://main.<project>.pages.dev/fr/` and `/en/`; say in D114's issue that the site is validated, or what changes |
 | D114, opening | The decider | Once validated, in this order: *Settings* › *Builds & deployments* › *Configure Production deployments*: *Production branch* `main`; then *Custom domains* › *Set up a custom domain*: `kitokey.com`. Then an agent's pull request removes noindex and points the listing to the site's policy |
 | D114 | The decider | When the Store gives Kitokey's page, its address in D114's issue; the price, as D102 asks |
 
@@ -517,8 +515,8 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   own counter off in that build; the decider may keep D83's in it. Default: the Store's.~~ Settled by the
   decider, 2026-11-20 (« essai (a) »): D83's counter kept, the Store's trial « Unlimited » (D102's section).
 - **The six built-in structures**: the market's common core; the decider may name others.
-- **D114's host**: Cloudflare recommends Workers for new projects (« Cloudflare recommends using Cloudflare Workers
-  for new projects », [Astro, *Deploy to Cloudflare*](https://docs.astro.build/en/guides/deploy/cloudflare/), read
+- **D114's host**: Cloudflare recommends Workers for new projects ("Cloudflare recommends using Cloudflare Workers
+  for new projects", [Astro, *Deploy to Cloudflare*](https://docs.astro.build/en/guides/deploy/cloudflare/), read
   2026-11-23); the decider chose Pages, whose settings hold the closed phase in four clicks. The build is a static
   folder: it moves to Workers or anywhere unchanged (ADR-0019). Default: Pages.
 - **D111's spike threshold**: 4 of the 6 structures, every section filled or said empty, over 3 meetings, with

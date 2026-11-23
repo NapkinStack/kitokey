@@ -15,8 +15,8 @@
 
 The Microsoft Store asks a privacy policy's address at submission ([Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies)
 10.5.1, read 2026-11-23). The policy is written ([`docs/privacy.md`](../privacy.md), D103) and linked on GitHub.
-The decider wants it on kitokey.com, Kitokey's shop window, with a landing « sérieux, moderne, ludique, sans pub,
-peut-être animé […] référençable » (2026-11-23, cycle 11's D114). The domain's registrar and DNS are Cloudflare's;
+The decider wants it on kitokey.com, Kitokey's shop window, with a landing that is professional and modern, playful,
+free of advertising, animated and indexable by search engines (the decider, 2026-11-23, cycle 11's D114). The domain's registrar and DNS are Cloudflare's;
 the decider chose Cloudflare Pages, no server, 0 €. No module of the repository serves the web.
 
 ## Problem
@@ -51,7 +51,7 @@ host's CDN: no server code, pages indexable as written.
 | [Eleventy](https://www.11ty.dev/docs/i18n/) | A JavaScript static site generator, several template languages | Yes — fewer built-ins: i18n and sitemap by hand |
 | Hand-written HTML | No tool | For one page; two languages, a sitemap with alternates and a policy read from Markdown would be written by hand |
 | Cloudflare Pages | Static hosting from a Git repository, preview deployments behind an access policy, build watch paths, 500 builds a month free ([limits](https://developers.cloudflare.com/pages/platform/limits/)) | Yes — the decider's host |
-| Cloudflare Workers static assets | « Cloudflare recommends using Cloudflare Workers for new projects » ([Astro, *Deploy to Cloudflare*](https://docs.astro.build/en/guides/deploy/cloudflare/), read 2026-11-23) | Yes — the exit; Pages' preview access policy holds the closed phase in one setting |
+| Cloudflare Workers static assets | "Cloudflare recommends using Cloudflare Workers for new projects" ([Astro, *Deploy to Cloudflare*](https://docs.astro.build/en/guides/deploy/cloudflare/), read 2026-11-23) | Yes — the exit; Pages' preview access policy holds the closed phase in one setting |
 
 ---
 
@@ -80,7 +80,7 @@ host's CDN: no server code, pages indexable as written.
 ## Decision
 
 Option 1. A module `site`, `criticality: prototype`, `user_facing: true`: it holds no key, places no order,
-moves no money and collects nobody's data (`.nstack/handbook/05-workflow.md` §7), the decider's « léger ». Astro
+moves no money and collects nobody's data (`.nstack/handbook/05-workflow.md` §7); the decider set the lightest criticality, 2026-11-23. Astro
 with its static output and no adapter; its sitemap integration; Lighthouse CI and axe-core in its tests, run in
 the workstation's Chromium. No analytics and no third party: `Content-Security-Policy: default-src 'self'` in
 `_headers`. Served by Cloudflare Pages from `modules/site`, main built as a preview behind the project's access
@@ -122,6 +122,6 @@ noindex until the opening, axe-core AA, Lighthouse at least 95.
 | Alternative | Why not |
 |---|---|
 | A server-rendered site (an adapter, Pages Functions) | Nothing to compute per request; a server is a cost and a surface |
-| Analytics, even cookieless | The decider: « sans pub »; the charter: nothing leaves without the user's choice; the page stating that cannot break it |
-| Zero Trust's application on the production address for the closed phase | Five steps for what one setting does on previews (the decider: « sans over ingé ») |
+| Analytics, even cookieless | The decider ruled out advertising, 2026-11-23; the charter: nothing leaves without the user's choice; the page stating that cannot break it |
+| Zero Trust's application on the production address for the closed phase | Five steps for what one setting does on previews (the decider asked for the simplest access control, 2026-11-23) |
 | GitHub Pages | The domain and its DNS are Cloudflare's; the decider chose Pages |
