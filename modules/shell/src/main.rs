@@ -3173,10 +3173,11 @@ async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, des
     .map_err(|error| shell.told(Failure::Unexpected, error))?
     .map_err(|why| shell.told(Failure::Keyring, why))?;
     // Each send kept with what came of it, a failure too: « perhaps arrived » is said again on a page drawn
-    // again, so that nobody sends twice.
+    // again, so that nobody sends twice. A record that cannot be written never hides what came of the send:
+    // a summary that left, said « not sent », would be sent twice. Logged, the outcome said all the same.
     let meeting = folder.file_name().and_then(|name| name.to_str()).unwrap_or_default().to_string();
     let at = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
-    sending::keep(
+    if let Err(error) = sending::keep(
         &sends_file(),
         &meeting,
         sending::Sent {
@@ -3184,8 +3185,9 @@ async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, des
             at,
             outcome: outcome.clone(),
         },
-    )
-    .map_err(|error| shell.told(Failure::SettingsUnwritten, error))?;
+    ) {
+        tracing::warn!(error = %error, "shell.send_unrecorded");
+    }
     match &outcome {
         sending::Outcome::Sent => tracing::info!("shell.summary_sent"),
         sending::Outcome::Failed { code, .. } => tracing::warn!(code = code.as_deref().unwrap_or("none"), "shell.summary_not_sent"),
