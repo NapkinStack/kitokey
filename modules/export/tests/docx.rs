@@ -168,6 +168,35 @@ fn the_transcript_is_a_table_its_head_bold_its_rows_in_the_meetings_order() {
             vec!["00:04", "Les autres", "a|b <i>c</i> & d"]
         ]
     );
+    // The head's runs bold, the rows' not: what tells a reader the head from the rows.
+    let rows = doc["document"]["children"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["type"] == "table")
+        .unwrap()["data"]["rows"]
+        .clone();
+    let bold: Vec<Vec<bool>> = rows
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            row["data"]["cells"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .flat_map(|cell| {
+                    cell["data"]["children"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .flat_map(runs)
+                        .map(|(_, bold)| bold)
+                })
+                .collect()
+        })
+        .collect();
+    assert_eq!(bold, [vec![true; 3], vec![false; 3], vec![false; 3]]);
 }
 
 #[test]
