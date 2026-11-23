@@ -1,5 +1,6 @@
 //! A meeting's summary sent to a destination the user set up (D110, PDR-0007), on their gesture each time:
-//! what kitokey-send said (`contracts/posting/v1`), and the record of each send — to which destination, when.
+//! what kitokey-send said (`contracts/posting/v1`), and the record of each send — to which destination, when,
+//! and what came of it: a page drawn again says it still, « perhaps arrived » first, so that nobody sends twice.
 //!
 //! The record is the shell's own data, one file beside its settings, each meeting by its folder's name: a
 //! meeting renamed keeps its folder (`title.txt`, `session-audio`), so it keeps its sends; no file is added to
@@ -29,7 +30,7 @@ pub const CODES: [&str; 11] = [
 ];
 
 /// What kitokey-send said of one send.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "outcome", rename_all = "lowercase")]
 pub enum Outcome {
     /// The destination answered `2xx`.
@@ -73,11 +74,13 @@ pub fn read(output: &str) -> Outcome {
     }
 }
 
-/// One send: to which destination, by its name, and when, as RFC 3339.
+/// One send: to which destination, by its name, when, as RFC 3339, and what kitokey-send said of it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sent {
     pub destination: String,
     pub at: String,
+    #[serde(flatten)]
+    pub outcome: Outcome,
 }
 
 /// Every meeting's sends, by its folder's name.
@@ -104,15 +107,34 @@ pub fn keep(file: &Path, meeting: &str, sent: Sent) -> io::Result<()> {
     fs::rename(&beside, file)
 }
 
-/// A meeting's sends, in the order they were made.
-pub fn of<'a>(record: &'a Record, meeting: &str) -> &'a [Sent] {
-    record.get(meeting).map(Vec::as_slice).unwrap_or_default()
+/// A meeting's sends that arrived, in the order they were made.
+pub fn of<'a>(record: &'a Record, meeting: &str) -> Vec<&'a Sent> {
+    record
+        .get(meeting)
+        .into_iter()
+        .flatten()
+        .filter(|sent| sent.outcome == Outcome::Sent)
+        .collect()
+}
+
+/// A meeting's last send to each destination, whatever came of it, in the order they were made: what the page
+/// says of each, as long as it is not sent there again.
+pub fn last<'a>(record: &'a Record, meeting: &str) -> Vec<&'a Sent> {
+    let all = record.get(meeting).map(Vec::as_slice).unwrap_or_default();
+    all.iter()
+        .enumerate()
+        .filter(|(n, sent)| !all[n + 1..].iter().any(|later| later.destination == sent.destination))
+        .map(|(_, sent)| sent)
+        .collect()
 }
 
 /// Whether a destination was ever sent to, from any meeting: before its first, the page says what leaves and
-/// where (PDR-0007 §3).
+/// where (PDR-0007 §3). A failed send is not one.
 pub fn ever(record: &Record, destination: &str) -> bool {
-    record.values().flatten().any(|sent| sent.destination == destination)
+    record
+        .values()
+        .flatten()
+        .any(|sent| sent.destination == destination && sent.outcome == Outcome::Sent)
 }
 
 #[cfg(test)]
@@ -144,6 +166,19 @@ mod tests {
                 retry_after: None
             }
         );
+    }
+
+    #[test]
+    fn an_event_it_does_not_know_before_the_last_line_is_passed_over() {
+        let said = "{\"event\":\"progress\"}\n{\"event\":\"failed\",\"code\":\"destination.gone\"}\n";
+        assert_eq!(
+            read(said),
+            Outcome::Failed {
+                code: Some("destination.gone".into()),
+                retry_after: None
+            }
+        );
+        assert_eq!(read("{\"event\":\"progress\"}\n{\"event\":\"sent\"}\n"), Outcome::Sent);
     }
 
     #[test]
@@ -180,6 +215,21 @@ mod tests {
         }
     }
 
+    fn send(destination: &str, at: &str, outcome: Outcome) -> Sent {
+        Sent {
+            destination: destination.into(),
+            at: at.into(),
+            outcome,
+        }
+    }
+
+    fn silent() -> Outcome {
+        Outcome::Failed {
+            code: Some("destination.silent".into()),
+            retry_after: None,
+        }
+    }
+
     #[test]
     fn a_send_is_kept_per_meeting_and_a_destination_known_once_sent_to() {
         let dir = tempfile::tempdir().unwrap();
@@ -188,19 +238,13 @@ mod tests {
         keep(
             &file,
             "2026-11-20_09-00",
-            Sent {
-                destination: "#équipe".into(),
-                at: "2026-11-23T15:00:00+01:00".into(),
-            },
+            send("#équipe", "2026-11-23T15:00:00+01:00", Outcome::Sent),
         )
         .unwrap();
         keep(
             &file,
             "2026-11-20_09-00",
-            Sent {
-                destination: "#équipe".into(),
-                at: "2026-11-23T15:05:00+01:00".into(),
-            },
+            send("#équipe", "2026-11-23T15:05:00+01:00", Outcome::Sent),
         )
         .unwrap();
         let all = record(&file);
@@ -209,6 +253,41 @@ mod tests {
         assert!(ever(&all, "#équipe"));
         assert!(!ever(&all, "#clients"));
         assert!(!file.with_extension("json.part").exists());
+    }
+
+    #[test]
+    fn a_failed_send_is_kept_with_its_outcome_listed_nowhere_and_never_a_first_send() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("sends.json");
+        let busy = Outcome::Failed {
+            code: Some("destination.busy".into()),
+            retry_after: Some(30),
+        };
+        keep(&file, "m", send("#clients", "2026-11-23T15:00:00+01:00", busy.clone())).unwrap();
+        let all = record(&file);
+        assert!(of(&all, "m").is_empty());
+        assert!(!ever(&all, "#clients"));
+        assert_eq!(last(&all, "m"), vec![&send("#clients", "2026-11-23T15:00:00+01:00", busy)]);
+    }
+
+    #[test]
+    fn the_last_send_to_each_destination_is_said_in_their_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("sends.json");
+        keep(&file, "m", send("#équipe", "2026-11-23T15:00:00+01:00", silent())).unwrap();
+        keep(&file, "m", send("#clients", "2026-11-23T15:01:00+01:00", Outcome::Sent)).unwrap();
+        keep(&file, "m", send("#équipe", "2026-11-23T15:02:00+01:00", Outcome::Sent)).unwrap();
+        keep(&file, "other", send("#autre", "2026-11-23T15:03:00+01:00", silent())).unwrap();
+        let all = record(&file);
+        assert_eq!(
+            last(&all, "m"),
+            vec![
+                &send("#clients", "2026-11-23T15:01:00+01:00", Outcome::Sent),
+                &send("#équipe", "2026-11-23T15:02:00+01:00", Outcome::Sent)
+            ]
+        );
+        assert_eq!(last(&all, "other"), vec![&send("#autre", "2026-11-23T15:03:00+01:00", silent())]);
+        assert!(last(&all, "none").is_empty());
     }
 
     #[test]
