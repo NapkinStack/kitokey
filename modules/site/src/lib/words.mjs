@@ -13,6 +13,7 @@ export const words = {
     keeps: "docs/privacy.md; the shell's tests of the confidential meeting (D110, PDR-0007)",
   },
   privacy: { en: "Privacy policy", fr: "Politique de confidentialité", keeps: "docs/privacy.md (D103), this site's /privacy/ (D114)" },
+  changed: { en: "Last changed:", fr: "Dernière modification :", keeps: "the policy's first line, the day it last changed (docs/privacy.md)" },
   other: { en: "Français", fr: "English", keeps: "the page in the other language (D114)" },
 };
 

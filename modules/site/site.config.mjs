@@ -15,3 +15,4 @@ export const languages = ["en", "fr"];
 
 // Where the policy's relative links (support.md, …) point once on the site: the source's folder on GitHub.
 export const privacyLinks = process.env.PRIVACY_LINKS ?? "https://github.com/NapkinStack/kitokey/blob/main/docs/";
+export const privacyHistory = process.env.PRIVACY_HISTORY ?? "https://github.com/NapkinStack/kitokey/commits/main/docs/privacy.md";
