@@ -639,6 +639,8 @@ else
   export PULSE_SINK=kitokey_e2e_quiet
   # A window that stops answering fails the run, never holds it: it takes about 6 minutes.
   if ! timeout --kill-after=30 1200 uv run --quiet --with selenium==4.51.0 --with jsonschema==4.23.0 --with rfc3339-validator==0.1.4 python -u scripts/e2e_window.py "$bin" "$work/window" | tee -a "$out/e2e.txt"; then
+    # Killed by its timeout, the run says so and names the scenario it cut — never a FAILED with no FAIL (#1129).
+    if [[ "${PIPESTATUS[0]}" =~ ^(124|137)$ ]]; then last=$(sed -nE 's/^    \(([a-z_]+): [0-9.]+ s\)$/\1/p' "$out/e2e.txt" | tail -1); say "  FAIL  killed by its timeout of 1200 s during $(tr , '\n' <<< "$only" | awk -v last="$last" 'last == "" || seen { print; exit } $0 == last { seen = 1 }' | grep . || echo "the scenario after ${last:-the start}")"; fi
     failed=1
   fi
 fi
