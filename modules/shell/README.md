@@ -165,9 +165,11 @@ it is typed as the meeting's `context.txt` (`contracts/session-audio/v2`), writt
 file beside it and only once the folder holds `session.json`; 400 characters at most, counted as
 characters; another script than Latin or Cyrillic is said, Whisper keeping only the last 224
 tokens. The transcript and the minutes read it as they start: the field is closed while either is
-made, or a transcript is left unfinished. Changed after they were made, *Refaire avec ce contexte*
-makes the transcript again with whoever the settings name to hear, then the minutes with whoever
-they name to write — each kept in place until the new one is whole, put back if it is not.
+made, or a transcript is left unfinished. Changed after they were made, its button — *Refaire la
+transcription*, *et le compte rendu* where minutes follow, the meeting having some or the settings
+making them (D113) — makes the transcript again with whoever the settings name to hear, then the
+minutes with whoever they name to write — each kept in place until the new one is whole, put back if
+it is not. Changed, the context starts nothing by itself.
 
 **A meeting's name** (D70): its heading clicked, a name typed, Enter — shown first in the list, its page and *Libérer de l'espace*, as text. It is kept as the meeting's `title.txt` (`contracts/session-audio/v2`), written whole through a file beside it, before the minutes' title (D48), which comes back when the name is emptied; made again, the minutes leave it. A folder is never renamed.
 
@@ -175,7 +177,7 @@ they name to write — each kept in place until the new one is whole, put back i
 (`contracts/session-audio/v3`, for a meeting of any version), written whole through a file beside
 it once the folder holds `session.json`, removed when none is left (`meeting_models_chosen`).
 `src/meeting_models.rs` lays them over Settings each time the meeting is made or made again — its
-transcript, its minutes, *Réessayer*, *Refaire avec ce contexte* —; Settings are never written. A
+transcript, its minutes, *Réessayer*, *Refaire la transcription et le compte rendu* —; Settings are never written. A
 Whisper model is found by its file's name among the models this computer lists
 (`settings::whisper_models`), never joined to a folder; a service to hear only if it is the one
 Settings set; a provider to write only Settings' own — another of its models — or one on this
@@ -200,7 +202,8 @@ Kitokey started again too: its `models.json` once its folder holds `session.json
 the one after; « Avancé » closed, it is said under the row, naming them — « Modèles gardés : small ·
 Qwen3 8b » —, and given with « Avancé » to a screen reader. Recording, it is that meeting's at once. In *Refaire…* it is kept once
 *Refaire* is pressed — *Annuler* changes nothing —, then the transcript is made again by them
-(`transcript_redo_own`) or the minutes. A model gone is said on the meeting's page and in « Avancé ».
+(`transcript_redo_own`) or the minutes. The transcript made again is made alone: where the meeting
+has minutes, its panel says they are kept, to make again after (the decider, 2026-11-18, D113). A model gone is said on the meeting's page and in « Avancé ».
 Minutes its own model failed to write name that model, and *Refaire… › Avancé* to choose another,
 on the page and in the notification alike (`words::cause_said`, the model said by `words::model_said`,
 the page's `modelSaid` rule); Settings' model failing, Settings are named as before.
