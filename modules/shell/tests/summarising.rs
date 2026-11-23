@@ -245,10 +245,20 @@ fn cancelled_minutes_end_within_two_seconds_with_what_they_started_the_minutes_t
         }
     };
     assert!(matches!(ended, Made::Failed(..)), "{ended:?}");
-    let stat = fs::read_to_string(format!("/proc/{}/stat", child.trim())).unwrap_or_default();
-    assert!(
-        stat.is_empty() || stat.rsplit_once(')').is_some_and(|(_, rest)| rest.trim_start().starts_with('Z')),
-        "its child still runs"
-    );
+    // Killed, the child closes its files, the end of what the shell reads, before the kernel makes
+    // it a zombie: read at once, it may still say `R`, its exit begun (#1031). Waited for, bounded.
+    let gone = |stat: &str| {
+        stat.is_empty()
+            || stat
+                .rsplit_once(')')
+                .is_some_and(|(_, rest)| rest.trim_start().starts_with(['Z', 'X']))
+    };
+    let until = std::time::Instant::now() + Duration::from_secs(1);
+    let mut stat = fs::read_to_string(format!("/proc/{}/stat", child.trim())).unwrap_or_default();
+    while !gone(&stat) && std::time::Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(10));
+        stat = fs::read_to_string(format!("/proc/{}/stat", child.trim())).unwrap_or_default();
+    }
+    assert!(gone(&stat), "its child still runs a second after its making ended: {stat}");
     assert_eq!(fs::read_to_string(&minutes).unwrap(), "the minutes before");
 }

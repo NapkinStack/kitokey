@@ -603,22 +603,22 @@ fn minutes_not_made_say_their_cause_and_its_gesture_when_the_program_named_one()
     ];
     // What each sentence is about, in each language: a sentence said for another cause fails.
     let about = |cause: Cause| match cause {
-        Cause::Unreachable => ("could not be reached", "pas pu être joint"),
-        Cause::TooSlow => ("in time", "à temps"),
-        Cause::RefusedKey => ("refused the key", "refusé la clé"),
-        Cause::NoCredit => ("credit", "crédit"),
-        Cause::UnknownModel => ("does not know", "ne connaît pas"),
+        Cause::Unreachable => ("Can’t reach", "Impossible de joindre"),
+        Cause::TooSlow => ("too long to respond", "pas répondu à temps"),
+        Cause::RefusedKey => ("rejected the API key", "refusé la clé"),
+        Cause::NoCredit => ("credit", "Crédit"),
+        Cause::UnknownModel => ("doesn’t recognize", "ne reconnaît pas"),
         Cause::Redirected => ("another address", "autre adresse"),
-        Cause::ProviderFailed => ("failed to answer", "pas su répondre"),
-        Cause::CutShort => ("before the end", "avant la fin"),
-        Cause::NotMinutes => ("did not write minutes", "pas écrit de compte rendu"),
-        Cause::TranscriptUnusable => ("cannot be read", "ne peut pas être lu"),
-        Cause::NoSpeech => ("no speech", "aucune parole"),
-        Cause::Settings => ("cannot be used as given", "tels quels"),
-        Cause::Unwritable => ("could not be written", "pas pu être écrit"),
-        Cause::TooMany => ("too many requests", "trop de demandes"),
-        Cause::Down => ("it is failing", "en panne"),
-        Cause::NoTimes => ("no times", "ne donne pas les temps"),
+        Cause::ProviderFailed => ("couldn’t respond", "pas pu répondre"),
+        Cause::CutShort => ("before finishing", "avant la fin"),
+        Cause::NotMinutes => ("didn’t produce a summary", "pas produit de compte rendu"),
+        Cause::TranscriptUnusable => ("can’t be read", "illisible"),
+        Cause::NoSpeech => ("No speech", "Aucune parole"),
+        Cause::Settings => ("isn’t valid", "ne sont pas valides"),
+        Cause::Unwritable => ("Couldn’t save", "Impossible d’enregistrer"),
+        Cause::TooMany => ("limiting requests", "limite le nombre de demandes"),
+        Cause::Down => ("having problems", "rencontre un problème"),
+        Cause::NoTimes => ("timestamps", "horodatage"),
     };
     for language in BOTH {
         let mut said = std::collections::HashSet::new();
@@ -644,7 +644,7 @@ fn minutes_not_made_say_their_cause_and_its_gesture_when_the_program_named_one()
                 if SETTINGS.contains(&cause) {
                     let settings = if language == Language::French { "réglages" } else { "settings" };
                     assert!(
-                        body.contains(settings) && !body.contains(words::menu(language).minutes),
+                        body.to_lowercase().contains(settings) && !body.contains(words::menu(language).minutes),
                         "{cause:?}: {body}"
                     );
                 }
@@ -1062,8 +1062,8 @@ fn a_confidential_meeting_s_words_are_said_in_both_languages_french_typeset_as_f
         (english.confidential_left_sound, 1),
         (french.confidential_left_transcript, 1),
         (english.confidential_left_transcript, 1),
-        (french.confidential_fetch, 1),
-        (english.confidential_fetch, 1),
+        (french.minutes_fetch_then, 1),
+        (english.minutes_fetch_then, 1),
     ] {
         assert_eq!(said.matches("{}").count(), holes, "{said}");
     }
@@ -1240,7 +1240,7 @@ const STILL_WRONG: &str = include_str!("words_still_wrong.txt");
 
 /// The sentences still without their comment, counted: 602 keys would be three review budgets.
 /// The number only goes down, as the list does.
-const WITHOUT_COMMENT: usize = 318;
+const WITHOUT_COMMENT: usize = 12;
 
 /// A sentence of `src/words.rs`, as the file arranges it.
 #[derive(Debug)]
@@ -1798,7 +1798,9 @@ fn the_review_s_wording_is_what_the_window_says_in_french() {
             "Ollama ne répond pas ou n’a aucun modèle. Lancez Ollama, puis téléchargez un modèle.",
         ),
         (french.key, "Clé d’API"),
-        (french.agree_local_write, "Rédiger ici"),
+        (french.agree_local_write, "Rédiger le compte rendu ici"),
+        // #933: a button that starts a making names it, as D113's Refaire… does.
+        (french.agree_local, "Rédiger plutôt le compte rendu sur cet ordinateur"),
     ] {
         assert_eq!(said, wanted);
     }
@@ -2064,18 +2066,18 @@ fn a_command_that_failed_says_its_sentence_and_the_raw_text_only_in_developer_mo
 fn a_test_with_a_cause_says_it_alone_the_raw_text_only_in_developer_mode() {
     use kitokey_shell::{summarising::Cause, words};
     for (cause, advice) in [
-        (Cause::TooMany, "wait, or check your plan with it"),
+        (Cause::TooMany, "Wait, or check your plan"),
         (
             Cause::Down,
-            "try again later. On this computer, this model may be too large for the memory: choose a smaller one",
+            "Try again later. If the model runs on this computer, it may be too large for its memory — choose a smaller one",
         ),
-        (Cause::NoTimes, "choose one that gives each segment’s times in Kitokey’s settings"),
+        (Cause::NoTimes, "Choose one that does in Settings"),
     ] {
         assert!(words::cause(cause, Language::English).contains(advice), "{cause:?}");
     }
     let plain = serde_json::to_string(&words::test_caused(Cause::Down, "raw", Language::French, false)).unwrap();
     assert!(
-        plain.contains("en panne") && !plain.contains("raw") && !plain.contains("ne répond pas"),
+        plain.contains("rencontre un problème") && !plain.contains("raw") && !plain.contains("ne répond pas"),
         "{plain}"
     );
     let developer = serde_json::to_string(&words::test_caused(Cause::Down, "raw", Language::French, true)).unwrap();

@@ -18,6 +18,13 @@ repos:
       - id: detect-private-key
       - id: check-added-large-files
         stages: [pre-commit]  # its own default adds the push
+        # Two files, each by its path; every other file keeps the limit.
+        # - axe-core's 637 KB, a test asset vendored for the shell's e2e (D106), pinned by its SHA-256 and
+        #   checked before it is injected, never shipped.
+        # - The shell's THIRD-PARTY-NOTICES.html, about 800 KB (D102): text made by cargo-about from Cargo.lock,
+        #   480 crates each under its licence's text, held true by modules/shell/tests/notices.rs. Apache-2.0's
+        #   51 copies differ by the copyright lines they carry, so none can be dropped.
+        exclude: ^modules/shell/(scripts/vendor/axe-core-4\.14\.0/axe\.min\.js|THIRD-PARTY-NOTICES\.html)$
       # Also outside a git merge: Copier writes its update conflicts straight into the
       # files. The configuration its documentation recommends.
       - id: check-merge-conflict
@@ -105,6 +112,21 @@ repos:
           |copilot\.microsoft\.com/(chats/|shares/)
           )
         stages: [pre-commit, commit-msg, manual]
+
+      # Git reads trailers from the message's last paragraph only: an Agent-Session line above a
+      # blank line — before a Co-Authored-By given in its own -m, say — names no session, and
+      # pr-check would say so only after the push. Git itself judges here: a message that names
+      # a session git does not read as a trailer is refused, with the correction.
+      - id: agent-session-trailer
+        name: "Agent-Session in the last paragraph: no blank line inside the trailer block"
+        language: system
+        entry: >-
+          sh -c 'grep -qiE "^agent-session[[:blank:]]*:" "$1" || exit 0;
+          git interpret-trailers --parse --no-divider "$1" | grep -qi "^agent-session:" && exit 0;
+          echo "Agent-Session is not in the last paragraph of the message, so git reads no session: put it
+          with Co-Authored-By and any other trailer in one block, no blank line between them." >&2;
+          exit 1' --
+        stages: [commit-msg]
 
       # Before a push, the fitness functions CI runs on every pull request — a fault seen here,
       # not after a round trip. The skills are left to CI: what they are generated from is

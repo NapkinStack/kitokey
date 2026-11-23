@@ -76,6 +76,14 @@ consumes:
   - contract: summarising
     version: v1
     module: summary
+  # D110: `kitokey-send --check` judges a destination's address before it is kept.
+  - contract: posting
+    version: v1
+    module: send
+  # D109: `kitokey-export` writes each summary to the folder chosen in Settings.
+  - contract: exporting
+    version: v1
+    module: export
 #  - contract: identity-api
 #    version: v1
 #    module: identity
@@ -263,6 +271,14 @@ dependencies:
     purpose: A file a day
     adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
     exit_strategy: One function, start in src/log.rs.
+  - name: cargo-about
+    purpose: >-
+      Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
+      never run by a build or a release (D102)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >-
+      Its output is a committed HTML page, about.hbs its template; any generator that lists the
+      crates with their licence texts replaces it, and tests/notices.rs judges the result.
 #  - name:
 #    purpose:
 #    adr:
@@ -331,6 +347,11 @@ evidence:
     - pattern: '"message":"shell\.recording_unavailable"'
       level: warning
       scenario: AN
+    # The window's CF: the stand-in kitokey-export refuses the folder (file.unwritable), as a folder
+    # that cannot be written does; said on the meeting's page (D109).
+    - pattern: '"message":"shell\.export_failed"'
+      level: warning
+      scenario: CF
     # The window's AV and AW: the stand-in licence says what no licence says, once in the log (D83).
     - pattern: '"message":"shell\.licence_unread"'
       level: warning

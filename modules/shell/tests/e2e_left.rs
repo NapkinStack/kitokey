@@ -13,8 +13,8 @@ const PLAY: &str = r#"
 import ast, contextlib, io, json, os, pathlib, signal, subprocess, sys, time, traceback
 tree = ast.parse(pathlib.Path(sys.argv[1]).read_text())
 taken = {node.name: node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in ("timed", "Window")}
-leave = next(node for node in taken["Window"].body if isinstance(node, ast.FunctionDef) and node.name == "__exit__")
-module = ast.fix_missing_locations(ast.Module(body=[taken["timed"], leave], type_ignores=[]))
+leave = [node for node in taken["Window"].body if isinstance(node, ast.FunctionDef) and node.name in ("__exit__", "end_kitokey")]
+module = ast.fix_missing_locations(ast.Module(body=[taken["timed"], *leave], type_ignores=[]))
 stuck = subprocess.Popen([sys.executable, "-c", "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(60)"])
 time.sleep(0.3)
 alive = lambda: stuck.poll() is None
@@ -30,7 +30,7 @@ class Quiet:
 scope = {"os": os, "signal": signal, "time": time, "traceback": traceback, "sys": sys, "FAILED": FAILED, "check": check, "PLAYING": None,
          "instances": lambda: [stuck.pid] if alive() else [], "single_instance_held": lambda: alive()}
 exec(compile(module, "e2e_window.py", "exec"), scope)
-window = type("Window", (), {"__exit__": scope["__exit__"]})()
+window = type("Window", (), {"__exit__": scope["__exit__"], "end_kitokey": scope.get("end_kitokey")})()
 window.browser = window.driver_process = Quiet()
 def corrections_gated(now):
     window.__exit__(None, None, None)

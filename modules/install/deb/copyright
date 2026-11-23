@@ -1,0 +1,27 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Kitokey
+Upstream-Contact: support@kitokey.com
+Source: https://github.com/NapkinStack/kitokey
+
+Files: *
+Copyright: 2026 c12c
+License: GPL-3
+Comment: The programs link crates and libraries of third parties, each under its own licence.
+ Each program's notices name them, their licences and their texts, beside this file:
+ /usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey.html
+ /usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-capture.html
+ /usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-transcription.html
+ /usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-summary.html
+ /usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-export.html
+ /usr/share/doc/kitokey/MPL-SOURCES.txt says where the sources of the MPL-2.0 crates are.
+
+License: GPL-3
+ This program is free software: you can redistribute it and/or modify it under the terms of
+ the GNU General Public License as published by the Free Software Foundation, version 3.
+ .
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ See the GNU General Public License for more details.
+ .
+ On Debian systems, the complete text of the GNU General Public License version 3 can be
+ found in /usr/share/common-licenses/GPL-3.
