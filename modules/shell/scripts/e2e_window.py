@@ -5367,8 +5367,9 @@ def summary_sent(now: dt.datetime) -> None:
         check("before a destination's first send, the page says what leaves and where: its name, never its address (PDR-0007 §3)",
               first is not None and "#équipe" in first and "compte rendu" in first and "transcription" in first and "son" in first
               and secret not in first and "discord.example" not in first, first)
+        # Selenium's text gives U+00A0 as a space: each read below compares with spaces.
         said = browser.find_element(By.ID, "send-said").text
-        check("sent: said on the page, the destination by its name", said.startswith("Envoyé à «\xa0#équipe\xa0»"), said)
+        check("sent: said on the page, the destination by its name", said.replace("\xa0", " ").startswith("Envoyé à « #équipe »"), said)
         made = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
         check("kitokey-send started with the meeting's folder and --kind discord; the address and the name on its input only (posting/v1)",
               len(made) == 1 and made[0]["args"][0].endswith(written.name) and made[0]["args"][1:] == ["--kind", "discord"]
@@ -5377,10 +5378,10 @@ def summary_sent(now: dt.datetime) -> None:
         again = send("#équipe")
         check("the next send to that destination goes at once, its gesture still asked: no notice again",
               again is None and len(calls.read_text().splitlines()) == 2, again)
-        for name, words_said in (("#parti", "configurez"), ("#occupé", "30\xa0s"), ("#horsligne", "connexion"), ("#muet", "regardez dans le canal")):
+        for name, words_said in (("#parti", "configurez"), ("#occupé", "30 s"), ("#horsligne", "connexion"), ("#muet", "regardez dans le canal")):
             send(name)
             said = browser.find_element(By.ID, "send-said").text
-            check(f"{name}: the outcome said with what to do (posting/v1)", words_said in said and secret not in said, said)
+            check(f"{name}: the outcome said with what to do (posting/v1)", words_said in said.replace("\xa0", " ") and secret not in said, said)
         page_text = browser.execute_script("return document.body.innerText")
         check("the address appears nowhere on the page", secret not in page_text, "")
         listed = "return [...document.querySelectorAll('#sends li')].map(li => li.textContent)"
@@ -5396,7 +5397,7 @@ def summary_sent(now: dt.datetime) -> None:
         wait_for(browser, lambda b: "#équipe" in b.find_element(By.ID, "confidential-left").text, 10)
         left = browser.find_element(By.ID, "confidential-left").text
         check("marked confidential after a send: the switch says where the summary already went (PDR-0007 §4)",
-              "le compte rendu à «\xa0#équipe\xa0»" in left, left)
+              "le compte rendu à « #équipe »" in left.replace("\xa0", " "), left)
         check("and offers no send any more", wait_for(browser, lambda b: not b.execute_script(offered), 5), browser.execute_script(offered))
     logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and secret in f.read_text(errors="ignore")]
     check("the address in no log nor state file of Kitokey (ADR-0007, PDR-0007 §1)", logged == [], logged)
