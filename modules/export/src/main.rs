@@ -10,7 +10,7 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use kitokey_export::{Include, Labels, Meeting, html, markdown};
+use kitokey_export::{Include, Labels, Meeting, docx, html, markdown};
 use serde_json::{Value, json};
 
 /// The version this program says (`--version`): the package's, named when it is built (`KITOKEY_VERSION`,
@@ -23,7 +23,7 @@ const VERSION: &str = match option_env!("KITOKEY_VERSION") {
 /// The formats this version writes. `exporting/v1` names `docx`, `srt`, `vtt` and `pdf` too: each
 /// joins this list as its writer is delivered (D108), and until then is a wrong argument, which the shell
 /// never gives — it offers only the formats this program writes.
-const WRITTEN: &[&str] = &["md", "html"];
+const WRITTEN: &[&str] = &["md", "html", "docx"];
 
 /// Why the program ends in failure: its sentence, and the code a person acts on, when there is one.
 struct Refused(String, Option<&'static str>);
@@ -155,13 +155,14 @@ fn export() -> Result<Value, Refused> {
             Some("meeting.empty"),
         ));
     }
+    let unwritable = |error: io::Error| Refused(format!("the file could not be written: {error}"), Some("file.unwritable"));
     let written = match asked.format.as_str() {
-        "md" => markdown(&meeting, include, &labels),
-        "html" => html(&meeting, include, &labels, &asked.lang, &name),
+        "md" => markdown(&meeting, include, &labels).into_bytes(),
+        "html" => html(&meeting, include, &labels, &asked.lang, &name).into_bytes(),
+        "docx" => docx(&meeting, include, &labels, &name).map_err(unwritable)?,
         other => unreachable!("{other} is refused with the arguments"),
     };
-    let bytes = whole(&to, written.as_bytes())
-        .map_err(|error| Refused(format!("the file could not be written: {error}"), Some("file.unwritable")))?;
+    let bytes = whole(&to, &written).map_err(unwritable)?;
     Ok(json!({"event": "written", "file": to, "bytes": bytes}))
 }
 

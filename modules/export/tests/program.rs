@@ -7,7 +7,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use kitokey_export::{Include, Labels, Meeting, html, markdown};
+use kitokey_export::{Include, Labels, Meeting, docx, html, markdown};
 use serde_json::{Value, json};
 
 const MINUTES: &str = "---\ncontract: minutes/v4\nmade: 2026-11-20T10:05:00+01:00\nprovider: \"local\"\nmodel: \"qwen3:8b\"\ncontext: null\ntitle: \"Prix & essai\"\n---\n\n## Points forts\n\nLe prix est fixé.\n\n## Actions\n\n- Écrire la page — Sam — vendredi\n\n## Points clés\n\n- 49 €\n";
@@ -127,6 +127,42 @@ fn html_is_written_its_language_the_options_and_its_name_the_inputs() {
     );
     assert_eq!(written, expected);
     assert!(written.contains("<html lang=\"fr-CA\">") && written.contains("<title>Réunion du 20 nov. 2026</title>"));
+    assert_eq!(ran.lines, [json!({"event": "written", "file": to, "bytes": written.len()})]);
+}
+
+#[test]
+fn docx_is_written_its_name_the_inputs_and_read_back_as_the_library_writes_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    // No title from the summary: the document is named by the input's `name`.
+    fs::write(folder.join("minutes.md"), MINUTES.replace("title: \"Prix & essai\"\n", "")).unwrap();
+    let to = dir.path().join("réunion.docx");
+
+    let ran = run(
+        &[folder.to_str().unwrap(), "--format", "docx", "--lang", "fr"],
+        &words(&to).to_string(),
+    );
+
+    assert!(ran.success, "{}", ran.said);
+    let written = fs::read(&to).unwrap();
+    let expected = docx(
+        &Meeting::read(&folder).unwrap(),
+        Include::all(),
+        &labels(),
+        "Réunion du 20 nov. 2026",
+    )
+    .unwrap();
+    let body = |bytes: &[u8]| -> Value {
+        serde_json::from_str::<Value>(&docx_rs::read_docx(bytes).expect("a document Word's format reads").json()).unwrap()["document"]
+            .clone()
+    };
+    assert_eq!(body(&written), body(&expected));
+    let first = &body(&written)["children"][0]["data"];
+    assert_eq!(first["property"]["style"], "Heading1");
+    assert_eq!(
+        first["children"][0]["data"]["children"][0]["data"]["text"],
+        "Réunion du 20 nov. 2026"
+    );
     assert_eq!(ran.lines, [json!({"event": "written", "file": to, "bytes": written.len()})]);
 }
 
