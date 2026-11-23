@@ -1,4 +1,4 @@
-# Run in an Ubuntu container by scripts/release.sh: the .deb of the five programs, its library
+# Run in an Ubuntu container by scripts/release.sh: the .deb of the six programs, its library
 # dependencies read by dpkg-shlibdeps from what each program links — the libraries installed
 # here for that, as a user's system has them —, and what is run or opened at run time, not
 # linked, named by hand: pw-metadata for capture, the tray's library for the shell.
@@ -7,7 +7,7 @@ apt-get update -qq
 apt-get install -y -qq --no-install-recommends dpkg-dev binutils \
   libwebkit2gtk-4.1-0 libgtk-3-0t64 librsvg2-2 libpipewire-0.3-0t64 libasound2t64 libvulkan1 >/dev/null
 root=/tmp/package
-for program in shell/kitokey capture/kitokey-capture transcription/kitokey-transcription summary/kitokey-summary export/kitokey-export; do
+for program in shell/kitokey capture/kitokey-capture transcription/kitokey-transcription summary/kitokey-summary export/kitokey-export send/kitokey-send; do
   install -Dm755 "/artefacts/$program" "$root/usr/bin/${program#*/}"
 done
 # Lighter without their symbols; a program that is no binary is left as it is.
@@ -23,6 +23,7 @@ install -Dm644 /artefacts/capture/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/
 install -Dm644 /artefacts/transcription/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-transcription.html"
 install -Dm644 /artefacts/summary/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-summary.html"
 install -Dm644 /artefacts/export/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-export.html"
+install -Dm644 /artefacts/send/THIRD-PARTY-NOTICES.html "$root/usr/share/doc/kitokey/THIRD-PARTY-NOTICES-kitokey-send.html"
 # Its copyright file (Debian Policy 12.5, DEP-5): the one notice a minimised Ubuntu keeps, naming the others.
 install -Dm644 /deb/copyright "$root/usr/share/doc/kitokey/copyright"
 # dpkg-shlibdeps reads a source package's control file where it runs: one is made for it.

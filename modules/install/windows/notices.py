@@ -1,7 +1,7 @@
 """What a package of Kitokey owes the authors of what it ships (D102), as Windows' zip and package
 lay it beside the programs: Kitokey's LICENSE, where the MPL crates' sources are, and each
 program's THIRD-PARTY-NOTICES.html, which its module's release left in the artefacts, named by the
-program. mac/build.sh, deb/build.sh and kitokey.spec lay the same names; scripts/test.sh reads all five.
+program. mac/build.sh, deb/build.sh and kitokey.spec lay the same names; scripts/test.sh reads all six.
 """
 import os
 
@@ -12,7 +12,7 @@ MPL = os.path.join(HERE, "..", "notices", "MPL-SOURCES.txt")
 # Each module's page, by the program it ships.
 PAGES = (("shell", "kitokey"), ("capture", "kitokey-capture"),
          ("transcription", "kitokey-transcription"), ("summary", "kitokey-summary"),
-         ("export", "kitokey-export"))
+         ("export", "kitokey-export"), ("send", "kitokey-send"))
 
 
 def files(artefacts):
