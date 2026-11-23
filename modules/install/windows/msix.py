@@ -1,5 +1,5 @@
 """Run on Windows by scripts/release.sh, and by trial.ps1 for a later version: Kitokey-<version>-x64.msix,
-made with the Windows SDK's MakeAppx from AppxManifest.xml.in, identity.json, the four programs and
+made with the Windows SDK's MakeAppx from AppxManifest.xml.in, identity.json, the five programs and
 Assets/ (D54). Unsigned: the Store signs what it publishes; outside it, whoever installs it signs it.
 
 Usage: msix.py <artefacts> <version> <out>
@@ -12,9 +12,11 @@ import shutil
 import subprocess
 import sys
 
+import notices as owed
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROGRAMS = ("shell/kitokey.exe", "capture/kitokey-capture.exe",
-            "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe")
+            "transcription/kitokey-transcription.exe", "summary/kitokey-summary.exe", "export/kitokey-export.exe")
 
 
 def four_parts(version):
@@ -56,6 +58,9 @@ def stage(artefacts, version, folder):
     for program in PROGRAMS:
         shutil.copy(os.path.join(artefacts, program), folder)
     shutil.copytree(os.path.join(HERE, "Assets"), os.path.join(folder, "Assets"))
+    # What the programs owe the authors of what they ship, beside them (D102).
+    for source, name in owed.files(artefacts):
+        shutil.copy(source, os.path.join(folder, name))
     with open(os.path.join(folder, "AppxManifest.xml"), "w", encoding="utf-8") as file:
         file.write(manifest(version, identity()))
 

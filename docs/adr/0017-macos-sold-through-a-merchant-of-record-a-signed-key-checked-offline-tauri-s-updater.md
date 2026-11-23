@@ -3,7 +3,10 @@
 > The framework's words: `.nstack/handbook/glossary.md`.
 
 - **Status**: Accepted — by the decider, 2026-11-20 (« 1017 approuvé », in their conversation with the coordinator; their
-  approval of #1017 on GitHub, again at efd2932 after main was merged into it)
+  approval of #1017 on GitHub, again at efd2932 after main was merged into it). Amended 2026-11-20, on the decider's
+  remark that Stripe was not compared: Stripe Managed Payments and Keygen added to the fallback, beside Paddle Billing
+  and Keygen (option 2b); Stripe with Stripe Tax set aside (*Rejected alternatives*). FastSpring stays the decision.
+  Reopened for study on 2026-11-21 at the decider's request: [docs/project/reviews/2026-11-21-payments-portfolio.md](../project/reviews/2026-11-21-payments-portfolio.md); the decision stands until the decider decides.
 - **Date**: 2026-11-20
 - **Decision makers**: the decider, `@napkinstack-admin`; proposed by an agent (marc, session 2b57f890-8981-4ce3-92f0-1ca23ed36acf)
 - **Scope**: project — the macOS build, sold; modules `shell` (the licence check, the updater) and `install` (the
@@ -66,7 +69,9 @@ or its framework's updater, the update signed with Ed25519.
 | [Polar](https://polar.sh/resources/pricing) | « 5% + 50¢ » (free plan), « +1.5% for international cards » | « Polar is the Merchant of Record » | Checked online: « validate the users license key via the `/v1/customer-portal/license-keys/validate` endpoint » ([licence keys](https://polar.sh/docs/features/benefits/license-keys)); no signed key found |
 | [Dodo Payments](https://dodopayments.com/pricing) | « 4% + 40c per domestic US transaction », « International payments… add +1.5% » | « a **Merchant of Record** » ([docs](https://docs.dodopayments.com/)) | Its own keys checked online (« The activate, deactivate, and validate license endpoints are public »); **keys the seller generates may be delivered** ([manual fulfilment](https://docs.dodopayments.com/developer-resources/manual-license-key-fulfillment.md)) |
 | [Creem](https://www.creem.io/pricing) | « 3.9 percent plus 40 US cents » | « We are the legal seller of record » ([docs](https://docs.creem.io/)) | « Generate and deliver software license keys automatically on purchase »; no page on checking them found; « the API key must stay on your backend » |
-| [Keygen](https://keygen.sh/docs/api/cryptography/) | « We will never take a percentage of revenue »; its tiers' prices did not load ([pricing](https://keygen.sh/pricing/)) | Not a merchant | Licences signed with the account's key, « powerful options for offline license verification »; « your account ID and public key should be hard-coded into your application code ». With Paddle: « allowing Paddle to communicate with Keygen using webhooks » ([Keygen + Paddle](https://keygen.sh/integrate/paddle/)), Billing or Classic not said |
+| [Stripe Managed Payments](https://docs.stripe.com/payments/managed-payments) (pages served in French) | « 3,5 % » « par transaction Managed Payments réussie, en plus des frais de paiement » — on top of the card fee: « 1,5 % + 0,25 € » for standard EEA cards, « 3,15 % + 0,25 € » for international ones ([pricing](https://stripe.com/pricing)) | « Marchand officiel: Stripe »; it « enregistre et dépose les déclarations fiscales auprès des autorités fiscales locales » in « plus de 80 pays » ([tax compliance](https://docs.stripe.com/payments/managed-payments/tax-compliance.md)); France among the seller's countries, access « sur la base d'un examen d'éligibilité »; « Logiciels » eligible, « Downloadable Software - personal use » among its tax codes ([eligibility](https://docs.stripe.com/payments/managed-payments/eligibility.md)) | None found: no page on keys or on delivering a digital good |
+| [Stripe with Stripe Tax](https://docs.stripe.com/tax/filing.md) | The card fee alone, and Stripe Tax's | Not a merchant: « Vous devez déclarer et verser les taxes que vous collectez pour chaque juridiction » ; Stripe files « aux États-Unis » and « certaines immatriculations en Irlande et au Canada »; its one OSS: « hors Union en Irlande »; the Union's VAT returns through partners (Marosa, Taxually), each priced on its own | None |
+| [Keygen](https://keygen.sh/docs/api/cryptography/) | « We will never take a percentage of revenue »; its tiers' prices did not load ([pricing](https://keygen.sh/pricing/)) | Not a merchant | Licences signed with the account's key, « powerful options for offline license verification »; « your account ID and public key should be hard-coded into your application code ». With Paddle: « allowing Paddle to communicate with Keygen using webhooks » ([Keygen + Paddle](https://keygen.sh/integrate/paddle/)), Billing or Classic not said. With Stripe: « letting Stripe communicate with Keygen over webhooks », its reference an example application ([Keygen + Stripe](https://keygen.sh/integrate/stripe/)); « Sign license keys with your account's Ed25519 signing key », usable « in offline or air-gapped environments »; free tier « up to 100 active licensed users », no share of revenue ([pricing](https://keygen.sh/pricing/), the paid tiers' prices did not load) |
 | [Tauri's updater](https://v2.tauri.app/plugin/updater/) (updated 2025-11-28) | — | — | Updates: `myapp.app.tar.gz` and its `.sig`; « Tauri's updater needs a signature… This cannot be disabled »; the public key in `tauri.conf.json` |
 | [Sparkle 2](https://sparkle-project.org/documentation/) | — | — | Updates: « Sparkle's EdDSA (ed25519) signature », the key in `Info.plist`; « Notarize and code sign the application via Apple's Developer ID program » |
 
@@ -106,6 +111,18 @@ The updater is the same in every option (Tauri's, below); the options differ in 
 - **Risk**: honestly, a webhook or a connector between Paddle and Keygen to set up and keep — Keygen's page says
   Paddle « communicate[s] with Keygen using webhooks », not whether for Billing; the signing key is Keygen's
   account's: leaving it means new keys for its customers. No server of ours if the connector is Keygen's.
+- **Cost of getting out**: back to option 1's keys, which the app still checks.
+
+### Option 2b — Stripe Managed Payments and Keygen Cloud (added 2026-11-20)
+
+- **Description**: as option 2, Stripe in Paddle's place: Stripe is the merchant and files the taxes; Keygen issues
+  each key on Stripe's webhook, signed with Ed25519, checked offline.
+- **Cost**: 3.5 % on top of the card's fee — at €49 on a standard EEA card, about €2.70, 5.5 %, under Paddle's
+  €2.95; on an international card about €3.51, 7.2 %, over it. Keygen's tier on top.
+- **Risk**: access is Stripe's to grant, after an eligibility review; the buyer sees « Link » as the merchant
+  (« Le client voit Link comme le marchand officiel », [how it works](https://docs.stripe.com/payments/managed-payments/how-it-works)).
+  **The same relay as option 2**: Keygen's Stripe integration is a webhook and an example application to run — a
+  server, ours unless a connector (Keygen's Zapier route, not read) carries it.
 - **Cost of getting out**: back to option 1's keys, which the app still checks.
 
 ### Option 3 — Dodo Payments delivering the same pre-signed keys
@@ -163,7 +180,10 @@ static file beside the release.
   theirs online; Gumroad costs twice as much; Keygen is not a merchant.
 - **The condition: FastSpring's written quote.** Its rate is not published — a figure attributed to a third party,
   5.9 % + $0.95, was not found and stays unconfirmed. Signing with FastSpring waits for its quote in writing.
-- **The fallback is option 2**, Paddle Billing and Keygen Cloud — not a function of ours. Option 3, Dodo, is to read
+- **The fallback is option 2 or 2b**: Keygen Cloud issuing the keys behind Paddle Billing or Stripe Managed
+  Payments — the cheaper for the buyers of the day (Stripe on European cards, Paddle on international ones), and
+  Stripe only once its review grants access. Either needs a relay from the merchant's webhook to Keygen that is
+  not a server of ours, or a new record. Option 3, Dodo, is to read
   further: if its manual fulfilment holds a list as FastSpring's does, it is an alternative at Paddle's price.
 - **The key is ours**, whatever the merchant: Ed25519 over `{id, edition, max_version}`, nothing personal, checked offline with the
   public key built into the app — as Keygen recommends, and as Kitokey already checks its list of models. A key
@@ -209,7 +229,7 @@ So the App Store is a second build, not a setting of this one: no key, no update
 > server of Kitokey's running —, on a build of cycle 12** before **2026-12-18**.
 
 What we do if it is not: correct — if FastSpring's quote or its list fails, option 3 (Dodo) if it holds a list,
-else option 2 (Paddle Billing and Keygen Cloud); never a server of ours but on the decider's word, as a new record.
+else option 2 or 2b (Keygen Cloud behind Paddle Billing or Stripe Managed Payments); never a server of ours but on the decider's word, as a new record.
 
 ---
 
@@ -226,7 +246,7 @@ else option 2 (Paddle Billing and Keygen Cloud); never a server of ours but on t
   convention accepts it; so does PDR-0001 (« no account, nothing sent »).
 - FastSpring's fee is unknown until its quote.
 
-**Impacts on other modules or contracts:** `shell` — the licence check and the updater (cycle 12); `install` — the
+**Impacts on other modules or contracts:** `shell` — the licence check and the updater (cycle 12), the updater never started from a package: Windows' package is the Store's to update (D102, 2026-11-20 — no Store policy names a self-update; 10.2.2 refuses « any form of dynamic inclusion of code » that changes the product, and the package's files are not Kitokey's to rewrite); `install` — the
 macOS package signed with Developer ID and notarised, an `.app.tar.gz` and its signature published beside it, and the
 tool that signs a batch of keys offline.
 
@@ -240,6 +260,9 @@ built in is the batch's; and a check that no secret key is in the repository —
 - **Paddle Billing with a function of ours**: Kitokey's first server, its private key online, for each sale. The
   fallback is Keygen's instead (option 2).
 - **Polar, Creem**: their keys checked online, or not shown checked offline.
+- **Stripe with Stripe Tax, without Managed Payments**: Kitokey would be the seller, registered and filing in each
+  jurisdiction; Stripe files in the United States and for some registrations in Ireland and Canada, its only OSS
+  « hors Union »: the Union's OSS return would be ours or a partner's, paid apart. PDR-0001 asks a merchant of record.
 - **Lemon Squeezy**: it closes on 2027-03-31, and its licence check is a call to its server.
 - **Paddle Classic's licence keys**: closed to new sellers.
 - **An online activation** (Lemon Squeezy's, Keygen's online mode): the app would send something to check a
@@ -256,5 +279,8 @@ built in is the batch's; and a check that no secret key is in the repository —
 - Creem: no page on checking its keys was found.
 - Gumroad's licence keys: its help page did not load.
 - Paddle Billing's whole API reference: no licence feature was found in the pages read.
+- Stripe Managed Payments: the card fee for a US card (« 6.4 % + $0.30 », said by third parties, was not read on
+  Stripe's page); whether a buyer's invoice names Kitokey or « Link »; how long its eligibility review takes.
+- Keygen: whether a connector (its Zapier route) relays Stripe's or Paddle's webhook without a server of ours.
 - App Review Guideline 3.1.1, on in-app purchase, was not read verbatim; 2.4.5 was.
 - Apple's notarisation page did not load; its requirement is quoted from Tauri's page.

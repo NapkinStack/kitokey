@@ -12,14 +12,14 @@ deliverables:
     state: ready
     acceptance:
       - "Given the identity Partner Center shows once the name is reserved, when CI builds the MSIX, then its `Identity` and `PublisherDisplayName` are Partner Center's, read from `identity.json` with no placeholder left — the build fails on one —, and the package installs, upgrades and is removed in CI as D54 already proves with the test certificate; held by CI's Windows job"
-      - "Given the MSIX build, when it is made, then cycle 07's self-updater is off in it — the Store updates the package —, and its licence is the Store's trial, D83's own trial counter off in that build; held by a test of the build, each switch read from the built package (the licence rule: *Open questions*)"
+      - "Given the MSIX build, when it is made, then cycle 07's self-updater is off in it — the Store updates the package —, and its trial is the app's own — PDR-0005's rule, held by D83's counter, the Store's trial set to « Unlimited » in Partner Center and the Store selling the licence (the decider, 2026-11-20: « essai (a) ») —; held by a test of the build, each switch read from the built package"
       - "Given that package, when it is built, then its size is recorded with the commit in a file of the repository, the baseline every later threshold reads; and when the Windows App Certification Kit runs on it in CI, every required test passes, its report kept with the run — half a day first proves the kit runs on CI's runner; a test it cannot run headless is named in the sheet with why, never skipped silently"
   - id: D103
     title: "The Store's listing is ready: its screenshots in French and in English made by the e2e, its privacy policy, and the downloads it needs said"
     module: shell
     state: ready
     acceptance:
-      - "Given the window's e2e, when it runs, then it writes four screenshots per language — the list, a meeting's page with its summary, the bar while recording, Settings — at the size Microsoft's page for Store screenshots asks, that page's address and the day it was read written in D103's section before the first pull request, from meetings made for the e2e with nothing of a real one; held by a test that checks the files' count and size"
+      - "Given the window's e2e, when it runs, then it writes four screenshots per language — a meeting's page with its summary and transcript, a word sought in a meeting's transcript, the list filtered by a search, Settings with its models on this computer — at the size Microsoft's page for Store screenshots asks, that page's address and the day it was read written in D103's section before the first pull request, from meetings made for the e2e with nothing of a real one, each a meeting Kitokey's buyers hold, readable at a glance (amended by the decider, 2026-11-21: D103's section); held by a test that checks the files' count and size"
       - "Given `docs/store/listing.md`, when the screenshots are made, then the listing names them in the order the Store shows them; it links a privacy policy, in the repository, written to the voice guide — the microphone and the system's sound recorded, nothing leaving the computer by default, what leaves when the user chooses a service or a channel, and to whom —; it says before purchase what is downloaded and from where — Ollama, which Kitokey never installs, and the default Whisper model with its size —; and every promise of its text is one the product keeps, each line pointing to the deliverable or test that holds it"
   - id: D104
     title: "The shell's e2e can be trusted: a red names a defect, not the machine"
@@ -34,7 +34,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given the release package on Linux, when the baseline runs alone — in a window the coordinator plans with the queues empty, so that it neither measures their load nor takes D104's attests' machine —, then it records the cold start to the window drawn, the memory at rest — the shell's and its web view's proportional set size —, and the time to open a meeting's page with a transcript of an hour, each the median of ten runs, written with the commit and the machine in a file of the repository"
-      - "Given the baseline, when the budgets are set, then each is the baseline plus a margin said with its reason, set against RAIL's 100 ms response and 1 s load and Apple's 400 ms launch to first frame, each source cited; the measure runs on the release pull request, alone, and fails it when a budget is exceeded; held by that run red on a change slowed on purpose"
+      - "Given the baseline, when the budgets are set, then each is the baseline plus a margin said with its reason, set against RAIL's 100 ms response and Apple's 400 ms launch to first frame, each source cited; the measure runs on the release pull request, alone, and fails it when a budget is exceeded; held by that run red on a change slowed on purpose"
   - id: D106
     title: "The surfaces a buyer sees first pass axe-core's AA rules and a checked list of WCAG 2.2 criteria"
     module: shell
@@ -70,7 +70,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given what leaves the computer, when this deliverable starts, then a PDR says, for each destination, on whose word a meeting leaves — a gesture each time, or « each new summary » set once —, that a meeting said confidential never leaves, and where a webhook's address is kept (the system's keyring, as keys are: ADR-0013); the decider accepts it, the day of that word written in the PDR, before any sending is merged"
-      - "Given a webhook address the user pasted — a generic one or Discord's —, when they send a summary, then an address that is not `https:`, or that points to the local network, is said before anything is sent; the generic one receives a JSON of the title, the summary in Markdown and its actions, and Discord's receives a short message with the summary attached as a Markdown file, within Discord's documented limits (cited); a refusal or no network is said on the page with what to do; a confidential meeting offers no send; held by the module's tests against a local server and by the e2e"
+      - "Given a webhook address the user pasted — a generic one, Discord's or Slack's incoming webhook —, when they send a summary, then an address that is not `https:`, or that points to the local network, is said before anything is sent; the generic one receives a JSON of the title, the summary in Markdown and its actions, and Discord's receives a short message with the summary attached as a Markdown file, within Discord's documented limits (cited), and Slack's receives the title and the summary in mrkdwn, within Slack's documented limits (cited); a refusal or no network is said on the page with what to do; a confidential meeting offers no send; held by the module's tests against a local server and by the e2e"
   - id: D111
     title: "A meeting's summary takes the structure of its kind, chosen on its page"
     module: summary
@@ -126,6 +126,19 @@ deliverables:
 > what cycle 10 left of D94 and D93 ([cycle 10's *Later*](10-kitokey-ready-when-you-come-back.md#later)); the
 > end date does not move (`framing.md` §4).
 
+> **D110's criterion 2 amended on the decider's word, 2026-11-20**, in their working session with the
+> coordinator, on reading PDR-0007 (#1039): « PDR acceptée, ok Slack dans D110 ». Slack's incoming webhook joins
+> the generic webhook and Discord's: a URL the user creates in their own workspace, no OAuth and no secret of
+> Kitokey's; its message in mrkdwn ([PDR-0007](../../pdr/0007-a-summary-leaves-for-a-channel-on-a-gesture-never-a-confidential-one.md)).
+> Slack's OAuth stays in *Later*.
+
+> **D105's criterion 2 amended on the decider's word, 2026-11-20**, in their working session with the
+> coordinator: « ok pour l'amendement de D105 ». « 1 s load » is no longer RAIL's: today it asks 5 s for a
+> first load on a mid-range phone over slow 3G, and 2 s after ([web.dev/articles/rail](https://web.dev/articles/rail),
+> read that day), neither a local desktop app's. The start is held against Apple's 400 ms to first frame
+> ([WWDC 2019, session 423](https://developer.apple.com/videos/play/wwdc2019/423/)), a meeting's page against
+> RAIL's 100 ms response; both stay targets until the baseline says where Kitokey is.
+
 ## Goal
 
 Two things stand between Kitokey and its first buyer. **The Store**: the package still carries a placeholder
@@ -143,7 +156,7 @@ edge is that the meeting already is a folder of files: export is never paywalled
 flowchart LR
     M["A meeting's folder<br/>audio · transcript · minutes"]:::have --> X["export (D108)<br/>Markdown · HTML · DOCX · PDF"]:::build
     X --> P["Its page (D109)<br/>Exporter · Copier · a folder"]:::build
-    X --> S["A channel (D110)<br/>webhook · Discord"]:::build
+    X --> S["A channel (D110)<br/>webhook · Discord · Slack"]:::build
     T["Its kind (D111)<br/>minutes/v5 structures"]:::build --> M
     W["The Store (D102–D106)<br/>identity · screenshots · trust · speed · access"]:::store
     classDef have fill:#374151,color:#fff
@@ -199,10 +212,18 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   which is the oracle.
 - Tauri emits EXE and MSI, not MSIX ([Tauri](https://v2.tauri.app/distribute/microsoft-store/)): the package is
   `install`'s own step, as it is today.
-- **The updater and the licence**: a Store package is updated by the Store (Microsoft's Store policies, to be
-  cited from their page in D102's first pull request), so cycle 07's self-updater is off in that build. Which
-  trial counts in the Store build — the Store's, or D83's own — is the decider's (*Open questions*); the
-  criterion is built with the convention, the Store's.
+- **The updater and the licence**: a Store package is updated by the Store. No policy names a self-update for
+  a non-game app — 10.2.5's « installed and updated only through the Store » is for games and Xbox —; 10.2.2
+  refuses « any form of dynamic inclusion of code » that changes the product ([Microsoft Store Policies
+  7.20](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies), read 2026-11-20). There is no
+  self-updater to switch off: cycle 07's is the system's (Copr, dnf), and the shell holds none; its rule is
+  written for the one to come (#1052, ADR-0017 #1053).
+- **The trial, decided** (the decider, 2026-11-20: « essai (a) »): the Store's trial cannot say PDR-0005's rule —
+  Partner Center offers « Time-limited » « 1 day, 7 days, 15 days, or 30 days », or « Unlimited », and counts no
+  meeting ([price and availability](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/price-and-availability)).
+  So the Store build keeps the app's own trial — 14 days or 10 meetings, whichever comes last, D83's counter —,
+  the Store's trial set to « Unlimited », and the Store sells the licence, which D83 already reads
+  (`StoreContext.GetAppLicenseAsync`). One rule of trial on every system; nothing to build for the licence.
 - **The size** is recorded here because every later threshold reads it, D108's first.
 
 ### D103
@@ -212,6 +233,19 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 - An app that records the microphone needs a privacy policy linked from its listing. A buyer reads before
   paying that the summary needs Ollama, which Kitokey never installs, and that the transcription model is
   downloaded at first run.
+- **Microsoft's page for Store screenshots, read on 2026-11-20** (ines, before D103's first pull request):
+  [*App screenshots, images, and trailers for MSIX app*](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/screenshots-and-images)
+  — the MSIX page, Kitokey being an MSIX ([PDR-0004](../../pdr/0004-windows-through-the-microsoft-store.md)).
+  Desktop « 1366 x 768 pixels or larger » (4K supported), a `.png` of at most 50 MB; one to ten, « at least four »
+  suggested; a caption of at most 200 characters; images and captions uploaded for each listing language;
+  « displayed in your listing in order »; no logo, icon or marketing message added.
+- **Criterion 1 amended** (the decider, 2026-11-21 around 03:00, relayed by the coordinator), to the coordinator's
+  proposal « D103 crit. 1: amend to 4 shots = meeting page, search in a meeting, list filtered by search, settings
+  with models installed; live time/levels → product issue »: « ok pour 1 mais il faut "simuler" des "contenus" de
+  réunion et autres textes parlant au public concerné, que ce soit réaliste et que les prospects puissent comprendre
+  de manière intuitive en un coup d'œil, il faut que les captures soient pertinentes ». The bar while recording is
+  no longer shot: the meeting's page shows neither the time nor the levels while it records; that is
+  #1076, and its shot comes back with it.
 
 ### D104
 
@@ -240,6 +274,16 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   not « meets WCAG 2.2 AA », and the criteria axe-core cannot judge are held by checks of their own.
 - Buyers' organisations ask for accessibility — EN 301 549 in EU public procurement, Section 508 in the US
   *(framer's assumption, not read)*.
+- What axe-core cannot judge on the list, a meeting's page, Settings and the bar, each held by a check of the shell's
+  e2e (criterion 2):
+
+  | WCAG 2.2 | What is checked | Held by |
+  |---|---|---|
+  | 2.4.7 Focus Visible (AA) | each Tab stop draws a ring, an outline or a shadow, that differs from the same element at rest | CE `keys_first_surfaces`, each language in each theme |
+  | 2.4.11 Focus Not Obscured (Minimum) (AA) | no Tab or Shift+Tab stop is entirely hidden: a point of its box, in the window, has it (or its label) on top, read at each frame until it does, a second at most (WebKit scrolls to a text field after its focus) | CE |
+  | 2.5.7 Dragging Movements (AA) | the shell has no drag (no `pointermove`, `drag*` or `mousemove` handler in `window.js`); the player seeks by one click on the drawing, and by its keys as a slider | `main()`: « a click on who spoke moves the playback there », « the arrows move the playback on the drawing, a slider » |
+  | 2.5.8 Target Size (Minimum) (AA) | each target shown is 24 by 24 CSS px, or a 24 px circle centred on it cuts no other target nor another small target's circle; a target in a sentence (inline, in a block with text of its own) is exempt | CE: axe's `target-size` leaves such cases « incomplete » (s106cdT), so CE measures it |
+  | 2.1.1 Keyboard (A) | every control shown, by a tag or a role that acts, is reached by Tab; in a roving group (WAI-ARIA APG: one member at tabindex 0, the others at -1, under one parent; or radios of one name), the others count once Tab reached its one stop and ArrowDown goes on to another. A control that acts by a click on an element of neither kind (a `div`) is not seen | CE, on a meeting that plays: its transcript's lines are such a group |
 
 ### D107
 
@@ -282,6 +326,42 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   summary model of Settings —, at least 4 of the 6 built-in structures yield every section either filled or said
   empty, over the team's sample of 3 meetings; below that, the structures that fail are cut and the result
   recorded — a refuted spike is a delivered one.
+- **The spike, 2026-11-20** (`kitokey-team/logs/d111-spike*.jsonl`): `qwen3:8b`, the local model Settings
+  recommends, on the bench's played meeting (`modules/platform/bench/meeting.txt`, French, synthesised voices),
+  3 runs per structure, 92 to 361 s an answer. Asked the sections' order in words, as v4 is: 3 of 6 structures
+  held every run — one-to-one, stand-up and interview each failed once, on form (no `## ` line twice, content
+  written as a title once). Given the skeleton to copy — `# <the meeting's title>`, then `## <section n's title>`
+  and `<section n's content>` line by line, each title « a few words naming the section, never its content »:
+  **6 of 6, every run; the threshold is held**, and summary asks it so (#1042). A JSON answer by constrained
+  decoding, the third variant, was not needed. Not met as written: one meeting played three times, not three
+  meetings; and the spike's request lacked summary's paragraph on the recogniser's errors and its times per bullet.
+- **The third spike, 2026-11-21** — what closes those two gaps.
+  - **Setup.** `kitokey-summary` itself was built at 0d365b7 and run as the shell runs it, `--structure <name>`
+    on `qwen3:8b` through Ollama's native route, so the request is the bytes `request_in` builds: rules, the
+    recogniser's errors, the times, the skeleton.
+  - **Sample.** Three meetings, two runs per structure, 36 runs:
+    - a written stand-up;
+    - a written client call;
+    - the bench's meeting recognised by whisper.cpp large-v3-turbo-q8_0, taken as transcript/v1 with the
+      recogniser's own errors.
+  - **Judged on what the program writes** (its one asking again included), as the coordinator decided before
+    the reading. The first answer's count is recorded beside it.
+  - **Result:**
+    - general, stand-up, client call and project review held every run;
+    - one-to-one and interview held 5 of 6;
+    - **4 of 6 structures, every run: the threshold is held.** The first answer's count is the same; nothing
+      was asked again.
+  - **The two failures** came on the recognised meeting: one-to-one run 1 (661 s) and interview run 2 (592 s).
+    Neither was on form. Each time the program refused with « the provider on this computer cut its answer
+    short »: Ollama said `done_reason: length` after the 4,096 tokens `num_predict` allows an answer, its
+    thinking counted (`modules/summary/src/provider.rs`, `WINDOW`). At about 7 tokens a second, that is the
+    590–660 s seen. The program wrote no incomplete minutes, as designed.
+  - **Read:** the structures' form held on every answer that ended. The risk left is a thinking model's length
+    on a longer, noisier transcript, which grows with an hour-long import. That is a follow-up issue, not
+    D111's criterion.
+  - **Evidence:** `kitokey-team/logs/d111-spike3.jsonl` (one line per run, the minutes or the refusal) and
+    `logs/evening/d111-spike3.log` (the table). Spike 3 was run at 0d365b7; `git diff 0d365b7 300c7b5 --
+    modules/summary` is empty, 300c7b5 being main 5553f42 merged in.
 - **The contract**: three pull requests, in order — `minutes/v5`'s page and schema, summary writing it, the
   shell reading v4 and v5. v4 is never removed in this cycle.
 
@@ -358,8 +438,9 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 - **The appetite**: two weeks, as cycles 08 to 10. Eleven deliverables do not all fit whole; the cut order
   above says what goes first. Three weeks would keep D111 whole. Default, without a word: two weeks.
 - **The PDF's size threshold**: 15 MB, D108's spike, read against D102's package size. A word changes it.
-- **The Store build's licence**: the convention is the Store's trial alone (PDR-0005's *Unlimited*), D83's
-  own counter off in that build; the decider may keep D83's in it. Default: the Store's.
+- ~~**The Store build's licence**: the convention is the Store's trial alone (PDR-0005's *Unlimited*), D83's
+  own counter off in that build; the decider may keep D83's in it. Default: the Store's.~~ Settled by the
+  decider, 2026-11-20 (« essai (a) »): D83's counter kept, the Store's trial « Unlimited » (D102's section).
 - **The six built-in structures**: the market's common core; the decider may name others.
 - **D111's spike threshold**: 4 of the 6 structures, every section filled or said empty, over 3 meetings, with
   Settings' default local model (D111's section). A word changes it.

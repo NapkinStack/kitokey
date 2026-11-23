@@ -35,7 +35,11 @@ module:
   #   removal_date: YYYY-MM-DD
 
 # Contracts PROVIDED by this module. `path` holds its document (B7).
-provides: []
+provides:
+  - contract: exporting
+    version: v1
+    path: contracts/exporting/v1
+    stability: experimental
 #  - contract: export-api
 #    version: v1
 #    path: contracts/export-api/v1
@@ -90,6 +94,14 @@ dependencies:
     purpose: Renders the summary's Markdown into the HTML page, its raw HTML said as text
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
     exit_strategy: One loop in html() of src/lib.rs; any CommonMark renderer that gives events replaces it.
+  - name: cargo-about
+    purpose: >-
+      Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
+      never run by a build or a release (D102)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >-
+      Its output is a committed HTML page, about.hbs its template; any generator that lists the
+      crates with their licence texts replaces it, and tests/notices.rs judges the result.
 #  - name:
 #    purpose:
 #    adr:
@@ -100,8 +112,9 @@ dependencies:
 # No stack is imposed. check and test are required once the module holds more than its
 # description (fitness M7): declare them before its first file of code.
 commands:
-  check: cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
+  check: bash -n scripts/release.sh && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
   test: cargo test --locked
+  release: bash scripts/release.sh
 #  bootstrap:                    # optional: make the module usable from a fresh clone
 #  run:                          # optional: local start, with doubles for the dependencies
 #  e2e:                          # optional: end-to-end scenarios; evidence written to .evidence/

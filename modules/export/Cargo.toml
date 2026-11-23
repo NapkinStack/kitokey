@@ -11,3 +11,7 @@ serde_json = "1.0.154"
 [dev-dependencies]
 quick-xml = "0.42.0"
 tempfile = "3"
+
+[[bin]]
+name = "kitokey-export"
+path = "src/main.rs"

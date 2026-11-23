@@ -88,3 +88,9 @@ pub fn answering(text: &str, finish: &str) -> String {
 pub fn answering_natively(text: &str, done: &str) -> String {
     serde_json::json!({ "message": { "role": "assistant", "content": text }, "done": true, "done_reason": done }).to_string()
 }
+
+/// The same, saying how many tokens of the request it read, as Ollama does in `prompt_eval_count`.
+pub fn answering_natively_having_read(text: &str, done: &str, read: usize) -> String {
+    serde_json::json!({ "message": { "role": "assistant", "content": text }, "done": true, "done_reason": done, "prompt_eval_count": read })
+        .to_string()
+}
