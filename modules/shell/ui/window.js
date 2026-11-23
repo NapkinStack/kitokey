@@ -1136,7 +1136,11 @@ function contextCard(session, { context, transcript, minutes }, words, settings,
   said.setAttribute("role", "status");
   const changed = element("div", "context-changed");
   changed.id = "context-changed";
-  const redo = element("button", "open", words.context_redo);
+  // It names what it starts (D113): the transcript, and the summary when one follows it — the meeting
+  // has one, or Settings make it —, as the shell says each time it reads the context.
+  const redo = element("button", "open");
+  const naming = (shown) => (redo.textContent = words.context_redo[shown.minutes_after ? 1 : 0]);
+  naming(context);
   redo.type = "button";
   redo.id = "context-redo";
   redo.addEventListener("click", async () => {
@@ -1173,6 +1177,7 @@ function contextCard(session, { context, transcript, minutes }, words, settings,
     try {
       const shown = await window.__TAURI__.core.invoke("context_saved", { name, text });
       card.dataset.changed = String(shown.changed);
+      naming(shown);
       said.textContent = "";
     } catch {
       said.textContent = words.context_not_saved;
@@ -1213,6 +1218,8 @@ function paintContext() {
       .invoke("context_shown", { name })
       .then((shown) => {
         card.dataset.changed = String(shown.changed);
+        const redo = document.getElementById("context-redo");
+        if (redo) redo.textContent = words.context_redo[shown.minutes_after ? 1 : 0];
         delete card.dataset.unread;
         paintContext();
       })
@@ -1609,7 +1616,15 @@ function redoPanel(offered, session, words, button) {
 }
 
 function redoTranscriptPanel(offered, session, words, button, corrected) {
-  const notes = [element("p", "says", words.redo_transcript_note)];
+  const note = element("p", "says", words.redo_transcript_note);
+  note.id = "redo-transcript-note";
+  const notes = [note];
+  // Made again, the transcript alone: the summary there is kept, said so (the decider, 2026-11-18, D113).
+  if (session.minutes) {
+    const kept = element("p", "says", words.redo_keeps_minutes);
+    kept.id = "redo-keeps-minutes";
+    notes.push(kept);
+  }
   // Made again, the transcript is another file: a person's corrections are not in it (ADR-0014).
   if (corrected) {
     const lost = element("p", "note warn", words.redo_loses_corrections);
