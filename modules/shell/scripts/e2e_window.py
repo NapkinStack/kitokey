@@ -3925,6 +3925,8 @@ def advanced_latest_answer(now: dt.datetime) -> None:
             browser.execute_script(
                 "const real = window.__TAURI__.core; window.held = []; window.armed = true; window.refusing = false;"
                 " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {"
+                "   if (asked === 'recording_now' && window.stale) { window.stale = false;"
+                "     return new Promise((ok, no) => window.held.push(() => real.invoke(asked, ...rest).then((a) => ok({ ...a, recording: false, meeting: null }), no))); }"
                 "   if (asked === 'models_offered' && window.failing && rest[0] && rest[0].name) return Promise.reject('failing (#1142)');"
                 "   if (asked === 'models_offered' && window.holding && rest[0] && rest[0].name) { window.holding = false;"
                 "     return new Promise((ok, no) => window.held.push(() => real.invoke(asked, ...rest).then(ok, no))); }"
@@ -3992,6 +3994,21 @@ def advanced_latest_answer(now: dt.datetime) -> None:
             check("« Avancé » closed, the models not read on its close: nothing is said (#1142)",
                   shown_again and not failed_said and not browser.execute_script(opened),
                   {"opened first": shown_again, "said": browser.execute_script(said), "open": browser.execute_script(opened)})
+            # #1166: the bar reads `recording_now` every 100 ms, and its readings may overlap. One asked before the
+            # start, answered after a later one — a machine under load —: « Avancé », opened by the user while
+            # recording, stays open, and the bar still records.
+            browser.execute_script(toggled)
+            open_before = wait_for(browser, lambda b: b.execute_script(opened), 5)
+            before_stale = browser.execute_script("return window.held.length")
+            browser.execute_script("window.stale = true")
+            stale_held = wait_for(browser, lambda b: b.execute_script("return window.held.length") == before_stale + 1, 5)
+            time.sleep(0.5)
+            browser.execute_script("window.held[arguments[0]]()", before_stale)
+            closed_after = wait_for(browser, lambda b: not b.execute_script(opened), 2)
+            check("an older reading of the recording, answered after a later one: « Avancé » left open, the bar still recording (#1166)",
+                  open_before and stale_held and not closed_after and browser.find_element(By.ID, "small-stop").is_displayed(),
+                  {"open before": open_before, "held": stale_held, "open": browser.execute_script(opened),
+                   "stop shown": browser.find_element(By.ID, "small-stop").is_displayed()})
             browser.execute_script("window.restoreCore()")
             press(browser, "small-stop")
             wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
