@@ -3,7 +3,8 @@
 How the program that sends a meeting's summary to a channel is started, what it is given, what it
 sends, and what it says: one line of text per event, for whoever started it. D110's program,
 framed by [PDR-0007](../../../docs/pdr/0007-a-summary-leaves-for-a-channel-on-a-gesture-never-a-confidential-one.md),
-consumed by the shell.
+consumed by the shell. D116 added Notion, a fourth kind, to this version (*Notion*): an additive change,
+every earlier input, line and code unchanged.
 
 ```mermaid
 flowchart LR
@@ -14,6 +15,7 @@ flowchart LR
     P -.->|"its error stream: one sentence, when it fails"| S
     F["The session's folder<br/>session-audio · minutes"]:::file -->|"read only"| P
     P -->|"one POST, https, to the address"| C["The channel<br/>a webhook · Discord · Slack"]:::outside
+    P -->|"notion: two reads, then one POST, https"| N["Notion's API<br/>api.notion.com"]:::outside
 
     classDef producer fill:#065f46,color:#fff
     classDef consumer fill:#1e3a8a,color:#fff
@@ -32,10 +34,12 @@ project's comparator (ADR-0005). What a schema cannot say is said here and nowhe
 ## How it is started
 
 - `kitokey-send <session-folder> --kind <kind>`, the options in any order: sends the meeting's
-  summary once, to the address on its input. `<kind>` is `webhook`, `discord` or `slack`: what the
-  address is, and so what it is sent (*What it sends*).
+  summary once, to the address on its input. `<kind>` is `webhook`, `discord`, `slack` or `notion`: what
+  the address is, and so what it is sent (*What it sends*, *Notion*).
 - `kitokey-send --check`: sends nothing; says whether the address on its input would be refused.
   Settings asks it before keeping an address (PDR-0007, *Edge cases*).
+- `kitokey-send --check --kind notion`: sends nothing; reads the database with the key, as a send would
+  before it creates anything, and says whether both would do (*Notion*).
 
 The arguments hold no word of the meeting and no address: a session's folder is named by the day and
 hour it started (`session-audio`). A process's arguments are public to the machine's users; a
@@ -45,8 +49,9 @@ webhook's address is a secret — whoever holds it posts to the channel —, so 
 
 | Field | Holds |
 |---|---|
-| `address` | The channel's webhook address, as the person pasted it. Always |
+| `address` | The channel's webhook address, as the person pasted it; for `notion`, the database's link. Always |
 | `name` | The meeting's name, for a meeting whose minutes hold no title: its `title.txt`, or the shell's name for it. `--check` ignores it |
+| `key` | For `notion` alone, and always with it: the integration's key, as the person pasted it — a secret, as an address is. The other kinds ignore it |
 
 ## Which addresses it refuses
 
@@ -97,6 +102,64 @@ nothing is sent. Discord's `content` is the one place cut, by design: the file c
 **Once**: one POST, never sent again by the program — not on a failure, not on a `429`. Whether to
 send again is the person's gesture.
 
+## Notion
+
+`--kind notion` reaches Notion's API, never the address: the address is the link of a database the
+person shared with their own internal integration, and the key is that integration's
+([*Authorization*](https://developers.notion.com/docs/authorization)). Its rules, read on Notion's pages on
+2026-11-23 — none of which shows the day it last changed:
+
+- **The database** is the link's last 32 hexadecimal characters before any `?`, hyphens left out: a link
+  Notion copies holds the database's title before them (`…/Notes-0123…cdef?v=…`), and an ID written as a
+  UUID, with its hyphens, gives the same 32 ([*Retrieve a data source*](https://developers.notion.com/reference/retrieve-a-data-source):
+  « the 32-character alphanumeric string »); a link that is not `https:` or holds none is
+  `address.refused`, nothing contacted.
+- **Every request** goes to `https://api.notion.com`, with `Authorization: Bearer <key>` and
+  `Notion-Version: 2026-03-11`, the version this contract pins
+  ([*Versioning*](https://developers.notion.com/reference/versioning)); another is a change of this page.
+  The rules of *Which addresses it refuses* — every resolved address judged, no redirect, no proxy — hold
+  for that host.
+- **A send** reads, then creates, within the 30 s of a send: `GET /v1/databases/<database>` for its data
+  sources — since `2025-09-03`, a database's answer lists them and holds no properties
+  ([upgrade guide](https://developers.notion.com/guides/get-started/upgrade-guide-2025-09-03)) —,
+  `GET /v1/data_sources/<data source>` for the name of its one `title` property
+  ([*Retrieve a data source*](https://developers.notion.com/reference/retrieve-a-data-source)), then **one**
+  `POST /v1/pages` — the one request that creates, never sent again. A read that fails, or is not answered
+  within the bound, ends the send with its code: nothing was created.
+- **One data source**: a database holding several is `database.several`, nothing created — the page would
+  land in one of them without the person choosing which.
+- **The page** ([*Create a page*](https://developers.notion.com/reference/post-page)): its parent the data
+  source; its title property, the title; its `children`, the summary as blocks
+  ([*Block*](https://developers.notion.com/reference/block)) — a section's `## ` title a `heading_2`, a
+  `### ` one a `heading_3`, a paragraph a `paragraph`, an item a `bulleted_list_item` or a
+  `numbered_list_item`, a `> ` line a `quote`, a fenced block a `code` in `plain text`, `---` a `divider` —,
+  and each action a `to_do`, left unticked. Inline, `**bold**`, `*italic*` and `` `code` `` become a rich
+  text's `annotations`, a link `[text](url)` its `link` ([*Rich text*](https://developers.notion.com/reference/rich-text)).
+- **Within Notion's limits** ([*Request limits*](https://developers.notion.com/reference/request-limits)):
+  a rich text's `content` at most 2000 characters, a longer text split over several; at most 100 rich
+  texts in a block; at most 100 blocks in `children`, one level, none nested; at most 500 KB a request.
+  A summary that does not fit **one** request is `summary.too_large`, and nothing is created: a second
+  request could fail after the first and leave half a page.
+
+Notion's answers, read as its [*Status codes*](https://developers.notion.com/reference/status-codes) say:
+
+| Status, Notion's `code` | `code` here | Nothing was created? | What a person does |
+|---|---|---|---|
+| `401` `unauthorized` | `key.refused` | Nothing | Paste the integration's key again, or a new one |
+| `404` `object_not_found` | `database.unshared` | Nothing | Share the database with the integration — its « ••• » menu, *Connections* —, or set up a database that exists |
+| `403` `restricted_resource` | `key.restricted` | Nothing | Give the integration the right to insert content, in Notion; or, when the workspace has reached its block limit, make room in it |
+| `429` `rate_limited` | `destination.busy`, with `retry_after` from `Retry-After` | Nothing | Wait, then send again |
+| `400` `validation_error`, and any other `3xx` or `4xx` | `destination.refused` | Nothing | Check that the link is a database's |
+| `5xx` | `destination.failed` | Nothing | Try again later |
+| No answer to a read (`GET`) within the bound | `destination.failed` | Nothing | Try again later |
+| The database's answer lists more than one data source | `database.several` | Nothing | Link a database that holds one data source |
+
+Notion gives `404` both for a database that does not exist and for one not shared with the
+integration: `database.unshared` names both. Notion gives `403` both for a missing capability and for a
+workspace over its block limit: `key.restricted` names both. No answer to a read is `destination.failed`:
+nothing was created. No answer to the `POST` within the bound is `destination.silent`: the page may have
+been created.
+
 ## What it carries
 
 **The output**: UTF-8, one JSON object per line, nothing else. Each has `event`:
@@ -128,6 +191,10 @@ is never shown, logged or written.
 | `destination.busy` | `429`: too many sends | Refused by it | Wait `retry_after` seconds, then send again |
 | `destination.refused` | Any other `3xx` or `4xx` | Refused by it | Check that the kind matches the address |
 | `destination.failed` | `5xx` | Refused by it | Try again later |
+| `key.refused` | `notion`: `401`, the key not valid | Nothing | Paste the integration's key again, or a new one |
+| `database.unshared` | `notion`: `404`, the database not shared with the integration, or gone | Nothing | Share the database with the integration, from Notion |
+| `key.restricted` | `notion`: `403`, the integration without the right to insert content, or the workspace over its block limit | Nothing | Give it that right, or make room in the workspace, in Notion |
+| `database.several` | `notion`: the database holds more than one data source | Nothing | Link a database that holds one |
 
 A consumer reads a code this page does not list as no code: a later code is added here, never a new
 version for it.
@@ -139,9 +206,9 @@ version for it.
 - `meeting.confidential` is judged before the address is: a confidential meeting is never sent, whoever
   started the program.
 - It contacts the address alone, once, over `https:`, within 30 s, and nothing else: no proxy, no
-  telemetry.
+  telemetry. For `notion`, Notion's API alone, two reads then one creation, within the same 30 s.
 - Its logs follow ADR-0007, under `KITOKEY_TRACE` when it is given: the kind, the outcome, the status
-  and the size sent; **never the address, nor any part of it**, nor any word of the meeting.
+  and the size sent; **never the address, nor any part of it**, never the key, nor any word of the meeting.
 
 ## Examples
 
@@ -156,6 +223,13 @@ It succeeded:
 
 ```json
 {"event": "sent"}
+```
+
+For Notion — the key and the link made up:
+
+```sh
+echo '{"address": "https://www.notion.so/team/Notes-0123456789abcdef0123456789abcdef?v=1", "key": "ntn_made-up", "name": "Point hebdo"}' \
+  | kitokey-send <meetings>/2026-11-20_09-30 --kind notion
 ```
 
 It failed, and says why:
