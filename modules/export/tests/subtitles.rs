@@ -64,7 +64,7 @@ fn srt_gives_each_segment_a_numbered_cue_between_its_start_and_its_end_in_the_me
 
 #[test]
 fn vtt_gives_each_segment_a_cue_its_speaker_a_voice_and_its_text_escaped() {
-    let file = vtt(&meeting(), Include::all(), &labels());
+    let file = vtt(&meeting(), Include::all(), &labels(), "fr");
     assert!(file.starts_with("WEBVTT\n\n"), "{file}");
     assert!(matches!(detect_format_from_str(&file), Ok(Format::WebVtt)), "{file}");
     let read: WebVttSubtitle = file.parse().unwrap();
@@ -72,16 +72,30 @@ fn vtt_gives_each_segment_a_cue_its_speaker_a_voice_and_its_text_escaped() {
     assert_eq!(
         cues,
         [
-            (1_000, 4_020, "<v Moi>Bonjour à tous."),
+            (1_000, 4_020, "<v Moi>Moi\u{a0}: Bonjour à tous.</v>"),
             (
                 4_500,
                 6_070,
-                "<v Les &lt;autres&gt; &amp; co>a|b &lt;i&gt;c&lt;/i&gt; &amp; d --&gt; e"
+                "<v Les &lt;autres&gt; &amp; co>Les &lt;autres&gt; &amp; co\u{a0}: a|b &lt;i&gt;c&lt;/i&gt; &amp; d --&gt; e</v>"
             ),
-            (3_725_500, 3_727_000, "<v Moi>Après une heure."),
+            (3_725_500, 3_727_000, "<v Moi>Moi\u{a0}: Après une heure.</v>"),
         ],
         "{file}"
     );
+    // The voice is the speaker's for a machine; most players show none of it (a browser's <track>,
+    // libass): the name is said in the cue too, as SDH does, and no markup of the meeting is left raw.
+    assert!(
+        !file.contains("<i>") && !file.contains("</i>"),
+        "a transcript's markup raw in a cue: {file}"
+    );
+}
+
+#[test]
+fn a_vtt_cue_says_its_speaker_in_its_text_punctuated_as_its_language_writes() {
+    let english = vtt(&meeting(), Include::all(), &labels(), "en");
+    assert!(english.contains("\n<v Moi>Moi: Bonjour à tous.</v>\n"), "{english}");
+    let quebec = vtt(&meeting(), Include::all(), &labels(), "fr-CA");
+    assert!(quebec.contains("\n<v Moi>Moi\u{a0}: Bonjour à tous.</v>\n"), "{quebec}");
 }
 
 #[test]
@@ -89,7 +103,7 @@ fn without_speakers_a_cue_is_its_text_alone_and_without_the_transcript_there_is_
     let mut include = Include::all();
     include.speakers = false;
     let srt_file = srt(&meeting(), include, &labels());
-    let vtt_file = vtt(&meeting(), include, &labels());
+    let vtt_file = vtt(&meeting(), include, &labels(), "fr");
     assert!(
         srt_file.starts_with("1\n00:00:01,000 --> 00:00:04,020\nBonjour à tous.\n\n"),
         "{srt_file}"
@@ -102,5 +116,5 @@ fn without_speakers_a_cue_is_its_text_alone_and_without_the_transcript_there_is_
 
     include.transcript = false;
     assert_eq!(srt(&meeting(), include, &labels()), "");
-    assert_eq!(vtt(&meeting(), include, &labels()), "WEBVTT\n");
+    assert_eq!(vtt(&meeting(), include, &labels(), "fr"), "WEBVTT\n");
 }

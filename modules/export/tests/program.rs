@@ -172,7 +172,7 @@ fn subtitles_are_written_the_transcript_alone_as_the_library_writes_them() {
     let folder = meeting(dir.path());
     for (format, expected) in [
         ("srt", srt(&Meeting::read(&folder).unwrap(), Include::all(), &labels())),
-        ("vtt", vtt(&Meeting::read(&folder).unwrap(), Include::all(), &labels())),
+        ("vtt", vtt(&Meeting::read(&folder).unwrap(), Include::all(), &labels(), "fr")),
     ] {
         let to = dir.path().join(format!("réunion.{format}"));
         let ran = run(

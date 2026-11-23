@@ -499,21 +499,23 @@ pub fn srt(meeting: &Meeting, include: Include, labels: &Labels) -> String {
     out
 }
 
-/// The transcript as WebVTT: each segment a cue between its start and its end, its speaker a voice
-/// (`<v>`), its text escaped as WebVTT asks — `&`, `<` and `>`.
-pub fn vtt(meeting: &Meeting, include: Include, labels: &Labels) -> String {
+/// The transcript as WebVTT: each segment a cue between its start and its end, its text escaped as
+/// WebVTT asks — `&`, `<` and `>`. Its speaker is a voice (`<v>`) for a machine, and said in the cue
+/// too, « Moi : … », as SDH names who speaks: most players show no voice (a browser's `<track>`,
+/// libass). The colon as `lang` writes it: French puts a no-break space before it.
+pub fn vtt(meeting: &Meeting, include: Include, labels: &Labels, lang: &str) -> String {
+    let colon = if lang.split('-').next() == Some("fr") { "\u{a0}: " } else { ": " };
     let mut out = String::from("WEBVTT\n");
     for (segment, end) in cues(meeting, include) {
-        let voice = match include.speakers {
-            true => format!("<v {}>", vtt_escaped(speaker(segment, labels))),
-            false => String::new(),
+        let text = vtt_escaped(&segment.text);
+        let said = match include.speakers {
+            true => {
+                let name = vtt_escaped(speaker(segment, labels));
+                format!("<v {name}>{name}{colon}{text}</v>")
+            }
+            false => text,
         };
-        out += &format!(
-            "\n{} --> {}\n{voice}{}\n",
-            stamp(segment.start, '.'),
-            stamp(end, '.'),
-            vtt_escaped(&segment.text)
-        );
+        out += &format!("\n{} --> {}\n{said}\n", stamp(segment.start, '.'), stamp(end, '.'));
     }
     out
 }

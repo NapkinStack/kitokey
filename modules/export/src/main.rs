@@ -164,7 +164,7 @@ fn export() -> Result<Value, Refused> {
         "html" => html(&meeting, include, &labels, &asked.lang, &name).into_bytes(),
         "docx" => docx(&meeting, include, &labels, &name).map_err(unwritable)?,
         "srt" => srt(&meeting, include, &labels).into_bytes(),
-        "vtt" => vtt(&meeting, include, &labels).into_bytes(),
+        "vtt" => vtt(&meeting, include, &labels, &asked.lang).into_bytes(),
         other => unreachable!("{other} is refused with the arguments"),
     };
     let bytes = whole(&to, &written).map_err(unwritable)?;
