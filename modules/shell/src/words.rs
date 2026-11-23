@@ -1335,6 +1335,18 @@ pub struct Window {
     /// Shows: a meeting's page, as a button. When: retry a failed step. At most: about 16
     /// characters. Placeholders: none.
     pub try_again: &'static str,
+    /// Shows: a meeting's page, its transcript's card, as a button (#933). When: the transcript was not made.
+    /// At most: one line in the card. Placeholders: none.
+    pub transcript_try_again: &'static str,
+    /// Shows: a meeting's page, its summary's card, as a button (#933). When: the summary was not made, or
+    /// Ollama did not answer. At most: one line in the card. Placeholders: none.
+    pub minutes_try_again: &'static str,
+    /// Shows: a meeting's page, its transcript's card, as a button (#933). When: the model is missing; once
+    /// fetched, the transcript is made. At most: one line. Placeholders: {} the model's size, {} its host.
+    pub transcript_fetch_then: &'static str,
+    /// Shows: a meeting's page, its summary's card, as a button (#933). When: Ollama holds no model; once
+    /// fetched, the summary is made. At most: one line. Placeholders: {} the model, as Ollama names it.
+    pub minutes_fetch_then: &'static str,
     /// Shows: the sidebar, as a list label. When: row: minutes being written. At most: 18
     /// characters. Placeholders: none.
     pub chip_making: &'static str,
@@ -1803,9 +1815,6 @@ pub struct Window {
     /// Shows: a meeting's page, as an error. When: confidential + Ollama has no model. At most: no
     /// limit. Placeholders: none.
     pub confidential_ollama_empty: &'static str,
-    /// Shows: a meeting's page, as a button. When: always. At most: about 30 characters.
-    /// Placeholders: {} model.
-    pub confidential_fetch: &'static str,
 }
 
 pub fn window(language: Language) -> Window {
@@ -2106,6 +2115,10 @@ pub fn window(language: Language) -> Window {
             agree_open: "Review",
             minutes_not_made: "The summary couldn’t be written. The transcript is unchanged.",
             try_again: "Try again",
+            transcript_try_again: "Try the transcript again",
+            minutes_try_again: "Try the summary again",
+            transcript_fetch_then: "Download the model ({}, {}) and transcribe",
+            minutes_fetch_then: "Download {} and write the summary",
             chip_making: "Summary…",
             chip_waiting: "Waiting",
             chip_awaiting: "Needs OK",
@@ -2136,10 +2149,10 @@ pub fn window(language: Language) -> Window {
             agree_to: "Recipient",
             agree_model: "Model",
             agree_remember: "Don’t ask again for this service",
-            agree_send: "Send the transcript",
+            agree_send: "Send and write",
             agree_not: "Don’t send",
-            agree_local: "Write it on this computer instead",
-            agree_local_write: "Write here",
+            agree_local: "Write the summary on this computer instead",
+            agree_local_write: "Write the summary here",
             shortcut: ["Keyboard shortcut", "Starts or stops a recording from anywhere."],
             shortcut_none: "No shortcut set",
             shortcut_where: "You can change it in your system’s keyboard settings.",
@@ -2267,7 +2280,6 @@ pub fn window(language: Language) -> Window {
             confidential_left_transcript: "the transcript to {}",
             confidential_not_saved: "Couldn’t mark the meeting as confidential. Try again.",
             confidential_ollama_empty: "Ollama has no model on this computer, so the summary will wait.",
-            confidential_fetch: "Download {}",
         },
         Language::French => Window {
             locale: "fr",
@@ -2574,6 +2586,10 @@ pub fn window(language: Language) -> Window {
             agree_open: "Voir et accepter",
             minutes_not_made: "Le compte rendu n’a pas pu être rédigé. La transcription n’a pas changé.",
             try_again: "Réessayer",
+            transcript_try_again: "Réessayer la transcription",
+            minutes_try_again: "Réessayer le compte rendu",
+            transcript_fetch_then: "Télécharger le modèle ({}, {}) et transcrire",
+            minutes_fetch_then: "Télécharger {} et rédiger le compte rendu",
             chip_making: "Compte rendu…",
             chip_waiting: "En attente",
             chip_awaiting: "Accord requis",
@@ -2607,10 +2623,10 @@ pub fn window(language: Language) -> Window {
             agree_to: "Destinataire",
             agree_model: "Modèle",
             agree_remember: "Ne plus demander pour ce service",
-            agree_send: "Envoyer la transcription",
+            agree_send: "Envoyer et rédiger",
             agree_not: "Ne pas envoyer",
-            agree_local: "Rédiger plutôt sur cet ordinateur",
-            agree_local_write: "Rédiger ici",
+            agree_local: "Rédiger plutôt le compte rendu sur cet ordinateur",
+            agree_local_write: "Rédiger le compte rendu ici",
             shortcut: ["Raccourci clavier", "Démarre ou arrête un enregistrement, où que vous soyez."],
             shortcut_none: "Aucun raccourci défini",
             shortcut_where: "Vous pouvez le modifier dans les réglages clavier du système.",
@@ -2744,7 +2760,6 @@ pub fn window(language: Language) -> Window {
             confidential_left_transcript: "la transcription à {}",
             confidential_not_saved: "Impossible de marquer la réunion comme confidentielle. Réessayez.",
             confidential_ollama_empty: "Ollama n’a aucun modèle sur cet ordinateur\u{a0}: le compte rendu attendra.",
-            confidential_fetch: "Télécharger {}",
         },
     }
 }

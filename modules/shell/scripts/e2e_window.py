@@ -1059,6 +1059,10 @@ def model_offered(now: dt.datetime) -> None:
         waits = "return document.getElementById('transcript-state')?.innerText || ''"
         offered = wait_for(browser, lambda b: "En attente du modèle de transcription" in b.execute_script(waits) and b.find_elements(By.CSS_SELECTOR, "#transcript-state #model-fetch"))
         check("a meeting waiting for the model offers it on its page", offered, browser.execute_script(waits))
+        # #933: the offer names what follows it, the transcript (as D113's Refaire… names what it starts).
+        fetch_said = browser.execute_script("return document.querySelector('#transcript-state #model-fetch')?.textContent ?? null")
+        check("on a meeting's page, the model's offer names what follows: « … et transcrire » (#933)",
+              fetch_said == f"Télécharger le modèle (300 ko, {host}) et transcrire", fetch_said)
         # Said once (#775): what it waits for, never « Pas encore de transcription » beside it.
         nones = browser.execute_script("return [...document.querySelectorAll('#meeting .transcript .none')].filter(e => e.offsetParent !== null).map(e => e.textContent)")
         check("a transcript waiting for its model says that alone, not also that there is none (#775)", nones == [], nones)
@@ -7939,6 +7943,24 @@ def minutes_checked(now: dt.datetime) -> None:
         asked = wait_for(browser, lambda b: b.find_elements(By.ID, "agree-send"), 10)
         check("the agreement before a first sending shows no price", asked and not browser.execute_script(priced_words, "agree"),
               browser.find_element(By.ID, "agree").text)
+        send_said = browser.execute_script("return document.getElementById('agree-send')?.textContent ?? null")
+        # One line (sam's T5 probe: the long label wrapped at 1100 px): the verbs alone, the page above saying what leaves and
+        # what is written (Microsoft's Writing Style, Apple's HIG).
+        check("the agreement's button names what it does, in a few words: « Envoyer et rédiger » (#933)", send_said == "Envoyer et rédiger", send_said)
+        # #1114 (the decider, 2026-11-21 ~19h): what stays shows a lock — the glyph of « Confidentielle », one meaning
+        # everywhere: it stays on this computer —, never a × that reads as cancel; in the text's colour, the size of the →.
+        stays = ("const s = document.querySelector('#agree .stays .sign svg'), l = document.querySelector('#agree .leaves .sign svg');"
+                 " const ink = getComputedStyle(document.body).color;"
+                 " return s && l ? {lock: s.innerHTML === icon('lock').innerHTML, colour: getComputedStyle(s).color === ink,"
+                 " size: Math.round(s.getBoundingClientRect().width) === Math.round(l.getBoundingClientRect().width)} : null")
+        locked = browser.execute_script(stays)
+        check("what stays shows Confidentielle's lock, in the ink, the size of the arrow (#1114)",
+              locked == {"lock": True, "colour": True, "size": True}, locked)
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1114-agreement-{width}-{theme}", theme)
     with Window(meetings, "fr_FR.UTF-8", online, small=True) as browser:
         check("the bar at rest shows no price",
               browser.find_elements(By.ID, "small-record") and not browser.execute_script(priced_words, "small"), browser.find_element(By.ID, "small").text)
@@ -10660,6 +10682,8 @@ def context_written(now: dt.datetime) -> None:
             failed = wait_for(browser, lambda b: b.find_elements(By.ID, "transcript-again"), 10)
         finally:
             (WORK / "fail-hearing").unlink()
+        retry_said = browser.execute_script("return document.getElementById('transcript-again')?.textContent ?? null")
+        check("the transcript's retry names what it starts: « Réessayer la transcription » (#933)", retry_said == "Réessayer la transcription", retry_said)
         check("failing, the transcript and the minutes made with the earlier context are put back",
               failed and ((meeting / "transcript.jsonl").read_text(), (meeting / "minutes.md").read_text()) == before
               and not list(meeting.glob("transcript-before-*")), sorted(p.name for p in meeting.iterdir()))
@@ -11040,11 +11064,13 @@ def confidential_kept(now: dt.datetime) -> None:
         check("Ollama silent: the minutes wait, said where to get it, nothing asked nor sent",
               silent and browser.find_elements(By.ID, "minutes-again") and counted["write"] == 1
               and not (waiting / "wait" / "minutes.md").exists(), browser.execute_script(state))
+        retry_said = browser.execute_script("return document.getElementById('minutes-again')?.textContent ?? null")
+        check("the summary's retry names what it starts: « Réessayer le compte rendu » (#933)", retry_said == "Réessayer le compte rendu", retry_said)
         ollama["silent"] = False
         press(browser, "minutes-again")
         empty = wait_for(browser, lambda b: "Ollama n’a aucun modèle sur cet ordinateur" in b.execute_script(state), 10)
         offered = browser.find_elements(By.ID, "ollama-fetch")
-        check("holding no model: said, its recommended model offered", empty and offered and offered[0].text == "Télécharger qwen3:8b",
+        check("holding no model: said, its recommended model offered", empty and offered and offered[0].text == "Télécharger qwen3:8b et rédiger le compte rendu",
               browser.execute_script(state))
         seen(browser, "d60-6-ollama-empty-light")
         press(browser, "ollama-fetch")

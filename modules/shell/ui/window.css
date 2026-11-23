@@ -230,6 +230,7 @@ select:hover, select:focus { border-color: var(--edge); }
 .goes li > div { display: flex; flex-direction: column; gap: 2px; }
 .goes .sign { flex: 0 0 18px; color: var(--soft); }
 .goes .leaves .sign { color: var(--accent); }
+.goes .stays .sign { color: var(--ink); }
 .recipient { margin: 0; padding: 12px 16px; border-radius: 12px; background: var(--raised); display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; }
 .recipient dt { color: var(--soft); }
 .recipient dd { margin: 0; text-align: right; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
