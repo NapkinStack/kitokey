@@ -3086,12 +3086,14 @@ fn sends_file() -> PathBuf {
 
 /// What a meeting's page offers to send (D110, PDR-0007 §2–§4): nothing for a meeting said confidential, with
 /// no summary, or with no destination set up; else each destination by its name, and whether it was ever sent
-/// to — before its first send, the page says what leaves and where. Its sends, listed. Never an address.
+/// to — before its first send, the page says what leaves and where. Its sends, listed; its last send to each
+/// destination with what came of it, said again whenever the page is drawn. Never an address.
 #[derive(serde::Serialize)]
 struct SendingShown {
     offered: bool,
     destinations: Vec<DestinationOffered>,
     sends: Vec<sending::Sent>,
+    last: Vec<sending::Sent>,
 }
 
 #[derive(serde::Serialize)]
@@ -3116,7 +3118,8 @@ fn sending_shown(shell: &Shell, folder: &Path) -> SendingShown {
     SendingShown {
         offered: summary && !confidential::marked(folder) && !destinations.is_empty(),
         destinations,
-        sends: sending::of(&record, meeting).to_vec(),
+        sends: sending::of(&record, meeting).into_iter().cloned().collect(),
+        last: sending::last(&record, meeting).into_iter().cloned().collect(),
     }
 }
 
@@ -3141,7 +3144,7 @@ const SEND_DEADLINE: std::time::Duration = std::time::Duration::from_secs(45);
 /// Sends a meeting's summary to a destination, on the user's gesture (D110, PDR-0007): a confidential meeting
 /// never — refused here before the program is started, as the program would —; the address read from the
 /// keyring and given on kitokey-send's input with the meeting's name, never among its arguments; one try, its
-/// outcome recorded when it was sent. The address is never logged, nor the destination's answer.
+/// outcome recorded, whatever it is. The address is never logged, nor the destination's answer.
 #[tauri::command]
 async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, destination: String) -> Result<SentShown, Told> {
     use kitokey_shell::destinations;
@@ -3169,19 +3172,20 @@ async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, des
     .await
     .map_err(|error| shell.told(Failure::Unexpected, error))?
     .map_err(|why| shell.told(Failure::Keyring, why))?;
-    if outcome == sending::Outcome::Sent {
-        let meeting = folder.file_name().and_then(|name| name.to_str()).unwrap_or_default().to_string();
-        let at = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
-        sending::keep(
-            &sends_file(),
-            &meeting,
-            sending::Sent {
-                destination: destination.clone(),
-                at,
-            },
-        )
-        .map_err(|error| shell.told(Failure::SettingsUnwritten, error))?;
-    }
+    // Each send kept with what came of it, a failure too: « perhaps arrived » is said again on a page drawn
+    // again, so that nobody sends twice.
+    let meeting = folder.file_name().and_then(|name| name.to_str()).unwrap_or_default().to_string();
+    let at = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+    sending::keep(
+        &sends_file(),
+        &meeting,
+        sending::Sent {
+            destination: destination.clone(),
+            at,
+            outcome: outcome.clone(),
+        },
+    )
+    .map_err(|error| shell.told(Failure::SettingsUnwritten, error))?;
     match &outcome {
         sending::Outcome::Sent => tracing::info!("shell.summary_sent"),
         sending::Outcome::Failed { code, .. } => tracing::warn!(code = code.as_deref().unwrap_or("none"), "shell.summary_not_sent"),
