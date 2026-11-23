@@ -358,7 +358,7 @@ nstack fitness       # manifests + boundaries + skills + plan + hygiene — befo
 nstack discover <idea-file>   # starts a discovery, for your agent
 nstack plan          # what needs a person first; then the discovery, the charter and the cycles (docs/project/), the decisions due at a closure, the project across its cycles, who holds what
 nstack claim D<n> --session <s> --person @<you>   # takes a deliverable before its first change; nstack unclaim gives it back
-                                                  # --take-over: a stale hold, or your own from another session
+                                                  # --take-over: a stale hold, or your own from another agent's session or outside nstack agent run; your agent restarted renews without it
 nstack deliver D<n> --held '#<pr>' --session <s>   # records a merged deliverable delivered; --write-states at the closure
 nstack agent add <name> [--clone <dir>] · nstack agent run <name> -- <command>   # an agent's own App and clone; add is a person's
 nstack agent status  # who this agent is — its App, repository, clone, gh and hooks; for a person, this project's agents

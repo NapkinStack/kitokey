@@ -1898,7 +1898,7 @@ function minutesCard(read, words, session, transcript, onPage) {
   // The minutes as written, rendered by the shell: raw HTML in them is text there, a link its words.
   const body = element("div", "body");
   body.innerHTML = read.body;
-  actionRows(body, words);
+  actionRows(body, words, read.actions);
   lineTimes(body, session, transcript, words);
   card.append(body);
   return card;
@@ -1950,14 +1950,16 @@ function lineTimes(body, session, transcript, words) {
 // The minutes' actions as rows (D46): « what — who — by when », as `minutes/v1` writes them, shown
 // Qui · Quoi · Pour quand, who in its colour, by when in monospace, the cells named for assistive
 // technology alone; an item that does not split in three is shown as written, in its place. A
-// line's time is none of the three (`minutes/v3`): it sits after what.
-function actionRows(body, words) {
+// line's time is none of the three (`minutes/v3`). `at` is the actions' section, counted from one, as
+// the shell read it: v1 to v4's second, v5's named by its id (D111); none, no rows.
+function actionRows(body, words, at) {
   // Every second-level title, as the shell's reader counts them.
   const titles = body.querySelectorAll("h2");
-  if (titles.length < 2) return;
-  let list = titles[1].nextElementSibling;
-  while (list && list !== titles[2] && !["UL", "OL"].includes(list.tagName)) list = list.nextElementSibling;
-  if (!list || list === titles[2]) return;
+  if (!at || titles.length < at) return;
+  const next = titles[at] ?? null;
+  let list = titles[at - 1].nextElementSibling;
+  while (list && list !== next && !["UL", "OL"].includes(list.tagName)) list = list.nextElementSibling;
+  if (!list || list === next) return;
   const table = element("table", "actions");
   const head = element("thead");
   const named = element("tr");
