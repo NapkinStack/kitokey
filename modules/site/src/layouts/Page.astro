@@ -25,7 +25,7 @@ const url = (l) => new URL(`/${l}/${path}`, site).href;
   </head>
   <body>
     <header>
-      <a class="brand" href={`/${lang}/`}>Kitokey</a>
+      <a class="brand" href="/">Kitokey</a>
       <a href={`/${other}/${path}`} hreflang={other} lang={other}>{say("other", lang)}</a>
     </header>
     <main><slot /></main>

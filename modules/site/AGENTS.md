@@ -31,7 +31,6 @@ Astro's telemetry is off in every script.
 
 ## Business invariants
 
-- No price before the decider announces it (`tests/words.test.mjs`).
 - No request to another host from any page (`tests/own-domain.test.mjs`, `_headers`' CSP).
 - `/en/privacy/` and `/fr/privacy/` say their half of the source, word for word (`tests/privacy.test.mjs`).
 
