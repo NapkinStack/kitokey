@@ -110,7 +110,7 @@ deliverables:
   - id: D115
     title: "The dates a summary's actions mention, ticked by the user, go to their calendar: an `.ics` file, or Google Calendar's or Outlook's own screen, with no account connected"
     module: shell
-    state: proposed
+    state: ready
     acceptance:
       - "Spike first: given invented meetings in French and in English, recorded on a known day, whose transcripts say « jeudi » on a Thursday, « dans quinze jours », « fin du mois », « demain », a date with no year, an explicit day and month, and an action with no date, when Settings' default local model writes their summary and the shell reads each action's *by when* against the meeting's day, then each proposed date is counted right, « not said » or wrong, apart, and recorded in D115's section with the model, the commit and the meetings; refuted if more than 1 proposed date in 50 is wrong, in which case only dates that name their day and month are proposed. A refuted spike is a delivered one"
       - "Given an action's *by when* and a reference day, when the shell resolves it, then it gives an absolute date only for an explicit date (with or without its year, the next one on or after the reference day), a weekday (the next one strictly after it), « demain », « dans N jours » or « dans N semaines » and their English forms, and « not said » for anything else — a month's end, a season, « bientôt », a weekday said on that very weekday; it never applies a procedural rule (no moving off a weekend or a holiday); the reference day is the meeting's start in local time, as its folder names it, never UTC; held by the shell's unit tests, a meeting started at 23:30 local time and one across a daylight saving change among them"
