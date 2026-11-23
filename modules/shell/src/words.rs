@@ -1406,6 +1406,10 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
     /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
+    /// Shows: a meeting's page, its transcript's Redo… panel, under its note: the summary is not made
+    /// again with it (the decider, 2026-11-18, D113). When: the meeting has a summary. At most: no limit.
+    /// Placeholders: none.
+    pub redo_keeps_minutes: &'static str,
     /// What a meeting lacks, offered on its page; what is said once asked; where a step ran.
     /// Shows: a meeting's page, as a button. When: meeting lacks minutes. At most: about 30
     /// characters. Placeholders: none.
@@ -1807,9 +1811,11 @@ pub struct Window {
     /// Shows: a meeting's page, as a help line. When: transcript (or + minutes) made with another
     /// context; [transcript only, both]. At most: no limit. Placeholders: none.
     pub context_changed: [&'static str; 2],
-    /// Shows: a meeting's page, as a button. When: redo with new context. At most: about 30
-    /// characters. Placeholders: none.
-    pub context_redo: &'static str,
+    /// Shows: a meeting's context card, the button under `context_changed`, naming what it starts (D113):
+    /// the transcript, then the summary when one follows it. When: the context changed after they were
+    /// made; the second where the meeting has a summary or Settings make one after a transcript, else the
+    /// first. At most: about 45 characters. Placeholders: none.
+    pub context_redo: [&'static str; 2],
     /// The language a meeting is spoken in (D65).
     /// Shows: a meeting's page, as a label. When: row: spoken language. At most: about 20
     /// characters. Placeholders: none.
@@ -1874,8 +1880,8 @@ pub struct Window {
     /// Shows: a meeting's page, as a help line. When: minutes older than transcript corrections.
     /// At most: no limit. Placeholders: none.
     pub corrected_since: &'static str,
-    /// Shows: a meeting's page, as a button. When: redo minutes with corrections. At most: about 36
-    /// characters. Placeholders: none.
+    /// Shows: a meeting's page, as a button naming what it starts, the summary (D113). When: redo minutes
+    /// with corrections. At most: about 45 characters. Placeholders: none.
     pub redo_corrections: &'static str,
     /// The minutes copied in one click, said in place (D45).
     /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip): copy
@@ -2256,6 +2262,7 @@ pub fn window(language: Language) -> Window {
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept.",
+            redo_keeps_minutes: "The current summary is kept; write it again afterwards if needed.",
             make_minutes: "Write summary",
             make_transcript: "Transcribe",
             make_minutes_with: "Write summary with {}",
@@ -2390,7 +2397,7 @@ pub fn window(language: Language) -> Window {
                 "The transcript was made with a different context.",
                 "The transcript and summary were made with a different context.",
             ],
-            context_redo: "Redo with this context",
+            context_redo: ["Write the transcript again", "Write the transcript and the summary again"],
             language_label: "Spoken language",
             language_default: "{}, from Settings",
             language_detected: "Detect automatically",
@@ -2416,7 +2423,7 @@ pub fn window(language: Language) -> Window {
             correction_empty: "A line can’t be empty. Press Escape to cancel.",
             correction_failed: "Edit not saved: {}",
             corrected_since: "The transcript was edited after this summary was written.",
-            redo_corrections: "Redo with edits",
+            redo_corrections: "Write the summary again with your edits",
             copy_minutes: "Copy summary",
             minutes_copied: "Copied",
             minutes_not_copied: "Couldn’t copy the summary.",
@@ -2763,6 +2770,7 @@ pub fn window(language: Language) -> Window {
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée.",
+            redo_keeps_minutes: "Le compte rendu actuel est gardé\u{202f}; refaites-le ensuite si besoin.",
             make_minutes: "Rédiger le compte rendu",
             make_transcript: "Transcrire",
             make_minutes_with: "Rédiger le compte rendu avec {}",
@@ -2906,7 +2914,7 @@ pub fn window(language: Language) -> Window {
                 "La transcription a été faite avec un autre contexte.",
                 "La transcription et le compte rendu ont été faits avec un autre contexte.",
             ],
-            context_redo: "Refaire avec ce contexte",
+            context_redo: ["Refaire la transcription", "Refaire la transcription et le compte rendu"],
             language_label: "Langue parlée",
             language_default: "{}, selon les Réglages",
             language_detected: "Détection automatique",
@@ -2932,7 +2940,7 @@ pub fn window(language: Language) -> Window {
             correction_empty: "Une ligne ne peut pas être vide. Appuyez sur Échap pour annuler.",
             correction_failed: "Correction non enregistrée\u{a0}: {}",
             corrected_since: "La transcription a été corrigée depuis la rédaction de ce compte rendu.",
-            redo_corrections: "Refaire avec les corrections",
+            redo_corrections: "Refaire le compte rendu avec les corrections",
             copy_minutes: "Copier le compte rendu",
             minutes_copied: "Copié",
             minutes_not_copied: "Impossible de copier le compte rendu.",
