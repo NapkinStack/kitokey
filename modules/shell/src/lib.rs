@@ -27,6 +27,7 @@ pub mod player;
 pub mod providers;
 pub mod recording;
 pub mod registry;
+pub mod sending;
 pub mod sessions;
 pub mod settings;
 pub mod sound_check;

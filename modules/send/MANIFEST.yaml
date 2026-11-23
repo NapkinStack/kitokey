@@ -104,6 +104,14 @@ dependencies:
     purpose: Reads the address as a browser does, IDNA and IPv4 forms included, before it is judged
     adr: docs/adr/0018-a-module-send-of-its-own-the-one-to-reach-a-channel.md
     exit_strategy: judged() in src/lib.rs; any WHATWG URL parser replaces it.
+  - name: cargo-about
+    purpose: >-
+      Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
+      never run by a build or a release (D102)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >-
+      Its output is a committed HTML page, about.hbs its template; any generator that lists the
+      crates with their licence texts replaces it, and tests/notices.rs judges the result.
 #  - name:
 #    purpose:
 #    adr:
