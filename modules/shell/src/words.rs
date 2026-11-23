@@ -829,6 +829,43 @@ pub struct Window {
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, its heading; and a step's «
     /// Avancé » in Settings, « Modèles ». When: always. At most: one line. Placeholders: none.
     pub advanced_title: &'static str,
+    /// The part of « Après un enregistrement » holding the destinations a summary can be sent to
+    /// (D110, PDR-0007), its heading. Shows: Settings, a sub-heading. When: always. At most: a few words. Placeholders: none.
+    pub destinations_title: &'static str,
+    /// Under that heading: what the card is for, and that nothing leaves without a gesture.
+    /// Shows: Settings, « Après un enregistrement », « Envoi des comptes rendus », secondary text. When: always. At most: two lines.
+    /// Placeholders: none.
+    pub destinations_said: &'static str,
+    /// The same card with no destination yet. Shows: Settings, in place of the list. When: none is
+    /// set up. At most: one line. Placeholders: none.
+    pub destinations_none: &'static str,
+    /// Each kind of destination, as the list and the choice name it (`posting/v1`'s kinds).
+    /// Shows: Settings, a list's choices and each row. When: always. At most: two words each.
+    /// Placeholders: none.
+    pub destination_kinds: [&'static str; 3],
+    /// The three fields' labels: its kind, its name, its address. Shows: Settings, labels. When:
+    /// always. At most: a few words each. Placeholders: none.
+    pub destination_fields: [&'static str; 3],
+    /// Under the address field: what to paste, and that it is kept in the keychain, never shown whole.
+    /// Shows: Settings, secondary text. When: always. At most: two lines. Placeholders: none.
+    pub destination_address_said: &'static str,
+    /// The button that adds it. Shows: Settings, a button. When: always. At most: one word.
+    /// Placeholders: none.
+    pub destination_add: &'static str,
+    /// The disclosure that unfolds the form adding a destination, folded at first (E5: no address
+    /// asked in the common case). Shows: Settings, « Envoi des comptes rendus », a button. When:
+    /// always. At most: three words. Placeholders: none.
+    pub destination_open: &'static str,
+    /// Each destination's button that forgets it, its address out of the keychain. Shows: Settings,
+    /// a button on each row. When: a destination is set up. At most: one word. Placeholders: none.
+    pub destination_forget: &'static str,
+    /// Said once a destination is added. Shows: Settings, under the fields, as a status. When: after
+    /// « Ajouter » kept it. At most: one line. Placeholders: {} the destination's name.
+    pub destination_added: &'static str,
+    /// The destination not added: why, the failure's sentence after it. Shows: Settings, under the
+    /// fields, as a status. When: « Ajouter » refused. At most: one line and the failure's.
+    /// Placeholders: {} the failure's sentence (lower-case start).
+    pub destination_not_added: &'static str,
     /// Before Kitokey's version, at the foot of « Général », as GNOME's « About » and Windows' Settings
     /// say it (#1089); the number follows, as `--version` gives it. Shows: Settings, « Général », its
     /// last line, in secondary text the user can select to copy. When: always. At most: one word.
@@ -1872,6 +1909,17 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "General",
             advanced_title: "Advanced",
+            destinations_title: "Sending summaries",
+            destinations_said: "The channels you can send a summary to. Nothing is sent unless you ask, and never a confidential meeting.",
+            destinations_none: "No destination yet.",
+            destination_kinds: ["Webhook", "Discord", "Slack"],
+            destination_fields: ["Kind", "Name", "Webhook address"],
+            destination_address_said: "Paste the channel’s webhook address. It’s kept in your system keychain and never shown in full again.",
+            destination_add: "Add",
+            destination_open: "Add a destination",
+            destination_forget: "Remove",
+            destination_added: "Destination {} added.",
+            destination_not_added: "Destination not added: {}",
             version_said: "Version",
             developer: ["Developer mode", "Shows technical details under each error, to help troubleshoot."],
             program_said: "Technical details: {}",
@@ -2315,6 +2363,17 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "Général",
             advanced_title: "Avancé",
+            destinations_title: "Envoi des comptes rendus",
+            destinations_said: "Les canaux où vous pourrez envoyer un compte rendu. Rien n’est envoyé sans que vous le demandiez, et jamais une réunion confidentielle.",
+            destinations_none: "Aucune destination pour l’instant.",
+            destination_kinds: ["Webhook", "Discord", "Slack"],
+            destination_fields: ["Type", "Nom", "Adresse du webhook"],
+            destination_address_said: "Collez l’adresse du webhook du canal. Elle est gardée dans le trousseau du système et n’est plus jamais affichée en entier.",
+            destination_add: "Ajouter",
+            destination_open: "Ajouter une destination",
+            destination_forget: "Supprimer",
+            destination_added: "Destination {} ajoutée.",
+            destination_not_added: "Destination non ajoutée\u{a0}: {}",
             version_said: "Version",
             developer: [
                 "Mode développeur",
@@ -2682,6 +2741,10 @@ pub enum Failure {
     Keyring,
     ProgramNotStarted,
     TestRefused,
+    /// A destination (D110): no name a person reads, a name already given, or an address refused.
+    DestinationUnnamed,
+    DestinationNamed,
+    DestinationRefused,
 }
 
 /// A failure's sentence. Most follow the page's own « not saved: » and so start in lower case; those
@@ -2767,6 +2830,16 @@ pub fn failure(failure: Failure, language: Language) -> String {
         (Failure::ProgramNotStarted, French) => "un composant de Kitokey n’a pas pu démarrer. Réinstallez Kitokey.",
         (Failure::TestRefused, English) => "check the address, model name and key, then try again.",
         (Failure::TestRefused, French) => "vérifiez l’adresse, le nom du modèle et la clé, puis réessayez.",
+        (Failure::DestinationUnnamed, English) => "give the destination a name of one line, at most 40 characters.",
+        (Failure::DestinationUnnamed, French) => "donnez à la destination un nom d’une ligne, de 40 caractères au plus.",
+        (Failure::DestinationNamed, English) => "a destination already has this name. Choose another.",
+        (Failure::DestinationNamed, French) => "une destination porte déjà ce nom. Choisissez-en un autre.",
+        (Failure::DestinationRefused, English) => {
+            "this address is refused: paste the channel’s webhook address, starting with https://, not one on this computer or its network."
+        }
+        (Failure::DestinationRefused, French) => {
+            "cette adresse est refusée\u{a0}: collez l’adresse du webhook du canal, qui commence par https://, et non une adresse de cet ordinateur ou de son réseau."
+        }
     }
     .to_string()
 }

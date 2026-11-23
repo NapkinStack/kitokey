@@ -2812,6 +2812,9 @@ let testing = false;
 let generalAdvanced = false;
 // « Modèles à télécharger » unfolded by the user, kept over the page's drawings (#782).
 let offeredOpen = false;
+// The form adding a destination unfolded (D110): folded at first, no address asked in the common
+// case (E5); kept while Settings are drawn again, as a destination added redraws them.
+let destinationOpen = false;
 // Each guided path's own (D95), the summary's and the transcription's: « Avancé » unfolded, kept
 // while Settings are drawn again; each service's last answer to « Vérifier la clé », by its place
 // in the list — what it refused, or the models it listed —, and where and which service chosen,
@@ -3253,6 +3256,104 @@ function showSettings(shown, minutes, words) {
     made.append(one);
   }
   parts.push(after);
+
+  // Where a summary can be sent (D110, PDR-0007), a part of « Après un enregistrement » — Settings keep
+  // their three groups (D95): each destination by its name, its kind, and its address as its host and
+  // the end of its path — never whole; one added is judged before it is kept.
+  const sending = element("div", "sending");
+  {
+    sending.append(element("h3", "", words.destinations_title), element("p", "says", words.destinations_said));
+    const kinds = { webhook: 0, discord: 1, slack: 2 };
+    const kept = element("ul", "lines");
+    kept.id = "destinations";
+    const none = element("p", "says", shown.destinations.length ? "" : words.destinations_none);
+    none.id = "destinations-said";
+    shown.destinations.forEach((destination, index) => {
+      const row = element("li", "row");
+      const rowSaid = element("span", "said");
+      rowSaid.append(element("span", "name", destination.name), element("span", "says", `${words.destination_kinds[kinds[destination.kind]]} · ${destination.shown}`));
+      const forget = element("button", "open", words.destination_forget);
+      forget.type = "button";
+      forget.id = `destination-forget-${index}`;
+      forget.disabled = locked;
+      forget.addEventListener("click", () =>
+        window.__TAURI__.core.invoke("destination_forgotten", { name: destination.name }).then(refresh, (why) => {
+          none.textContent = fill(words.not_saved, why);
+        }),
+      );
+      row.append(rowSaid, forget);
+      kept.append(row);
+    });
+    // The add form apart from the list, its fields the Settings' own (guidedField, guidedList); the
+    // address on a whole line, long enough to read back what was pasted.
+    const adding = element("div", "fields adding");
+    adding.id = "destination-adding";
+    const [kindField, kind] = guidedList("destination-kind", words.destination_fields[0], locked);
+    for (const [value, index] of Object.entries(kinds)) guidedOption(kind, value, words.destination_kinds[index]);
+    const [namedField, named] = guidedField("destination-name", words.destination_fields[1], "text", "", locked);
+    named.maxLength = 40;
+    named.autocomplete = "off";
+    const [addressField, address] = guidedField("destination-address", words.destination_fields[2], "url", "", locked);
+    addressField.classList.add("whole");
+    address.autocomplete = "off";
+    address.spellcheck = false;
+    address.setAttribute("aria-describedby", "destination-address-said");
+    const addressSaid = element("p", "says", words.destination_address_said);
+    addressSaid.id = "destination-address-said";
+    const add = element("button", "open", words.destination_add);
+    add.type = "button";
+    add.id = "destination-add";
+    add.disabled = locked;
+    const result = element("p", "says");
+    result.id = "destination-said";
+    result.setAttribute("role", "status");
+    add.addEventListener("click", () => {
+      add.disabled = true;
+      window.__TAURI__.core
+        .invoke("destination_added", { kind: kind.value, name: named.value, address: address.value })
+        .then(
+          () => {
+            // Kept: the address leaves the page at once; the list, drawn again, names it.
+            address.value = "";
+            return refresh().then(() => {
+              const said = document.getElementById("destination-said");
+              if (said) said.textContent = fill(words.destination_added, named.value.trim());
+            });
+          },
+          (why) => {
+            result.textContent = fill(words.destination_not_added, why);
+            add.disabled = locked;
+          },
+        );
+    });
+    adding.append(
+      kindField,
+      namedField,
+      addressField,
+      addressSaid,
+      add,
+      result,
+    );
+    // Folded at first: a disclosure (ARIA APG), as « Avancé »; unfolded by a click, the focus goes to
+    // its first field. Escape does not fold it: a half-filled form is not lost by a key.
+    const opening = element("button", "disclose-advanced");
+    opening.type = "button";
+    opening.id = "destination-open";
+    opening.setAttribute("aria-controls", "destination-adding");
+    opening.append(icon("chevron-right"), element("span", "", words.destination_open));
+    const unfoldAdding = (now) => {
+      destinationOpen = now;
+      opening.setAttribute("aria-expanded", String(now));
+      opening.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
+      adding.hidden = !now;
+    };
+    opening.addEventListener("click", () => {
+      unfoldAdding(!destinationOpen);
+      if (destinationOpen) kind.focus();
+    });
+    unfoldAdding(destinationOpen);
+    sending.append(kept, none, opening, adding);
+  }
 
   const models = element("section", "card group");
   models.append(element("h2", "", words.models_title), element("p", "says", words.models_intro));
@@ -3863,7 +3964,7 @@ function showSettings(shown, minutes, words) {
   // Outside Windows' package, no startup task: nothing offered (D84).
   more.append(speaks, looks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
   // What becomes of a recording: where it goes and how long its sound stays, after what is made.
-  after.append(where, keep);
+  after.append(where, keep, sending);
 
   // Last, for whoever looks into a failure: the developer mode (D29), folded at the bottom of
   // « Général » (D95) — a disclosure (ARIA APG), as the redo panel's « Avancé ».
