@@ -3925,6 +3925,7 @@ def advanced_latest_answer(now: dt.datetime) -> None:
             browser.execute_script(
                 "const real = window.__TAURI__.core; window.held = []; window.armed = true; window.refusing = false;"
                 " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {"
+                "   if (asked === 'models_offered' && window.failing && rest[0] && rest[0].name) return Promise.reject('failing (#1142)');"
                 "   if (asked === 'models_offered' && window.holding && rest[0] && rest[0].name) { window.holding = false;"
                 "     return new Promise((ok, no) => window.held.push(() => real.invoke(asked, ...rest).then(ok, no))); }"
                 "   if (asked === 'models_offered' && window.refusing && rest[0] && rest[0].name) { window.refusing = false;"
@@ -3980,6 +3981,17 @@ def advanced_latest_answer(now: dt.datetime) -> None:
                   held and not reopened and browser.execute_script("return document.getElementById('small-advanced').getAttribute('aria-expanded')") == "false",
                   {"held": held, "state": browser.execute_script("const t = document.getElementById('small-advanced'); const p = document.getElementById('small-advanced-panel');"
                                                                  " return {expanded: t?.getAttribute('aria-expanded'), hidden: p?.hidden}")})
+            # #1142: a close asks only to drop the opening's answer: the models not read on it, nothing is said —
+            # the user asked nothing to be read.
+            browser.execute_script(toggled)
+            shown_again = wait_for(browser, lambda b: b.execute_script(opened), 5)
+            browser.execute_script("window.failing = true")
+            browser.execute_script(toggled)
+            failed_said = wait_for(browser, lambda b: "Impossible de lire les modèles" in b.execute_script(said), 2)
+            browser.execute_script("window.failing = false")
+            check("« Avancé » closed, the models not read on its close: nothing is said (#1142)",
+                  shown_again and not failed_said and not browser.execute_script(opened),
+                  {"opened first": shown_again, "said": browser.execute_script(said), "open": browser.execute_script(opened)})
             browser.execute_script("window.restoreCore()")
             press(browser, "small-stop")
             wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
