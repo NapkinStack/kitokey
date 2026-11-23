@@ -17,6 +17,8 @@ const TRANSCRIPT: &str = concat!(
     "\n",
     r#"{"type":"segment","speaker":"others","track":"remote","voice":null,"start":9.0,"end":8.0,"text":"Fin avant le début."}"#,
     "\n",
+    r#"{"type":"segment","speaker":"me","track":"local","voice":null,"start":10.0,"end":10.0,"text":"Sans durée."}"#,
+    "\n",
     r#"{"type":"complete","duration":3730.0,"made":"2026-11-20T10:05:00+01:00"}"#,
     "\n",
 );
@@ -51,7 +53,7 @@ fn srt_gives_each_segment_a_numbered_cue_between_its_start_and_its_end_in_the_me
     assert_eq!(
         cues,
         [(1, 1_000, 4_020), (2, 4_500, 6_070), (3, 3_725_500, 3_727_000)],
-        "a segment whose end is before its start is left out: {file}"
+        "a segment whose end is not after its start is left out: {file}"
     );
     assert!(
         file.starts_with("1\n00:00:01,000 --> 00:00:04,020\n[Moi] Bonjour à tous.\n\n2\n"),
