@@ -1,6 +1,6 @@
 # Kitokey — privacy policy / politique de confidentialité
 
-Last changed / dernière modification: 2026-11-21. Publisher / éditeur: c12c (NapkinStack).
+Last changed / dernière modification: 2026-11-23. Publisher / éditeur: c12c (NapkinStack).
 [English](#english) · [Français](#français)
 
 ```mermaid
@@ -78,6 +78,12 @@ telemetry ever exist, it will be off until you turn it on, and will show what it
   `com.napkinstack.Kitokey`); revoke it also at the service that issued it.
 - A model downloaded through Ollama is kept by Ollama: remove it there (`ollama rm <model>`).
 
+### This website
+
+kitokey.com is served by Cloudflare Pages. To send you a page, Cloudflare receives your IP address and the page
+you ask for, as any web host does ([Cloudflare's privacy policy](https://www.cloudflare.com/privacypolicy/)). The
+site sets no cookie, runs no tracker and no analytics, and loads nothing from another domain.
+
 ### Contact
 
 Questions, or a request about your data: [support@kitokey.com](mailto:support@kitokey.com), or
@@ -151,6 +157,13 @@ montrerait ce qu'elle envoie et où.
 - Une clé donnée reste dans le trousseau de votre système jusqu'à ce que vous l'y supprimiez
   (sous `com.napkinstack.Kitokey`) ; révoquez-la aussi auprès du service qui l'a émise.
 - Un modèle téléchargé par Ollama est gardé par Ollama : retirez-le là (`ollama rm <modèle>`).
+
+### Ce site
+
+kitokey.com est servi par Cloudflare Pages. Pour vous envoyer une page, Cloudflare reçoit votre adresse IP et la
+page demandée, comme tout hébergeur web ([politique de confidentialité de Cloudflare](https://www.cloudflare.com/privacypolicy/)).
+Le site ne dépose aucun cookie, n'utilise aucun traceur ni outil de mesure d'audience, et ne charge rien depuis un
+autre domaine.
 
 ### Contact
 

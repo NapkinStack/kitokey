@@ -1761,7 +1761,7 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
     Ok(Opened {
         session,
         transcript: meeting::transcript(&folder),
-        minutes: minutes::minutes(&folder, words::window(shell.language()).minutes_sections),
+        minutes: read_minutes(&folder, shell.language()),
         developer: shell.settings().developer,
         listen: playable(&shell, &folder),
         context: context_of(&shell, &folder),
@@ -2064,10 +2064,7 @@ struct ConfidentialShown {
 fn confidential_of(shell: &Shell, folder: &Path) -> ConfidentialShown {
     let on = confidential::marked(folder);
     let mut left = shell.left.lock().unwrap().get(folder).cloned().unwrap_or_default();
-    let read = confidential::left(
-        &meeting::transcript(folder),
-        &minutes::minutes(folder, words::window(shell.language()).minutes_sections),
-    );
+    let read = confidential::left(&meeting::transcript(folder), &read_minutes(folder, shell.language()));
     for said in read {
         confidential::add(&mut left, said.what, &said.host);
     }
@@ -2091,10 +2088,7 @@ fn confidential_set(app: AppHandle, shell: State<'_, Shell>, name: String, on: b
         shell.ollama_waiting.lock().unwrap().remove(&folder);
         return Ok(confidential_of(&shell, &folder));
     }
-    let mut left = confidential::left(
-        &meeting::transcript(&folder),
-        &minutes::minutes(&folder, words::window(shell.language()).minutes_sections),
-    );
+    let mut left = confidential::left(&meeting::transcript(&folder), &read_minutes(&folder, shell.language()));
     // The transcript a service is making: ended, made again here first in line.
     let running = shell.transcription.lock().unwrap();
     let hearing = shell.hearing.lock().unwrap().as_deref() == Some(folder.as_path());
@@ -2133,7 +2127,7 @@ fn confidential_set(app: AppHandle, shell: State<'_, Shell>, name: String, on: b
     let awaiting = shell.awaiting.lock().unwrap().iter().any(|(aside, _)| *aside == folder);
     let queued = shell.minutes_waiting.lock().unwrap().iter().any(|queued| queued.folder == folder);
     let by_service = matches!(
-        minutes::minutes(&folder, words::window(shell.language()).minutes_sections),
+        read_minutes(&folder, shell.language()),
         Read::Present(minutes) if minutes.provider.as_deref().is_some_and(|provider| provider != "local")
     );
     if awaiting {
@@ -2157,7 +2151,7 @@ struct ContextShown {
 fn context_of(shell: &Shell, folder: &Path) -> ContextShown {
     let text = context::read(folder);
     let transcript = meeting::transcript(folder);
-    let minutes = minutes::minutes(folder, words::window(shell.language()).minutes_sections);
+    let minutes = read_minutes(folder, shell.language());
     ContextShown {
         changed: context::changed(text.as_deref(), &transcript, &minutes),
         text: text.unwrap_or_default(),
@@ -4153,6 +4147,17 @@ fn open_window_at(app: &AppHandle, page: &str) {
 /// Shows a notification. A desktop that shows none is no reason to stop anything.
 fn tell(app: &AppHandle, notice: &Notice) {
     let _ = app.notification().builder().title(&notice.title).body(&notice.body).show();
+}
+
+/// A meeting's minutes, their sections named as the page names them in `language`: v1 to v4's
+/// three by their place, v5's by their ids (D111).
+fn read_minutes(folder: &Path, language: Language) -> Read<minutes::Minutes> {
+    let words = words::window(language);
+    minutes::minutes_named(
+        folder,
+        words.minutes_sections,
+        &minutes::named_by_id(words.minutes_sections, words.structure_sections),
+    )
 }
 
 /// Puts the tray in a state: its entry's words, whether it answers, and its icon.

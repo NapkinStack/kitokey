@@ -8541,6 +8541,32 @@ def actions_rows(now: dt.datetime) -> None:
         browser.execute_script("document.querySelector('#meeting .minutes').scrollIntoView({block: 'start'})")
         time.sleep(0.3)
         shot(browser, "d46-actions-rows")
+        # In a structure (minutes/v5, D111): the actions are the section their id names — the fourth
+        # here, never the second by place —, each section titled as the page names its id.
+        structured = meetings / "2026-10-29_10-00"
+        session(structured, now - dt.timedelta(hours=20), 10, {"local.wav": 1000})
+        (structured / "transcript.jsonl").write_text((folder / "transcript.jsonl").read_text())
+        sections = json.dumps([{"id": i, "about": "One line."} for i in ("status", "risks", "decisions", "actions")])
+        (structured / "minutes.md").write_text(
+            "---\ncontract: minutes/v5\nmade: 2026-10-29T11:00:00+01:00\nprovider: \"local\"\nmodel: \"qwen3:8b\"\ncontext: null\n"
+            f"structure: project_review\nsections: {sections}\nactions: actions\n---\n\n"
+            "## Où on en est\n\nLa recette commence lundi.\n\n## Risques et problèmes\n\n- Le serveur — non livré — vendredi\n\n"
+            "## Ce qu'on a décidé\n\n- Le lot 3 est reporté\n\n## À faire\n\n- Relancer le fournisseur — Inès — vendredi\n")
+        browser.execute_script(f"location.hash = '#/meeting/{structured.name}'")
+        wait_for(browser, lambda b: b.execute_script(
+            "return [...document.querySelectorAll('#meeting .minutes .body h2')].length === 4"), 10)
+        titles = browser.execute_script("return [...document.querySelectorAll('#meeting .minutes .body h2')].map(h => h.textContent)")
+        check("minutes in a structure: each section titled as the page names its id (D111)",
+              titles == ["État", "Risques", "Décisions", "Actions"], titles)
+        # The section the table stands in — the last title before it —, then its rows: what the check reads.
+        placed = ("const t = document.querySelector('#meeting .minutes .body table.actions'); if (!t) return null;"
+                  " const h = [...document.querySelectorAll('#meeting .minutes .body h2')]"
+                  ".filter(h => h.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING);"
+                  " return h.length ? h[h.length - 1].textContent : 'before every title'")
+        wait_for(browser, lambda b: b.execute_script(placed), 5)
+        got = [browser.execute_script(placed), browser.execute_script(rows)]
+        check("minutes in a structure: the rows are the actions' section, found by its id, never the second section by place (D111)",
+              got == ["Actions", [[["who", "Inès"], ["what", "Relancer le fournisseur"], ["when", "vendredi"]]]], got)
 
 
 def meeting_told_once(now: dt.datetime) -> None:

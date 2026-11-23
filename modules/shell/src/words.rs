@@ -961,6 +961,13 @@ pub struct Window {
     /// Shows: a meeting's page, as a heading. When: the three section titles of minutes. At most:
     /// about 20 characters. Placeholders: none.
     pub minutes_sections: [&'static str; 3],
+    /// A meeting's minutes in a structure (`minutes/v5`, D111): the sections of the five
+    /// structures beyond `general`, as the page names them, whatever titles the model wrote, in the
+    /// order of `minutes::SECTION_IDS` after its first three — updates, feedback, progress, blockers,
+    /// needs, questions, next steps, background, answers, status, risks, decisions.
+    /// Shows: a meeting's page, as a heading. When: the section titles of minutes made in a
+    /// structure. At most: about 20 characters. Placeholders: none.
+    pub structure_sections: [&'static str; 12],
     /// The actions' three cells, named for assistive technology alone (D46), and what a meeting
     /// left unsettled, as the summary writes it.
     /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: column names of
@@ -2026,6 +2033,20 @@ pub fn window(language: Language) -> Window {
             developer: ["Developer mode", "Shows technical details under each error, to help troubleshoot."],
             program_said: "Technical details: {}",
             minutes_sections: ["Highlights", "Actions", "Key points"],
+            structure_sections: [
+                "Updates",
+                "Feedback",
+                "Progress",
+                "Blockers",
+                "Needs",
+                "Questions",
+                "Next steps",
+                "Background",
+                "Answers",
+                "Status",
+                "Risks",
+                "Decisions",
+            ],
             actions_cells: ["Who", "What", "When"],
             unsettled: "not specified",
             model_recommended: "{} — recommended",
@@ -2494,6 +2515,20 @@ pub fn window(language: Language) -> Window {
             ],
             program_said: "Détail technique\u{a0}: {}",
             minutes_sections: ["Points saillants", "Actions", "Points clés"],
+            structure_sections: [
+                "Avancement",
+                "Retours",
+                "Avancées",
+                "Blocages",
+                "Besoins",
+                "Questions",
+                "Prochaines étapes",
+                "Parcours",
+                "Réponses",
+                "État",
+                "Risques",
+                "Décisions",
+            ],
             actions_cells: ["Qui", "Quoi", "Pour quand"],
             unsettled: "non précisé",
             model_recommended: "{} — recommandé",

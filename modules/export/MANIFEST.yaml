@@ -90,6 +90,10 @@ dependencies:
     purpose: Reads the session's started, the transcript's lines, the minutes' quoted values; writes front matter values
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
     exit_strategy: Meeting::read and markdown in src/lib.rs; any JSON library replaces it.
+  - name: pulldown-cmark
+    purpose: Renders the summary's Markdown into the HTML page, its raw HTML said as text
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One loop in html() of src/lib.rs; any CommonMark renderer that gives events replaces it.
   - name: cargo-about
     purpose: >-
       Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
