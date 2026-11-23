@@ -2,6 +2,8 @@
 //! and the one POST. The program (`src/main.rs`) uses [`Policy::strict`] alone; a test injects its own policy through this library to reach a
 //! server on this computer, never through the program.
 
+pub mod notion;
+
 use std::fmt;
 use std::fs;
 use std::io;
