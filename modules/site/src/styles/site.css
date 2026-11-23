@@ -1,0 +1,28 @@
+/* The app's look (the shell's window stylesheet, copied once — ADR-0019): its tokens, the system's font, its two themes. */
+:root {
+  color-scheme: light dark;
+  --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
+  --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
+    --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
+}
+a { color: var(--accent); }
+header, main, footer { max-width: 60rem; margin: 0 auto; padding: 1.5rem 1rem; }
+header { display: flex; justify-content: space-between; align-items: center; }
+.brand { font-weight: 700; font-size: 1.25rem; color: var(--ink); text-decoration: none; }
+h1 { font-size: clamp(2rem, 5vw, 3rem); line-height: 1.15; margin: 1rem 0; }
+.lead { font-size: 1.2rem; color: var(--soft); max-width: 40rem; }
+.cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); margin: 2rem 0; padding: 0; list-style: none; }
+.cards li { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.25rem; }
+footer { color: var(--soft); border-top: 1px solid var(--line); }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid var(--line); padding: .5rem; text-align: left; vertical-align: top; }

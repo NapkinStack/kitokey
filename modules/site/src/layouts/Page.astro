@@ -1,0 +1,36 @@
+---
+// Every page's head (D114): its title and description, hreflang both ways, and — until the decider
+// opens the site — noindex.
+import "../styles/site.css";
+import { open } from "../../site.config.mjs";
+import { say } from "../lib/words.mjs";
+
+const { lang, title, description, path } = Astro.props;
+const other = lang === "en" ? "fr" : "en";
+const site = Astro.site;
+const url = (l) => new URL(`/${l}/${path}`, site).href;
+---
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {!open && <meta name="robots" content="noindex" />}
+    <link rel="canonical" href={url(lang)} />
+    <link rel="alternate" hreflang="en" href={url("en")} />
+    <link rel="alternate" hreflang="fr" href={url("fr")} />
+    <link rel="alternate" hreflang="x-default" href={new URL("/", site).href} />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href={`/${lang}/`}>Kitokey</a>
+      <a href={`/${other}/${path}`} hreflang={other} lang={other}>{say("other", lang)}</a>
+    </header>
+    <main><slot /></main>
+    <footer>
+      <a href={`/${lang}/privacy/`}>{say("privacy", lang)}</a>
+    </footer>
+  </body>
+</html>

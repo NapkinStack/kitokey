@@ -1,0 +1,25 @@
+---
+// The x-default page: the two languages, each named in its own.
+import "../styles/site.css";
+import { open } from "../../site.config.mjs";
+import { say } from "../lib/words.mjs";
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kitokey</title>
+    <meta name="description" content={say("description", "en")} />
+    {!open && <meta name="robots" content="noindex" />}
+    <link rel="alternate" hreflang="en" href={new URL("/en/", Astro.site).href} />
+    <link rel="alternate" hreflang="fr" href={new URL("/fr/", Astro.site).href} />
+    <link rel="alternate" hreflang="x-default" href={new URL("/", Astro.site).href} />
+  </head>
+  <body>
+    <main>
+      <h1>Kitokey</h1>
+      <p><a href="/en/" hreflang="en" lang="en">English</a> · <a href="/fr/" hreflang="fr" lang="fr">Français</a></p>
+    </main>
+  </body>
+</html>

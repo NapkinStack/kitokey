@@ -1,0 +1,13 @@
+---
+// /<lang>/privacy/: its half of docs/privacy.md, the one source (D114, criterion 2).
+import { readFile } from "node:fs/promises";
+import Page from "../layouts/Page.astro";
+import { privacySource } from "../../site.config.mjs";
+import { half } from "../lib/privacy.mjs";
+import { say } from "../lib/words.mjs";
+const { lang } = Astro.props;
+const html = await half(await readFile(privacySource, "utf8"), lang);
+---
+<Page lang={lang} title={`Kitokey — ${say("privacy", lang)}`} description={say("local", lang)} path="privacy/">
+  <Fragment set:html={html} />
+</Page>
