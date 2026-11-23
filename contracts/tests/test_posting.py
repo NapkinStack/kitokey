@@ -85,7 +85,7 @@ def test_notion_holds_its_documented_limits_and_creates_one_page_or_none():
 
 def test_notion_has_a_code_for_each_refusal_a_person_acts_on_differently():
     codes = section("What it carries")
-    for code in ("key.refused", "database.unshared", "key.restricted"):
+    for code in ("key.refused", "database.unshared", "key.restricted", "database.several"):
         assert f"| `{code}` |" in codes, code
     assert "`database.unshared` names both" in " ".join(section("Notion").split())
 
@@ -94,3 +94,11 @@ def test_the_key_is_a_secret_as_the_address_is():
     flat = " ".join(PAGE.split())
     assert "the integration's key, as the person pasted it — a secret, as an address is" in flat
     assert "never the key" in flat
+
+
+def test_notion_reads_the_database_as_a_link_holds_it_and_says_what_an_unanswered_read_is():
+    flat = " ".join(section("Notion").split())
+    assert "the link's last 32 hexadecimal characters before any `?`, hyphens left out" in flat
+    assert "holds the database's title before them" in flat
+    assert "| No answer to a read (`GET`) within the bound | `destination.failed` | Nothing |" in section("Notion")
+    assert "a database holding several is `database.several`, nothing created" in flat

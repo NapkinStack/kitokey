@@ -109,19 +109,25 @@ person shared with their own internal integration, and the key is that integrati
 ([*Authorization*](https://developers.notion.com/docs/authorization)). Its rules, read on Notion's pages on
 2026-11-23 — none of which shows the day it last changed:
 
-- **The database** is the 32-character string the link holds after its last `/` and before any `?`,
-  hyphens left out ([*Retrieve a database*](https://developers.notion.com/reference/retrieve-a-database));
-  a link that is not `https:` or holds none is `address.refused`, nothing contacted.
+- **The database** is the link's last 32 hexadecimal characters before any `?`, hyphens left out: a link
+  Notion copies holds the database's title before them (`…/Notes-0123…cdef?v=…`), and an ID written as a
+  UUID, with its hyphens, gives the same 32 ([*Retrieve a data source*](https://developers.notion.com/reference/retrieve-a-data-source):
+  « the 32-character alphanumeric string »); a link that is not `https:` or holds none is
+  `address.refused`, nothing contacted.
 - **Every request** goes to `https://api.notion.com`, with `Authorization: Bearer <key>` and
   `Notion-Version: 2026-03-11`, the version this contract pins
   ([*Versioning*](https://developers.notion.com/reference/versioning)); another is a change of this page.
   The rules of *Which addresses it refuses* — every resolved address judged, no redirect, no proxy — hold
   for that host.
-- **A send** reads, then creates, within the 30 s of a send: `GET /v1/databases/<database>` for its first
-  data source, `GET /v1/data_sources/<data source>` for the name of its one `title` property
+- **A send** reads, then creates, within the 30 s of a send: `GET /v1/databases/<database>` for its data
+  sources — since `2025-09-03`, a database's answer lists them and holds no properties
+  ([upgrade guide](https://developers.notion.com/guides/get-started/upgrade-guide-2025-09-03)) —,
+  `GET /v1/data_sources/<data source>` for the name of its one `title` property
   ([*Retrieve a data source*](https://developers.notion.com/reference/retrieve-a-data-source)), then **one**
-  `POST /v1/pages` — the one request that creates, never sent again. A read that fails ends the send with its
-  code: nothing was created.
+  `POST /v1/pages` — the one request that creates, never sent again. A read that fails, or is not answered
+  within the bound, ends the send with its code: nothing was created.
+- **One data source**: a database holding several is `database.several`, nothing created — the page would
+  land in one of them without the person choosing which.
 - **The page** ([*Create a page*](https://developers.notion.com/reference/post-page)): its parent the data
   source; its title property, the title; its `children`, the summary as blocks
   ([*Block*](https://developers.notion.com/reference/block)) — a section's `## ` title a `heading_2`, a
@@ -141,14 +147,18 @@ Notion's answers, read as its [*Status codes*](https://developers.notion.com/ref
 |---|---|---|---|
 | `401` `unauthorized` | `key.refused` | Nothing | Paste the integration's key again, or a new one |
 | `404` `object_not_found` | `database.unshared` | Nothing | Share the database with the integration — its « ••• » menu, *Connections* —, or set up a database that exists |
-| `403` `restricted_resource` | `key.restricted` | Nothing | Give the integration the right to insert content, in Notion |
+| `403` `restricted_resource` | `key.restricted` | Nothing | Give the integration the right to insert content, in Notion; or, when the workspace has reached its block limit, make room in it |
 | `429` `rate_limited` | `destination.busy`, with `retry_after` from `Retry-After` | Nothing | Wait, then send again |
 | `400` `validation_error`, and any other `3xx` or `4xx` | `destination.refused` | Nothing | Check that the link is a database's |
 | `5xx` | `destination.failed` | Nothing | Try again later |
+| No answer to a read (`GET`) within the bound | `destination.failed` | Nothing | Try again later |
+| The database's answer lists more than one data source | `database.several` | Nothing | Link a database that holds one data source |
 
 Notion gives `404` both for a database that does not exist and for one not shared with the
-integration: `database.unshared` names both. No answer to the `POST` within the bound is
-`destination.silent`: the page may have been created.
+integration: `database.unshared` names both. Notion gives `403` both for a missing capability and for a
+workspace over its block limit: `key.restricted` names both. No answer to a read is `destination.failed`:
+nothing was created. No answer to the `POST` within the bound is `destination.silent`: the page may have
+been created.
 
 ## What it carries
 
@@ -183,7 +193,8 @@ is never shown, logged or written.
 | `destination.failed` | `5xx` | Refused by it | Try again later |
 | `key.refused` | `notion`: `401`, the key not valid | Nothing | Paste the integration's key again, or a new one |
 | `database.unshared` | `notion`: `404`, the database not shared with the integration, or gone | Nothing | Share the database with the integration, from Notion |
-| `key.restricted` | `notion`: `403`, the integration without the right to insert content | Nothing | Give it that right, in Notion |
+| `key.restricted` | `notion`: `403`, the integration without the right to insert content, or the workspace over its block limit | Nothing | Give it that right, or make room in the workspace, in Notion |
+| `database.several` | `notion`: the database holds more than one data source | Nothing | Link a database that holds one |
 
 A consumer reads a code this page does not list as no code: a later code is added here, never a new
 version for it.
