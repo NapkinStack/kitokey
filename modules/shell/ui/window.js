@@ -4679,8 +4679,11 @@ function showSmall(words) {
       readKept();
     });
     drawn.unfold(opened);
+    // A close is an ask too: an opening's answer come after it is no longer the latest, and never opens
+    // « Avancé » again under the user (#1142).
     drawn.toggle.addEventListener("click", () => {
       if (drawn.toggle.getAttribute("aria-expanded") === "true") advancedOf(true).then(() => document.getElementById("small-advanced")?.focus());
+      else advancedOf(false);
     });
     // The control the focus is on stays the one focused once drawn again (showSmall's rule).
     const focused = advanced.contains(document.activeElement) ? document.activeElement.id : null;

@@ -3462,7 +3462,8 @@ def models_advanced(now: dt.datetime) -> None:
                   whole and not got["fit"] and got["said"] == got["text"] and got["size"] == "12px" and got["inside"], got)
             # « Avancé » closed and opened again — drawn anew with the choice kept: said whole again.
             press(browser, "small-advanced")
-            wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is True, 3)
+            closed = wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is True, 3)
+            check("fr, the bar: « Avancé » closed, its panel hidden before it is opened again (#1142)", closed, browser.execute_script(shown, "small"))
             press(browser, "small-advanced")
             again = wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is False
                              and b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] == LONG_SAID + " — sur cet ordinateur", 5)
