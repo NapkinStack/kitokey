@@ -82,7 +82,8 @@ try {
         }
         $state = ($task | ConvertFrom-Json).state
         Write-Output "  the startup task, as Windows holds it: $state"
-        Check "the startup task's state is one Windows names: $state" ($state -in 'Disabled', 'DisabledByUser', 'Enabled', 'DisabledByPolicy', 'EnabledByPolicy')
+        # Off until the user turns it on in Settings, never by the package (#1085).
+        Check "the startup task is off, as the package declares it: $state" ($state -eq 'Disabled')
         Stop-Process -Id $process.Id -Force
         Wait-For 'its process gone' 30 { -not (Get-Process kitokey -ErrorAction SilentlyContinue) } | Out-Null
     }
@@ -90,9 +91,20 @@ try {
     Add-AppxPackage -Path $first
     $installed = Get-AppxPackage -Name $identity.name
     Check "installed, version $version.0" ($installed.Version -eq "$version.0")
-    foreach ($program in 'kitokey', 'kitokey-capture', 'kitokey-transcription', 'kitokey-summary') {
+    foreach ($program in 'kitokey', 'kitokey-capture', 'kitokey-transcription', 'kitokey-summary', 'kitokey-export') {
         Check "$program.exe inside it" (Test-Path (Join-Path $installed.InstallLocation "$program.exe"))
     }
+    # The Store updates the package; nothing in it updates itself (D102, criterion 2). A Tauri plugin is
+    # routed by its name, so Tauri's updater registered in the shell leaves `updater` in its executable,
+    # where the shell holds none today: the installed file is read, before the package's first start.
+    $shell = [IO.File]::ReadAllBytes((Join-Path $installed.InstallLocation 'kitokey.exe'))
+    $text = [Text.Encoding]::ASCII.GetString($shell)
+    $at = $text.IndexOf('updater', [StringComparison]::Ordinal)
+    if ($at -ge 0) {
+        $from = [Math]::Max(0, $at - 40)
+        Write-Output "  found at byte $at`: $($text.Substring($from, [Math]::Min(100, $text.Length - $from)) -replace '[^\x20-\x7e]', '.')"
+    }
+    Check 'no self-updater in the installed kitokey.exe: no `updater` in it' ($at -lt 0)
     $own = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalCache"
     try {
         Start-Kitokey $installed

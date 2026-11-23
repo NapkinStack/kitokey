@@ -96,11 +96,31 @@ deliverables:
       - "Given a meeting's page, when the user presses the control that opens the redo panel, then nothing starts: the only buttons that start a making name it — « Refaire la transcription », « Refaire le compte rendu » —, and a changed context starts nothing by itself either; before it starts, the panel says in one line what will be made, with which model, what follows it — the summary made again after a transcript — and that the current version stays until the new one is whole; Escape or « Annuler » leaves everything as it was; held by the e2e, no played engine started before the button that names it"
       - "Given a transcript or a summary replaced by a redo, when the new one is whole, then the one replaced — the last one only — stays in the meeting's folder under a name no step reads, said in one line of prose on the contract's page, in place of going to the trash; the page offers « Revenir à la version précédente » with that version's time and model; going back swaps the two, a person's corrections kept; the next redo sends the older one to the trash, as today. Cut first when the breaker nears, said at the closure"
       - "Given Settings' model missing, or the meeting's folder not writable, when the redo panel shows, then its start button stays with a model that is there, or the panel says which of the two is wrong and what to do — never a setting the user did not touch (#771); given a redo that failed beside the version kept, then the page says the last redo failed and why, never « non fait » beside what it shows (#772); given the panel open, when the window crosses 840 CSS px either way, then the panel, its choice and the focus stay (#777); held by the e2e"
+  - id: D114
+    title: "kitokey.com, Kitokey's shop window: its privacy policy and a landing in French and in English, closed to the public until the decider validates it"
+    module: site
+    state: ready
+    acceptance:
+      - "Given the module `site`, when it is created, then its `MANIFEST.yaml` (`criticality: prototype`, `user_facing: true`), its `AGENTS.md` and ADR-0019 are written, and `astro build` writes static HTML alone — no server code, no adapter. Everything lives under `modules/site/`, with its own `package.json` and lockfile; it imports nothing from another module, and reads one file outside itself, `docs/privacy.md`, whose path is set in a single configuration value; held by the fitness functions (B1) and a test that refuses any path leaving the module (`../`) outside that value. It is portable: `git subtree split --prefix=modules/site` gives a repository that builds alone, the policy's source given as a parameter; the command is written in the module's `AGENTS.md`, and the verifier runs it once and records the build"
+      - "Given `docs/privacy.md`, the one source, given a section on the site itself — hosted by Cloudflare Pages, no cookie, no tracker, no script from another domain — when the site is built, then `/en/privacy/` and `/fr/privacy/` hold its English and its French half; held by a test of the build that fails when a page's text differs from its half of the source"
+      - "Given the landing in French and in English, when it is built, then it shows the promise, D103's four screenshots of its language, the price said to be coming until the decider has set it, the Microsoft Store download — said to be coming soon until the Store gives its link —, and Linux free through Copr; its sentences follow `modules/shell/docs/voice.md`, its colours and type the app's, in both themes; no advertising and no script or font from another domain: held by a test that opens every built page in a headless Chromium and fails on any request to a host other than the site's, and by `Content-Security-Policy: default-src 'self'` in its `_headers`, read by the same test. Nothing leaks before its time: no price before the decider announces it; no promise the product does not keep — each sentence of the landing points to a merged deliverable or test, in a table of the module as `docs/store/listing.md` does —; screenshots only of the e2e's invented meetings (D103); no key and no analytics identifier; held by a test that fails on a landing sentence missing from that table, the screenshots' check of D103, and the hooks' secret scan"
+      - "Given the landing, when it is shown, then a few CSS animations play the journey — a meeting recorded, its transcript, its summary —, none of which runs under `prefers-reduced-motion: reduce`; and axe-core reports no violation of its WCAG 2.2 AA rules on every page, both languages, both themes; held by the module's tests, the reduced-motion case asserting that no animation runs"
+      - "Given the build, when it is read, then each page has its own `title` and description, Open Graph tags and an image, `hreflang` for `en`, `fr` and `x-default` both ways; `sitemap.xml` lists every page with its alternates; a JSON-LD `SoftwareApplication` names the app, its systems and its category, its `offers` added once the price is said, never a rating or a review that does not exist; and Lighthouse scores at least 95 in performance, accessibility, best practices and SEO, mobile and desktop, on the built pages served locally — SEO on the opening's build, without noindex; held by the module's tests, run by the attest and by CI"
+      - "Given the build before the opening, then `robots.txt` says `Disallow: /` and every page carries `<meta name=\"robots\" content=\"noindex\">`, held by a test; the opening removes both in one commit that changes that test with them. Given the Pages project set as *What needs a person* says, when main's first deployment is up, then an anonymous request to `main.<project>.pages.dev` gets no page but a redirect to Cloudflare Access, and `<project>.pages.dev` serves nothing; the verifier records each response's status and `Location` at that first deployment"
 ---
 
 # Cycle 11 — Kitokey on sale, and out of the app
 
 > The framework's words: `.nstack/handbook/glossary.md`.
+
+> **D114 entered by the decider, 2026-11-23**, in their working session with the coordinator: the Store needs a
+> public privacy policy, and kitokey.com is the product's shop window. Requirements: professional and modern,
+> playful, no advertising, an animated landing, indexable by search engines. Hosting: Cloudflare Pages — the
+> domain's registrar and DNS are Cloudflare already —, no server, no cost. The same day, the decider set its
+> criticality to the lightest one, and kept the site closed to the public and unindexed until they validate it,
+> with the simplest access control available. On where the site lives, the decider chose this public repository, in a
+> module of its own that can leave it, with nothing published before its time. The end date does not move (`framing.md` §4); D114's cut comes
+> first (*Deliverables*).
 
 > **Started on 2026-11-20**, at cycle 10's closure, early, on the decider's word that day in their working
 > session with the coordinator: « on termine le cycle en cours ». `start` and `end` move to that day, as this
@@ -191,7 +211,7 @@ QA: ines; UI and accessibility: lina; content and summary: sam.
 | D102, D107, D108 | marc |
 | D104, D105 | ines |
 | D106, D109 | lina |
-| D103, D110, D111, D112 | sam |
+| D103, D110, D111, D112, D114 | sam |
 | D113 | lina |
 
 **The order**: D108's Markdown merges first, its model reading sections as a list; D109's export, D110 and
@@ -199,9 +219,9 @@ DOCX then consume it. `minutes/v5` (D111) merges as early as it can, and D108 is
 D105 measures in windows the coordinator plans with the queues empty, so that it neither measures their load
 nor takes D104's machine.
 
-**Cut first, in this order, when the breaker nears**: D113 whole, to cycle 12; then D111 whole, to cycle 12, if `minutes/v5` is not merged by
+**Cut first, in this order, when the breaker nears**: D114's animations and its Lighthouse threshold (its axe-core check kept), to cycle 12; then D113 whole, to cycle 12; then D111 whole, to cycle 12, if `minutes/v5` is not merged by
 the cycle's fifth working day (2026-11-26); then D110's Discord (the generic webhook kept); then D109's folder export; then
-D105's budgets (the baseline kept); then D112's English contractions (its comments kept). Never cut: D102, D104, D106, D108's Markdown, D109's export and copy.
+D105's budgets (the baseline kept); then D112's English contractions (its comments kept). Never cut: D102, D104, D106, D108's Markdown, D109's export and copy, D114's privacy policy and its closed phase.
 D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 
 ### D102
@@ -326,6 +346,42 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   summary model of Settings —, at least 4 of the 6 built-in structures yield every section either filled or said
   empty, over the team's sample of 3 meetings; below that, the structures that fail are cut and the result
   recorded — a refuted spike is a delivered one.
+- **The spike, 2026-11-20** (`kitokey-team/logs/d111-spike*.jsonl`): `qwen3:8b`, the local model Settings
+  recommends, on the bench's played meeting (`modules/platform/bench/meeting.txt`, French, synthesised voices),
+  3 runs per structure, 92 to 361 s an answer. Asked the sections' order in words, as v4 is: 3 of 6 structures
+  held every run — one-to-one, stand-up and interview each failed once, on form (no `## ` line twice, content
+  written as a title once). Given the skeleton to copy — `# <the meeting's title>`, then `## <section n's title>`
+  and `<section n's content>` line by line, each title « a few words naming the section, never its content »:
+  **6 of 6, every run; the threshold is held**, and summary asks it so (#1042). A JSON answer by constrained
+  decoding, the third variant, was not needed. Not met as written: one meeting played three times, not three
+  meetings; and the spike's request lacked summary's paragraph on the recogniser's errors and its times per bullet.
+- **The third spike, 2026-11-21** — what closes those two gaps.
+  - **Setup.** `kitokey-summary` itself was built at 0d365b7 and run as the shell runs it, `--structure <name>`
+    on `qwen3:8b` through Ollama's native route, so the request is the bytes `request_in` builds: rules, the
+    recogniser's errors, the times, the skeleton.
+  - **Sample.** Three meetings, two runs per structure, 36 runs:
+    - a written stand-up;
+    - a written client call;
+    - the bench's meeting recognised by whisper.cpp large-v3-turbo-q8_0, taken as transcript/v1 with the
+      recogniser's own errors.
+  - **Judged on what the program writes** (its one asking again included), as the coordinator decided before
+    the reading. The first answer's count is recorded beside it.
+  - **Result:**
+    - general, stand-up, client call and project review held every run;
+    - one-to-one and interview held 5 of 6;
+    - **4 of 6 structures, every run: the threshold is held.** The first answer's count is the same; nothing
+      was asked again.
+  - **The two failures** came on the recognised meeting: one-to-one run 1 (661 s) and interview run 2 (592 s).
+    Neither was on form. Each time the program refused with « the provider on this computer cut its answer
+    short »: Ollama said `done_reason: length` after the 4,096 tokens `num_predict` allows an answer, its
+    thinking counted (`modules/summary/src/provider.rs`, `WINDOW`). At about 7 tokens a second, that is the
+    590–660 s seen. The program wrote no incomplete minutes, as designed.
+  - **Read:** the structures' form held on every answer that ended. The risk left is a thinking model's length
+    on a longer, noisier transcript, which grows with an hour-long import. That is a follow-up issue, not
+    D111's criterion.
+  - **Evidence:** `kitokey-team/logs/d111-spike3.jsonl` (one line per run, the minutes or the refusal) and
+    `logs/evening/d111-spike3.log` (the table). Spike 3 was run at 0d365b7; `git diff 0d365b7 300c7b5 --
+    modules/summary` is empty, 300c7b5 being main 5553f42 merged in.
 - **The contract**: three pull requests, in order — `minutes/v5`'s page and schema, summary writing it, the
   shell reading v4 and v5. v4 is never removed in this cycle.
 
@@ -346,6 +402,62 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 - Criteria 2 and 5 of cycle 10's D93 were held there (#809, #810, #879, #931) and are not repeated.
 - Cut first in this cycle too: the Store and export come before it.
 
+### D114
+
+- **Why now**: Partner Center asks for the privacy policy's URL at submission ([Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies)
+  10.5.1, read 2026-11-23). The submission does not wait on the site: `docs/store/listing.md` already links
+  [`docs/privacy.md`](../../privacy.md) on GitHub, public since PDR-0002. Once the site opens, the listing's line
+  points to `https://kitokey.com/<lang>/privacy/` instead, in the opening's pull request.
+- **The module** `site`, `prototype`: it holds no key, places no order, moves no money and touches nobody's
+  personal data — it collects nothing —, so `.nstack/handbook/05-workflow.md` §7 asks no more; the decider set
+  the lightest criticality, 2026-11-23. At `prototype` no test sheet is owed: each criterion is held by the module's tests, and criterion 6's
+  second half by the verifier's record of the first deployment. Its stack and its host: [ADR-0019](../../adr/0019-kitokey-com-a-static-site-built-by-astro-served-by-cloudflare-pages.md).
+- **A dedicated, portable space**: the module holds its whole toolchain; the one path out of it, to
+  `docs/privacy.md`, is one configuration value, which the build takes as a parameter once the module is split
+  out by `git subtree split`. A private repository was weighed and set aside (ADR-0019): this one keeps a single
+  source and the same guards; the split is the way out if a private one is wanted later.
+- **Nothing leaks**: the repository is public, so a draft is public once pushed. The guards are the content's,
+  checked: no price until announced, no promise without its merged deliverable, no screenshot of a real meeting,
+  no key or analytics identifier.
+- **One source** for the policy: the site reads `docs/privacy.md` at build time and splits it at its two
+  language headings; the site's own section is written there, in both languages, so the app's policy and the
+  site's stay one text.
+- **The screenshots** are D103's, made by the shell's e2e (`store_shots`): a script of `site` copies the eight
+  files from a run's evidence folder given on its command line into the module, where they are committed —
+  Cloudflare's build does not run the shell's e2e. A test checks there are four per language, named in
+  `docs/store/listing.md`'s order. Astro writes them in smaller formats at build time.
+- **The look** is the app's: its tokens (`modules/shell/ui/window.css`, `:root` and its dark theme) copied once
+  into the module, the system's font stack, no web font fetched from elsewhere. The voice: `modules/shell/docs/voice.md`.
+- **No third party, by construction**: no analytics, no font or script from a CDN, no embed. The browser refuses
+  them too: `Content-Security-Policy: default-src 'self'` in `_headers`
+  ([Cloudflare Pages, *Headers*](https://developers.cloudflare.com/pages/configuration/headers/), read 2026-11-23);
+  Astro's styles written to files rather than inlined, so that the policy needs no `'unsafe-inline'`.
+- **Referencing**: hreflang by `<link rel="alternate">` in each page and in the sitemap, each version naming
+  itself and the other, with `x-default` ([Google, *Localized versions*](https://developers.google.com/search/docs/specialty/international/localized-versions));
+  Astro's i18n routing and `@astrojs/sitemap`'s `i18n` option write both ([Astro, *Internationalization*](https://docs.astro.build/en/guides/internationalization/),
+  [*@astrojs/sitemap*](https://docs.astro.build/en/guides/integrations-guide/sitemap/)). Google shows a
+  `SoftwareApplication` rich result only with `offers.price` and one of `aggregateRating` or `review`
+  ([Google, *Software app*](https://developers.google.com/search/docs/appearance/structured-data/software-app)):
+  none is invented, so the JSON-LD is written for what it says, the rich result waits for real reviews.
+- **Lighthouse** runs from `@lhci/cli` on the static build (`staticDistDir`, [Lighthouse CI, *Getting started*](https://github.com/GoogleChrome/lighthouse-ci/blob/main/docs/getting-started.md))
+  with the workstation's Chromium. Its SEO category fails on a page that asks not to be indexed (its
+  `is-crawlable` audit), so SEO is scored on the build without noindex, the one the opening merges.
+- **Closed until validated**, with no more than the Pages project's own settings (the decider, 2026-11-23: the simplest access control
+  available). Its *Enable access policy* protects preview deployments alone — "Note that this will only protect
+  your preview deployments" —, and restricts them to the Cloudflare account's members
+  ([Cloudflare Pages, *Preview deployments*](https://developers.cloudflare.com/pages/configuration/preview-deployments/),
+  read 2026-11-23). So main is built as a preview — the production branch is `site-live`, which an agent creates
+  first at a commit without `modules/site`, so that a production build has nothing to serve
+  ([*Branch deployment controls*](https://developers.cloudflare.com/pages/configuration/branch-build-controls/)) —
+  and the site is read at `main.<project>.pages.dev`, the alias of main's last deployment. No Zero Trust
+  application, no list of addresses. Builds are limited to the site's paths, so that the team's other pushes
+  spend none of the free plan's 500 builds a month ([*Build watch paths*](https://developers.cloudflare.com/pages/configuration/build-watch-paths/),
+  [*Limits*](https://developers.cloudflare.com/pages/platform/limits/)).
+- **Opening**: the decider's gestures, in *What needs a person*, then an agent's pull request removing noindex
+  and pointing the listing to the site's policy.
+- **Holder**: sam (content, web, UX). Cut first in this cycle: its animations and its Lighthouse threshold go to
+  cycle 12 before anything else; its privacy page and its closed phase are never cut.
+
 ## What needs a person
 
 | Deliverable | Who | The literal gesture |
@@ -358,6 +470,11 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 | D110 | The decider | Read the PDR from its pull request; say « PDR acceptée », or what changes |
 | Cycle 09's D56 | The decider | As [cycle 07](07-wholeheard-from-the-systems-updater.md#what-needs-a-person) says, in a terminal of your own, never through an agent: a minisign key, its `.pub` alone given to an agent — or say « D56 reportée » |
 | Cycle 09's D53, D84 | The colleague on Windows 11 | [#482](https://github.com/NapkinStack/kitokey/issues/482) and [#795](https://github.com/NapkinStack/kitokey/issues/795), updated first by an agent with the package's link: install it, record a real call of five minutes, then sign out and in again; answer there |
+| D114, before the Pages project | An agent | Push the branch `site-live` at a commit of main from before the module's first pull request, so that it has no `modules/site` |
+| D114, the Pages project | The decider | In the Cloudflare dashboard, in this order: **1.** *Workers & Pages* › *Create* › *Pages* › *Connect to Git*: the repository `NapkinStack/kitokey`; *Production branch* `site-live`; *Framework preset* Astro; *Build command* `npm run build`; *Build output directory* `dist`; *Root directory* `modules/site`; *Save and Deploy*. **2.** The project › *Settings* › *General* › *Enable access policy*. **3.** *Settings* › *Builds & deployments* › *Preview branch control* › *Custom branches*: include `main`, exclude `*`. **4.** *Settings* › *Build* › *Build watch paths*: include `modules/site/*`, `docs/privacy.md`. Then say in D114's issue the project's name |
+| D114, validation | The decider | Signed in to Cloudflare, read `https://main.<project>.pages.dev/fr/` and `/en/`; say in D114's issue that the site is validated, or what changes |
+| D114, opening | The decider | Once validated, in this order: *Settings* › *Builds & deployments* › *Configure Production deployments*: *Production branch* `main`; then *Custom domains* › *Set up a custom domain*: `kitokey.com`. Then an agent's pull request removes noindex and points the listing to the site's policy |
+| D114 | The decider | When the Store gives Kitokey's page, its address in D114's issue; the price, as D102 asks |
 
 ## Dependency with a date
 
@@ -406,6 +523,10 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
   own counter off in that build; the decider may keep D83's in it. Default: the Store's.~~ Settled by the
   decider, 2026-11-20 (« essai (a) »): D83's counter kept, the Store's trial « Unlimited » (D102's section).
 - **The six built-in structures**: the market's common core; the decider may name others.
+- **D114's host**: Cloudflare recommends Workers for new projects ("Cloudflare recommends using Cloudflare Workers
+  for new projects", [Astro, *Deploy to Cloudflare*](https://docs.astro.build/en/guides/deploy/cloudflare/), read
+  2026-11-23); the decider chose Pages, whose settings hold the closed phase in four clicks. The build is a static
+  folder: it moves to Workers or anywhere unchanged (ADR-0019). Default: Pages.
 - **D111's spike threshold**: 4 of the 6 structures, every section filled or said empty, over 3 meetings, with
   Settings' default local model (D111's section). A word changes it.
 

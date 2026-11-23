@@ -1,0 +1,22 @@
+---
+// The site's root, until the landing comes: the policy in each language.
+import "../styles/site.css";
+import { open } from "../../site.config.mjs";
+import { say } from "../lib/words.mjs";
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kitokey</title>
+    <meta name="description" content={say("description", "en")} />
+    {!open && <meta name="robots" content="noindex" />}
+  </head>
+  <body>
+    <main>
+      <h1>Kitokey</h1>
+      <p><a href="/en/privacy/" hreflang="en" lang="en">{say("privacy", "en")}</a> · <a href="/fr/privacy/" hreflang="fr" lang="fr">{say("privacy", "fr")}</a></p>
+    </main>
+  </body>
+</html>
