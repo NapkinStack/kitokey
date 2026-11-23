@@ -3895,6 +3895,8 @@ def advanced_latest_answer(now: dt.datetime) -> None:
             browser.execute_script(
                 "const real = window.__TAURI__.core; window.held = []; window.armed = true; window.refusing = false;"
                 " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {"
+                "   if (asked === 'models_offered' && window.holding && rest[0] && rest[0].name) { window.holding = false;"
+                "     return new Promise((ok, no) => window.held.push(() => real.invoke(asked, ...rest).then(ok, no))); }"
                 "   if (asked === 'models_offered' && window.refusing && rest[0] && rest[0].name) { window.refusing = false;"
                 "     return new Promise((ok, no) => window.held.push(() => no('held, then refused (#852)'))); }"
                 "   if (asked === 'models_offered' && window.armed && rest[0] && rest[0].name) { window.armed = false; window.heldFor = rest[0].name;"
@@ -3935,6 +3937,19 @@ def advanced_latest_answer(now: dt.datetime) -> None:
             check("an older ask refused after a later one answered: « Avancé » shows the models, and nothing says they could not be read (#852)",
                   held and answered and not refused and browser.execute_script(opened),
                   {"held": held, "answered": answered, "said": browser.execute_script(said), "open": browser.execute_script(opened)})
+            # #1142: the opening's ask held, « Avancé » closed before its answer — BD's slow Ollama —: the answer,
+            # the same models as drawn, come after the close, never opens it again under the user.
+            browser.execute_script(toggled)
+            browser.execute_script("window.holding = true")
+            browser.execute_script(toggled)
+            held = wait_for(browser, lambda b: b.execute_script("return window.held.length") == 3, 5)
+            browser.execute_script(toggled)
+            browser.execute_script("window.held[2]()")
+            reopened = wait_for(browser, lambda b: b.execute_script(opened), 2)
+            check("« Avancé » closed while its opening's ask is held: that answer, come after the close, leaves it closed (#1142)",
+                  held and not reopened and browser.execute_script("return document.getElementById('small-advanced').getAttribute('aria-expanded')") == "false",
+                  {"held": held, "state": browser.execute_script("const t = document.getElementById('small-advanced'); const p = document.getElementById('small-advanced-panel');"
+                                                                 " return {expanded: t?.getAttribute('aria-expanded'), hidden: p?.hidden}")})
             browser.execute_script("window.restoreCore()")
             press(browser, "small-stop")
             wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
