@@ -30,7 +30,7 @@ use kitokey_shell::microphone;
 use kitokey_shell::{
     autostart,
     confidential::{self, Left, Wait, What},
-    context, correction, desktop, keys,
+    context, correction, desktop, exporting, keys,
     licence::{self, Licence},
     log,
     meeting::{self, Read, Transcript},
@@ -139,6 +139,8 @@ struct Shell {
     /// that a later failure never shows an earlier one's cause (D29); and the model, when it was the
     /// meeting's own (D91): its gesture is then in *Refaire…*, not in Settings.
     minutes_failed: Mutex<HashMap<PathBuf, MinutesFailed>>,
+    /// The meetings whose summary could not be written to the export folder, and why (D109).
+    not_exported: Mutex<HashMap<PathBuf, String>>,
     /// The loopback server the opened meeting is played from, started with the first (D26).
     served: Mutex<Option<player::Served>>,
     /// How many times each meeting's minutes were written since the start: a page drawn with
@@ -565,6 +567,7 @@ fn main() {
                 minutes_waiting: Mutex::new(VecDeque::new()),
                 awaiting: Mutex::new(Vec::new()),
                 minutes_failed: Mutex::new(HashMap::new()),
+                not_exported: Mutex::new(HashMap::new()),
                 served: Mutex::new(None),
                 minutes_made: Mutex::new(HashMap::new()),
                 minutes_tried: Mutex::new(HashMap::new()),
@@ -2524,6 +2527,8 @@ struct SettingsShown {
     sessions: PathBuf,
     /// The same, as people write it: from their home, with a tilde.
     sessions_said: String,
+    /// The folder every summary is written to too, said so; none, none (D109).
+    export_said: Option<String>,
     after: After,
     reminder: bool,
     /// A call another application starts is offered to be recorded (D30).
@@ -2619,11 +2624,8 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
     Ok(SettingsShown {
         shortcut: shell.shortcut.lock().unwrap().clone(),
         shortcut_settings: keyboard_settings().is_some(),
-        sessions_said: match dirs::home_dir().and_then(|home| settings.sessions.strip_prefix(home).ok().map(PathBuf::from)) {
-            Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
-            Some(rest) => format!("~/{}", rest.display()),
-            None => settings.sessions.display().to_string(),
-        },
+        sessions_said: from_home_said(&settings.sessions),
+        export_said: settings.export.as_deref().map(from_home_said),
         sessions: settings.sessions,
         after: settings.after,
         reminder: settings.reminder,
@@ -2664,6 +2666,15 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
     })
 }
 
+/// A folder as people write it: from their home, with a tilde.
+fn from_home_said(folder: &Path) -> String {
+    match dirs::home_dir().and_then(|home| folder.strip_prefix(home).ok().map(PathBuf::from)) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+        Some(rest) => format!("~/{}", rest.display()),
+        None => folder.display().to_string(),
+    }
+}
+
 /// One choice the page changed.
 #[derive(serde::Deserialize)]
 struct Change {
@@ -2686,6 +2697,8 @@ struct Change {
     language: Option<String>,
     /// Every window's look (D98).
     appearance: Option<Appearance>,
+    /// The folder every summary is written to too (D109): a path, or empty for none.
+    export: Option<String>,
 }
 
 /// Writes a change to the settings file, then holds it: the next recording follows it. Nothing
@@ -2707,6 +2720,20 @@ fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Re
         }
         std::fs::create_dir_all(&sessions).map_err(|error| shell.told(Failure::FolderUnmade, error))?;
         settings.sessions = sessions;
+    }
+    // The export folder (D109): a whole path, made when it is not there yet; empty, none.
+    if let Some(export) = change.export {
+        settings.export = match export.trim() {
+            "" => None,
+            written => {
+                let folder = settings::from_home(PathBuf::from(written));
+                if !folder.is_absolute() {
+                    return Err(shell.told(Failure::FolderNotWhole, "no whole path, from the root or from ~"));
+                }
+                std::fs::create_dir_all(&folder).map_err(|error| shell.told(Failure::FolderUnmade, error))?;
+                Some(folder)
+            }
+        };
     }
     if let Some(after) = change.after {
         settings.after = after;
@@ -3508,6 +3535,9 @@ struct Makings {
     /// The minutes left of a meeting's making, by its name, from the speeds measured here: none
     /// measured for one of its steps, or thirty seconds or less, none (D92).
     left: HashMap<String, u64>,
+    /// Every summary is written to a folder too (D109); those not written there, by their meeting.
+    export: bool,
+    not_exported: Vec<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -3653,6 +3683,8 @@ fn makings(shell: State<'_, Shell>) -> Makings {
             .map(|(folder, what)| (named(folder), *what))
             .collect(),
         left,
+        export: settings.export.is_some(),
+        not_exported: shell.not_exported.lock().unwrap().keys().map(|folder| named(folder)).collect(),
     }
 }
 
@@ -4025,6 +4057,9 @@ fn write_minutes_from(
                 cancel: Cancel::default(),
             });
         }
+        if matches!(made, summarising::Made::Written(_)) {
+            export_written(&shell, &folder);
+        }
         minutes_ended(
             &app,
             &folder,
@@ -4048,6 +4083,47 @@ fn write_minutes_from(
         // where no window of Kitokey has the focus (D92).
         tell_made(&app, &words::minutes(&said, shell.language()), &folder, written);
     });
+}
+
+/// « Exporter chaque compte rendu » (D109): the summary just written, written to the folder chosen
+/// too, by `kitokey-export` (`exporting/v1`), named by its meeting's folder; never a confidential
+/// meeting's, a folder chosen being one a service may copy (D60). Not written there, it is said on
+/// its page until it is.
+fn export_written(shell: &Shell, folder: &Path) {
+    let Some(chosen) = shell.settings().export else {
+        return;
+    };
+    if confidential::marked(folder) {
+        return;
+    }
+    let language = shell.language();
+    let said = words::exported(language);
+    let name = meeting_said(folder, language);
+    let to = chosen.join(format!("{}.md", named(folder)));
+    let input = exporting::Input {
+        to: &to,
+        name: &name,
+        transcript: said.transcript,
+        me: said.me,
+        others: said.others,
+        time: said.time,
+        speaker: said.speaker,
+        text: said.text,
+    };
+    let tag = match language {
+        Language::French => "fr",
+        Language::English => "en",
+    };
+    match exporting::markdown(&program("kitokey-export", "KITOKEY_EXPORT"), folder, tag, &input) {
+        Ok(()) => {
+            tracing::info!("shell.exported");
+            shell.not_exported.lock().unwrap().remove(folder);
+        }
+        Err(why) => {
+            tracing::warn!(detail = %why, "shell.export_failed");
+            shell.not_exported.lock().unwrap().insert(folder.to_path_buf(), why);
+        }
+    }
 }
 
 /// The minutes' entry while they are written, and after.

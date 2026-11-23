@@ -334,6 +334,40 @@ pub struct Menu {
     pub show_bar: &'static str,
 }
 
+/// The words a file exported shows that no contract carries (`exporting/v1`'s input, D109): the
+/// transcript's heading, who spoke, and the transcript's three columns.
+pub struct Exported {
+    pub transcript: &'static str,
+    pub me: &'static str,
+    pub others: &'static str,
+    pub time: &'static str,
+    pub speaker: &'static str,
+    pub text: &'static str,
+}
+
+pub fn exported(language: Language) -> Exported {
+    match language {
+        // Shows: an exported file, the transcript's heading, who spoke, and its three columns (D109).
+        // When: the transcript is included. At most: 24 characters. Placeholders: none.
+        Language::English => Exported {
+            transcript: "Transcript",
+            me: "You",
+            others: "Others",
+            time: "Time",
+            speaker: "Who",
+            text: "Text",
+        },
+        Language::French => Exported {
+            transcript: "Transcription",
+            me: "Vous",
+            others: "Les autres",
+            time: "Heure",
+            speaker: "Qui",
+            text: "Texte",
+        },
+    }
+}
+
 pub fn menu(language: Language) -> Menu {
     match language {
         Language::English => Menu {
@@ -964,6 +998,22 @@ pub struct Window {
     /// Shows: Settings, « Après un enregistrement », the folder's button: the system's dialog.
     /// When: always. At most: one line. Placeholders: none.
     pub choose: &'static str,
+    /// « Exporter chaque compte rendu » (D109): the folder every new summary is written to too.
+    /// Shows: Settings, « Après un enregistrement », a row: its name, then its line under it. When:
+    /// always. At most: one line for the name, the line wraps. Placeholders: none.
+    pub export_folder: [&'static str; 2],
+    /// Shows: Settings, « Après un enregistrement », the export row's folder, as its value. When: no
+    /// folder chosen. At most: about 20 characters. Placeholders: none.
+    pub export_none: &'static str,
+    /// Shows: Settings, « Après un enregistrement », the export row, as a button. When: a folder is
+    /// chosen. At most: about 20 characters. Placeholders: none.
+    pub export_stop: &'static str,
+    /// Shows: a meeting's page, as a note under its summary (D109). When: a folder is chosen and the
+    /// meeting is confidential, so never written there (D60). At most: one line. Placeholders: none.
+    pub export_confidential: &'static str,
+    /// Shows: a meeting's page, as an error under its summary (D109). When: its summary could not be
+    /// written to the export folder. At most: two lines. Placeholders: none.
+    pub export_failed: &'static str,
     /// The recording bar, its icon in the sidebar's foot (D89), what it says (D90).
     /// Shows: the sidebar, as a name for a screen reader. When: icon button (tooltip): open the
     /// recording bar. At most: no limit. Placeholders: none.
@@ -1959,6 +2009,14 @@ pub fn window(language: Language) -> Window {
                 "New meetings are saved here. Existing ones stay in the old folder: Kitokey only shows and cleans up this one.",
             ],
             choose: "Choose…",
+            export_folder: [
+                "Export every summary",
+                "Each new summary is also written to this folder, in Markdown, named by the meeting’s date and time. Redoing a summary replaces its file in the folder.",
+            ],
+            export_none: "No folder",
+            export_stop: "Stop exporting",
+            export_confidential: "Confidential: not exported.",
+            export_failed: "Kitokey could not write the summary to the export folder. Choose another folder in Settings.",
             small: "Recording bar",
             small_mic: "Your microphone",
             small_meeting: "Meeting audio",
@@ -2419,6 +2477,14 @@ pub fn window(language: Language) -> Window {
                 "Les nouvelles réunions sont enregistrées ici. Les réunions existantes restent dans l’ancien dossier\u{a0}: Kitokey n’affiche et ne nettoie que celui-ci.",
             ],
             choose: "Choisir…",
+            export_folder: [
+                "Exporter chaque compte rendu",
+                "Chaque nouveau compte rendu est aussi écrit dans ce dossier, en Markdown, nommé par la date et l’heure de la réunion. Refaire un compte rendu remplace son fichier dans le dossier.",
+            ],
+            export_none: "Aucun dossier",
+            export_stop: "Ne plus exporter",
+            export_confidential: "Confidentielle\u{a0}: pas exportée.",
+            export_failed: "Impossible d’écrire le compte rendu dans le dossier d’export. Choisissez un autre dossier dans les Réglages.",
             small: "Barre d’enregistrement",
             small_mic: "Votre micro",
             small_meeting: "Le son de la réunion",

@@ -676,6 +676,15 @@ function paintMakings() {
       not_made: minutes.dataset.kept === "true" ? words.minutes_redo_failed : words.minutes_not_made,
     });
   }
+  // The summary not written to the export folder, or a confidential meeting's never (D109, D60).
+  const exported = document.getElementById("export-said");
+  if (exported) {
+    const failed = makings?.not_exported.includes(exported.dataset.name);
+    const kept = makings?.export && exported.dataset.confidential === "true";
+    const text = failed ? words.export_failed : kept ? words.export_confidential : "";
+    if (exported.textContent !== text) exported.textContent = text;
+    exported.hidden = text === "";
+  }
   // No line corrected while the transcript is made or waits to be (D62): its pencils hidden.
   for (const pencil of document.querySelectorAll("#meeting .lines .edit")) {
     if (pencil.parentElement.querySelector(".correcting")) continue;
@@ -1779,6 +1788,14 @@ function minutesCard(read, words, session, transcript, onPage) {
   state.setAttribute("role", "status");
   state.hidden = true;
   card.append(state);
+  // Whether its summary went to the export folder too (D109): said when it did not, painted below.
+  const exported = element("p", "note warn");
+  exported.id = "export-said";
+  exported.dataset.name = nameOf(session);
+  exported.dataset.confidential = String(!!session.confidential);
+  exported.setAttribute("role", "status");
+  exported.hidden = true;
+  card.append(exported);
   if (read.state !== "present") {
     card.append(element("p", "none", read.state === "absent" ? words.no_minutes : words.unreadable));
     if (read.state === "absent" && transcript.state === "present" && transcript.complete) {
@@ -3893,6 +3910,57 @@ function showSettings(shown, minutes, words) {
     if (chosen !== null) save({ sessions: chosen });
   });
   where.append(whereSaid, folderShown, path, choose);
+  // Every new summary written to a folder too (D109), typed or chosen as the meetings' folder is;
+  // none, nowhere else. « Ne plus exporter » forgets it.
+  const exporting = element("div", "row folder");
+  const exportSaid = element("label", "said");
+  exportSaid.htmlFor = "export-folder";
+  exportSaid.id = "export-label";
+  const exportHelp = element("span", "says", words.export_folder[1]);
+  exportHelp.id = "export-help";
+  exportSaid.append(element("span", "name", words.export_folder[0]), exportHelp);
+  const exportPath = element("input");
+  exportPath.id = "export-folder";
+  exportPath.type = "text";
+  exportPath.value = shown.export_said ?? "";
+  exportPath.disabled = locked;
+  exportPath.spellcheck = false;
+  exportPath.hidden = true;
+  const exportAs = (shown.export_said ?? "").replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
+  const exportShown = element(
+    "button",
+    "path",
+    shown.export_said === null ? words.export_none : shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs,
+  );
+  exportShown.type = "button";
+  exportShown.id = "export-shown";
+  exportShown.setAttribute("aria-labelledby", "export-label export-shown");
+  exportShown.disabled = locked;
+  exportShown.addEventListener("click", () => {
+    exportShown.hidden = true;
+    exportPath.hidden = false;
+    exportPath.focus();
+    exportPath.select();
+  });
+  exportPath.addEventListener("change", () => save({ export: exportPath.value.trim() }));
+  exportPath.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") exportPath.blur();
+  });
+  const exportChoose = element("button", "open", words.choose);
+  exportChoose.type = "button";
+  exportChoose.id = "choose-export";
+  exportChoose.disabled = locked;
+  exportChoose.addEventListener("click", async () => {
+    const chosen = await window.__TAURI__.core.invoke("choose_folder");
+    if (chosen !== null) save({ export: chosen });
+  });
+  const exportStop = element("button", "open", words.export_stop);
+  exportStop.type = "button";
+  exportStop.id = "export-stop";
+  exportStop.disabled = locked;
+  exportStop.hidden = shown.export_said === null;
+  exportStop.addEventListener("click", () => save({ export: "" }));
+  exporting.append(exportSaid, exportShown, exportPath, exportChoose, exportStop);
   // The shortcut: the desktop's to grant and to change; the page says which keys, and where.
   const keys = element("div", "row");
   const keysSaid = element("span", "said");
@@ -3965,7 +4033,7 @@ function showSettings(shown, minutes, words) {
   // Outside Windows' package, no startup task: nothing offered (D84).
   more.append(speaks, looks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
   // What becomes of a recording: where it goes and how long its sound stays, after what is made.
-  after.append(where, keep, sending);
+  after.append(where, exporting, keep, sending);
 
   // Last, for whoever looks into a failure: the developer mode (D29), folded at the bottom of
   // « Général » (D95) — a disclosure (ARIA APG), as the redo panel's « Avancé ».

@@ -86,6 +86,31 @@ echo '{"event": "answered"}'
 """
 )
 SUMMARY.chmod(0o755)
+# kitokey-export played here, as exporting/v1 says it (D108, D109): its arguments and its input
+# kept beside it; the file asked for written whole at `to` — the meeting's minutes, as an md would
+# hold them —, then `written`; with `export-refuse` there, `failed` with `file.unwritable`, nothing written.
+EXPORTER = WORK / "kitokey-export"
+EXPORTER.write_text(
+    """#!/bin/sh
+here=$(dirname "$0")
+printf '%s\\n' "$*" > "$here/export-args"
+cat > "$here/export-input"
+if [ -e "$here/export-refuse" ]; then
+  echo '{"event": "failed", "code": "file.unwritable"}'
+  echo "kitokey-export: the file could not be written" >&2
+  exit 1
+fi
+python3 - "$1" "$here/export-input" <<'END'
+import json, pathlib, sys
+to = pathlib.Path(json.loads(pathlib.Path(sys.argv[2]).read_text())["to"])
+written = to.with_name(to.name + ".part")
+written.write_text((pathlib.Path(sys.argv[1]) / "minutes.md").read_text())
+written.replace(to)
+print(json.dumps({"event": "written", "file": str(to), "bytes": to.stat().st_size}))
+END
+"""
+)
+EXPORTER.chmod(0o755)
 # kitokey-transcription played here: a whole transcript, naming the model it was given — a
 # service's by its host, as the real one names it; where a scenario stands the service in
 # ($STANDIN, D60), its request is sent to it, as the real one would send the sound there.
@@ -660,7 +685,7 @@ class Window:
         self.file.write_text(f'sessions = "{sessions}"\n{opened}{greeted}{more}')
         self.env = dict(os.environ, XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
         # An Ollama and a keyring of the scenario's, never the user's own.
-        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER))
+        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_EXPORT=str(EXPORTER), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER))
 
     def __enter__(self) -> webdriver.Remote:
         # One Kitokey per session: one still leaving takes this start's arguments and this one
@@ -5671,6 +5696,102 @@ def bar_after_stop(now: dt.datetime) -> None:
                 for gate in gates:
                     gate.unlink(missing_ok=True)
                 (WORK / "fail-minutes").unlink(missing_ok=True)
+
+
+def summaries_to_a_folder(now: dt.datetime) -> None:
+    """CF. D109, criterion 3: a folder chosen in Settings for « Exporter chaque compte rendu »; each
+    summary written from then on is written there too, in Markdown, named by the meeting's date and
+    time, through `kitokey-export` as exporting/v1 starts it; a confidential meeting never (D60), its
+    page saying so; a folder that cannot be written said on the meeting's page, the summary kept in the
+    meeting; « Ne plus exporter » ends it. In French and in English."""
+    print("CF. every new summary written to the folder chosen, in Markdown, named by its meeting; never a confidential one; a refusal said (D109)")
+    words_of = {
+        "fr": {"none": "Aucun dossier", "help": "Chaque nouveau compte rendu est aussi écrit dans ce dossier, en Markdown, nommé par la date et l’heure de la réunion. Refaire un compte rendu remplace son fichier dans le dossier.",
+               "confidential": "Confidentielle\u00a0: pas exportée.",
+               "failed": "Impossible d’écrire le compte rendu dans le dossier d’export. Choisissez un autre dossier dans les Réglages."},
+        "en": {"none": "No folder", "help": "Each new summary is also written to this folder, in Markdown, named by the meeting’s date and time. Redoing a summary replaces its file in the folder.",
+               "confidential": "Confidential: not exported.",
+               "failed": "Kitokey could not write the summary to the export folder. Choose another folder in Settings."},
+    }
+    settings = 'after = "nothing"\nreminder = false\nminutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n'
+    idle = "return window.__TAURI__.core.invoke('makings').then(m => m.minutes === null)"
+    said = "const s = document.getElementById('export-said'); return s && s.getClientRects().length ? s.textContent : ''"
+    shown = lambda b, id_: bool(b.find_elements(By.ID, id_)) and b.find_element(By.ID, id_).is_displayed()
+    for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
+        said_here = words_of[short]
+        meetings = WORK / f"to-folder-{short}"
+        plain, secret = meetings / "2026-10-18_12-00", meetings / "2026-10-18_13-00"
+        for folder in (plain, secret):
+            session(folder, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+            (folder / "transcript.jsonl").write_text(
+                '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+                '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+        (secret / "confidential").touch()
+        out = WORK / f"exported-{short}"
+        out.mkdir()
+        window = Window(meetings, language, settings)
+        kept = lambda: window.file.read_text()
+        try:
+            with window as browser:
+                # Settings: no folder yet; the help says what goes there, how it is named, and that a redo replaces.
+                browser.execute_script("location.hash = '#/settings'")
+                offered = wait_for(browser, lambda b: shown(b, "export-shown"), 10)
+                got = [browser.find_element(By.ID, "export-shown").text if offered else None,
+                       browser.find_element(By.ID, "export-help").text if shown(browser, "export-help") else None, shown(browser, "export-stop")]
+                check(f"{short}: Settings offer « Exporter chaque compte rendu », no folder yet, its help said (D109)",
+                      got == [said_here["none"], said_here["help"], False], got)
+                # A folder typed where its path shows, as the meetings' folder is: kept by the settings.
+                if offered:
+                    browser.find_element(By.ID, "export-shown").click()
+                    field = wait_for(browser, lambda b: shown(b, "export-folder"), 5) and browser.find_element(By.ID, "export-folder")
+                    if field:
+                        field.send_keys(str(out), Keys.ENTER)
+                chosen = wait_for(browser, lambda b: f'export = "{out}"' in kept() and shown(b, "export-stop"), 5)
+                check(f"{short}: the folder typed is kept by the settings, « Ne plus exporter » offered (D109)", chosen, kept())
+                # A summary written: written to the folder too, named by its meeting, through kitokey-export.
+                (WORK / "export-args").unlink(missing_ok=True)
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
+                target = out / f"{plain.name}.md"
+                # Read as a file there or not: a mutant that writes nothing fails the rows, never raises.
+                held = lambda path: path.read_text() if path.is_file() else "the file absent"
+                written = wait_for(browser, lambda b: target.is_file() and b.execute_script(idle), 15)
+                args = (WORK / "export-args").read_text().strip() if (WORK / "export-args").exists() else ""
+                given = json.loads((WORK / "export-input").read_text()) if written else {}
+                check(f"{short}: the summary written is written to the folder too, named by its meeting, its Markdown the minutes' (D109)",
+                      written and held(target) == held(plain / "minutes.md"), sorted(p.name for p in out.iterdir()))
+                check(f"{short}: through kitokey-export as exporting/v1 starts it: md, the language, the summary alone; where to write on its input (D109)",
+                      args == f"{plain} --format md --lang {short} --without-transcript" and given.get("to") == str(target)
+                      and all(given.get(key) for key in ("name", "transcript", "me", "others", "time", "speaker", "text")), [args, given])
+                # A confidential meeting: its summary written in it, never to the folder; its page says so.
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", secret.name)
+                made = wait_for(browser, lambda b: (secret / "minutes.md").is_file() and b.execute_script(idle), 15)
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{secret.name}")
+                told = wait_for(browser, lambda b: b.execute_script(said) == said_here["confidential"], 10)
+                check(f"{short}: a confidential meeting's summary never goes to the folder, its page says so (D60, D109)",
+                      made and told and not (out / f"{secret.name}.md").exists(), [browser.execute_script(said), sorted(p.name for p in out.iterdir())])
+                # A folder that cannot be written: said on the meeting's page, the summary kept in the meeting.
+                (WORK / "export-refuse").touch()
+                before = held(target)
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{plain.name}")
+                refused = wait_for(browser, lambda b: b.execute_script(said) == said_here["failed"], 15)
+                check(f"{short}: a folder that cannot be written is said on the meeting's page, never skipped silently; the summary kept (D109)",
+                      refused and (plain / "minutes.md").is_file() and held(target) == before, browser.execute_script(said))
+                (WORK / "export-refuse").unlink()
+                # « Ne plus exporter »: the folder forgotten, a summary written after it written nowhere else.
+                browser.execute_script("location.hash = '#/settings'")
+                stop = wait_for(browser, lambda b: shown(b, "export-stop"), 10) and browser.find_element(By.ID, "export-stop")
+                if stop:
+                    stop.click()
+                forgot = wait_for(browser, lambda b: "export =" not in kept() and b.find_element(By.ID, "export-shown").text == said_here["none"], 5)
+                (WORK / "export-args").unlink(missing_ok=True)
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
+                again = wait_for(browser, lambda b: b.execute_script(idle) and (plain / "minutes.md").is_file(), 15)
+                time.sleep(1)
+                check(f"{short}: « Ne plus exporter » forgets the folder; a summary written after it goes nowhere else (D109)",
+                      forgot and again and not (WORK / "export-args").exists(), kept())
+        finally:
+            (WORK / "export-refuse").unlink(missing_ok=True)
 
 
 def axe_first_surfaces(now: dt.datetime) -> None:
@@ -14347,6 +14468,7 @@ def main() -> int:
     bar_opened(now)
     bar_language(now)
     bar_after_stop(now)
+    summaries_to_a_folder(now)
     axe_first_surfaces(now)
     keys_first_surfaces(now)
     page_one_bar(now)

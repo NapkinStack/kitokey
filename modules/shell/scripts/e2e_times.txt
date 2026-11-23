@@ -71,3 +71,6 @@ settings_narrow_without_model 3.0
 settings_version 1.5
 store_shots 8.1
 unsaved_choice_kept 3.0
+# Added with #1045 (D109), from its partial at 89356a6 (2026-11-23, partial-i-l1045ok-89356a6): a scenario written
+# after f5699a8, measured rather than counted as the median.
+summaries_to_a_folder 8.1

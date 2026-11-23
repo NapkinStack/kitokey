@@ -148,6 +148,9 @@ pub struct Settings {
     pub window: Window,
     /// The first run's assistant was shown (D58): it opens by itself at one start only.
     pub welcomed: bool,
+    /// « Exporter chaque compte rendu » (D109): the folder each summary written is written to
+    /// too, in Markdown; none, nowhere else.
+    pub export: Option<PathBuf>,
     /// The full window's sidebar folded by the user (D61): opened again as it was left.
     pub folded: bool,
     /// Every window's look, the system's by default (D98).
@@ -186,6 +189,7 @@ impl Default for Settings {
             minutes_model: None,
             meeting_language: None,
             minutes_agreed: None,
+            export: None,
             keep_audio: KeepAudio::Always,
             developer: false,
             offer: true,
@@ -250,6 +254,7 @@ pub fn file() -> Option<PathBuf> {
 struct Written {
     reminder: Option<bool>,
     sessions: Option<toml::Spanned<PathBuf>>,
+    export: Option<PathBuf>,
     /// Before `after`: `false` was "nothing follows".
     transcript: Option<bool>,
     after: Option<After>,
@@ -309,9 +314,10 @@ impl std::fmt::Display for Unread {
 }
 
 /// The keys a settings file may hold: those a refusal names.
-const KEYS: [&str; 27] = [
+const KEYS: [&str; 28] = [
     "reminder",
     "sessions",
+    "export",
     "transcript",
     "after",
     "model",
@@ -434,6 +440,8 @@ pub fn read(path: &Path) -> Result<Settings, Unread> {
             }
         };
     }
+    // A folder named from the root or from ~ alone: any other is no folder (D109).
+    settings.export = written.export.map(from_home).filter(|folder| folder.is_absolute());
     if let Some(sessions) = written.sessions {
         settings.sessions = whole("sessions", "the folder's", |line| Refused::SessionsNotWhole { line }, sessions)?;
     }
@@ -520,6 +528,14 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     }
     if settings.sessions != before.sessions {
         set(&mut document, "sessions", text(&settings.sessions));
+    }
+    if settings.export != before.export {
+        match &settings.export {
+            Some(folder) => set(&mut document, "export", text(folder)),
+            None => {
+                document.remove("export");
+            }
+        }
     }
     if settings.after != before.after {
         set(
@@ -628,6 +644,7 @@ mod tests {
         let mut fields = fields!(
             reminder,
             sessions,
+            export,
             transcript,
             after,
             model,
