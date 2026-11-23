@@ -4061,7 +4061,8 @@ function showAgreement(name, agreement, words, session) {
     const said = element("div", "");
     said.append(element("strong", "", title), element("span", "says", fill(says, ...values)));
     const sign = element("span", "sign");
-    sign.append(icon(mark === "leaves" ? "arrow-right" : "x"));
+    // What stays, Confidentielle's lock: one meaning everywhere, it stays on this computer (#1114, the decider).
+    sign.append(icon(mark === "leaves" ? "arrow-right" : "lock"));
     line.append(sign, said);
     return line;
   };
