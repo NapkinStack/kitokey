@@ -4,7 +4,9 @@ Every refusal starts with a code between brackets — `FAIL [K1]`. This page say
 refuses and where its reason is written. It defines nothing: the reasons are in the pages it
 points at, and the checks are the engine's. A command's own name between brackets —
 `FAIL [deliver]`, `FAIL [agent]` — is that command refusing what it was asked: its message says
-why, and the action.
+why, and the action. `[hold]` is `nstack claim` and `nstack unclaim` (`project.md`, *Who holds a
+deliverable*); `[nstack]` the engine's install and the pre-push hook (`INSTALL.md`; an agent's
+identity: *The agent commits as the App*); `[labels]` the labels the pull request check reads.
 
 ```mermaid
 flowchart LR
@@ -68,7 +70,7 @@ a family, a number a rule; a retired rule's number is never reused.
 | `C1` | A framing document whose front matter cannot be read | `.nstack/handbook/project.md` |
 | `C2` | A charter with an unknown status, no single decider or no success criterion | `.nstack/handbook/project.md` |
 | `C3` | A cycle with no goal, no appetite, an end that is not its start plus its appetite, or an `accepted_on` that is not a date | `.nstack/handbook/project.md` |
-| `C4` | A deliverable with no id, title or state — or ready, in progress or accepted without acceptance criteria | `05-workflow.md` §3 |
+| `C4` | A deliverable with no id, title or state — or ready, in progress or accepted without acceptance criteria | `05-workflow.md` §6; `.nstack/handbook/project.md`, *What CI checks* |
 | `C5` | Two accepted cycles, or an accepted cycle under a charter that is not | `.nstack/handbook/project.md` |
 | `C6` | A closed or stopped cycle with no outcome or no end date; a success criterion recorded outside a closure, twice in one, outside the charter's filled criteria, in an unknown state, or observed with no day | `.nstack/handbook/project.md` |
 | `C7` | A discovery decided with no decider, date or challenger — or a charter with no go before it | `.nstack/handbook/project.md` |
@@ -93,11 +95,11 @@ a family, a number a rule; a retired rule's number is never reused.
 
 | Code | Refuses | Why |
 |---|---|---|
-| `T1` | A change that owes a test sheet and carries none | `05-workflow.md` §7 |
-| `T2` | A sheet with no verifier, a verifier who is an author, a person named verifier with no hand on the pull request — no edit of its description, no review, no comment —, a row left empty, or a row with more cells than its header | `05-workflow.md` §7 |
-| `T3` | A scenario passed with no evidence, or no commit it was verified on | `05-workflow.md` §7 |
-| `T4` | Evidence older than the head commit | `05-workflow.md` §7 |
-| `T5` | A scenario failed, or left not verified with no `human only — <reason>` | `05-workflow.md` §7 |
+| `T1` | A change that owes a test sheet and carries none | `05-workflow.md` §7, *The test sheet* |
+| `T2` | A sheet with no verifier, a verifier who is an author, a person named verifier with no hand on the pull request — no edit of its description, no review, no comment —, a row left empty, or a row with more cells than its header | `05-workflow.md` §7, *The test sheet* |
+| `T3` | A scenario passed with no evidence, or no commit it was verified on | `05-workflow.md` §7, *The test sheet* |
+| `T4` | Evidence older than the head commit | `05-workflow.md` §7, *The test sheet* |
+| `T5` | A scenario failed, or left not verified with no `human only — <reason>` | `05-workflow.md` §7, *The test sheet* |
 
 ## A — checks attested on a workstation
 
@@ -127,10 +129,10 @@ it has no cycle, K1 to K3 and K5 say nothing there, and every other rule applies
 
 | Code | Refuses | Why |
 |---|---|---|
-| `K1` | In a framed project, delivery work with no accepted cycle | `.nstack/handbook/project.md` |
-| `K2` | Delivery work from the cycle's end date — its first day over: the circuit breaker | `.nstack/handbook/project.md` |
-| `K3` | Delivery work that names no ready or in-progress deliverable | `.nstack/handbook/project.md` |
-| `K4` | The out-of-cycle label with no justification | `.nstack/handbook/project.md` |
+| `K1` | In a framed project, delivery work with no accepted cycle | `.nstack/handbook/project.md`, *What CI checks* |
+| `K2` | Delivery work from the cycle's end date — its first day over: the circuit breaker | `.nstack/handbook/project.md`, *What CI checks* |
+| `K3` | Delivery work that names no ready or in-progress deliverable | `.nstack/handbook/project.md`, *What CI checks* |
+| `K4` | The out-of-cycle label with no justification | `.nstack/handbook/project.md`, *What CI checks* |
 | `K5` | Delivery work for a deliverable someone else holds — from none of the hold's sessions (a merge counts), nor its person's account | `.nstack/handbook/project.md`, *Who holds a deliverable* |
 
 ## V — a contract version someone relies on
