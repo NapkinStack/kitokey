@@ -230,6 +230,7 @@ select:hover, select:focus { border-color: var(--edge); }
 .goes li > div { display: flex; flex-direction: column; gap: 2px; }
 .goes .sign { flex: 0 0 18px; color: var(--soft); }
 .goes .leaves .sign { color: var(--accent); }
+.goes .stays .sign { color: var(--ink); }
 .recipient { margin: 0; padding: 12px 16px; border-radius: 12px; background: var(--raised); display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; }
 .recipient dt { color: var(--soft); }
 .recipient dd { margin: 0; text-align: right; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
@@ -250,6 +251,14 @@ select:hover, select:focus { border-color: var(--edge); }
 /* The summary's guided steps (D95): a step's sentence, its « Avancé » and its fields each on a line. */
 .fields > .fields, .fields > .says, .fields > .disclose-advanced { flex-basis: 100%; }
 .fields > .disclose-advanced { justify-content: flex-start; }
+/* The destinations' add form (D110): apart from the list above it, the address on its own line. */
+.fields.adding { padding-top: 14px; border-top: 1px solid var(--line); }
+/* …a part of « Après un enregistrement » (D95's three groups), its heading as the redo panel's, its
+   disclosure on a line of its own. */
+.sending { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
+.sending h3 { margin: 0; font-size: 15px; }
+.sending > .disclose-advanced { align-self: flex-start; }
+.fields > .field.whole { flex-basis: 100%; }
 .tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); }
 .path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; }
 .path:hover { border-color: var(--edge); color: var(--ink); }
@@ -272,6 +281,13 @@ select:hover, select:focus { border-color: var(--edge); }
 .drawn .legend .range { margin-left: auto; font: 12.5px ui-monospace, monospace; color: var(--soft); }
 /* The player (D26): the drawing is its control, a line marks where the playback is. */
 .drawn .drawing { position: relative; cursor: pointer; }
+/* Nothing drawn yet (#1134): the player's slider a bare track, as a scrubber; with no player, no track. */
+/* Its target 24 px high (WCAG 2.2, 2.5.8), taking the 14 px the 6 px rail took before; the rail drawn 6 px at its
+   centre, its own box; the playhead on the rail alone. */
+.drawn .drawing.bare { height: 24px; margin: -5px 0; }
+.drawn .drawing.bare::before { content: ""; position: absolute; left: 0; right: 0; top: 9px; height: 6px; border-radius: 3px; background: var(--edge); }
+.drawn .drawing.bare .playhead { top: 9px; bottom: 9px; }
+.drawn .drawing.bare:not([role="slider"]) { display: none; }
 .drawn .playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.7; pointer-events: none; }
 .drawn .player { display: flex; align-items: center; gap: 12px; }
 .drawn .player .at { font: 12.5px ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
@@ -354,6 +370,20 @@ body.small-window .frame { display: none; }
 /* A thin meter for each side in the row (D90, board 5): its icon, a 4 px track; a side silent two
    minutes, or with nothing to record, dashed and its icon crossed, said in a grey line under the row. */
 #small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; margin-left: 8px; }
+/* A meeting's page while it records (#1076, #1112): in the who-spoke area, its time large at the centre, as Voice
+   Memos and Granola show a live meeting, the two sides' levels — the bar's meters — under it. */
+.live-now { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 100px; padding: 8px 0; }
+.live-time { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.2; }
+/* Two columns, each its meter over its label: the meter a block of its column's width and 4 px — never a flex item of
+   the column, whose basis would take its height (#1112, 3600377's shots). */
+.page-levels { display: flex; gap: 16px; width: min(100%, 480px); }
+.page-meter { flex: 1 1 0; min-width: 120px; display: flex; flex-direction: column; gap: 6px; }
+.page-meter > .page-level { display: block; flex: none; width: 100%; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+.page-level > .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }
+.page-level > .fill.remote { background: var(--ok); }
+.page-meter > .here, .page-meter > .remote { font-size: 14px; overflow-wrap: anywhere; }
+.page-meter > .here { color: var(--accent); }
+.page-meter > .remote { color: var(--ok); }
 #small .meter { display: flex; align-items: center; gap: 6px; color: var(--soft); }
 #small .meter .track { flex: 1 1 auto; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
 #small .meter .fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width 90ms linear; }

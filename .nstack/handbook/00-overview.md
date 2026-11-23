@@ -180,7 +180,7 @@ Every file the framework writes into a project is one of two things, never both.
 |---|---|---|
 | **Whose** | The framework's | The project's |
 | **At creation** | Written whole | Written as a form: headings, and the place of a diagram |
-| **At an update** | Merged | Never touched again — recreated only when missing |
+| **At an update** | Merged | Never touched again — recreated only when missing; `SECURITY.md` rewritten when the forge changes, the project's text merged in |
 | **Which** | Everything else: the kernel, the playbooks, this handbook, the templates, the checks | `README.md`, `SECURITY.md`, `modules/README.md`, `docs/adr/README.md`, `docs/pdr/README.md` |
 
 A file holding the framework's words *and* waiting for the project's belongs to nobody: the

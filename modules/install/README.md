@@ -5,7 +5,7 @@ What this module is for, who owns it and how critical it is: its
 
 ```mermaid
 flowchart LR
-    M["shell · capture · transcription · summary<br/>each module's release"]:::mod --> D["dist/&lt;module&gt;/<br/>their programs, the desktop entry, the icon"]:::art
+    M["shell · capture · transcription · summary · export<br/>each module's release"]:::mod --> D["dist/&lt;module&gt;/<br/>their programs, the desktop entry, the icon"]:::art
     D --> B["install's release<br/>rpmbuild or dpkg, in a container<br/>of the system KITOKEY_TARGET names;<br/>the Mac's app on a Mac"]:::this
     B --> R["dist/install/<br/>kitokey-‹version›.x86_64.rpm · kitokey_‹version›_amd64.deb ·<br/>Kitokey-‹version›-macos-arm64.zip, made on a Mac ·<br/>Kitokey-‹version›-windows-x64.zip and -x64.msix, made on Windows"]:::out
     classDef mod fill:#374151,color:#fff
@@ -52,16 +52,17 @@ from [`docs/privacy.md`](../../docs/privacy.md)'s Linux line.
 
 ## What every package owes its third parties (D102)
 
-Each format lays the same six files beside the programs: Kitokey's `LICENSE`, as `LICENSE.txt`;
+Each format lays the same seven files beside the programs: Kitokey's `LICENSE`, as `LICENSE.txt`;
 `notices/MPL-SOURCES.txt`, which says where the Mozilla Public License crates' sources are
 (MPL-2.0 §3.2); and each program's `THIRD-PARTY-NOTICES.html`, the page its module's release left
 in `dist/<module>/`, named by the program — `THIRD-PARTY-NOTICES-kitokey.html`,
-`…-kitokey-capture.html`, `…-kitokey-transcription.html`, `…-kitokey-summary.html`.
+`…-kitokey-capture.html`, `…-kitokey-transcription.html`, `…-kitokey-summary.html`,
+`…-kitokey-export.html`.
 
 | Format | Where |
 |---|---|
 | rpm | `/usr/share/licenses/kitokey/` |
-| .deb | `/usr/share/doc/kitokey/` |
+| .deb | `/usr/share/doc/kitokey/`, with its `copyright` file (Debian Policy 12.5, DEP-5 form, `deb/copyright`) naming the others: a minimised Ubuntu keeps that file alone |
 | the Mac's app | `Kitokey.app/Contents/Resources/` |
 | Windows' zip and package | beside `kitokey.exe` |
 
@@ -103,7 +104,7 @@ KITOKEY_TARGET=fedora-44 KITOKEY_VERSION=0.2.0 bash modules/install/scripts/e2e.
 ```
 
 On a Mac, `nstack release` makes `dist/install/Kitokey-<version>-macos-arm64.zip`: the app,
-its four programs in `Contents/MacOS` and transcription's `kitokey-speech` (D42), signed ad hoc, not by Apple. GitHub's macOS runner makes
+its five programs in `Contents/MacOS` and transcription's `kitokey-speech` (D42), signed ad hoc, not by Apple. GitHub's macOS runner makes
 it on every change to a program on `main` (`.github/workflows/macos-app.yml`, the job *the app*; on a pull request only when it changes install) and keeps it 7
 days on the run. Opened the first time through System Settings → Privacy & Security → Open
 Anyway (D38).

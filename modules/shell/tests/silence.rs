@@ -31,7 +31,11 @@ const SILENT: &[(&str, usize, &str)] = &[
         1,
         "it returns a failed reading as `unread`, which the list says; the command itself cannot fail, and a later opening reads again",
     ),
-    ("recording_now", 1, "returns no `Result`: it cannot fail"),
+    (
+        "recording_now",
+        2,
+        "returns no `Result`: it cannot fail — read by the bar and by the page of the meeting being recorded (#1076)",
+    ),
     (
         "next_context",
         1,

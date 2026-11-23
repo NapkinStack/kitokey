@@ -246,7 +246,7 @@ else option 2 or 2b (Keygen Cloud behind Paddle Billing or Stripe Managed Paymen
   convention accepts it; so does PDR-0001 (« no account, nothing sent »).
 - FastSpring's fee is unknown until its quote.
 
-**Impacts on other modules or contracts:** `shell` — the licence check and the updater (cycle 12); `install` — the
+**Impacts on other modules or contracts:** `shell` — the licence check and the updater (cycle 12), the updater never started from a package: Windows' package is the Store's to update (D102, 2026-11-20 — no Store policy names a self-update; 10.2.2 refuses « any form of dynamic inclusion of code » that changes the product, and the package's files are not Kitokey's to rewrite); `install` — the
 macOS package signed with Developer ID and notarised, an `.app.tar.gz` and its signature published beside it, and the
 tool that signs a batch of keys offline.
 
