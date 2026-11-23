@@ -5,10 +5,11 @@ edition = "2024"
 publish = false
 
 [dependencies]
+pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html"] }
 serde_json = "1.0.154"
 
 [dev-dependencies]
-pulldown-cmark = { version = "0.13.4", default-features = false }
+quick-xml = "0.42.0"
 tempfile = "3"
 
 [[bin]]

@@ -7,7 +7,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use kitokey_export::{Include, Labels, Meeting, markdown};
+use kitokey_export::{Include, Labels, Meeting, html, markdown};
 use serde_json::{Value, json};
 
 const MINUTES: &str = "---\ncontract: minutes/v4\nmade: 2026-11-20T10:05:00+01:00\nprovider: \"local\"\nmodel: \"qwen3:8b\"\ncontext: null\ntitle: \"Prix & essai\"\n---\n\n## Points forts\n\nLe prix est fixé.\n\n## Actions\n\n- Écrire la page — Sam — vendredi\n\n## Points clés\n\n- 49 €\n";
@@ -101,6 +101,33 @@ fn it_writes_the_file_whole_where_the_input_says_and_says_so_in_one_line() {
     assert!(ran.said.is_empty(), "nothing on the error stream: {}", ran.said);
     let left: Vec<_> = fs::read_dir(&out).unwrap().map(|entry| entry.unwrap().file_name()).collect();
     assert_eq!(left, [to.file_name().unwrap()], "no file beside it left behind");
+}
+
+#[test]
+fn html_is_written_its_language_the_options_and_its_name_the_inputs() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    // No title from the summary: the page is named by the input's `name`.
+    fs::write(folder.join("minutes.md"), MINUTES.replace("title: \"Prix & essai\"\n", "")).unwrap();
+    let to = dir.path().join("réunion.html");
+
+    let ran = run(
+        &[folder.to_str().unwrap(), "--format", "html", "--lang", "fr-CA"],
+        &words(&to).to_string(),
+    );
+
+    assert!(ran.success, "{}", ran.said);
+    let written = fs::read_to_string(&to).unwrap();
+    let expected = html(
+        &Meeting::read(&folder).unwrap(),
+        Include::all(),
+        &labels(),
+        "fr-CA",
+        "Réunion du 20 nov. 2026",
+    );
+    assert_eq!(written, expected);
+    assert!(written.contains("<html lang=\"fr-CA\">") && written.contains("<title>Réunion du 20 nov. 2026</title>"));
+    assert_eq!(ran.lines, [json!({"event": "written", "file": to, "bytes": written.len()})]);
 }
 
 #[test]
