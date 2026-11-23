@@ -4995,9 +4995,15 @@ function showSmall(words) {
   };
 
   let recording = null;
+  // Each reading numbered, as « Avancé »'s asks are (#815): readings every 100 ms may overlap, and one
+  // answered after a later one is older than what is drawn — never drawn over it (#1166).
+  let tickAsked = 0;
+  let tickDrawn = 0;
   const tick = async () => {
+    const asked = ++tickAsked;
     const now = await invoke("recording_now").catch(() => null);
-    if (now === null) return;
+    if (now === null || asked < tickDrawn) return;
+    tickDrawn = asked;
     if (now.recording !== recording) {
       const first = recording === null;
       // What was typed last, kept before the field is emptied for the next recording.
