@@ -5232,6 +5232,21 @@ def destinations_kept(now: dt.datetime) -> None:
                   " return [o.getAttribute('aria-expanded'), o.getAttribute('aria-controls'), a.getClientRects().length > 0, document.activeElement.id]")
         before = browser.execute_script(folded) if drawn else None
         if drawn:
+            # For an eye (lina's): the part as first seen, folded — the group's heading, the rule, its own
+            # heading, the list and the closed button — at the two widths, in both looks.
+            group = "document.getElementById('destination-open').closest('section.card')"
+            # At 420 px the group is taller than 800 px: a taller window, for the heading and the button in one image.
+            for width, height in ((1100, 800), (420, 1040)):
+                browser.set_window_size(width, height)
+                browser.execute_script(f"{group}.scrollIntoView({{block: 'start'}})")
+                print("        folded part, its group's box and the button's (top, bottom) at", width, "px:",
+                      browser.execute_script(f"const g = {group}.getBoundingClientRect(), o = document.getElementById('destination-open').getBoundingClientRect();"
+                                             " return [[Math.round(g.top), Math.round(g.bottom)], [Math.round(o.top), Math.round(o.bottom)], innerHeight]"))
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d110-destinations-folded-fr-{width}-{theme}", theme)
+            browser.set_window_size(1100, 800)
+            # Back across 840 px the page is drawn again (#777): pressed during that drawing, a click starts nothing.
+            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-open')"), 10)
             press(browser, "destination-open")
         opened = drawn and wait_for(browser, lambda b: b.execute_script(folded)[0] == "true", 5)
         after = browser.execute_script(folded) if drawn else None
