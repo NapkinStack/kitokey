@@ -4726,11 +4726,13 @@ function showSmall(words) {
   // Each ask numbered: an answer come after a later ask's is neither drawn nor said — the later one
   // is (#815). Ollama answering late, an older answer, come last, closed « Avancé » under the user.
   let advancedAsked = 0;
-  const advancedOf = async (opened) => {
+  // `closing`: a close's ask, made only to drop an opening's answer — the user asked nothing to be read,
+  // so its failure is never said (#1142).
+  const advancedOf = async (opened, closing = false) => {
     const name = meeting.name;
     const asked = ++advancedAsked;
     const offered = await invoke("models_offered", { name }).catch((why) => {
-      if (asked === advancedAsked) smallSaid("models", fill(words.models_not_read, why));
+      if (asked === advancedAsked && !closing) smallSaid("models", fill(words.models_not_read, why));
       return null;
     });
     if (offered === null || asked !== advancedAsked) return;
@@ -4753,7 +4755,7 @@ function showSmall(words) {
     // « Avancé » again under the user (#1142).
     drawn.toggle.addEventListener("click", () => {
       if (drawn.toggle.getAttribute("aria-expanded") === "true") advancedOf(true).then(() => document.getElementById("small-advanced")?.focus());
-      else advancedOf(false);
+      else advancedOf(false, true);
     });
     // The control the focus is on stays the one focused once drawn again (showSmall's rule).
     const focused = advanced.contains(document.activeElement) ? document.activeElement.id : null;
