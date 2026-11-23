@@ -8,6 +8,7 @@ pub mod confidential;
 pub mod context;
 pub mod correction;
 pub mod desktop;
+pub mod destinations;
 pub mod exporting;
 pub mod flac;
 pub mod keys;

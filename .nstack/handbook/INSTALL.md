@@ -95,6 +95,10 @@ git push -u origin nstack/update-vX.Y.Z  # then the PR, validated by CI
 A version published minutes ago may not be served yet: PyPI's CDN can list the previous ones for a
 few minutes, and `--refresh-package` clears only uv's own cache. *No version of napkinstack==X.Y.Z*
 right after a release means wait a few minutes, then run the same command again.
+*Executable already exists: pre-commit* means the engine was installed another way — from its
+sources, say: `bash .nstack/install-engine.sh` deletes a link the removed engine left pointing
+nowhere and installs the version the project records; a `pre-commit` of another installation it
+never touches. Then run the `uv tool install` line above again for X.Y.Z.
 
 An agent passes its session — `nstack update --session <its identifier>` — and the commit
 carries the trailer every commit of an agent carries (`AGENTS.md`, *Identity*).
@@ -223,6 +227,14 @@ your tokens, your SSH agent or your git configuration — and refuses to start i
 looks for your files can still read them — a container or a system user of its own closes that.
 It says so as it starts, in a few lines on the error output — the agent's own output is untouched.
 
+**The agent commits as the App, in any repository.** Its identity is written in its own git
+configuration, the one `nstack agent run` hands git, with `user.useConfigOnly`: a second clone
+the agent makes commits as the App too, and a repository with no identity refuses the commit —
+git never makes one up from this machine's user and host name, which a push would publish. In
+the project's clone, the pre-push hook refuses a commit whose author or committer is not the
+agent's. `nstack agent status` says an agent whose configuration lacks it; `nstack agent run`
+writes it for an agent made before.
+
 **Your agent tool's configuration is still yours.** The tool you start — Claude Code, another —
 reads its own configuration from your home (`~/.claude` for Claude Code): your sandbox, your
 hooks, your permissions apply to the agent too. For Claude Code, `nstack agent run <name> -- claude`
@@ -235,7 +247,10 @@ your warm caches, `UV_CACHE_DIR` and `PRE_COMMIT_HOME`, since the sandbox opens 
 builds that write elsewhere, such as Cargo's `~/.cargo`, need that folder in your sandbox's
 `allowWrite` — and sets the clone so
 that `git switch -c <branch> origin/main` and a plain `git push` never write `.git/config`, which
-the sandbox protects. Unix sockets — audio, display, the session bus — stay closed unless the
+the sandbox protects. The sandbox also protects `.claude/skills/` — an agent never rewrites its own
+instructions —, so git could not write the committed skills there: the clone leaves that folder out
+of its working tree (a sparse checkout: still in every commit), and the agent gets the default
+branch's skills from a folder of its own (`--add-dir`), refreshed at each run. Unix sockets — audio, display, the session bus — stay closed unless the
 project answers `agent_sockets: true` (`.nstack/handbook/07-governance.md` §7 says the risk).
 Given your own `--settings`, it adds none and says so. A hook of yours that refuses `gh` — against your own
 account — lets an agent's session through only when its `gh` is the App's
@@ -254,6 +269,7 @@ by no check afterwards:
 - [ ] Its private key stored outside any repository; in CI, the CI's secrets
 - [ ] The agent's session reaches no human credential: `nstack agent run` keeps them out of its
       environment; keeping it out of your files is a sandbox's work
+- [ ] Its commits carry the App's identity, never one git makes up from the machine — `nstack agent status`
 - [ ] On `approval: agent`, one App per agent: an App never approves what it pushed
 
 Rather than click through these pages, print the calls that close the distance and run them
@@ -270,9 +286,9 @@ gesture stays a person's — it refuses a GitHub App's token, an agent's session
 the plan and the account it would act as, and makes nothing until you confirm at the keyboard.
 Run it in your own terminal. The credential, in this order:
 
-- **a token in `GH_TOKEN`**, when one is set — portable, no `gh` needed: fine-grained, limited to
-  the repository, Administration: write and Issues: write, valid one day. Without a credential,
-  the command prints GitHub's form for it, filled in; you pick the repository there.
+- **a token in `GH_TOKEN`** (or `GITHUB_TOKEN`), when one is set — portable, no `gh` needed:
+  fine-grained, limited to the repository, Administration: write and Issues: write, valid one day.
+  Without a credential, the command prints GitHub's form for it, filled in; you pick the repository there.
 - **otherwise your `gh` login**, as `gh` itself would use it — its token, scope `repo`, is
   enough. With two accounts logged in, `gh` uses the active one: `gh auth switch` first, and
   check the account the plan names.
@@ -325,7 +341,7 @@ It never reads your `gh` login by itself; to have it read with that login, for o
 | `.nstack/forms/` | The forms a command or a playbook copies: charter, cycle, decision, rules | Agents and commands |
 | `.nstack/handbook/` | **The handbook**: the why behind every rule | Humans, once |
 | `docs/adr/`, `docs/pdr/` | The decisions taken, with their success criterion | Everyone, on demand |
-| `.copier-answers.yml` | The NapkinStack version and the creation answers | `nstack update`, the only thing that changes it |
+| `.copier-answers.yml` | The NapkinStack version and the creation answers | The `_` lines: `nstack update`, never by hand. The answers: the decider, by hand, in a pull request |
 | `.github/` | What makes the rules non-bypassable | GitHub |
 
 > **`.nstack/handbook/` is never loaded into an agent's context.** It is the human reference.
@@ -346,7 +362,7 @@ nstack claim D<n> --session <s> --person @<you>   # takes a deliverable before i
 nstack deliver D<n> --held '#<pr>' --session <s>   # records a merged deliverable delivered; --write-states at the closure
 nstack agent add <name> [--clone <dir>] · nstack agent run <name> -- <command>   # an agent's own App and clone; add is a person's
 nstack agent status  # who this agent is — its App, repository, clone, gh and hooks; for a person, this project's agents
-nstack board [--dry-run]   # the cycles shown on GitHub as milestones and issues — CI runs it on every merge; --dry-run previews a proposed cycle
+nstack board [--dry-run]   # the cycles shown on GitHub as milestones and issues — CI runs it on every merge; --dry-run previews a proposed cycle; by hand, Run workflow, never beside it
 nstack skills        # generates the agents' skills from the playbooks
 nstack doctor        # the workstation and the forge's settings, read-only
 nstack settings      # the calls that would bring the forge's settings to the checklist; --apply: yours makes them
@@ -392,10 +408,16 @@ nstack skills           # generates .claude/skills/ and .agents/skills/ from .ns
 nstack skills --check   # checks they are in sync (runs in CI)
 ```
 
-**`.nstack/playbooks/` stays the source of truth.** The skills are generated, gitignored, and
-never edited by hand — you change the playbook, then regenerate. A playbook with no entry
-in `.nstack/skills.yaml` fails CI; a generated skill that has drifted fails
-`nstack skills --check` locally.
+**`.nstack/playbooks/` stays the source of truth.** The skills are generated from it, never
+edited by hand — you change the playbook, run `nstack skills`, and commit both. They are
+**committed**, as a lockfile is: an agent starting from a fresh clone — a cloud agent, a new
+contributor's — has them. `nstack init` commits them with the project, `nstack update` in its own
+commit; `.gitattributes` marks them generated, so the forge folds them in a review, and the
+review budget does not count them. A playbook with no entry in `.nstack/skills.yaml`
+fails CI; a skill that drifted from its playbook, or was edited by hand, fails it too (S3).
+Inside an agent's sandbox, `.claude/skills/` cannot be written: an agent that changes a playbook
+regenerates `.agents/skills/` alone, and a person runs `nstack skills` and commits the rest — S3
+says it until then. A change to the agents' instructions passes a person's hands.
 
 This indirection has a reason: a tool is an **adapter**, never a foundation
 (`.nstack/tooling-profile.md`). If the rules existed only as skills, the OS would stop

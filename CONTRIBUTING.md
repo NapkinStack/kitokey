@@ -87,7 +87,7 @@ flowchart LR
 - **Delivered is recorded, not requested**: once merged and each criterion held,
   `nstack deliver D30 --held '#412'` — and an agent adds `--session <its session>`. No pull request, and the plan says it.
 - **Any coding agent works**, under an identity of its own (*Joining the project*); the skills
-  `nstack skills` makes under `.claude/skills/` and `.agents/skills/` are the tools' shortcut to the same playbooks
+  `nstack skills` makes under `.claude/skills/` and `.agents/skills/`, committed, are the tools' shortcut to the same playbooks
   (`.nstack/playbooks/`).
 - **Who checks whom.** The author never verifies nor approves their own work: a verifier
   runs the test sheet, then the approver of *Joining the project*, step 6, approves

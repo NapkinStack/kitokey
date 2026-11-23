@@ -139,13 +139,15 @@ def test_the_comparator_refuses_a_schemas_breaks_wherever_they_are(path, tmp_pat
 # `track` and `voice`, in a transcript written before they were; a `silent`'s `nothing`, said by
 # a capture that knows it (#361); a `device`'s `headset`, said by a capture that listens (D88); a
 # `complete`'s `made`, in a transcript written before it was (D93); its `made_in`, `cost` and
-# `currency`, said only when the producer knows them (D97).
-OPTIONAL = {"stopped", "track", "voice", "nothing", "headset", "made", "made_in", "cost", "currency"}
+# `currency`, said only when the producer knows them (D97); a `failed`'s `retry_after`, said when the
+# destination said it (posting/v1).
+OPTIONAL = {"stopped", "track", "voice", "nothing", "headset", "made", "made_in", "cost", "currency", "retry_after"}
 SHOWN_AS_LINES = {
     "transcript/v1/line.schema.json",
     "recording/v1/event.schema.json",
     "summarising/v1/event.schema.json",
     "exporting/v1/event.schema.json",
+    "posting/v1/event.schema.json",
 }
 EXAMPLES = {
     "transcript/v1/line.schema.json": (
@@ -676,6 +678,59 @@ EXAMPLES["exporting/v1/input.schema.json"][1].extend(
     + [{**_INPUT, name: f"{value}\n"} for name, value in _INPUT.items()]
 )
 
+# posting/v1 (D110): the input, the output's lines, and what a generic webhook receives.
+_SEND = {"address": "https://discord.com/api/webhooks/1/abc", "name": "Réunion du 20 nov. 2026"}
+EXAMPLES["posting/v1/input.schema.json"] = (
+    [_SEND, {"address": "http://192.168.1.2/", "name": "n"}],
+    [
+        "an input that is no object",
+        {"address": "https://example.com/hook"},
+        {"name": "n"},
+        {"address": "", "name": "n"},
+        {"address": "https://example.com/hook\n", "name": "n"},
+        {"address": "https://example.com/hook", "name": "two\nlines"},
+        {"address": 3, "name": "n"},
+    ],
+)
+EXAMPLES["posting/v1/event.schema.json"] = (
+    [
+        {"event": "sent"},
+        {"event": "checked"},
+        {"event": "failed", "code": "address.refused"},
+        {"event": "failed", "code": "destination.busy", "retry_after": 2},
+        {"event": "failed", "code": "a code of a later version"},
+        {"event": "an event of a later version"},
+    ],
+    [
+        "a line that is no object",
+        {"code": "address.refused"},
+        {"event": "failed"},
+        {"event": "failed", "code": ""},
+        {"event": "failed", "code": "network.unreachable\n"},
+        {"event": "failed", "code": 401},
+        {"event": "failed", "code": "destination.busy", "retry_after": -1},
+        {"event": "failed", "code": "destination.busy", "retry_after": 1.5},
+        {"event": "failed", "code": "destination.busy", "retry_after": "2"},
+    ],
+)
+EXAMPLES["posting/v1/payload.schema.json"] = (
+    [
+        {"title": "Point hebdo", "summary": "## Résumé\n\nFixé.\n", "actions": ["Écrire la note — Léa — vendredi"]},
+        {"title": "Réunion du 20 nov. 2026", "summary": "", "actions": []},
+    ],
+    [
+        "a body that is no object",
+        {"summary": "", "actions": []},
+        {"title": "t", "actions": []},
+        {"title": "t", "summary": ""},
+        {"title": "", "summary": "", "actions": []},
+        {"title": "two\nlines", "summary": "", "actions": []},
+        {"title": "t", "summary": "", "actions": "one"},
+        {"title": "t", "summary": "", "actions": [""]},
+        {"title": "t", "summary": "", "actions": [3]},
+    ],
+)
+
 
 @pytest.mark.parametrize("path", SCHEMAS, ids=NAMES)
 def test_a_schema_allows_what_its_page_shows_and_refuses_what_its_page_refuses(path):
@@ -792,3 +847,15 @@ def test_session_audio_v3_shows_a_meetings_own_models_its_schema_allows():
     # The page names the file, and v1's and v2's pages say a meeting of theirs may hold it too.
     for version in ("v1", "v2", "v3"):
         assert "| `models.json` |" in (CONTRACTS / f"session-audio/{version}/README.md").read_text()
+
+
+def test_posting_v1_shows_a_generic_webhooks_body_its_schema_allows_its_actions_those_of_its_summary():
+    reads = jsonschema.Draft202012Validator(json.loads((CONTRACTS / "posting/v1/payload.schema.json").read_text()))
+    bodies = [json.loads(block) for block in shown("posting/v1/README.md", "Valid — a generic webhook received")]
+    assert len(bodies) == 1 and reads.is_valid(bodies[0])
+    # Its actions are the items of its section of actions, each without its bullet; and no word of
+    # the transcript or of the front matter but the title.
+    body = bodies[0]
+    section = body["summary"].split("## Actions\n", 1)[1]
+    assert body["actions"] == [line[2:] for line in section.splitlines() if line.startswith("- ")]
+    assert set(body) == {"title", "summary", "actions"} and "---" not in body["summary"]

@@ -1,6 +1,6 @@
 # Kitokey — privacy policy / politique de confidentialité
 
-Last changed / dernière modification: 2026-11-04. Publisher / éditeur: NapkinStack.
+Last changed / dernière modification: 2026-11-21. Publisher / éditeur: c12c (NapkinStack).
 [English](#english) · [Français](#français)
 
 ```mermaid
@@ -44,14 +44,21 @@ only when you do one of these:
 |---|---|---|
 | A service to transcribe | The meeting's sound, and its context and language | The service you chose: `openrouter.ai`, `api.openai.com` |
 | A service to write the minutes | The transcript and the context | The service you chose: `openrouter.ai`, `api.openai.com`, `api.mistral.ai`, or the address you typed |
+| Test the service chosen for the minutes (« Test », a click) | A short sentence, nothing from your meetings | That service |
 | Download a speech model (a click) | A request for that file | `huggingface.co` |
 | Read the list of models again (a click) | A request for that file | `raw.githubusercontent.com` |
 | Download a model through Ollama (a click) | Ollama's own request | Ollama, a program of its own, from its registry |
+
+On Windows, Kitokey asks the Microsoft Store whether you bought it, each time you start a
+recording: the Store answers, under Microsoft's own policy; nothing of a meeting goes with it.
 
 The host is shown to you and agreed by you before a first sending. What a service does with what
 it receives is under its own policy: read it before you choose it.
 
 A meeting you say **confidential** is made on this computer alone, even when a service is chosen.
+
+Kitokey sends a meeting to no channel today — no mail, no chat, no shared folder. Copying its
+minutes or its transcript puts them on your clipboard, and they go where you paste them.
 
 There is no telemetry, no analytics, no advertising, and we receive no data about you. Should
 telemetry ever exist, it will be off until you turn it on, and will show what it sends and where.
@@ -73,7 +80,8 @@ telemetry ever exist, it will be off until you turn it on, and will show what it
 
 ### Contact
 
-Questions: [an issue on this repository](https://github.com/NapkinStack/kitokey/issues).
+Questions, or a request about your data: [support@kitokey.com](mailto:support@kitokey.com), or
+[Kitokey's support page](support.md).
 Changes to this policy are in this file's history.
 
 ## Français
@@ -106,15 +114,23 @@ part que si vous faites l'un de ces choix :
 |---|---|---|
 | Un service pour transcrire | Le son de la réunion, son contexte et sa langue | Le service choisi : `openrouter.ai`, `api.openai.com` |
 | Un service pour écrire le compte rendu | La transcription et le contexte | Le service choisi : `openrouter.ai`, `api.openai.com`, `api.mistral.ai`, ou l'adresse saisie |
+| Tester le service choisi pour le compte rendu (« Tester », un clic) | Une courte phrase, rien de vos réunions | Ce service |
 | Télécharger un modèle de parole (un clic) | La demande de ce fichier | `huggingface.co` |
 | Relire la liste des modèles (un clic) | La demande de ce fichier | `raw.githubusercontent.com` |
 | Télécharger un modèle par Ollama (un clic) | La demande d'Ollama elle-même | Ollama, un programme à part, depuis son registre |
+
+Sous Windows, Kitokey demande au Microsoft Store si vous l'avez acheté, à chaque enregistrement
+lancé : le Store répond, selon la politique de Microsoft ; rien d'une réunion ne part avec.
 
 L'hôte vous est montré et vous l'acceptez avant un premier envoi. Ce qu'un service fait de ce qu'il
 reçoit relève de sa propre politique : lisez-la avant de le choisir.
 
 Une réunion dite **confidentielle** est traitée sur cet ordinateur seulement, même si un service est
 choisi.
+
+Kitokey n'envoie aujourd'hui une réunion vers aucun canal — ni courriel, ni messagerie, ni dossier
+partagé. Copier son compte rendu ou sa transcription les met dans votre presse-papiers, et ils vont là
+où vous les collez.
 
 Il n'y a ni télémétrie, ni mesure d'audience, ni publicité, et nous ne recevons aucune donnée sur
 vous. Si une télémétrie existait un jour, elle resterait coupée tant que vous ne l'activez pas, et
@@ -138,5 +154,6 @@ montrerait ce qu'elle envoie et où.
 
 ### Contact
 
-Questions : [une issue sur ce dépôt](https://github.com/NapkinStack/kitokey/issues). Les
+Questions, ou une demande sur vos données : [support@kitokey.com](mailto:support@kitokey.com), ou
+[la page d'assistance de Kitokey](support.md#français). Les
 changements de cette politique sont dans l'historique de ce fichier.

@@ -640,6 +640,9 @@ pub struct Window {
     /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the
     /// speaking-time drawing. At most: no limit. Placeholders: none.
     pub who_spoke: &'static str,
+    /// Shows: a meeting's page, in its who-spoke area (#1116). When: the meeting has no transcript yet. At most:
+    /// one line. Placeholders: none.
+    pub who_spoke_later: &'static str,
     /// Shows: a meeting's page, as a status. When: transcript card, none yet. At most: no limit.
     /// Placeholders: none.
     pub no_transcript: &'static str,
@@ -860,6 +863,48 @@ pub struct Window {
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, its heading; and a step's «
     /// Avancé » in Settings, « Modèles ». When: always. At most: one line. Placeholders: none.
     pub advanced_title: &'static str,
+    /// The part of « Après un enregistrement » holding the destinations a summary can be sent to
+    /// (D110, PDR-0007), its heading. Shows: Settings, a sub-heading. When: always. At most: a few words. Placeholders: none.
+    pub destinations_title: &'static str,
+    /// Under that heading: what the card is for, and that nothing leaves without a gesture.
+    /// Shows: Settings, « Après un enregistrement », « Envoi des comptes rendus », secondary text. When: always. At most: two lines.
+    /// Placeholders: none.
+    pub destinations_said: &'static str,
+    /// The same card with no destination yet. Shows: Settings, in place of the list. When: none is
+    /// set up. At most: one line. Placeholders: none.
+    pub destinations_none: &'static str,
+    /// Each kind of destination, as the list and the choice name it (`posting/v1`'s kinds).
+    /// Shows: Settings, a list's choices and each row. When: always. At most: two words each.
+    /// Placeholders: none.
+    pub destination_kinds: [&'static str; 3],
+    /// The three fields' labels: its kind, its name, its address. Shows: Settings, labels. When:
+    /// always. At most: a few words each. Placeholders: none.
+    pub destination_fields: [&'static str; 3],
+    /// Under the address field: what to paste, and that it is kept in the keychain, never shown whole.
+    /// Shows: Settings, secondary text. When: always. At most: two lines. Placeholders: none.
+    pub destination_address_said: &'static str,
+    /// The button that adds it. Shows: Settings, a button. When: always. At most: one word.
+    /// Placeholders: none.
+    pub destination_add: &'static str,
+    /// The disclosure that unfolds the form adding a destination, folded at first (E5: no address
+    /// asked in the common case). Shows: Settings, « Envoi des comptes rendus », a button. When:
+    /// always. At most: three words. Placeholders: none.
+    pub destination_open: &'static str,
+    /// Each destination's button that forgets it, its address out of the keychain. Shows: Settings,
+    /// a button on each row. When: a destination is set up. At most: one word. Placeholders: none.
+    pub destination_forget: &'static str,
+    /// Said once a destination is added. Shows: Settings, under the fields, as a status. When: after
+    /// « Ajouter » kept it. At most: one line. Placeholders: {} the destination's name.
+    pub destination_added: &'static str,
+    /// The destination not added: why, the failure's sentence after it. Shows: Settings, under the
+    /// fields, as a status. When: « Ajouter » refused. At most: one line and the failure's.
+    /// Placeholders: {} the failure's sentence (lower-case start).
+    pub destination_not_added: &'static str,
+    /// Before Kitokey's version, at the foot of « Général », as GNOME's « About » and Windows' Settings
+    /// say it (#1089); the number follows, as `--version` gives it. Shows: Settings, « Général », its
+    /// last line, in secondary text the user can select to copy. When: always. At most: one word.
+    /// Placeholders: none.
+    pub version_said: &'static str,
     /// Shows: Settings, « Général », folded « Avancé » at its bottom, a switch: its name, then its
     /// line under it (D29). When: always. At most: one line for the name, the line wraps.
     /// Placeholders: none.
@@ -1236,8 +1281,9 @@ pub struct Window {
     /// else `redo_transcript_title`. At most: wraps inside the panel. Placeholders: {} the model, as
     /// people say it.
     pub redo_transcript_do: &'static str,
-    /// Shows: the recording bar and Redo…, as a choice of a list. When: appended to a local model's
-    /// name. At most: about 20 characters. Placeholders: none.
+    /// Shows: the recording bar and Redo…, as a choice of a list; a meeting's page, after the model
+    /// of minutes this computer wrote (#1080). When: appended to a local model's name. At most:
+    /// about 20 characters. Placeholders: none.
     pub on_computer: &'static str,
     /// Shows: a meeting's page, its Redo… panel, as a heading. When: redo the transcript. At most:
     /// no limit. Placeholders: none.
@@ -1260,6 +1306,10 @@ pub struct Window {
     /// one shown (D93). When: another model is chosen in its line. At most: no limit. Placeholders: {}
     /// the model, as its line says it.
     pub minutes_made_with: &'static str,
+    /// Shows: a meeting's page, under the summary's line: a language model wrote it ([Store
+    /// Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) 11.16, #1092).
+    /// When: a summary is shown. At most: one line. Placeholders: none.
+    pub minutes_ai: &'static str,
     /// Shows: a meeting's page, above the button that makes the transcript again, the model that made
     /// the one shown (D93). When: another model is chosen in its line. At most: no limit.
     /// Placeholders: {} the model, as its line says it.
@@ -1419,6 +1469,9 @@ pub struct Window {
     /// Shows: Settings, « Modèles », the summary's step, beside « Tester » while it asks. When: the
     /// model is a service's. At most: no limit. Placeholders: {} the host.
     pub test_sends: &'static str,
+    /// Shows: Settings, « Modèles », the summary's step, beside « Tester » while it asks. When: the
+    /// model is this computer's Ollama's (#1080): no address said. At most: no limit. Placeholders: none.
+    pub test_sends_here: &'static str,
     /// Shows: Settings, « Modèles », beside « Tester » or a key's test. When: while it asks. At
     /// most: one line. Placeholders: none.
     pub testing: &'static str,
@@ -1634,8 +1687,9 @@ pub struct Window {
     /// Shows: a meeting's page, as a label. When: row: spoken language. At most: about 20
     /// characters. Placeholders: none.
     pub language_label: &'static str,
-    /// Shows: a meeting's page, as a choice of a list: its first, followed by « — » and the language
-    /// Settings name. When: always. At most: about 30 characters. Placeholders: none.
+    /// Shows: a meeting's page, as a choice of a list: its first, when Settings name a language —
+    /// detecting it, `language_detected` says it as Settings do (#1074). When: always. At most:
+    /// about 30 characters. Placeholders: {} the language Settings name.
     pub language_default: &'static str,
     /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
     /// first choice. When: Whisper or a service hears. At most: one line. Placeholders: none.
@@ -1655,9 +1709,6 @@ pub struct Window {
     /// Shows: a meeting's page, as an error. When: always. At most: no limit. Placeholders: {}
     /// failure sentence.
     pub name_not_saved: &'static str,
-    /// Shows: a meeting's page, as a choice of a list. When: appended "detected". At most: about 12
-    /// characters. Placeholders: none.
-    pub language_detected_short: &'static str,
     /// SpeechAnalyzer's language when the settings name none: the system's, never the app's (D64).
     /// Shows: Settings, « Modèles », the transcription's step, the language of the meetings, its
     /// first choice. When: Apple's SpeechAnalyzer hears (D64). At most: one line. Placeholders:
@@ -1820,7 +1871,7 @@ pub fn window(language: Language) -> Window {
             written_by: "Written by {}",
             written_via: ", via {}",
             at: "at",
-            heard_by: "Transcribed by {} on this computer",
+            heard_by: "Transcribed by {}, on this computer",
             transcribed_on: "Transcribed on {}",
             minutes_of: "Summary of {}",
             made_in: "in {}",
@@ -1830,6 +1881,7 @@ pub fn window(language: Language) -> Window {
             here_described: "You — your microphone",
             remote_described: "Others — the call’s audio",
             who_spoke: "Who spoke when: you on top, others below",
+            who_spoke_later: "Who spoke when appears once it is transcribed.",
             no_transcript: "No transcript yet.",
             no_minutes: "No summary yet.",
             being_made: "Still transcribing — more is on its way.",
@@ -1907,6 +1959,18 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "General",
             advanced_title: "Advanced",
+            destinations_title: "Sending summaries",
+            destinations_said: "The channels you can send a summary to. Nothing is sent unless you ask, and never a confidential meeting.",
+            destinations_none: "No destination yet.",
+            destination_kinds: ["Webhook", "Discord", "Slack"],
+            destination_fields: ["Kind", "Name", "Webhook address"],
+            destination_address_said: "Paste the channel’s webhook address. It’s kept in your system keychain and never shown in full again.",
+            destination_add: "Add",
+            destination_open: "Add a destination",
+            destination_forget: "Remove",
+            destination_added: "Destination {} added.",
+            destination_not_added: "Destination not added: {}",
+            version_said: "Version",
             developer: ["Developer mode", "Shows technical details under each error, to help troubleshoot."],
             program_said: "Technical details: {}",
             minutes_sections: ["Highlights", "Actions", "Key points"],
@@ -2034,6 +2098,7 @@ pub fn window(language: Language) -> Window {
             make_transcript: "Transcribe",
             make_minutes_with: "Write summary with {}",
             minutes_made_with: "This summary was written with {}.",
+            minutes_ai: "Written by AI: read it before you share it.",
             transcript_made_with: "This transcript was made with {}.",
             minutes_making: "Writing summary",
             minutes_waiting: "Queued · {} ahead",
@@ -2081,6 +2146,7 @@ pub fn window(language: Language) -> Window {
             shortcut_open: "Keyboard settings",
             test: "Test",
             test_sends: "The test sends a short sentence to {} — nothing from your meetings.",
+            test_sends_here: "The test sends a short sentence to Ollama, on this computer — nothing from your meetings.",
             testing: "Testing…",
             test_answered: "It works: the model responds.",
             test_failed: "The model isn’t responding: {}",
@@ -2160,14 +2226,13 @@ pub fn window(language: Language) -> Window {
             ],
             context_redo: "Redo with this context",
             language_label: "Spoken language",
-            language_default: "Same as Settings",
+            language_default: "{}, from Settings",
             language_detected: "Detect automatically",
             meetings_language: "Meeting language",
             language_not_saved: "Language not saved: {}",
             rename_meeting: "Rename this meeting",
             name_meeting: "Name this meeting",
             name_not_saved: "Name not saved: {}",
-            language_detected_short: "detected",
             language_as_system: "System language",
             language_heard_as: "{} — SpeechAnalyzer transcribes in {}",
             app_language: [
@@ -2275,6 +2340,7 @@ pub fn window(language: Language) -> Window {
             here_described: "Vous — votre micro",
             remote_described: "Les autres — le son de l’appel",
             who_spoke: "Temps de parole au fil de la réunion\u{a0}: vous en haut, les autres en bas",
+            who_spoke_later: "Le temps de parole s’affichera après la transcription.",
             no_transcript: "Pas encore de transcription.",
             no_minutes: "Pas encore de compte rendu.",
             being_made: "Transcription en cours\u{a0}: la suite arrive.",
@@ -2355,6 +2421,18 @@ pub fn window(language: Language) -> Window {
             ],
             general_title: "Général",
             advanced_title: "Avancé",
+            destinations_title: "Envoi des comptes rendus",
+            destinations_said: "Les canaux où vous pourrez envoyer un compte rendu. Rien n’est envoyé sans que vous le demandiez, et jamais une réunion confidentielle.",
+            destinations_none: "Aucune destination pour l’instant.",
+            destination_kinds: ["Webhook", "Discord", "Slack"],
+            destination_fields: ["Type", "Nom", "Adresse du webhook"],
+            destination_address_said: "Collez l’adresse du webhook du canal. Elle est gardée dans le trousseau du système et n’est plus jamais affichée en entier.",
+            destination_add: "Ajouter",
+            destination_open: "Ajouter une destination",
+            destination_forget: "Supprimer",
+            destination_added: "Destination {} ajoutée.",
+            destination_not_added: "Destination non ajoutée\u{a0}: {}",
+            version_said: "Version",
             developer: [
                 "Mode développeur",
                 "Affiche le détail technique sous chaque erreur, pour aider au diagnostic.",
@@ -2488,6 +2566,7 @@ pub fn window(language: Language) -> Window {
             make_transcript: "Transcrire",
             make_minutes_with: "Rédiger le compte rendu avec {}",
             minutes_made_with: "Ce compte rendu a été fait avec {}.",
+            minutes_ai: "Rédigé par une IA\u{a0}: relisez-le avant de le partager.",
             transcript_made_with: "Cette transcription a été faite avec {}.",
             minutes_making: "Rédaction du compte rendu",
             minutes_waiting: "En attente · {} avant",
@@ -2538,6 +2617,7 @@ pub fn window(language: Language) -> Window {
             shortcut_open: "Réglages du clavier",
             test: "Tester",
             test_sends: "Le test envoie une courte phrase à {}, rien de vos réunions.",
+            test_sends_here: "Le test envoie une courte phrase à Ollama, sur cet ordinateur — rien de vos réunions.",
             testing: "Test en cours…",
             test_answered: "Ça fonctionne\u{a0}: le modèle répond.",
             test_failed: "Le modèle ne répond pas\u{a0}: {}",
@@ -2623,14 +2703,13 @@ pub fn window(language: Language) -> Window {
             ],
             context_redo: "Refaire avec ce contexte",
             language_label: "Langue parlée",
-            language_default: "Celle des Réglages",
+            language_default: "{}, selon les Réglages",
             language_detected: "Détection automatique",
             meetings_language: "Langue des réunions",
             language_not_saved: "Langue non enregistrée\u{a0}: {}",
             rename_meeting: "Renommer cette réunion",
             name_meeting: "Nommer cette réunion",
             name_not_saved: "Nom non enregistré\u{a0}: {}",
-            language_detected_short: "détectée",
             language_as_system: "Celle du système",
             language_heard_as: "{} — SpeechAnalyzer transcrit en {}",
             app_language: [
@@ -2728,6 +2807,10 @@ pub enum Failure {
     Keyring,
     ProgramNotStarted,
     TestRefused,
+    /// A destination (D110): no name a person reads, a name already given, or an address refused.
+    DestinationUnnamed,
+    DestinationNamed,
+    DestinationRefused,
 }
 
 /// A failure's sentence. Most follow the page's own « not saved: » and so start in lower case; those
@@ -2813,6 +2896,16 @@ pub fn failure(failure: Failure, language: Language) -> String {
         (Failure::ProgramNotStarted, French) => "un composant de Kitokey n’a pas pu démarrer. Réinstallez Kitokey.",
         (Failure::TestRefused, English) => "check the address, model name and key, then try again.",
         (Failure::TestRefused, French) => "vérifiez l’adresse, le nom du modèle et la clé, puis réessayez.",
+        (Failure::DestinationUnnamed, English) => "give the destination a name of one line, at most 40 characters.",
+        (Failure::DestinationUnnamed, French) => "donnez à la destination un nom d’une ligne, de 40 caractères au plus.",
+        (Failure::DestinationNamed, English) => "a destination already has this name. Choose another.",
+        (Failure::DestinationNamed, French) => "une destination porte déjà ce nom. Choisissez-en un autre.",
+        (Failure::DestinationRefused, English) => {
+            "this address is refused: paste the channel’s webhook address, starting with https://, not one on this computer or its network."
+        }
+        (Failure::DestinationRefused, French) => {
+            "cette adresse est refusée\u{a0}: collez l’adresse du webhook du canal, qui commence par https://, et non une adresse de cet ordinateur ou de son réseau."
+        }
     }
     .to_string()
 }
