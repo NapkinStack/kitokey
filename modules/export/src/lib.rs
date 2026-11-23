@@ -344,11 +344,14 @@ fn text(said: &str) -> String {
 /// links and images are said as their words.
 pub fn docx(meeting: &Meeting, include: Include, labels: &Labels, name: &str) -> io::Result<Vec<u8>> {
     use docx_rs::{Docx, Paragraph, Run, Style, StyleType, Table, TableCell, TableRow};
-    let heading = |id: &str, name: &str, size: usize| Style::new(id, StyleType::Paragraph).name(name).bold().size(size);
+    // Each heading style at its outline level: what Word's navigation pane and a document's outline read.
+    let heading = |id: &str, name: &str, size: usize, level: usize| {
+        Style::new(id, StyleType::Paragraph).name(name).bold().size(size).outline_lvl(level)
+    };
     let mut doc = Docx::new()
-        .add_style(heading("Heading1", "heading 1", 32))
-        .add_style(heading("Heading2", "heading 2", 26))
-        .add_style(heading("Heading3", "heading 3", 24))
+        .add_style(heading("Heading1", "heading 1", 32, 0))
+        .add_style(heading("Heading2", "heading 2", 26, 1))
+        .add_style(heading("Heading3", "heading 3", 24, 2))
         .add_style(
             Style::new("ListBullet", StyleType::Paragraph)
                 .name("List Bullet")
@@ -398,8 +401,16 @@ pub fn docx(meeting: &Meeting, include: Include, labels: &Labels, name: &str) ->
         }
         doc = doc.add_table(Table::new(rows));
     }
+    let mut built = doc.build();
+    // The transcript's head declared its table's header row (`w:tblHeader`): bold alone tells a screen
+    // reader nothing. docx-rs 0.4.22 has no such mark, so it goes into the part it writes, on the one
+    // table's first row.
+    let document = String::from_utf8(built.document).map_err(io::Error::other)?;
+    built.document = document
+        .replacen("<w:tr><w:trPr />", "<w:tr><w:trPr><w:tblHeader /></w:trPr>", 1)
+        .into_bytes();
     let mut out = io::Cursor::new(vec![]);
-    doc.build().pack(&mut out).map_err(io::Error::other)?;
+    built.pack(&mut out).map_err(io::Error::other)?;
     Ok(out.into_inner())
 }
 

@@ -12,6 +12,7 @@ serde_json = "1.0.154"
 [dev-dependencies]
 quick-xml = "0.42.0"
 tempfile = "3"
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 
 [[bin]]
 name = "kitokey-export"

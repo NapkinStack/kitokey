@@ -144,6 +144,7 @@ dependencies = [
  "quick-xml 0.42.0",
  "serde_json",
  "tempfile",
+ "zip",
 ]
 
 [[package]]

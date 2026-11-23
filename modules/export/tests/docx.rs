@@ -224,3 +224,49 @@ fn what_is_included_is_the_callers_choice_and_a_meeting_without_a_title_takes_th
     );
     assert!(table(&doc).is_empty(), "no transcript asked, a table written");
 }
+
+/// A part of the package as Word reads it: docx-rs's reader keeps neither a row's header mark nor a
+/// style's outline level, so the test reads the XML itself.
+fn part(minutes: Option<&str>, include: Include, name: &str) -> String {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("session.json"), SESSION).unwrap();
+    if let Some(minutes) = minutes {
+        fs::write(dir.path().join("minutes.md"), minutes).unwrap();
+    }
+    fs::write(dir.path().join("transcript.jsonl"), TRANSCRIPT).unwrap();
+    let bytes = docx(&Meeting::read(dir.path()).unwrap(), include, &labels(), "Réunion du 20 nov. 2026").unwrap();
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+    std::io::read_to_string(archive.by_name(name).unwrap()).unwrap()
+}
+
+#[test]
+fn the_tables_head_is_declared_its_header_row_for_a_screen_reader_and_word_s_checker() {
+    let document = part(Some(MINUTES), Include::all(), "word/document.xml");
+    let rows: Vec<&str> = document.split("<w:tr>").skip(1).collect();
+    assert_eq!(rows.len(), 3, "the head and two rows");
+    assert!(
+        rows[0].starts_with("<w:trPr><w:tblHeader />"),
+        "the head's row is not declared a header: {}",
+        &rows[0][..80.min(rows[0].len())]
+    );
+    assert!(
+        rows[1..].iter().all(|row| !row.contains("w:tblHeader")),
+        "only the head is a header row"
+    );
+}
+
+#[test]
+fn the_heading_styles_carry_their_outline_level_for_the_navigation_pane() {
+    let styles = part(Some(MINUTES), Include::all(), "word/styles.xml");
+    for (id, level) in [("Heading1", 0), ("Heading2", 1), ("Heading3", 2)] {
+        let style = styles
+            .split("<w:style ")
+            .find(|s| s.contains(&format!("w:styleId=\"{id}\"")))
+            .expect(id);
+        let style = &style[..style.find("</w:style>").unwrap()];
+        assert!(
+            style.contains(&format!("<w:outlineLvl w:val=\"{level}\" />")),
+            "{id} has no outline level {level}: {style}"
+        );
+    }
+}
