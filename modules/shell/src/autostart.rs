@@ -5,10 +5,10 @@
 //!
 //! [XDG Autostart]: https://specifications.freedesktop.org/autostart-spec/latest/
 //!
-//! On Windows, the package declares a startup task Windows turns on at its first start (D84):
-//! [`StartupTask`] is read and changed, Windows' Startup settings are the setting, and nothing is
-//! written under `AppData\Roaming\autostart`, which Windows never reads. Outside a package — the
-//! zip —, there is no task, and Settings offer nothing.
+//! On Windows, the package declares a startup task, off until the user turns it on with
+//! Settings' switch (D84, #1085): [`StartupTask`] is read and changed, Windows' Startup settings
+//! are the setting, and nothing is written under `AppData\Roaming\autostart`, which Windows never
+//! reads. Outside a package — the zip —, there is no task, and Settings offer nothing.
 //!
 //! [`StartupTask`]: https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.startuptask
 

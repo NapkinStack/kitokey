@@ -6,6 +6,7 @@
   approval of #1017 on GitHub, again at efd2932 after main was merged into it). Amended 2026-11-20, on the decider's
   remark that Stripe was not compared: Stripe Managed Payments and Keygen added to the fallback, beside Paddle Billing
   and Keygen (option 2b); Stripe with Stripe Tax set aside (*Rejected alternatives*). FastSpring stays the decision.
+  Reopened for study on 2026-11-21 at the decider's request: [docs/project/reviews/2026-11-21-payments-portfolio.md](../project/reviews/2026-11-21-payments-portfolio.md); the decision stands until the decider decides.
 - **Date**: 2026-11-20
 - **Decision makers**: the decider, `@napkinstack-admin`; proposed by an agent (marc, session 2b57f890-8981-4ce3-92f0-1ca23ed36acf)
 - **Scope**: project — the macOS build, sold; modules `shell` (the licence check, the updater) and `install` (the
@@ -245,7 +246,7 @@ else option 2 or 2b (Keygen Cloud behind Paddle Billing or Stripe Managed Paymen
   convention accepts it; so does PDR-0001 (« no account, nothing sent »).
 - FastSpring's fee is unknown until its quote.
 
-**Impacts on other modules or contracts:** `shell` — the licence check and the updater (cycle 12); `install` — the
+**Impacts on other modules or contracts:** `shell` — the licence check and the updater (cycle 12), the updater never started from a package: Windows' package is the Store's to update (D102, 2026-11-20 — no Store policy names a self-update; 10.2.2 refuses « any form of dynamic inclusion of code » that changes the product, and the package's files are not Kitokey's to rewrite); `install` — the
 macOS package signed with Developer ID and notarised, an `.app.tar.gz` and its signature published beside it, and the
 tool that signs a batch of keys offline.
 
