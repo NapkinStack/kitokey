@@ -10,7 +10,7 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use kitokey_export::{Include, Labels, Meeting, markdown};
+use kitokey_export::{Include, Labels, Meeting, html, markdown};
 use serde_json::{Value, json};
 
 /// The version this program says (`--version`): the package's, named when it is built (`KITOKEY_VERSION`,
@@ -20,10 +20,10 @@ const VERSION: &str = match option_env!("KITOKEY_VERSION") {
     _ => env!("CARGO_PKG_VERSION"),
 };
 
-/// The formats this version writes. `exporting/v1` names `html`, `docx`, `srt`, `vtt` and `pdf` too: each
+/// The formats this version writes. `exporting/v1` names `docx`, `srt`, `vtt` and `pdf` too: each
 /// joins this list as its writer is delivered (D108), and until then is a wrong argument, which the shell
 /// never gives — it offers only the formats this program writes.
-const WRITTEN: &[&str] = &["md"];
+const WRITTEN: &[&str] = &["md", "html"];
 
 /// Why the program ends in failure: its sentence, and the code a person acts on, when there is one.
 struct Refused(String, Option<&'static str>);
@@ -62,6 +62,7 @@ const USAGE: &str = "usage: kitokey-export <session-folder> --format <format> --
 struct Asked {
     folder: PathBuf,
     format: String,
+    lang: String,
     include: Include,
 }
 
@@ -106,11 +107,16 @@ fn asked() -> Result<Asked, Refused> {
     if lang.is_empty() || lang.len() > 35 || !lang.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
         return Err(wrong("--lang is not a language's tag"));
     }
-    Ok(Asked { folder, format, include })
+    Ok(Asked {
+        folder,
+        format,
+        lang,
+        include,
+    })
 }
 
 /// The input: one JSON object, where to write and the file's words, each on one line (`input.schema.json`).
-fn input() -> Result<(PathBuf, Labels), Refused> {
+fn input() -> Result<(PathBuf, String, Labels), Refused> {
     let wrong = |why: String| Refused(format!("the input is not exporting/v1's: {why}"), None);
     let mut text = String::new();
     io::stdin().read_to_string(&mut text).map_err(|error| wrong(error.to_string()))?;
@@ -121,8 +127,8 @@ fn input() -> Result<(PathBuf, Labels), Refused> {
             _ => Err(wrong(format!("« {name} » missing, empty or on more than one line"))),
         }
     };
-    // `name` is the meeting's, for a format that names it: required by the contract, unused by Markdown.
-    field("name")?;
+    // `name` is the meeting's, for a format that names it (HTML's title): required by the contract, unused by Markdown.
+    let name = field("name")?;
     let labels = Labels {
         transcript: field("transcript")?,
         me: field("me")?,
@@ -131,12 +137,12 @@ fn input() -> Result<(PathBuf, Labels), Refused> {
         speaker: field("speaker")?,
         text: field("text")?,
     };
-    Ok((PathBuf::from(field("to")?), labels))
+    Ok((PathBuf::from(field("to")?), name, labels))
 }
 
 fn export() -> Result<Value, Refused> {
     let asked = asked()?;
-    let (to, labels) = input()?;
+    let (to, name, labels) = input()?;
     let unreadable = || Refused("the session's folder could not be read".into(), Some("meeting.unreadable"));
     if !asked.folder.is_dir() {
         return Err(unreadable());
@@ -151,6 +157,7 @@ fn export() -> Result<Value, Refused> {
     }
     let written = match asked.format.as_str() {
         "md" => markdown(&meeting, include, &labels),
+        "html" => html(&meeting, include, &labels, &asked.lang, &name),
         other => unreachable!("{other} is refused with the arguments"),
     };
     let bytes = whole(&to, written.as_bytes())
