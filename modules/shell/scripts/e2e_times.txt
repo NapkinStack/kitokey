@@ -74,3 +74,6 @@ unsaved_choice_kept 3.0
 # Added with #1045 (D109), from its partial at 89356a6 (2026-11-23, partial-i-l1045ok-89356a6): a scenario written
 # after f5699a8, measured rather than counted as the median.
 summaries_to_a_folder 8.1
+# Added with #1055 (D113), from its partial at 2f5db4a (2026-11-23, partial-i-l1055pre-2f5db4a): a scenario written
+# after f5699a8, measured rather than counted as the median.
+redo_says_what_follows 22.0
