@@ -24,6 +24,7 @@ on:
       - "modules/capture/**"
       - "modules/summary/**"
       - "modules/export/**"
+      - "modules/send/**"
       - "modules/transcription/**"
       - "modules/shell/**"
       - "modules/install/**"
@@ -71,7 +72,8 @@ jobs:
           sys.path.insert(0, "modules/install/windows")
           import notices  # what the programs owe their third parties, by name (D102)
           names = sorted(zipfile.ZipFile(sys.argv[1]).namelist())
-          programs = ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary", "kitokey-export")
+          programs = ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary", "kitokey-export",
+                      "kitokey-send")
           owed = [name for _, name in notices.files("dist")]
           wanted = sorted([f"Kitokey/{p}.exe" for p in programs] + [f"Kitokey/{name}" for name in owed])
           print(names)
