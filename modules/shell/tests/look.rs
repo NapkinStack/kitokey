@@ -326,7 +326,7 @@ fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
 /// Each pair of colours the theme uses (D89's first round of drawings, *Contrast, both themes*), read
 /// from the file in both themes: text 4.5:1 (WCAG 2.2, 1.4.3), a control's edge or a meter 3:1 (1.4.11).
 /// `--line` is no pair: it divides, and borders no control (the test below).
-const PAIRS: [(&str, &str, f64); 25] = [
+const PAIRS: [(&str, &str, f64); 27] = [
     ("var(--ink)", "var(--ground)", 4.5),
     ("var(--ink)", "var(--surface)", 4.5),
     ("var(--ink)", "var(--raised)", 4.5),
@@ -334,6 +334,9 @@ const PAIRS: [(&str, &str, f64); 25] = [
     ("var(--soft)", "var(--surface)", 4.5),
     ("var(--soft)", "var(--raised)", 4.5),
     ("var(--ink)", SELECTED, 4.5),
+    // A secondary hovered, pressed (#1094): its words still read.
+    ("var(--ink)", "var(--hover)", 4.5),
+    ("var(--ink)", "var(--pressed)", 4.5),
     ("var(--soft)", SELECTED, 4.5),
     ("var(--accent)", "var(--surface)", 4.5),
     ("var(--accent)", "var(--ground)", 4.5),
@@ -922,10 +925,110 @@ fn a_control_is_edged_and_a_line_only_divides() {
         let a_control = selector
             .split(',')
             .any(|one| FIELDS.iter().any(|field| one.trim().split(' ').any(|part| part.starts_with(field))));
-        assert!(!(bordered_by_line && a_control), "{selector} borders a control with --line");
+        // #1094: a field may rest on the line when its bottom edge holds the 3:1 (Fluent 2's fields).
+        let edged_below = body.contains("border-bottom-color: var(--edge)");
+        assert!(
+            !(bordered_by_line && a_control && !edged_below),
+            "{selector} borders a control with --line alone"
+        );
     }
-    for control in [".open, .search", "select", ".field input", ".context-text", ".setting"] {
-        let found = rules(STYLE).into_iter().find(|(selector, _)| selector == control).unwrap();
-        assert!(found.1.contains("var(--edge)"), "{control}");
+    // A field is edged: all round, or at its bottom (#1094); a secondary button is not framed at all.
+    for control in [".search", "select", ".field input", ".context-text", ".setting"] {
+        let edged = rules(STYLE)
+            .into_iter()
+            .any(|(selector, body)| selector.split(',').any(|one| one.trim() == control) && body.contains("var(--edge)"));
+        assert!(edged, "{control}");
     }
+}
+
+/// The value the last rule naming `selector` alone in its list gives `name`, comments aside.
+fn declared(style: &str, selector: &str, name: &str) -> Option<String> {
+    rules(style)
+        .into_iter()
+        .filter(|(selectors, _)| selectors.split(',').any(|one| one.trim() == selector))
+        .filter_map(|(_, body)| {
+            body.split(';')
+                .filter_map(|one| one.split_once(':'))
+                .rfind(|(key, _)| key.trim() == name)
+                .map(|(_, value)| value.trim().to_string())
+        })
+        .next_back()
+}
+
+/// #1094: the window's controls in a hierarchy, after Fluent 2's appearances and GNOME's HIG — one
+/// primary filled; a secondary on the raised ground, on the line with its bottom edged as Windows 11's
+/// controls are (a signifier at rest: ines' challenge of #1096, NN/g's weak signifiers), answering the
+/// pointer and the press; an icon button bare until hovered, pressed too.
+#[test]
+fn a_secondary_rests_on_the_line_its_bottom_edged_and_answers_the_pointer_and_the_press() {
+    let missing: Vec<String> = [
+        (".open", "border-color", "var(--line)"),
+        (".open", "border-bottom-color", "var(--edge)"),
+        (".open", "background", "var(--raised)"),
+        (".open:hover", "background", "var(--hover)"),
+        (".open:active", "background", "var(--pressed)"),
+        (".icon-button:hover", "background", "var(--raised)"),
+        (".icon-button:active", "background", "var(--pressed)"),
+    ]
+    .into_iter()
+    .filter(|(selector, name, value)| declared(STYLE, selector, name).as_deref() != Some(*value))
+    .map(|(selector, name, value)| format!("{selector} {name}: {:?}, not {value}", declared(STYLE, selector, name)))
+    .collect();
+    assert_eq!(missing, Vec::<String>::new());
+}
+
+/// #1094: a field rests on the divider's line, its bottom edge at 3:1 (WCAG 2.2 1.4.11) as Fluent 2's
+/// fields do; hovered or focused, it is edged all round.
+#[test]
+fn a_field_rests_on_the_line_its_bottom_edged() {
+    let mut missing = Vec::new();
+    for field in ["select", ".search", ".field input", ".picks input", ".setting"] {
+        for (name, value) in [("border-color", "var(--line)"), ("border-bottom-color", "var(--edge)")] {
+            if declared(STYLE, field, name).as_deref() != Some(value) {
+                missing.push(format!("{field} {name}: {:?}, not {value}", declared(STYLE, field, name)));
+            }
+        }
+    }
+    for state in ["select:hover", "select:focus", ".search:hover", ".search:focus", ".setting:hover"] {
+        if declared(STYLE, state, "border-color").as_deref() != Some("var(--edge)") {
+            missing.push(format!(
+                "{state} border-color: {:?}, not var(--edge)",
+                declared(STYLE, state, "border-color")
+            ));
+        }
+    }
+    assert_eq!(missing, Vec::<String>::new());
+}
+
+/// #1094: a step's model on its line is a quiet list — no frame, no ground until hovered, a chevron
+/// after it (the language's setting's, board 4) — and the line reads in the text's face, not as a log.
+#[test]
+fn a_makers_line_reads_in_the_text_face_its_model_a_quiet_list() {
+    let maker = declared(STYLE, ".maker", "font").unwrap_or_default();
+    assert!(!maker.contains("monospace"), ".maker is set in {maker}");
+    for (name, value) in [("border-color", "transparent"), ("background", "transparent")] {
+        assert_eq!(
+            declared(STYLE, ".maker .page-model", name).as_deref(),
+            Some(value),
+            ".maker .page-model {name}"
+        );
+    }
+    assert_eq!(
+        declared(STYLE, ".maker .page-model:hover", "background").as_deref(),
+        Some("var(--raised)")
+    );
+    assert!(
+        PAGE.contains("lineWith") && PAGE.contains("pick.tagName === \"SELECT\""),
+        "the list's chevron is not drawn"
+    );
+}
+
+/// #1094: the focus ring is the one D69 drew, unchanged: 3 px of the accent, 2 px off.
+#[test]
+fn the_focus_ring_is_unchanged() {
+    assert_eq!(
+        declared(STYLE, "button:focus-visible", "outline").as_deref(),
+        Some("3px solid var(--accent)")
+    );
+    assert_eq!(declared(STYLE, "button:focus-visible", "outline-offset").as_deref(), Some("2px"));
 }
