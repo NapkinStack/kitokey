@@ -203,7 +203,10 @@ When a deliverable's work went on other branches, the empty branch its claim sta
 `Deliverable:` line, or its id in parentheses in a subject — once it is no longer `ready` or `in-progress`, or once it belongs to another cycle, with the commands that delete it.
 
 The hold is a branch of the shared remote, `nstack/hold/<cycle>/D30`, whose commits are its
-events; the remote takes the first of two claims and refuses the second. A hold's last work is
+events; the remote takes the first of two claims and refuses the second. The cycle a claim reads
+is the one on that remote's default branch, whatever this checkout holds. A remote that is
+somebody's clone — a `git clone --shared` of a working clone — is refused: a hold pushed there is
+nobody else's. A local hub, bare or a working tree cloned from nowhere, stays a shared remote. A hold's last work is
 its newest event or commit on a branch `d30-…`; with none for `hold_days` (an answer of the
 project, 7 by default) it is **stale**, and anyone may take it over — recorded, with whom it was
 taken from; the previous work is kept. The pull request check refuses delivery work for a
