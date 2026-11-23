@@ -69,7 +69,7 @@ preserving them.
 │   ├── tooling-profile.md        Capabilities → the tools of the moment
 │   └── handbook/                 ← this handbook
 │       ├── README.md             you are here
-│       ├── INSTALL.md            The foundation's manual: install, forge settings, updates
+│       ├── INSTALL.md            The foundation's manual: install, forge settings, updates; *The commands*: every `nstack` verb
 │       ├── RULES.md              Every code a check prints, and where its reason is written
 │       ├── project.md            What docs/project/ holds, and the two stages of a project
 │       ├── 00-overview.md        OS architecture, the 4 layers
