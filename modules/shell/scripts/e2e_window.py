@@ -11717,8 +11717,20 @@ def window_looks(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{made.name}'")
         wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
         # The trial over (D83): buying holds it in the recording's place, then gives it back.
-        # #1147: read past one header poll (1.5 s): the page shows what the shell says, not what was painted.
-        swapped = [browser.execute_script(f"paintRefused({state}); return arguments[0]", None) or time.sleep(1.6) or browser.execute_script(PRIMARIES) for state in ("true", "false")]
+        # The shell's answer stood in, never the page painted over it: the header's poll, every 1.5 s, paints
+        # what the shell says, and a state painted by the check alone is painted back (#1147).
+        browser.execute_script("const real = window.__TAURI__.core; window.refusedNow = true;"
+                               " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => ['header', 'listed'].includes(asked)"
+                               "   ? real.invoke(asked, ...rest).then((a) => ({ ...a, refused: window.refusedNow })) : real.invoke(asked, ...rest) };"
+                               " window.restoreRefused = () => { window.__TAURI__.core = real; };")
+        swapped = []
+        for state, wanted in ((True, ["buy"]), (False, ["record"])):
+            browser.execute_script("window.refusedNow = arguments[0]", state)
+            wait_for(browser, lambda b: b.execute_script(PRIMARIES) == wanted, 5)
+            # Past one more poll: the shell's word stays.
+            time.sleep(1.6)
+            swapped.append(browser.execute_script(PRIMARIES))
+        browser.execute_script("window.restoreRefused()")
         check("the trial over, one primary still: « Acheter Kitokey », then the recording's again", swapped == [["buy"], ["record"]], swapped)
         for theme in ("light", "dark"):
             shot_themed(browser, f"d69-full-{theme}", theme)
