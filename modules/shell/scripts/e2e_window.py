@@ -130,7 +130,7 @@ address = json.loads(said)["address"]
 host = address.split("://", 1)[-1].split("/", 1)[0]
 if address.startswith("https://") and host not in ("127.0.0.1", "localhost") and not host.startswith("192.168."):
     # A send (not --check): the destination's answer played by its host, as posting/v1 names each outcome.
-    played = {"gone.example": ("destination.gone", None), "busy.example": ("destination.busy", 30),
+    played = {"gone.example": ("destination.gone", None), "busy.example": ("destination.busy", 30), "later.example": ("destination.busy", None),
               "offline.example": ("network.unreachable", None), "silent.example": ("destination.silent", None)}
     if "--check" not in sys.argv and host in played:
         code, after = played[host]
@@ -5300,7 +5300,8 @@ def summary_sent(now: dt.datetime) -> None:
                     ("webhook", "#parti", f"https://gone.example/hook/{secret}"),
                     ("slack", "#occupé", f"https://busy.example/services/T0/B0/{secret}"),
                     ("webhook", "#horsligne", f"https://offline.example/hook/{secret}"),
-                    ("webhook", "#muet", f"https://silent.example/hook/{secret}")]
+                    ("webhook", "#muet", f"https://silent.example/hook/{secret}"),
+                    ("webhook", "#saturé", f"https://later.example/hook/{secret}")]
     offered = "return !!document.getElementById('send-open')"
     window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\n')
     with window as browser:
@@ -5325,7 +5326,7 @@ def summary_sent(now: dt.datetime) -> None:
             had = browser.execute_script(rows)
             press(browser, "destination-add")
             wait_for(browser, lambda b: b.execute_script(rows) == had + 1, 10)
-        check("five destinations set up for this scenario", browser.execute_script(rows) == 5, browser.execute_script(rows))
+        check("six destinations set up for this scenario", browser.execute_script(rows) == 6, browser.execute_script(rows))
         calls.unlink(missing_ok=True)
         page(secret_one)
         check("a confidential meeting offers no send (PDR-0007 §4)", not browser.execute_script(offered), browser.execute_script(offered))
@@ -5341,13 +5342,15 @@ def summary_sent(now: dt.datetime) -> None:
         listed = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#send-panel button.send-to"), 5)
         names = browser.execute_script("return [...document.querySelectorAll('#send-panel button.send-to')].map(b => b.textContent)") if listed else []
         check("the panel offers each destination by its name, « Envoyer à « #équipe » », by keyboard alone",
-              names[:1] == ["Envoyer à «\xa0#équipe\xa0»"] and len(names) == 5
+              names[:1] == ["Envoyer à «\xa0#équipe\xa0»"] and len(names) == 6
               and browser.execute_script("return document.activeElement.classList.contains('send-to')"), names)
         ActionChains(browser).send_keys(Keys.ESCAPE).perform()
         closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "send-panel"), 5)
         check("Escape closes the panel, nothing sent, the focus back on « Envoyer… »",
               closed and not calls.exists() and browser.execute_script("return document.activeElement.id") == "send-open",
               browser.execute_script("return document.activeElement.id"))
+
+        described = []
 
         def send(name, confirm=True):
             press(browser, "send-open")
@@ -5356,6 +5359,9 @@ def summary_sent(now: dt.datetime) -> None:
             said_now = "return document.getElementById('send-said')?.textContent ?? ''"
             wait_for(browser, lambda b: b.find_elements(By.ID, "send-notice") or b.execute_script(said_now), 5)
             shown = browser.find_element(By.ID, "send-notice").text if browser.find_elements(By.ID, "send-notice") else None
+            if shown is not None:
+                described.append(browser.execute_script("const c = document.getElementById('send-confirm');"
+                                                        " return [c.getAttribute('aria-describedby'), document.getElementById(c.getAttribute('aria-describedby'))?.textContent]"))
             if shown is not None and confirm:
                 press(browser, "send-confirm")
             if confirm:
@@ -5367,6 +5373,10 @@ def summary_sent(now: dt.datetime) -> None:
         check("before a destination's first send, the page says what leaves and where: its name, never its address (PDR-0007 §3)",
               first is not None and "#équipe" in first and "compte rendu" in first and "transcription" in first and "son" in first
               and secret not in first and "discord.example" not in first, first)
+        check("and that a summary sent cannot be taken back (PDR-0007, expected behaviour, step 3)",
+              first is not None and "ne peut pas être repris" in first, first)
+        check("« Envoyer » is described by the notice: a screen reader says what leaves before it is pressed",
+              described[:1] and described[0][0] == "send-notice" and "ne peut pas être repris" in (described[0][1] or ""), described)
         # Selenium's text gives U+00A0 as a space: each read below compares with spaces.
         said = browser.find_element(By.ID, "send-said").text
         check("sent: said on the page, the destination by its name", said.replace("\xa0", " ").startswith("Envoyé à « #équipe »"), said)
@@ -5378,10 +5388,24 @@ def summary_sent(now: dt.datetime) -> None:
         again = send("#équipe")
         check("the next send to that destination goes at once, its gesture still asked: no notice again",
               again is None and len(calls.read_text().splitlines()) == 2, again)
-        for name, words_said in (("#parti", "configurez"), ("#occupé", "30 s"), ("#horsligne", "connexion"), ("#muet", "regardez dans le canal")):
+        for name, words_said in (("#parti", "configurez"), ("#occupé", "30 s"), ("#saturé", "Réessayez plus tard"),
+                                 ("#horsligne", "connexion"), ("#muet", "regardez dans le canal")):
             send(name)
             said = browser.find_element(By.ID, "send-said").text
             check(f"{name}: the outcome said with what to do (posting/v1)", words_said in said.replace("\xa0", " ") and secret not in said, said)
+        saturated = browser.execute_script("return [...document.querySelectorAll('#send-last p')].map(p => p.textContent).find(s => s.includes('#saturé')) ?? ''")
+        check("busy with no delay given: no delay made up", "plus tard" in saturated and " s." not in saturated.replace("\xa0", " "), saturated)
+        # The page drawn again — as when the window comes back after a look in the channel: each failure still said,
+        # from the record, « perhaps arrived » first of all.
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: not b.find_elements(By.ID, "send-said"), 10)
+        page(written)
+        wait_for(browser, lambda b: b.execute_script("return document.getElementById('send-last')?.childElementCount") == 5, 10)
+        again_said = [s.replace("\xa0", " ") for s in browser.execute_script("return [...document.querySelectorAll('#send-last p')].map(p => p.textContent)")]
+        check("drawn again, each destination's last failed send still said, from the record: « #muet » may have arrived",
+              len(again_said) == 5 and any("« #muet »" in s and "regardez dans le canal" in s for s in again_said)
+              and any("« #saturé »" in s and "Réessayez plus tard" in s for s in again_said)
+              and not any("#équipe" in s for s in again_said), again_said)
         page_text = browser.execute_script("return document.body.innerText")
         check("the address appears nowhere on the page", secret not in page_text, "")
         listed = "return [...document.querySelectorAll('#sends li')].map(li => li.textContent)"

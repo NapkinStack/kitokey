@@ -1783,15 +1783,19 @@ function startsOnPage(id, words, command) {
 // A meeting's summary sent to a destination the user set up (D110, PDR-0007), on their gesture each time:
 // « Envoyer… » among the summary's actions only when it may be — a summary, a destination, not confidential —;
 // its panel, each destination by its name; before a destination's first send, what leaves and where, its
-// name and never its address; the outcome said in place, with what to do; each send listed under it.
+// name and never its address; the outcome said in place, with what to do; each send listed under it. A send
+// that failed is said again from the record whenever the page is drawn — « perhaps arrived » most of all, read
+// on coming back from the channel —, as long as that destination is not sent to again.
 function sendPart(card, top, actions, session, words) {
   const name = nameOf(session);
   const said = element("p", "says send-said");
   said.id = "send-said";
   said.setAttribute("role", "status");
+  const failed = element("div", "says send-last");
+  failed.id = "send-last";
   const sends = element("ul", "sends");
   sends.id = "sends";
-  top.after(said, sends);
+  top.after(said, failed, sends);
   const when = (at) => new Date(at).toLocaleString(document.documentElement.lang || undefined, { dateStyle: "medium", timeStyle: "short" });
   const listSends = (shown) => sends.replaceChildren(...shown.sends.map((sent) => element("li", "", fill(words.send_listed, sent.destination, when(sent.at)))));
   const outcome = (result, destination) => {
@@ -1808,16 +1812,22 @@ function sendPart(card, top, actions, session, words) {
       "network.unreachable": words.send_offline,
       "destination.silent": fill(words.send_silent, destination),
       "destination.gone": fill(words.send_gone, destination),
-      "destination.busy": fill(words.send_busy, destination, result.retry_after ?? 60),
+      "destination.busy": result.retry_after ? fill(words.send_busy, destination, result.retry_after) : fill(words.send_busy_later, destination),
       "destination.refused": fill(words.send_refused, destination),
       "destination.failed": fill(words.send_failed, destination),
     };
     return by[result.code] ?? words.send_not_sent;
   };
+  // Each destination's last send for this meeting, when it failed; the one just said in place, not twice.
+  const sayFailed = (shown, but) =>
+    failed.replaceChildren(
+      ...shown.last.filter((sent) => sent.outcome !== "sent" && sent.destination !== but).map((sent) => element("p", "", outcome(sent, sent.destination))),
+    );
   (async () => {
     const shown = await window.__TAURI__.core.invoke("sending_of", { name }).catch(() => null);
     if (!shown) return;
     listSends(shown);
+    sayFailed(shown);
     if (!shown.offered) return;
     let offered = shown.destinations;
     const open = iconButton("send", words.send_open, "send-open");
@@ -1839,6 +1849,7 @@ function sendPart(card, top, actions, session, words) {
         said.textContent = outcome(result, destination);
         offered = result.sending.destinations;
         listSends(result.sending);
+        sayFailed(result.sending, destination);
         if (!result.sending.offered) open.remove();
       } catch {
         said.textContent = words.send_not_sent;
@@ -1865,6 +1876,8 @@ function sendPart(card, top, actions, session, words) {
           const confirm = element("button", "primary", words.send_confirm);
           confirm.type = "button";
           confirm.id = "send-confirm";
+          // Its name read with what leaves, where, and that it cannot be taken back.
+          confirm.setAttribute("aria-describedby", "send-notice");
           confirm.addEventListener("click", () => send(destination.name));
           const cancel = element("button", "", words.send_cancel);
           cancel.type = "button";

@@ -949,9 +949,9 @@ pub struct Window {
     /// Each destination's button in the send panel (PDR-0007 §2). Shows: a meeting's page, the send panel. When:
     /// the panel is open. At most: four words. Placeholders: {} the destination's name.
     pub send_to: &'static str,
-    /// Before a destination's first send, what leaves and where, by its name (PDR-0007 §3). Shows: a meeting's
-    /// page, the send panel. When: the destination was never sent to. At most: two lines. Placeholders: {} the
-    /// destination's name.
+    /// Before a destination's first send, what leaves and where, by its name, and that it cannot be taken back
+    /// (PDR-0007 §3). Shows: a meeting's page, the send panel. When: the destination was never sent to. At most:
+    /// three lines. Placeholders: {} the destination's name.
     pub send_notice: &'static str,
     /// The button that sends after the notice. Shows: a meeting's page, the send panel. When: the notice is shown.
     /// At most: one word. Placeholders: none.
@@ -995,6 +995,10 @@ pub struct Window {
     /// posting/v1's destination.busy: wait, then send again. Shows: a meeting's page, as a status. When: the
     /// destination said 429. At most: one line. Placeholders: {} the destination's name, {} seconds.
     pub send_busy: &'static str,
+    /// posting/v1's destination.busy when the destination said no delay: wait, then send again. Shows: a meeting's
+    /// page, as a status. When: the destination said 429 without Retry-After. At most: one line. Placeholders: {}
+    /// the destination's name.
+    pub send_busy_later: &'static str,
     /// posting/v1's destination.refused: the kind may not match. Shows: a meeting's page, as a status. When:
     /// another 3xx or 4xx. At most: two lines. Placeholders: {} the destination's name.
     pub send_refused: &'static str,
@@ -2095,7 +2099,7 @@ pub fn window(language: Language) -> Window {
             destination_not_added: "Destination not added: {}",
             send_open: "Send…",
             send_to: "Send to “{}”",
-            send_notice: "The title, the summary and its actions go to “{}”. Never the audio, never the transcript.",
+            send_notice: "The title, the summary and its actions go to “{}”. Never the audio, never the transcript. A summary sent cannot be taken back.",
             send_confirm: "Send",
             send_cancel: "Cancel",
             send_sending: "Sending to “{}”…",
@@ -2110,6 +2114,7 @@ pub fn window(language: Language) -> Window {
             send_silent: "“{}” didn’t answer: the summary may have arrived; look in the channel before sending again.",
             send_gone: "“{}” no longer exists or was revoked. Set the destination up again, with a new address.",
             send_busy: "“{}” is receiving too many sends. Try again in {} s.",
+            send_busy_later: "“{}” is receiving too many sends. Try again later.",
             send_refused: "“{}” refused it. Check that the destination’s kind matches its address.",
             send_failed: "“{}” has a problem. Try again later.",
             send_not_sent: "The summary couldn’t be sent. Try again.",
@@ -2595,7 +2600,7 @@ pub fn window(language: Language) -> Window {
             destination_not_added: "Destination non ajoutée\u{a0}: {}",
             send_open: "Envoyer…",
             send_to: "Envoyer à « {} »",
-            send_notice: "Le titre, le compte rendu et ses actions partent vers « {} ». Jamais le son, jamais la transcription.",
+            send_notice: "Le titre, le compte rendu et ses actions partent vers « {} ». Jamais le son, jamais la transcription. Un compte rendu envoyé ne peut pas être repris.",
             send_confirm: "Envoyer",
             send_cancel: "Annuler",
             send_sending: "Envoi vers « {} »…",
@@ -2610,6 +2615,7 @@ pub fn window(language: Language) -> Window {
             send_silent: "« {} » n’a pas répondu : le compte rendu est peut-être arrivé ; regardez dans le canal avant de renvoyer.",
             send_gone: "« {} » n’existe plus ou a été révoqué. Reconfigurez la destination avec une nouvelle adresse.",
             send_busy: "« {} » reçoit trop d’envois. Réessayez dans {} s.",
+            send_busy_later: "« {} » reçoit trop d’envois. Réessayez plus tard.",
             send_refused: "« {} » a refusé l’envoi. Vérifiez que le type de la destination correspond à son adresse.",
             send_failed: "« {} » a un problème. Réessayez plus tard.",
             send_not_sent: "Le compte rendu n’a pas pu partir. Réessayez.",
