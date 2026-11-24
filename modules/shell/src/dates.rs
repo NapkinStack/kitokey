@@ -6,7 +6,7 @@
 //! that reads two ways. No procedural rule moves a date (no weekend, no holiday): the user ticks what they
 //! keep. Days are calendar days, so a change of daylight saving time moves nothing.
 
-use chrono::{Datelike, Duration, NaiveDate};
+use chrono::{Datelike, Days, NaiveDate};
 
 const MONTHS: [(&str, u32); 24] = [
     ("janvier", 1),
@@ -89,40 +89,87 @@ const NUMBERS: [(&str, i64); 34] = [
     ("thirty", 30),
 ];
 
+/// Words that make a date a guess, a past, a range or a rule of its own — « pas demain », « jeudi dernier »,
+/// « vendredi prochain » (this week's or the next?), « lundi ou mardi », « après demain », « jours ouvrés »
+/// (a working-day rule): with one of them, nothing is said.
+const GUESSES: [&str; 26] = [
+    "pas",
+    "not",
+    "dernier",
+    "derniere",
+    "last",
+    "passe",
+    "passee",
+    "past",
+    "ago",
+    "prochain",
+    "prochaine",
+    "next",
+    "ou",
+    "or",
+    "apres",
+    "after",
+    "ouvre",
+    "ouvres",
+    "ouvrable",
+    "ouvrables",
+    "business",
+    "working",
+    "environ",
+    "around",
+    "about",
+    "vers",
+];
+
 /// The meeting's day, as its folder names it (session-audio/v3, *The folder*: `2026-10-14_14-05`, then
 /// `-2` for a second session in the same minute): the local day the recording started.
 pub fn reference_day(folder: &str) -> Option<NaiveDate> {
     let (date, time) = folder.split_once('_')?;
-    let time_ok = time.len() >= 5 && time.as_bytes()[2] == b'-' && time[..2].parse::<u32>().is_ok_and(|h| h < 24);
-    if !time_ok {
+    let mut parts = time.split('-');
+    let hour = parts.next().filter(|h| h.len() == 2)?.parse::<u32>().ok().filter(|h| *h < 24);
+    let minute = parts.next().filter(|m| m.len() == 2)?.parse::<u32>().ok().filter(|m| *m < 60);
+    let rest = parts.next().is_none_or(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()));
+    if hour.is_none() || minute.is_none() || !rest || parts.next().is_some() {
         return None;
     }
     NaiveDate::parse_from_str(date, "%Y-%m-%d").ok()
 }
 
-/// The date an action's *by when* names against `day`, or `None` when it names none without a guess.
+/// The date an action's *by when* names against `day`, or `None` when it names none without a guess: exactly
+/// one date said — an explicit one, a weekday, « demain », a count of days or weeks —, or an explicit date and
+/// the weekday it falls on; never a word of `GUESSES`.
 pub fn resolve(when: &str, day: NaiveDate) -> Option<NaiveDate> {
     let text = plain(when);
     let words: Vec<&str> = text
         .split(|c: char| !c.is_alphanumeric() && c != '/' && c != '-')
         .filter(|w| !w.is_empty())
         .collect();
-    if let Some(found) = iso(&words) {
-        return found;
+    let guessed = |w: &&str| w.split('-').any(|part| GUESSES.contains(&part));
+    if words.iter().any(guessed) {
+        return None;
     }
-    if let Some(found) = named_month(&words, day) {
-        return found;
+    // Each date said, `None` for one said that does not exist or cannot be read: then nothing is.
+    let mut explicit = iso(&words);
+    explicit.extend(named_month(&words, day));
+    explicit.extend(numeric(&words, day));
+    let mut relative: Vec<Option<NaiveDate>> = words
+        .iter()
+        .filter(|w| matches!(**w, "demain" | "tomorrow"))
+        .map(|_| day.succ_opt())
+        .collect();
+    relative.extend(within(&words, day));
+    let mut weekdays: Vec<u32> = words
+        .iter()
+        .filter_map(|w| DAYS.iter().find(|(name, _)| name == w).map(|(_, d)| *d))
+        .collect();
+    weekdays.dedup();
+    match (explicit.as_slice(), relative.as_slice(), weekdays.as_slice()) {
+        ([date], [], []) | ([], [date], []) => *date,
+        // A date and its weekday: said twice, the same day; two days that differ, which one is not said.
+        ([Some(date)], [], [weekday]) => (date.weekday().num_days_from_monday() == *weekday).then_some(*date),
+        ([], [], [weekday]) => next_weekday(*weekday, day),
+        _ => None,
     }
-    if let Some(found) = numeric(&words, day) {
-        return found;
-    }
-    if words.iter().any(|w| *w == "demain" || *w == "tomorrow") {
-        return day.checked_add_signed(Duration::days(1));
-    }
-    if let Some(found) = within(&words, day) {
-        return found;
-    }
-    weekday(&words, day)
 }
 
 /// Lower case, no accent, French elisions split off (« d'ici » is « d ici »).
@@ -159,27 +206,27 @@ fn year(word: Option<&&str>) -> Option<i32> {
     word.filter(|w| w.len() == 4).and_then(|w| w.parse().ok())
 }
 
-/// A day and month with a year is that day; without, the next one on or after `day`. `Some(None)`: it
-/// names a date that does not exist.
+/// A day and month with a year is that day; without, the next one that exists on or after `day` (a 29
+/// February within the next eight years). `None`: it names a date that does not exist.
 fn dated(d: u32, m: u32, y: Option<i32>, day: NaiveDate) -> Option<NaiveDate> {
     if let Some(y) = y {
         return NaiveDate::from_ymd_opt(y, m, d);
     }
-    match NaiveDate::from_ymd_opt(day.year(), m, d) {
-        Some(found) if found >= day => Some(found),
-        _ => NaiveDate::from_ymd_opt(day.year() + 1, m, d),
-    }
+    (day.year()..=day.year() + 8).find_map(|y| NaiveDate::from_ymd_opt(y, m, d).filter(|found| *found >= day))
 }
 
-fn iso(words: &[&str]) -> Option<Option<NaiveDate>> {
-    let word = words
+fn iso(words: &[&str]) -> Vec<Option<NaiveDate>> {
+    words
         .iter()
-        .find(|w| w.len() == 10 && w.as_bytes()[4] == b'-' && w.as_bytes()[7] == b'-')?;
-    Some(NaiveDate::parse_from_str(word, "%Y-%m-%d").ok())
+        .filter(|w| w.len() == 10 && w.as_bytes()[4] == b'-' && w.as_bytes()[7] == b'-')
+        .map(|w| NaiveDate::parse_from_str(w, "%Y-%m-%d").ok())
+        .collect()
 }
 
-/// « 12 décembre [2026] », « le 1er décembre », « December 12[, 2026] », « 3rd of March ».
-fn named_month(words: &[&str], day: NaiveDate) -> Option<Option<NaiveDate>> {
+/// « 12 décembre [2026] », « le 1er décembre », « December 12[, 2026] », « 3rd of March »; a month named
+/// with no day is no date.
+fn named_month(words: &[&str], day: NaiveDate) -> Vec<Option<NaiveDate>> {
+    let mut found = Vec::new();
     for (at, word) in words.iter().enumerate() {
         let Some(m) = month(word) else { continue };
         let before = at.checked_sub(1).and_then(|i| words.get(i)).copied();
@@ -189,62 +236,81 @@ fn named_month(words: &[&str], day: NaiveDate) -> Option<Option<NaiveDate>> {
             before
         };
         if let Some(d) = before.and_then(ordinal) {
-            return Some(dated(d, m, year(words.get(at + 1)), day));
-        }
-        if let Some(d) = words.get(at + 1).and_then(|w| ordinal(w)) {
-            return Some(dated(d, m, year(words.get(at + 2)), day));
+            found.push(dated(d, m, year(words.get(at + 1)), day));
+        } else if let Some(d) = words.get(at + 1).and_then(|w| ordinal(w)) {
+            found.push(dated(d, m, year(words.get(at + 2)), day));
         }
     }
-    None
+    found
 }
 
 /// « 12/12 », « 15/01[/2027] »: day then month, read only when it cannot be month then day.
-fn numeric(words: &[&str], day: NaiveDate) -> Option<Option<NaiveDate>> {
-    let word = words.iter().find(|w| w.contains('/'))?;
-    let parts: Vec<&str> = word.split('/').collect();
-    if !(2..=3).contains(&parts.len()) || parts.iter().any(|p| p.is_empty() || !p.chars().all(|c| c.is_ascii_digit())) {
-        return None;
-    }
-    let (a, b): (u32, u32) = (parts[0].parse().ok()?, parts[1].parse().ok()?);
-    if a != b && a <= 12 && b <= 12 {
-        return Some(None);
-    }
-    Some(dated(a, b, year(parts.get(2)), day))
-}
-
-/// « dans N jours|semaines », « in N days|weeks »; French counts « huit jours » a week, « quinze » two.
-fn within(words: &[&str], day: NaiveDate) -> Option<Option<NaiveDate>> {
-    for at in 0..words.len() {
-        if !matches!(words[at], "dans" | "in") {
+fn numeric(words: &[&str], day: NaiveDate) -> Vec<Option<NaiveDate>> {
+    let mut found = Vec::new();
+    for word in words.iter().filter(|w| w.contains('/')) {
+        let parts: Vec<&str> = word.split('/').collect();
+        let digits = parts
+            .iter()
+            .all(|p| !p.is_empty() && p.len() <= 4 && p.chars().all(|c| c.is_ascii_digit()));
+        if !(2..=3).contains(&parts.len()) || !digits {
+            found.push(None);
             continue;
         }
-        let (Some(count), Some(unit)) = (words.get(at + 1), words.get(at + 2)) else {
-            continue;
-        };
-        let n = count
-            .parse::<i64>()
-            .ok()
-            .or_else(|| NUMBERS.iter().find(|(w, _)| w == count).map(|(_, n)| *n));
-        let Some(n) = n else { continue };
-        let days = match *unit {
-            "jour" | "jours" if n == 8 || n == 15 => n - 1,
-            "jour" | "jours" | "day" | "days" => n,
-            "semaine" | "semaines" | "week" | "weeks" => n * 7,
+        let (a, b): (u32, u32) = (parts[0].parse().unwrap_or(0), parts[1].parse().unwrap_or(0));
+        found.push(if a != b && a <= 12 && b <= 12 {
+            None
+        } else {
+            dated(a, b, year(parts.get(2)), day)
+        });
+    }
+    found
+}
+
+/// « dans N jours|semaines », « in N days|weeks », N one or more, its date within the calendar's reach; French counts « huit jours »
+/// a week and « quinze jours » two when said in words, as written when in digits. A count of days or weeks with
+/// no « dans » or « in » before it (« et 2 jours », « dans les 2 jours ») is not read: `None`.
+fn within(words: &[&str], day: NaiveDate) -> Vec<Option<NaiveDate>> {
+    let mut found = Vec::new();
+    for (at, unit) in words.iter().enumerate() {
+        let week = match *unit {
+            "jour" | "jours" | "day" | "days" => false,
+            "semaine" | "semaines" | "week" | "weeks" => true,
             _ => continue,
         };
-        return Some(day.checked_add_signed(Duration::days(days)));
+        let Some(count) = at.checked_sub(1).and_then(|i| words.get(i)) else {
+            continue;
+        };
+        let worded = NUMBERS.iter().find(|(w, _)| w == count).map(|(_, n)| *n);
+        let n = worded.or_else(|| {
+            count
+                .chars()
+                .all(|c| c.is_ascii_digit())
+                .then(|| count.parse::<i64>().ok())
+                .flatten()
+        });
+        if n.is_none() && !count.chars().all(|c| c.is_ascii_digit()) {
+            // « une semaine » with no count word before it is no count: « la semaine prochaine » is left to GUESSES.
+            continue;
+        }
+        let said = at
+            .checked_sub(2)
+            .and_then(|i| words.get(i))
+            .is_some_and(|w| matches!(*w, "dans" | "in"));
+        let days = n.filter(|_| said).and_then(|n| match (week, worded) {
+            (true, _) => n.checked_mul(7),
+            (false, Some(8 | 15)) => Some(n - 1),
+            (false, _) => Some(n),
+        });
+        found.push(days.filter(|d| *d >= 1).and_then(|d| day.checked_add_days(Days::new(d as u64))));
     }
-    None
+    found
 }
 
 /// A weekday: the next one strictly after `day`; said on that very weekday, not said.
-fn weekday(words: &[&str], day: NaiveDate) -> Option<NaiveDate> {
-    let target = words
-        .iter()
-        .find_map(|w| DAYS.iter().find(|(name, _)| name == w).map(|(_, d)| *d))?;
+fn next_weekday(target: u32, day: NaiveDate) -> Option<NaiveDate> {
     let ahead = (7 + target - day.weekday().num_days_from_monday()) % 7;
     if ahead == 0 {
         return None;
     }
-    day.checked_add_signed(Duration::days(i64::from(ahead)))
+    day.checked_add_days(Days::new(u64::from(ahead)))
 }

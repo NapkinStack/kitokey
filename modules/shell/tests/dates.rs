@@ -116,3 +116,77 @@ fn the_reference_day_is_the_folders_local_day() {
     assert_eq!(reference_day("notes"), None);
     assert_eq!(reference_day("2026-13-01_10-00"), None);
 }
+
+// What the verifier found at fb5cd4f (marc, #1187): a date's guess, never a date.
+
+#[test]
+fn a_count_out_of_reach_is_not_said_and_never_panics() {
+    for when in [
+        "dans 999999999999 jours",
+        "in 9999999999999999 weeks",
+        "dans 9223372036854775807 semaines",
+        "dans 99999999999999999999999 jours",
+        "dans 0 jours",
+        "dans -3 jours",
+        "in -2 weeks",
+    ] {
+        assert_eq!(resolve(when, tuesday()), None, "{when:?}");
+    }
+}
+
+#[test]
+fn a_past_a_negation_a_range_or_a_rule_is_not_said() {
+    for when in [
+        "après demain",
+        "apres demain",
+        "pas demain",
+        "jeudi dernier",
+        "last Friday",
+        "dans 2 jours ouvrés",
+        "in 2 business days",
+        "lundi ou mardi",
+        "Monday or Tuesday",
+        "demain ou jeudi",
+        "vendredi prochain",
+        "next Friday",
+        "dans 1 semaine et 2 jours",
+        "2 jours",
+        "dans les 2 jours",
+        "12 décembre, 15 décembre",
+    ] {
+        assert_eq!(resolve(when, tuesday()), None, "{when:?}");
+    }
+}
+
+#[test]
+fn a_weekday_and_a_date_that_disagree_are_not_said() {
+    assert_eq!(resolve("jeudi 27 novembre", tuesday()), None);
+    assert_eq!(resolve("lundi 25 décembre", tuesday()), None);
+    assert_eq!(resolve("vendredi 27 novembre", tuesday()), Some(day(2026, 11, 27)));
+    assert_eq!(resolve("Friday, December 25", tuesday()), Some(day(2026, 12, 25)));
+}
+
+#[test]
+fn n_in_digits_is_taken_as_written() {
+    assert_eq!(resolve("dans 15 jours", tuesday()), Some(day(2026, 12, 9)));
+    assert_eq!(resolve("dans 8 jours", tuesday()), Some(day(2026, 12, 2)));
+}
+
+#[test]
+fn the_next_29_february_is_the_next_one_that_exists() {
+    assert_eq!(resolve("29 février", tuesday()), Some(day(2028, 2, 29)));
+}
+
+#[test]
+fn a_folder_whose_hour_is_not_one_names_no_day() {
+    for folder in [
+        "2026-11-24_24-00",
+        "2026-11-24_99-00",
+        "2026-11-24_14-75",
+        "2026-11-24_1430",
+        "2026-11-24_14-30x",
+        "2026-11-24_",
+    ] {
+        assert_eq!(reference_day(folder), None, "{folder:?}");
+    }
+}
