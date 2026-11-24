@@ -177,7 +177,7 @@ from then on the plan check refuses an accepted charter over a form left as it c
 
 ## 5. The end of a cycle
 
-**Every deliverable delivered or accepted** — `nstack deliver --write-states`, then write the closure: what was delivered, which success
+**Every deliverable delivered or accepted** — `nstack deliver --write-states`, and `nstack plan --prune` for the empty start branches a deferred deliverable left, then write the closure: what was delivered, which success
 criteria moved, what was deferred, and **which documents the cycle brought current** — the
 front page and the module map first, each with its pull request; set `status: closed`,
 `outcome: completed`, `ended_on`. A next cycle carrying `accepted_on` is set `status: accepted` in the
