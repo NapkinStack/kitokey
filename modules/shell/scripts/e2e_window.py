@@ -6264,6 +6264,78 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                     check(f"{said}, each target 24 by 24 CSS px, or spaced as the criterion allows (WCAG 2.5.8, D106)", shown and tight == [], tight)
 
 
+def redo_says_what_is_wrong(now: dt.datetime) -> None:
+    """CI. D113, criterion 3: Refaire… with Settings' model missing, or the meeting's folder not writable —
+    its button stays and the panel says which is wrong and what to do, never a setting the user did not
+    touch (#771); the panel open, the window crossing 840 px either way — the panel, its choice and the
+    focus stay (#777). In French."""
+    print("CI. Refaire…: what is wrong said in its panel, its button kept; open across the 840 px break, it stays as it was (D113)")
+    idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+            " && m.minutes_waiting.length === 0 && m.transcripts_waiting.length === 0)")
+    # The notes shown: « Avancé » closed holds its own status line, empty and hidden (s113cok).
+    note = ("const p = document.getElementById('redo-transcript-panel'); if (!p) return null;"
+            " const go = document.getElementById('redo-transcript-do');"
+            " return [!!go && !go.disabled, [...p.querySelectorAll('.note.warn')].filter((n) => n.getClientRects().length).map((n) => n.textContent)]")
+    model = WORK / "redo-wrong-model.bin"
+    model.write_bytes(b"\0" * 16)
+    for case, settings_model, read_only in (("Settings' model missing", WORK / "redo-wrong-missing.bin", False),
+                                            ("the meeting's folder not writable", model, True)):
+        meetings = WORK / f"redo-wrong-{'model' if not read_only else 'folder'}"
+        meeting = meetings / "2026-10-18_12-00"
+        session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+        (meeting / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+        settings = f'after = "nothing"\nreminder = false\nmodel = "{settings_model}"\n'
+        try:
+            with Window(meetings, "fr_FR.UTF-8", settings) as browser:
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript") and b.execute_script(idle), 15)
+                if read_only:
+                    meeting.chmod(0o555)
+                press(browser, "redo-transcript")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
+                press(browser, "redo-transcript-do")
+                told = wait_for(browser, lambda b: (b.execute_script(note) or [False, []])[1], 10)
+                got = browser.execute_script(note) or [False, []]
+                check(f"{case}: Refaire's button stays, and the panel says what is wrong and what to do, never « Non enregistré » (#771)",
+                      told and got[0] and len(got[1]) == 1 and got[1][0].startswith("Pas refait\u00a0: ") and "Non enregistré" not in got[1][0], got)
+        finally:
+            meeting.chmod(0o755)
+    # #777: open, its « Avancé » open, a model chosen and the focus on it; the window crosses 840 px both ways.
+    meetings = WORK / "redo-break"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+    (meeting / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+    state = ("const p = document.getElementById('redo-transcript-panel'), s = document.getElementById('redo-transcript-panel-transcription-model'),"
+             " a = document.getElementById('redo-transcript-panel-advanced');"
+             " return [!!p && p.isConnected && p.getClientRects().length > 0, s ? s.value : null, a ? a.getAttribute('aria-expanded') : null,"
+             " document.activeElement ? document.activeElement.id : null, p ? p.dataset.kept ?? null : null]")
+    with Window(meetings, "fr_FR.UTF-8", f'after = "nothing"\nreminder = false\nmodel = "{model}"\n') as browser:
+        browser.set_window_size(1100, 800)
+        browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript") and b.execute_script(idle), 15)
+        press(browser, "redo-transcript")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
+        press(browser, "redo-transcript-panel-advanced")
+        pick = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-transcription-model"), 5) and \
+            Select(browser.find_element(By.ID, "redo-transcript-panel-transcription-model"))
+        if pick:
+            pick.select_by_index(len(pick.options) - 1)
+        # Marked: a panel drawn anew would come without the mark.
+        browser.execute_script("const p = document.getElementById('redo-transcript-panel'); p.dataset.kept = 'yes';"
+                               " document.getElementById('redo-transcript-panel-transcription-model').focus()")
+        before = browser.execute_script(state)
+        for width, side in ((830, "narrowed below 840 px"), (1100, "widened again")):
+            browser.set_window_size(width, 800)
+            time.sleep(1.5)
+            after = browser.execute_script(state)
+            check(f"Refaire… open, the window {side}: the panel, its « Avancé », its choice and the focus stay as they were (#777)",
+                  before[0] and after == before, [before, after])
+
+
 def redo_says_what_follows(now: dt.datetime) -> None:
     """CG. D113, criterion 1, as the decider settled it on 2026-11-18 (#804: the summary is kept):
     « Refaire… » opened starts nothing; its one button names the transcript and its model, never the
@@ -14865,6 +14937,7 @@ def main() -> int:
     summaries_to_a_folder(now)
     axe_first_surfaces(now)
     keys_first_surfaces(now)
+    redo_says_what_is_wrong(now)
     redo_says_what_follows(now)
     page_one_bar(now)
     page_estimate(now)

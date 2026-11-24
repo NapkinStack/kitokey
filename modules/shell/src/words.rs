@@ -1406,6 +1406,10 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
     /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
+    /// Shows: a meeting's page, its Redo… panel, as an error above its button (#771). When: the redo
+    /// could not start. At most: no limit. Placeholders: {} what is wrong and what to do, as the failure
+    /// says it.
+    pub redo_not_done: &'static str,
     /// Shows: a meeting's page, its transcript's Redo… panel, under its note: the summary is not made
     /// again with it (the decider, 2026-11-18, D113). When: the meeting has a summary. At most: no limit.
     /// Placeholders: none.
@@ -2262,6 +2266,7 @@ pub fn window(language: Language) -> Window {
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept.",
+            redo_not_done: "Not redone: {}",
             redo_keeps_minutes: "The current summary is kept; write it again afterwards if needed.",
             make_minutes: "Write summary",
             make_transcript: "Transcribe",
@@ -2770,6 +2775,7 @@ pub fn window(language: Language) -> Window {
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée.",
+            redo_not_done: "Pas refait\u{a0}: {}",
             redo_keeps_minutes: "Le compte rendu actuel est gardé\u{202f}; refaites-le ensuite si besoin.",
             make_minutes: "Rédiger le compte rendu",
             make_transcript: "Transcrire",

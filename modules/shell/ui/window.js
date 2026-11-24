@@ -1603,10 +1603,15 @@ function redoWith(offered, session, words, button, id, title, notes, again, step
       panel.replaceWith(button);
       readMakings();
     } catch (why) {
-      go.replaceWith(element("p", "note warn", fill(words.not_saved, why)));
+      // Not started: said why and what to do, the button kept for another try (#771).
+      wrong.textContent = fill(words.redo_not_done, why);
+      wrong.hidden = false;
+      waiting(go, false);
     }
   });
-  panel.append(advanced.box, ...notes, go);
+  const wrong = element("p", "note warn");
+  wrong.hidden = true;
+  panel.append(advanced.box, ...notes, wrong, go);
   return closes(panel, go, button, words);
 }
 
@@ -5638,7 +5643,11 @@ let drawing = 0;
 
 // Under 840 px, one pane at a time (D61): the list's address is the list alone.
 const narrow = matchMedia("(max-width: 839px)");
-narrow.addEventListener("change", () => refresh());
+// Only the list's address shows another thing across the break (its pane beside it, D61): a meeting's
+// page stays as it is, a panel open in it too, its choice and the focus (#777).
+narrow.addEventListener("change", () => {
+  if (location.hash === "" || location.hash === "#/") refresh();
+});
 
 // The address changed: what is shown acts as it stands, so it goes at once, as a page does when it
 // navigates; the drawing fills it. Only a meeting's own address keeps it, reached from beside the
