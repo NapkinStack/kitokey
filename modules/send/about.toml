@@ -1,0 +1,98 @@
+# The licences a crate of kitokey-send may come under (D102): any other, GPL, LGPL or AGPL among
+# them, and `cargo about generate` refuses to write the notices.
+#
+# THIRD-PARTY-NOTICES.html is made from this file, about.hbs and Cargo.lock, and committed;
+# tests/notices.rs is red when it no longer names Cargo.lock's crates. Make it again, from this
+# folder, with the version pinned here:
+#
+#   cargo install --locked cargo-about --version 0.9.3 --features cli
+#   cargo about generate --locked --fail about.hbs --output-file THIRD-PARTY-NOTICES.html
+accepted = [
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "Unicode-3.0",
+]
+# What ships: the crates linked into the program, on the systems it is built for; neither what
+# only builds it nor what only tests it.
+targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+# kitokey-send itself is the project's, under LICENSE: not a third party.
+private = { ignore = true }
+
+# ring 0.17.14: cargo-about's own workaround no longer matches its files and read whole sources
+# instead, code included. Its notices, each from the file that holds it: its ISC licence (Brian
+# Smith), BoringSSL's Apache licence, fiat-crypto's, once_cell's, and the ISC header of one source
+# file for each other author whose notice its sources carry — the header alone, not the code.
+[ring.clarify]
+license = "Apache-2.0 AND ISC AND MIT"
+
+[[ring.clarify.files]]
+path = "LICENSE-other-bits"
+license = "ISC"
+checksum = "f025ccfb7dfb6bdfedc75ca0f67acc69e6fb4998143d834f7c2f38a29989680f"
+
+[[ring.clarify.files]]
+path = "LICENSE-BoringSSL"
+license = "Apache-2.0"
+checksum = "005fc765ddc5115da796cca915baa9557abae13ff35e0a47c47affc56f6c414d"
+
+[[ring.clarify.files]]
+path = "third_party/fiat/LICENSE"
+license = "Apache-2.0"
+checksum = "9eacbcb81be660840c714a560a9d65ba07913db98dd4baf969f78dd499fdd60f"
+
+[[ring.clarify.files]]
+path = "src/polyfill/once_cell/LICENSE-APACHE"
+license = "Apache-2.0"
+checksum = "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+
+[[ring.clarify.files]]
+path = "src/polyfill/once_cell/LICENSE-MIT"
+license = "MIT"
+checksum = "6ee2ed6c77710de911761acd5fc1ad1da00f476beb1a7ef27e78c2d1858deafc"
+
+[[ring.clarify.files]]
+path = "crypto/fipsmodule/ec/ecp_nistz384.h"
+license = "ISC"
+start = "Copyright (c) 2014, Intel Corporation."
+end = "CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE."
+checksum = "4e622e20d04fd552b8b528b950c08a8125b0c7f934f20a2a1df75f8273a17773"
+
+[[ring.clarify.files]]
+path = "crypto/poly1305/poly1305.c"
+license = "ISC"
+start = "Copyright (c) 2014, Google Inc."
+end = "CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE."
+checksum = "ed6813e62aea0e5af661f769415dc44e1d316c37487634181661d9c2ea974391"
+
+[[ring.clarify.files]]
+path = "crypto/fipsmodule/ec/ecp_nistz.h"
+license = "ISC"
+start = "Copyright (c) 2015, Google Inc."
+end = "CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE."
+checksum = "a4716a1ece644e3e80c2fab29012c567f6c4edb4a5ad8ff0590e42c2c751b34f"
+
+[[ring.clarify.files]]
+path = "crypto/fipsmodule/aes/aes_nohw.c"
+license = "ISC"
+start = "Copyright (c) 2019, Google Inc."
+end = "CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE."
+checksum = "a3e1cc5cfe20882b769f280a2090cbbee3d33f844901379401b6840f7861f7ae"
+
+[[ring.clarify.files]]
+path = "src/limb.rs"
+license = "ISC"
+start = "Copyright 2016 David Judd."
+end = "CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE."
+checksum = "b146bcea2f89d2e464f3d9cd13f1126e978c6228539bee216627c6366a05ee17"
+
+[[ring.clarify.files]]
+path = "src/debug.rs"
+license = "ISC"
+start = "Copyright 2018 Trent Clarke."
+end = "CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE."
+checksum = "14a67430aef942ebaf72deed89a78834d1725f7c99ebf5cbbad2585a44adeec5"

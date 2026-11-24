@@ -1,10 +1,14 @@
 # Kitokey's package for Fedora. Two ways, one header: given `artefacts`, it packs what each module's
-# release left in dist/ (scripts/release.sh); not given, it builds the four programs from the source
+# release left in dist/ (scripts/release.sh); not given, it builds the six programs from the source
 # package copr/srpm.sh makes — the crates vendored in it, no network —, as Copr does (D78).
 # rpmbuild finds the libraries every program links and requires their packages itself.
 %if %{undefined artefacts}
 %global artefacts dist
 %global from_source 1
+# Kitokey's LICENSE and install's notices (D102): in the source package; else mounted by
+# scripts/release.sh, which defines both.
+%global licence LICENSE
+%global owed modules/install/notices
 # Built in release mode, without symbols to gather: no debuginfo package.
 %global debug_package %{nil}
 %endif
@@ -57,18 +61,36 @@ install -Dm755 %{artefacts}/shell/kitokey %{buildroot}%{_bindir}/kitokey
 install -Dm755 %{artefacts}/capture/kitokey-capture %{buildroot}%{_bindir}/kitokey-capture
 install -Dm755 %{artefacts}/transcription/kitokey-transcription %{buildroot}%{_bindir}/kitokey-transcription
 install -Dm755 %{artefacts}/summary/kitokey-summary %{buildroot}%{_bindir}/kitokey-summary
+install -Dm755 %{artefacts}/export/kitokey-export %{buildroot}%{_bindir}/kitokey-export
+install -Dm755 %{artefacts}/send/kitokey-send %{buildroot}%{_bindir}/kitokey-send
 # Lighter without their symbols; a program that is no binary is left as it is.
 for program in %{buildroot}%{_bindir}/*; do strip "$program" 2>/dev/null || :; done
 install -Dm644 %{artefacts}/shell/com.napkinstack.Kitokey.desktop %{buildroot}%{_datadir}/applications/com.napkinstack.Kitokey.desktop
 install -Dm644 %{artefacts}/shell/com.napkinstack.Kitokey.png %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png
+# What the programs owe the authors of what they ship (D102), as windows/notices.py names it.
+install -Dm644 %{licence} %{buildroot}%{_datadir}/licenses/kitokey/LICENSE.txt
+install -Dm644 %{owed}/MPL-SOURCES.txt %{buildroot}%{_datadir}/licenses/kitokey/MPL-SOURCES.txt
+install -Dm644 %{artefacts}/shell/THIRD-PARTY-NOTICES.html %{buildroot}%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey.html
+install -Dm644 %{artefacts}/capture/THIRD-PARTY-NOTICES.html %{buildroot}%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-capture.html
+install -Dm644 %{artefacts}/transcription/THIRD-PARTY-NOTICES.html %{buildroot}%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-transcription.html
+install -Dm644 %{artefacts}/summary/THIRD-PARTY-NOTICES.html %{buildroot}%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-summary.html
+install -Dm644 %{artefacts}/export/THIRD-PARTY-NOTICES.html %{buildroot}%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-export.html
+install -Dm644 %{artefacts}/send/THIRD-PARTY-NOTICES.html %{buildroot}%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-send.html
 
 %files
-%if 0%{?from_source}
-%license LICENSE
-%endif
+%{_datadir}/licenses/kitokey/LICENSE.txt
+%{_datadir}/licenses/kitokey/MPL-SOURCES.txt
+%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey.html
+%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-capture.html
+%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-transcription.html
+%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-summary.html
+%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-export.html
+%{_datadir}/licenses/kitokey/THIRD-PARTY-NOTICES-kitokey-send.html
 %{_bindir}/kitokey
 %{_bindir}/kitokey-capture
 %{_bindir}/kitokey-transcription
 %{_bindir}/kitokey-summary
+%{_bindir}/kitokey-export
+%{_bindir}/kitokey-send
 %{_datadir}/applications/com.napkinstack.Kitokey.desktop
 %{_datadir}/icons/hicolor/512x512/apps/com.napkinstack.Kitokey.png

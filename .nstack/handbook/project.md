@@ -171,19 +171,28 @@ them never deliver it twice:
 ```bash
 nstack claim D30 --person @alice --session <session>   # held; its first work branch d30-… made, unless one exists
 nstack plan                                             # who holds what, since when; what is stale
-nstack unclaim D30                                      # given back: by its holder's session, the decider, anyone once stale; a record: who made it, the decider
+nstack unclaim D30 --session <session>                 # given back: by its holder's session (its person read from the hold), the decider, anyone once stale; a record: who made it, the decider
 nstack claim D30 --take-over --person @alice            # a hold nobody worked on for hold_days, or your own person's other session
 nstack claim '#14' --person @alice --session <session>  # an issue no cycle plans — a bug, a flaky test: held the same way, work on issue-14-…
 ```
+
+The hold works the same on any forge, and on none. On GitHub, with a token, the claim also opens a
+draft pull request from its first work branch, where people look; on another forge nothing is shown
+there, the claim says so, and `nstack plan` is where the hold is seen.
 
 An issue is held as a deliverable is, in a framed project or not: the forge's assignee says who
 works on it and refuses nobody, the hold does. `nstack plan` lists the issues held. Quote `'#14'`
 — `#` starts a shell comment — or write `14`. Its work merged, its holder gives it back
 (`nstack unclaim '#14'`): an issue's hold does not end with a cycle.
 
-Two agents one person runs are two holders: a session renews only a hold it is on. Another
-session of that person is refused like anyone else, and takes the hold with `--take-over` when
-the person says so, stale or not; a person with no `--session` renews their own. A renewed
+Two agents one person runs are two holders: a session renews only a hold it is on, or one its
+own agent put there. Another agent's session of that person, or any session outside `nstack
+agent run`, is refused like anyone else, and takes the hold with `--take-over` when the person
+says so, stale or not; a person with no `--session` renews their own. An agent restarted under a new session is the same holder: in
+`nstack agent run`, when its own App's identity committed every event that put a session on the
+hold, `nstack claim D30 --person @alice --session <it>` renews it, says so and records the session
+it leaves, and `nstack unclaim D30 --person @alice --session <it>` gives it back. Two live sessions
+of one agent are therefore one holder. A renewed
 hold with no work branch left gets its first one again, unless the deliverable is merged.
 
 An empty branch its claim started for another title of the same id — an earlier cycle's `D30` —
@@ -194,13 +203,17 @@ When a deliverable's work went on other branches, the empty branch its claim sta
 `Deliverable:` line, or its id in parentheses in a subject — once it is no longer `ready` or `in-progress`, or once it belongs to another cycle, with the commands that delete it.
 
 The hold is a branch of the shared remote, `nstack/hold/<cycle>/D30`, whose commits are its
-events; the remote takes the first of two claims and refuses the second. A hold's last work is
+events; the remote takes the first of two claims and refuses the second. The cycle a claim reads
+is the one on that remote's default branch, whatever this checkout holds. A remote that is
+somebody's clone — a `git clone --shared` of a working clone — is refused: a hold pushed there is
+nobody else's. A local hub, bare or a working tree cloned from nowhere, stays a shared remote. A hold's last work is
 its newest event or commit on a branch `d30-…`; with none for `hold_days` (an answer of the
 project, 7 by default) it is **stale**, and anyone may take it over — recorded, with whom it was
 taken from; the previous work is kept. The pull request check refuses delivery work for a
 deliverable someone else holds (K5): its commits name none of the hold's sessions, and no
 author, committer or opener is its person; nobody holds it, it asks nothing. A holder working
-from a new session takes it first, on the person's word — `nstack claim D30 --take-over --person @alice --session <it>`. The
+from a new session takes it first, on the person's word — `nstack claim D30 --take-over --person @alice --session <it>` —,
+or, an agent restarted under its own identity, renews it with `nstack claim D30 --person @alice --session <it>`. The
 previous session's work goes on with the new one: its commits — a merge of the default branch into
 the former branch is enough — name the new session, and K5 reads it there. A hold says who is
 accountable; it proves nobody's identity.

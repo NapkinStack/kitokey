@@ -62,7 +62,7 @@ desktop's tools leave it (`Hidden`, `X-GNOME-Autostart-enabled`). `autostart` in
 file says Kitokey wrote it once: turned off, it is never written again by itself.
 
 **On Windows** (D84), the package declares a startup task, `KitokeyStartupTask` (`install`'s
-manifest), that Windows turns on at the first start; nothing is written under
+manifest), off until the user turns it on with Settings' switch (#1085); nothing is written under
 `AppData\Roaming\autostart`. The same switch reads and changes the task through `StartupTask`
 (`src/autostart.rs`): turned off by the user in Windows' Startup settings, or set by a policy, it is
 shown as Windows holds it, disabled, with the sentence saying why. The zip has no task: the switch
@@ -102,8 +102,8 @@ meetings in a sidebar of 280 px with the recording, a search over what each row 
 freeing space and the agreements in the pane beside it, as wide as the window leaves it; under 840 px,
 one at a time, the pane with a way back. A meeting opens from the list: its minutes as written, with
 who wrote them and where; its transcript in the meeting's order, each line with its side and
-voice, searched over what was said — the two side by side once the pane is 1000 px wide, their text
-75 characters at most; who spoke over the meeting; its folder, opened in the
+voice, searched over what was said, the word found marked (#1078) — the two side by side once the pane is 1000 px wide, their text
+75 characters at most; who spoke over the meeting, each segment a bar on its side's lane (#1077); its folder, opened in the
 system's file manager. *Réglages* sets what follows a recording, the transcription's model among
 those on this computer, the reminder and how long the audio is kept — each choice saved at once
 in the settings file; one Kitokey could not read is said, and not written over. Audio kept
@@ -165,9 +165,11 @@ it is typed as the meeting's `context.txt` (`contracts/session-audio/v2`), writt
 file beside it and only once the folder holds `session.json`; 400 characters at most, counted as
 characters; another script than Latin or Cyrillic is said, Whisper keeping only the last 224
 tokens. The transcript and the minutes read it as they start: the field is closed while either is
-made, or a transcript is left unfinished. Changed after they were made, *Refaire avec ce contexte*
-makes the transcript again with whoever the settings name to hear, then the minutes with whoever
-they name to write — each kept in place until the new one is whole, put back if it is not.
+made, or a transcript is left unfinished. Changed after they were made, its button — *Refaire la
+transcription*, *et le compte rendu* where minutes follow, the meeting having some or the settings
+making them (D113) — makes the transcript again with whoever the settings name to hear, then the
+minutes with whoever they name to write — each kept in place until the new one is whole, put back if
+it is not. Changed, the context starts nothing by itself.
 
 **A meeting's name** (D70): its heading clicked, a name typed, Enter — shown first in the list, its page and *Libérer de l'espace*, as text. It is kept as the meeting's `title.txt` (`contracts/session-audio/v2`), written whole through a file beside it, before the minutes' title (D48), which comes back when the name is emptied; made again, the minutes leave it. A folder is never renamed.
 
@@ -175,7 +177,7 @@ they name to write — each kept in place until the new one is whole, put back i
 (`contracts/session-audio/v3`, for a meeting of any version), written whole through a file beside
 it once the folder holds `session.json`, removed when none is left (`meeting_models_chosen`).
 `src/meeting_models.rs` lays them over Settings each time the meeting is made or made again — its
-transcript, its minutes, *Réessayer*, *Refaire avec ce contexte* —; Settings are never written. A
+transcript, its minutes, *Réessayer*, *Refaire la transcription et le compte rendu* —; Settings are never written. A
 Whisper model is found by its file's name among the models this computer lists
 (`settings::whisper_models`), never joined to a folder; a service to hear only if it is the one
 Settings set; a provider to write only Settings' own — another of its models — or one on this
@@ -200,7 +202,8 @@ Kitokey started again too: its `models.json` once its folder holds `session.json
 the one after; « Avancé » closed, it is said under the row, naming them — « Modèles gardés : small ·
 Qwen3 8b » —, and given with « Avancé » to a screen reader. Recording, it is that meeting's at once. In *Refaire…* it is kept once
 *Refaire* is pressed — *Annuler* changes nothing —, then the transcript is made again by them
-(`transcript_redo_own`) or the minutes. A model gone is said on the meeting's page and in « Avancé ».
+(`transcript_redo_own`) or the minutes. The transcript made again is made alone: where the meeting
+has minutes, its panel says they are kept, to make again after (the decider, 2026-11-18, D113). A model gone is said on the meeting's page and in « Avancé ».
 Minutes its own model failed to write name that model, and *Refaire… › Avancé* to choose another,
 on the page and in the notification alike (`words::cause_said`, the model said by `words::model_said`,
 the page's `modelSaid` rule); Settings' model failing, Settings are named as before.
@@ -383,6 +386,16 @@ keyboard, without which GTK is never told it has the focus. Missing GNOME Shell,
 extension or PipeWire, it says `NOT RUN`. `bash scripts/e2e.sh` alone still runs on the desktop
 itself — the tray, the notifications and the window shown, the run's microphone made the
 system's default meanwhile — for whoever wants to watch it: quit Kitokey first.
+
+## What it owes its crates' authors
+
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links under its licence's text, then what the window draws that is no crate —
+Lucide's icons (`ui/LUCIDE-LICENSE`) and Montserrat's outlines in its name (`ui/MONTSERRAT-OFL.txt`).
+It is made with cargo-about from `about.toml`, whose `accepted` list refuses any other licence, GPL
+among them, and `about.hbs`, which holds the two files' texts; it is committed, and
+`tests/notices.rs` is red once it no longer names the crates the program links, or no longer holds
+either file as written. `about.toml`'s header gives the two commands that make it again.
 
 ## Contracts
 

@@ -8,6 +8,8 @@ dist=${NSTACK_DIST:?run through nstack release, which names this module\'s artef
 target=${KITOKEY_TARGET:-}
 # Windows names a program with its .exe (D53).
 exe=; [ "${OS:-}" = Windows_NT ] && exe=.exe
+# What the program owes its crates' authors goes beside it, for the package to ship (D102).
+cp "$here/THIRD-PARTY-NOTICES.html" "$dist/"
 # The processors it is built for: .cargo/config.toml, read by every build of the module.
 # On the graphics card through Vulkan where the machine has it — a tenth of the meeting's
 # length on the decider's laptop —, on the processor where it has not (ADR-0003). A Mac has no

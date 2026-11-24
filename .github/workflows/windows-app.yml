@@ -23,6 +23,8 @@ on:
     paths:
       - "modules/capture/**"
       - "modules/summary/**"
+      - "modules/export/**"
+      - "modules/send/**"
       - "modules/transcription/**"
       - "modules/shell/**"
       - "modules/install/**"
@@ -67,9 +69,13 @@ jobs:
           zip=$(ls dist/install/Kitokey-*-windows-x64.zip)
           python - "$zip" <<'PY'
           import sys, zipfile
+          sys.path.insert(0, "modules/install/windows")
+          import notices  # what the programs owe their third parties, by name (D102)
           names = sorted(zipfile.ZipFile(sys.argv[1]).namelist())
-          programs = ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary")
-          wanted = sorted(f"Kitokey/{p}.exe" for p in programs)
+          programs = ("kitokey", "kitokey-capture", "kitokey-transcription", "kitokey-summary", "kitokey-export",
+                      "kitokey-send")
+          owed = [name for _, name in notices.files("dist")]
+          wanted = sorted([f"Kitokey/{p}.exe" for p in programs] + [f"Kitokey/{name}" for name in owed])
           print(names)
           sys.exit(names != wanted)
           PY
@@ -95,6 +101,8 @@ jobs:
         run: modules/install/windows/certify.ps1 -Out dist/install
 
       - name: The package, kept for the colleagues
+        # Kept when the kit fails too (D102): its report is the run's evidence.
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: kitokey-windows-x64-msix
