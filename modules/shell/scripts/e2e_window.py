@@ -8504,7 +8504,7 @@ def dates_mentioned(now: dt.datetime) -> None:
         '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
         '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":3.0,"text":"Bonjour."}\n'
         '{"type":"segment","speaker":"me","track":"local","start":4.0,"end":7.0,"text":"Inès, tu envoies le devis jeudi ?"}\n'
-        '{"type":"segment","speaker":"them","track":"remote","start":7.0,"end":9.0,"text":"Oui, jeudi."}\n'
+        '{"type":"segment","speaker":"others","track":"remote","start":7.0,"end":9.0,"text":"Oui, jeudi."}\n'
         '{"type":"segment","speaker":"me","track":"local","start":10.0,"end":13.0,"text":"Marc rappelle Jiří le 12 décembre."}\n'
         '{"type":"complete","duration":20.0}\n')
     (folder / "minutes.md").write_text(
