@@ -117,7 +117,7 @@ deliverables:
       - "Given a meeting's page whose actions hold at least one resolved date, when the user opens « Dates mentionnées », then each item shows its date in full, the action's words and its passage, nothing is ticked, the reference day is shown and changing it resolves the dates again, and no word says « échéance »; with no resolved date, the panel is not offered; nothing leaves the computer until the user ticks an item and chooses a destination; held by the shell's e2e, in both languages"
       - "Given ticked items, when the user saves them as an `.ics`, then the shell hands their dates, words and passages to `kitokey-export` in the format `ics` that D117 adds, and the file is written where the user chose; nothing else leaves; held by the shell's e2e, the file read back and its events counted"
       - "Given a ticked item, when the user chooses Google Calendar or Outlook, then the shell opens the system's browser on the provider's own screen, the event pre-filled and unsaved — Google's link as Google's page documents it, an all-day event as `YYYYMMDD/YYYYMMDD` ending the next day; Outlook on the web's as checked by hand (*What needs a person*) —, every value percent-encoded; nothing is sent before that click; held by the shell's unit tests of each link and the e2e reading the address handed to the opener, never opening it. The Outlook link ships only once the hand check has passed, the `.ics` always beside it"
-      - "Given a confidential meeting, when its dates are offered, then only the `.ics`, written on this computer, is offered: no link carries its words to Google or Microsoft, as no channel takes it (PDR-0007); held by the shell's e2e"
+      - "Given a confidential meeting, when its dates are offered, then the `.ics`, written on this computer, is offered as for any meeting, and a Google Calendar or Outlook link opens only after one sentence says the meeting is confidential and its words will leave for that provider, Confirm or Cancel, asked at every opening (PDR-0007, amended 2026-11-24); held by the shell's e2e"
   - id: D116
     title: "A summary can be sent to a Notion database the user shared, through a key they created, never a confidential one"
     module: send
@@ -133,6 +133,20 @@ deliverables:
     state: ready
     acceptance:
       - "Given ticked items, when the user saves them as an `.ics`, then `export` writes one all-day `VEVENT` per item — `DTSTART;VALUE=DATE`, `DTEND` the next day, `DTSTAMP` in UTC, a `UID` stable for the meeting and the item, `SUMMARY` the action's what and who, `DESCRIPTION` its passage and the meeting's name —, lines ended by CRLF, folded at 75 octets, text escaped as RFC 5545 §3.3.11 says; held by `export`'s tests, the file parsed back by an independent parser and checked against RFC 5545's required properties, a name with commas, semicolons, a newline and non-Latin letters among them. `exporting/v1` gains the format `ics` and an optional field of its input, the dates — an additive change, v1 extended in place and no consumer broken (`.nstack/handbook/03-contracts.md`), held by the project's comparator (`contracts/scripts/compat.py`) passing the new v1 against the one before and by the contract's schema tests, consumed by the shell alone"
+  - id: D118
+    title: "`send` sends a confidential meeting when the shell says the user confirmed it, and only then"
+    module: send
+    state: ready
+    acceptance:
+      - "Given `posting/v1`, when its input gains an optional `confirmed_confidential` (a boolean, false when absent), then the change is additive — v1 extended in place, no consumer broken, held by the project's comparator (`contracts/scripts/compat.py`) against the v1 before and by the contract's schema tests —, merged first in a pull request of `contracts` alone; `meeting.confidential` keeps its code and now means a confidential meeting sent without that confirmation"
+      - "Given a session folder holding `confidential`, when kitokey-send runs, then it sends only if its input says `confirmed_confidential: true`, and refuses with `meeting.confidential`, nothing sent, otherwise — judged before the address, as today; a meeting that is not confidential is sent as before whatever the field says; held by send's tests against a local server: refused without the field, refused with false, sent with true, one request and never a second"
+  - id: D119
+    title: "A confidential meeting's page offers its sends, each asking once more in one plain sentence"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given a confidential meeting with a summary, when the user chooses « Envoyer à « <name> » », then the page asks in one sentence, in both languages, that the meeting is confidential and its summary will leave this computer for that destination, with Confirm and Cancel; Cancel sends nothing; Confirm runs kitokey-send with `confirmed_confidential: true` (D118); the question is asked again at every send, never remembered; the switch keeps saying where its summary already went (PDR-0007, point 4, amended 2026-11-24); held by the shell's e2e, by keyboard alone, through the kitokey-send stand-in reading its input"
+      - "Given a meeting that is not confidential, when the user sends it, then nothing changes from today; held by the shell's existing e2e, unchanged in meaning"
 ---
 
 # Cycle 11 — Kitokey on sale, and out of the app
@@ -151,6 +165,13 @@ deliverables:
 > both modules move at once. D115 keeps the shell's side and consumes D117's format. The same day, the decider made
 > the calendar and the site's redesign priorities: the cut order no longer cuts D115's panel and `.ics` nor D114's
 > animations; D115's Outlook link stays the first cut, as its hand check needs a colleague on Windows.
+
+> **D118 and D119 entered, 2026-11-24**, framing PDR-0007's amendment of that day (the decider, through the
+> coordinator; the amendment accepted by the decider's approval of #1184): a confidential meeting is transcribed
+> and summarised on this computer alone, never by an online service, and is sent only on an explicit
+> confirmation, every time. D118 is `send`'s side (the contract's field first, then the program), D119 the
+> shell's (the question on the page). D115's sixth criterion is rewritten the same way: a calendar link for a confidential
+> meeting behind the same one-sentence confirmation, the `.ics` without one.
 
 > **D116 entered by the decider, 2026-11-23**, through the coordinator: Notion joins cycle 11, so that the
 > product's presentation on kitokey.com can name it. The decider set the way the same day: an internal
@@ -275,6 +296,8 @@ QA: ines; UI and accessibility: lina; content and summary: sam.
 | D113 | lina |
 | D115 | ines |
 | D117 | marc |
+| D118 | sam |
+| D119 | lina |
 
 **The order**: D108's Markdown merges first, its model reading sections as a list; D109's export, D110 and
 DOCX then consume it. `minutes/v5` (D111) merges as early as it can, and D108 is tested on it once it lands.
