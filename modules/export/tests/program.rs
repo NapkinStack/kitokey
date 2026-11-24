@@ -7,7 +7,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use kitokey_export::{Include, Labels, Meeting, docx, html, markdown};
+use kitokey_export::{Include, Labels, Meeting, docx, html, markdown, srt, vtt};
 use serde_json::{Value, json};
 
 const MINUTES: &str = "---\ncontract: minutes/v4\nmade: 2026-11-20T10:05:00+01:00\nprovider: \"local\"\nmodel: \"qwen3:8b\"\ncontext: null\ntitle: \"Prix & essai\"\n---\n\n## Points forts\n\nLe prix est fixé.\n\n## Actions\n\n- Écrire la page — Sam — vendredi\n\n## Points clés\n\n- 49 €\n";
@@ -167,6 +167,28 @@ fn docx_is_written_its_name_the_inputs_and_read_back_as_the_library_writes_it() 
 }
 
 #[test]
+fn subtitles_are_written_the_transcript_alone_as_the_library_writes_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    for (format, expected) in [
+        ("srt", srt(&Meeting::read(&folder).unwrap(), Include::all(), &labels())),
+        ("vtt", vtt(&Meeting::read(&folder).unwrap(), Include::all(), &labels(), "fr")),
+    ] {
+        let to = dir.path().join(format!("réunion.{format}"));
+        let ran = run(
+            &[folder.to_str().unwrap(), "--format", format, "--lang", "fr", "--without-summary"],
+            &words(&to).to_string(),
+        );
+        assert!(ran.success, "{format}: {}", ran.said);
+        let written = fs::read_to_string(&to).unwrap();
+        assert_eq!(written, expected, "{format}");
+        assert!(written.contains("Bonjour à tous."), "{format}: the transcript's words");
+        assert!(!written.contains("49 €"), "{format}: no word of the summary");
+        assert_eq!(ran.lines, [json!({"event": "written", "file": to, "bytes": written.len()})]);
+    }
+}
+
+#[test]
 fn what_is_left_out_is_the_options_choice_in_any_order() {
     let dir = tempfile::tempdir().unwrap();
     let folder = meeting(dir.path());
@@ -229,6 +251,12 @@ fn a_cause_a_person_acts_on_is_its_one_line_and_a_sentence_and_nothing_is_writte
                 "--without-summary",
                 "--without-transcript",
             ],
+            &to,
+            "meeting.empty",
+        ),
+        // Subtitles are the transcript alone: a summary does not make one.
+        (
+            vec![folder.to_str().unwrap(), "--format", "srt", "--lang", "fr", "--without-transcript"],
             &to,
             "meeting.empty",
         ),
