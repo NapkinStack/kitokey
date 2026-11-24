@@ -102,3 +102,17 @@ def test_notion_reads_the_database_as_a_link_holds_it_and_says_what_an_unanswere
     assert "holds the database's title before them" in flat
     assert "| No answer to a read (`GET`) within the bound | `destination.failed` | Nothing |" in section("Notion")
     assert "a database holding several is `database.several`, nothing created" in flat
+
+
+def test_a_confidential_meeting_is_sent_only_with_its_confirmation_judged_before_the_address():
+    """D118, PDR-0007 point 4 amended 2026-11-24: `meeting.confidential` keeps its code and now means
+    a confidential meeting sent without `confirmed_confidential: true`."""
+    flat = " ".join(PAGE.split())
+    assert "| `confirmed_confidential` |" in PAGE
+    assert "a confidential meeting is sent only when its input says `confirmed_confidential: true`" in flat
+    row = next(
+        line for line in section("What it carries").splitlines() if line.startswith("| `meeting.confidential` |")
+    )
+    assert "without `confirmed_confidential: true`" in row
+    assert "`meeting.confidential` is judged before the address is" in flat
+    assert "a confidential meeting is never sent" not in flat
