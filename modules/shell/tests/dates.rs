@@ -192,3 +192,45 @@ fn a_folder_whose_hour_is_not_one_names_no_day() {
         assert_eq!(reference_day(folder), None, "{folder:?}");
     }
 }
+
+use kitokey_shell::dates::{Event, google};
+
+fn event<'a>(date: NaiveDate, who: Option<&'a str>, passage: Option<&'a str>) -> Event<'a> {
+    Event {
+        date,
+        what: "Envoyer le devis & la grille #2",
+        who,
+        passage,
+        meeting: "Point client — Dupont",
+    }
+}
+
+#[test]
+fn a_google_link_is_an_all_day_event_pre_filled_unsaved() {
+    let link = google(&event(day(2026, 11, 26), Some("Léa"), Some("on se dit jeudi\npour le devis")));
+    assert_eq!(
+        link,
+        "https://calendar.google.com/calendar/render?action=TEMPLATE\
+         &text=Envoyer%20le%20devis%20%26%20la%20grille%20%232%20%E2%80%94%20L%C3%A9a\
+         &dates=20261126/20261127\
+         &details=on%20se%20dit%20jeudi%0Apour%20le%20devis%0A%0APoint%20client%20%E2%80%94%20Dupont"
+    );
+}
+
+#[test]
+fn a_google_link_ends_the_next_day_across_a_year_and_says_no_one_unnamed() {
+    let link = google(&event(day(2026, 12, 31), None, None));
+    assert!(link.contains("&dates=20261231/20270101&"), "{link}");
+    assert!(link.contains("&text=Envoyer%20le%20devis%20%26%20la%20grille%20%232&"), "{link}");
+    assert!(link.ends_with("&details=Point%20client%20%E2%80%94%20Dupont"), "{link}");
+    // Every value percent-encoded: nothing but unreserved characters and escapes after each `=`.
+    for value in link
+        .split('?')
+        .nth(1)
+        .unwrap()
+        .split('&')
+        .map(|pair| pair.split_once('=').unwrap().1)
+    {
+        assert!(value.chars().all(|c| c.is_ascii_alphanumeric() || "-._~%/".contains(c)), "{value}");
+    }
+}
