@@ -53,6 +53,7 @@ only when you do one of these:
 | Read the list of models again (a click) | A request for that file | `raw.githubusercontent.com` |
 | Download a model through Ollama (a click) | Ollama's own request | Ollama, a program of its own, from its registry |
 | Send a summary to a channel (« Send… » on a meeting's page, then its name; before a first send to it, « Send » once more) | The meeting's title, its summary and its actions — never the sound, never the transcript | The webhook address you pasted for that channel in Settings: Slack, Discord, or another webhook |
+| Add a date to Google Calendar (« Dates mentioned », a date ticked, then « Open in Google Calendar ») | The action's words and who, its date, the passage and the meeting's name, in the link | `calendar.google.com`, in your browser, under Google's own policy; never for a confidential meeting |
 
 On Windows, Kitokey asks the Microsoft Store whether you bought it, each time you start a
 recording: the Store answers, under Microsoft's own policy; nothing of a meeting goes with it.
@@ -137,6 +138,7 @@ part que si vous faites l'un de ces choix :
 | Relire la liste des modèles (un clic) | La demande de ce fichier | `raw.githubusercontent.com` |
 | Télécharger un modèle par Ollama (un clic) | La demande d'Ollama elle-même | Ollama, un programme à part, depuis son registre |
 | Envoyer un compte rendu vers un canal (« Envoyer… » sur la page d'une réunion, puis son nom ; avant un premier envoi vers lui, « Envoyer » une fois de plus) | Le titre de la réunion, son compte rendu et ses actions — jamais le son, jamais la transcription | L'adresse de webhook collée pour ce canal dans les Réglages : Slack, Discord ou un autre webhook |
+| Ajouter une date à Google Agenda (« Dates mentionnées », une date cochée, puis « Ouvrir dans Google Agenda ») | Les mots de l'action et le « qui », sa date, le passage et le nom de la réunion, dans le lien | `calendar.google.com`, dans votre navigateur, sous la politique de Google ; jamais pour une réunion confidentielle |
 
 Sous Windows, Kitokey demande au Microsoft Store si vous l'avez acheté, à chaque enregistrement
 lancé : le Store répond, selon la politique de Microsoft ; rien d'une réunion ne part avec.
