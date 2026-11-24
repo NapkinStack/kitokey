@@ -3147,6 +3147,8 @@ struct SentShown {
     #[serde(flatten)]
     outcome: sending::Outcome,
     sending: SendingShown,
+    /// The switch as it now reads: a confirmed send of a confidential meeting is said under it (D119).
+    confidential: ConfidentialShown,
 }
 
 /// How long the shell waits for kitokey-send: longer than its own 30 s for an answer (`posting/v1`), so that it
@@ -3173,6 +3175,7 @@ async fn summary_sent(
         return Ok(SentShown {
             outcome: sending::Outcome::confidential(),
             sending: sending_shown(&shell, &folder),
+            confidential: confidential_of(&shell, &folder),
         });
     }
     let kept = shell
@@ -3216,6 +3219,7 @@ async fn summary_sent(
     Ok(SentShown {
         outcome,
         sending: sending_shown(&shell, &folder),
+        confidential: confidential_of(&shell, &folder),
     })
 }
 

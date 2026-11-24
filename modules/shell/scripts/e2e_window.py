@@ -5504,7 +5504,10 @@ def confidential_sent(now: dt.datetime) -> None:
             check(f"{short}: a confidential meeting with a summary offers « Envoyer… » (D119)", shown, browser.execute_script(offered))
 
             def choose():
-                # By keyboard alone: « Envoyer… » reached and pressed by Enter, the destination by Enter.
+                # By keyboard alone: « Envoyer… » reached and pressed by Enter, the destination by Enter. Absent, it
+                # says so: the rows below fail, never raise.
+                if not browser.execute_script(offered):
+                    return ""
                 browser.execute_script("document.getElementById('send-open').focus()")
                 ActionChains(browser).send_keys(Keys.ENTER).perform()
                 wait_for(browser, lambda b: b.execute_script("return document.activeElement?.classList.contains('send-to')"), 5)

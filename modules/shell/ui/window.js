@@ -325,7 +325,9 @@ function languageRow(save, language, languages, words, settled, apple, system, i
 }
 
 // The switch on a meeting's page, a setting of its row (D89): the file written or removed at once;
-// what had left said under the row. Its lock open while it is off, as board 4 draws it.
+// what had left said under the row. Its lock open while it is off, as board 4 draws it. Drawn again in place
+// after a confirmed send, which it then names (D119).
+let confidentialShown = null;
 function confidentialCard(session, confidential, words) {
   const name = nameOf(session);
   const card = element("label", "setting confidential");
@@ -363,11 +365,8 @@ function confidentialCard(session, confidential, words) {
       paint(shown);
       // Its lists read again, in place: no service offered once said confidential (D91, D93).
       if (pageOffered?.name === name) pageOffered.again();
-      // Said confidential: no send offered any more (PDR-0007 §4).
-      if (shown.on) {
-        document.getElementById("send-panel")?.remove();
-        document.getElementById("send-open")?.remove();
-      }
+      // Said confidential: an open send panel closed; its sends are asked again from now on (D119).
+      if (shown.on) document.getElementById("send-panel")?.remove();
     } catch {
       box.checked = !box.checked;
       said.textContent = words.confidential_not_saved;
@@ -378,6 +377,7 @@ function confidentialCard(session, confidential, words) {
   });
   card.append(element("span", "name", words.confidential_chip), box);
   paint(confidential);
+  confidentialShown = { name, paint };
   return [card, left, said, described];
 }
 
@@ -1871,6 +1871,7 @@ function sendPart(card, top, actions, session, words) {
         said.textContent = outcome(result, destination);
         offered = result.sending.destinations;
         secret = result.sending.confidential;
+        if (confidentialShown?.name === name) confidentialShown.paint(result.confidential);
         listSends(result.sending);
         sayFailed(result.sending, destination);
         if (!result.sending.offered) open.remove();
@@ -1892,6 +1893,8 @@ function sendPart(card, top, actions, session, words) {
         to.type = "button";
         to.dataset.destination = destination.name;
         to.addEventListener("click", () => {
+          // Said confidential since the page was drawn: its switch is the one read now.
+          secret = document.getElementById("confidential-switch")?.checked ?? secret;
           if (!destination.first && !secret) return send(destination.name);
           const firstSaid = [];
           // A confidential meeting: asked once more, every time, never remembered (D119).
