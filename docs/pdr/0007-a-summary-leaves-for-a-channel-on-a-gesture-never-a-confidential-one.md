@@ -5,10 +5,14 @@
 - **Status**: Accepted — the decider, 2026-11-20, in their working session with the coordinator: « PDR
   acceptée, ok Slack dans D110 ». Proposed by sam, author of D110 (cycle 11), the same day. Slack's incoming
   webhook is thereby in D110's second criterion (cycle 11's file, its dated note).
+- **Amended, 2026-11-23**: a fourth kind, Notion (*Decision*, point 8), for cycle 11's D116, which the decider
+  entered that day. Proposed by sam in the pull request that frames D116; the decider's approval of that pull
+  request accepts it, the forge recording its day. Everything else in this PDR is unchanged and applies to it.
 - **Date**: 2026-11-20
 - **Decision makers**: the decider, `@napkinstack-admin`
 - **Modules affected**: `export` (what a summary becomes when it is sent, D108's Markdown); `shell` (the
-  page's gesture, the destinations in Settings, their addresses in the system's keyring).
+  page's gesture, the destinations in Settings, their addresses in the system's keyring); `send` (the program
+  that sends, `posting/v1`).
 
 > The PDR describes **what the product must do and why**, never its implementation.
 
@@ -126,6 +130,12 @@ user sees what leaves before anything leaves on its own. The cost is one click p
    receives one JSON object: the title, the summary in Markdown, and the actions. **Slack** receives one
    message: the title and the summary converted to mrkdwn, within Slack's documented limits, cited in the
    pull request that sends it.
+8. **Notion** (amendment of 2026-11-23, D116): a fourth kind, of another shape. The user creates an internal
+   integration in their own Notion workspace, shares one database with it, and pastes its key and the
+   database's link in Settings. The key is a secret, kept as point 1 keeps an address: in the keyring, never
+   written elsewhere, never shown whole again. Each send creates one page in that database: the meeting's
+   title, the summary as blocks, each action a to-do left unticked. No OAuth and no secret of Kitokey's:
+   Notion's OAuth stays in cycle 12. Points 2 to 6 apply to it as they are written.
 
 ---
 

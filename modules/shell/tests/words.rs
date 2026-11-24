@@ -1009,8 +1009,30 @@ fn the_context_s_words_are_said_in_both_languages_french_typeset_as_french() {
     // The field's name, as D59's criterion says it.
     assert_eq!(french.context_label, "De quoi parle la réunion\u{202f}? Qui y participe\u{202f}?");
     assert_eq!(english.context_label, "What’s the meeting about? Who’s attending?");
-    assert_eq!(french.context_redo, "Refaire avec ce contexte");
+    // Its button names what it starts (D113, the decider, 2026-11-18): the transcript, and the summary
+    // after it where one follows — as `context_changed` says what was made.
+    assert_eq!(
+        french.context_redo,
+        ["Refaire la transcription", "Refaire la transcription et le compte rendu"]
+    );
+    assert_eq!(
+        english.context_redo,
+        ["Write the transcript again", "Write the transcript and the summary again"]
+    );
+    // So does the summary's, made again with a transcript's corrections (D113).
+    assert_eq!(french.redo_corrections, "Refaire le compte rendu avec les corrections");
+    assert_eq!(english.redo_corrections, "Write the summary again with your edits");
+    // The transcript's redo panel says the summary there is kept (the decider, 2026-11-18).
+    assert_eq!(
+        french.redo_keeps_minutes,
+        "Le compte rendu actuel est gardé\u{202f}; refaites-le ensuite si besoin."
+    );
+    assert_eq!(
+        english.redo_keeps_minutes,
+        "The current summary is kept; write it again afterwards if needed."
+    );
     for sentence in [
+        french.redo_keeps_minutes,
         french.context_label,
         french.context_example,
         french.context_why,

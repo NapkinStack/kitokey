@@ -131,6 +131,26 @@ fn nothing_listening_is_unreachable() {
 }
 
 #[test]
+fn a_connection_not_made_within_the_bound_is_unreachable_as_nothing_left() {
+    // A server that takes the TCP connection and never answers the TLS handshake: the request never leaves,
+    // so the send is said « no connection », never « may have arrived » (#1167).
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let (tell, heard) = mpsc::channel();
+    thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(stream) = stream else { return };
+            tell.send(()).ok();
+            thread::sleep(Duration::from_secs(5));
+            drop(stream);
+        }
+    });
+    let url = Url::parse(&format!("https://127.0.0.1:{port}/hook")).unwrap();
+    assert_eq!(post(&url, &json(), here()), Outcome::Unreachable);
+    assert_eq!(heard.try_iter().count(), 1);
+}
+
+#[test]
 fn the_body_and_its_type_arrive_as_given() {
     let (url, heard) = server(Some("HTTP/1.1 204 No Content\r\n\r\n"));
     assert_eq!(post(&url, &json(), here()), Outcome::Sent);

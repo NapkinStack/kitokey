@@ -40,7 +40,7 @@ use kitokey_shell::{
     named, player,
     providers::{self, OnlineOffered},
     recording::{self, Recording, Said, Source},
-    registry,
+    registry, sending,
     sessions::{self, Listed},
     settings::{self, After, Appearance, Engine, KeepAudio, Log, Settings},
     sound_check, speech,
@@ -300,8 +300,8 @@ impl Shell {
 }
 
 /// How a transcript is made again: with the Whisper model a *Refaire…* picked, this time only;
-/// or by whoever the settings name to hear, its minutes after it — *Refaire avec ce contexte*
-/// (D59).
+/// or by whoever the settings name to hear, its minutes after it — *Refaire la transcription et le
+/// compte rendu*, the context's button (D59, D113).
 #[derive(Clone, PartialEq)]
 enum Again {
     Model(PathBuf),
@@ -422,6 +422,8 @@ fn main() {
             transcript_redo_own,
             title_saved,
             confidential_set,
+            sending_of,
+            summary_sent,
             transcript_redo,
             transcript_corrected,
             transcript_asked,
@@ -2068,6 +2070,12 @@ fn confidential_of(shell: &Shell, folder: &Path) -> ConfidentialShown {
     for said in read {
         confidential::add(&mut left, said.what, &said.host);
     }
+    // Its summary sent to a destination, by its name (D110, PDR-0007 §4).
+    if let Some(meeting) = folder.file_name().and_then(|name| name.to_str()) {
+        for sent in sending::of(&sending::record(&sends_file()), meeting) {
+            confidential::add(&mut left, What::Summary, &sent.destination);
+        }
+    }
     ConfidentialShown {
         on,
         left: if on { left } else { Vec::new() },
@@ -2144,8 +2152,16 @@ fn confidential_set(app: AppHandle, shell: State<'_, Shell>, name: String, on: b
 #[derive(serde::Serialize)]
 struct ContextShown {
     text: String,
-    /// Its transcript or minutes were made with another: *Refaire avec ce contexte* is offered.
+    /// Its transcript or minutes were made with another: *Refaire la transcription* is offered.
     changed: bool,
+    /// Made again with it, its minutes follow the transcript: its button names them too (D113).
+    minutes_after: bool,
+}
+
+/// Whether a transcript made again with the context brings minutes after it: when the meeting has
+/// some, or the settings make them (D59) — what the context's button names (D113).
+fn minutes_after(folder: &Path, after: After) -> bool {
+    folder.join("minutes.md").is_file() || after == After::Minutes
 }
 
 fn context_of(shell: &Shell, folder: &Path) -> ContextShown {
@@ -2155,6 +2171,7 @@ fn context_of(shell: &Shell, folder: &Path) -> ContextShown {
     ContextShown {
         changed: context::changed(text.as_deref(), &transcript, &minutes),
         text: text.unwrap_or_default(),
+        minutes_after: minutes_after(folder, shell.settings().after),
     }
 }
 
@@ -2253,9 +2270,9 @@ fn next_context_kept(shell: State<'_, Shell>, text: String) -> Result<(), Told> 
     Ok(())
 }
 
-/// *Refaire avec ce contexte* (D59): the transcript made again by whoever the settings name to
-/// hear, then the minutes by whoever they name to write — each kept in place until the new one
-/// is whole, put back if it is not.
+/// The context's button, *Refaire la transcription* (D59, D113): the transcript made again by whoever
+/// the settings name to hear, then the minutes by whoever they name to write — each kept in place until
+/// the new one is whole, put back if it is not.
 #[tauri::command]
 fn context_redo(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
     let folder = session_folder(&shell, &name)?;
@@ -3069,6 +3086,171 @@ async fn destination_added(app: AppHandle, shell: State<'_, Shell>, kind: String
     added.map_err(|error| shell.told(Failure::Unexpected, error))??;
     look_again(&app);
     Ok(())
+}
+
+/// Where each send is recorded: `sends.json` beside the settings, the shell's own (D110, `sending`).
+fn sends_file() -> PathBuf {
+    settings::file().map_or_else(|| PathBuf::from("sends.json"), |file| file.with_file_name("sends.json"))
+}
+
+/// What a meeting's page offers to send (D110, PDR-0007 §2–§4): nothing for a meeting said confidential, with
+/// no summary, or with no destination set up; else each destination by its name, and whether it was ever sent
+/// to — before its first send, the page says what leaves and where. Its sends, listed; its last send to each
+/// destination with what came of it, said again whenever the page is drawn. Never an address.
+#[derive(serde::Serialize)]
+struct SendingShown {
+    offered: bool,
+    destinations: Vec<DestinationOffered>,
+    sends: Vec<sending::Sent>,
+    last: Vec<sending::Sent>,
+}
+
+#[derive(serde::Serialize)]
+struct DestinationOffered {
+    name: String,
+    first: bool,
+}
+
+fn sending_shown(shell: &Shell, folder: &Path) -> SendingShown {
+    let record = sending::record(&sends_file());
+    let meeting = folder.file_name().and_then(|name| name.to_str()).unwrap_or_default();
+    let destinations: Vec<DestinationOffered> = shell
+        .settings()
+        .destinations
+        .iter()
+        .map(|kept| DestinationOffered {
+            name: kept.name.clone(),
+            first: !sending::ever(&record, &kept.name),
+        })
+        .collect();
+    let summary = matches!(read_minutes(folder, shell.language()), Read::Present(_));
+    SendingShown {
+        offered: summary && !confidential::marked(folder) && !destinations.is_empty(),
+        destinations,
+        sends: sending::of(&record, meeting).into_iter().cloned().collect(),
+        last: sending::last(&record, meeting).into_iter().cloned().collect(),
+    }
+}
+
+#[tauri::command]
+fn sending_of(shell: State<'_, Shell>, name: String) -> Result<SendingShown, Told> {
+    let folder = session_folder(&shell, &name)?;
+    Ok(sending_shown(&shell, &folder))
+}
+
+/// The outcome of one send, and what the page offers after it.
+#[derive(serde::Serialize)]
+struct SentShown {
+    #[serde(flatten)]
+    outcome: sending::Outcome,
+    sending: SendingShown,
+}
+
+/// How long the shell waits for kitokey-send: longer than its own 30 s for an answer (`posting/v1`), so that it
+/// says first; past it, the send is said as one that may have arrived, never sent again (OPS1, OPS2).
+const SEND_DEADLINE: std::time::Duration = std::time::Duration::from_secs(45);
+
+/// Sends a meeting's summary to a destination, on the user's gesture (D110, PDR-0007): a confidential meeting
+/// never — refused here before the program is started, as the program would —; the address read from the
+/// keyring and given on kitokey-send's input with the meeting's name, never among its arguments; one try, its
+/// outcome recorded, whatever it is. The address is never logged, nor the destination's answer.
+#[tauri::command]
+async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, destination: String) -> Result<SentShown, Told> {
+    use kitokey_shell::destinations;
+    let folder = session_folder(&shell, &name)?;
+    if confidential::marked(&folder) {
+        return Ok(SentShown {
+            outcome: sending::Outcome::confidential(),
+            sending: sending_shown(&shell, &folder),
+        });
+    }
+    let kept = shell
+        .settings()
+        .destinations
+        .iter()
+        .find(|kept| kept.name == destination)
+        .cloned()
+        .ok_or_else(|| shell.told(Failure::Unexpected, "no such destination"))?;
+    let meeting = named::read(&folder).unwrap_or_else(|| name.clone());
+    let (kind, at) = (kept.kind.as_str(), folder.clone());
+    tracing::info!(kind, "shell.summary_sending");
+    let outcome = tauri::async_runtime::spawn_blocking(move || -> Result<sending::Outcome, String> {
+        let address = destinations::address(&kept.name)?.ok_or_else(|| "the destination's address is not in the keyring".to_string())?;
+        Ok(sent(&at, kind, &address, &meeting))
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?
+    .map_err(|why| shell.told(Failure::Keyring, why))?;
+    // Each send kept with what came of it, a failure too: « perhaps arrived » is said again on a page drawn
+    // again, so that nobody sends twice. A record that cannot be written never hides what came of the send:
+    // a summary that left, said « not sent », would be sent twice. Logged, the outcome said all the same.
+    let meeting = folder.file_name().and_then(|name| name.to_str()).unwrap_or_default().to_string();
+    let at = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+    if let Err(error) = sending::keep(
+        &sends_file(),
+        &meeting,
+        sending::Sent {
+            destination: destination.clone(),
+            at,
+            outcome: outcome.clone(),
+        },
+    ) {
+        tracing::warn!(error = %error, "shell.send_unrecorded");
+    }
+    match &outcome {
+        sending::Outcome::Sent => tracing::info!("shell.summary_sent"),
+        sending::Outcome::Failed { code, .. } => tracing::warn!(code = code.as_deref().unwrap_or("none"), "shell.summary_not_sent"),
+    }
+    look_again(&app);
+    Ok(SentShown {
+        outcome,
+        sending: sending_shown(&shell, &folder),
+    })
+}
+
+/// Starts kitokey-send for one send (`posting/v1`): the meeting's folder and the destination's kind as its
+/// arguments, the address and the meeting's name on its input; waits for it within `SEND_DEADLINE`.
+fn sent(folder: &Path, kind: &str, address: &str, meeting: &str) -> sending::Outcome {
+    use std::io::Write as _;
+    let none = sending::Outcome::Failed {
+        code: None,
+        retry_after: None,
+    };
+    let started = std::process::Command::new(program("kitokey-send", "KITOKEY_SEND"))
+        .arg(folder)
+        .args(["--kind", kind])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn();
+    let Ok(mut child) = started else {
+        return none;
+    };
+    let input = serde_json::json!({ "address": address, "name": meeting }).to_string();
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(input.as_bytes());
+    }
+    let begun = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if begun.elapsed() < SEND_DEADLINE => std::thread::sleep(std::time::Duration::from_millis(100)),
+            // Past the deadline: it may have arrived; never sent again (posting/v1, « Once »).
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return sending::Outcome::Failed {
+                    code: Some("destination.silent".into()),
+                    retry_after: None,
+                };
+            }
+            Err(_) => return none,
+        }
+    }
+    match child.wait_with_output() {
+        Ok(output) => sending::read(&String::from_utf8_lossy(&output.stdout)),
+        Err(_) => none,
+    }
 }
 
 /// Forgets a destination: its address out of the keyring first, then out of the settings; the
@@ -4569,7 +4751,9 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         return Err((Failure::ModelAbsent, "no model on this computer".to_string()));
     }
     // Made again with the context: its minutes too, when it had some or the settings make them.
-    let minutes_after = again == Again::Settings && (folder.join("minutes.md").is_file() || settings.after == After::Minutes);
+    // Made again with the context: its minutes too, when it had some or the settings make them. Made
+    // again by Refaire…, the transcript alone: its summary is kept, as the panel says (the decider, D113).
+    let minutes_after = again == Again::Settings && minutes_after(&folder, settings.after);
     // Set aside under a name of its own, never written over; put back if the new one is not made.
     let current = folder.join("transcript.jsonl");
     let previous = match sessions::set_aside(&current, true) {
