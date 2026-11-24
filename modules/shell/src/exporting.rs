@@ -10,7 +10,7 @@ use std::{
 };
 
 /// What the program is given on its input: where to write, and the file's words (`exporting/v1`).
-#[derive(serde::Serialize)]
+#[derive(Clone, Copy, serde::Serialize)]
 pub struct Input<'a> {
     pub to: &'a Path,
     pub name: &'a str,
@@ -73,7 +73,21 @@ pub fn markdown(program: &Path, folder: &Path, language: &str, input: &Input) ->
 
 /// Writes `input.dates` as an `.ics` at `input.to` (D115): done or why, as `markdown`.
 pub fn ics(program: &Path, folder: &Path, language: &str, input: &Input) -> Result<(), String> {
-    exported(program, folder, &["--format", "ics", "--lang", language], input)
+    // As the page sends them, each date made what the contract wants: `what` and `who` on one line.
+    let dates: Option<Vec<Dated>> = input.dates.map(|dates| {
+        dates
+            .iter()
+            .map(|d| Dated {
+                id: d.id.clone(),
+                ..Dated::new(0, &d.date, &d.what, d.who.as_deref(), d.passage.as_deref())
+            })
+            .collect()
+    });
+    let input = Input {
+        dates: dates.as_deref(),
+        ..*input
+    };
+    exported(program, folder, &["--format", "ics", "--lang", language], &input)
 }
 
 fn exported(program: &Path, folder: &Path, args: &[&str], input: &Input) -> Result<(), String> {

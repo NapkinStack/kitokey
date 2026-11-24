@@ -79,3 +79,25 @@ fn the_markdown_export_gives_no_dates() {
     assert!(given.get("dates").is_none(), "{given}");
     assert!(fs::read_to_string(dir.path().join("args")).unwrap().contains("--format md"));
 }
+
+#[test]
+fn dates_as_the_page_sends_them_reach_the_program_on_one_line_where_the_contract_wants_one() {
+    // The page's dates come straight into `dates_ics`, never through `Dated::new` (marc, #1194).
+    let dir = tempfile::tempdir().unwrap();
+    let folder = dir.path().join("2026-11-24_23-30");
+    fs::create_dir(&folder).unwrap();
+    let to = dir.path().join("dates.ics");
+    let dates = [Dated {
+        id: "a2".into(),
+        date: "2026-11-26".into(),
+        what: "Envoyer\nle devis".into(),
+        who: Some("\r\n".into()),
+        passage: Some("Ligne une\nligne deux".into()),
+    }];
+    exporting::ics(&program(dir.path()), &folder, "fr", &input(&to, Some(&dates))).unwrap();
+    let given: Value = serde_json::from_str(&fs::read_to_string(dir.path().join("input")).unwrap()).unwrap();
+    assert_eq!(
+        given["dates"],
+        json!([{"id": "a2", "date": "2026-11-26", "what": "Envoyer le devis", "who": null, "passage": "Ligne une\nligne deux"}])
+    );
+}
