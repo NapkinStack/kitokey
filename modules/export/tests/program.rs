@@ -39,13 +39,18 @@ struct Ran {
 }
 
 fn run(args: &[&str], input: &str) -> Ran {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_kitokey-export"))
+    let child = Command::new(env!("CARGO_BIN_EXE_kitokey-export"))
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .expect("the program starts");
+    ran(child, input)
+}
+
+/// The program started, given its input, judged by its exit, its lines and its sentence.
+fn ran(mut child: std::process::Child, input: &str) -> Ran {
     // A program that refuses its arguments ends before reading its input: a pipe closed under the write is
     // that end, and the run is judged by its exit and its sentence, as `exporting/v1` judges a refusal (#1068).
     if let Err(error) = child.stdin.take().unwrap().write_all(input.as_bytes()) {
@@ -304,8 +309,6 @@ fn a_wrong_argument_or_input_is_a_sentence_alone() {
     missing.as_object_mut().unwrap().remove("speaker");
     for (args, input) in [
         (vec![folder, "--format", "odt", "--lang", "fr"], good.to_string()),
-        // A format the contract names that this version does not write yet: the shell offers only those it does.
-        (vec![folder, "--format", "pdf", "--lang", "fr"], good.to_string()),
         (vec![folder, "--format", "md"], good.to_string()),
         (
             vec![folder, "--format", "md", "--lang", "fr", "--to", to.to_str().unwrap()],
@@ -349,6 +352,171 @@ fn it_says_its_version() {
         .unwrap();
     assert!(output.status.success());
     assert!(String::from_utf8_lossy(&output.stdout).starts_with("kitokey-export "));
+}
+
+/// A system whose fonts are these test fonts alone: fontconfig's file names their folder, as a system's
+/// names its own. Linux reads it; macOS and Windows have no such file, and `tests/pdf.rs` judges the choice.
+#[cfg(target_os = "linux")]
+fn system(dir: &Path, fonts: &[&str]) -> std::path::PathBuf {
+    let folder = dir.join("fonts");
+    fs::create_dir(&folder).unwrap();
+    for name in fonts {
+        fs::copy(format!("{}/tests/fonts/{name}", env!("CARGO_MANIFEST_DIR")), folder.join(name)).unwrap();
+    }
+    let conf = dir.join("fonts.conf");
+    fs::write(
+        &conf,
+        format!(
+            "<?xml version=\"1.0\"?>\n<fontconfig><dir>{}</dir></fontconfig>\n",
+            folder.display()
+        ),
+    )
+    .unwrap();
+    conf
+}
+
+#[cfg(target_os = "linux")]
+fn run_on(conf: &Path, args: &[&str], input: &str) -> Ran {
+    let child = Command::new(env!("CARGO_BIN_EXE_kitokey-export"))
+        .env("FONTCONFIG_FILE", conf)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("the program starts");
+    ran(child, input)
+}
+
+/// The names of the fonts a PDF embeds, its subset's tag taken off.
+#[cfg(target_os = "linux")]
+fn embedded(bytes: &[u8]) -> Vec<String> {
+    let document = lopdf::Document::load_mem(bytes).unwrap();
+    let mut names: Vec<String> = document
+        .objects
+        .values()
+        .filter_map(|object| object.as_dict().ok())
+        .filter(|dict| dict.get(b"Type").and_then(|t| t.as_name()).is_ok_and(|t| t == b"FontDescriptor"))
+        .filter_map(|dict| dict.get(b"FontName").and_then(|n| n.as_name()).ok())
+        .map(|name| {
+            let name = String::from_utf8_lossy(name).into_owned();
+            name.split_once('+').map_or(name.clone(), |(_, name)| name.to_string())
+        })
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn pdf_is_written_with_the_systems_static_faces_before_a_variable_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    fs::write(
+        folder.join("transcript.jsonl"),
+        TRANSCRIPT.replace("Bonjour à tous.", "Bonjour, 会议纪要."),
+    )
+    .unwrap();
+    let conf = system(
+        dir.path(),
+        &[
+            "NotoSansSC-VF-subset.otf",
+            "NotoSans-Regular-subset.ttf",
+            "NotoSans-Bold-subset.ttf",
+            "NotoSansSC-Regular-subset.otf",
+            "NotoSansSC-Bold-subset.otf",
+        ],
+    );
+    let to = dir.path().join("réunion.pdf");
+
+    let ran = run_on(
+        &conf,
+        &[folder.to_str().unwrap(), "--format", "pdf", "--lang", "fr"],
+        &words(&to).to_string(),
+    );
+
+    assert!(ran.success, "{}", ran.said);
+    let written = fs::read(&to).unwrap();
+    assert!(written.starts_with(b"%PDF-"));
+    assert_eq!(ran.lines, [json!({"event": "written", "file": to, "bytes": written.len()})]);
+    let text = pdf_extract::extract_text_from_mem(&written).unwrap();
+    assert!(text.contains("会议纪要") && text.contains("Prix & essai"), "{text}");
+    let fonts = embedded(&written);
+    assert!(
+        fonts.iter().any(|f| f.starts_with("NotoSansCJKSC-")),
+        "the static CJK face: {fonts:?}"
+    );
+    assert!(
+        !fonts.iter().any(|f| f.ends_with("-Thin")),
+        "never the variable face's default: {fonts:?}"
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn pdf_takes_a_variable_face_where_no_static_one_has_the_letters() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    fs::write(
+        folder.join("transcript.jsonl"),
+        TRANSCRIPT.replace("Bonjour à tous.", "Bonjour, 会议纪要."),
+    )
+    .unwrap();
+    let conf = system(
+        dir.path(),
+        &[
+            "NotoSans-Regular-subset.ttf",
+            "NotoSans-Bold-subset.ttf",
+            "NotoSansSC-VF-subset.otf",
+        ],
+    );
+    let to = dir.path().join("m.pdf");
+
+    let ran = run_on(
+        &conf,
+        &[folder.to_str().unwrap(), "--format", "pdf", "--lang", "fr"],
+        &words(&to).to_string(),
+    );
+
+    assert!(ran.success, "{}", ran.said);
+    let written = fs::read(&to).unwrap();
+    assert!(pdf_extract::extract_text_from_mem(&written).unwrap().contains("会议纪要"));
+    assert!(
+        embedded(&written).iter().any(|f| f == "NotoSansCJKsc-Thin"),
+        "{:?}",
+        embedded(&written)
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn no_font_of_the_system_with_the_letters_is_pdf_no_font_and_nothing_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    fs::write(
+        folder.join("transcript.jsonl"),
+        TRANSCRIPT.replace("Bonjour à tous.", "Bonjour, 会议纪要."),
+    )
+    .unwrap();
+    let conf = system(dir.path(), &["NotoSans-Regular-subset.ttf", "NotoSans-Bold-subset.ttf"]);
+    let to = dir.path().join("m.pdf");
+
+    let ran = run_on(
+        &conf,
+        &[folder.to_str().unwrap(), "--format", "pdf", "--lang", "fr"],
+        &words(&to).to_string(),
+    );
+
+    assert_eq!(ran.code, Some(1));
+    assert_eq!(ran.lines, [json!({"event": "failed", "code": "pdf.no_font"})]);
+    assert!(
+        ran.said.starts_with("kitokey-export: ") && ran.said.lines().count() == 1,
+        "{}",
+        ran.said
+    );
+    assert!(!ran.said.contains('会'), "the sentence says no word of the meeting: {}", ran.said);
+    assert!(!to.exists());
 }
 
 /// The dates the shell hands over for an `.ics` (D117), as `exporting/v1`'s input carries them.

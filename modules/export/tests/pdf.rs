@@ -4,8 +4,9 @@
 //! subsets of Noto, in `tests/fonts/`.
 
 use std::fs;
+use std::sync::Arc;
 
-use kitokey_export::{Include, Labels, Meeting, pdf};
+use kitokey_export::{Face, FontInfo, Include, Labels, Meeting, chosen, pdf};
 use lopdf::{Document, Object};
 
 const SESSION: &str = r#"{"contract": "session-audio/v3", "started": "2026-11-20T09:30:00+01:00", "tracks": {}}"#;
@@ -36,7 +37,15 @@ fn labels() -> Labels {
     }
 }
 
-fn fonts() -> Vec<Vec<u8>> {
+/// A test font, as one face.
+fn face(name: &str) -> Face {
+    Face {
+        data: Arc::new(fs::read(format!("{}/tests/fonts/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()),
+        index: 0,
+    }
+}
+
+fn fonts() -> Vec<Face> {
     [
         "NotoSans-Regular-subset.ttf",
         "NotoSans-Bold-subset.ttf",
@@ -44,18 +53,30 @@ fn fonts() -> Vec<Vec<u8>> {
         "NotoSansSC-Bold-subset.otf",
         "NotoColorEmoji-subset.ttf",
     ]
-    .iter()
-    .map(|name| fs::read(format!("{}/tests/fonts/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap())
+    .into_iter()
+    .map(face)
     .collect()
 }
 
-fn written(include: Include) -> Vec<u8> {
+/// The meeting of these tests, or one of a summary alone.
+fn meeting(minutes: &str, transcript: &str) -> Meeting {
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join("session.json"), SESSION).unwrap();
-    fs::write(dir.path().join("minutes.md"), MINUTES).unwrap();
-    fs::write(dir.path().join("transcript.jsonl"), TRANSCRIPT).unwrap();
-    let meeting = Meeting::read(dir.path()).unwrap();
-    pdf(&meeting, include, &labels(), "fr", "Réunion du 20 nov. 2026", &fonts()).expect("a PDF")
+    fs::write(dir.path().join("minutes.md"), minutes).unwrap();
+    fs::write(dir.path().join("transcript.jsonl"), transcript).unwrap();
+    Meeting::read(dir.path()).unwrap()
+}
+
+fn written(include: Include) -> Vec<u8> {
+    pdf(
+        &meeting(MINUTES, TRANSCRIPT),
+        include,
+        &labels(),
+        "fr",
+        "Réunion du 20 nov. 2026",
+        &fonts(),
+    )
+    .expect("a PDF")
 }
 
 /// The text as an extractor reads it, its runs of white space — U+00A0 and U+202F among them — as one.
@@ -174,5 +195,90 @@ fn what_is_included_is_the_callers_choice() {
     assert!(
         !text.contains("Points forts") && text.contains("Moi") && text.contains("00:01"),
         "{text}"
+    );
+}
+
+const VARIABLE: &str = "NotoSansSC-VF-subset.otf";
+
+fn choose(meeting: &Meeting, names: &[&str], sans: Option<&str>) -> Result<Vec<String>, char> {
+    let faces: Vec<FontInfo> = names
+        .iter()
+        .map(|name| FontInfo::new(&fs::read(format!("{}/tests/fonts/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap(), 0).unwrap())
+        .collect();
+    chosen(meeting, Include::all(), &labels(), "Réunion du 20 nov. 2026", &faces, sans)
+        .map(|taken| taken.into_iter().map(|i| names[i].to_string()).collect())
+}
+
+#[test]
+fn static_faces_are_chosen_before_a_variable_one_of_the_same_letters() {
+    let names = [
+        VARIABLE,
+        "NotoSans-Regular-subset.ttf",
+        "NotoSans-Bold-subset.ttf",
+        "NotoSansSC-Regular-subset.otf",
+        "NotoSansSC-Bold-subset.otf",
+        "NotoColorEmoji-subset.ttf",
+    ];
+    assert_eq!(
+        choose(&meeting(MINUTES, TRANSCRIPT), &names, Some("Noto Sans")).unwrap(),
+        &names[1..],
+        "the sans-serif first, then the family that has the most of what is missing; the variable face left out"
+    );
+}
+
+#[test]
+fn a_variable_face_is_chosen_where_no_static_one_has_the_letters() {
+    // The summary's CJK alone, which the variable subset has; the transcript's other CJK left out.
+    let names = ["NotoSans-Regular-subset.ttf", "NotoSans-Bold-subset.ttf", VARIABLE];
+    let only_latin_and_these = meeting(MINUTES, "");
+    assert_eq!(choose(&only_latin_and_these, &names, Some("Noto Sans")).unwrap(), names);
+}
+
+#[test]
+fn a_letter_no_face_has_is_refused_by_that_letter() {
+    let names = [
+        "NotoSans-Regular-subset.ttf",
+        "NotoSans-Bold-subset.ttf",
+        VARIABLE,
+        "NotoColorEmoji-subset.ttf",
+    ];
+    // 下 is the first, by its code, of the transcript's CJK that no face here has.
+    assert_eq!(choose(&meeting(MINUTES, TRANSCRIPT), &names, None), Err('下'));
+}
+
+#[test]
+fn a_symbol_no_face_has_is_no_refusal_and_a_family_nothing_needs_is_not_chosen() {
+    // No emoji face: 👍 and 🎉 are no letters, the PDF is written. A summary in Latin alone: no CJK face.
+    let names = [
+        "NotoSans-Regular-subset.ttf",
+        "NotoSans-Bold-subset.ttf",
+        "NotoSansSC-Regular-subset.otf",
+    ];
+    assert_eq!(choose(&meeting(MINUTES, TRANSCRIPT), &names, None).unwrap(), names);
+    let latin = MINUTES.replace("- 会议纪要\n", "- Fini\n");
+    assert_eq!(choose(&meeting(&latin, ""), &names, None).unwrap(), &names[..2],);
+}
+
+#[test]
+fn the_systems_sans_serif_comes_first_when_it_has_any_of_the_letters() {
+    let names = [
+        "NotoSans-Regular-subset.ttf",
+        "NotoSans-Bold-subset.ttf",
+        "NotoSansSC-Regular-subset.otf",
+        "NotoColorEmoji-subset.ttf",
+    ];
+    assert_eq!(
+        choose(&meeting(MINUTES, TRANSCRIPT), &names, Some("Noto Color Emoji")).unwrap(),
+        [
+            "NotoColorEmoji-subset.ttf",
+            "NotoSans-Regular-subset.ttf",
+            "NotoSans-Bold-subset.ttf",
+            "NotoSansSC-Regular-subset.otf"
+        ]
+    );
+    // A sans-serif the system names but has not, or which has none of the letters: the rule of the most.
+    assert_eq!(
+        choose(&meeting(MINUTES, TRANSCRIPT), &names, Some("Cantarell")).unwrap()[0],
+        names[0]
     );
 }

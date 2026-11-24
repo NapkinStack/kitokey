@@ -8,6 +8,7 @@ publish = false
 docx-rs = { version = "0.4.22", default-features = false }
 pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html"] }
 serde_json = "1.0.154"
+fontdb = "0.23.0"
 typst = "=0.15.1"
 typst-layout = "=0.15.1"
 typst-pdf = "=0.15.1"

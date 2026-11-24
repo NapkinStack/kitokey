@@ -5,10 +5,12 @@
 //! it prefers them; this module reads none from the system.
 
 use pulldown_cmark::{Event, HeadingLevel, Tag, TagEnd};
+use std::sync::Arc;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime, Duration};
 use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
-use typst::text::{Font, FontBook};
+
+use typst::text::{Font, FontBook, FontFlags, FontInfo};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World};
 use typst_layout::PagedDocument;
@@ -19,8 +21,11 @@ use crate::{Include, Labels, Meeting, Speaker, time};
 /// The meeting as a PDF/UA-1 document: its title and language set, « heading 1 » the meeting, « heading
 /// 2 » each section and the transcript, a model's own headings under them; the transcript a table its
 /// head marked as such. As in the page, a model's raw HTML, links and images are said as their words.
-pub fn pdf(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, name: &str, fonts: &[Vec<u8>]) -> Result<Vec<u8>, String> {
-    let fonts: Vec<Font> = fonts.iter().flat_map(|font| Font::iter(Bytes::new(font.clone()))).collect();
+pub fn pdf(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, name: &str, fonts: &[Face]) -> Result<Vec<u8>, String> {
+    let fonts: Vec<Font> = fonts
+        .iter()
+        .filter_map(|face| Font::new(Bytes::new(Shared(face.data.clone())), face.index))
+        .collect();
     let book = FontBook::from_fonts(&fonts);
     let mut families: Vec<String> = Vec::new();
     for font in &fonts {
@@ -51,6 +56,93 @@ pub fn pdf(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, nam
         },
     )
     .map_err(said)
+}
+
+/// A font file's bytes, shared: a system's font mapped once, a collection's faces reading the same bytes.
+pub type Data = Arc<dyn AsRef<[u8]> + Send + Sync>;
+
+/// One face of a font file: the file's bytes, and the face's place in it (0 but in a collection).
+#[derive(Clone)]
+pub struct Face {
+    pub data: Data,
+    pub index: u32,
+}
+
+struct Shared(Data);
+
+impl AsRef<[u8]> for Shared {
+    fn as_ref(&self) -> &[u8] {
+        (*self.0).as_ref()
+    }
+}
+
+/// The faces the meeting needs, among `faces` — what the system's are, read without keeping them —, by their place in it: static faces first,
+/// a variable face only where no static one has a character, at its default instance (`exporting/v1`).
+/// The family `sans` names — the system's sans-serif — comes first when it has any; then, each time,
+/// the family that has the most of what is still missing, the first given on a tie. Every face of a
+/// family taken comes with it, its bold for the headings. A letter no face has is `Err`, that letter:
+/// the PDF would show a box for a word. A symbol no face has — an emoji — is drawn as a box, the rest
+/// written.
+pub fn chosen(
+    meeting: &Meeting,
+    include: Include,
+    labels: &Labels,
+    name: &str,
+    faces: &[FontInfo],
+    sans: Option<&str>,
+) -> Result<Vec<usize>, char> {
+    let mut missing: Vec<char> = source(meeting, include, labels, "", name, &[])
+        .chars()
+        .filter(|&c| !invisible(c))
+        .collect();
+    missing.sort_unstable();
+    missing.dedup();
+    let mut taken: Vec<usize> = Vec::new();
+    for variable in [false, true] {
+        // The families of this kind, in the order first given.
+        let mut families: Vec<&str> = Vec::new();
+        for info in faces {
+            if info.flags.contains(FontFlags::VARIABLE) == variable && !families.contains(&info.family.as_str()) {
+                families.push(&info.family);
+            }
+        }
+        let of = |family: &str| -> Vec<usize> {
+            (0..faces.len())
+                .filter(|&i| faces[i].family == family && faces[i].flags.contains(FontFlags::VARIABLE) == variable)
+                .collect()
+        };
+        let has = |family: &str, c: char| of(family).iter().any(|&i| faces[i].coverage.contains(c as u32));
+        loop {
+            let count = |family: &str| missing.iter().filter(|&&c| has(family, c)).count();
+            let best = sans
+                .filter(|&sans| !variable && taken.is_empty() && families.contains(&sans) && count(sans) > 0)
+                .or_else(|| {
+                    families
+                        .iter()
+                        .copied()
+                        .map(|family| (count(family), family))
+                        .filter(|&(n, _)| n > 0)
+                        .rev()
+                        .max_by_key(|&(n, _)| n)
+                        .map(|(_, family)| family)
+                });
+            let Some(family) = best else { break };
+            missing.retain(|&c| !has(family, c));
+            taken.extend(of(family));
+            families.retain(|&f| f != family);
+        }
+    }
+    match missing.into_iter().find(|c| c.is_alphabetic()) {
+        Some(letter) => Err(letter),
+        None => Ok(taken),
+    }
+}
+
+/// A character no face draws: white space, a control, a joiner or a variation selector.
+fn invisible(c: char) -> bool {
+    c.is_whitespace()
+        || c.is_control()
+        || matches!(c, '\u{ad}' | '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2060}'..='\u{206f}' | '\u{fe00}'..='\u{fe0f}' | '\u{feff}' | '\u{e0000}'..='\u{e0fff}')
 }
 
 fn said(errors: impl IntoIterator<Item = typst::diag::SourceDiagnostic>) -> String {
