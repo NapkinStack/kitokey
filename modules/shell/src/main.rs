@@ -30,7 +30,7 @@ use kitokey_shell::microphone;
 use kitokey_shell::{
     autostart,
     confidential::{self, Left, Wait, What},
-    context, correction, desktop, exporting, keys,
+    context, correction, dates, desktop, exporting, keys,
     licence::{self, Licence},
     log,
     meeting::{self, Read, Transcript},
@@ -430,6 +430,8 @@ fn main() {
             transcript_again,
             opened,
             open_folder,
+            dates_resolved,
+            date_google,
             open_logs,
             diagnostic,
             settings_shown,
@@ -2444,6 +2446,75 @@ fn local_instead(app: AppHandle, shell: State<'_, Shell>, name: String, model: S
     }
     make_minutes(&app, folder);
     look_again(&app);
+    Ok(())
+}
+
+/// What a meeting's actions' *by when* name (D115): the day they are read against — the meeting's own, as its
+/// folder names it, or the one the user set — and each one's date, or none when it names none without a guess.
+#[derive(serde::Serialize)]
+struct Resolved {
+    day: String,
+    dates: Vec<Option<String>>,
+}
+
+#[tauri::command]
+fn dates_resolved(name: String, whens: Vec<String>, day: Option<String>) -> Option<Resolved> {
+    let day = match day {
+        Some(day) => chrono::NaiveDate::parse_from_str(&day, "%Y-%m-%d").ok()?,
+        None => dates::reference_day(&name)?,
+    };
+    let dated = |when: &String| dates::resolve(when, day).map(|date| date.format("%Y-%m-%d").to_string());
+    Some(Resolved {
+        day: day.format("%Y-%m-%d").to_string(),
+        dates: whens.iter().map(dated).collect(),
+    })
+}
+
+/// One ticked date, as the page shows it: its day, the action's what and who, its passage, the meeting's name.
+#[derive(serde::Deserialize)]
+struct Ticked {
+    date: String,
+    what: String,
+    who: Option<String>,
+    passage: Option<String>,
+    meeting: String,
+}
+
+/// Opens Google Calendar's own screen on a ticked date, the event pre-filled and unsaved (D115): nothing leaves
+/// before this gesture, and never a confidential meeting's words (PDR-0007): its dates go to an `.ics` alone.
+#[tauri::command]
+fn date_google(shell: State<'_, Shell>, name: String, item: Ticked) -> Result<(), Told> {
+    if confidential::marked(&session_folder(&shell, &name)?) {
+        return Err(shell.told(Failure::LinkNotOpened, "a confidential meeting is given no link"));
+    }
+    let date = chrono::NaiveDate::parse_from_str(&item.date, "%Y-%m-%d").map_err(|error| shell.told(Failure::LinkNotOpened, error))?;
+    let event = dates::Event {
+        date,
+        what: &item.what,
+        who: item.who.as_deref(),
+        passage: item.passage.as_deref(),
+        meeting: &item.meeting,
+    };
+    browsing(&shell, &dates::google(&event))
+}
+
+/// Opens an address in the system's browser; `KITOKEY_BROWSER` names another program, as the e2e's stand-in that
+/// writes down the address it is handed and opens nothing.
+fn browsing(shell: &Shell, address: &str) -> Result<(), Told> {
+    let opener = std::env::var_os("KITOKEY_BROWSER").map(PathBuf::from).unwrap_or_else(|| {
+        PathBuf::from(if cfg!(target_os = "macos") {
+            "open"
+        } else if cfg!(windows) {
+            "explorer"
+        } else {
+            "xdg-open"
+        })
+    });
+    let mut started = std::process::Command::new(opener)
+        .arg(address)
+        .spawn()
+        .map_err(|error| shell.told(Failure::LinkNotOpened, error))?;
+    std::thread::spawn(move || started.wait());
     Ok(())
 }
 

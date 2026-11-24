@@ -2049,10 +2049,126 @@ function minutesCard(read, words, session, transcript, onPage) {
   // The minutes as written, rendered by the shell: raw HTML in them is text there, a link its words.
   const body = element("div", "body");
   body.innerHTML = read.body;
-  actionRows(body, words, read.actions);
+  const mentioned = actionRows(body, words, read.actions);
   lineTimes(body, session, transcript, words);
   card.append(body);
+  datesOffer(card, mentioned, session, transcript, words);
   return card;
+}
+
+// « Dates mentionnées » (D115): the dates the actions' by when name, read by the shell against the meeting's day,
+// offered to the user's calendar. Offered only when one names a date. Nothing is ticked, and nothing leaves this
+// computer before an item is ticked and a destination chosen; a confidential meeting is offered no link (PDR-0007).
+// Granola, Otter and Fireflies list actions and leave their dates as words; Gmail and Apple Mail detect a date
+// in a message and offer to make an event of it, one at a time: here the same, the date said in full, its passage
+// beside it, the user choosing.
+function datesOffer(card, mentioned, session, transcript, words) {
+  if (mentioned.length === 0) return;
+  const button = element("button", "open", words.dates_open);
+  button.type = "button";
+  button.id = "dates-open";
+  button.hidden = true;
+  card.append(button);
+  window.__TAURI__.core
+    .invoke("dates_resolved", { name: nameOf(session), whens: mentioned.map((m) => m.when), day: null })
+    .then((resolved) => (button.hidden = !resolved?.dates.some(Boolean)))
+    .catch(() => {});
+  button.addEventListener("click", () => datesPanel(mentioned, session, transcript, words, button));
+}
+
+// What was said where an action was set: the segments from its second, two at most.
+function passageAt(transcript, second) {
+  if (second === null || transcript.state !== "present") return null;
+  const said = transcript.segments.filter((s) => s.end > second).slice(0, 2).map((s) => s.text.trim());
+  return said.length ? said.join("\n") : null;
+}
+
+function datesPanel(mentioned, session, transcript, words, back) {
+  const name = nameOf(session);
+  const dialog = element("dialog", "check-sound dates");
+  dialog.id = "dates";
+  dialog.setAttribute("aria-labelledby", "dates-title");
+  const head = element("div", "check-head");
+  const title = element("h2", "", words.dates_open);
+  title.id = "dates-title";
+  const close = iconButton("x", words.check_close, "dates-close");
+  head.append(title, close);
+  const day = element("input");
+  day.type = "date";
+  day.id = "dates-day";
+  const dayLabel = element("label", "dates-day", words.dates_day);
+  dayLabel.htmlFor = "dates-day";
+  const list = element("ul", "dates-list");
+  list.id = "dates-list";
+  const google = element("button", "primary", words.dates_google);
+  google.type = "button";
+  google.id = "dates-google";
+  google.disabled = true;
+  // Read when it opens: the switch may have changed since the page was drawn; the shell refuses it anyway.
+  google.hidden = document.getElementById("confidential-switch")?.checked === true;
+  const said = element("p", "note warn");
+  said.id = "dates-said";
+  said.setAttribute("role", "status");
+  said.hidden = true;
+  const goes = element("div", "dates-goes");
+  goes.append(google);
+  dayLabel.append(day);
+  dialog.append(head, element("p", "note", words.dates_says), dayLabel, list, goes, said);
+  const full = new Intl.DateTimeFormat(document.documentElement.lang, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  let shown = [];
+  const ticked = () => shown.filter((item) => item.box.checked);
+  const draw = async (asked) => {
+    const resolved = await window.__TAURI__.core.invoke("dates_resolved", { name, whens: mentioned.map((m) => m.when), day: asked }).catch(() => null);
+    if (!resolved) return;
+    day.value = resolved.day;
+    shown = [];
+    list.replaceChildren();
+    for (const [index, date] of resolved.dates.entries()) {
+      if (!date) continue;
+      const action = mentioned[index];
+      const item = element("li", "dates-item");
+      const box = element("input");
+      box.type = "checkbox";
+      box.addEventListener("change", () => (google.disabled = ticked().length === 0));
+      const words_ = element("label", "dates-what");
+      const when = element("span", "dates-when", full.format(new Date(`${date}T00:00:00Z`)));
+      words_.append(box, when, element("span", "", action.who ? `${action.what} — ${action.who}` : action.what));
+      const passage = passageAt(transcript, action.second);
+      item.append(words_);
+      if (passage) item.append(element("blockquote", "dates-passage", passage));
+      list.append(item);
+      shown.push({ box, date, action, passage });
+    }
+    google.disabled = true;
+  };
+  day.addEventListener("change", () => day.value && draw(day.value));
+  google.addEventListener("click", async () => {
+    said.hidden = true;
+    const meeting = document.querySelector("#meeting h1")?.textContent ?? name;
+    for (const { date, action, passage } of ticked()) {
+      const item = { date, what: action.what, who: action.who, passage, meeting };
+      try {
+        await window.__TAURI__.core.invoke("date_google", { name, item });
+      } catch (why) {
+        said.textContent = why;
+        said.hidden = false;
+        return;
+      }
+    }
+  });
+  const end = () => {
+    dialog.close();
+    dialog.remove();
+    back.focus();
+  };
+  close.addEventListener("click", end);
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    end();
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+  draw(null);
 }
 
 // A line's time (D75), the shell's own mark: a small link that opens its passage and plays from that
@@ -2106,11 +2222,13 @@ function lineTimes(body, session, transcript, words) {
 function actionRows(body, words, at) {
   // Every second-level title, as the shell's reader counts them.
   const titles = body.querySelectorAll("h2");
-  if (!at || titles.length < at) return;
+  // Each row split in three whose by when is said, for « Dates mentionnées » (D115).
+  const mentioned = [];
+  if (!at || titles.length < at) return mentioned;
   const next = titles[at] ?? null;
   let list = titles[at - 1].nextElementSibling;
   while (list && list !== next && !["UL", "OL"].includes(list.tagName)) list = list.nextElementSibling;
-  if (!list || list === next) return;
+  if (!list || list === next) return mentioned;
   const table = element("table", "actions");
   const head = element("thead");
   const named = element("tr");
@@ -2126,6 +2244,7 @@ function actionRows(body, words, at) {
     const row = element("tr");
     if (parts.length === 3 && parts.every((part) => part !== "")) {
       const [what, who, when] = parts;
+      if (!unsettled(when)) mentioned.push({ what, who: unsettled(who) ? null : who, when, second: time ? Number(time.dataset.second) : null });
       for (const [text, kind] of [[who, "who"], [what, "what"], [when, "when"]]) {
         // Short, on one line; long, back to the line between words, never pushing the card wider.
         const long = kind !== "what" && text.length > 18 ? " long" : "";
@@ -2144,6 +2263,7 @@ function actionRows(body, words, at) {
   }
   table.append(head, rows);
   list.replaceWith(table);
+  return mentioned;
 }
 
 const folded = (text) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();

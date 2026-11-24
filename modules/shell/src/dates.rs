@@ -314,3 +314,62 @@ fn next_weekday(target: u32, day: NaiveDate) -> Option<NaiveDate> {
     }
     day.checked_add_days(Days::new(u64::from(ahead)))
 }
+
+/// One ticked item, as a calendar shows it: its day, all day long; its title the action's what, then « — who »
+/// when someone is named; its notes the passage, a blank line, then the meeting's name — as `exporting/v1`'s
+/// `.ics` writes SUMMARY and DESCRIPTION, so a link and the file say the same.
+pub struct Event<'a> {
+    pub date: NaiveDate,
+    pub what: &'a str,
+    pub who: Option<&'a str>,
+    pub passage: Option<&'a str>,
+    pub meeting: &'a str,
+}
+
+impl Event<'_> {
+    fn title(&self) -> String {
+        match self.who.map(str::trim).filter(|who| !who.is_empty()) {
+            Some(who) => format!("{} — {who}", self.what),
+            None => self.what.to_string(),
+        }
+    }
+
+    fn notes(&self) -> String {
+        match self.passage.map(str::trim).filter(|passage| !passage.is_empty()) {
+            Some(passage) => format!("{passage}\n\n{}", self.meeting),
+            None => self.meeting.to_string(),
+        }
+    }
+
+    /// The day after, an all-day event's end as Google's link and RFC 5545 count it.
+    fn end(&self) -> NaiveDate {
+        self.date.succ_opt().unwrap_or(self.date)
+    }
+}
+
+/// Google Calendar's own screen, the event pre-filled and unsaved: `render?action=TEMPLATE`, `text`, `dates` as
+/// `YYYYMMDD/YYYYMMDD` ending the next day for an all-day event, `details`. Google publishes no reference page
+/// for this link; the form followed is the Interaction Design Foundation's add-event-to-calendar-docs
+/// (`services/google.md`), the one calendar buttons use.
+pub fn google(event: &Event) -> String {
+    format!(
+        "https://calendar.google.com/calendar/render?action=TEMPLATE&text={}&dates={}/{}&details={}",
+        encoded(&event.title()),
+        event.date.format("%Y%m%d"),
+        event.end().format("%Y%m%d"),
+        encoded(&event.notes()),
+    )
+}
+
+/// Percent-encoded as RFC 3986 says: its unreserved characters kept, every other byte of its UTF-8 escaped.
+fn encoded(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() * 3);
+    for byte in text.bytes() {
+        if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
+            out.push(char::from(byte));
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}

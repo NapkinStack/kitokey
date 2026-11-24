@@ -145,6 +145,10 @@ sys.exit(1)
 """
 )
 SENDER.chmod(0o755)
+# The system's browser stood in (D115): it writes down the address it is handed and opens nothing.
+BROWSER = WORK / "browser"
+BROWSER.write_text('#!/bin/sh\nprintf \'%s\\n\' "$1" >> "$(dirname "$0")/browsed.txt"\n')
+BROWSER.chmod(0o755)
 HEARING = WORK / "kitokey-transcription"
 HEARING.write_text(
     """#!/bin/sh
@@ -694,7 +698,7 @@ class Window:
         self.file.write_text(f'sessions = "{sessions}"\n{opened}{greeted}{more}')
         self.env = dict(os.environ, XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
         # An Ollama and a keyring of the scenario's, never the user's own.
-        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_EXPORT=str(EXPORTER), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER))
+        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_EXPORT=str(EXPORTER), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER), KITOKEY_BROWSER=str(BROWSER))
 
     def __enter__(self) -> webdriver.Remote:
         # One Kitokey per session: one still leaving takes this start's arguments and this one
@@ -8840,6 +8844,93 @@ def renaming(now: dt.datetime) -> None:
               [again, live_again, browser.execute_script(alive), browser.execute_script(resting)])
 
 
+def dates_mentioned(now: dt.datetime) -> None:
+    """CM. « Dates mentionnées » (D115): each action's by when read against the meeting's day; ticked, to Google Calendar."""
+    print("CM. « Dates mentionnées »: the dates an action names, in full, its passage beside it, nothing ticked; the day changed, read again; "
+          "nothing leaves before a tick and a destination; none offered without a date; no link for a confidential meeting (D115)")
+    meetings = WORK / "dating"
+    # Tuesday 24 November 2026, started at 23:30 local time: its day is the 24th, whatever UTC says.
+    folder = meetings / "2026-11-24_23-30"
+    session(folder, now - dt.timedelta(days=1), 20, {"local.wav": 1000})
+    (folder / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":3.0,"text":"Bonjour."}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":4.0,"end":7.0,"text":"Inès, tu envoies le devis jeudi ?"}\n'
+        '{"type":"segment","speaker":"others","track":"remote","start":7.0,"end":9.0,"text":"Oui, jeudi."}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":10.0,"end":13.0,"text":"Marc rappelle Jiří le 12 décembre."}\n'
+        '{"type":"complete","duration":20.0}\n')
+    (folder / "minutes.md").write_text(
+        "---\ncontract: minutes/v3\nmade: 2026-11-24T23:55:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+        "## 1.\n\nLe devis part.\n\n## 2.\n\n- Envoyer le devis — Inès — jeudi [00:04]\n- Réserver la salle — non précisé — fin du mois\n"
+        "- Rappeler Jiří — Marc — 12 décembre [00:10]\n\n## 3.\n\n- Rien\n")
+    none = meetings / "2026-11-23_10-00"
+    session(none, now - dt.timedelta(days=2), 10, {"local.wav": 1000})
+    (none / "transcript.jsonl").write_text((folder / "transcript.jsonl").read_text())
+    (none / "minutes.md").write_text(
+        "---\ncontract: minutes/v1\nmade: 2026-11-23T11:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+        "## 1.\n\nRien.\n\n## 2.\n\n- Réserver la salle — Paul — bientôt\n\n## 3.\n\n- Rien\n")
+    browsed = WORK / "browsed.txt"
+    browsed.unlink(missing_ok=True)
+    panel = ("const d = document.getElementById('dates'); if (!d || !d.open) return null;"
+             " return {day: document.getElementById('dates-day').value, text: d.textContent,"
+             " items: [...d.querySelectorAll('.dates-item')].map(i => [i.querySelector('.dates-when').textContent,"
+             " i.querySelector('.dates-what').textContent.replace(i.querySelector('.dates-when').textContent, ''),"
+             " i.querySelector('.dates-passage')?.textContent ?? null, i.querySelector('input').checked]),"
+             " google: [document.getElementById('dates-google').hidden, document.getElementById('dates-google').disabled]}")
+    offered = "const b = document.getElementById('dates-open'); return b ? !b.hidden : false"
+    for language, opens, thursday, december, later in (
+        ("fr_FR.UTF-8", "Dates mentionnées", "jeudi 26 novembre 2026", "samedi 12 décembre 2026", "jeudi 3 décembre 2026"),
+        ("en_US.UTF-8", "Dates mentioned", "Thursday, November 26, 2026", "Saturday, December 12, 2026", "Thursday, December 3, 2026"),
+    ):
+        browsed.unlink(missing_ok=True)
+        (folder / "confidential").unlink(missing_ok=True)
+        with Window(meetings, language, "reminder = false\n") as browser:
+            browser.set_window_size(1100, 800)
+            browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+            shown = wait_for(browser, lambda b: b.execute_script(offered), 10)
+            check(f"{language}: offered under the actions, « {opens} »", shown and browser.find_element(By.ID, "dates-open").text == opens,
+                  browser.execute_script("return document.getElementById('dates-open')?.outerHTML"))
+            press(browser, "dates-open")
+            wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("items"), 5)
+            got = browser.execute_script(panel)
+            check(f"{language}: each date in full, the action's words, its passage; the month's end not offered; nothing ticked; "
+                  "the meeting's day shown, the 24th though it started at 23:30; no « échéance »",
+                  got["day"] == "2026-11-24" and got["items"] == [[thursday, "Envoyer le devis — Inès", "Inès, tu envoies le devis jeudi ?\nOui, jeudi.", False],
+                                                                  [december, "Rappeler Jiří — Marc", "Marc rappelle Jiří le 12 décembre.", False]]
+                  and "échéance" not in got["text"].lower() and got["google"] == [False, True], got)
+            browser.execute_script("const d = document.getElementById('dates-day'); d.value = '2026-11-27'; d.dispatchEvent(new Event('change'))")
+            moved = wait_for(browser, lambda b: ((b.execute_script(panel) or {}).get("items") or [[None]])[0][0] == later, 5)
+            check(f"{language}: the day changed to Friday the 27th, read again: « jeudi » the next Thursday", moved, browser.execute_script(panel))
+            check(f"{language}: nothing handed to the browser before a tick and a destination", not browsed.exists(), browsed.exists())
+            browser.execute_script("document.querySelector('#dates .dates-item input').click()")
+            press(browser, "dates-google")
+            handed = wait_for(browser, lambda b: browsed.exists() and browsed.read_text().strip() != "", 5)
+            address = browsed.read_text().strip() if browsed.exists() else ""
+            check(f"{language}: the ticked date alone handed to the browser: Google Calendar's screen, all day from the 3rd to the 4th",
+                  handed and address.count("\n") == 0 and address.startswith("https://calendar.google.com/calendar/render?action=TEMPLATE&text=Envoyer%20le%20devis%20%E2%80%94%20In%C3%A8s&dates=20261203/20261204&details="), address)
+            press(browser, "dates-close")
+            wait_for(browser, lambda b: b.execute_script("return !document.getElementById('dates')"), 5)
+            # A meeting whose actions name no date: nothing offered.
+            browser.execute_script(f"location.hash = '#/meeting/{none.name}'")
+            wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .minutes table.actions"), 10)
+            time.sleep(0.5)
+            check(f"{language}: no date named, « {opens} » not offered", not browser.execute_script(offered), browser.execute_script(offered))
+            # Confidential: no link offered, and the shell refuses one anyway.
+            (folder / "confidential").write_bytes(b"")
+            browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+            wait_for(browser, lambda b: b.execute_script(offered), 10)
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('confidential-switch')?.checked === true"), 5)
+            press(browser, "dates-open")
+            wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("items"), 5)
+            check(f"{language}: a confidential meeting is offered no link", browser.execute_script(panel)["google"][0] is True, browser.execute_script(panel))
+            refused = browser.execute_async_script(
+                "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('date_google', {name: arguments[0], item: "
+                "{date: '2026-12-03', what: 'x', who: null, passage: null, meeting: 'y'}}).then(() => done('opened'), (why) => done(String(why)))", folder.name)
+            check(f"{language}: and the shell refuses it", refused != "opened" and browsed.read_text().count("\n") == 1, [refused, browsed.read_text()])
+            press(browser, "dates-close")
+    (folder / "confidential").unlink(missing_ok=True)
+
+
 def actions_rows(now: dt.datetime) -> None:
     """AK. A meeting's actions as rows: Qui · Quoi · Pour quand (D46)."""
     print("AK. the minutes' actions as rows — who in its colour, by when in monospace, an item that does not split shown as written (D46)")
@@ -14909,6 +15000,7 @@ def main() -> int:
     pages_seen(now)
     store_shots(now)
     actions_rows(now)
+    dates_mentioned(now)
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
