@@ -115,4 +115,9 @@ def test_a_confidential_meeting_is_sent_only_with_its_confirmation_judged_before
     )
     assert "without `confirmed_confidential: true`" in row
     assert "`meeting.confidential` is judged before the address is" in flat
+    assert "the confirmation is the consumer's to ask, at each send, never remembered" in flat
+    assert "a meeting that is not confidential is sent whatever it says" in flat
+    field = next(line for line in PAGE.splitlines() if line.startswith("| `confirmed_confidential` |"))
+    assert "for this send" in field
+    assert "kept" not in field and "next send" not in field
     assert "a confidential meeting is never sent" not in flat
