@@ -326,7 +326,7 @@ fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
 /// Each pair of colours the theme uses (D89's first round of drawings, *Contrast, both themes*), read
 /// from the file in both themes: text 4.5:1 (WCAG 2.2, 1.4.3), a control's edge or a meter 3:1 (1.4.11).
 /// `--line` is no pair: it divides, and borders no control (the test below).
-const PAIRS: [(&str, &str, f64); 27] = [
+const PAIRS: [(&str, &str, f64); 29] = [
     ("var(--ink)", "var(--ground)", 4.5),
     ("var(--ink)", "var(--surface)", 4.5),
     ("var(--ink)", "var(--raised)", 4.5),
@@ -360,7 +360,13 @@ const PAIRS: [(&str, &str, f64); 27] = [
     ("var(--mark-edge)", SELECTED, 3.0),
     ("var(--mark-edge)", "var(--surface)", 3.0),
     ("var(--mark-ink)", "var(--mark)", 4.5),
+    // A level on its track, tinted with its own colour (#1179): the level seen against it (1.4.11).
+    ("var(--accent)", TINT_HERE, 3.0),
+    ("var(--ok)", TINT_REMOTE, 3.0),
 ];
+/// Each side's track, as the meters mix it (#1179).
+const TINT_HERE: &str = "color-mix(in srgb, var(--accent) 14%, var(--raised))";
+const TINT_REMOTE: &str = "color-mix(in srgb, var(--ok) 14%, var(--raised))";
 /// The selected row's ground, as the sidebar mixes it.
 const SELECTED: &str = "color-mix(in srgb, var(--accent) 13%, var(--surface))";
 
@@ -394,6 +400,46 @@ fn each_pair_of_the_theme_reaches_its_threshold_in_both_themes() {
             .any(|line| line.starts_with("theme 1: var(--edge)")),
         "a faint edge passed"
     );
+}
+
+/// A level meter (#1179): it rises at once — no transition on its fill —, and falls eased by `.falling`, in
+/// 300 to 800 ms (a VU meter's fall, as Zoom's and Meet's levels); the bar's and the page's tracks 6 px, the
+/// panel's 8, each tinted with its side's colour. Less motion: the global rule removes the easing, and the
+/// page draws a held level (tests/meter.rs).
+#[test]
+fn a_meter_rises_at_once_and_falls_eased_in_the_style() {
+    let style = without_css_comments(STYLE);
+    let rule = |selector: &str| {
+        style
+            .split(selector)
+            .nth(1)
+            .and_then(|part| part.split('}').next())
+            .unwrap_or_else(|| panic!("no {selector}"))
+            .to_string()
+    };
+    for fill in ["#small .meter .fill {", ".page-level > .fill {", ".check-fill {"] {
+        assert!(!rule(fill).contains("transition"), "{fill}{}", rule(fill));
+    }
+    let falling = rule(".falling {");
+    let ms: Vec<u32> = falling
+        .split("ms")
+        .filter_map(|part| part.rsplit(' ').next()?.parse().ok())
+        .collect();
+    assert!(!ms.is_empty() && ms.iter().all(|ms| (300..=800).contains(ms)), "{falling}");
+    for (track, height) in [
+        ("#small .meter .track {", 6),
+        (".page-meter > .page-level {", 6),
+        (".check-track {", 8),
+    ] {
+        assert!(rule(track).contains(&format!("height: {height}px")), "{track}{}", rule(track));
+    }
+    assert!(
+        style.contains(TINT_HERE) && style.contains(TINT_REMOTE),
+        "the tracks are tinted otherwise: say so here"
+    );
+    assert!(style.contains(
+        "prefers-reduced-motion: reduce) {\n  *, *::before, *::after { animation: none !important; transition: none !important; }"
+    ));
 }
 
 #[test]

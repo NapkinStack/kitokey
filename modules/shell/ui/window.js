@@ -1245,6 +1245,38 @@ const elapsed = (seconds) => {
   return [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60].map((n) => String(n).padStart(2, "0")).join(":");
 };
 
+// A level meter's drawing from a reading, 0 to 1, given the one drawn before (#1179): the reading drawn at once,
+// a fall eased by the style's `.falling`, as a VU meter — Zoom's and Meet's levels are smoothed too —, and the
+// loudest of the last 0.8 s kept as a tick. Who asks for less motion is drawn a level held a second, in three
+// steps — silent, heard, loud —, and no tick: nothing moves ten times a second (D69). Pure: tests/meter.rs runs it.
+function levelShown(was, reading, now, still) {
+  const percent = Math.round(Math.min(1, Math.max(0, reading)) * 100);
+  if (still) {
+    if (was && was.peak === null && now - was.at < 1000) return was;
+    return { width: percent < 20 ? 0 : percent < 75 ? 50 : 90, falling: false, peak: null, at: now };
+  }
+  const kept = was && was.peak !== null && percent < was.peak && now - was.at <= 800;
+  return { width: percent, falling: Boolean(was) && percent < was.width, peak: kept ? was.peak : percent, at: kept ? was.at : now };
+}
+
+// Draws a reading on a meter's fill, its track the meter a screen reader reads (its value the reading itself), its
+// tick the fill's next sibling.
+const levelsDrawn = new WeakMap();
+const lessMotion = matchMedia("(prefers-reduced-motion: reduce)");
+function paintLevel(fill_, reading) {
+  const shown = levelShown(levelsDrawn.get(fill_), reading, performance.now(), lessMotion.matches);
+  levelsDrawn.set(fill_, shown);
+  fill_.classList.toggle("falling", shown.falling);
+  fill_.style.width = `${shown.width}%`;
+  const tick = fill_.nextElementSibling;
+  if (tick) {
+    tick.classList.toggle("falling", shown.falling);
+    tick.hidden = shown.peak === null || shown.peak <= shown.width;
+    tick.style.left = `${shown.peak ?? 0}%`;
+  }
+  fill_.parentElement.setAttribute("aria-valuenow", String(Math.round(Math.min(1, Math.max(0, reading)) * 100)));
+}
+
 // The page of the meeting being recorded (#1076): both sides' levels as the bar's meters, and its time,
 // read from what the bar reads ten times a second (`recording_now`). Neither is a live region — a screen
 // reader would say them ten times a second —, a meter's value is read when it is reached, as the bar's.
@@ -1265,18 +1297,14 @@ function pageLevels(name, time, words) {
     track.setAttribute("aria-valuemax", "100");
     track.setAttribute("aria-valuenow", "0");
     const fill_ = element("span", index === 0 ? "fill here" : "fill remote");
-    track.append(fill_);
+    track.append(fill_, element("span", "peak"));
     column.append(track, element("span", index === 0 ? "here" : "remote", index === 0 ? words.here_described : words.remote_described));
     row.append(column);
     return fill_;
   });
   const paint = (now) => {
     time.textContent = elapsed(now.seconds);
-    for (const [index, fill_] of fills.entries()) {
-      const percent = Math.round(now.levels[index] * 100);
-      fill_.style.width = `${percent}%`;
-      fill_.parentElement.setAttribute("aria-valuenow", String(percent));
-    }
+    for (const [index, fill_] of fills.entries()) paintLevel(fill_, now.levels[index]);
   };
   if (pageLast?.meeting === name) paint(pageLast);
   // The poll ends with the page or the recording, and its reading with it: a meeting deleted frees its name within
@@ -4372,7 +4400,7 @@ async function checkSound(words, back, lost) {
     const track = element("div", "check-track");
     const fill = element("span", "check-fill");
     fill.id = `check-level-${id}`;
-    track.append(fill);
+    track.append(fill, element("span", "peak"));
     // A meter a screen reader reads as one, from 0 to 100.
     track.setAttribute("role", "meter");
     track.setAttribute("aria-label", name);
@@ -4380,10 +4408,10 @@ async function checkSound(words, back, lost) {
     track.setAttribute("aria-valuemax", "100");
     track.setAttribute("aria-valuenow", "0");
     source.append(top, track);
-    return [source, device, fill, track];
+    return [source, device, fill];
   };
-  const [me, meDevice, meFill, meTrack] = side("mic", words.small_mic, "me", "near");
-  const [others, othersDevice, othersFill, othersTrack] = side("volume-2", words.small_meeting, "others", "far");
+  const [me, meDevice, meFill] = side("mic", words.small_mic, "me", "near");
+  const [others, othersDevice, othersFill] = side("volume-2", words.small_meeting, "others", "far");
   const said = (glyph, id, kind) => {
     const line = element("p", `check-said ${kind}`);
     line.id = id;
@@ -4470,10 +4498,9 @@ async function checkSound(words, back, lost) {
   const paint = ({ open, heard: listened, call: held }) => {
     // Its listening ended by the shell — a recording started elsewhere, the panel given up —: it goes.
     if (!open) return end();
-    for (const [index, device, fill, track] of [[0, meDevice, meFill, meTrack], [1, othersDevice, othersFill, othersTrack]]) {
+    for (const [index, device, fill] of [[0, meDevice, meFill], [1, othersDevice, othersFill]]) {
       device.textContent = listened.unavailable[index] ? words.check_unavailable : listened.devices[index] ?? "";
-      fill.style.width = `${Math.round(listened.levels[index] * 100)}%`;
-      track.setAttribute("aria-valuenow", String(Math.round(listened.levels[index] * 100)));
+      paintLevel(fill, listened.levels[index]);
     }
     // A call holds the microphone: its sentence alone — the headset stays in its call profile after.
     bluetooth.hidden = !listened.headset || held;
@@ -4953,7 +4980,7 @@ function showSmall(words) {
     bar.setAttribute("aria-valuemax", "100");
     const fill_ = element("span", "fill");
     fill_.id = id;
-    bar.append(fill_);
+    bar.append(fill_, element("span", "peak"));
     const named = element("span", "device unseen");
     named.id = device;
     row.append(bar, named);
@@ -5233,12 +5260,7 @@ function showSmall(words) {
     if (micNext.textContent !== recorded) micNext.textContent = recorded;
     const whole = Math.floor(now.seconds);
     time.textContent = [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60].map((n) => String(n).padStart(2, "0")).join(":");
-    for (const [index, id] of ["level-me", "level-others"].entries()) {
-      const percent = Math.round(now.levels[index] * 100);
-      const fill_ = document.getElementById(id);
-      fill_.style.width = `${percent}%`;
-      fill_.parentElement.setAttribute("aria-valuenow", String(percent));
-    }
+    for (const [index, id] of ["level-me", "level-others"].entries()) paintLevel(document.getElementById(id), now.levels[index]);
     // Written when it changes alone: a tick that rewrites text under a click loses it in WebKitGTK.
     for (const [index, check] of checks.entries()) {
       const device = now.devices[index] ?? "";
