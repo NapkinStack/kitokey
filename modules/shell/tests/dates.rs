@@ -153,6 +153,8 @@ fn a_past_a_negation_a_range_or_a_rule_is_not_said() {
         "2 jours",
         "dans les 2 jours",
         "12 décembre, 15 décembre",
+        "lundi, mardi",
+        "lundi et mardi",
     ] {
         assert_eq!(resolve(when, tuesday()), None, "{when:?}");
     }
