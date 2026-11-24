@@ -744,6 +744,13 @@ EXAMPLES["posting/v1/input.schema.json"] = (
         {"address": 3, "name": "n"},
     ],
 )
+# posting/v1's `confirmed_confidential` (D118), added in place: optional, a boolean, false when absent.
+EXAMPLES["posting/v1/input.schema.json"][0].extend(
+    [{**_SEND, "confirmed_confidential": True}, {**_SEND, "confirmed_confidential": False}]
+)
+EXAMPLES["posting/v1/input.schema.json"][1].extend(
+    [{**_SEND, "confirmed_confidential": value} for value in ("true", 1, 0, None, "")]
+)
 EXAMPLES["posting/v1/event.schema.json"] = (
     [
         {"event": "sent"},
