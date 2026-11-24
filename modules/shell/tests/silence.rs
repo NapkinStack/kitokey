@@ -14,6 +14,11 @@ use oxc_span::{GetSpan, SourceType};
 const SILENT: &[(&str, usize, &str)] = &[
     ("page_failed", 1, "the log itself: nowhere left to say it"),
     (
+        "sending_of",
+        1,
+        "what a summary offers to send (D110): not read, no send is offered and nothing is listed, and the next drawing reads again; it fails only when the meeting is gone",
+    ),
+    (
         "services_offered",
         1,
         "an addition to the redo list (D96): not read, Settings' models and this computer's are still offered; a service that does not answer is logged by the shell",
@@ -31,7 +36,11 @@ const SILENT: &[(&str, usize, &str)] = &[
         1,
         "it returns a failed reading as `unread`, which the list says; the command itself cannot fail, and a later opening reads again",
     ),
-    ("recording_now", 1, "returns no `Result`: it cannot fail"),
+    (
+        "recording_now",
+        2,
+        "returns no `Result`: it cannot fail — read by the bar and by the page of the meeting being recorded (#1076)",
+    ),
     (
         "next_context",
         1,

@@ -14,7 +14,7 @@ case ${1:?before or after} in
   after)
     previous=$(rpm -q --qf '%{VERSION}' kitokey)
     check "upgraded with dnf, kitokey $previous to $version" "dnf upgrade -y -q --refresh kitokey >/tmp/upgrade.log 2>&1 && test \"\$(rpm -q --qf '%{VERSION}' kitokey)\" = \"\$version\" || { tail -5 /tmp/upgrade.log; false; }"
-    for program in kitokey kitokey-capture kitokey-transcription kitokey-summary; do
+    for program in kitokey kitokey-capture kitokey-transcription kitokey-summary kitokey-export kitokey-send; do
       check "$program says $version" "test \"\$($program --version)\" = \"$program $version\""
     done
     check "the meetings and the settings stay as they were" "test \"\$(snapshot)\" = \"\$(cat /tmp/kept-before)\""

@@ -341,7 +341,7 @@ It never reads your `gh` login by itself; to have it read with that login, for o
 | `.nstack/forms/` | The forms a command or a playbook copies: charter, cycle, decision, rules | Agents and commands |
 | `.nstack/handbook/` | **The handbook**: the why behind every rule | Humans, once |
 | `docs/adr/`, `docs/pdr/` | The decisions taken, with their success criterion | Everyone, on demand |
-| `.copier-answers.yml` | The NapkinStack version and the creation answers | `nstack update`, the only thing that changes it |
+| `.copier-answers.yml` | The NapkinStack version and the creation answers | The `_` lines: `nstack update`, never by hand. The answers: the decider, by hand, in a pull request |
 | `.github/` | What makes the rules non-bypassable | GitHub |
 
 > **`.nstack/handbook/` is never loaded into an agent's context.** It is the human reference.
@@ -358,7 +358,7 @@ nstack fitness       # manifests + boundaries + skills + plan + hygiene — befo
 nstack discover <idea-file>   # starts a discovery, for your agent
 nstack plan          # what needs a person first; then the discovery, the charter and the cycles (docs/project/), the decisions due at a closure, the project across its cycles, who holds what
 nstack claim D<n> --session <s> --person @<you>   # takes a deliverable before its first change; nstack unclaim gives it back
-                                                  # --take-over: a stale hold, or your own from another session
+                                                  # --take-over: a stale hold, or your own from another agent's session or outside nstack agent run; your agent restarted renews without it
 nstack deliver D<n> --held '#<pr>' --session <s>   # records a merged deliverable delivered; --write-states at the closure
 nstack agent add <name> [--clone <dir>] · nstack agent run <name> -- <command>   # an agent's own App and clone; add is a person's
 nstack agent status  # who this agent is — its App, repository, clone, gh and hooks; for a person, this project's agents

@@ -545,3 +545,163 @@ fn minutes_v4_read_as_v3_do_and_say_how_long_they_took() {
         );
     }
 }
+
+/// minutes/v5's own example, as its page shows it (D111): the contract read on the consumer's side.
+fn v5_example() -> String {
+    // A Windows checkout gives the page \r\n: read as the contract writes it (bar.rs:88, #1042).
+    let page = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../contracts/minutes/v5/README.md"))
+        .unwrap()
+        .replace("\r\n", "\n");
+    let valid = &page[page.find("Valid:").unwrap()..];
+    let start = valid.find("```markdown\n").unwrap() + "```markdown\n".len();
+    valid[start..start + valid[start..].find("\n```").unwrap()].to_string() + "\n"
+}
+
+/// The page's names of a structure's sections, by id, as `words.rs` gives them.
+const BY_ID: [(&str, &str); 4] = [
+    ("status", "État"),
+    ("risks", "Risques"),
+    ("decisions", "Décisions"),
+    ("actions", "Actions"),
+];
+
+fn read_v5(text: &str) -> Read<minutes::Minutes> {
+    let folder = tempfile::tempdir().unwrap();
+    fs::write(folder.path().join("minutes.md"), text).unwrap();
+    minutes::minutes_named(folder.path(), NAMES, &BY_ID)
+}
+
+#[test]
+fn minutes_v5_are_read_their_sections_named_by_their_ids_and_their_actions_found_by_theirs() {
+    let Read::Present(minutes) = read_v5(&v5_example()) else {
+        panic!("v5's own example not read")
+    };
+    // Each title the page's for its id, in the sections' order; the model's own titles gone.
+    let titles: Vec<&str> = minutes
+        .body
+        .match_indices("<h2>")
+        .map(|(at, _)| &minutes.body[at + 4..at + 4 + minutes.body[at + 4..].find("</h2>").unwrap()])
+        .collect();
+    assert_eq!(titles, ["État", "Risques", "Décisions", "Actions"], "{}", minutes.body);
+    assert!(!minutes.body.contains("Risques et problèmes"), "{}", minutes.body);
+    // The actions are the section whose id `actions` names: the fourth here, never the second by place.
+    assert_eq!(minutes.actions, Some(4));
+    // In v5 an item of any section may end with its time: marked wherever it is.
+    assert!(minutes.body.contains(r#"<time data-second="252">04:12</time>"#), "{}", minutes.body);
+    assert!(minutes.body.contains(r#"<time data-second="270">04:30</time>"#), "{}", minutes.body);
+    assert_eq!(minutes.title.as_deref(), Some("Point d'avancement du projet Atlas"));
+    assert!(minutes.markdown.starts_with("## État\n"), "{}", minutes.markdown);
+}
+
+#[test]
+fn minutes_before_v5_have_their_actions_in_their_second_section() {
+    let Read::Present(minutes) = read(MINUTES) else {
+        panic!("not read")
+    };
+    assert_eq!(minutes.actions, Some(2));
+}
+
+#[test]
+fn a_section_whose_id_the_page_does_not_name_keeps_the_models_title() {
+    // A model's title unlike any of the page's names, so that kept and renamed differ (ines, #1043).
+    let text = v5_example()
+        .replace(r#""id": "decisions""#, r#""id": "later_kind""#)
+        .replace("## Décisions", "## Ce qui a été tranché");
+    let Read::Present(minutes) = read_v5(&text) else {
+        panic!("not read")
+    };
+    assert!(
+        minutes.body.contains("<h2>Ce qui a été tranché</h2>"),
+        "the model's own title, kept: {}",
+        minutes.body
+    );
+    assert!(!minutes.body.contains("<h2>Décisions</h2>"), "{}", minutes.body);
+    assert!(
+        minutes.body.contains("<h2>État</h2>") && minutes.body.contains("<h2>Actions</h2>"),
+        "{}",
+        minutes.body
+    );
+}
+
+#[test]
+fn minutes_v5_whose_front_matter_and_body_disagree_are_unreadable() {
+    let example = v5_example();
+    for (why, text) in [
+        ("a section fewer", example.replacen("## Décisions\n", "", 1)),
+        (
+            "actions naming no id",
+            example.replacen("actions: actions", "actions: next_steps", 1),
+        ),
+        ("no sections", {
+            let at = example.find("sections: ").unwrap();
+            let end = at + example[at..].find('\n').unwrap() + 1;
+            format!("{}{}", &example[..at], &example[end..])
+        }),
+        ("no structure", example.replacen("structure: project_review\n", "", 1)),
+        ("an id twice", example.replacen(r#""id": "risks""#, r#""id": "status""#, 1)),
+        ("sections not an array", example.replacen("sections: [", "sections: {\"a\": [", 1)),
+        (
+            "an empty about",
+            example.replacen(r#""about": "Each risk"#, r#""about": "", "was": "Each risk"#, 1),
+        ),
+        (
+            "an about on two lines",
+            example.replacen(r#""about": "Each risk"#, r#""about": "Each\nrisk"#, 1),
+        ),
+        (
+            "an about over 200 characters",
+            example.replacen(r#""about": "Each risk"#, &format!(r#""about": "{}"#, "x".repeat(201)), 1),
+        ),
+        ("seven sections", {
+            let more: String = ["a", "b", "c"]
+                .iter()
+                .map(|id| format!(r#"{{"id": "{id}", "about": "Seven."}}, "#))
+                .collect();
+            example
+                .replacen(r#"[{"id": "status""#, &format!(r#"[{more}{{"id": "status""#), 1)
+                .replacen("## État", "## A\n\nUn.\n\n## B\n\nDeux.\n\n## C\n\nTrois.\n\n## État", 1)
+        }),
+    ] {
+        assert!(matches!(read_v5(&text), Read::Unreadable), "{why}: read");
+    }
+}
+
+#[test]
+fn minutes_v5_without_actions_read_with_none_to_show_as_rows() {
+    let text = v5_example().replacen("actions: actions\n", "", 1);
+    let Read::Present(minutes) = read_v5(&text) else {
+        panic!("not read")
+    };
+    assert_eq!(minutes.actions, None);
+    assert!(
+        minutes.body.contains("<h2>Actions</h2>"),
+        "the section is still shown: {}",
+        minutes.body
+    );
+}
+
+#[test]
+fn in_minutes_v5_a_time_ends_an_item_of_the_first_section_too() {
+    let text = v5_example().replacen(
+        "La recette commence lundi ; le lot 2 a une semaine de retard sur le plan.",
+        "- La recette commence lundi [01:05]",
+        1,
+    );
+    let Read::Present(minutes) = read_v5(&text) else {
+        panic!("not read")
+    };
+    assert!(minutes.body.contains(r#"<time data-second="65">01:05</time>"#), "{}", minutes.body);
+}
+
+#[test]
+fn an_about_of_200_characters_is_within_its_bounds() {
+    let text = v5_example().replacen(
+        r#""about": "Each risk or issue raised, one bullet each.""#,
+        &format!(r#""about": "{}""#, "x".repeat(200)),
+        1,
+    );
+    assert!(
+        matches!(read_v5(&text), Read::Present(_)),
+        "200 characters is the most, not too many"
+    );
+}

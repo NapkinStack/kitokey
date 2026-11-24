@@ -99,6 +99,8 @@ pub enum What {
     Sound,
     /// Its transcript, to a service that wrote the minutes.
     Transcript,
+    /// Its summary, to a destination the user sent it to (D110, PDR-0007 §4): `host` is the destination's name.
+    Summary,
 }
 
 /// What had left, and to which host.

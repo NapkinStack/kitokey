@@ -26,6 +26,7 @@ import sys
 import threading
 import time
 import traceback
+import unicodedata
 import urllib.request
 import wave
 from pathlib import Path
@@ -85,9 +86,65 @@ echo '{"event": "answered"}'
 """
 )
 SUMMARY.chmod(0o755)
+# kitokey-export played here, as exporting/v1 says it (D108, D109): its arguments and its input
+# kept beside it; the file asked for written whole at `to` — the meeting's minutes, as an md would
+# hold them —, then `written`; with `export-refuse` there, `failed` with `file.unwritable`, nothing written.
+EXPORTER = WORK / "kitokey-export"
+EXPORTER.write_text(
+    """#!/bin/sh
+here=$(dirname "$0")
+printf '%s\\n' "$*" > "$here/export-args"
+cat > "$here/export-input"
+if [ -e "$here/export-refuse" ]; then
+  echo '{"event": "failed", "code": "file.unwritable"}'
+  echo "kitokey-export: the file could not be written" >&2
+  exit 1
+fi
+python3 - "$1" "$here/export-input" <<'END'
+import json, pathlib, sys
+to = pathlib.Path(json.loads(pathlib.Path(sys.argv[2]).read_text())["to"])
+written = to.with_name(to.name + ".part")
+written.write_text((pathlib.Path(sys.argv[1]) / "minutes.md").read_text())
+written.replace(to)
+print(json.dumps({"event": "written", "file": str(to), "bytes": to.stat().st_size}))
+END
+"""
+)
+EXPORTER.chmod(0o755)
 # kitokey-transcription played here: a whole transcript, naming the model it was given — a
 # service's by its host, as the real one names it; where a scenario stands the service in
 # ($STANDIN, D60), its request is sent to it, as the real one would send the sound there.
+# kitokey-send played here (posting/v1, D110): each call kept beside it — its arguments, and its input,
+# where the address is, a secret — and answered as the real one judges an address: `https:` to a host
+# that is not this computer is checked; anything else refused. It never sends anything anywhere: a send's
+# outcome is played by the address's host (gone, busy, offline, silent; any other: sent).
+SENDER = WORK / "kitokey-send"
+SENDER.write_text(
+    """#!/usr/bin/env python3
+import json, sys
+from pathlib import Path
+said = sys.stdin.read()
+with open(Path(sys.argv[0]).parent / "send-calls.jsonl", "a") as calls:
+    calls.write(json.dumps({"args": sys.argv[1:], "input": said}) + "\\n")
+address = json.loads(said)["address"]
+host = address.split("://", 1)[-1].split("/", 1)[0]
+if address.startswith("https://") and host not in ("127.0.0.1", "localhost") and not host.startswith("192.168."):
+    # A send (not --check): the destination's answer played by its host, as posting/v1 names each outcome.
+    played = {"gone.example": ("destination.gone", None), "busy.example": ("destination.busy", 30), "later.example": ("destination.busy", None),
+              "offline.example": ("network.unreachable", None), "silent.example": ("destination.silent", None)}
+    if "--check" not in sys.argv and host in played:
+        code, after = played[host]
+        print(json.dumps({"event": "failed", "code": code, **({"retry_after": after} if after else {})}))
+        print("kitokey-send: the destination did not take it", file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps({"event": "checked" if "--check" in sys.argv else "sent"}))
+    sys.exit(0)
+print(json.dumps({"event": "failed", "code": "address.refused"}))
+print("kitokey-send: the address is refused: it is not https, or it points to this computer or its network", file=sys.stderr)
+sys.exit(1)
+"""
+)
+SENDER.chmod(0o755)
 HEARING = WORK / "kitokey-transcription"
 HEARING.write_text(
     """#!/bin/sh
@@ -170,8 +227,10 @@ if [ "$1" = listen ]; then
   done
 fi
 printf '%s\\n' "$*" > "$here/recorder-args"
-folder="$2/2026-10-18_12-00"; mkdir -p "$folder"
-printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","tracks":{}}' > "$folder/session.json"
+# Its meeting's folder and times: the scenarios' fixed ones, or another a scenario names (D103's screenshots).
+at=${KITOKEY_E2E_RECORDED_AT:-2026-10-18T12:00:00+02:00}; until=${KITOKEY_E2E_RECORDED_UNTIL:-2026-10-18T12:00:05+02:00}
+folder="$2/${KITOKEY_E2E_RECORDED:-2026-10-18_12-00}"; mkdir -p "$folder"
+printf '{"contract":"session-audio/v2","started":"%s","tracks":{}}' "$at" > "$folder/session.json"
 # As recording/v1 says, where the scenario asks it (`faithful-recorder`, CC): its reader gone, it goes on
 # (#773); its input closed stops nothing; a termination signal stops it as `stop` does — `session.json` says
 # `stopped`, and it ends well. Unasked, it dies with its reader, as every other scenario has it (s961b2).
@@ -181,7 +240,7 @@ if [ -e "$2/faithful-recorder" ]; then
   faithful=true
   trap '' PIPE
   echo $$ > "$here/recorder-pid"
-  stopped() { printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"; echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'; exit 0; }
+  stopped() { printf '{"contract":"session-audio/v2","started":"%s","stopped":"%s","tracks":{}}' "$at" "$until" > "$folder/session.json"; echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'; exit 0; }
   trap stopped TERM INT
 fi
 me='"Mic"'
@@ -216,7 +275,7 @@ while :; do
   # Another device that reads as the one chosen, which is not back.
   if [ -e "$2/mic-same" ]; then d=$(cat "$2/mic-same"); rm "$2/mic-same"; echo '{"event":"device","source":"me","device":"'"$d"'"}'; fi
 done
-printf '{"contract":"session-audio/v2","started":"2026-10-18T12:00:00+02:00","stopped":"2026-10-18T12:00:05+02:00","tracks":{}}' > "$folder/session.json"
+printf '{"contract":"session-audio/v2","started":"%s","stopped":"%s","tracks":{}}' "$at" "$until" > "$folder/session.json"
 echo '{"event":"stopped","folder":"'"$folder"'","seconds":5.0}'
 """
 )
@@ -635,7 +694,7 @@ class Window:
         self.file.write_text(f'sessions = "{sessions}"\n{opened}{greeted}{more}')
         self.env = dict(os.environ, XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
         # An Ollama and a keyring of the scenario's, never the user's own.
-        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER))
+        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_EXPORT=str(EXPORTER), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER))
 
     def __enter__(self) -> webdriver.Remote:
         # One Kitokey per session: one still leaving takes this start's arguments and this one
@@ -960,7 +1019,18 @@ def model_offered(now: dt.datetime) -> None:
     threading.Thread(target=server.serve_forever, daemon=True).start()
     host = f"127.0.0.1:{server.server_address[1]}"
     meetings, data = WORK / "fetching", WORK / "data-fetching"
-    session(meetings / "2026-10-25_10-00", now - dt.timedelta(hours=1), 5, {"local.wav": 2000})
+    session(meetings / "2026-10-25_10-00", now - dt.timedelta(hours=1), 5, {})
+    # Its sound playable, as a meeting just recorded has it (#1134): the page offers its player before any transcript.
+    waiting = meetings / "2026-10-25_10-00"
+    record = json.loads((waiting / "session.json").read_text())
+    record["tracks"] = {"local": {"device": "Mic"}}
+    (waiting / "session.json").write_text(json.dumps(record))
+    with wave.open(str(waiting / "local.wav"), "wb") as made:
+        made.setnchannels(1)
+        made.setsampwidth(2)
+        made.setframerate(48000)
+        made.writeframes(bytes(2 * 48000 * 2))
+    (waiting / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n')
     heard = meetings / "2026-10-25_10-00" / "transcript.jsonl"
     fetched = data / "kitokey" / "models" / "ggml-large-v3-turbo-q8_0.bin"
     window = Window(meetings, "fr_FR.UTF-8")
@@ -998,9 +1068,47 @@ def model_offered(now: dt.datetime) -> None:
         waits = "return document.getElementById('transcript-state')?.innerText || ''"
         offered = wait_for(browser, lambda b: "En attente du modèle de transcription" in b.execute_script(waits) and b.find_elements(By.CSS_SELECTOR, "#transcript-state #model-fetch"))
         check("a meeting waiting for the model offers it on its page", offered, browser.execute_script(waits))
+        # #933: the offer names what follows it, the transcript (as D113's Refaire… names what it starts).
+        fetch_said = browser.execute_script("return document.querySelector('#transcript-state #model-fetch')?.textContent ?? null")
+        check("on a meeting's page, the model's offer names what follows: « … et transcrire » (#933)",
+              fetch_said == f"Télécharger le modèle (300 ko, {host}) et transcrire", fetch_said)
         # Said once (#775): what it waits for, never « Pas encore de transcription » beside it.
         nones = browser.execute_script("return [...document.querySelectorAll('#meeting .transcript .none')].filter(e => e.offsetParent !== null).map(e => e.textContent)")
         check("a transcript waiting for its model says that alone, not also that there is none (#775)", nones == [], nones)
+        # #1116 (the decider, 2026-11-21 ~19h): no transcript yet, the who-spoke area keeps no blank height — one line says
+        # when it will appear (an empty state says what will come, NN/g), in the soft colour. #1134: the line stands in the
+        # who-spoke card, never in the drawing, which is the player's slider once the sound plays.
+        later = ("const c = document.querySelector('#meeting .drawn'), d = document.querySelector('#meeting .drawing'),"
+                 " p = document.getElementById('who-spoke-later'); if (!c || !p) return null;"
+                 " return {text: p.textContent, card: c.contains(p), drawing: d ? Math.round(d.getBoundingClientRect().height) : 0}")
+        no_blank = browser.execute_script(later)
+        check("no transcript yet: one line says when who spoke will appear, in the who-spoke card, no blank canvas (#1116, #1134)",
+              no_blank is not None and no_blank["text"] == "Le temps de parole s’affichera après la transcription." and no_blank["card"]
+              and no_blank["drawing"] <= 24, no_blank)
+        # #1134: its sound playable, the player is offered, its slider a bare track: a slider's children are presentational
+        # (WAI-ARIA 1.2), so the line said outside it, and a press on the line no seek.
+        # Its target and its rail read each on its own element (2.5.8): the slider's box, at least 24 px; the rail drawn in it,
+        # its ::before, 4 to 8 px — a rail not drawn reads 0 (cc98fad: a 6 px height eaten by border-box padding, i-v1138ok).
+        bare = ("const s = document.querySelector('#meeting [role=slider]'), p = document.getElementById('who-spoke-later');"
+                " return {slider: !!s, play: !!document.getElementById('play'), line_in: !!(s && p && s.contains(p)),"
+                " text: s ? s.textContent.trim() : null, height: s ? Math.round(s.getBoundingClientRect().height) : 0,"
+                " rail: s ? Math.round(parseFloat(getComputedStyle(s, '::before').height) || 0) : 0,"
+                " width: s ? Math.round(s.getBoundingClientRect().width) : 0}")
+        track = browser.execute_script(bare)
+        check("no transcript yet, its sound playable: the player offered, its slider a bare rail of 4 to 8 px in a 24 px target, the line outside it (#1134)",
+              track["slider"] and track["play"] and not track["line_in"] and track["text"] == "" and track["height"] >= 24 and 4 <= track["rail"] <= 8 and track["width"] >= 200, track)
+        # A legend names and scales what is drawn: nothing drawn yet, no legend — the header says the meeting's length (#1134).
+        legends = browser.execute_script("return [...document.querySelectorAll('#meeting .legend')].filter(e => e.getClientRects().length).map(e => e.textContent)")
+        check("no transcript yet: no legend, nothing drawn to name or to scale (#1134)", legends == [], legends)
+        size = browser.get_window_size()
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            browser.execute_script("scrollTo(0, 0)")
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1116-untranscribed-{width}-{theme}", theme)
+        browser.set_window_size(size["width"], size["height"])
+        time.sleep(0.3)
         # The tray's entry that fetches it follows the language chosen, at once (D64).
         speak = lambda code: browser.execute_script("return window.__TAURI__.core.invoke('settings_saved', {change: {language: arguments[0]}})", code)
         tray = lambda b, said: any(label.startswith(said) for label in tray_labels())
@@ -2495,7 +2603,7 @@ def meeting_language(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         own = Select(browser.find_element(By.ID, "meeting-language"))
         check("a meeting's page offers its own language, the settings' by default — the language they name said",
-              own.first_selected_option.text == "Celle des Réglages — English" and not (heard / "language").exists(), own.first_selected_option.text)
+              own.first_selected_option.text == "English, selon les Réglages" and not (heard / "language").exists(), own.first_selected_option.text)
         choose(browser, "meeting-language", "de")
         written = wait_for(browser, lambda b: (heard / "language").exists() and (heard / "language").read_text() == "de\n", 5)
         check("chosen on its page, the meeting's language file holds its code alone", written)
@@ -2527,7 +2635,7 @@ def meeting_language(now: dt.datetime) -> None:
                                      for line in log.read_text(errors="replace").splitlines()
                                      if any(word in line for word in ("language_set", "\"WARN\"", "\"ERROR\"", "panicked"))][-8:]),
             }
-        check("« Celle des Réglages »: the file removed", removed, None if removed else said_then())
+        check("« …, selon les Réglages »: the file removed", removed, None if removed else said_then())
         args.unlink(missing_ok=True)
         browser.execute_script("window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", heard.name, str(model))
         again = wait_for(browser, lambda b: "--language" in told(), 15)
@@ -2550,7 +2658,7 @@ def meeting_language(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         # By script, in one step: the page may be drawn again between finding the list and reading it.
         said = browser.execute_script("const p = document.getElementById('meeting-language'); return p.options[p.selectedIndex].text")
-        check("the settings detecting it, the page says « détectée »", said == "Celle des Réglages — détectée", said)
+        check("the settings detecting it, the page says « Détection automatique », the words Settings use (#1074)", said == "Détection automatique", said)
         # Refused on its page (the shell's refusal stood in for, each refusal its own words): said, and
         # still said once the page is drawn again; a second refusal says its own; a choice saved says
         # none; gone once the page is left (#841, the rule of #655's fix).
@@ -2606,8 +2714,8 @@ def meeting_language(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
         offered = [o.text for o in Select(browser.find_element(By.ID, "meeting-language")).options]
-        check("SpeechAnalyzer hearing: the page says the system's language, never « détectée », and offers French and English alone",
-              offered == ["Celle des Réglages — Français", "Français", "English"], offered)
+        check("SpeechAnalyzer hearing: the page says the system's language, never « Détection automatique », and offers French and English alone (#1074)",
+              offered == ["Français, selon les Réglages", "Français", "English"], offered)
     with window as browser:
         press(browser, "settings-link")
         wait_for(browser, lambda b: b.find_elements(By.ID, "meetings-language"), 10)
@@ -2686,9 +2794,10 @@ echo '{{"available":true,"installed":true,"supported":true}}'
                                stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
     try:
         with window as browser:
-            menu = wait_for(browser, lambda b: tray_labels() == french, 10)
-            check("started in French, the system's: the window and the tray's menu speak it",
-                  menu and sections(browser) == ["Réglages", "fr"], (tray_labels(), sections(browser)))
+            # The menu and the page, both: the window's first drawing can come after the tray's labels (#1131).
+            spoken = wait_for(browser, lambda b: tray_labels() == french and sections(b) == ["Réglages", "fr"], 10)
+            check("started in French, the system's: the window and the tray's menu speak it", spoken,
+                  (tray_labels(), sections(browser)))
             press(browser, "settings-link")
             wait_for(browser, lambda b: b.find_elements(By.ID, "app-language"), 10)
             pick = Select(browser.find_element(By.ID, "app-language"))
@@ -2772,9 +2881,9 @@ echo '{{"available":true,"installed":true,"supported":true}}'
         window.file.write_text(window.file.read_text().replace('engine = "speechanalyzer"', 'engine = "service"')
                                + 'transcription_provider = "http://127.0.0.1:9/v1"\ntranscription_model = "hears"\n')
         with window as browser:
-            menu = wait_for(browser, lambda b: tray_labels() == english, 10)
-            check("started again, the system still French: it speaks the one chosen", menu and sections(browser) == ["Settings", "en"],
-                  (tray_labels(), sections(browser)))
+            # The menu and the page, both: the window's first drawing can come after the tray's labels (#1131).
+            spoken = wait_for(browser, lambda b: tray_labels() == english and sections(b) == ["Settings", "en"], 10)
+            check("started again, the system still French: it speaks the one chosen", spoken, (tray_labels(), sections(browser)))
             press(browser, "settings-link")
             wait_for(browser, lambda b: b.find_elements(By.ID, "app-language"), 10)
             kept = Select(browser.find_element(By.ID, "app-language")).first_selected_option.text
@@ -3046,6 +3155,10 @@ def cancelled_at_once(now: dt.datetime) -> None:
     )
     with window as browser:
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        # Minutes this computer wrote (`provider: local`) said as a buyer reads it, never the contract's word (#1080).
+        here = wait_for(browser, lambda b: "writer first" in makers(b), 10)
+        check("minutes written on this computer: « Writer first, sur cet ordinateur » — as « Transcrit par …, sur cet ordinateur » —, never « via local » (#1080)",
+              here and "writer first, sur cet ordinateur" in makers(browser) and "via local" not in makers(browser), makers(browser))
         for what, file, step, start, (first, second), said_after in steps:
             before, listed = sha(file), sorted(p.name for p in meeting.iterdir())
             held, child = WORK / f"held-{step}", WORK / f"held-{step}-child"
@@ -3387,7 +3500,8 @@ def models_advanced(now: dt.datetime) -> None:
                   whole and not got["fit"] and got["said"] == got["text"] and got["size"] == "12px" and got["inside"], got)
             # « Avancé » closed and opened again — drawn anew with the choice kept: said whole again.
             press(browser, "small-advanced")
-            wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is True, 3)
+            closed = wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is True, 3)
+            check("fr, the bar: « Avancé » closed, its panel hidden before it is opened again (#1142)", closed, browser.execute_script(shown, "small"))
             press(browser, "small-advanced")
             again = wait_for(browser, lambda b: b.execute_script(shown, "small")["hidden"] is False
                              and b.execute_script(LONG_SHOWN, "small-minutes-model")["said"] == LONG_SAID + " — sur cet ordinateur", 5)
@@ -3820,6 +3934,11 @@ def advanced_latest_answer(now: dt.datetime) -> None:
             browser.execute_script(
                 "const real = window.__TAURI__.core; window.held = []; window.armed = true; window.refusing = false;"
                 " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => {"
+                "   if (asked === 'recording_now' && window.stale) { window.stale = false;"
+                "     return new Promise((ok, no) => window.held.push(() => real.invoke(asked, ...rest).then((a) => ok({ ...a, recording: false, meeting: null }), no))); }"
+                "   if (asked === 'models_offered' && window.failing && rest[0] && rest[0].name) return Promise.reject('failing (#1142)');"
+                "   if (asked === 'models_offered' && window.holding && rest[0] && rest[0].name) { window.holding = false;"
+                "     return new Promise((ok, no) => window.held.push(() => real.invoke(asked, ...rest).then(ok, no))); }"
                 "   if (asked === 'models_offered' && window.refusing && rest[0] && rest[0].name) { window.refusing = false;"
                 "     return new Promise((ok, no) => window.held.push(() => no('held, then refused (#852)'))); }"
                 "   if (asked === 'models_offered' && window.armed && rest[0] && rest[0].name) { window.armed = false; window.heldFor = rest[0].name;"
@@ -3860,6 +3979,45 @@ def advanced_latest_answer(now: dt.datetime) -> None:
             check("an older ask refused after a later one answered: « Avancé » shows the models, and nothing says they could not be read (#852)",
                   held and answered and not refused and browser.execute_script(opened),
                   {"held": held, "answered": answered, "said": browser.execute_script(said), "open": browser.execute_script(opened)})
+            # #1142: the opening's ask held, « Avancé » closed before its answer — BD's slow Ollama —: the answer,
+            # the same models as drawn, come after the close, never opens it again under the user.
+            browser.execute_script(toggled)
+            browser.execute_script("window.holding = true")
+            browser.execute_script(toggled)
+            held = wait_for(browser, lambda b: b.execute_script("return window.held.length") == 3, 5)
+            browser.execute_script(toggled)
+            browser.execute_script("window.held[2]()")
+            reopened = wait_for(browser, lambda b: b.execute_script(opened), 2)
+            check("« Avancé » closed while its opening's ask is held: that answer, come after the close, leaves it closed (#1142)",
+                  held and not reopened and browser.execute_script("return document.getElementById('small-advanced').getAttribute('aria-expanded')") == "false",
+                  {"held": held, "state": browser.execute_script("const t = document.getElementById('small-advanced'); const p = document.getElementById('small-advanced-panel');"
+                                                                 " return {expanded: t?.getAttribute('aria-expanded'), hidden: p?.hidden}")})
+            # #1142: a close asks only to drop the opening's answer: the models not read on it, nothing is said —
+            # the user asked nothing to be read.
+            browser.execute_script(toggled)
+            shown_again = wait_for(browser, lambda b: b.execute_script(opened), 5)
+            browser.execute_script("window.failing = true")
+            browser.execute_script(toggled)
+            failed_said = wait_for(browser, lambda b: "Impossible de lire les modèles" in b.execute_script(said), 2)
+            browser.execute_script("window.failing = false")
+            check("« Avancé » closed, the models not read on its close: nothing is said (#1142)",
+                  shown_again and not failed_said and not browser.execute_script(opened),
+                  {"opened first": shown_again, "said": browser.execute_script(said), "open": browser.execute_script(opened)})
+            # #1166: the bar reads `recording_now` every 100 ms, and its readings may overlap. One asked before the
+            # start, answered after a later one — a machine under load —: « Avancé », opened by the user while
+            # recording, stays open, and the bar still records.
+            browser.execute_script(toggled)
+            open_before = wait_for(browser, lambda b: b.execute_script(opened), 5)
+            before_stale = browser.execute_script("return window.held.length")
+            browser.execute_script("window.stale = true")
+            stale_held = wait_for(browser, lambda b: b.execute_script("return window.held.length") == before_stale + 1, 5)
+            time.sleep(0.5)
+            browser.execute_script("window.held[arguments[0]]()", before_stale)
+            closed_after = wait_for(browser, lambda b: not b.execute_script(opened), 2)
+            check("an older reading of the recording, answered after a later one: « Avancé » left open, the bar still recording (#1166)",
+                  open_before and stale_held and not closed_after and browser.find_element(By.ID, "small-stop").is_displayed(),
+                  {"open before": open_before, "held": stale_held, "open": browser.execute_script(opened),
+                   "stop shown": browser.find_element(By.ID, "small-stop").is_displayed()})
             browser.execute_script("window.restoreCore()")
             press(browser, "small-stop")
             wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
@@ -5129,6 +5287,303 @@ def settings_folded(now: dt.datetime) -> None:
         check("« Refaire le réglage » in « Général », not among the models (#782)", browser.execute_script(card) == "Général", browser.execute_script(card))
 
 
+
+def summary_sent(now: dt.datetime) -> None:
+    """CL. D110, PDR-0007 §2–§6, posting/v1: a meeting's summary sent to a destination set up in Settings, on the
+    user's gesture each time. No « Envoyer… » without a destination, on a confidential meeting, or without a
+    summary. Before a destination's first send the page says what leaves and where — its name, never its address —;
+    the next goes at once. kitokey-send is started with the meeting's folder and the destination's kind, the address
+    and the meeting's name on its input only. Each outcome is said on the page with what to do; the address appears
+    nowhere. A send is recorded and listed, kept when the meeting is renamed; marked confidential after, the switch
+    says where the summary already went. Addresses here are made up; kitokey-send is played (it refuses this
+    computer's addresses by design: its own tests post to a local server)."""
+    print("CL. a summary sent to a destination on the user's gesture: offered only when it may be, what leaves said first, each outcome said (D110)")
+    calls = WORK / "send-calls.jsonl"
+    calls.unlink(missing_ok=True)
+    meetings = WORK / "sending"
+    written, secret_one, unwritten = (meetings / name for name in ("2026-11-20_09-00", "2026-11-20_10-00", "2026-11-20_11-00"))
+    for folder in (written, secret_one, unwritten):
+        session(folder, now - dt.timedelta(days=3), 30, {"local.wav": 1000})
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+    for folder in (written, secret_one):
+        (folder / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-11-20T10:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+    (secret_one / "confidential").write_text("")
+    secret = "made-up-secret-9c21"
+    destinations = [("discord", "#équipe", f"https://discord.example/api/webhooks/1/{secret}"),
+                    ("webhook", "#parti", f"https://gone.example/hook/{secret}"),
+                    ("slack", "#occupé", f"https://busy.example/services/T0/B0/{secret}"),
+                    ("webhook", "#horsligne", f"https://offline.example/hook/{secret}"),
+                    ("webhook", "#muet", f"https://silent.example/hook/{secret}"),
+                    ("webhook", "#saturé", f"https://later.example/hook/{secret}")]
+    offered = "return !!document.getElementById('send-open')"
+    window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\n')
+    with window as browser:
+        def page(folder):
+            browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+            return wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed()
+                            and b.execute_script("return !!document.querySelector('.card.minutes')"), 10)
+        page(written)
+        check("no destination set up: the summary offers no « Envoyer… » (PDR-0007 §2)",
+              not browser.execute_script(offered), browser.execute_script(offered))
+        # The destinations, set up as a person does: in Settings, each address judged then kept in the keyring.
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
+        press(browser, "destination-open")
+        rows = "return document.querySelectorAll('#destinations li').length"
+        for kind, name, address in destinations:
+            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            for field, value in (("destination-name", name), ("destination-address", address)):
+                element = browser.find_element(By.ID, field)
+                element.clear()
+                element.send_keys(value)
+            had = browser.execute_script(rows)
+            press(browser, "destination-add")
+            wait_for(browser, lambda b: b.execute_script(rows) == had + 1, 10)
+        check("six destinations set up for this scenario", browser.execute_script(rows) == 6, browser.execute_script(rows))
+        calls.unlink(missing_ok=True)
+        page(secret_one)
+        check("a confidential meeting offers no send (PDR-0007 §4)", not browser.execute_script(offered), browser.execute_script(offered))
+        page(unwritten)
+        check("a meeting without its summary offers no send", not browser.execute_script(offered), browser.execute_script(offered))
+        page(written)
+        check("a summary, destinations set up, not confidential: « Envoyer… » among its actions",
+              browser.execute_script(offered) and browser.execute_script(
+                  "return !!document.getElementById('send-open').closest('.minutes-actions')"), browser.execute_script(offered))
+        # By keyboard alone: the button reached and pressed by Enter, the panel's first destination focused.
+        browser.execute_script("document.getElementById('send-open').focus()")
+        ActionChains(browser).send_keys(Keys.ENTER).perform()
+        listed = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#send-panel button.send-to"), 5)
+        names = browser.execute_script("return [...document.querySelectorAll('#send-panel button.send-to')].map(b => b.textContent)") if listed else []
+        check("the panel offers each destination by its name, « Envoyer à « #équipe » », by keyboard alone",
+              names[:1] == ["Envoyer à «\xa0#équipe\xa0»"] and len(names) == 6
+              and browser.execute_script("return document.activeElement.classList.contains('send-to')"), names)
+        ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+        closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "send-panel"), 5)
+        check("Escape closes the panel, nothing sent, the focus back on « Envoyer… »",
+              closed and not calls.exists() and browser.execute_script("return document.activeElement.id") == "send-open",
+              browser.execute_script("return document.activeElement.id"))
+
+        described = []
+
+        def send(name, confirm=True):
+            press(browser, "send-open")
+            wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#send-panel button.send-to"), 5)
+            browser.execute_script("[...document.querySelectorAll('#send-panel button.send-to')].find(b => b.dataset.destination === arguments[0]).click()", name)
+            said_now = "return document.getElementById('send-said')?.textContent ?? ''"
+            wait_for(browser, lambda b: b.find_elements(By.ID, "send-notice") or b.execute_script(said_now), 5)
+            shown = browser.find_element(By.ID, "send-notice").text if browser.find_elements(By.ID, "send-notice") else None
+            if shown is not None:
+                described.append(browser.execute_script("const c = document.getElementById('send-confirm');"
+                                                        " return [c.getAttribute('aria-describedby'), document.getElementById(c.getAttribute('aria-describedby'))?.textContent]"))
+            if shown is not None and confirm:
+                press(browser, "send-confirm")
+            if confirm:
+                # Its outcome, not « Envoi vers … », which is said while kitokey-send runs.
+                wait_for(browser, lambda b: b.execute_script(said_now) and not b.execute_script(said_now).endswith("…"), 15)
+            return shown
+
+        first = send("#équipe")
+        check("before a destination's first send, the page says what leaves and where: its name, never its address (PDR-0007 §3)",
+              first is not None and "#équipe" in first and "compte rendu" in first and "transcription" in first and "son" in first
+              and secret not in first and "discord.example" not in first, first)
+        check("and that a summary sent cannot be taken back (PDR-0007, expected behaviour, step 3)",
+              first is not None and "ne peut pas être repris" in first, first)
+        check("« Envoyer » is described by the notice: a screen reader says what leaves before it is pressed",
+              described[:1] and described[0][0] == "send-notice" and "ne peut pas être repris" in (described[0][1] or ""), described)
+        # Selenium's text gives U+00A0 as a space: each read below compares with spaces.
+        said = browser.find_element(By.ID, "send-said").text
+        check("sent: said on the page, the destination by its name", said.replace("\xa0", " ").startswith("Envoyé à « #équipe »"), said)
+        made = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+        check("kitokey-send started with the meeting's folder and --kind discord; the address and the name on its input only (posting/v1)",
+              len(made) == 1 and made[0]["args"][0].endswith(written.name) and made[0]["args"][1:] == ["--kind", "discord"]
+              and json.loads(made[0]["input"]).get("address", "").endswith(secret) and "name" in json.loads(made[0]["input"])
+              and all(secret not in arg for arg in made[0]["args"]), made)
+        again = send("#équipe")
+        check("the next send to that destination goes at once, its gesture still asked: no notice again",
+              again is None and len(calls.read_text().splitlines()) == 2, again)
+        for name, words_said in (("#parti", "configurez"), ("#occupé", "30 s"), ("#saturé", "Réessayez plus tard"),
+                                 ("#horsligne", "connexion"), ("#muet", "regardez dans le canal")):
+            send(name)
+            said = browser.find_element(By.ID, "send-said").text
+            check(f"{name}: the outcome said with what to do (posting/v1)", words_said in said.replace("\xa0", " ") and secret not in said, said)
+        saturated = browser.execute_script("return [...document.querySelectorAll('#send-last p')].map(p => p.textContent).find(s => s.includes('#saturé')) ?? ''")
+        check("busy with no delay given: no delay made up", "plus tard" in saturated and " s." not in saturated.replace("\xa0", " "), saturated)
+        # The page drawn again — as when the window comes back after a look in the channel: each failure still said,
+        # from the record, « perhaps arrived » first of all.
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: not b.find_elements(By.ID, "send-said"), 10)
+        page(written)
+        wait_for(browser, lambda b: b.execute_script("return document.getElementById('send-last')?.childElementCount") == 5, 10)
+        again_said = [s.replace("\xa0", " ") for s in browser.execute_script("return [...document.querySelectorAll('#send-last p')].map(p => p.textContent)")]
+        check("drawn again, each destination's last failed send still said, from the record: « #muet » may have arrived",
+              len(again_said) == 5 and any("« #muet »" in s and "regardez dans le canal" in s for s in again_said)
+              and any("« #saturé »" in s and "Réessayez plus tard" in s for s in again_said)
+              and not any("#équipe" in s for s in again_said), again_said)
+        # The record made unwritable (its file written beside first: a folder there): a send that left is said sent
+        # all the same, never « could not leave », which would have it sent twice. Not recorded, so not listed.
+        record = Path(window.env["XDG_CONFIG_HOME"]) / "kitokey" / "sends.json"
+        beside = record.with_suffix(".json.part")
+        beside.mkdir()
+        try:
+            send("#équipe")
+            said = browser.find_element(By.ID, "send-said").text.replace("\xa0", " ")
+            check("the record unwritable: a send that left is still said sent, never « n'a pas pu partir »",
+                  said.startswith("Envoyé à « #équipe »") and len(calls.read_text().splitlines()) == 8, said)
+        finally:
+            beside.rmdir()
+        page_text = browser.execute_script("return document.body.innerText")
+        check("the address appears nowhere on the page", secret not in page_text, "")
+        listed = "return [...document.querySelectorAll('#sends li')].map(li => li.textContent)"
+        sends = browser.execute_script(listed)
+        check("each send recorded and listed on the page: « Envoyé à « #équipe » », twice; a failure not listed",
+              len(sends) == 2 and all("#équipe" in s for s in sends), sends)
+        # Renamed: the folder keeps its name, so the record stays (title.txt, session-audio).
+        browser.execute_script("return window.__TAURI__.core.invoke('title_saved', {name: arguments[0], title: 'Point budget'})", written.name)
+        page(written)
+        check("renamed, the meeting keeps its sends", len(browser.execute_script(listed)) == 2, browser.execute_script(listed))
+        # Marked confidential after: the switch says where the summary already went; no send offered.
+        browser.find_element(By.ID, "confidential-switch").click()
+        wait_for(browser, lambda b: "#équipe" in b.find_element(By.ID, "confidential-left").text, 10)
+        left = browser.find_element(By.ID, "confidential-left").text
+        check("marked confidential after a send: the switch says where the summary already went (PDR-0007 §4)",
+              "le compte rendu à « #équipe »" in left.replace("\xa0", " "), left)
+        check("and offers no send any more", wait_for(browser, lambda b: not b.execute_script(offered), 5), browser.execute_script(offered))
+    logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and secret in f.read_text(errors="ignore")]
+    check("the address in no log nor state file of Kitokey (ADR-0007, PDR-0007 §1)", logged == [], logged)
+
+def destinations_kept(now: dt.datetime) -> None:
+    """CK. D110, PDR-0007 §1 and §6: Settings keeps the destinations a summary can be sent to — a kind, a
+    name, the address pasted. The address is judged by kitokey-send --check, given on its input and never
+    as an argument; refused (not https:, or this computer), it is said and nothing is kept; checked, it
+    goes to the keyring and is never shown whole again — its host and the end of its path — nor written
+    in the settings' file. Forgotten, the destination is gone. Addresses here are made up."""
+    print("CK. Settings: a destination added, its address judged then kept in the keyring, never shown whole; forgotten (D110)")
+    calls = WORK / "send-calls.jsonl"
+    calls.unlink(missing_ok=True)
+    meetings = WORK / "destinations"
+    meetings.mkdir(exist_ok=True)
+    secret = "made-up-secret-7f3a"
+    good = f"https://hooks.example/services/T00/B00/{secret}"
+    window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\n')
+    with window as browser:
+        browser.execute_script("location.hash = '#/settings'")
+        drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
+        # A part of « Après un enregistrement », not a group of its own: Settings keep their three (D95).
+        card = ("const b = document.getElementById('destination-open'); const p = b && b.closest('.sending'); const c = b && b.closest('section.card');"
+                " return p && c ? [c.querySelector('h2').textContent, p.querySelector('h3').textContent] : null")
+        check("Settings offer, in « Après un enregistrement », a part where a destination is added (D110, D95)",
+              drawn and browser.execute_script(card) == ["Après un enregistrement", "Envoi des comptes rendus"],
+              browser.execute_script(card) if drawn else None)
+        # Folded at first, no address asked (E5); unfolded by its button (ARIA APG Disclosure), the focus in its first field.
+        folded = ("const o = document.getElementById('destination-open'), a = document.getElementById('destination-address');"
+                  " return [o.getAttribute('aria-expanded'), o.getAttribute('aria-controls'), a.getClientRects().length > 0, document.activeElement.id]")
+        before = browser.execute_script(folded) if drawn else None
+        if drawn:
+            # For an eye (lina's): the part as first seen, folded — the group's heading, the rule, its own
+            # heading, the list and the closed button — at the two widths, in both looks.
+            group = "document.getElementById('destination-open').closest('section.card')"
+            # At 420 px the group is taller than 800 px: a taller window, for the heading and the button in one image.
+            for width, height in ((1100, 800), (420, 1040)):
+                browser.set_window_size(width, height)
+                browser.execute_script(f"{group}.scrollIntoView({{block: 'start'}})")
+                print("        folded part, its group's box and the button's (top, bottom) at", width, "px:",
+                      browser.execute_script(f"const g = {group}.getBoundingClientRect(), o = document.getElementById('destination-open').getBoundingClientRect();"
+                                             " return [[Math.round(g.top), Math.round(g.bottom)], [Math.round(o.top), Math.round(o.bottom)], innerHeight]"))
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d110-destinations-folded-fr-{width}-{theme}", theme)
+            browser.set_window_size(1100, 800)
+            # Back across 840 px the page is drawn again (#777): pressed during that drawing, a click starts nothing.
+            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-open')"), 10)
+            press(browser, "destination-open")
+        opened = drawn and wait_for(browser, lambda b: b.execute_script(folded)[0] == "true", 5)
+        after = browser.execute_script(folded) if drawn else None
+        check("folded at first, no address shown; « Ajouter une destination » unfolds it, the focus in its first field (E5, ARIA APG)",
+              before is not None and before[:3] == ["false", "destination-adding", False]
+              and opened and after == ["true", "destination-adding", True, "destination-kind"], (before, after))
+        rows = "return [...document.querySelectorAll('#destinations li')].map(li => li.innerText)"
+        check("none yet: the card says so", drawn and browser.execute_script(rows) == []
+              and "Aucune destination" in browser.find_element(By.ID, "destinations-said").text, browser.execute_script(rows) if drawn else None)
+
+        def add(kind, name, address):
+            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            for field, value in (("destination-name", name), ("destination-address", address)):
+                element = browser.find_element(By.ID, field)
+                element.clear()
+                element.send_keys(value)
+            press(browser, "destination-add")
+
+        if drawn:
+            add("webhook", "#équipe", "http://hooks.example/plain")
+            said = wait_for(browser, lambda b: "https" in b.find_element(By.ID, "destination-said").text, 10)
+            check("an address not https: is refused, said why, nothing kept (PDR-0007 §6)",
+                  said and browser.execute_script(rows) == [], browser.find_element(By.ID, "destination-said").text)
+            add("slack", "#équipe", good)
+            kept = wait_for(browser, lambda b: len(b.execute_script(rows)) == 1, 10)
+            row = browser.execute_script(rows)[0] if kept else ""
+            check("checked, the destination is listed: its name, its kind, its address as its host and the end of its path",
+                  kept and "#équipe" in row and "Slack" in row and "hooks.example" in row and secret not in row and secret[-4:] in row, row)
+            check("the address field is emptied once kept", browser.find_element(By.ID, "destination-address").get_attribute("value") == "")
+            # For an eye (lina's): the card with one destination, at the two widths, in both looks.
+            for width in (1100, 420):
+                browser.set_window_size(width, 800)
+                browser.execute_script("document.getElementById('destination-add').scrollIntoView({block: 'center'})")
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d110-destinations-fr-{width}-{theme}", theme)
+            browser.set_window_size(1100, 800)
+            check("the address is never written in the settings' file (PDR-0007 §1)",
+                  window.file.exists() and secret not in window.file.read_text() and "#équipe" in window.file.read_text())
+            judged = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+            check("each address judged by kitokey-send --check, the address on its input, never among its arguments",
+                  len(judged) == 2 and all(call["args"] == ["--check"] and secret not in " ".join(call["args"]) for call in judged)
+                  and json.loads(judged[1]["input"])["address"] == good, [call["args"] for call in judged])
+            # A second destination under a name already kept: said, and refused before any address is judged.
+            # Back across 840 px the page is drawn again (#777): the form is filled once that drawing is done.
+            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-kind')"), 10)
+            add("discord", "#équipe", good.replace("T00", "T01"))
+            # Read by script: a destination kept by mistake draws the card again, and a node held would be stale.
+            said_now = "return document.getElementById('destination-said')?.textContent ?? null"
+            taken = wait_for(browser, lambda b: "déjà ce nom" in (b.execute_script(said_now) or ""), 10)
+            judged_again = len(calls.read_text().splitlines()) if calls.exists() else 0
+            check("a name already kept is refused, said, nothing judged nor kept",
+                  taken and len(browser.execute_script(rows)) == 1 and judged_again == 2,
+                  (browser.execute_script(said_now), browser.execute_script(rows), judged_again))
+            # Back across 840 px, the page is drawn again (#777): pressed while that drawing runs, the
+            # click lands on a button being replaced and starts nothing (the run at b4321a4) — waited for.
+            settled = wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-forget-0')"), 10)
+            forgetting = browser.execute_script("const b = document.getElementById('destination-forget-0'); return b ? [b.textContent, b.disabled] : null"), settled
+            press(browser, "destination-forget-0")
+            gone = wait_for(browser, lambda b: b.execute_script(rows) == [], 10)
+            check("forgotten, the destination is gone from the page", gone, (forgetting, browser.execute_script(rows), browser.find_element(By.ID, "destinations-said").text))
+            check("forgotten, the destination is gone from the settings' file", "#équipe" not in window.file.read_text(),
+                  [line for line in window.file.read_text().splitlines() if "destination" in line or "équipe" in line])
+
+
+def settings_version(now: dt.datetime) -> None:
+    """CJ. Settings' « Général » says Kitokey's version at its foot (#1089), as `--version` says it: « Version
+    1.0.0 », secondary text a person can select and copy for support, in French and in English."""
+    print("CJ. Settings: « Général » says the version, as --version does, selectable (#1089)")
+    said = subprocess.run([str(BINARY), "--version"], capture_output=True, text=True, timeout=30).stdout.strip()
+    version = said.removeprefix("kitokey ")
+    line = ("const v = document.getElementById('app-version'); const c = v && v.closest('section.card');"
+            " return v ? {text: v.textContent, card: c ? c.querySelector('h2').textContent : null,"
+            " select: getComputedStyle(v).userSelect, shown: v.getClientRects().length > 0,"
+            " last: !!c && c.lastElementChild === v} : null")
+    for locale, card in (("fr_FR.UTF-8", "Général"), ("en_US.UTF-8", "General")):
+        taping = WORK / f"settings-version-{locale[:2]}"
+        taping.mkdir()
+        with Window(taping, locale, 'after = "nothing"\n') as browser:
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.execute_script(line) is not None, 10)
+            got = browser.execute_script(line)
+            check(f"{locale[:2]}: « Version {version} » at the foot of « {card} », shown and selectable (#1089)",
+                  bool(version) and got is not None and got["text"] == f"Version {version}" and got["card"] == card
+                  and got["shown"] and got["last"] and got["select"] not in ("none",), (said, got))
+
+
 def settings_narrow_without_model(now: dt.datetime) -> None:
     """BU. Settings at 420 px on a Kitokey with no model on this computer (#868): the guided step for the
     transcription — its way, the model's state and its offer — inside its card, nothing spilling; « Avancé »
@@ -5231,7 +5686,7 @@ def appearance_chosen(now: dt.datetime) -> None:
 
 def bar_language(now: dt.datetime) -> None:
     """BR. D99: the bar's options offer the meeting's language — at rest the next meeting's, recording
-    the one in progress' —, the meeting's page's list (D65, D89), « Celle des Réglages » first, and its
+    the one in progress' —, the meeting's page's list (D65, D89), Settings' choice first (#1074), and its
     refusal said as the page says it; by the keyboard alone, in French and in English."""
     print("BR. the bar's options: the meeting's language, the next one's at rest, taken at the start, the one in progress' while recording, refused said — keyboard alone, French and English (D99)")
     focused = "const a = document.activeElement; return a.id || a.className"
@@ -5260,8 +5715,8 @@ def bar_language(now: dt.datetime) -> None:
         keys(browser, Keys.ENTER)
         return wait_for(browser, lambda b: not b.execute_script("return document.getElementById('small-options').hidden"), 3)
     for language, (short, settled, first, refused) in {
-        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Celle des Réglages — Deutsch", "Langue non enregistrée : "),
-        "en_US.UTF-8": ("en", "", "Same as Settings — detected", "Language not saved: "),
+        "fr_FR.UTF-8": ("fr", 'meeting_language = "de"\n', "Deutsch, selon les Réglages", "Langue non enregistrée : "),
+        "en_US.UTF-8": ("en", "", "Detect automatically", "Language not saved: "),
     }.items():
         taping = WORK / f"bar-language-{short}"
         taping.mkdir()
@@ -5326,8 +5781,8 @@ def bar_after_stop(now: dt.datetime) -> None:
     """BV. D92, criterion 1: a recording stopped from the bar, the bar at rest names its meeting and its
     stage — the transcript, then the summary, then ready with « Ouvrir » to its page —, in a polite live
     region that says each stage once; until its page is opened or another recording starts. A step that
-    fails is said there in one line, its cause as the page says it, with « Ouvrir ». By the keyboard alone,
-    in French and in English, light then dark."""
+    fails is said there in one line, its cause as the page says it, with « Ouvrir »; so is a summary written but
+    not to the export folder (D109). By the keyboard alone, in French and in English, light then dark."""
     print("BV. after the stop, the bar names the meeting and its stage, ready with Ouvrir; a failure said with its cause (D92)")
     focused = "return document.activeElement ? document.activeElement.id : ''"
     said = "const s = document.getElementById('small-last-said'); return s && s.getClientRects().length ? s.textContent : ''"
@@ -5459,10 +5914,119 @@ def bar_after_stop(now: dt.datetime) -> None:
                       ended and failed and line[0] == 1 and line[1] <= 20 and line[2] == line[3] == meeting + not_made,
                       [ended, browser.execute_script(said), browser.execute_script(shown), line])
                 shot_themed(browser, f"d92-bar-failed-{short}-{theme}", theme)
+                # D109: a summary written, but not to the export folder that refuses it: said here too, as its page says it.
+                refused = {"fr": "Impossible d’écrire le compte rendu dans le dossier d’export. Choisissez un autre dossier dans les Réglages.",
+                           "en": "Kitokey could not write the summary to the export folder. Choose another folder in Settings."}[short]
+                folder = WORK / f"bar-export-{short}-{theme}"
+                folder.mkdir()
+                browser.execute_script("return window.__TAURI__.core.invoke('settings_saved', {change: {export: arguments[0]}})", str(folder))
+                (WORK / "fail-minutes").unlink()
+                (WORK / "export-refuse").touch()
+                noted = record() and stop() and wait_for(
+                    browser, lambda b: b.execute_script(said).endswith(refused) and b.execute_script(shown), 20)
+                check(f"{short}: its summary written, not to the export folder: the bar says so as its page does, « Ouvrir » beside it (D109)",
+                      noted and not any(folder.iterdir()), [browser.execute_script(said), browser.execute_script(shown)])
             finally:
                 for gate in gates:
                     gate.unlink(missing_ok=True)
                 (WORK / "fail-minutes").unlink(missing_ok=True)
+                (WORK / "export-refuse").unlink(missing_ok=True)
+
+
+def summaries_to_a_folder(now: dt.datetime) -> None:
+    """CF. D109, criterion 3: a folder chosen in Settings for « Exporter chaque compte rendu »; each
+    summary written from then on is written there too, in Markdown, named by the meeting's date and
+    time, through `kitokey-export` as exporting/v1 starts it; a confidential meeting never (D60), its
+    page saying so; a folder that cannot be written said on the meeting's page, the summary kept in the
+    meeting; « Ne plus exporter » ends it. In French and in English."""
+    print("CF. every new summary written to the folder chosen, in Markdown, named by its meeting; never a confidential one; a refusal said (D109)")
+    words_of = {
+        "fr": {"none": "Aucun dossier", "help": "Chaque nouveau compte rendu est aussi écrit dans ce dossier, en Markdown, nommé par la date et l’heure de la réunion. Refaire un compte rendu remplace son fichier dans le dossier.",
+               "confidential": "Confidentielle\u00a0: pas exportée.",
+               "failed": "Impossible d’écrire le compte rendu dans le dossier d’export. Choisissez un autre dossier dans les Réglages."},
+        "en": {"none": "No folder", "help": "Each new summary is also written to this folder, in Markdown, named by the meeting’s date and time. Redoing a summary replaces its file in the folder.",
+               "confidential": "Confidential: not exported.",
+               "failed": "Kitokey could not write the summary to the export folder. Choose another folder in Settings."},
+    }
+    settings = 'after = "nothing"\nreminder = false\nminutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n'
+    idle = "return window.__TAURI__.core.invoke('makings').then(m => m.minutes === null)"
+    said = "const s = document.getElementById('export-said'); return s && s.getClientRects().length ? s.textContent : ''"
+    shown = lambda b, id_: bool(b.find_elements(By.ID, id_)) and b.find_element(By.ID, id_).is_displayed()
+    for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
+        said_here = words_of[short]
+        meetings = WORK / f"to-folder-{short}"
+        plain, secret = meetings / "2026-10-18_12-00", meetings / "2026-10-18_13-00"
+        for folder in (plain, secret):
+            session(folder, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+            (folder / "transcript.jsonl").write_text(
+                '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+                '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+        (secret / "confidential").touch()
+        out = WORK / f"exported-{short}"
+        out.mkdir()
+        window = Window(meetings, language, settings)
+        kept = lambda: window.file.read_text()
+        try:
+            with window as browser:
+                # Settings: no folder yet; the help says what goes there, how it is named, and that a redo replaces.
+                browser.execute_script("location.hash = '#/settings'")
+                offered = wait_for(browser, lambda b: shown(b, "export-shown"), 10)
+                got = [browser.find_element(By.ID, "export-shown").text if offered else None,
+                       browser.find_element(By.ID, "export-help").text if shown(browser, "export-help") else None, shown(browser, "export-stop")]
+                check(f"{short}: Settings offer « Exporter chaque compte rendu », no folder yet, its help said (D109)",
+                      got == [said_here["none"], said_here["help"], False], got)
+                # A folder typed where its path shows, as the meetings' folder is: kept by the settings.
+                if offered:
+                    browser.find_element(By.ID, "export-shown").click()
+                    field = wait_for(browser, lambda b: shown(b, "export-folder"), 5) and browser.find_element(By.ID, "export-folder")
+                    if field:
+                        field.send_keys(str(out), Keys.ENTER)
+                chosen = wait_for(browser, lambda b: f'export = "{out}"' in kept() and shown(b, "export-stop"), 5)
+                check(f"{short}: the folder typed is kept by the settings, « Ne plus exporter » offered (D109)", chosen, kept())
+                # A summary written: written to the folder too, named by its meeting, through kitokey-export.
+                (WORK / "export-args").unlink(missing_ok=True)
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
+                target = out / f"{plain.name}.md"
+                # Read as a file there or not: a mutant that writes nothing fails the rows, never raises.
+                held = lambda path: path.read_text() if path.is_file() else "the file absent"
+                written = wait_for(browser, lambda b: target.is_file() and b.execute_script(idle), 15)
+                args = (WORK / "export-args").read_text().strip() if (WORK / "export-args").exists() else ""
+                given = json.loads((WORK / "export-input").read_text()) if written else {}
+                check(f"{short}: the summary written is written to the folder too, named by its meeting, its Markdown the minutes' (D109)",
+                      written and held(target) == held(plain / "minutes.md"), sorted(p.name for p in out.iterdir()))
+                check(f"{short}: through kitokey-export as exporting/v1 starts it: md, the language, the summary alone; where to write on its input (D109)",
+                      args == f"{plain} --format md --lang {short} --without-transcript" and given.get("to") == str(target)
+                      and all(given.get(key) for key in ("name", "transcript", "me", "others", "time", "speaker", "text")), [args, given])
+                # A confidential meeting: its summary written in it, never to the folder; its page says so.
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", secret.name)
+                made = wait_for(browser, lambda b: (secret / "minutes.md").is_file() and b.execute_script(idle), 15)
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{secret.name}")
+                told = wait_for(browser, lambda b: b.execute_script(said) == said_here["confidential"], 10)
+                check(f"{short}: a confidential meeting's summary never goes to the folder, its page says so (D60, D109)",
+                      made and told and not (out / f"{secret.name}.md").exists(), [browser.execute_script(said), sorted(p.name for p in out.iterdir())])
+                # A folder that cannot be written: said on the meeting's page, the summary kept in the meeting.
+                (WORK / "export-refuse").touch()
+                before = held(target)
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{plain.name}")
+                refused = wait_for(browser, lambda b: b.execute_script(said) == said_here["failed"], 15)
+                check(f"{short}: a folder that cannot be written is said on the meeting's page, never skipped silently; the summary kept (D109)",
+                      refused and (plain / "minutes.md").is_file() and held(target) == before, browser.execute_script(said))
+                (WORK / "export-refuse").unlink()
+                # « Ne plus exporter »: the folder forgotten, a summary written after it written nowhere else.
+                browser.execute_script("location.hash = '#/settings'")
+                stop = wait_for(browser, lambda b: shown(b, "export-stop"), 10) and browser.find_element(By.ID, "export-stop")
+                if stop:
+                    stop.click()
+                forgot = wait_for(browser, lambda b: "export =" not in kept() and b.find_element(By.ID, "export-shown").text == said_here["none"], 5)
+                (WORK / "export-args").unlink(missing_ok=True)
+                browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", plain.name)
+                again = wait_for(browser, lambda b: b.execute_script(idle) and (plain / "minutes.md").is_file(), 15)
+                time.sleep(1)
+                check(f"{short}: « Ne plus exporter » forgets the folder; a summary written after it goes nowhere else (D109)",
+                      forgot and again and not (WORK / "export-args").exists(), kept())
+        finally:
+            (WORK / "export-refuse").unlink(missing_ok=True)
 
 
 def axe_first_surfaces(now: dt.datetime) -> None:
@@ -5698,6 +6262,164 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                           shown and forth and missed == [] and unmoved == [] and (what != "a meeting's page" or led), (missed, unmoved, sorted(led)))
                     tight = browser.execute_script(KEY_TARGETS, KEY_ACTING)
                     check(f"{said}, each target 24 by 24 CSS px, or spaced as the criterion allows (WCAG 2.5.8, D106)", shown and tight == [], tight)
+
+
+def redo_says_what_is_wrong(now: dt.datetime) -> None:
+    """CI. D113, criterion 3: Refaire… with Settings' model missing, or the meeting's folder not writable —
+    its button stays and the panel says which is wrong and what to do, never a setting the user did not
+    touch (#771); the panel open, the window crossing 840 px either way — the panel, its choice and the
+    focus stay (#777). In French."""
+    print("CI. Refaire…: what is wrong said in its panel, its button kept; open across the 840 px break, it stays as it was (D113)")
+    idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+            " && m.minutes_waiting.length === 0 && m.transcripts_waiting.length === 0)")
+    # The notes shown: « Avancé » closed holds its own status line, empty and hidden (s113cok).
+    note = ("const p = document.getElementById('redo-transcript-panel'); if (!p) return null;"
+            " const go = document.getElementById('redo-transcript-do');"
+            " return [!!go && !go.disabled, [...p.querySelectorAll('.note.warn')].filter((n) => n.getClientRects().length).map((n) => n.textContent)]")
+    model = WORK / "redo-wrong-model.bin"
+    model.write_bytes(b"\0" * 16)
+    for case, settings_model, read_only in (("Settings' model missing", WORK / "redo-wrong-missing.bin", False),
+                                            ("the meeting's folder not writable", model, True)):
+        meetings = WORK / f"redo-wrong-{'model' if not read_only else 'folder'}"
+        meeting = meetings / "2026-10-18_12-00"
+        session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+        (meeting / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+        settings = f'after = "nothing"\nreminder = false\nmodel = "{settings_model}"\n'
+        try:
+            with Window(meetings, "fr_FR.UTF-8", settings) as browser:
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript") and b.execute_script(idle), 15)
+                if read_only:
+                    meeting.chmod(0o555)
+                press(browser, "redo-transcript")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
+                press(browser, "redo-transcript-do")
+                told = wait_for(browser, lambda b: (b.execute_script(note) or [False, []])[1], 10)
+                got = browser.execute_script(note) or [False, []]
+                check(f"{case}: Refaire's button stays, and the panel says what is wrong and what to do, never « Non enregistré » (#771)",
+                      told and got[0] and len(got[1]) == 1 and got[1][0].startswith("Pas refait\u00a0: ") and "Non enregistré" not in got[1][0], got)
+        finally:
+            meeting.chmod(0o755)
+    # #777: open, its « Avancé » open, a model chosen and the focus on it; the window crosses 840 px both ways.
+    meetings = WORK / "redo-break"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+    (meeting / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+    state = ("const p = document.getElementById('redo-transcript-panel'), s = document.getElementById('redo-transcript-panel-transcription-model'),"
+             " a = document.getElementById('redo-transcript-panel-advanced');"
+             " return [!!p && p.isConnected && p.getClientRects().length > 0, s ? s.value : null, a ? a.getAttribute('aria-expanded') : null,"
+             " document.activeElement ? document.activeElement.id : null, p ? p.dataset.kept ?? null : null]")
+    with Window(meetings, "fr_FR.UTF-8", f'after = "nothing"\nreminder = false\nmodel = "{model}"\n') as browser:
+        browser.set_window_size(1100, 800)
+        browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript") and b.execute_script(idle), 15)
+        press(browser, "redo-transcript")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
+        press(browser, "redo-transcript-panel-advanced")
+        pick = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-transcription-model"), 5) and \
+            Select(browser.find_element(By.ID, "redo-transcript-panel-transcription-model"))
+        if pick:
+            pick.select_by_index(len(pick.options) - 1)
+        # Marked: a panel drawn anew would come without the mark.
+        browser.execute_script("const p = document.getElementById('redo-transcript-panel'); p.dataset.kept = 'yes';"
+                               " document.getElementById('redo-transcript-panel-transcription-model').focus()")
+        before = browser.execute_script(state)
+        for width, side in ((830, "narrowed below 840 px"), (1100, "widened again")):
+            browser.set_window_size(width, 800)
+            time.sleep(1.5)
+            after = browser.execute_script(state)
+            check(f"Refaire… open, the window {side}: the panel, its « Avancé », its choice and the focus stay as they were (#777)",
+                  before[0] and after == before, [before, after])
+
+
+def redo_says_what_follows(now: dt.datetime) -> None:
+    """CG. D113, criterion 1, as the decider settled it on 2026-11-18 (#804: the summary is kept):
+    « Refaire… » opened starts nothing; its one button names the transcript and its model, never the
+    summary; where the meeting has a summary, the panel says it is kept; the context's button names what it starts — the transcript, and the
+    summary after it when one follows; Escape and « Annuler » leave everything as it was; pressed, the
+    transcript alone is made again, its summary kept as it was. In French and in English."""
+    print("CG. Refaire… starts nothing; it makes the transcript alone, the summary kept and said so; the context's button names what it starts (D113)")
+    words_of = {
+        "fr": {"do": "Refaire la transcription avec ", "summary": "compte rendu",
+               "both": "Refaire la transcription et le compte rendu", "alone": "Refaire la transcription",
+               "keeps": "Le compte rendu actuel est gardé\u202f; refaites-le ensuite si besoin.",
+               "note": "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée."},
+        "en": {"do": "Write the transcript again with ", "summary": "summary",
+               "both": "Write the transcript and the summary again", "alone": "Write the transcript again",
+               "keeps": "The current summary is kept; write it again afterwards if needed.",
+               "note": "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept."},
+    }
+    model = WORK / "redo-follows-model.bin"
+    model.write_bytes(b"\0" * 16)
+    settings = (f'after = "nothing"\nreminder = false\nmodel = "{model}"\n'
+                'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n')
+    idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+            " && m.minutes_waiting.length === 0 && m.transcripts_waiting.length === 0)")
+    panel = ("const p = document.getElementById('redo-transcript-panel'); if (!p) return null;"
+             " const go = document.getElementById('redo-transcript-do'), note = document.getElementById('redo-transcript-note'),"
+             " kept = document.getElementById('redo-keeps-minutes');"
+             " return [go ? go.textContent : null, note ? note.textContent : null, p.querySelector('h3').textContent, kept ? kept.textContent : null]")
+    hearing, writing = WORK / "hearing-args", WORK / "summary-args"
+    for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
+        said = words_of[short]
+        meetings = WORK / f"redo-follows-{short}"
+        both, alone = meetings / "2026-10-18_12-00", meetings / "2026-10-18_13-00"
+        for folder in (both, alone):
+            session(folder, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+            (folder / "transcript.jsonl").write_text(
+                '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+                '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+        (both / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: mistral\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
+        with Window(meetings, language, settings) as browser:
+            for meeting, summarised, what in ((both, True, "with a summary"), (alone, False, "without one")):
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript") and b.execute_script(idle), 15)
+                hearing.unlink(missing_ok=True)
+                writing.unlink(missing_ok=True)
+                summary = lambda: (meeting / "minutes.md").read_bytes() if (meeting / "minutes.md").exists() else None
+                summary_before = summary()
+                press(browser, "redo-transcript")
+                opened = wait_for(browser, lambda b: b.execute_script(panel) is not None, 5)
+                time.sleep(1.5)
+                got = browser.execute_script(panel) or [None, None, None, None]
+                quiet = not hearing.exists() and not writing.exists()
+                named = bool(got[0]) and got[0].startswith(said["do"]) and said["summary"] not in got[0]
+                check(f"{short}, {what}: Refaire… opened starts nothing; its button names the transcript and its model, never the summary (D113)",
+                      opened and quiet and named and got[1] == said["note"] and got[2] == said["alone"], [got, quiet])
+                check(f"{short}, {what}: " + ("the panel says the summary is kept (D113, the decider 2026-11-18)" if summarised else "no summary, none said kept (D113)"),
+                      got[3] == (said["keeps"] if summarised else None), got[3])
+                # Settings make none after a transcript: the context's button names the summary only where there is one.
+                context = browser.execute_script("const c = document.getElementById('context-redo'); return c ? c.textContent : null")
+                check(f"{short}, {what}: the context's button names what it starts (D113)",
+                      context == (said["both"] if summarised else said["alone"]), context)
+                ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+                closed = wait_for(browser, lambda b: b.execute_script(panel) is None, 3)
+                time.sleep(1)
+                check(f"{short}, {what}: Escape closes the panel, nothing started (D113)",
+                      closed and not hearing.exists() and not writing.exists(), [closed, hearing.exists(), writing.exists()])
+                # « Annuler » as Escape (ines' pre-read: only Escape was pinned): the panel closed, nothing started.
+                press(browser, "redo-transcript")
+                reopened = wait_for(browser, lambda b: b.execute_script(panel) is not None, 5)
+                if reopened:
+                    press(browser, "redo-transcript-panel-cancel")
+                shut = reopened and wait_for(browser, lambda b: b.execute_script(panel) is None, 3)
+                time.sleep(1)
+                check(f"{short}, {what}: « Annuler » closes the panel, nothing started (D113)",
+                      shut and not hearing.exists() and not writing.exists(), [reopened, shut, hearing.exists(), writing.exists()])
+                press(browser, "redo-transcript")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
+                press(browser, "redo-transcript-do")
+                heard = wait_for(None, lambda b: hearing.exists(), 15)
+                done = heard and wait_for(browser, lambda b: b.execute_script(idle), 20)
+                time.sleep(1)
+                check(f"{short}, {what}: pressed, the transcript alone is made again, no summary written, the one there kept as it was (D113)",
+                      heard and done and not writing.exists() and summary() == summary_before, [heard, done, writing.exists(), summary() == summary_before])
 
 
 def page_one_bar(now: dt.datetime) -> None:
@@ -7439,6 +8161,14 @@ def minutes_checked(now: dt.datetime) -> None:
             browser.execute_script("arguments[0].scrollIntoView({block: 'nearest'})", search)
             search.send_keys("numéro 3,")
             wait_for(browser, lambda b: not b.execute_script(in_view, 50))
+            # Each line the search keeps marks the words it found (#1078): the transcript's own marks, read nowhere else
+            # since the Store's search shot gave way to the recording's (#1126).
+            kept = ("return [...document.querySelectorAll('#meeting .transcript .lines li')].filter(l => l.offsetParent)"
+                    ".map(l => [...l.querySelectorAll('mark')].map(m => m.textContent))")
+            wait_for(browser, lambda b: (lines := b.execute_script(kept)) and all(lines), 3)
+            lines = browser.execute_script(kept)
+            check(f"{short}: a search marks the words it found in each line it keeps (#1078)",
+                  bool(lines) and all(marks and all(m.lower() == "numéro 3," for m in marks) for marks in lines), lines)
             browser.execute_script(links)[0].click()
             check(f"{short}: a passage a search hid is shown, the search given up",
                   wait_for(browser, lambda b: b.execute_script(in_view, 50), 3) and browser.find_element(By.ID, "search").get_attribute("value") == "",
@@ -7606,6 +8336,24 @@ def minutes_checked(now: dt.datetime) -> None:
         asked = wait_for(browser, lambda b: b.find_elements(By.ID, "agree-send"), 10)
         check("the agreement before a first sending shows no price", asked and not browser.execute_script(priced_words, "agree"),
               browser.find_element(By.ID, "agree").text)
+        send_said = browser.execute_script("return document.getElementById('agree-send')?.textContent ?? null")
+        # One line (sam's T5 probe: the long label wrapped at 1100 px): the verbs alone, the page above saying what leaves and
+        # what is written (Microsoft's Writing Style, Apple's HIG).
+        check("the agreement's button names what it does, in a few words: « Envoyer et rédiger » (#933)", send_said == "Envoyer et rédiger", send_said)
+        # #1114 (the decider, 2026-11-21 ~19h): what stays shows a lock — the glyph of « Confidentielle », one meaning
+        # everywhere: it stays on this computer —, never a × that reads as cancel; in the text's colour, the size of the →.
+        stays = ("const s = document.querySelector('#agree .stays .sign svg'), l = document.querySelector('#agree .leaves .sign svg');"
+                 " const ink = getComputedStyle(document.body).color;"
+                 " return s && l ? {lock: s.innerHTML === icon('lock').innerHTML, colour: getComputedStyle(s).color === ink,"
+                 " size: Math.round(s.getBoundingClientRect().width) === Math.round(l.getBoundingClientRect().width)} : null")
+        locked = browser.execute_script(stays)
+        check("what stays shows Confidentielle's lock, in the ink, the size of the arrow (#1114)",
+              locked == {"lock": True, "colour": True, "size": True}, locked)
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1114-agreement-{width}-{theme}", theme)
     with Window(meetings, "fr_FR.UTF-8", online, small=True) as browser:
         check("the bar at rest shows no price",
               browser.find_elements(By.ID, "small-record") and not browser.execute_script(priced_words, "small"), browser.find_element(By.ID, "small").text)
@@ -7942,6 +8690,63 @@ def renaming(now: dt.datetime) -> None:
         check("being recorded, Libérer de l'espace names it, its date beside", bool(busy) and busy[0][0] == "En direct" and "·" in busy[0][1], busy)
         browser.execute_script(f"location.hash = '#/meeting/{recording.name}'")
         wait_for(browser, lambda b: head(b) == "En direct", 10)
+        # #1076: while it records, its page shows the time running and both sides' levels, read from what the bar
+        # reads (`recording_now`); neither is a live region, as the bar's are not.
+        alive = ("const t = document.getElementById('page-time'), m = [...document.querySelectorAll('#meeting .page-level')];"
+                 " return t && t.getClientRects().length ? {time: t.textContent, live: t.closest('[aria-live]') !== null || m.some(e => e.closest('[aria-live]') !== null),"
+                 " meters: m.map(e => [e.getAttribute('role'), e.getAttribute('aria-label'), Number(e.getAttribute('aria-valuenow'))])} : null")
+        first_seen = wait_for(browser, lambda b: b.execute_script(alive), 5) and browser.execute_script(alive)
+        time.sleep(1.2)
+        later = browser.execute_script(alive)
+        check("while it records, its page shows the time running and both sides' levels as meters, no live region (#1076)",
+              bool(first_seen) and bool(later) and later["time"] != first_seen["time"] and later["time"].count(":") == 2 and not later["live"]
+              and [m[0] for m in later["meters"]] == ["meter", "meter"] and all(m[1] for m in later["meters"]) and all(m[2] > 0 for m in later["meters"]),
+              [first_seen, later])
+        # #1133: the page drawn again while it records (a focus, a change of address, a gesture) starts from what it last
+        # read, never from « 00:00:00 » and empty meters until its next reading: read the very drawing, as it is put in.
+        redrawn = ("const done = arguments[arguments.length - 1], old = document.getElementById('page-time');"
+                   " const seen = new MutationObserver(() => { const t = document.getElementById('page-time');"
+                   " if (t && t !== old) { seen.disconnect(); done({time: t.textContent,"
+                   " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow')))}); } });"
+                   " seen.observe(document.body, {childList: true, subtree: true}); refresh();"
+                   " setTimeout(() => { seen.disconnect(); done(null); }, 4000);")
+        drawn_again = browser.execute_async_script(redrawn)
+        check("while it records, drawn again: the page starts from its last reading, never « 00:00:00 » nor an empty meter (#1133)",
+              bool(drawn_again) and drawn_again["time"] != "00:00:00" and len(drawn_again["meters"]) == 2 and all(m > 0 for m in drawn_again["meters"]),
+              drawn_again)
+        # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
+        # left at the legend's right, where the range stands at rest.
+        big = ("const t = document.getElementById('page-time'), d = document.querySelector('#meeting .drawing'), h = document.querySelector('#meeting h1'),"
+               " m = [...document.querySelectorAll('#meeting .page-level')]; if (!t || !d || !h) return null; const r = t.getBoundingClientRect();"
+               " return {inside: d.contains(t), size: parseFloat(getComputedStyle(t).fontSize), heading: parseFloat(getComputedStyle(h).fontSize),"
+               " tabular: getComputedStyle(t).fontVariantNumeric.includes('tabular-nums'),"
+               " under: m.length === 2 && m.every(e => d.contains(e) && e.getBoundingClientRect().top >= r.bottom),"
+               " right: document.querySelector('#meeting .legend .range')?.textContent ?? null,"
+               # Each side's label right under its own meter (Gestalt proximity), within the meter's width.
+               " labels: m.map((e, i) => { const l = e.parentElement.querySelector(i ? ':scope > .remote' : ':scope > .here'); if (!l) return false;"
+               " const a = e.getBoundingClientRect(), b = l.getBoundingClientRect();"
+               " return b.left >= a.left - 1 && b.right <= a.right + 1 && b.top >= a.bottom - 1 && b.top - a.bottom <= 16; })}")
+        large = browser.execute_script(big)
+        check("while it records, the time stands large in the who-spoke area, tabular, the meters under it, each side's label under its meter, nothing at the legend's right (#1112)",
+              large is not None and large["inside"] and large["size"] >= large["heading"] and large["tabular"] and large["under"] and large["right"] is None and large["labels"] == [True, True],
+              large)
+        # Its page while it records, seen (#1076, T4; the source of the Store's recording shot): 420 and 1100 px, light and dark.
+        size = browser.get_window_size()
+        drawn_meters = ("const d = document.querySelector('#meeting .drawing')?.getBoundingClientRect(); if (!d) return null;"
+                        " return [...document.querySelectorAll('#meeting .page-level')].map(e => { const r = e.getBoundingClientRect();"
+                        " return [Math.round(r.width), Math.round(r.height), r.left >= d.left - 1 && r.right <= d.right + 1 && r.top >= d.top - 1 && r.bottom <= d.bottom + 1]; })")
+        for width in (420, 1100):
+            browser.set_window_size(width, 800)
+            time.sleep(0.5)
+            browser.execute_script("scrollTo(0, 0)")
+            # #1112: each side's meter drawn, at both widths — wide enough to read, a bar's height, inside the area.
+            meters_seen = browser.execute_script(drawn_meters)
+            check(f"at {width} px, both meters drawn: at least 120 × 4 px, inside the who-spoke area (#1112)",
+                  meters_seen is not None and len(meters_seen) == 2 and all(w >= 120 and h >= 4 and inside for w, h, inside in meters_seen), meters_seen)
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d1076-recording-{width}-{theme}", theme)
+        browser.set_window_size(size["width"], size["height"])
+        time.sleep(0.3)
         # Pressed once it is the stop gesture, as the shell says it: recording, nothing stopping, no
         # press of the window's still answered — and once the shell's half second has passed since
         # the start's press, which takes a press within it for the same one (D68). 6eb6ce0's red in a
@@ -7964,9 +8769,75 @@ def renaming(now: dt.datetime) -> None:
                "presses reaching the button": [clicks, browser.execute_script("return window.__recordClicks")],
                "pressed, seconds after the start's press": after_start,
                "session.json": (recording / "session.json").read_text()})
+        # #1076: once it stops, the page leaves the live time and meters for its rest, its poll ended: the meeting's range,
+        # or, with no transcript yet, the line saying when who spoke will appear (#1134: no legend while nothing is drawn).
+        resting = ("return document.querySelector('#meeting .legend .range')?.textContent"
+                   " ?? document.getElementById('who-spoke-later')?.textContent ?? ''")
+        at_rest = lambda b: "–" in b.execute_script(resting) or bool(b.find_elements(By.ID, "who-spoke-later"))
+        settled = wait_for(browser, lambda b: b.execute_script(alive) is None and at_rest(b), 10)
+        check("stopped: the page at rest again, its range or its line before a transcript, no live time nor meters (#1076, #1134)", settled,
+              [browser.execute_script(alive), browser.execute_script(resting)])
         rest = ("const d = document.getElementById('name-dot'), g = document.getElementById('name-gap');"
                 " return [getComputedStyle(d).fill === getComputedStyle(document.querySelector('.brand svg')).color, d.getAttribute('r') === d.dataset.rest, g.getAttribute('r') === g.dataset.rest]")
         check("stopped: the name at rest again, its dot in the name's ink (D89)", browser.execute_script(rest) == [True, True, True], browser.execute_script(rest))
+        # #1076: stopped from elsewhere — by the shell's own command, as the tray, the shortcut and the bar stop it —, the
+        # window's button is never pressed, and its redraw a moment after a press (`setTimeout(refresh, 1200)`) never
+        # comes: the page's poll alone draws the range back.
+        now_meeting = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('recording_now')"
+                       ".then((n) => done(n.recording && n.meeting ? n.meeting : null), () => done(null))")
+        # Pressed only once the shell holds no recording nor its stop: before, a press counts as the stop going on, and
+        # is let go (`toggle_recording`) — s1076ok2's red was that press, not the page.
+        idle_header = ("const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('header')"
+                       ".then((h) => done(!h.recording && !h.stopping), () => done(false))")
+        wait_for(browser, lambda b: b.execute_async_script(idle_header), 10)
+        time.sleep(0.6)
+        browser.execute_script("window.__TAURI__.core.invoke('record')")
+        wait_for(browser, lambda b: b.execute_async_script(now_meeting), 10)
+        again = browser.execute_async_script(now_meeting)
+        first_drawn = None
+        if again:
+            # The same folder as before (the recorder played here names it): the page left, then opened again, so it is
+            # drawn for the recording. Its first drawing read as it is put in (#1133).
+            browser.execute_script("location.hash = '#/'")
+            first_drawn = browser.execute_async_script(
+                "const done = arguments[arguments.length - 1], seen = new MutationObserver(() => {"
+                " const t = document.getElementById('page-time'); if (t) { seen.disconnect(); done(t.textContent); } });"
+                " seen.observe(document.body, {childList: true, subtree: true}); location.hash = arguments[0];"
+                " setTimeout(() => { seen.disconnect(); done(null); }, 5000);", f"#/meeting/{again}")
+        # #1133 (marc's review): a meeting recorded again under the same name — a deleted one's name is free again in the
+        # same minute (capture's `new_folder`) — never starts from the last recording's reading: the time never goes back.
+        check("recorded again under the same name: its page starts at « 00:00:00 », not at the last recording's time (#1133)",
+              first_drawn == "00:00:00", [again, first_drawn])
+        live_again = bool(again) and wait_for(browser, lambda b: b.execute_script(alive), 10)
+        # #1130 (sam's review): a track gained while it records (`session-audio/v2`, *A track gained later*), as a real
+        # capture writes it at once: the page offers its sound (`listen`), and a slider's children are presentational
+        # (WAI-ARIA 1.2), so neither meter may stand inside one — nor the time take a press for a seek.
+        if again:
+            folder = recording.parent / again
+            record = json.loads((folder / "session.json").read_text())
+            record["tracks"] = {"local": {"device": "Mic"}}
+            with wave.open(str(folder / "local.wav"), "wb") as made:
+                made.setnchannels(1)
+                made.setsampwidth(2)
+                made.setframerate(48000)
+                made.writeframes(bytes(2 * 48000))
+            (folder / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n')
+            (folder / "session.json").write_text(json.dumps(record))
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{again}")
+        tracked = ("const m = [...document.querySelectorAll('#meeting [role=meter]')], t = document.getElementById('page-time');"
+                   " return t && t.getClientRects().length ? {meters: m.length, in_slider: m.filter(e => e.closest('[role=slider]')).length,"
+                   " time_in_slider: t.closest('[role=slider]') !== null, sliders: document.querySelectorAll('#meeting [role=slider]').length} : null")
+        seen_tracked = bool(again) and wait_for(browser, lambda b: b.execute_script(tracked), 10)
+        got_tracked = browser.execute_script(tracked)
+        check("while it records, a track gained: both meters and the time stand in no slider (#1130)",
+              seen_tracked and got_tracked is not None and got_tracked["meters"] == 2 and got_tracked["in_slider"] == 0 and not got_tracked["time_in_slider"],
+              got_tracked)
+        time.sleep(0.8)
+        browser.execute_script("window.__TAURI__.core.invoke('record')")
+        drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and at_rest(b), 5)
+        check("stopped from elsewhere, the window's button not pressed: the page draws its rest back by itself (#1076, #1134)", drawn_back,
+              [again, live_again, browser.execute_script(alive), browser.execute_script(resting)])
 
 
 def actions_rows(now: dt.datetime) -> None:
@@ -8022,6 +8893,32 @@ def actions_rows(now: dt.datetime) -> None:
         browser.execute_script("document.querySelector('#meeting .minutes').scrollIntoView({block: 'start'})")
         time.sleep(0.3)
         shot(browser, "d46-actions-rows")
+        # In a structure (minutes/v5, D111): the actions are the section their id names — the fourth
+        # here, never the second by place —, each section titled as the page names its id.
+        structured = meetings / "2026-10-29_10-00"
+        session(structured, now - dt.timedelta(hours=20), 10, {"local.wav": 1000})
+        (structured / "transcript.jsonl").write_text((folder / "transcript.jsonl").read_text())
+        sections = json.dumps([{"id": i, "about": "One line."} for i in ("status", "risks", "decisions", "actions")])
+        (structured / "minutes.md").write_text(
+            "---\ncontract: minutes/v5\nmade: 2026-10-29T11:00:00+01:00\nprovider: \"local\"\nmodel: \"qwen3:8b\"\ncontext: null\n"
+            f"structure: project_review\nsections: {sections}\nactions: actions\n---\n\n"
+            "## Où on en est\n\nLa recette commence lundi.\n\n## Risques et problèmes\n\n- Le serveur — non livré — vendredi\n\n"
+            "## Ce qu'on a décidé\n\n- Le lot 3 est reporté\n\n## À faire\n\n- Relancer le fournisseur — Inès — vendredi\n")
+        browser.execute_script(f"location.hash = '#/meeting/{structured.name}'")
+        wait_for(browser, lambda b: b.execute_script(
+            "return [...document.querySelectorAll('#meeting .minutes .body h2')].length === 4"), 10)
+        titles = browser.execute_script("return [...document.querySelectorAll('#meeting .minutes .body h2')].map(h => h.textContent)")
+        check("minutes in a structure: each section titled as the page names its id (D111)",
+              titles == ["État", "Risques", "Décisions", "Actions"], titles)
+        # The section the table stands in — the last title before it —, then its rows: what the check reads.
+        placed = ("const t = document.querySelector('#meeting .minutes .body table.actions'); if (!t) return null;"
+                  " const h = [...document.querySelectorAll('#meeting .minutes .body h2')]"
+                  ".filter(h => h.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING);"
+                  " return h.length ? h[h.length - 1].textContent : 'before every title'")
+        wait_for(browser, lambda b: b.execute_script(placed), 5)
+        got = [browser.execute_script(placed), browser.execute_script(rows)]
+        check("minutes in a structure: the rows are the actions' section, found by its id, never the second section by place (D111)",
+              got == ["Actions", [[["who", "Inès"], ["what", "Relancer le fournisseur"], ["when", "vendredi"]]]], got)
 
 
 def meeting_told_once(now: dt.datetime) -> None:
@@ -8535,6 +9432,10 @@ def unsaved_choice_kept(now: dt.datetime) -> None:
         with window as browser:
             browser.find_element(By.ID, "settings-link").click()
             wait_for(browser, lambda b: b.find_elements(By.ID, "minutes") and b.find_elements(By.ID, "reminder"), 10)
+            # What « Tester » sends and to whom, this computer's Ollama saved: said so, never its address (#1080).
+            sends = browser.execute_script("return document.getElementById('minutes-tested')?.textContent ?? null")
+            check("Tester, this computer's Ollama saved: « … à Ollama, sur cet ordinateur — rien de vos réunions. », no address (#1080)",
+                  sends == "Le test envoie une courte phrase à Ollama, sur cet ordinateur — rien de vos réunions.", sends)
             Select(browser.find_element(By.ID, "minutes")).select_by_visible_text("Mistral 7b")
             unsaid = wait_for(browser, lambda b: b.find_element(By.ID, "minutes-unsaved").is_displayed(), 3)
             # The list as it is, marked in the page: a reference the driver holds is refused once it is gone.
@@ -8821,6 +9722,12 @@ def models_on_the_page(now: dt.datetime) -> None:
                   and got["transcription"]["label"] == "Modèle de transcription"
                   and any(line.startswith("Compte rendu du 18 oct. à ") and line.endswith(" · Qwen3 14b") for line in lines)
                   and any(line.startswith("Transcrit le 18 oct. à ") and line.endswith(" · Whisper page settings") for line in lines), (got, lines))
+            # #1094: each list on its line quiet — no frame, no ground until hovered —, Lucide's chevron after it.
+            quiet = browser.execute_script(
+                "return [...document.querySelectorAll('#meeting .maker .page-model')].map(s => { const c = getComputedStyle(s), n = s.nextElementSibling;"
+                " return [c.borderTopColor, c.backgroundColor, !!n && n.matches('svg.glyph.chevron'), getComputedStyle(s.parentElement).fontFamily.includes('monospace')]; })")
+            check("each model list on its line is quiet, a chevron after it, the line in the text's face (#1094)",
+                  len(quiet) == 2 and all(q == ["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)", True, False] for q in quiet), quiet)
             if not shown:
                 return
             # Drawn again — refresh(), as a focus does —: the models already read are not asked again.
@@ -9374,9 +10281,9 @@ def two_panes(now: dt.datetime) -> None:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: shown(b) == names[-1] and b.find_elements(By.CSS_SELECTOR, ".transcript .lines li"), 10)
         made = makers(browser)
-        check("in English: when each version was made, in local time, then its model, how long, what it cost (D93, D97)",
-              sorted(made) == sorted(["Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo · in 31 min 52 s · $0.012",
-                                      "Summary of Oct 23 at 05:00 AM · Claude Sonnet, via openrouter.ai · in 3 s"]), made)
+        check("in English: when each version was made, in local time — « 4:42 AM », no zero US English does not write (#1075) —, then its model, how long, what it cost (D93, D97)",
+              sorted(made) == sorted(["Transcribed on Oct 23 at 4:42 AM · Whisper large v3 turbo · in 31 min 52 s · $0.012",
+                                      "Summary of Oct 23 at 5:00 AM · Claude Sonnet, via openrouter.ai · in 3 s"]), made)
         english = [browser.find_element(By.ID, "record-said").text] + [
             [browser.find_element(By.ID, i).get_attribute(a) for a in ("aria-label", "title")] for i in ("fold", "unfold", "free-link", "small-link", "settings-link")]
         browser.execute_script("document.activeElement.blur()")
@@ -9404,9 +10311,9 @@ def two_panes(now: dt.datetime) -> None:
         # A transcript whose last line says no `made`: its model alone, no time (D93).
         browser.execute_script(f"location.hash = '#/meeting/{names[-2]}'")
         alone = wait_for(browser, lambda b: shown(b) == names[-2] and makers(b), 10)
-        check("a transcript that does not say when it was made: its model alone, no time (D93)",
-              alone and makers(browser) == ["Transcribed by Whisper large v3 turbo on this computer"], makers(browser))
-        line = "Transcribed on Oct 23 at 04:42 AM · Whisper large v3 turbo · in "
+        check("a transcript that does not say when it was made: its model alone, no time (D93); « , on this computer » with its comma, as the minutes' line (#1093)",
+              alone and makers(browser) == ["Transcribed by Whisper large v3 turbo, on this computer"], makers(browser))
+        line = "Transcribed on Oct 23 at 4:42 AM · Whisper large v3 turbo · in "
         times_taken(browser, {names[-3]: line + "2 min 05 s", names[-4]: line + "1 h 02 min", names[-5]: line + "1 s"})
 
     empty = WORK / "panes-none"
@@ -9603,9 +10510,9 @@ def transcript_corrected(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
         offered = wait_for(browser, lambda b: b.find_elements(By.ID, "corrected-since"), 10)
-        check("the minutes written before it say the transcript was corrected since, and offer « Refaire avec les corrections »",
+        check("the minutes written before it say the transcript was corrected since, and offer « Refaire le compte rendu avec les corrections »",
               offered and "corrigée depuis la rédaction de ce compte rendu" in browser.find_element(By.ID, "corrected-since").text
-              and browser.find_element(By.ID, "redo-corrections").text == "Refaire avec les corrections")
+              and browser.find_element(By.ID, "redo-corrections").text == "Refaire le compte rendu avec les corrections")
         time.sleep(2)
         check("nothing is made again without that click", (heard / "minutes.md").read_text() == minutes)
         # Refaire… of a corrected transcript says its corrections will not be kept.
@@ -9632,7 +10539,7 @@ def transcript_corrected(now: dt.datetime) -> None:
         finally:
             (WORK / "slow-minutes").unlink()
         remade = wait_for(browser, lambda b: (heard / "minutes.md").read_text() != minutes, 10)
-        check("« Refaire avec les corrections »: the minutes made again by whoever the settings name, from the corrected transcript",
+        check("« Refaire le compte rendu avec les corrections »: the minutes made again by whoever the settings name, from the corrected transcript",
               remade and "model: mistral" in (heard / "minutes.md").read_text(), (heard / "minutes.md").read_text()[:200])
         # Asked while the transcript is made again: refused — one writer at a time.
         (WORK / "slow-hearing").touch()
@@ -9660,7 +10567,7 @@ def transcript_corrected(now: dt.datetime) -> None:
 
 
 def corrections_gated(now: dt.datetime) -> None:
-    """AG. « Refaire avec les corrections » through Refaire…'s own gate (D62): a service not agreed to
+    """AG. « Refaire le compte rendu avec les corrections » through Refaire…'s own gate (D62): a service not agreed to
     asks first, in the pane (D61); a meeting said confidential is made here (D60)."""
     print("AG. the minutes made again with the corrections: the agreement asked in the pane, a confidential meeting made here (D62, D61)")
     ollama = {"held": ["qwen3:8b"]}
@@ -9713,7 +10620,7 @@ def corrections_gated(now: dt.datetime) -> None:
             asked = wait_for(browser, lambda b: b.execute_script("return location.hash") == f"#/agree/{opened.name}"
                              and b.find_elements(By.ID, "agree-send"), 10)
             time.sleep(2)
-            check("a service not agreed to: « Refaire avec les corrections » asks first, as Refaire… does — the step not started, two seconds on",
+            check("a service not agreed to: « Refaire le compte rendu avec les corrections » asks first, as Refaire… does — the step not started, two seconds on",
                   asked and not args.exists() and (opened / "minutes.md").read_text() == minutes, browser.execute_script("return location.hash"))
             check("the agreement opens in the pane, the sidebar kept beside it (D61)", browser.execute_script(
                 "return document.getElementById('pane').contains(document.getElementById('agree'))")
@@ -10145,13 +11052,28 @@ def context_written(now: dt.datetime) -> None:
               and label == "De quoi parle la réunion ? Qui y participe ?", (area.get_attribute("value"), label))
         check("made with it, nothing is offered to make again", not browser.find_element(By.ID, "context-changed").is_displayed())
         more = " Siobhán O’Neill (juridique)."
+        made = lambda: tuple((p.read_text(), p.stat().st_mtime_ns) for p in (meeting / "transcript.jsonl", meeting / "minutes.md"))
+        made_before = made()
         area.click()
         keys(browser, Keys.END, more)
         changed = wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
-        check("changed after its transcript and minutes, Refaire avec ce contexte is offered, said why",
+        # D113, criterion 1 (ines' pre-read): a changed context starts nothing by itself — it waits for its button. Judged
+        # first, before any step a making started by itself would break (s1055nctxauto). A making the fakes end within the
+        # wait would leave the same text: it is seen by the files' times, and by the field it closes while typed in
+        # (s1055nctxauto3).
+        time.sleep(1.5)
+        still = browser.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+                                       " && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)")
+        check("a changed context starts nothing by itself: no making, the transcript and the summary as they were (D113)",
+              still and made() == made_before and (meeting / "context.txt").read_text() == said + more
+              and browser.find_element(By.ID, "context-text").get_attribute("readonly") is None,
+              [still, made() == made_before, (meeting / "context.txt").read_text()[-40:]])
+        # Its button names what it starts: the transcript, and its summary after it (D113).
+        check("changed after its transcript and minutes, the context's button is offered, naming both, said why",
               changed and (meeting / "context.txt").read_text() == said + more
               and browser.find_element(By.CSS_SELECTOR, "#context-changed .says").text == "La transcription et le compte rendu ont été faits avec un autre contexte."
-              and browser.find_element(By.ID, "context-redo").text == "Refaire avec ce contexte", (meeting / "context.txt").read_text())
+              and browser.find_element(By.ID, "context-redo").text == "Refaire la transcription et le compte rendu",
+              ((meeting / "context.txt").read_text(), browser.find_element(By.ID, "context-redo").text))
         seen(browser, "d59-4-page-changed-light")
         # Made again, slowly: the field closed meanwhile, and said.
         (WORK / "slow-hearing").touch()
@@ -10194,6 +11116,8 @@ def context_written(now: dt.datetime) -> None:
             failed = wait_for(browser, lambda b: b.find_elements(By.ID, "transcript-again"), 10)
         finally:
             (WORK / "fail-hearing").unlink()
+        retry_said = browser.execute_script("return document.getElementById('transcript-again')?.textContent ?? null")
+        check("the transcript's retry names what it starts: « Réessayer la transcription » (#933)", retry_said == "Réessayer la transcription", retry_said)
         check("failing, the transcript and the minutes made with the earlier context are put back",
               failed and ((meeting / "transcript.jsonl").read_text(), (meeting / "minutes.md").read_text()) == before
               and not list(meeting.glob("transcript-before-*")), sorted(p.name for p in meeting.iterdir()))
@@ -10262,6 +11186,8 @@ def context_written(now: dt.datetime) -> None:
         stop_from_small(browser)
         wait_for(browser, lambda b: (meeting / "minutes.md").exists(), 15)
     (meeting / "local.wav").write_bytes(b"\0" * 1000)
+    # No summary yet, the settings making one (`after = "minutes"`): made again, one follows (D113).
+    (meeting / "minutes.md").unlink()
     window = Window(meeting.parent, "en_GB.UTF-8", settings)
     window.env.update(GTK_THEME="Adwaita:dark")
     with window as browser:
@@ -10269,9 +11195,25 @@ def context_written(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "context-text"), 10)
         context_opened(browser).send_keys(Keys.END, " And Lena.")
         changed = wait_for(browser, lambda b: b.find_element(By.ID, "context-changed").is_displayed(), 3)
-        check("in English, a meeting's page offers Redo with this context", changed
-              and browser.find_element(By.ID, "context-redo").text == "Redo with this context", browser.find_element(By.ID, "context-redo").text)
+        check("in English, a meeting without its summary, the settings making one: the context's button names both", changed
+              and browser.find_element(By.ID, "context-redo").text == "Write the transcript and the summary again", browser.find_element(By.ID, "context-redo").text)
         seen(browser, "d59-4-page-changed-dark")
+    # And Settings making none after a transcript (D113, from D93's 1f31a6d): the button names what will be
+    # made, not what is there — the transcript alone.
+    alone = WORK / "context-no-minutes"
+    bare = alone / "2026-10-18_12-00"
+    session(bare, now - dt.timedelta(hours=1), 3, {"local.wav": 1000})
+    (bare / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n'
+    )
+    (bare / "context.txt").write_text("Point budget.")
+    with Window(alone, "fr_FR.UTF-8", settings.replace('after = "minutes"', 'after = "transcript"')) as browser:
+        browser.execute_script(f"location.hash = '#/meeting/{bare.name}'")
+        offered = wait_for(browser, lambda b: b.find_elements(By.ID, "context-changed") and b.find_element(By.ID, "context-changed").is_displayed(), 10)
+        label = browser.find_element(By.ID, "context-redo").text if offered else None
+        check("no summary, Settings' after = transcript: the context's button names what will be made, « Refaire la transcription » (D113)",
+              offered and label == "Refaire la transcription" and not (bare / "minutes.md").exists(), label)
 
 
 def context_gaps(now: dt.datetime) -> None:
@@ -10574,11 +11516,13 @@ def confidential_kept(now: dt.datetime) -> None:
         check("Ollama silent: the minutes wait, said where to get it, nothing asked nor sent",
               silent and browser.find_elements(By.ID, "minutes-again") and counted["write"] == 1
               and not (waiting / "wait" / "minutes.md").exists(), browser.execute_script(state))
+        retry_said = browser.execute_script("return document.getElementById('minutes-again')?.textContent ?? null")
+        check("the summary's retry names what it starts: « Réessayer le compte rendu » (#933)", retry_said == "Réessayer le compte rendu", retry_said)
         ollama["silent"] = False
         press(browser, "minutes-again")
         empty = wait_for(browser, lambda b: "Ollama n’a aucun modèle sur cet ordinateur" in b.execute_script(state), 10)
         offered = browser.find_elements(By.ID, "ollama-fetch")
-        check("holding no model: said, its recommended model offered", empty and offered and offered[0].text == "Télécharger qwen3:8b",
+        check("holding no model: said, its recommended model offered", empty and offered and offered[0].text == "Télécharger qwen3:8b et rédiger le compte rendu",
               browser.execute_script(state))
         seen(browser, "d60-6-ollama-empty-light")
         press(browser, "ollama-fetch")
@@ -11151,18 +12095,55 @@ def window_looks(now: dt.datetime) -> None:
             "return [...document.querySelectorAll('.primary, .open, .icon-button, select, .search, .field input, .setting')]"
             ".filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select')).map(e => [e.id || e.className, e.getBoundingClientRect().height]).filter(([, h]) => h !== 32)")
         check("every control shown is 32 px high (D89)", tall == [], tall)
-        edged = browser.execute_script(
-            "const t = document.createElement('i'); t.style.color = 'var(--edge)'; document.body.append(t); const edge = getComputedStyle(t).color; t.remove();"
-            " const all = [...document.querySelectorAll('.open, select, .search, .field input, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
-            " return [all.length > 0, all.filter(e => getComputedStyle(e).borderTopColor !== edge).map(e => e.id || e.className)]")
-        check("fields and secondary buttons are bordered with --edge (D89)", edged == [True, []], edged)
         filled = browser.execute_script(
             "const t = document.createElement('i'); t.style.background = 'var(--surface)'; document.body.append(t); const surface = getComputedStyle(t).backgroundColor; t.remove();"
-            " const all = [...document.querySelectorAll('select, .search, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select'));"
+            " const all = [...document.querySelectorAll('select, .search, .setting')].filter(e => e.offsetParent && !e.closest('#small') && !e.matches('.setting select, .page-model'));"
             " return [all.length > 0, all.filter(e => getComputedStyle(e).backgroundColor !== surface).map(e => e.id || e.className)]")
         check("fields are drawn on the surface, only edged, as board 2 (D89)", filled == [True, []], filled)
+        # #1094, on Settings — the page holding a list, a field and secondary buttons at once (the meeting's page here
+        # has no list of its own nor a secondary shown): fields rest on the line, their bottom edged at 3:1 (Fluent 2's
+        # fields); a secondary button rests on the line, its bottom edged as Windows 11's controls — on --raised, or on the
+        # surface inside a step — and answers the pointer.
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed() and b.find_elements(By.CSS_SELECTOR, "#settings select"), 10)
+        token = ("const token = (v) => { const t = document.createElement('i'); t.style.color = `var(${v})`; document.body.append(t);"
+                 " const c = getComputedStyle(t).color; t.remove(); return c; };")
+        edged = browser.execute_script(
+            token + " const all = [...document.querySelectorAll('select, .search, .field input, .setting')].filter(e => e.offsetParent && !e.closest('#small')"
+            " && !e.matches('.setting select, .page-model'));"
+            " return [all.filter(e => e.matches('select')).length > 0, all.filter(e => { const s = getComputedStyle(e);"
+            " return s.borderTopColor !== token('--line') || s.borderBottomColor !== token('--edge'); }).map(e => e.id || e.className)]")
+        check("fields rest on --line, their bottom edged with --edge (#1094)", edged == [True, []], edged)
+        bare = browser.execute_script(
+            token + " const all = [...document.querySelectorAll('#settings .open')].filter(e => e.offsetParent);"
+            " return [all.length > 0, all.filter(e => { const s = getComputedStyle(e);"
+            " return s.borderTopColor !== token('--line') || s.borderBottomColor !== token('--edge') || s.backgroundColor !== token(e.closest('.step') ? '--surface' : '--raised'); })"
+            ".map(e => e.id || e.className)]")
+        check("secondary buttons rest on --line, their bottom edged, on --raised or a step's surface (#1094)", bare == [True, []], bare)
+        hovered = next((e for e in browser.find_elements(By.CSS_SELECTOR, "#settings .open") if e.is_displayed()), None)
+        if hovered is not None:
+            ActionChains(browser).move_to_element(hovered).perform()
+            time.sleep(0.3)
+        answered = hovered is not None and browser.execute_script(token + " return getComputedStyle(arguments[0]).backgroundColor === token('--hover')", hovered)
+        check("a secondary button hovered takes --hover (#1094)", answered, hovered.get_attribute("id") or hovered.text if hovered is not None else None)
+        ActionChains(browser).move_to_element(browser.find_element(By.CSS_SELECTOR, ".brand")).perform()
+        browser.execute_script(f"location.hash = '#/meeting/{made.name}'")
+        wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed(), 10)
         # The trial over (D83): buying holds it in the recording's place, then gives it back.
-        swapped = [browser.execute_script(f"paintRefused({state}); return arguments[0]", None) or browser.execute_script(PRIMARIES) for state in ("true", "false")]
+        # The shell's answer stood in, never the page painted over it: the header's poll, every 1.5 s, paints
+        # what the shell says, and a state painted by the check alone is painted back (#1147).
+        browser.execute_script("const real = window.__TAURI__.core; window.refusedNow = true;"
+                               " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => ['header', 'listed'].includes(asked)"
+                               "   ? real.invoke(asked, ...rest).then((a) => ({ ...a, refused: window.refusedNow })) : real.invoke(asked, ...rest) };"
+                               " window.restoreRefused = () => { window.__TAURI__.core = real; };")
+        swapped = []
+        for state, wanted in ((True, ["buy"]), (False, ["record"])):
+            browser.execute_script("window.refusedNow = arguments[0]", state)
+            wait_for(browser, lambda b: b.execute_script(PRIMARIES) == wanted, 5)
+            # Past one more poll: the shell's word stays.
+            time.sleep(1.6)
+            swapped.append(browser.execute_script(PRIMARIES))
+        browser.execute_script("window.restoreRefused()")
         check("the trial over, one primary still: « Acheter Kitokey », then the recording's again", swapped == [["buy"], ["record"]], swapped)
         for theme in ("light", "dark"):
             shot_themed(browser, f"d69-full-{theme}", theme)
@@ -11292,6 +12273,588 @@ def pages_seen(now: dt.datetime) -> None:
                     time.sleep(0.4)
                     shot_themed(browser, f"d89-{page}-{width}-{theme}", theme)
 
+
+
+# The meetings the Store's screenshots show (D103): invented for them, nothing of a real one, each a situation the
+# people who buy Kitokey live between two calls — a product review, a client's quote and schedule, a project's
+# kickoff, a check-in, a 1:1, a steering committee (the decider, 2026-11-21: « que ce soit réaliste et que les
+# prospects puissent comprendre de manière intuitive en un coup d'œil »). Each language its own; three are kept
+# whole — minutes, transcript, sound —: the review shot 1 opens, the client's call shot 2 searches for its quote,
+# the kickoff shot 3 finds with that client's name. A summary cites a line as « [@n] », its n-th line, written as
+# the moment it starts. Who spoke is the page's own — « Vous », « Réunion · voix 1 » —: names are said, never labelled.
+STORE_MEETINGS = {
+    "fr": {
+        "titles": ["Point d’équipe hebdo", "Point individuel — Hugo", "Atelier Lumen — cadrage du projet",
+                   "Atelier Lumen — devis et planning", "Comité de pilotage — T4", "Revue produit de la semaine"],
+        "minutes": ("## 1.\n\nLa 2.4 sort jeudi comme prévu ; l’export PDF suit la semaine d’après, le temps de couvrir deux cas. Les tickets du support baissent de 15\u00a0% ce mois-ci, la moitié encore sur la connexion SSO ; l’activation passe de 41 à 48\u00a0%.\n\n"
+                    "## 2.\n\n- Prévenir le support du report de l’export — Hugo — demain [@190]\n"
+                    "- Préparer les notes de version — Camille — mercredi [@192]\n"
+                    "- Ouvrir une version de test à Atelier Lumen et à la mutuelle Horizon — Camille — vendredi [@9]\n\n"
+                    "## 3.\n\n- Les tests de charge passent depuis la correction du cache. [@1]\n"
+                    "- Deux clients attendent l’export pour leur clôture du mois. [@5]\n"),
+        "said": [("me", None, "On commence par la 2.4 : Hugo, où en sont les tests ?"),
+                 ("others", "1", "Tout passe depuis la correction du cache, les tests de charge aussi."),
+                 ("me", None, "Bien. Et l’export PDF, on le garde dans cette version ?"),
+                 ("others", "2", "Je préférerais le décaler d’une semaine, il reste deux cas à couvrir."),
+                 ("others", "2", "Les tableaux sur plusieurs pages, et les logos des clients."),
+                 ("others", "1", "D’accord, mais deux clients l’attendent pour leur clôture du mois."),
+                 ("me", None, "Lesquels ?"),
+                 ("others", "1", "Atelier Lumen et la mutuelle Horizon, ils l’ont demandé en septembre."),
+                 ("me", None, "On peut leur ouvrir une version de test ?"),
+                 ("others", "2", "Oui, dès vendredi, si les tableaux tiennent."),
+],
+        "lines": 196,
+        "filler": ["Côté support, les tickets ont baissé de 15 % ce mois-ci.", "La moitié concerne encore la connexion SSO.",
+                   "On a une piste, c’est le délai d’expiration du jeton.", "Tu peux regarder ça avant la 2.5 ?",
+                   "Oui, je le mets en haut de la liste.", "Pour l’onboarding, les premiers retours sont bons.",
+                   "Le taux d’activation passe de 41 à 48 %.", "Il faudrait le montrer au comité de pilotage.",
+                   "Je prépare deux diapositives pour mardi.", "Et la refonte des notifications, elle avance ?",
+                   "Les maquettes sont prêtes, on les teste lundi avec cinq clients.", "Très bien, on en reparle la semaine prochaine."],
+        # Its end: who does what, and the date said again.
+        "found": {190: ("me", None, "Pour l’export, Hugo prévient le support dès demain."),
+                  191: ("others", "1", "Je leur écris aussi, ils préfèrent l’entendre de nous."),
+                  192: ("others", "2", "Et moi, je prépare les notes de version pour mercredi."),
+                  193: ("me", None, "La date de sortie ne bouge pas ?"),
+                  194: ("others", "1", "Non, jeudi matin, comme prévu."),
+                  195: ("me", None, "Parfait. On sort la 2.4 jeudi, l’export suit la semaine d’après.")},
+        "call": {
+            "minutes": ("## 1.\n\nL’Atelier Lumen valide le périmètre : la boutique en ligne avant les fêtes, le paiement en trois fois "
+                        "au second lot. Le devis révisé passe à 21 400 € HT, en deux lots.\n\n"
+                        "## 2.\n\n- Envoyer le devis révisé en deux lots — Vous — jeudi [@61]\n"
+                        "- Préparer le fichier des 400 fiches produit — Léa — vendredi [@8]\n"
+                        "- Planifier la formation de l’équipe de la boutique — Hugo — lundi [@10]\n\n"
+                        "## 3.\n\n- La boutique doit être en ligne avant les fêtes. [@3]\n"
+                        "- Signature avant la fin du mois si le devis tient à 21 400 €. [@118]\n"),
+            "lines": 280,
+            "said": [],
+            "filler": ["Bonjour à tous, merci d’avoir décalé le créneau.", "On a relu le cahier des charges avec l’équipe hier.",
+                       "Le catalogue en ligne reste la priorité pour vous ?", "Oui, il faut qu’il soit prêt pour les fêtes.",
+                       "Le paiement en trois fois, c’est indispensable ?", "Nos clients le demandent souvent, oui.",
+                       "On peut le prévoir dans le second lot.", "Et la reprise des 400 fiches produit, qui s’en charge ?",
+                       "Léa peut préparer le fichier de notre côté.", "Parfait, on l’importera en une fois.",
+                       "Il faudra aussi former l’équipe de la boutique.", "Une demi-journée devrait suffire."],
+            "found": {9: ("others", "1", "Le devis de septembre prévoyait 18 000 €, on peut rester dans cette enveloppe ?"),
+                      61: ("me", None, "Je vous envoie le devis révisé jeudi, avec la livraison en deux lots."),
+                      118: ("others", "2", "Si le devis tient à 21 400 €, on signe avant la fin du mois."),
+                      170: ("me", None, "Dans le devis, la formation de l’équipe est comptée à part."),
+                      236: ("others", "1", "On fait valider le devis par notre associée lundi.")},
+            "sought": "devis",
+        },
+        "kickoff": {
+            "minutes": ("## 1.\n\nL’Atelier Lumen veut une boutique en ligne avant les fêtes : 400 produits, un budget autour de 20 000 €.\n\n"
+                        "## 2.\n\n- Envoyer une proposition chiffrée — Vous — vendredi [@236]\n"
+                        "- Chiffrer à part le paiement en plusieurs fois — Vous — vendredi [@238]\n\n"
+                        "## 3.\n\n- Les fêtes font 40 % des ventes de l’année. [@3]\n"
+                        "- 400 produits, avec leurs déclinaisons de couleur. [@4]\n"),
+            "said": [("me", None, "Merci d’être venus. Racontez-nous ce qui vous amène."),
+                     ("others", "1", "Nos ventes en ligne passent par Instagram, on veut une vraie boutique."),
+                     ("me", None, "Pour quand ?"),
+                     ("others", "1", "Avant les fêtes, c’est là qu’on fait 40 % de l’année."),
+                     ("others", "2", "Et on a 400 produits, avec leurs déclinaisons de couleur."),
+                     ("me", None, "Vous avez une enveloppe en tête ?"),
+                     ("others", "1", "Autour de 20 000 €, un peu plus si ça vaut le coup."),
+],
+            "lines": 239,
+            "filler": ["Aujourd’hui, comment vous gérez les commandes ?", "Sur un tableur, et les paiements par virement.",
+                       "Et les stocks, ils sont à jour où ?", "Dans le même tableur, mis à jour le soir.",
+                       "On pourra le relier à la boutique.", "Vous avez déjà des photos des produits ?",
+                       "Oui, pour la plupart, sur fond blanc.", "Parfait, ça nous fera gagner du temps.",
+                       "Qui validera les maquettes chez vous ?", "Moi, avec Léa pour les textes.",
+                       "On vous propose un point toutes les deux semaines.", "Ça nous va très bien."],
+            # Its end: what follows, and when.
+            "found": {236: ("me", None, "Je vous envoie une proposition chiffrée d’ici vendredi."),
+                      237: ("others", "2", "Pensez au paiement en plusieurs fois, nos clients le demandent."),
+                      238: ("me", None, "C’est noté, on le chiffre à part.")},
+            "sought": "lumen",
+        },
+    },
+    "en": {
+        "titles": ["Weekly team check-in", "1:1 — Hugo", "Lumen Studio — project kickoff",
+                   "Lumen Studio — quote call", "Steering committee — Q4", "Weekly product review"],
+        "minutes": ("## 1.\n\n2.4 ships on Thursday as planned; the PDF export follows the week after, to cover two more cases. Support tickets are down 15% this month, half still about SSO sign-in; activation goes from 41 to 48%.\n\n"
+                    "## 2.\n\n- Tell support the export is delayed — Hugo — tomorrow [@190]\n"
+                    "- Write the release notes — Camille — Wednesday [@192]\n"
+                    "- Give Lumen Studio and Horizon Insurance a test version — Camille — Friday [@9]\n\n"
+                    "## 3.\n\n- Load tests pass since the cache fix. [@1]\n"
+                    "- Two customers need the export for their month-end close. [@5]\n"),
+        "said": [("me", None, "Let’s start with 2.4: Hugo, where are the tests?"),
+                 ("others", "1", "Everything passes since the cache fix, load tests included."),
+                 ("me", None, "Good. And the PDF export, do we keep it in this version?"),
+                 ("others", "2", "I’d rather move it a week, two cases are still uncovered."),
+                 ("others", "2", "Tables over several pages, and the customers’ logos."),
+                 ("others", "1", "Fine, but two customers need it for their month-end close."),
+                 ("me", None, "Which ones?"),
+                 ("others", "1", "Lumen Studio and Horizon Insurance, they asked in September."),
+                 ("me", None, "Can we give them a test version?"),
+                 ("others", "2", "Yes, from Friday, if the tables hold."),
+],
+        "lines": 196,
+        "filler": ["On support, tickets are down 15% this month.", "Half of them are still about SSO sign-in.",
+                   "We have a lead, it’s the token’s expiry time.", "Can you look at it before 2.5?",
+                   "Yes, I’ll put it at the top of the list.", "For onboarding, the first feedback is good.",
+                   "Activation goes from 41 to 48%.", "We should show that at the steering committee.",
+                   "I’ll prepare two slides for Tuesday.", "And the notifications redesign, is it moving?",
+                   "The mock-ups are ready, we test them on Monday with five customers.", "Great, let’s pick it up next week."],
+        # Its end: who does what, and the date said again.
+        "found": {190: ("me", None, "For the export, Hugo tells support tomorrow."),
+                  191: ("others", "1", "I’ll write to them too, they’d rather hear it from us."),
+                  192: ("others", "2", "And I’ll write the release notes for Wednesday."),
+                  193: ("me", None, "The release date doesn’t move?"),
+                  194: ("others", "1", "No, Thursday morning, as planned."),
+                  195: ("me", None, "Perfect. 2.4 ships on Thursday, the export the week after.")},
+        "call": {
+            "minutes": ("## 1.\n\nLumen Studio approves the scope: the online shop before the holidays, instalment payments in the "
+                        "second phase. The revised quote comes to $21,400, in two phases.\n\n"
+                        "## 2.\n\n- Send the revised quote in two phases — You — Thursday [@61]\n"
+                        "- Prepare the file of 400 product pages — Léa — Friday [@8]\n"
+                        "- Schedule the shop team’s training — Hugo — Monday [@10]\n\n"
+                        "## 3.\n\n- The shop must be live before the holidays. [@3]\n"
+                        "- They sign before the month ends if the quote holds at $21,400. [@118]\n"),
+            "lines": 280,
+            "said": [],
+            "filler": ["Hello everyone, thanks for moving the slot.", "We went through the requirements with the team yesterday.",
+                       "Is the online catalogue still your priority?", "Yes, it has to be ready for the holidays.",
+                       "Are instalment payments a must?", "Our customers ask for them a lot, yes.",
+                       "We can plan them for the second phase.", "And the 400 product pages, who moves them over?",
+                       "Léa can prepare the file on our side.", "Great, we’ll import it in one go.",
+                       "The shop team will need some training too.", "Half a day should be enough."],
+            "found": {9: ("others", "1", "September’s quote said $18,000, can we stay within that budget?"),
+                      61: ("me", None, "I’ll send you the revised quote on Thursday, with delivery in two phases."),
+                      118: ("others", "2", "If the quote holds at $21,400, we sign before the month ends."),
+                      170: ("me", None, "In the quote, the team’s training is priced separately."),
+                      236: ("others", "1", "Our partner signs off the quote on Monday.")},
+            "sought": "quote",
+        },
+        "kickoff": {
+            "minutes": ("## 1.\n\nLumen Studio wants an online shop before the holidays: 400 products, a budget around $20,000.\n\n"
+                        "## 2.\n\n- Send a costed proposal — You — Friday [@236]\n"
+                        "- Price instalment payments separately — You — Friday [@238]\n\n"
+                        "## 3.\n\n- The holidays make 40% of the year’s sales. [@3]\n"
+                        "- 400 products, each in several colours. [@4]\n"),
+            "said": [("me", None, "Thanks for coming in. Tell us what brings you here."),
+                     ("others", "1", "We sell online through Instagram, we want a real shop."),
+                     ("me", None, "By when?"),
+                     ("others", "1", "Before the holidays, that’s 40% of our year."),
+                     ("others", "2", "And we have 400 products, each in several colours."),
+                     ("me", None, "Do you have a budget in mind?"),
+                     ("others", "1", "Around $20,000, a bit more if it’s worth it."),
+],
+            "lines": 239,
+            "filler": ["How do you handle orders today?", "In a spreadsheet, with payments by bank transfer.",
+                       "And the stock, where is it kept up to date?", "In the same spreadsheet, updated every evening.",
+                       "We can connect it to the shop.", "Do you already have product photos?",
+                       "Yes, most of them, on a white background.", "Great, that will save us time.",
+                       "Who signs off the mock-ups on your side?", "I do, with Léa for the copy.",
+                       "We suggest a check-in every two weeks.", "That works for us."],
+            # Its end: what follows, and when.
+            "found": {236: ("me", None, "I’ll send you a costed proposal by Friday."),
+                      237: ("others", "2", "Think about instalment payments, our customers ask for them."),
+                      238: ("me", None, "Noted, we’ll price that separately.")},
+            "sought": "lumen",
+        },
+    },
+}
+# The meeting each shot opens, by its index among the titles: 1 the weekly review, 3 the client's kickoff, found with
+# its call by the client's name. 2 is a meeting recorded as the run takes it (#1126).
+STORE_OPENED = {"1-meeting": 5, "3-list": 2}
+STORE_RATE = 8000
+# The hour each meeting started, oldest first: a working day's, whenever the e2e runs.
+STORE_HOURS = [(9, 30), (14, 0), (10, 15), (16, 30), (11, 0), (14, 30)]
+
+
+def store_said(meeting: dict) -> list:
+    """A kept meeting's lines, as long as such a meeting lasts: what it says first, then its filler in turn, its found
+    lines where they fall; one side holds the floor a few lines, then the other, the same every run."""
+    said, random = list(meeting["said"]), __import__("random").Random(meeting["lines"])
+    side, left = "me", 0
+    for index in range(len(said), meeting["lines"]):
+        if not left:
+            side, left = ("others" if side == "me" else "me"), random.randint(6, 18)
+        left -= 1
+        said.append(meeting["found"].get(index) or (side, None if side == "me" else random.choice("12"),
+                                                    meeting["filler"][index % len(meeting["filler"])]))
+    return said
+
+
+def store_segments(said: list, seed: int) -> list[tuple]:
+    """Each line's speaker, voice, text, start and end, as people talk: as long as its words take, a breath to a few
+    seconds between two, now and then the next speaker in before the end — the same every run (`seed`)."""
+    random = __import__("random").Random(seed)
+    segments, at = [], 3.0
+    for who, voice, text in said:
+        if segments and segments[-1][0] != who and random.random() < 0.2:
+            at -= random.uniform(0.3, 1.0)
+        lasts = len(text) / 15 + random.uniform(0.8, 3.0)
+        segments.append((who, voice, text, round(at, 1), round(at + lasts, 1)))
+        at += lasts + random.uniform(0.4, 3.0)
+    return segments
+
+
+def store_clock(seconds: float) -> str:
+    """A moment as the page writes it (`clock`): « 02:05 », « 1:02:05 » past an hour."""
+    whole = int(seconds)
+    return ":".join(f"{part:02d}" for part in ([whole // 3600] if whole >= 3600 else []) + [whole % 3600 // 60, whole % 60])
+
+
+def store_minutes(meeting: dict, segments: list) -> str:
+    """A kept meeting's minutes, each « [@n] » written as the moment its n-th line starts."""
+    return re.sub(r"\[@(\d+)\]", lambda cited: f"[{store_clock(segments[int(cited[1])][3])}]", meeting["minutes"])
+
+
+def store_audio(folder: Path, segments: list) -> None:
+    """A kept meeting's two tracks, made here and never kept in the repository: speech-like bursts where its
+    transcript says each side spoke, silence elsewhere — the same every run, so two runs draw the same."""
+    random = __import__("random").Random(103)
+    length = int(STORE_RATE * (segments[-1][4] + 3))
+    # Syllables at about 4 a second, one take as long as the longest line, each line its start.
+    take = bytearray(2 * int(STORE_RATE * max(end - start for *_, start, end in segments)))
+    for n in range(len(take) // 2):
+        level = 0.55 + 0.45 * math.sin(2 * math.pi * 4.1 * n / STORE_RATE)
+        struct.pack_into("<h", take, 2 * n, int(9000 * level * random.uniform(-1, 1)))
+    for track, who in (("local", "me"), ("remote", "others")):
+        samples = bytearray(2 * length)
+        for speaker, _, _, start, end in segments:
+            if speaker != who:
+                continue
+            at, many = 2 * int(STORE_RATE * start), 2 * int(STORE_RATE * (end - start))
+            samples[at:at + many] = take[:many]
+        with wave.open(str(folder / f"{track}.wav"), "wb") as made:
+            made.setnchannels(1)
+            made.setsampwidth(2)
+            made.setframerate(STORE_RATE)
+            made.writeframes(bytes(samples))
+    record = json.loads((folder / "session.json").read_text())
+    record["tracks"] = {"local": {"device": "Mic"}, "remote": {"device": "Speaker"}}
+    (folder / "session.json").write_text(json.dumps(record))
+    (folder / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n{"track":"remote","sample":0,"at":0.0}\n')
+
+
+# Microsoft's least for a desktop screenshot: « 1366 x 768 pixels or larger », a .png of at most 50 MB (D103).
+STORE_LEAST, STORE_MOST = (1366, 768), 50 * 1024 * 1024
+
+
+def png_size(file: Path) -> tuple[int, int]:
+    """A PNG's width and height, read from its header; (0, 0) when it is no PNG."""
+    head = file.read_bytes()[:24]
+    return struct.unpack(">II", head[16:24]) if head[:8] == b"\x89PNG\r\n\x1a\n" else (0, 0)
+
+
+def store_hours(text: str) -> list[int]:
+    """The hours a page dates a meeting or a summary at — « · 14:30 », « à 14:30 », « · 2:30 PM », « at 2:30 PM » —,
+    on 24 hours; never a moment of a recording (« 00:45 »), which has neither."""
+    return [int(hour) % 12 + (12 if half == "PM" else 0) if half else int(hour)
+            for hour, half in re.findall(r"(?:· |\bà |\bat )(\d{1,2}):\d\d(?:\s*([AP]M))?", text)]
+
+
+def store_lanes(rects: list) -> tuple[int, int, float]:
+    """Who spoke as the page draws it (#1077): a bar for each segment, yours on one lane, the others' on the other —
+    how many bars each lane holds, and the share of the drawn width where both lanes have a bar at once: near
+    nothing where people take turns, all of it where two lines are drawn the same."""
+    covered = {"local": set(), "remote": set()}
+    for track, x, width, _ in rects:
+        covered.setdefault(track, set()).update(range(int(x), max(int(x) + 1, int(-(-(x + width) // 1)))))
+    both, either = covered["local"] & covered["remote"], covered["local"] | covered["remote"]
+    counts = {track: sum(1 for kind, *_ in rects if kind == track) for track in ("local", "remote")}
+    return counts["local"], counts["remote"], round(len(both) / max(1, len(either)), 3)
+
+
+def store_lasted(row: str) -> int:
+    """A list row's length, in minutes, as it says it: « 25 min », « 1 h 05 »."""
+    hours, minutes = re.search(r"(\d+)\s*h\b", row), re.search(r"(\d+)\s*min\b", row)
+    return 60 * int(hours[1] if hours else 0) + int(minutes[1] if minutes else 0)
+
+
+def store_shots(now: dt.datetime) -> None:
+    """CH. D103: the Microsoft Store's screenshots, made here from meetings invented for them, in French then
+    in English, light, in the Store's order — « displayed in your listing in order », Microsoft's page says —, the
+    benefit first (the coordinator, 2026-11-20 and 2026-11-21): a meeting's page with its minutes and transcript, a meeting
+    while it records, its time large and both meters (#1076, #1112, #1126), a word sought in the list, Settings with its
+    model on this computer. Each 1920 × 1080 — Microsoft's « 1366 x 768 pixels or larger »,
+    its MSIX page read on 2026-11-20 (D103's section) —, written to `store/<fr|en>/` in KITOKEY_SCREENSHOTS'
+    folder, or the run's own; then counted: four PNGs a language, each at least 1366 × 768, at most 50 MB."""
+    print("CH. the Store's screenshots: four a language, French and English, 1920 × 1080, from meetings invented for them (D103)")
+    store = Path(os.environ.get("KITOKEY_SCREENSHOTS") or WORK / "shots") / "store"
+    shutil.rmtree(store, ignore_errors=True)
+    # What each shot's page says, read as it is taken: a Store shot says no audio lost, no run's folder, no night hour.
+    shown: dict[str, dict] = {}
+    # The recording's shot as read just before it is taken (#1126): its time and both meters, and the list's first
+    # row, the recording itself when it is dated the run's hour. Never read after: the page drawn again just after the
+    # shot shows « 00:00:00 » and empty meters until its next reading, a tenth of a second later (s1126r3time).
+    taken: dict[str, dict] = {}
+    seen = lambda browser, shot: shown.update({shot: browser.execute_script(
+        "const shown = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent);"
+        "return {freed: shown('.chip.gone, #no-player').length,"
+        " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText,"
+        " lanes: [...document.querySelectorAll('#meeting svg.relief rect')].map(r => [r.getAttribute('class'), +r.getAttribute('x'), +r.getAttribute('width'), +r.getAttribute('y')]),"
+        " sought: [document.getElementById('search')?.value ?? '', document.getElementById('find')?.value ?? ''],"
+        " marked: [shown('#meeting .transcript .lines li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent)),"
+        " shown('#groups li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent))],"
+        " writers: shown('#meeting .maker').filter(p => p.querySelector('select')).map(p => { const s = p.querySelector('select');"
+        " let after = s.options[s.selectedIndex]?.textContent ?? '';"
+        " for (let n = p.querySelector('select').nextSibling; n; n = n.nextSibling) after += n.textContent; return after; }),"
+        " lines: [shown('#meeting .transcript .lines li').length, document.querySelectorAll('#meeting .transcript .lines li').length],"
+        " rows: [shown('#groups li').length, document.querySelectorAll('#groups li').length],"
+        " fetch: shown('#model-fetch').length, said: shown('#groups li').map(e => e.innerText),"
+        " models: shown('#settings h2').filter(h => ['Modèles', 'Models'].includes(h.textContent)).map(h => Math.round(h.getBoundingClientRect().top)),"
+        " cut: [...document.querySelectorAll('#groups li *')].filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent),"
+        " here: document.getElementById('minutes-here')?.checked ?? null,"
+        " confidential: document.getElementById('confidential-switch')?.checked ?? null,"
+        " crossing: [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
+        " && e.getBoundingClientRect().top < innerHeight && e.getBoundingClientRect().bottom > innerHeight).map(e => e.textContent.trim() || e.tagName),"
+        " above: [...shown('#settings section.card').filter(s => s.getBoundingClientRect().top < 0 && s.getBoundingClientRect().bottom > 0"
+        " && ![...s.querySelectorAll('h2')].some(h => ['Modèles', 'Models'].includes(h.textContent))).map(s => s.querySelector('h2')?.textContent ?? 'SECTION'),"
+        " ...[...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
+        " && e.getBoundingClientRect().top < 0 && e.getBoundingClientRect().bottom > 0).map(e => e.textContent.trim() || e.tagName)],"
+        " fit: window.storeFit ?? null,"
+        " live: (() => { const t = document.getElementById('page-time'), h = document.querySelector('#meeting h1'),"
+        " m = [...document.querySelectorAll('#meeting .page-level')]; return t && t.getClientRects().length && h ? {time: t.textContent,"
+        " large: parseFloat(getComputedStyle(t).fontSize) >= parseFloat(getComputedStyle(h).fontSize), title: h.textContent,"
+        " meters: m.map(e => Number(e.getAttribute('aria-valuenow')))} : null; })(),"
+        " zero: (document.getElementById('settings')?.innerText.match(/\\b0\\s(?:o|B)\\b/g) ?? []).length}")})
+    # An Ollama of CH's own, holding the model every meeting's minutes name: Settings says them written on this
+    # computer, as the meetings do.
+    class Ollama(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"models": [{"name": "qwen3:8b"}]}).encode()
+            self.send_response(200)
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Ollama)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    ollama = f"http://127.0.0.1:{server.server_address[1]}"
+    # 2 is recorded as the run takes it, at the run's own hour: the window and every meeting are put in a zone where
+    # that hour is 14 h, so the recording dates itself in the working day as the meetings do, whenever the run is
+    # (`Etc/GMT-5` is 5 h east of UTC: tzdata's names count the other way).
+    east = (14 - now.astimezone(dt.timezone.utc).hour) % 24
+    east -= 24 if east > 14 else 0
+    now = now.astimezone(dt.timezone(dt.timedelta(hours=east)))
+    for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
+        said = STORE_MEETINGS[short]
+        # The meetings' folder is the user's own, in a home of its own: Settings says « Dossier personnel / Kitokey »,
+        # never the run's path. Its data too: the model there is CH's alone, never the other scenarios'.
+        home = WORK / f"store-{short}"
+        meetings = home / "Kitokey"
+        model = home / "share" / "kitokey" / "models" / "ggml-large-v3-turbo-q8_0.bin"
+        model.parent.mkdir(parents=True, exist_ok=True)
+        # The model on this computer, as Settings reads it — a file of its name, its published size, sparse —: the
+        # transcription's privacy shown, its size as it is.
+        with open(model, "wb") as made:
+            made.truncate(874_188_075)
+        starts = [(now - dt.timedelta(days=2 * (len(said["titles"]) - index))).replace(hour=hour, minute=minute, second=0, microsecond=0)
+                  for index, (hour, minute) in enumerate(STORE_HOURS)]
+        names = [start.strftime("%Y-%m-%d_%H-%M") for start in starts]
+        kept = {5: said, 3: said["call"], 2: said["kickoff"]}
+        for index, (name, title) in enumerate(zip(names, said["titles"])):
+            folder, meeting = meetings / name, kept.get(index)
+            segments = store_segments(store_said(meeting), 103 + index) if meeting else None
+            minutes = (segments[-1][4] + 3) / 60 if segments else 25 + 5 * index
+            session(folder, starts[index], minutes, {} if segments else {"local.wav": 1000})
+            # A client's meetings said confidential, as their owner would (the decider, 2026-11-21 ~12:50): heard and
+            # written here alone, the lock shown on where it matters; the team's own product review left as it is.
+            if index in (2, 3):
+                (folder / "confidential").write_bytes(b"")
+            made = starts[index] + dt.timedelta(minutes=minutes + 4)
+            (folder / "minutes.md").write_text(
+                f"---\ncontract: minutes/v2\nmade: {made.isoformat(timespec='seconds')}\nprovider: local\nmodel: qwen3:8b\ncontext: null\n"
+                f"title: {json.dumps(title, ensure_ascii=False)}\n---\n\n" + (store_minutes(meeting, segments) if segments else
+                                                                                re.sub(r" \[@\d+\]", "", said["minutes"])))
+            if not segments:
+                continue
+            lines = [{"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0",
+                      "language": short, "context": None},
+                     *({"type": "segment", "speaker": who, "track": "local" if who == "me" else "remote", "voice": voice,
+                        "start": start, "end": end, "text": text} for who, voice, text, start, end in segments),
+                     {"type": "complete", "duration": segments[-1][4] + 3}]
+            (folder / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
+            store_audio(folder, segments)
+        # After a recording, the transcript then the minutes: what Kitokey does on its own, chosen as a buyer would.
+        window = Window(meetings, language, f'reminder = false\nafter = "minutes"\nminutes_provider = "{ollama}/v1"\nminutes_model = "qwen3:8b"\n',
+                        ollama=ollama)
+        window.env.update(GTK_THEME="Adwaita", HOME=str(home), XDG_DATA_HOME=str(home / "share"), TZ=f"Etc/GMT{-east:+d}")
+        # The stand-in for capture dates its meeting as the scenarios' fixed one unless told: told the run's hour.
+        window.env.update(KITOKEY_E2E_RECORDED_AT=now.isoformat(timespec="seconds"),
+                          KITOKEY_E2E_RECORDED_UNTIL=(now + dt.timedelta(seconds=5)).isoformat(timespec="seconds"),
+                          KITOKEY_E2E_RECORDED=now.strftime("%Y-%m-%d_%H-%M"))
+        with window as browser:
+            browser.set_window_size(1920, 1080)
+            if not wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 3):
+                # The window's frame took its share of what was asked: asked again, by what was missing.
+                browser.set_window_size(2 * 1920 - browser.execute_script("return innerWidth"), 1080)
+                wait_for(browser, lambda b: b.execute_script("return innerWidth") == 1920, 5)
+            (store / short).mkdir(parents=True, exist_ok=True)
+            for shot_name, index in STORE_OPENED.items():
+                browser.execute_script("location.hash = arguments[0]", f"#/meeting/{names[index]}")
+                wait_for(browser, lambda b: b.execute_script(
+                    "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
+                    " && p.querySelectorAll('.transcript .lines li').length > 0", names[index]), 10)
+                # 3: a word sought in the list, only its meetings left (« retrouver n'importe quelle réunion »).
+                if shot_name == "3-list":
+                    browser.find_element(By.ID, "find").send_keys(kept[index]["sought"])
+                browser.execute_script("document.activeElement.blur(); scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
+                time.sleep(0.6)
+                browser.save_screenshot(str(store / short / f"{shot_name}.png"))
+                browser.execute_script("document.documentElement.style.overflow = ''")
+                seen(browser, f"{short}/{shot_name}.png")
+                if shot_name == "3-list":
+                    browser.execute_script("const f = document.getElementById('find'); f.value = ''; f.dispatchEvent(new Event('input'))")
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 10)
+            # Its models at the top — on this computer, nothing sent —, the card above wholly out of the image, the one
+            # under them going on past its edge between two rows (lina and the coordinator, 2026-11-21); the page's
+            # scrollbar, an artefact of the shot's height, hidden for it alone.
+            # The scroll is chosen from the page as drawn, never tuned: the top anywhere from the card above's bottom to
+            # the Models heading's top — the card's own padding may go, a scrolled page (the coordinator, 2026-11-21) —,
+            # the nearest to the card's top at 14 px where neither edge crosses a control or a line of text, and the
+            # page long enough to scroll there. None: `storeFit` names both bands, for the edge check to say.
+            browser.execute_script(
+                "const box = e => { const r = e.getBoundingClientRect(); return {top: r.top + scrollY, bottom: r.bottom + scrollY}; };"
+                "const cards = [...document.querySelectorAll('#settings section.card')].filter(e => e.offsetParent);"
+                "const title = [...document.querySelectorAll('#settings h2')].find(h => ['Modèles', 'Models'].includes(h.textContent));"
+                "const card = title.closest('section'), before = cards[cards.indexOf(card) - 1];"
+                "const leaves = [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))).map(box);"
+                "const crosses = y => leaves.some(r => r.top < y && r.bottom > y);"
+                "const from = Math.ceil(before ? box(before).bottom : 0), to = Math.min(Math.floor(box(title).top), document.documentElement.scrollHeight - innerHeight);"
+                "const aim = Math.round(box(card).top) - 14;"
+                "const fits = [...Array(Math.max(0, to - from + 1)).keys()].map(i => from + i).sort((a, b) => Math.abs(a - aim) - Math.abs(b - aim))"
+                "  .find(y => !crosses(y) && !crosses(y + innerHeight));"
+                "window.storeFit = fits === undefined ? `no scroll fits: the top in ${from}..${to}, the bottom in ${from + innerHeight}..${to + innerHeight} (page px), every one across a control or a line of text` : null;"
+                "scrollTo(0, fits ?? aim);"
+                "document.documentElement.style.overflow = 'hidden'")
+            time.sleep(0.4)
+            browser.save_screenshot(str(store / short / "4-settings.png"))
+            seen(browser, f"{short}/4-settings.png")
+            browser.execute_script("document.documentElement.style.overflow = ''")
+            # 2: a meeting while it records, from the window's button, named as the team's own meeting: its time large in
+            # the who-spoke area, both meters (#1076, #1112). Taken last, so that no other shot shows it.
+            live = lambda b: "live" in (b.find_element(By.ID, "record").get_attribute("class") or "")
+            press(browser, "record")
+            wait_for(browser, lambda b: live(b) and any(f.name not in names and (f / "session.json").exists() for f in meetings.iterdir()), 10)
+            recording = next(f for f in meetings.iterdir() if f.name not in names)
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{recording.name}")
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting')?.dataset.name") == recording.name
+                     and b.find_elements(By.ID, "rename"), 10)
+            press(browser, "rename")
+            # Its field opens holding what the heading said: selected, so that the name typed replaces it.
+            wait_for(browser, lambda b: b.execute_script("const f = document.getElementById('naming');"
+                                                         " if (f && document.activeElement === f) { f.select(); return true; } return false"), 5)
+            ActionChains(browser).send_keys(said["titles"][0] + Keys.ENTER).perform()
+            wait_for(browser, lambda b: b.execute_script("return document.querySelector('#meeting h1')?.textContent") == said["titles"][0], 5)
+            # Both sides heard a moment, so that each meter shows a level.
+            wait_for(browser, lambda b: b.execute_script("const m = [...document.querySelectorAll('#meeting .page-level')];"
+                                                         " return m.length === 2 && m.every(e => Number(e.getAttribute('aria-valuenow')) > 0)"), 10)
+            # Its time past 00:00:00, as a recording under way shows it.
+            wait_for(browser, lambda b: re.search(r"[1-9]", b.execute_script("return document.getElementById('page-time')?.textContent || ''")), 10)
+            browser.execute_script("document.activeElement.blur(); scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
+            time.sleep(0.6)
+            taken[f"{short}/2-recording.png"] = browser.execute_script(
+                "return {time: document.getElementById('page-time')?.textContent ?? null,"
+                " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow'))),"
+                " first: document.querySelector('#groups .session')?.getAttribute('href') ?? null, name: arguments[0]}",
+                f"#/meeting/{recording.name}")
+            browser.save_screenshot(str(store / short / "2-recording.png"))
+            seen(browser, f"{short}/2-recording.png")
+            browser.execute_script("document.documentElement.style.overflow = ''")
+            press(browser, "record")
+            wait_for(browser, lambda b: "stopped" in (recording / "session.json").read_text() and not live(b), 10)
+    made = sorted(store.glob("*/*.png"))
+    sizes = {f"{file.parent.name}/{file.name}": (png_size(file), file.stat().st_size) for file in made}
+    check("the Store's screenshots: four a language, French and English, in the Store's order (D103)",
+          [name for name in sizes] == [f"{short}/{n}" for short in ("en", "fr")
+                                       for n in ("1-meeting.png", "2-recording.png", "3-list.png", "4-settings.png")], sorted(sizes))
+    check("each at least 1366 × 768 and at most 50 MB, as Microsoft's page asks (D103)",
+          bool(sizes) and all(w >= STORE_LEAST[0] and h >= STORE_LEAST[1] and 0 < size <= STORE_MOST for (w, h), size in sizes.values()),
+          sizes)
+    check("no screenshot says an audio deleted or one Kitokey cannot play (D103)",
+          len(shown) == 8 and not any(page["freed"] for page in shown.values()), {shot: page["freed"] for shot, page in shown.items()})
+    settings = {shot: page["folder"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' screenshot says the meetings' folder in the user's home, never the run's own path (D103)",
+          len(settings) == 2 and all(folder and not folder.startswith("/") for folder in settings.values()), settings)
+    hours = {shot: store_hours(page["text"]) for shot, page in shown.items()}
+    check("every screenshot dates its meetings (D103)", len(hours) == 8 and all(hours.values()),
+          [shot for shot, said in hours.items() if not said])
+    check("every meeting and summary the screenshots date is of the working day, 8 h to 19 h (D103)",
+          all(8 <= hour < 19 for said in hours.values() for hour in said),
+          {shot: [hour for hour in said if not 8 <= hour < 19] for shot, said in hours.items() if any(not 8 <= hour < 19 for hour in said)})
+    # Each cited « [@n] » names a line the meeting has.
+    cited = {f"{short}/{kind}": [int(n) for n in re.findall(r"\[@(\d+)\]", meeting["minutes"]) if int(n) >= len(store_said(meeting))]
+             for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("call", said["call"]), ("kickoff", said["kickoff"]))}
+    check("every moment a summary cites is one its transcript starts a line at (D103)", not any(cited.values()), cited)
+    lanes = {shot: store_lanes(page["lanes"]) for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("who spoke, drawn on the meeting's shot, shows the turns: each side's lane at least 4 bars, both lanes drawn at once over a tenth of the width at most (#1077)",
+          len(lanes) == 2 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in lanes.values()), lanes)
+    # « Vous » on the upper lane, « Les autres » on the lower, as the transcript's sides read top to bottom (lina, #1093).
+    tops = {shot: (max((y for kind, _, _, y in page["lanes"] if kind == "local"), default=None),
+                   min((y for kind, _, _, y in page["lanes"] if kind == "remote"), default=None))
+            for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("who spoke: « Vous » on the upper lane, every bar of it above every bar of « Les autres » (#1077)",
+          len(tops) == 2 and all(here is not None and others is not None and here < others for here, others in tops.values()), tops)
+    lasted = {shot: [store_lasted(row) for row in page["said"]] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("every meeting the list shows lasts as such a meeting does, at least 15 min (D103)",
+          len(lasted) == 2 and all(len(rows) == 6 and min(rows) >= 15 for rows in lasted.values()), lasted)
+    # 2: a meeting while it records (#1126): its name, the time running large in the who-spoke area (#1112), both sides'
+    # meters moving (#1076); its hour the working day's, as every shot's (the dates check above).
+    live = {shot: page["live"] for shot, page in shown.items() if shot.endswith("2-recording.png")}
+    check("the recording shot: a meeting named as the team's own, its time running large (#1126)",
+          len(live) == 2 and all(on and re.fullmatch(r"\d+:\d\d:\d\d", on["time"]) and on["large"]
+                                 and on["title"] == STORE_MEETINGS[shot[:2]]["titles"][0] for shot, on in live.items()), live)
+    # What the image shows, read just before it was taken: a time already past 00:00:00, both meters moving, and the
+    # recording dated as the run takes it — the newest meeting, the list's first row —, whatever the run's hour (#1126).
+    check("the recording shot, as taken: its time past 00:00:00, both meters moving, the recording the list's first row (#1126)",
+          len(taken) == 2 and all(on["time"] and re.fullmatch(r"\d+:\d\d:\d\d", on["time"]) and re.search(r"[1-9]", on["time"])
+                                  and len(on["meters"]) == 2 and all(level > 0 for level in on["meters"])
+                                  and on["first"] == on["name"] for on in taken.values()), taken)
+    # The word sought marked where it is found, in each line or row kept (#1078): accents and case aside, as the search.
+    fold = lambda text: "".join(c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)).lower()
+    marks = {shot: page["marked"][1] for shot, page in shown.items() if shot.endswith("3-list.png")}
+    unmarked = {shot: lines for shot, lines in marks.items()
+                if not lines or any(not marked or any(fold(m) != fold(shown[shot]["sought"][1]) for m in marked) for marked in lines)}
+    check("a search marks the word it found in each row it keeps (#1078)", len(marks) == 2 and not unmarked, unmarked)
+    listed = {shot: page["rows"] for shot, page in shown.items() if shot.endswith("3-list.png")}
+    check("the list shot: a word typed in the list's search, only its meetings shown, at least two (D103)",
+          len(listed) == 2 and all(2 <= seen_ < total for seen_, total in listed.values()), listed)
+    fetched = {shot: page["fetch"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot shows the transcription's model on this computer, none to download (D103)",
+          len(fetched) == 2 and not any(fetched.values()), fetched)
+    cut = {shot: page["cut"] for shot, page in shown.items() if page["cut"]}
+    check("no screenshot cuts a meeting's title or line in the list (D103)", len(shown) == 8 and not cut, cut)
+    here = {shot: page["here"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot says the minutes written on this computer, as every meeting's are (D103)", len(here) == 2 and all(here.values()), here)
+    above = {shot: page["above"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    # Its top may cut the Models card's own padding — a page scrolled —, never the card above nor a line or a control
+    # (the coordinator, 2026-11-21, after #1081's longer Tester line left no offset with the card's top whole).
+    check("Settings' shot cuts no text or control at its top, nor the card above its models (D103)", len(above) == 2 and not any(above.values()), above)
+    crossing = {shot: page["crossing"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot: the card under its models goes on past the image's edge between two rows, never through a control or a line of text (D103)",
+          len(crossing) == 2 and not any(crossing.values()),
+          {shot: {"crossing": crossing[shot], "fit": shown[shot]["fit"]} for shot in crossing})
+    # What only a run has — a loopback address, its stand-ins' ports — never on a buyer's screen.
+    run = {shot: sorted(set(re.findall(r"127\.0\.0\.1(?::\d+)?|localhost:(?!11434\b)\d+", page["text"]))) for shot, page in shown.items()}
+    check("no screenshot shows an address or a port only the run has (D103)", len(run) == 8 and not any(run.values()),
+          {shot: said for shot, said in run.items() if said})
+    # Each step's line with a model to choose says where it ran, as the line without one does (#1090): its model
+    # chosen, then what follows it.
+    writers = {shot: page["writers"] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("a meeting's step with its model a list says where it ran, its model chosen then: « Qwen3 8b, sur cet ordinateur » (#1090)",
+          len(writers) == 2 and all(said and all(("sur cet ordinateur" if shot.startswith("fr") else "on this computer") in one for one in said)
+                                    for shot, said in writers.items()), writers)
+    # The minutes say a language model wrote them (Store Policies 11.16, #1092).
+    ai = {shot: ("Rédigé par une IA\u00a0: relisez-le avant de le partager." if shot.startswith("fr") else "Written by AI: read it before you share it.") in page["text"]
+          for shot, page in shown.items() if shot.endswith("1-meeting.png")}
+    check("a meeting's minutes say an AI wrote them (#1092)", len(ai) == 2 and all(ai.values()), ai)
+    # A time as each language writes it (#1075): US English no zero before the hour, French two digits.
+    clocks = {shot: re.findall(r"\b0\d:\d\d\s?[AP]M" if shot.startswith("en") else r"(?<![\d:])\d:\d\d\b", page["text"]) for shot, page in shown.items()}
+    check("times written as each language does: « 2:30 PM », « 09:30 » (#1075)", len(clocks) == 8 and not any(clocks.values()),
+          {shot: found for shot, found in clocks.items() if found})
+    zero = {shot: page["zero"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot says the model's size as it is, never « 0 o » (D103)", len(zero) == 2 and not any(zero.values()), zero)
+    models = {shot: page["models"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot shows its models at the top: their heading in the image's first third — Microsoft's « top two-thirds » for what matters (D103)",
+          len(models) == 2 and all(len(top) == 1 and 0 <= top[0] < 1080 / 3 for top in models.values()), models)
 
 def trial_over(now: dt.datetime) -> None:
     """AV. The trial over on a stand-in licence (PDR-0005, D83): no recording from the window, the
@@ -11777,13 +13340,17 @@ def main() -> int:
             )
             drawn = browser.execute_script(
                 "const s = document.querySelector('#meeting .relief'); return [s.getAttribute('aria-label'),"
-                " ...['local', 'remote'].map(t => s.querySelector('.' + t).getAttribute('points').split(' ').map(p => +p.split(',')[1]))]"
+                " ...['local', 'remote'].map(t => [...s.querySelectorAll('rect.' + t)].map(r => ['x', 'width', 'y', 'height'].map(a => +r.getAttribute(a))))]"
             )
             label, here, remote = drawn
-            # Speech in the first sixtieth of the meeting, on each side: here rises above the middle, remote falls below.
+            # Each segment a bar on its side's lane (#1077): here above the middle, remote below; speech in the first
+            # sixtieth of the meeting on each side, none of here's in its last.
             check(
-                "who spoke is drawn over the meeting, here above and remote below",
-                label.startswith("Temps de parole") and len(here) == len(remote) == 60 and here[0] < 42 and remote[0] > 46 and here[-1] == 42,
+                "who spoke is drawn over the meeting, each segment a bar: here on the upper lane, remote on the lower (#1077)",
+                label.startswith("Temps de parole") and here and remote
+                and all(y + height <= 44 for _, _, y, height in here) and all(y >= 44 for _, _, y, _ in remote)
+                and min(x for x, *_ in here) < 1100 / 60 and min(x for x, *_ in remote) < 1100 / 60
+                and max(x + width for x, width, *_ in here) < 1100 * 59 / 60,
                 drawn,
             )
             maker = lines_seen(browser, "#meeting .minutes .maker")[0]
@@ -13340,6 +14907,7 @@ def main() -> int:
     gestures_answer(now)
     window_looks(now)
     pages_seen(now)
+    store_shots(now)
     actions_rows(now)
     announced(now)
     heard_checked(now)
@@ -13352,6 +14920,9 @@ def main() -> int:
     unsaved_choice_kept(now)
     key_kept_to_its_host(now)
     settings_folded(now)
+    destinations_kept(now)
+    summary_sent(now)
+    settings_version(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
     focus_kept(now)
@@ -13363,8 +14934,11 @@ def main() -> int:
     bar_opened(now)
     bar_language(now)
     bar_after_stop(now)
+    summaries_to_a_folder(now)
     axe_first_surfaces(now)
     keys_first_surfaces(now)
+    redo_says_what_is_wrong(now)
+    redo_says_what_follows(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)

@@ -242,9 +242,27 @@ fn the_program_writes_the_transcript_from_the_service_its_host_in_the_header() {
     let complete: serde_json::Value = serde_json::from_str(transcript.lines().last().unwrap()).unwrap();
     let took = ran.elapsed().as_secs_f64();
     assert!(
-        complete["made_in"].as_f64().is_some_and(|made_in| (0.0..=took).contains(&made_in)),
+        complete["made_in"].as_f64().is_some_and(|made_in| within_the_run(made_in, took)),
         "{complete}, the run took {took} s"
     );
+}
+
+/// Whether a `made_in` says no more than the run took, as the test measured it around the program.
+/// The program rounds to the nearest hundredth, so the run is rounded the same way: rounding keeps
+/// the order, and a step that took no longer than the run never reads above it.
+fn within_the_run(made_in: f64, took: f64) -> bool {
+    (0.0..=(took * 100.0).round() / 100.0).contains(&made_in)
+}
+
+/// A run measured at 0.0796 s whose program wrote 0.08 (CI, run 44908069949, #1105): the header
+/// says it to the hundredth, the nearest one, so a run that lasted no longer can still read higher.
+#[test]
+fn a_made_in_rounded_up_from_its_own_run_is_within_it() {
+    assert!(within_the_run(0.08, 0.079573756));
+    assert!(within_the_run(0.04, 0.038551386));
+    // Above the run however it is rounded: more than the program can have taken.
+    assert!(!within_the_run(0.09, 0.079573756));
+    assert!(!within_the_run(-0.01, 0.079573756));
 }
 
 #[test]

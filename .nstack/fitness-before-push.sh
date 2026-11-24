@@ -16,7 +16,12 @@
 # agent's own (#456): a commit git made up from the machine would publish its user and host name.
 # Read: every commit of the local branches and tags, and of the ref pushed, that the remote does not
 # hold yet — pre-commit names only the first ref of a push of several. What a fetch brought — the
-# remote-tracking branches, the attested records fetched beside them — is the remote's already.
+# remote-tracking branches, the attested records fetched beside them, and what nstack claim fetched
+# under refs/nstack-remote/ (the default branch, holds, work branches) — is the remote's already (#484).
+# A merge of the forge's can still reach here through no such ref: a merge of main made in another
+# clone and fetched into FETCH_HEAD, origin/main stale. Before refusing, the hook fetches the default
+# branch of the remote it pushes to into refs/nstack-remote/base, as claim does, and counts again:
+# a clean push fetches nothing; no remote-tracking branch of the person's moves, nor FETCH_HEAD.
 if [ -n "${NSTACK_AGENT:-}" ]; then
   MINE=$(git config --global user.email)
   NAME=$(git config --global user.name)
@@ -27,16 +32,33 @@ if [ -n "${NSTACK_AGENT:-}" ]; then
   fi
   FROM=""
   case "${PRE_COMMIT_FROM_REF:-}" in ""|*[!0]*) FROM=${PRE_COMMIT_FROM_REF:-} ;; esac
-  COUNT=$(git log --format='%ae%x09%ce%x09%an%x09%cn' --branches --tags ${PRE_COMMIT_TO_REF:+"$PRE_COMMIT_TO_REF"} \
-      --not --remotes --glob='refs/notes/nstack-remote/*' ${FROM:+"$FROM"} 2>/dev/null |
-    awk -F '\t' -v me="$MINE" -v name="$NAME" '$1 != me || $2 != me || $3 != name || $4 != name' | wc -l | tr -d ' ')
+  foreign() {
+    git log --format='%ae%x09%ce%x09%an%x09%cn' --branches --tags ${PRE_COMMIT_TO_REF:+"$PRE_COMMIT_TO_REF"} \
+        --not --remotes --glob='refs/nstack-remote/*' --glob='refs/notes/nstack-remote/*' ${FROM:+"$FROM"} 2>/dev/null |
+      awk -F '\t' -v me="$MINE" -v name="$NAME" '$1 != me || $2 != me || $3 != name || $4 != name' | wc -l | tr -d ' '
+  }
+  COUNT=$(foreign)
+  FETCHED=""
+  if [ "${COUNT:-0}" -gt 0 ] && GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh} -o BatchMode=yes" \
+      git fetch --quiet --no-tags --no-write-fetch-head "${PRE_COMMIT_REMOTE_NAME:-origin}" \
+      "+HEAD:refs/nstack-remote/base" </dev/null >/dev/null 2>&1; then
+    FETCHED=yes
+    COUNT=$(foreign)
+  fi
   if [ "${COUNT:-0}" -gt 0 ]; then
     echo "FAIL [nstack] ${COUNT} commit(s) the remote does not hold yet are not agent ${NSTACK_AGENT}'s identity"
     echo "      ($NAME <$MINE>) as author or committer: pushed, they would publish another — this machine's"
     echo "      user and host, or a person's name."
     echo "      Action: the agent's own commits under a made-up identity: git rebase --exec 'git commit --amend"
     echo "      --no-edit --reset-author' <their base>. Another's work brought here keeps its author: it is"
-    echo "      pushed from that person's own session, never re-signed."
+    echo "      pushed from that person's own session, never re-signed. Commits the remote already holds"
+    if [ -n "$FETCHED" ]; then
+      echo "      (a merge made on the forge) are never re-signed either: this hook fetched the remote's"
+      echo "      default branch already; a merge on another branch of the forge: git fetch, then push again."
+    else
+      echo "      (a merge made on the forge) are never re-signed either: git fetch, then push again."
+    fi
+    echo "      Why: .nstack/handbook/INSTALL.md, *The agent commits as the App*."
     exit 1
   fi
 fi
