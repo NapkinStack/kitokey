@@ -1245,6 +1245,38 @@ const elapsed = (seconds) => {
   return [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60].map((n) => String(n).padStart(2, "0")).join(":");
 };
 
+// A level meter's drawing from a reading, 0 to 1, given the one drawn before (#1179): the reading drawn at once,
+// a fall eased by the style's `.falling`, as a VU meter — Zoom's and Meet's levels are smoothed too —, and the
+// loudest of the last 0.8 s kept as a tick. Who asks for less motion is drawn a level held a second, in three
+// steps — silent, heard, loud —, and no tick: nothing moves ten times a second (D69). Pure: tests/meter.rs runs it.
+function levelShown(was, reading, now, still) {
+  const percent = Math.round(Math.min(1, Math.max(0, reading)) * 100);
+  if (still) {
+    if (was && was.peak === null && now - was.at < 1000) return was;
+    return { width: percent < 20 ? 0 : percent < 75 ? 50 : 90, falling: false, peak: null, at: now };
+  }
+  const kept = was && was.peak !== null && percent < was.peak && now - was.at <= 800;
+  return { width: percent, falling: Boolean(was) && percent < was.width, peak: kept ? was.peak : percent, at: kept ? was.at : now };
+}
+
+// Draws a reading on a meter's fill, its track the meter a screen reader reads (its value the reading itself), its
+// tick the fill's next sibling.
+const levelsDrawn = new WeakMap();
+const lessMotion = matchMedia("(prefers-reduced-motion: reduce)");
+function paintLevel(fill_, reading) {
+  const shown = levelShown(levelsDrawn.get(fill_), reading, performance.now(), lessMotion.matches);
+  levelsDrawn.set(fill_, shown);
+  fill_.classList.toggle("falling", shown.falling);
+  fill_.style.width = `${shown.width}%`;
+  const tick = fill_.nextElementSibling;
+  if (tick) {
+    tick.classList.toggle("falling", shown.falling);
+    tick.hidden = shown.peak === null || shown.peak <= shown.width;
+    tick.style.left = `${shown.peak ?? 0}%`;
+  }
+  fill_.parentElement.setAttribute("aria-valuenow", String(Math.round(Math.min(1, Math.max(0, reading)) * 100)));
+}
+
 // The page of the meeting being recorded (#1076): both sides' levels as the bar's meters, and its time,
 // read from what the bar reads ten times a second (`recording_now`). Neither is a live region — a screen
 // reader would say them ten times a second —, a meter's value is read when it is reached, as the bar's.
@@ -1265,18 +1297,14 @@ function pageLevels(name, time, words) {
     track.setAttribute("aria-valuemax", "100");
     track.setAttribute("aria-valuenow", "0");
     const fill_ = element("span", index === 0 ? "fill here" : "fill remote");
-    track.append(fill_);
+    track.append(fill_, element("span", "peak"));
     column.append(track, element("span", index === 0 ? "here" : "remote", index === 0 ? words.here_described : words.remote_described));
     row.append(column);
     return fill_;
   });
   const paint = (now) => {
     time.textContent = elapsed(now.seconds);
-    for (const [index, fill_] of fills.entries()) {
-      const percent = Math.round(now.levels[index] * 100);
-      fill_.style.width = `${percent}%`;
-      fill_.parentElement.setAttribute("aria-valuenow", String(percent));
-    }
+    for (const [index, fill_] of fills.entries()) paintLevel(fill_, now.levels[index]);
   };
   if (pageLast?.meeting === name) paint(pageLast);
   // The poll ends with the page or the recording, and its reading with it: a meeting deleted frees its name within
@@ -2049,10 +2077,147 @@ function minutesCard(read, words, session, transcript, onPage) {
   // The minutes as written, rendered by the shell: raw HTML in them is text there, a link its words.
   const body = element("div", "body");
   body.innerHTML = read.body;
-  actionRows(body, words, read.actions);
+  const mentioned = actionRows(body, words, read.actions);
   lineTimes(body, session, transcript, words);
   card.append(body);
+  datesOffer(card, mentioned, session, transcript, words);
   return card;
+}
+
+// « Dates mentionnées » (D115): the dates the actions' by when name, read by the shell against the meeting's day,
+// offered to the user's calendar. Offered only when one names a date. Nothing is ticked, and nothing leaves this
+// computer before an item is ticked and a destination chosen; a confidential meeting is offered no link (PDR-0007).
+// Granola, Otter and Fireflies list actions and leave their dates as words; Gmail and Apple Mail detect a date
+// in a message and offer to make an event of it, one at a time: here the same, the date said in full, its passage
+// beside it, the user choosing.
+function datesOffer(card, mentioned, session, transcript, words) {
+  if (mentioned.length === 0) return;
+  const button = element("button", "open", words.dates_open);
+  button.type = "button";
+  button.id = "dates-open";
+  button.hidden = true;
+  card.append(button);
+  window.__TAURI__.core
+    .invoke("dates_resolved", { name: nameOf(session), whens: mentioned.map((m) => m.when), day: null })
+    .then((resolved) => (button.hidden = !resolved?.dates.some(Boolean)))
+    .catch(() => {});
+  button.addEventListener("click", () => datesPanel(mentioned, session, transcript, words, button));
+}
+
+// What was said where an action was set: the segments from its second, two at most.
+function passageAt(transcript, second) {
+  if (second === null || transcript.state !== "present") return null;
+  const said = transcript.segments.filter((s) => s.end > second).slice(0, 2).map((s) => s.text.trim());
+  return said.length ? said.join("\n") : null;
+}
+
+function datesPanel(mentioned, session, transcript, words, back) {
+  const name = nameOf(session);
+  const dialog = element("dialog", "check-sound dates");
+  dialog.id = "dates";
+  dialog.setAttribute("aria-labelledby", "dates-title");
+  const head = element("div", "check-head");
+  const title = element("h2", "", words.dates_open);
+  title.id = "dates-title";
+  const close = iconButton("x", words.check_close, "dates-close");
+  head.append(title, close);
+  const day = element("input");
+  day.type = "date";
+  day.id = "dates-day";
+  const dayLabel = element("label", "dates-day", words.dates_day);
+  dayLabel.htmlFor = "dates-day";
+  const list = element("ul", "dates-list");
+  list.id = "dates-list";
+  const google = element("button", "primary", words.dates_google);
+  google.type = "button";
+  google.id = "dates-google";
+  google.disabled = true;
+  // Read when it opens: the switch may have changed since the page was drawn; the shell refuses it anyway.
+  google.hidden = document.getElementById("confidential-switch")?.checked === true;
+  const ics = element("button", "open", words.dates_ics);
+  ics.type = "button";
+  ics.id = "dates-ics";
+  ics.disabled = true;
+  const saved = element("p", "note");
+  saved.id = "dates-saved";
+  saved.setAttribute("role", "status");
+  const said = element("p", "note warn");
+  said.id = "dates-said";
+  said.setAttribute("role", "status");
+  said.hidden = true;
+  const goes = element("div", "dates-goes");
+  goes.append(ics, google);
+  dayLabel.append(day);
+  dialog.append(head, element("p", "note", words.dates_says), dayLabel, list, goes, saved, said);
+  const full = new Intl.DateTimeFormat(document.documentElement.lang, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  let shown = [];
+  const ticked = () => shown.filter((item) => item.box.checked);
+  const draw = async (asked) => {
+    const resolved = await window.__TAURI__.core.invoke("dates_resolved", { name, whens: mentioned.map((m) => m.when), day: asked }).catch(() => null);
+    if (!resolved) return;
+    day.value = resolved.day;
+    shown = [];
+    list.replaceChildren();
+    for (const [index, date] of resolved.dates.entries()) {
+      if (!date) continue;
+      const action = mentioned[index];
+      const item = element("li", "dates-item");
+      const box = element("input");
+      box.type = "checkbox";
+      box.addEventListener("change", () => (google.disabled = ics.disabled = ticked().length === 0));
+      const words_ = element("label", "dates-what");
+      const when = element("span", "dates-when", full.format(new Date(`${date}T00:00:00Z`)));
+      words_.append(box, when, element("span", "", action.who ? `${action.what} — ${action.who}` : action.what));
+      const passage = passageAt(transcript, action.second);
+      item.append(words_);
+      if (passage) item.append(element("blockquote", "dates-passage", passage));
+      list.append(item);
+      shown.push({ box, date, action, passage });
+    }
+    google.disabled = ics.disabled = true;
+  };
+  day.addEventListener("change", () => day.value && draw(day.value));
+  ics.addEventListener("click", async () => {
+    said.hidden = true;
+    saved.textContent = "";
+    const to = await window.__TAURI__.core.invoke("dates_file_chosen", { name }).catch(() => null);
+    if (!to) return;
+    const dates = ticked().map(({ date, action, passage }) => ({ id: `a${action.place}`, date, what: action.what, who: action.who, passage }));
+    try {
+      await window.__TAURI__.core.invoke("dates_ics", { name, to, dates });
+      saved.textContent = fill(words.dates_saved, to.split(/[\\/]/).pop());
+    } catch (why) {
+      said.textContent = fill(words.not_saved, why);
+      said.hidden = false;
+    }
+  });
+  google.addEventListener("click", async () => {
+    said.hidden = true;
+    const meeting = document.querySelector("#meeting h1")?.textContent ?? name;
+    for (const { date, action, passage } of ticked()) {
+      const item = { date, what: action.what, who: action.who, passage, meeting };
+      try {
+        await window.__TAURI__.core.invoke("date_google", { name, item });
+      } catch (why) {
+        said.textContent = why;
+        said.hidden = false;
+        return;
+      }
+    }
+  });
+  const end = () => {
+    dialog.close();
+    dialog.remove();
+    back.focus();
+  };
+  close.addEventListener("click", end);
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    end();
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+  draw(null);
 }
 
 // A line's time (D75), the shell's own mark: a small link that opens its passage and plays from that
@@ -2106,11 +2271,13 @@ function lineTimes(body, session, transcript, words) {
 function actionRows(body, words, at) {
   // Every second-level title, as the shell's reader counts them.
   const titles = body.querySelectorAll("h2");
-  if (!at || titles.length < at) return;
+  // Each row split in three whose by when is said, for « Dates mentionnées » (D115).
+  const mentioned = [];
+  if (!at || titles.length < at) return mentioned;
   const next = titles[at] ?? null;
   let list = titles[at - 1].nextElementSibling;
   while (list && list !== next && !["UL", "OL"].includes(list.tagName)) list = list.nextElementSibling;
-  if (!list || list === next) return;
+  if (!list || list === next) return mentioned;
   const table = element("table", "actions");
   const head = element("thead");
   const named = element("tr");
@@ -2126,6 +2293,8 @@ function actionRows(body, words, at) {
     const row = element("tr");
     if (parts.length === 3 && parts.every((part) => part !== "")) {
       const [what, who, when] = parts;
+      // `place`, the action's row in the minutes from one: the `.ics`'s UID keeps it (D115).
+      if (!unsettled(when)) mentioned.push({ what, who: unsettled(who) ? null : who, when, second: time ? Number(time.dataset.second) : null, place: rows.children.length + 1 });
       for (const [text, kind] of [[who, "who"], [what, "what"], [when, "when"]]) {
         // Short, on one line; long, back to the line between words, never pushing the card wider.
         const long = kind !== "what" && text.length > 18 ? " long" : "";
@@ -2144,6 +2313,7 @@ function actionRows(body, words, at) {
   }
   table.append(head, rows);
   list.replaceWith(table);
+  return mentioned;
 }
 
 const folded = (text) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -4372,7 +4542,7 @@ async function checkSound(words, back, lost) {
     const track = element("div", "check-track");
     const fill = element("span", "check-fill");
     fill.id = `check-level-${id}`;
-    track.append(fill);
+    track.append(fill, element("span", "peak"));
     // A meter a screen reader reads as one, from 0 to 100.
     track.setAttribute("role", "meter");
     track.setAttribute("aria-label", name);
@@ -4380,10 +4550,10 @@ async function checkSound(words, back, lost) {
     track.setAttribute("aria-valuemax", "100");
     track.setAttribute("aria-valuenow", "0");
     source.append(top, track);
-    return [source, device, fill, track];
+    return [source, device, fill];
   };
-  const [me, meDevice, meFill, meTrack] = side("mic", words.small_mic, "me", "near");
-  const [others, othersDevice, othersFill, othersTrack] = side("volume-2", words.small_meeting, "others", "far");
+  const [me, meDevice, meFill] = side("mic", words.small_mic, "me", "near");
+  const [others, othersDevice, othersFill] = side("volume-2", words.small_meeting, "others", "far");
   const said = (glyph, id, kind) => {
     const line = element("p", `check-said ${kind}`);
     line.id = id;
@@ -4470,10 +4640,9 @@ async function checkSound(words, back, lost) {
   const paint = ({ open, heard: listened, call: held }) => {
     // Its listening ended by the shell — a recording started elsewhere, the panel given up —: it goes.
     if (!open) return end();
-    for (const [index, device, fill, track] of [[0, meDevice, meFill, meTrack], [1, othersDevice, othersFill, othersTrack]]) {
+    for (const [index, device, fill] of [[0, meDevice, meFill], [1, othersDevice, othersFill]]) {
       device.textContent = listened.unavailable[index] ? words.check_unavailable : listened.devices[index] ?? "";
-      fill.style.width = `${Math.round(listened.levels[index] * 100)}%`;
-      track.setAttribute("aria-valuenow", String(Math.round(listened.levels[index] * 100)));
+      paintLevel(fill, listened.levels[index]);
     }
     // A call holds the microphone: its sentence alone — the headset stays in its call profile after.
     bluetooth.hidden = !listened.headset || held;
@@ -4953,7 +5122,7 @@ function showSmall(words) {
     bar.setAttribute("aria-valuemax", "100");
     const fill_ = element("span", "fill");
     fill_.id = id;
-    bar.append(fill_);
+    bar.append(fill_, element("span", "peak"));
     const named = element("span", "device unseen");
     named.id = device;
     row.append(bar, named);
@@ -5233,12 +5402,7 @@ function showSmall(words) {
     if (micNext.textContent !== recorded) micNext.textContent = recorded;
     const whole = Math.floor(now.seconds);
     time.textContent = [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60].map((n) => String(n).padStart(2, "0")).join(":");
-    for (const [index, id] of ["level-me", "level-others"].entries()) {
-      const percent = Math.round(now.levels[index] * 100);
-      const fill_ = document.getElementById(id);
-      fill_.style.width = `${percent}%`;
-      fill_.parentElement.setAttribute("aria-valuenow", String(percent));
-    }
+    for (const [index, id] of ["level-me", "level-others"].entries()) paintLevel(document.getElementById(id), now.levels[index]);
     // Written when it changes alone: a tick that rewrites text under a click loses it in WebKitGTK.
     for (const [index, check] of checks.entries()) {
       const device = now.devices[index] ?? "";
