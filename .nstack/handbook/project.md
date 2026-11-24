@@ -198,9 +198,12 @@ hold with no work branch left gets its first one again, unless the deliverable i
 An empty branch its claim started for another title of the same id — an earlier cycle's `D30` —
 is never this deliverable's work: the claim makes its own beside it.
 
-When a deliverable's work went on other branches, the empty branch its claim started stays:
-`nstack plan` names it once the default branch records the deliverable's delivery — its
-`Deliverable:` line, or its id in parentheses in a subject — once it is no longer `ready` or `in-progress`, or once it belongs to another cycle, with the commands that delete it.
+When a deliverable's work went on other branches, the empty branch its claim started — one empty
+commit — is the framework's own: `nstack deliver` removes it with the delivery, here and on the
+remote, unless a push since gave it work. `nstack plan` names those left — the default branch
+records the deliverable's delivery (its `Deliverable:` line, or its id in parentheses in a
+subject), it is no longer `ready` or `in-progress`, or it belongs to another cycle — and
+`nstack plan --prune` removes them all, the decider's one command for what no delivery meets.
 
 The hold is a branch of the shared remote, `nstack/hold/<cycle>/D30`, whose commits are its
 events; the remote takes the first of two claims and refuses the second. The cycle a claim reads

@@ -4,7 +4,7 @@ Every refusal starts with a code between brackets — `FAIL [K1]`. This page say
 refuses and where its reason is written. It defines nothing: the reasons are in the pages it
 points at, and the checks are the engine's. A command's own name between brackets —
 `FAIL [deliver]`, `FAIL [agent]` — is that command refusing what it was asked: its message says
-why, and the action. `[hold]` is `nstack claim` and `nstack unclaim` (`project.md`, *Who holds a
+why, and the action. `[hold]` is `nstack claim`, `nstack unclaim` and `nstack plan --prune` (`project.md`, *Who holds a
 deliverable*); `[nstack]` the engine's install and the pre-push hook (`INSTALL.md`; an agent's
 identity: *The agent commits as the App*); `[labels]` the labels the pull request check reads.
 
@@ -176,7 +176,7 @@ repository *unguarded*; `W1` does not run.
 | `G6` | No private vulnerability reporting, on a public repository | `SECURITY.md` |
 | `G7` | Actions allowed beyond the list | `07-governance.md` §7 |
 | `G8` | Actions not pinned to a commit | `07-governance.md` §7 |
-| `G9` | A workflow runs for an outside contributor without approval | `07-governance.md` §7 |
+| `G9` | A workflow runs for an outside contributor without approval, on a public repository | `07-governance.md` §7 |
 | `G10` | A workflow token that writes, or that approves pull requests | `07-governance.md` §7 |
 | `G11` | A label missing: one of the three exceptions, or one a shipped issue template puts on an issue | `10-measurement.md` §3 |
 | `G12` | Somebody on the bypass list | `07-governance.md` §7 |
