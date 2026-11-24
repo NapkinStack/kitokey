@@ -10,7 +10,7 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use kitokey_export::{Include, Labels, Meeting, docx, html, markdown};
+use kitokey_export::{Dated, Include, Labels, Meeting, docx, html, ics, markdown, srt, vtt};
 use serde_json::{Value, json};
 
 /// The version this program says (`--version`): the package's, named when it is built (`KITOKEY_VERSION`,
@@ -20,10 +20,10 @@ const VERSION: &str = match option_env!("KITOKEY_VERSION") {
     _ => env!("CARGO_PKG_VERSION"),
 };
 
-/// The formats this version writes. `exporting/v1` names `docx`, `srt`, `vtt` and `pdf` too: each
-/// joins this list as its writer is delivered (D108), and until then is a wrong argument, which the shell
-/// never gives — it offers only the formats this program writes.
-const WRITTEN: &[&str] = &["md", "html", "docx"];
+/// The formats this version writes. `exporting/v1` names `pdf` too: it joins this list as its writer is
+/// delivered (D108), and until then is a wrong argument, which the shell never gives — it offers only
+/// the formats this program writes.
+const WRITTEN: &[&str] = &["md", "html", "docx", "srt", "vtt", "ics"];
 
 /// Why the program ends in failure: its sentence, and the code a person acts on, when there is one.
 struct Refused(String, Option<&'static str>);
@@ -115,8 +115,9 @@ fn asked() -> Result<Asked, Refused> {
     })
 }
 
-/// The input: one JSON object, where to write and the file's words, each on one line (`input.schema.json`).
-fn input() -> Result<(PathBuf, String, Labels), Refused> {
+/// The input: one JSON object, where to write and the file's words, each on one line, and the dates an
+/// `.ics` is made of, which `ics` alone reads (`input.schema.json`).
+fn input(format: &str) -> Result<(PathBuf, String, Labels, Vec<Dated>), Refused> {
     let wrong = |why: String| Refused(format!("the input is not exporting/v1's: {why}"), None);
     let mut text = String::new();
     io::stdin().read_to_string(&mut text).map_err(|error| wrong(error.to_string()))?;
@@ -137,29 +138,89 @@ fn input() -> Result<(PathBuf, String, Labels), Refused> {
         speaker: field("speaker")?,
         text: field("text")?,
     };
-    Ok((PathBuf::from(field("to")?), name, labels))
+    let dates = match format {
+        "ics" => dates(object.get("dates")).map_err(|why| wrong(why.into()))?,
+        _ => Vec::new(),
+    };
+    Ok((PathBuf::from(field("to")?), name, labels, dates))
+}
+
+/// The input's `dates`, as `input.schema.json` says them: what a schema cannot say — an `id` twice, a day
+/// no calendar has — is the writer's to refuse. Why, in words of the contract, never of the input.
+fn dates(dates: Option<&Value>) -> Result<Vec<Dated>, &'static str> {
+    let items = dates.and_then(Value::as_array).filter(|items| !items.is_empty());
+    let items = items.ok_or("« dates » missing, empty or no array")?;
+    fn one_line(value: &Value) -> Option<&str> {
+        value.as_str().filter(|text| !text.is_empty() && !text.contains(['\n', '\r']))
+    }
+    items
+        .iter()
+        .map(|item| {
+            let id = item["id"].as_str().filter(|id| {
+                let bytes = id.as_bytes();
+                (1..=64).contains(&bytes.len())
+                    && bytes[0] != b'-'
+                    && bytes.iter().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-')
+            });
+            let optional = |name: &str, line: bool| match item.get(name) {
+                None | Some(Value::Null) => Ok(None),
+                Some(value) => value
+                    .as_str()
+                    .filter(|text| !text.is_empty() && !(line && text.contains(['\n', '\r'])))
+                    .map(|text| Some(text.to_string()))
+                    .ok_or(()),
+            };
+            Ok(Dated {
+                id: id.ok_or("an item's « id » missing or not [a-z0-9-]")?.to_string(),
+                date: item["date"].as_str().ok_or("an item's « date » missing")?.to_string(),
+                what: one_line(&item["what"])
+                    .ok_or("an item's « what » missing, empty or on more than one line")?
+                    .to_string(),
+                who: optional("who", true).map_err(|()| "an item's « who » empty, not text or on more than one line")?,
+                passage: optional("passage", false).map_err(|()| "an item's « passage » empty or not text")?,
+            })
+        })
+        .collect()
 }
 
 fn export() -> Result<Value, Refused> {
     let asked = asked()?;
-    let (to, name, labels) = input()?;
+    let (to, name, labels, dates) = input(&asked.format)?;
     let unreadable = || Refused("the session's folder could not be read".into(), Some("meeting.unreadable"));
     if !asked.folder.is_dir() {
         return Err(unreadable());
     }
     let meeting = Meeting::read(&asked.folder).map_err(|_| unreadable())?;
     let include = asked.include;
-    if !(include.summary && !meeting.sections.is_empty() || include.transcript && !meeting.segments.is_empty()) {
+    let unwritable = |error: io::Error| Refused(format!("the file could not be written: {error}"), Some("file.unwritable"));
+    // The `.ics` is the dates alone: named by the minutes' title, or the input's name; no summary nor
+    // transcript needed, no option of form read.
+    if asked.format == "ics" {
+        let folder_name = asked.folder.file_name().map(|name| name.to_string_lossy()).unwrap_or_default();
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs());
+        let title = meeting.title.as_deref().unwrap_or(&name);
+        let written =
+            ics(&dates, title, &folder_name, stamp).map_err(|why| Refused(format!("the input is not exporting/v1's: {why}"), None))?;
+        let bytes = whole(&to, written.as_bytes()).map_err(unwritable)?;
+        return Ok(json!({"event": "written", "file": to, "bytes": bytes}));
+    }
+    // Subtitles are the transcript alone (`exporting/v1`): a summary makes none.
+    let subtitles = matches!(asked.format.as_str(), "srt" | "vtt");
+    let transcript = include.transcript && !meeting.segments.is_empty();
+    if !(transcript || !subtitles && include.summary && !meeting.sections.is_empty()) {
         return Err(Refused(
             "nothing to write: neither a summary nor a transcript".into(),
             Some("meeting.empty"),
         ));
     }
-    let unwritable = |error: io::Error| Refused(format!("the file could not be written: {error}"), Some("file.unwritable"));
     let written = match asked.format.as_str() {
         "md" => markdown(&meeting, include, &labels).into_bytes(),
         "html" => html(&meeting, include, &labels, &asked.lang, &name).into_bytes(),
         "docx" => docx(&meeting, include, &labels, &name).map_err(unwritable)?,
+        "srt" => srt(&meeting, include, &labels).into_bytes(),
+        "vtt" => vtt(&meeting, include, &labels, &asked.lang).into_bytes(),
         other => unreachable!("{other} is refused with the arguments"),
     };
     let bytes = whole(&to, &written).map_err(unwritable)?;

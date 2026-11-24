@@ -7,7 +7,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use kitokey_export::{Include, Labels, Meeting, docx, html, markdown};
+use kitokey_export::{Include, Labels, Meeting, docx, html, markdown, srt, vtt};
 use serde_json::{Value, json};
 
 const MINUTES: &str = "---\ncontract: minutes/v4\nmade: 2026-11-20T10:05:00+01:00\nprovider: \"local\"\nmodel: \"qwen3:8b\"\ncontext: null\ntitle: \"Prix & essai\"\n---\n\n## Points forts\n\nLe prix est fixé.\n\n## Actions\n\n- Écrire la page — Sam — vendredi\n\n## Points clés\n\n- 49 €\n";
@@ -167,6 +167,28 @@ fn docx_is_written_its_name_the_inputs_and_read_back_as_the_library_writes_it() 
 }
 
 #[test]
+fn subtitles_are_written_the_transcript_alone_as_the_library_writes_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    for (format, expected) in [
+        ("srt", srt(&Meeting::read(&folder).unwrap(), Include::all(), &labels())),
+        ("vtt", vtt(&Meeting::read(&folder).unwrap(), Include::all(), &labels(), "fr")),
+    ] {
+        let to = dir.path().join(format!("réunion.{format}"));
+        let ran = run(
+            &[folder.to_str().unwrap(), "--format", format, "--lang", "fr", "--without-summary"],
+            &words(&to).to_string(),
+        );
+        assert!(ran.success, "{format}: {}", ran.said);
+        let written = fs::read_to_string(&to).unwrap();
+        assert_eq!(written, expected, "{format}");
+        assert!(written.contains("Bonjour à tous."), "{format}: the transcript's words");
+        assert!(!written.contains("49 €"), "{format}: no word of the summary");
+        assert_eq!(ran.lines, [json!({"event": "written", "file": to, "bytes": written.len()})]);
+    }
+}
+
+#[test]
 fn what_is_left_out_is_the_options_choice_in_any_order() {
     let dir = tempfile::tempdir().unwrap();
     let folder = meeting(dir.path());
@@ -229,6 +251,12 @@ fn a_cause_a_person_acts_on_is_its_one_line_and_a_sentence_and_nothing_is_writte
                 "--without-summary",
                 "--without-transcript",
             ],
+            &to,
+            "meeting.empty",
+        ),
+        // Subtitles are the transcript alone: a summary does not make one.
+        (
+            vec![folder.to_str().unwrap(), "--format", "srt", "--lang", "fr", "--without-transcript"],
             &to,
             "meeting.empty",
         ),
@@ -321,4 +349,149 @@ fn it_says_its_version() {
         .unwrap();
     assert!(output.status.success());
     assert!(String::from_utf8_lossy(&output.stdout).starts_with("kitokey-export "));
+}
+
+/// The dates the shell hands over for an `.ics` (D117), as `exporting/v1`'s input carries them.
+fn dates() -> Value {
+    json!([
+        {"id": "a1", "date": "2026-11-27", "what": "Écrire la page, vite; bien", "who": "Sam", "passage": "Sam écrit la page.\nVendredi."},
+        {"id": "a2", "date": "2026-12-31", "what": "Clore", "who": null, "passage": null},
+        {"id": "a3", "date": "2027-01-04", "what": "Relire"}
+    ])
+}
+
+#[test]
+fn ics_is_written_one_event_per_date_named_by_the_minutes_title() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    let to = dir.path().join("dates.ics");
+    let mut input = words(&to);
+    input["dates"] = dates();
+
+    let ran = run(&[folder.to_str().unwrap(), "--format", "ics", "--lang", "fr"], &input.to_string());
+
+    assert!(ran.success, "{}", ran.said);
+    let written = fs::read_to_string(&to).unwrap();
+    assert_eq!(ran.lines, [json!({"event": "written", "file": to, "bytes": written.len()})]);
+    let calendar = icalendar::parser::read_calendar(&icalendar::parser::unfold(&written))
+        .unwrap()
+        .components
+        .into_iter()
+        .map(|event| {
+            let get = |name: &str| {
+                let property = event.properties.iter().find(|p| p.name.as_str() == name).unwrap();
+                property.val.as_str().to_string()
+            };
+            (get("UID"), get("DTSTART"), get("SUMMARY"), get("DESCRIPTION"))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        calendar,
+        [
+            (
+                "a1-2026-11-20_09-30@kitokey".into(),
+                "20261127".into(),
+                "Écrire la page, vite; bien — Sam".into(),
+                "Sam écrit la page.\nVendredi.\n\nPrix & essai".into()
+            ),
+            (
+                "a2-2026-11-20_09-30@kitokey".into(),
+                "20261231".into(),
+                "Clore".into(),
+                "Prix & essai".into()
+            ),
+            (
+                "a3-2026-11-20_09-30@kitokey".into(),
+                "20270104".into(),
+                "Relire".into(),
+                "Prix & essai".into()
+            ),
+        ]
+    );
+}
+
+#[test]
+fn ics_of_a_folder_with_neither_summary_nor_transcript_is_named_by_the_input() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = dir.path().join("2026-11-20_09-30");
+    fs::create_dir(&folder).unwrap();
+    let to = dir.path().join("dates.ics");
+    let mut input = words(&to);
+    input["dates"] = json!([{"id": "a1", "date": "2026-11-27", "what": "Relire"}]);
+
+    let ran = run(
+        &[folder.to_str().unwrap(), "--format", "ics", "--lang", "en", "--without-summary"],
+        &input.to_string(),
+    );
+
+    assert!(ran.success, "the dates are the file: meeting.empty does not apply ({})", ran.said);
+    assert!(
+        fs::read_to_string(&to)
+            .unwrap()
+            .contains("\r\nDESCRIPTION:Réunion du 20 nov. 2026\r\n")
+    );
+}
+
+#[test]
+fn ics_without_its_dates_or_with_dates_not_exporting_v1s_is_a_sentence_alone_and_nothing_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    let to = dir.path().join("dates.ics");
+    let item = json!({"id": "a1", "date": "2026-11-27", "what": "Relire"});
+    let mut cases = vec![Value::Null, json!([]), json!("a1"), json!([item, item])];
+    for (field, wrong) in [
+        ("id", json!("A 1")),
+        ("id", json!("")),
+        ("id", json!("-a")),
+        ("id", json!("a".repeat(65))),
+        ("date", json!("2026-02-30")),
+        ("date", json!("27/11/2026")),
+        ("what", json!("")),
+        ("what", json!("deux\nlignes")),
+        ("what", Value::Null),
+        ("who", json!("")),
+        ("who", json!("deux\nlignes")),
+        ("who", json!(3)),
+        ("passage", json!("")),
+        ("passage", json!(["a"])),
+    ] {
+        let mut wrong_item = item.clone();
+        wrong_item[field] = wrong;
+        cases.push(json!([wrong_item]));
+    }
+    cases.push(json!([{"date": "2026-11-27", "what": "Relire"}]));
+
+    for dates in cases {
+        let mut input = words(&to);
+        if !dates.is_null() {
+            input["dates"] = dates.clone();
+        }
+        let ran = run(&[folder.to_str().unwrap(), "--format", "ics", "--lang", "fr"], &input.to_string());
+        assert_eq!(ran.code, Some(2), "{dates}: {}", ran.said);
+        assert!(ran.lines.is_empty(), "{dates}: no line, no code: the caller's error");
+        assert!(ran.said.starts_with("kitokey-export: "), "{}", ran.said);
+        assert!(
+            !ran.said.contains("Relire") && !ran.said.contains("lignes"),
+            "no word of the input: {}",
+            ran.said
+        );
+        assert!(!to.exists(), "{dates}: nothing written");
+    }
+}
+
+#[test]
+fn another_format_ignores_the_dates() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    let to = dir.path().join("réunion.md");
+    let mut input = words(&to);
+    input["dates"] = json!("not even an array");
+
+    let ran = run(&[folder.to_str().unwrap(), "--format", "md", "--lang", "fr"], &input.to_string());
+
+    assert!(ran.success, "{}", ran.said);
+    assert_eq!(
+        fs::read_to_string(&to).unwrap(),
+        markdown(&Meeting::read(&folder).unwrap(), Include::all(), &labels())
+    );
 }

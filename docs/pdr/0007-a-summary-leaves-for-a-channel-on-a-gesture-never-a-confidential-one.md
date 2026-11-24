@@ -1,4 +1,4 @@
-# PDR-0007 — A summary leaves for a channel on the user's gesture, each time; a confidential meeting never does
+# PDR-0007 — A summary leaves for a channel on the user's gesture, each time; a confidential meeting only once confirmed again
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
@@ -8,6 +8,12 @@
 - **Amended, 2026-11-23**: a fourth kind, Notion (*Decision*, point 8), for cycle 11's D116, which the decider
   entered that day. Proposed by sam in the pull request that frames D116; the decider's approval of that pull
   request accepts it, the forge recording its day. Everything else in this PDR is unchanged and applies to it.
+- **Amended, 2026-11-24**: *confidential* means what D60 made it — transcribed and summarised on this computer
+  alone, never by an online service —, not « never sent ». The decider, that day, in their working session with
+  the coordinator: an organisation that keeps its meetings from online AI may still choose to share a summary;
+  when the user sends or exports a confidential meeting, they do it explicitly, and the page explains it simply.
+  Point 4 and what follows from it are rewritten (*Decision*, point 4). Proposed by the coordinator; the
+  decider's approval of the pull request accepts it, the forge recording its day.
 - **Date**: 2026-11-20
 - **Decision makers**: the decider, `@napkinstack-admin`
 - **Modules affected**: `export` (what a summary becomes when it is sent, D108's Markdown); `shell` (the
@@ -22,7 +28,9 @@
 flowchart LR
     S["Settings: a destination<br/>its name · its address pasted"]:::user --> K["The system's keyring<br/>the address, never shown again whole"]:::keep
     P["A meeting's page<br/>« Envoyer à … »"]:::user --> C{"Confidential?"}:::rule
-    C -->|"yes"| N["No send offered"]:::no
+    C -->|"yes"| Q{"Confirmed again:<br/>« confidential, it will leave »?"}:::rule
+    Q -->|"cancel"| N["Nothing sent"]:::no
+    Q -->|"confirm"| A
     C -->|"no"| A{"https, and not<br/>this computer or its network?"}:::rule
     A -->|"no"| R["Said, nothing sent"]:::no
     A -->|"yes"| W["Sent: the title, the summary,<br/>its actions — never the audio<br/>nor the transcript"]:::out
@@ -53,7 +61,7 @@ the user chose it ». A webhook's address is itself a secret: whoever holds it p
 ## Goal
 
 A user sends a meeting's summary to a channel they set up, with one gesture, knowing what leaves and where.
-A meeting said confidential cannot be sent.
+A meeting said confidential is sent only on an explicit confirmation that says it is confidential.
 
 ## Out of scope
 
@@ -117,9 +125,15 @@ user sees what leaves before anything leaves on its own. The cost is one click p
 3. **What leaves**: the meeting's title, its summary in Markdown (D108's), and its actions. Never the audio
    and never the transcript. Before a destination's first send, the page says once what leaves and where it
    goes: the destination's name, never its address.
-4. **A meeting said confidential (D60) is never sent.** The page offers no send for it. If a meeting is
-   marked confidential after it was sent, the switch says where its summary already went, as it already says
-   for the sound and the transcript (« Already sent earlier: … »).
+4. **A meeting said confidential (D60) is sent only on an explicit confirmation** (amended 2026-11-24).
+   Confidential means its transcript and summary were made on this computer alone, never by an online
+   service; it does not forbid the user from sharing its summary. The page still offers « Envoyer à … » for it,
+   and the gesture asks once more, each time, in one plain sentence: the meeting is confidential, its summary
+   will leave this computer for « <destination> », confirm or cancel — nothing leaves on the first click. The
+   same holds for every channel, Notion included, and for a calendar link that carries the meeting's words
+   (the `.ics` written on this computer needs no confirmation). If a meeting is marked confidential after it
+   was sent, the switch says where its summary already went, as it already says for the sound and the
+   transcript (« Already sent earlier: … »).
 5. **Each send is recorded on the meeting**: to which destination (by its name) and when. That record is what
    point 4 reads.
 6. **An address Kitokey refuses before anything is sent**: one that is not `https:`, or whose host is this
@@ -150,7 +164,7 @@ user sees what leaves before anything leaves on its own. The cost is one click p
 4. The page says it was sent, to « #équipe », and the meeting records it.
 
 **Edge cases and degraded states:**
-- A confidential meeting offers no send.
+- A confidential meeting is sent only after its explicit confirmation (point 4).
 - An address that is not `https:`, or that points to this computer or its network, is refused in Settings
   with why, and nothing is saved.
 - No network, the server refusing (an address deleted, a 401 or 404), too many sends (429), a summary too large
@@ -177,7 +191,7 @@ user sees what leaves before anything leaves on its own. The cost is one click p
     limits.
   - Slack's receives the title and the summary in mrkdwn, within its documented limits.
   - A refusal or no network is said on the page with what to do.
-  - A confidential meeting offers no send.
+  - A confidential meeting is sent only after its explicit confirmation (point 4).
   - Held by the module's tests against a local server, and by the e2e.
 
 ---
@@ -186,7 +200,7 @@ user sees what leaves before anything leaves on its own. The cost is one click p
 
 > We will consider this was the right call if, before **2027-01-31**:
 > - the decider and the colleagues on trial send summaries to a channel they use;
-> - no issue reports a summary sent without the user's gesture, or a confidential meeting sent;
+> - no issue reports a summary sent without the user's gesture, or a confidential meeting sent without its explicit confirmation;
 > - no issue reports a webhook's address written outside the keyring.
 
 How it is observed:

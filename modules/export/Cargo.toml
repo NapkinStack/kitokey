@@ -12,6 +12,8 @@ serde_json = "1.0.154"
 [dev-dependencies]
 quick-xml = "0.42.0"
 tempfile = "3"
+aspasia = "0.2.1"
+icalendar = { version = "0.17.17", default-features = false, features = ["parser"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 
 [[bin]]

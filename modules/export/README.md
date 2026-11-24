@@ -17,17 +17,23 @@ flowchart LR
     H --> P["an HTML page"]:::out
     M --> D["docx()"]:::module
     D --> O["a Word document"]:::out
+    M --> V["srt() · vtt()"]:::module
+    V --> U["subtitles: the transcript alone"]:::out
+    C["the dates the shell<br/>hands over (its input)"]:::file --> I["ics()"]:::module
+    M -->|"the meeting's name"| I
+    I --> K["a calendar: one all-day<br/>event per date"]:::out
 
     classDef file fill:#374151,color:#fff
     classDef module fill:#065f46,color:#fff
     classDef out fill:#1e3a8a,color:#fff
 ```
 
-**Legend** — grey: a meeting's files and the contract each follows · green: this module · blue: what it writes.
+**Legend** — grey: a meeting's files and the contract each follows, and the dates its caller gives · green: this module · blue: what it writes.
 
 A library and its program: a meeting's folder read into one model, every format written from it
-(D108). It writes Markdown, HTML and DOCX today; subtitles and a PDF follow. The words a file shows
-that no contract carries — « Transcription », who spoke — are given by its caller.
+(D108). It writes Markdown, HTML, DOCX and subtitles (SRT, WebVTT) today; a PDF follows. The words a file shows
+that no contract carries — « Transcription », who spoke — are given by its caller. Beside them, an iCalendar
+file (RFC 5545, D117): the dates a meeting's actions mention, resolved by the shell, one all-day event each.
 
 The program, `kitokey-export`, is what the shell starts ([`exporting/v1`](../../contracts/exporting/v1/README.md)):
 
