@@ -17,6 +17,8 @@ on:
     paths:
       - "modules/capture/**"
       - "modules/summary/**"
+      - "modules/export/**"
+      - "modules/send/**"
       - "modules/transcription/**"
       - "modules/shell/**"
       - "modules/install/**"
@@ -55,8 +57,25 @@ jobs:
           unpacked=$(mktemp -d)
           ditto -x -k "$zip" "$unpacked"
           app=$unpacked/Kitokey.app
-          for program in kitokey kitokey-capture kitokey-transcription kitokey-speech kitokey-summary; do
+          for program in kitokey kitokey-capture kitokey-transcription kitokey-speech kitokey-summary \
+            kitokey-export kitokey-send; do
             test -x "$app/Contents/MacOS/$program"
+          done
+          # What the programs owe their third parties (D102), as modules/install/windows/notices.py names them.
+          owed=$(python3 - <<'PY'
+          import sys
+          sys.path.insert(0, "modules/install/windows")
+          import notices
+          owed = [name for _, name in notices.files("dist")]
+          # As many as notices.py names, never a number here: a module added adds its page (#1047).
+          # None empty, none split by the shell's words: a failed assert fails the step.
+          assert owed and all(name and not any(c.isspace() for c in name) for name in owed), owed
+          print(" ".join(owed))
+          PY
+          )
+          for name in $owed; do
+            test -s "$app/Contents/Resources/$name"
+            echo "Contents/Resources/$name"
           done
           read_key() { plutil -extract "$1" raw "$app/Contents/Info.plist"; }
           for key in CFBundleName NSMicrophoneUsageDescription NSAudioCaptureUsageDescription; do

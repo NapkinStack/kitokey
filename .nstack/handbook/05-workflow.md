@@ -113,6 +113,11 @@ is in the automation backlog. It covers:
 These values are starting points to calibrate, not truths. The principle matters more
 than the number: **the batch must be reviewable in one session of attention**.
 
+`nstack pr-scope` leaves out lock files and generated names (`*.generated.*`, `generated/`, the
+skills), and every path the project's `.gitattributes` marks `linguist-generated` (any value but
+`false`), which GitHub also folds in its diffs. A tool's output that no name gives away is declared there, as the licence notices a
+dependency tool writes; the line that declares it is in the diff a reviewer reads.
+
 **Going over.** The check reports, it does not block automatically (except for modules
 touched, where it does block). A justified overrun — code generation, a mechanical
 migration, a mass rename — goes through an explicit label. What matters is that the
@@ -346,7 +351,12 @@ the change, and the stricter applies:
     person — and the run is at most 7 days old, the default branch moved by 20 commits at most. A
     module that reads something it does not declare is the risk: declare it in `consumes` — a
     record cannot be declared: a check never reads one —, and the default branch's own `Module
-    checks` run catches what was missed once it runs that module;
+    checks` run catches what was missed once it runs that module. A commit with no passing record
+    of its own is the case to know: `pr-check`'s T4 says so — `nstack attest` with that commit checked out, and
+    its rows stand without running them again —, as it says a digest that differs, with what
+    changed — a module consumed, a shared file; or, when no file did, the modules run or the
+    engine —, or a run past its bound. The forge's run, made at the push, comes before the head's record: where the
+    ruleset requires `nstack / local checks`, it leaves a row that waits only for the head's record to that status, and says so;
   - one **explored** by hand keeps the commit its evidence was produced on, and the verifier
     adds a **`Confirmed`** column on the head commit saying **what moved since and why it leaves
     the result standing**. Reading three fixes is not the same work as driving six scenarios
@@ -385,9 +395,15 @@ rows as it read them, and the check compares the description with them: an **exp
 Commit cell moved and whose evidence did not was never explored again, and fails — evidence names
 its run (a link to that screenshot, video or trace), so a new run brings a new one. The commit it
 moved from is the one the first record holding that evidence names: putting it back and confirming
-the head passes, even after a record held the moved cell. A row a record
-held and the sheet no longer shows is said. A rebase or a squash drops the records of the commits
-it rewrites, and what they read with them. The approver decides on the sheet; where the project answers
+the head passes, even after a record held the moved cell — and so does any ancestor of that
+commit, where the row was explored before a record held it; a move to a commit that is not its
+ancestor is said. A row a record
+held and the sheet no longer shows is said, unless a line under the sheet says why it left —
+`Removed: S3, S4 — <why>` —: whoever edits the sheet writes it, and the approver judges it. A rebase or a squash drops the records of the commits
+it rewrites, and what they read with them. Only this pull request's records are read: each names
+the pull request it was made for — its number where the forge gives it, and its branch, the one
+the checkout tracks — so a branch started on another's never reads that one's sheet. Attest on the
+pull request's branch, one tracking it, or detached; a branch of another name is another's. The approver decides on the sheet; where the project answers
 `approval: agent`, the approver of a `prototype` or `standard` module may be the verifier itself,
 an agent under another identity than the author's (`07-governance.md` §7).
 

@@ -1,0 +1,150 @@
+# Machine-readable source of truth for the module.
+# Read by: humans (onboarding), agents (scoping), CI (fitness functions).
+# Any divergence between this file and the code fails CI.
+
+module:
+  name: "send"
+
+  # ONE sentence. If it needs an "and", the module probably does two things.
+  responsibility: >
+    Sends a meeting's summary to a channel the user set up, once, on their gesture, never a confidential one.
+
+  owner: "NapkinStack/maintainers"          # a GitHub team, organisation/team; a user only without an organisation
+  contact: "@NapkinStack/maintainers"
+
+  # proposed | active | maintenance | deprecated | retired   (.nstack/handbook/02-modules.md §6)
+  lifecycle: active
+
+  # What does a failure of this module cost? nothing, thrown away | a user's patience |
+  # a day of work | a key, an order, money, personal data. The decider settles it; what
+  # each value requires is the table in .nstack/handbook/05-workflow.md §7.
+  # prototype | standard | high | critical
+  criticality: "standard"
+
+  # Does a user see this module? true requires a test sheet on its pull requests from
+  # standard up (.nstack/handbook/05-workflow.md §7).
+  user_facing: true
+
+  # The module's name in the code, when it differs from the folder (package, namespace).
+  # Used by boundary detection.
+  # code_name: send
+
+  # Only when lifecycle = deprecated. The check turns red once the date has passed.
+  # deprecation:
+  #   replaced_by:
+  #   removal_date: YYYY-MM-DD
+
+# Contracts PROVIDED by this module. `path` holds its document (B7).
+provides:
+  - contract: posting
+    version: v1
+    path: contracts/posting/v1
+    stability: experimental
+#  - contract: send-api
+#    version: v1
+#    path: contracts/send-api/v1
+#    stability: experimental      # experimental | stable | deprecated
+#    # removal_date: YYYY-MM-DD   # required when stability = deprecated
+
+# Contracts CONSUMED - this is the DECLARED graph.
+# CI compares it with the contracts this module's files read: one read and not declared
+# fails (B1), one declared and never read is reported (B4), one nobody provides fails (B6).
+consumes:
+  - contract: session-audio
+    version: v1
+    module: capture
+  - contract: session-audio
+    version: v2
+    module: capture
+  - contract: session-audio
+    version: v3
+    module: capture
+  - contract: minutes
+    version: v1
+    module: summary
+  - contract: minutes
+    version: v2
+    module: summary
+  - contract: minutes
+    version: v3
+    module: summary
+  - contract: minutes
+    version: v4
+    module: summary
+#  - contract: identity-api
+#    version: v1
+#    module: identity
+
+# Modules whose release artefacts this module's release assembles — what a user installs,
+# made of theirs (.nstack/handbook/09-platform.md §2). Read in dist/<module>/, never in their
+# folders; `nstack release` runs them first (M11, B9).
+# assembles: []
+
+# Data owned. Nobody else accesses it directly.
+data:
+  owns: []
+  shared: []                     # any exception requires a named ADR
+
+# Significant external dependencies.
+# Each one declares its exit strategy (.nstack/handbook/06-decisions.md §3).
+dependencies:
+  - name: serde_json
+    purpose: Reads the input and the minutes' quoted values; writes the output's lines and the bodies sent
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: input, minutes_read and body in src/; any JSON library replaces it.
+  - name: ureq
+    purpose: >
+      The one connection of the module, to the address the user set up, through a resolver that
+      judges every address
+    adr: docs/adr/0018-a-module-send-of-its-own-the-one-to-reach-a-channel.md
+    exit_strategy: >
+      post() in src/lib.rs, its Judging resolver; any HTTP client that resolves through a resolver of
+      ours replaces it.
+  - name: url
+    purpose: Reads the address as a browser does, IDNA and IPv4 forms included, before it is judged
+    adr: docs/adr/0018-a-module-send-of-its-own-the-one-to-reach-a-channel.md
+    exit_strategy: judged() in src/lib.rs; any WHATWG URL parser replaces it.
+  - name: cargo-about
+    purpose: >-
+      Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
+      never run by a build or a release (D102)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >-
+      Its output is a committed HTML page, about.hbs its template; any generator that lists the
+      crates with their licence texts replaces it, and tests/notices.rs judges the result.
+#  - name:
+#    purpose:
+#    adr:
+#    exit_strategy:
+
+# Standard verbs: the same names everywhere, running this module's stack commands
+# (.nstack/handbook/09-platform.md §2). `nstack <verb> <module>` runs them from this folder.
+# No stack is imposed. check and test are required once the module holds more than its
+# description (fitness M7): declare them before its first file of code.
+commands:
+  check: bash -n scripts/release.sh && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
+  test: cargo test --locked
+  release: bash scripts/release.sh
+#  check:                        # under 2 min: format, lint, types
+#  test:                         # NEVER starts another module
+#  bootstrap:                    # optional: make the module usable from a fresh clone
+#  run:                          # optional: local start, with doubles for the dependencies
+#  e2e:                          # optional: end-to-end scenarios; logs and screenshots written
+#                                # to $NSTACK_EVIDENCE, read after the run (.nstack/playbooks/tests.md)
+#  clean:                        # optional: remove what the commands above leave in this folder
+#                                # (build outputs); CI runs it after every job on a self-hosted runner
+#  release:                      # optional: the module's shippable artefacts, written into
+#                                # $NSTACK_DIST (dist/<module>/); `nstack release <module> …`
+#                                # passes the platform or target to it
+
+# evidence:                      # optional, with e2e: what its scenarios provoke on purpose (M12)
+#   provoked:                    # a warning or an error not declared here is said after the run:
+#     - pattern: "key refused"   # an error fails it, a warning fails from criticality high
+#       level: warning           # warning | error
+#       scenario: S3             # the scenario that provokes it, for the reader
+#   levels: '^(?P<level>\w+)\|'  # only if the logs say their level in an uncommon form
+
+docs:
+  readme: README.md
+  agents: AGENTS.md
+  runbook: docs/runbook.md     # required when criticality >= high

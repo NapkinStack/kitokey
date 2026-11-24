@@ -48,3 +48,32 @@ minutes_checked 27.4
 meeting_renamed 12.3
 trial_over 17.1
 trial_left 3.8
+# Added from main's last green full run, at f5699a8 (2026-11-22, e2e-history 20261122T070805): the scenarios
+# written after 9eae465, which counted as the median — focus_swept, ~11 min, among them.
+advanced_latest_answer 6.4
+appearance_chosen 4.6
+axe_first_surfaces 14.9
+bar_after_stop 40.4
+bar_language 15.2
+ends_on_sigterm 7.0
+focus_kept 40.2
+focus_swept 691.3
+key_kept_to_its_host 5.5
+keys_first_surfaces 74.0
+meeting_trashed 17.0
+models_on_the_page 11.3
+page_estimate 44.6
+page_one_bar 47.6
+redo_choice_starts_nothing 23.1
+redo_offers_the_services_models 7.2
+settings_folded 1.2
+settings_narrow_without_model 3.0
+settings_version 1.5
+store_shots 8.1
+unsaved_choice_kept 3.0
+# Added with #1045 (D109), from its partial at 89356a6 (2026-11-23, partial-i-l1045ok-89356a6): a scenario written
+# after f5699a8, measured rather than counted as the median.
+summaries_to_a_folder 8.1
+# Added with #1055 (D113), from its partial at 2f5db4a (2026-11-23, partial-i-l1055pre-2f5db4a): a scenario written
+# after f5699a8, measured rather than counted as the median.
+redo_says_what_follows 22.0

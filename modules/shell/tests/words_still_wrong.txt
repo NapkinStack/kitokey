@@ -1,2 +1,2 @@
 lexicon window.minutes_stopped[0] "Minutes stopped. You can start them again, with another model if you like." « minutes »
-placeholders of: in both languages
+placeholders of comment 11: in both languages

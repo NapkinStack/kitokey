@@ -28,15 +28,15 @@ loads its playbook (§4). You never verify, challenge or approve your own work.
 and you never approve a pull request — except where the project answers `approval: agent`, as the
 verifier — or, where no sheet is owed, the reviewer — of another agent's change to a
 `prototype` or `standard` module, saying in the approval your session and what you are expert in — one round, never pushing to it, never *request changes* (`.nstack/handbook/07-governance.md` §7). Every commit you make
-carries the trailer `Agent-Session: <an identifier of this session>`; as a verifier, you
+carries the trailer `Agent-Session: <an identifier of this session>` in its last paragraph; as a verifier, you
 sign the sheet `Verifier: session <that identifier>`, and `pr-check` refuses one among the authors.
 
 **Hold.** As the author of a deliverable of the accepted cycle, take it before your first
 change: `nstack claim D<n> --session <this session> --person <the person you work for>` — their
 forge handle, asked once, never git's user: agents sharing one identity would be one person.
-Held by someone else — another agent's session is someone else, even for your person — stop and
-say who holds it; never work around a hold, never force-push a
-branch `nstack/hold/…` (`.nstack/handbook/project.md`, *Who holds a deliverable*). An issue no
+Held by someone else — another agent's session is someone else, even for your person, never your
+own agent restarted, which renews it — stop and say who holds it; never work around a hold, never
+force-push a branch `nstack/hold/…` (`.nstack/handbook/project.md`, *Who holds a deliverable*). An issue no
 cycle plans is held the same way, `nstack claim '#<n>'`, and unclaimed once its work is merged.
 
 **Words.** Facing a person, use the framework's words as `.nstack/handbook/glossary.md` defines
@@ -102,11 +102,11 @@ You **stop and report** in these cases, without looking for a way around:
 | 3 consecutive failures on the same fix | Stop. The problem is in the framing or the assumption, not in the code. |
 | The change touches a 2nd module | Stop. See §4. |
 | The success criterion cannot be made executable | Stop. Say so, propose a verifiable alternative. |
-| A quality gate blocks | Stop. Never a workaround, a `skip`, a `--no-verify` or a disabled test — a flaky one is quarantined, as `tests.md` says. |
+| A quality gate blocks | Stop. Apply its `Action:` when it fixes the cause and is yours to take — a label, a take-over or a decider's choice is the person's: report it (`.nstack/handbook/RULES.md` says each code's reason). Never a workaround, a `skip`, a `--no-verify` or a disabled test — a flaky one is quarantined, as `tests.md` says. |
 | Potentially destructive action | Stop. See §5. |
 | A blocking piece of information is missing after searching | Ask for clarification. Once, precisely. |
 | The framework itself is wrong — a message, a check, a page | Stop; never a workaround. Report it to the decider: the file, the message, what is wrong. Fixing it at its source is a task the decider assigns (`.nstack/handbook/INSTALL.md`, *When the framework is wrong*). |
-| The deliverable is held by someone else (`nstack claim` refuses it) | Stop. Say who holds it and since when; take another ready deliverable — and take over only when the person you work for asks: a stale hold, or one another session of theirs holds. |
+| The deliverable is held by someone else (`nstack claim` refuses it) | Stop. Say who holds it and since when; take another ready deliverable — and take over only when the person you work for asks: a stale hold, or one another agent's session of theirs holds. |
 | A module's criticality has to be chosen | Propose it with what it costs, and let the decider settle it: it is a product decision (`.nstack/handbook/05-workflow.md` §7). |
 
 A red CI is never a detail. A bypassed gate is an incident.
