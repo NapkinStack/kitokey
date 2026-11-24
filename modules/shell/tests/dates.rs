@@ -116,4 +116,3 @@ fn the_reference_day_is_the_folders_local_day() {
     assert_eq!(reference_day("notes"), None);
     assert_eq!(reference_day("2026-13-01_10-00"), None);
 }
-

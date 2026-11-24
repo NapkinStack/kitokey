@@ -248,4 +248,3 @@ fn weekday(words: &[&str], day: NaiveDate) -> Option<NaiveDate> {
     }
     day.checked_add_signed(Duration::days(i64::from(ahead)))
 }
-
