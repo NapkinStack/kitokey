@@ -438,6 +438,9 @@ fn a_meter_rises_at_once_and_falls_eased_in_the_style() {
         style.contains(TINT_HERE) && style.contains(TINT_REMOTE),
         "the tracks are tinted otherwise: say so here"
     );
+    // The tick tells the loudest moment: drawn whole, its colour on its track is the fill's pair above (1.4.11, lina,
+    // #1185: at 0.6 it fell to 2.20–2.79).
+    assert!(!rule("\n.peak {").contains("opacity"), "{}", rule("\n.peak {"));
     assert!(style.contains(
         "prefers-reduced-motion: reduce) {\n  *, *::before, *::after { animation: none !important; transition: none !important; }"
     ));
