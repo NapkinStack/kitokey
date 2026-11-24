@@ -37,22 +37,47 @@ as it is for `summarising/v1` — and every other argument is a choice of form. 
 are public to the machine's users; what is the person's goes on the input.
 
 - `<format>`: `md` — CommonMark, a YAML front matter, the transcript a GFM table —, `html`, `docx`,
-  `srt`, `vtt`, `pdf` — tagged, PDF/UA-1.
+  `srt`, `vtt`, `pdf` — tagged, PDF/UA-1 —, `ics` — an iCalendar file (RFC 5545) of the input's
+  `dates` (*The dates of an `.ics`*).
 - `<language>`: a BCP 47 tag, `fr` or `en` today: the file's language (`<html lang>`, the PDF's
   `/Lang`). It translates nothing: the words come from the input.
 - What is left out — the summary, the transcript, who spoke, when — is the person's choice.
   `srt` and `vtt` are the transcript alone, its times their very form: there, `--without-summary`
-  and `--without-times` change nothing.
+  and `--without-times` change nothing. `ics` is the dates alone: no option of form changes it,
+  and it needs neither summary nor transcript.
 
 **Its input**: one JSON object, UTF-8, then the end of the input. Where to write and the meeting's
 name are a person's, so they are never in the arguments, which any user of the machine may read.
-Each value is on one line:
+Each value is on one line, a date's `passage` alone excepted:
 
 | Field | Holds |
 |---|---|
 | `to` | The path of the file to write. Its folder exists. A file already there is **replaced**: whether to replace it is the consumer's question to the person, asked before — a system's save dialog asks it |
 | `name` | The meeting's name, for a meeting whose minutes hold no title: its `title.txt`, or the shell's name for it |
 | `transcript`, `me`, `others`, `time`, `speaker`, `text` | The words a file shows that no contract carries, in the person's language: the transcript's heading, who spoke — the person, the others —, and the transcript's three columns |
+| `dates` | **Optional**: the dates an `.ics` is made of, required by `ics` and ignored by every other format. An array of one item at least, in the order of the events (below) |
+
+### The dates of an `.ics`
+
+Added 2026-11-24 (D117), additively: v1 extended in place, no consumer broken. The shell resolves each
+date; the program never moves one — no weekend, no holiday, no time zone. Each item of `dates`:
+
+| Field | Holds | In the file |
+|---|---|---|
+| `id` | Required. The action's key within the meeting, stable from one export to the next: `[a-z0-9][a-z0-9-]*`, 64 characters at most, **unique** in the array | `UID`: `<id>-<the session's folder's name>@kitokey` — the same meeting and item, the same event, which a calendar updates rather than doubles |
+| `date` | Required. `YYYY-MM-DD`, a day of the Gregorian calendar, in the person's local calendar | `DTSTART;VALUE=DATE`, and `DTEND;VALUE=DATE` the next day: an all-day event |
+| `what` | Required. The action's words, on one line | `SUMMARY`: `what`, then ` — who` when there is one |
+| `who` | Optional, or null. Who does it, on one line | in `SUMMARY` |
+| `passage` | Optional, or null. The transcript's passage, which may span lines | `DESCRIPTION`: the passage, an empty line, then the meeting's name — its minutes' title, else `name`; the name alone without a passage |
+
+The file is RFC 5545's: `VERSION:2.0`, `PRODID:-//Kitokey//kitokey-export//EN`, then one `VEVENT` per item in
+the array's order, each with its `DTSTAMP`, the moment written in UTC, and `TRANSP:TRANSPARENT` — a date said
+is no meeting, and leaves the day free. Lines end with CRLF and are folded at 75 octets, never inside a
+letter; text is escaped as §3.3.11 says, a line's end as `\n`, any other control character but a tab
+written as a space. No time, no time zone, no alarm, no `METHOD`: a file a calendar imports.
+
+An `ics` with no `dates`, with an `id` twice, or with a day no calendar has, is an input that is not this
+page's: the sentence alone, no code (*Failing*).
 
 **The fonts of a PDF** are the system's, static faces first; a variable face only where no static
 one has the letters, at its default weight, and logged. None ships with the program.
@@ -79,7 +104,7 @@ closed.
 | `code` | The cause | What a person does |
 |---|---|---|
 | `meeting.unreadable` | The session's folder, or a file in it, could not be read | Check the folder, then try again |
-| `meeting.empty` | Nothing to write: neither summary nor transcript, as asked or as there | Include the summary or the transcript, or make them first |
+| `meeting.empty` | Nothing to write: neither summary nor transcript, as asked or as there — never for `ics`, whose dates are the file | Include the summary or the transcript, or make them first |
 | `file.unwritable` | The file could not be written where asked: no room, no right, the folder gone | Choose another place, or free space |
 | `pdf.no_font` | No font of the system has the meeting's letters | Install the fonts of its script |
 | `pdf.failed` | The PDF could not be laid out | Export in another format; the logs hold the detail |
@@ -103,6 +128,13 @@ Started with:
 ```sh
 echo '{"to": "<documents>/meeting.pdf", "name": "Réunion du 20 nov. 2026", "transcript": "Transcription", "me": "Moi", "others": "Les autres", "time": "Heure", "speaker": "Qui", "text": "Texte"}' \
   | kitokey-export <meetings>/2026-11-20_09-30 --format pdf --lang fr
+```
+
+An `.ics` of two dates:
+
+```sh
+echo '{"to": "<documents>/dates.ics", "name": "Réunion du 20 nov. 2026", "transcript": "Transcription", "me": "Moi", "others": "Les autres", "time": "Heure", "speaker": "Qui", "text": "Texte", "dates": [{"id": "a1", "date": "2026-11-27", "what": "Envoyer le devis", "who": "Léa", "passage": "Léa : vendredi, sans faute."}, {"id": "a3", "date": "2026-12-01", "what": "Relire la page"}]}' \
+  | kitokey-export <meetings>/2026-11-20_09-30 --format ics --lang fr
 ```
 
 It succeeded:

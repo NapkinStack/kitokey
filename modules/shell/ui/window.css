@@ -706,6 +706,13 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .check-source.far .check-track { background: color-mix(in srgb, var(--ok) 14%, var(--raised)); }
 .check-fill { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--accent); }
 .check-source.far .check-fill, .check-source.far .peak { background: var(--ok); }
+/* « Dates mentionnées » (D115): « Vérifier le son »'s panel, each date ticked or not, its passage under it. */
+.dates-day { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
+.dates-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.dates-what { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 14px; }
+.dates-when { font-weight: 600; }
+.dates-passage { margin: 4px 0 0 26px; padding-left: 10px; border-left: 2px solid var(--line); color: var(--soft); font-size: 13px; white-space: pre-line; }
+.dates-goes { display: flex; gap: 8px; justify-content: flex-end; padding: 16px 0; }
 .check-said { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; font-size: 12.5px; line-height: 1.4; color: var(--soft); }
 .check-said .glyph { margin-top: 1px; }
 .check-said.okay { color: var(--ok); font-weight: 600; font-size: 13px; }

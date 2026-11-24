@@ -1,5 +1,6 @@
 //! Each summary written, written to the folder the user chose too (D109): by `kitokey-export`, as
-//! `contracts/exporting/v1` starts it — Markdown, the summary alone.
+//! `contracts/exporting/v1` starts it — Markdown, the summary alone. And the dates a user ticks on a
+//! meeting's page, as an `.ics` (D115): `ics`, its `dates` on the input.
 
 use std::{
     io::{Read, Write},
@@ -9,7 +10,7 @@ use std::{
 };
 
 /// What the program is given on its input: where to write, and the file's words (`exporting/v1`).
-#[derive(serde::Serialize)]
+#[derive(Clone, Copy, serde::Serialize)]
 pub struct Input<'a> {
     pub to: &'a Path,
     pub name: &'a str,
@@ -19,6 +20,40 @@ pub struct Input<'a> {
     pub time: &'a str,
     pub speaker: &'a str,
     pub text: &'a str,
+    /// The `.ics`'s events (`exporting/v1`, *The dates of an `.ics`*); absent for any other format.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dates: Option<&'a [Dated]>,
+}
+
+/// One ticked date as `exporting/v1` takes it: `id` the action's place in the minutes (`a1`, `a2`…), stable for
+/// the meeting, which the `.ics` makes its UID of; `what` and `who` on one line, as the contract wants them.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Dated {
+    pub id: String,
+    pub date: String,
+    pub what: String,
+    pub who: Option<String>,
+    pub passage: Option<String>,
+}
+
+impl Dated {
+    /// The action at `place` (from one) in the minutes' actions: its words on one line, its passage as said.
+    pub fn new(place: usize, date: &str, what: &str, who: Option<&str>, passage: Option<&str>) -> Self {
+        let one_line = |text: &str| {
+            text.split(['\n', '\r'])
+                .map(str::trim)
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        Dated {
+            id: format!("a{place}"),
+            date: date.to_string(),
+            what: one_line(what),
+            who: who.map(one_line).filter(|who| !who.is_empty()),
+            passage: passage.map(str::to_string).filter(|passage| !passage.trim().is_empty()),
+        }
+    }
 }
 
 /// How long the program is given: a Markdown of a summary takes it well under a second; past this,
@@ -28,9 +63,37 @@ const BOUND: Duration = Duration::from_secs(60);
 /// Writes `folder`'s summary as Markdown at `input.to`: done once the program said `written` and
 /// ended well; else why, for the logs — its own sentence, or its code.
 pub fn markdown(program: &Path, folder: &Path, language: &str, input: &Input) -> Result<(), String> {
+    exported(
+        program,
+        folder,
+        &["--format", "md", "--lang", language, "--without-transcript"],
+        input,
+    )
+}
+
+/// Writes `input.dates` as an `.ics` at `input.to` (D115): done or why, as `markdown`.
+pub fn ics(program: &Path, folder: &Path, language: &str, input: &Input) -> Result<(), String> {
+    // As the page sends them, each date made what the contract wants: `what` and `who` on one line.
+    let dates: Option<Vec<Dated>> = input.dates.map(|dates| {
+        dates
+            .iter()
+            .map(|d| Dated {
+                id: d.id.clone(),
+                ..Dated::new(0, &d.date, &d.what, d.who.as_deref(), d.passage.as_deref())
+            })
+            .collect()
+    });
+    let input = Input {
+        dates: dates.as_deref(),
+        ..*input
+    };
+    exported(program, folder, &["--format", "ics", "--lang", language], &input)
+}
+
+fn exported(program: &Path, folder: &Path, args: &[&str], input: &Input) -> Result<(), String> {
     let mut child = Command::new(program)
         .arg(folder)
-        .args(["--format", "md", "--lang", language, "--without-transcript"])
+        .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

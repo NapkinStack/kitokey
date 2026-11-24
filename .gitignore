@@ -29,6 +29,9 @@ coverage/
 # Local agent settings: machine-specific paths and permissions
 .claude/settings.local.json
 
+# A clone's resume note (.nstack/playbooks/pause-and-resume.md): one per clone, never shared
+.nstack/local/
+
 # Agent session and machine state: written by the tool as it runs, never by the project.
 # `.claude/settings.json` and `.claude/hooks/` are deliberately absent from this list —
 # project-level settings and hooks are shared with the team on purpose. What follows is
