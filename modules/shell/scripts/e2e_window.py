@@ -4238,7 +4238,7 @@ def heard_checked(now: dt.datetime) -> None:
                 browser.find_element(By.ID, "small-record").click()
                 wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
                 got = browser.execute_script(meters)
-                check("a thin meter per side in the row: its icon, a 4 px track, named by its side", got == [[True, 4, me], [True, 4, others]], got)
+                check("a thin meter per side in the row: its icon, a 6 px track (#1179), named by its side", got == [[True, 6, me], [True, 6, others]], got)
                 check("at silence, nothing said, the bar its row alone", browser.execute_script(said) == ["", ""]
                       and wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44, 3), [browser.execute_script(said), browser.execute_script("return innerHeight")])
                 before = browser.execute_script(place)
