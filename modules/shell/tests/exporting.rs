@@ -3,10 +3,14 @@
 //! the contract wants one; and the Markdown export unchanged, no `dates` on its input.
 #![cfg(unix)]
 
-use std::{fs, os::unix::fs::PermissionsExt, path::Path};
+use std::{fs, os::unix::fs::PermissionsExt, path::Path, sync::Mutex};
 
 use kitokey_shell::exporting::{self, Dated, Input};
 use serde_json::{Value, json};
+
+/// One test at a time writes its program and starts it: a test's fork while another's program is still open for
+/// writing makes that program « Text file busy » (ETXTBSY), as #1194's first attest met it.
+static ONE: Mutex<()> = Mutex::new(());
 
 /// A `kitokey-export` that keeps its arguments and its input beside it, writes the file and says `written`.
 fn program(dir: &Path) -> std::path::PathBuf {
@@ -38,6 +42,7 @@ fn input<'a>(to: &'a Path, dates: Option<&'a [Dated]>) -> Input<'a> {
 
 #[test]
 fn the_ticked_dates_go_to_kitokey_export_as_an_ics_each_on_one_line_where_the_contract_wants_one() {
+    let _one = ONE.lock().unwrap_or_else(|held| held.into_inner());
     let dir = tempfile::tempdir().unwrap();
     let folder = dir.path().join("2026-11-24_23-30");
     fs::create_dir(&folder).unwrap();
@@ -69,6 +74,7 @@ fn the_ticked_dates_go_to_kitokey_export_as_an_ics_each_on_one_line_where_the_co
 
 #[test]
 fn the_markdown_export_gives_no_dates() {
+    let _one = ONE.lock().unwrap_or_else(|held| held.into_inner());
     let dir = tempfile::tempdir().unwrap();
     let folder = dir.path().join("2026-11-24_23-30");
     fs::create_dir(&folder).unwrap();
@@ -83,6 +89,7 @@ fn the_markdown_export_gives_no_dates() {
 #[test]
 fn dates_as_the_page_sends_them_reach_the_program_on_one_line_where_the_contract_wants_one() {
     // The page's dates come straight into `dates_ics`, never through `Dated::new` (marc, #1194).
+    let _one = ONE.lock().unwrap_or_else(|held| held.into_inner());
     let dir = tempfile::tempdir().unwrap();
     let folder = dir.path().join("2026-11-24_23-30");
     fs::create_dir(&folder).unwrap();
