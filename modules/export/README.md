@@ -17,6 +17,8 @@ flowchart LR
     H --> P["an HTML page"]:::out
     M --> D["docx()"]:::module
     D --> O["a Word document"]:::out
+    M --> V["srt() · vtt()"]:::module
+    V --> U["subtitles: the transcript alone"]:::out
 
     classDef file fill:#374151,color:#fff
     classDef module fill:#065f46,color:#fff
@@ -26,7 +28,7 @@ flowchart LR
 **Legend** — grey: a meeting's files and the contract each follows · green: this module · blue: what it writes.
 
 A library and its program: a meeting's folder read into one model, every format written from it
-(D108). It writes Markdown, HTML and DOCX today; subtitles and a PDF follow. The words a file shows
+(D108). It writes Markdown, HTML, DOCX and subtitles (SRT, WebVTT) today; a PDF follows. The words a file shows
 that no contract carries — « Transcription », who spoke — are given by its caller.
 
 The program, `kitokey-export`, is what the shell starts ([`exporting/v1`](../../contracts/exporting/v1/README.md)):

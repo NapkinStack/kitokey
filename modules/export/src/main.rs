@@ -10,7 +10,7 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use kitokey_export::{Include, Labels, Meeting, docx, html, markdown};
+use kitokey_export::{Include, Labels, Meeting, docx, html, markdown, srt, vtt};
 use serde_json::{Value, json};
 
 /// The version this program says (`--version`): the package's, named when it is built (`KITOKEY_VERSION`,
@@ -20,10 +20,10 @@ const VERSION: &str = match option_env!("KITOKEY_VERSION") {
     _ => env!("CARGO_PKG_VERSION"),
 };
 
-/// The formats this version writes. `exporting/v1` names `docx`, `srt`, `vtt` and `pdf` too: each
-/// joins this list as its writer is delivered (D108), and until then is a wrong argument, which the shell
-/// never gives — it offers only the formats this program writes.
-const WRITTEN: &[&str] = &["md", "html", "docx"];
+/// The formats this version writes. `exporting/v1` names `pdf` too: it joins this list as its writer is
+/// delivered (D108), and until then is a wrong argument, which the shell never gives — it offers only
+/// the formats this program writes.
+const WRITTEN: &[&str] = &["md", "html", "docx", "srt", "vtt"];
 
 /// Why the program ends in failure: its sentence, and the code a person acts on, when there is one.
 struct Refused(String, Option<&'static str>);
@@ -149,7 +149,10 @@ fn export() -> Result<Value, Refused> {
     }
     let meeting = Meeting::read(&asked.folder).map_err(|_| unreadable())?;
     let include = asked.include;
-    if !(include.summary && !meeting.sections.is_empty() || include.transcript && !meeting.segments.is_empty()) {
+    // Subtitles are the transcript alone (`exporting/v1`): a summary makes none.
+    let subtitles = matches!(asked.format.as_str(), "srt" | "vtt");
+    let transcript = include.transcript && !meeting.segments.is_empty();
+    if !(transcript || !subtitles && include.summary && !meeting.sections.is_empty()) {
         return Err(Refused(
             "nothing to write: neither a summary nor a transcript".into(),
             Some("meeting.empty"),
@@ -160,6 +163,8 @@ fn export() -> Result<Value, Refused> {
         "md" => markdown(&meeting, include, &labels).into_bytes(),
         "html" => html(&meeting, include, &labels, &asked.lang, &name).into_bytes(),
         "docx" => docx(&meeting, include, &labels, &name).map_err(unwritable)?,
+        "srt" => srt(&meeting, include, &labels).into_bytes(),
+        "vtt" => vtt(&meeting, include, &labels, &asked.lang).into_bytes(),
         other => unreachable!("{other} is refused with the arguments"),
     };
     let bytes = whole(&to, &written).map_err(unwritable)?;
