@@ -2106,14 +2106,21 @@ function datesPanel(mentioned, session, transcript, words, back) {
   google.disabled = true;
   // Read when it opens: the switch may have changed since the page was drawn; the shell refuses it anyway.
   google.hidden = document.getElementById("confidential-switch")?.checked === true;
+  const ics = element("button", "open", words.dates_ics);
+  ics.type = "button";
+  ics.id = "dates-ics";
+  ics.disabled = true;
+  const saved = element("p", "note");
+  saved.id = "dates-saved";
+  saved.setAttribute("role", "status");
   const said = element("p", "note warn");
   said.id = "dates-said";
   said.setAttribute("role", "status");
   said.hidden = true;
   const goes = element("div", "dates-goes");
-  goes.append(google);
+  goes.append(ics, google);
   dayLabel.append(day);
-  dialog.append(head, element("p", "note", words.dates_says), dayLabel, list, goes, said);
+  dialog.append(head, element("p", "note", words.dates_says), dayLabel, list, goes, saved, said);
   const full = new Intl.DateTimeFormat(document.documentElement.lang, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
   let shown = [];
   const ticked = () => shown.filter((item) => item.box.checked);
@@ -2129,7 +2136,7 @@ function datesPanel(mentioned, session, transcript, words, back) {
       const item = element("li", "dates-item");
       const box = element("input");
       box.type = "checkbox";
-      box.addEventListener("change", () => (google.disabled = ticked().length === 0));
+      box.addEventListener("change", () => (google.disabled = ics.disabled = ticked().length === 0));
       const words_ = element("label", "dates-what");
       const when = element("span", "dates-when", full.format(new Date(`${date}T00:00:00Z`)));
       words_.append(box, when, element("span", "", action.who ? `${action.what} — ${action.who}` : action.what));
@@ -2139,9 +2146,23 @@ function datesPanel(mentioned, session, transcript, words, back) {
       list.append(item);
       shown.push({ box, date, action, passage });
     }
-    google.disabled = true;
+    google.disabled = ics.disabled = true;
   };
   day.addEventListener("change", () => day.value && draw(day.value));
+  ics.addEventListener("click", async () => {
+    said.hidden = true;
+    saved.textContent = "";
+    const to = await window.__TAURI__.core.invoke("dates_file_chosen", { name }).catch(() => null);
+    if (!to) return;
+    const dates = ticked().map(({ date, action, passage }) => ({ id: `a${action.place}`, date, what: action.what, who: action.who, passage }));
+    try {
+      await window.__TAURI__.core.invoke("dates_ics", { name, to, dates });
+      saved.textContent = fill(words.dates_saved, to.split(/[\\/]/).pop());
+    } catch (why) {
+      said.textContent = fill(words.not_saved, why);
+      said.hidden = false;
+    }
+  });
   google.addEventListener("click", async () => {
     said.hidden = true;
     const meeting = document.querySelector("#meeting h1")?.textContent ?? name;
@@ -2244,7 +2265,8 @@ function actionRows(body, words, at) {
     const row = element("tr");
     if (parts.length === 3 && parts.every((part) => part !== "")) {
       const [what, who, when] = parts;
-      if (!unsettled(when)) mentioned.push({ what, who: unsettled(who) ? null : who, when, second: time ? Number(time.dataset.second) : null });
+      // `place`, the action's row in the minutes from one: the `.ics`'s UID keeps it (D115).
+      if (!unsettled(when)) mentioned.push({ what, who: unsettled(who) ? null : who, when, second: time ? Number(time.dataset.second) : null, place: rows.children.length + 1 });
       for (const [text, kind] of [[who, "who"], [what, "what"], [when, "when"]]) {
         // Short, on one line; long, back to the line between words, never pushing the card wider.
         const long = kind !== "what" && text.length > 18 ? " long" : "";

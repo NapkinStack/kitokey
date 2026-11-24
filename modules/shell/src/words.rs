@@ -1336,6 +1336,12 @@ pub struct Window {
     /// Shows: the « Dates mentionnées » panel, a button. When: a meeting not confidential. At most: about 28
     /// characters. Placeholders: none.
     pub dates_google: &'static str,
+    /// Shows: the « Dates mentionnées » panel, a button. When: always, a confidential meeting's too. At most: about
+    /// 40 characters. Placeholders: none.
+    pub dates_ics: &'static str,
+    /// Shows: the « Dates mentionnées » panel, as a status. When: the `.ics` is written. At most: one line.
+    /// Placeholders: {} the file's name.
+    pub dates_saved: &'static str,
     /// It could not listen; or a recording runs.
     /// Shows: « Vérifier le son », as an error. When: cannot listen. At most: no limit.
     /// Placeholders: none.
@@ -2255,6 +2261,8 @@ pub fn window(language: Language) -> Window {
             dates_says: "Tick the ones to put in your calendar. Nothing leaves this computer until you choose where.",
             dates_day: "Meeting day",
             dates_google: "Open in Google Calendar",
+            dates_ics: "Save as a calendar file (.ics)",
+            dates_saved: "Saved in {}.",
             check_failed: "Kitokey can’t listen to your microphone or the meeting audio right now. Close this panel and open it again.",
             check_recording: "A recording is in progress — its meters are in the recording bar.",
             free: "Free up space",
@@ -2765,6 +2773,8 @@ pub fn window(language: Language) -> Window {
             dates_says: "Cochez celles à mettre dans votre agenda. Rien ne quitte cet ordinateur avant que vous choisissiez où.",
             dates_day: "Jour de la réunion",
             dates_google: "Ouvrir dans Google Agenda",
+            dates_ics: "Enregistrer un fichier d’agenda (.ics)",
+            dates_saved: "Enregistré dans {}.",
             check_failed: "Kitokey ne parvient pas à écouter votre micro ni le son de la réunion. Fermez ce panneau et rouvrez-le.",
             check_recording: "Un enregistrement est en cours\u{a0}: ses jauges sont dans la barre d’enregistrement.",
             free: "Faire de la place",
@@ -3044,6 +3054,7 @@ pub enum Failure {
     SettingsUnwritten,
     FolderNotOpened,
     LinkNotOpened,
+    DatesNotSaved,
     KeyboardSettings,
     Keyring,
     ProgramNotStarted,
@@ -3130,6 +3141,8 @@ pub fn failure(failure: Failure, language: Language) -> String {
         }
         (Failure::FolderNotOpened, English) => "Couldn’t open the folder. Open it from your file manager.",
         (Failure::FolderNotOpened, French) => "Impossible d’ouvrir le dossier. Ouvrez-le depuis votre gestionnaire de fichiers.",
+        (Failure::DatesNotSaved, English) => "the calendar file wasn’t written. Choose another folder, then try again.",
+        (Failure::DatesNotSaved, French) => "le fichier d’agenda n’a pas pu être écrit. Choisissez un autre dossier, puis réessayez.",
         (Failure::LinkNotOpened, English) => "Couldn’t open your browser. Save the dates as a calendar file instead.",
         (Failure::LinkNotOpened, French) => "Impossible d’ouvrir le navigateur. Enregistrez plutôt les dates dans un fichier d’agenda.",
         (Failure::KeyboardSettings, English) => "Can’t open keyboard settings from here. Open them from your system settings.",

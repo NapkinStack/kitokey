@@ -432,6 +432,8 @@ fn main() {
             open_folder,
             dates_resolved,
             date_google,
+            dates_file_chosen,
+            dates_ics,
             open_logs,
             diagnostic,
             settings_shown,
@@ -2498,6 +2500,48 @@ fn date_google(shell: State<'_, Shell>, name: String, item: Ticked) -> Result<()
     browsing(&shell, &dates::google(&event))
 }
 
+/// Where the ticked dates go as an `.ics`, chosen in the system's own dialog, its name the meeting's; none when the
+/// user closes it (D115). Allowed for a confidential meeting: the file stays on this computer (PDR-0007).
+#[tauri::command]
+async fn dates_file_chosen(app: AppHandle, name: String) -> Option<PathBuf> {
+    use tauri_plugin_dialog::DialogExt;
+    let folder = sessions::folder(&app.state::<Shell>().settings().sessions, &name)?;
+    let chosen = app
+        .dialog()
+        .file()
+        .set_file_name(format!("{}.ics", named(&folder)))
+        .add_filter("iCalendar", &["ics"]);
+    chosen.blocking_save_file()?.into_path().ok()
+}
+
+/// Writes the ticked dates at `to` as an `.ics`, by `kitokey-export` (`exporting/v1`'s `ics`, D115): each a
+/// whole day, its title and notes as the page shows them, its UID stable for the meeting and the action.
+#[tauri::command]
+fn dates_ics(shell: State<'_, Shell>, name: String, to: PathBuf, dates: Vec<exporting::Dated>) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let language = shell.language();
+    let said = words::exported(language);
+    let meeting = meeting_said(&folder, language);
+    let input = exporting::Input {
+        to: &to,
+        name: &meeting,
+        transcript: said.transcript,
+        me: said.me,
+        others: said.others,
+        time: said.time,
+        speaker: said.speaker,
+        text: said.text,
+        dates: Some(&dates),
+    };
+    let tag = match language {
+        Language::French => "fr",
+        Language::English => "en",
+    };
+    exporting::ics(&program("kitokey-export", "KITOKEY_EXPORT"), &folder, tag, &input)
+        .inspect(|()| tracing::info!(dates = dates.len(), "shell.dates_saved"))
+        .map_err(|why| shell.told(Failure::DatesNotSaved, why))
+}
+
 /// Opens an address in the system's browser; `KITOKEY_BROWSER` names another program, as the e2e's stand-in that
 /// writes down the address it is handed and opens nothing.
 fn browsing(shell: &Shell, address: &str) -> Result<(), Told> {
@@ -4356,6 +4400,7 @@ fn export_written(shell: &Shell, folder: &Path) {
         time: said.time,
         speaker: said.speaker,
         text: said.text,
+        dates: None,
     };
     let tag = match language {
         Language::French => "fr",

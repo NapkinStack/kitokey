@@ -25,6 +25,11 @@ const SILENT: &[(&str, usize, &str)] = &[
     ),
     ("makings", 2, "returns no `Result`: it cannot fail"),
     (
+        "dates_file_chosen",
+        1,
+        "returns an `Option`, `None` when the user closes the dialog: nothing chosen, nothing to say (D115)",
+    ),
+    (
         "dates_resolved",
         2,
         "returns an `Option`, never an error: « Dates mentionnées » not offered, or its list left as it was, is what no answer means (D115)",

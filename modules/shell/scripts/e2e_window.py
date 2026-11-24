@@ -8908,6 +8908,24 @@ def dates_mentioned(now: dt.datetime) -> None:
             address = browsed.read_text().strip() if browsed.exists() else ""
             check(f"{language}: the ticked date alone handed to the browser: Google Calendar's screen, all day from the 3rd to the 4th",
                   handed and address.count("\n") == 0 and address.startswith("https://calendar.google.com/calendar/render?action=TEMPLATE&text=Envoyer%20le%20devis%20%E2%80%94%20In%C3%A8s&dates=20261203/20261204&details="), address)
+            # The same tick saved as an .ics (D117's writer): the dialog stood in, the program given the ticked date alone.
+            ics = WORK / f"dates-{language[:2]}.ics"
+            ics.unlink(missing_ok=True)
+            for kept in ("export-args", "export-input"):
+                (WORK / kept).unlink(missing_ok=True)
+            browser.execute_script(
+                "const real = window.__TAURI__.core; window.__TAURI__.core = {...real, invoke: (asked, ...rest) =>"
+                " asked === 'dates_file_chosen' ? Promise.resolve(arguments[0]) : real.invoke(asked, ...rest)}", str(ics))
+            press(browser, "dates-ics")
+            written = wait_for(browser, lambda b: ics.is_file() and b.execute_script("return document.getElementById('dates-saved').textContent") != "", 10)
+            given = json.loads((WORK / "export-input").read_text()) if (WORK / "export-input").is_file() else {}
+            args = (WORK / "export-args").read_text().split() if (WORK / "export-args").is_file() else []
+            check(f"{language}: saved as an .ics: kitokey-export asked for ics, the ticked date alone on its input, its id the action's row, said done",
+                  written and args[1:5] == ["--format", "ics", "--lang", language[:2]]
+                  and given.get("dates") == [{"id": "a1", "date": "2026-12-03", "what": "Envoyer le devis", "who": "Inès",
+                                              "passage": "Inès, tu envoies le devis jeudi ?\nOui, jeudi."}]
+                  and ics.name in browser.execute_script("return document.getElementById('dates-saved').textContent"),
+                  [written, args, given.get("dates"), browser.execute_script("return document.getElementById('dates-saved').textContent")])
             press(browser, "dates-close")
             wait_for(browser, lambda b: b.execute_script("return !document.getElementById('dates')"), 5)
             # A meeting whose actions name no date: nothing offered.
@@ -8922,7 +8940,9 @@ def dates_mentioned(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.execute_script("return document.getElementById('confidential-switch')?.checked === true"), 5)
             press(browser, "dates-open")
             wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("items"), 5)
-            check(f"{language}: a confidential meeting is offered no link", browser.execute_script(panel)["google"][0] is True, browser.execute_script(panel))
+            check(f"{language}: a confidential meeting is offered no link, the .ics still (it stays on this computer)",
+                  browser.execute_script(panel)["google"][0] is True and browser.execute_script("return document.getElementById('dates-ics').hidden") is False,
+                  browser.execute_script(panel))
             refused = browser.execute_async_script(
                 "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('date_google', {name: arguments[0], item: "
                 "{date: '2026-12-03', what: 'x', who: null, passage: null, meeting: 'y'}}).then(() => done('opened'), (why) => done(String(why)))", folder.name)
