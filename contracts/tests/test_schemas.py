@@ -715,6 +715,7 @@ EXAMPLES["exporting/v1/input.schema.json"][1].extend(
             ("id", "a" * 65),
             ("id", "a 1"),
             ("date", "27/11/2026"),
+            ("date", "2026-1-27"),
             ("date", "2026-11-27T10:00"),
             ("date", 20261127),
             ("what", ""),
