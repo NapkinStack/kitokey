@@ -155,6 +155,20 @@ deliverables:
 > module of its own that can leave it, with nothing published before its time. The end date does not move (`framing.md` §4); D114's cut comes
 > first (*Deliverables*).
 
+> **D114's criterion 3 amended, 2026-11-23**: where it says the site's « colours and type the app's », the
+> titles in Bricolage Grotesque and the header's wordmark, the app's own icon kept as the mark; the decider,
+> 2026-11-23, through the coordinator.
+
+> **D114's criteria 3 and 4 amended, 2026-11-24**: the decider's request of 2026-11-24 after seeing v4 locally:
+> full redesign, feature cards with short clips, export platforms' logos prominent; given through the coordinator.
+> Criterion 3: in place of « D103's four screenshots of its language » and « its colours and type the app's », each
+> feature card with its clip of a test meeting, never a real one, made by the shell's e2e; the palette the site's
+> own, its fonts kept (the amendment of 2026-11-23); the export formats as neutral badges, a platform's logo only
+> as its brand guidelines allow. Criterion 4: in place of « a few CSS animations play the journey », muted clips,
+> each played once in view, the poster alone under `prefers-reduced-motion: reduce`, and CSS motion, none of which
+> runs under it. The other criteria do not change: the privacy policy, the build's SEO, Lighthouse at least 95,
+> axe-core, closed until validated.
+
 > **Started on 2026-11-20**, at cycle 10's closure, early, on the decider's word that day in their working
 > session with the coordinator: « on termine le cycle en cours ». `start` and `end` move to that day, as this
 > page said they would; the two dated dependencies below move with them.
