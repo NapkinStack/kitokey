@@ -30,6 +30,7 @@ server of ours, and it sends nothing anywhere unless you chose to.
 | The key of a service, if you gave one | Your system's keyring, under `com.napkinstack.Kitokey`: never in a file |
 | The webhook address of a channel you set up to send summaries to | The same keyring, under the same name: never in a file, never shown again in full |
 | Which summary you sent, to which channel's name, and when — never its address | `sends.json`, beside your settings |
+| Each new summary, if you turned on « Export every summary » — never a confidential meeting's | The folder you chose: if a service syncs or shares it, it goes where that folder goes |
 | Downloaded speech models | Your user's data folder |
 | Logs: steps, durations, hosts, models and failures — never a word of a meeting, nor a key | Your user's state folder (on Windows, the application's data) |
 | What the window's web engine keeps for itself: its cache and its own storage — no meeting, no setting | On Linux, `~/.local/share/com.napkinstack.Kitokey` |
@@ -62,8 +63,8 @@ it receives is under its own policy: read it before you choose it.
 A meeting you say **confidential** is made on this computer alone, even when a service is chosen.
 
 A summary goes to a channel only when you send it, once for each gesture, and never a confidential
-meeting's. Kitokey sends no mail and fills no shared folder. Copying its minutes or its transcript
-puts them on your clipboard, and they go where you paste them.
+meeting's. Kitokey sends no mail. Copying its minutes or its transcript puts them on your clipboard,
+and they go where you paste them.
 
 There is no telemetry, no analytics, no advertising, and we receive no data about you. Should
 telemetry ever exist, it will be off until you turn it on, and will show what it sends and where.
@@ -113,6 +114,7 @@ Changes to this policy are in this file's history.
 | La clé d'un service, si vous en avez donné une | Le trousseau de votre système, sous `com.napkinstack.Kitokey` : jamais dans un fichier |
 | L'adresse de webhook d'un canal où vous envoyez des comptes rendus | Le même trousseau, sous le même nom : jamais dans un fichier, jamais réaffichée en entier |
 | Quel compte rendu vous avez envoyé, vers quel nom de canal, et quand — jamais son adresse | `sends.json`, à côté de vos réglages |
+| Chaque nouveau compte rendu, si vous avez activé « Exporter chaque compte rendu » — jamais celui d'une réunion confidentielle | Le dossier que vous avez choisi : si un service le synchronise ou le partage, il va là où va ce dossier |
 | Les modèles de parole téléchargés | Le dossier de données de votre utilisateur |
 | Les journaux : étapes, durées, hôtes, modèles et échecs — jamais un mot d'une réunion, ni une clé | Le dossier d'état de votre utilisateur (sous Windows, les données de l'application) |
 | Ce que le moteur web de la fenêtre garde pour lui : son cache et son propre stockage — aucune réunion, aucun réglage | Sous Linux, `~/.local/share/com.napkinstack.Kitokey` |
@@ -146,9 +148,8 @@ Une réunion dite **confidentielle** est traitée sur cet ordinateur seulement, 
 choisi.
 
 Un compte rendu ne part vers un canal que lorsque vous l'envoyez, une fois par geste, et jamais celui
-d'une réunion confidentielle. Kitokey n'envoie aucun courriel et ne remplit aucun dossier partagé.
-Copier son compte rendu ou sa transcription les met dans votre presse-papiers, et ils vont là où vous
-les collez.
+d'une réunion confidentielle. Kitokey n'envoie aucun courriel. Copier son compte rendu ou sa
+transcription les met dans votre presse-papiers, et ils vont là où vous les collez.
 
 Il n'y a ni télémétrie, ni mesure d'audience, ni publicité, et nous ne recevons aucune donnée sur
 vous. Si une télémétrie existait un jour, elle resterait coupée tant que vous ne l'activez pas, et
