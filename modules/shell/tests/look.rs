@@ -408,7 +408,8 @@ fn each_pair_of_the_theme_reaches_its_threshold_in_both_themes() {
 /// page draws a held level (tests/meter.rs).
 #[test]
 fn a_meter_rises_at_once_and_falls_eased_in_the_style() {
-    let style = without_css_comments(STYLE);
+    // A Windows checkout ends its lines with CRLF (#1042): read as LF.
+    let style = without_css_comments(STYLE).replace("\r\n", "\n");
     let rule = |selector: &str| {
         style
             .split(selector)
