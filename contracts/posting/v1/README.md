@@ -52,6 +52,7 @@ webhook's address is a secret — whoever holds it posts to the channel —, so 
 | `address` | The channel's webhook address, as the person pasted it; for `notion`, the database's link. Always |
 | `name` | The meeting's name, for a meeting whose minutes hold no title: its `title.txt`, or the shell's name for it. `--check` ignores it |
 | `key` | For `notion` alone, and always with it: the integration's key, as the person pasted it — a secret, as an address is. The other kinds ignore it |
+| `confirmed_confidential` | `true` once the person confirmed, for this send, sending a meeting said confidential; absent means `false`. Without it, a confidential meeting is refused; a meeting that is not confidential is sent whatever it says (D118, PDR-0007 point 4). `--check` ignores it |
 
 ## Which addresses it refuses
 
@@ -182,7 +183,7 @@ is never shown, logged or written.
 |---|---|---|---|
 | `address.refused` | *Which addresses it refuses* | Nothing | Paste the channel's `https:` webhook address |
 | `meeting.unreadable` | The session's folder, or a file in it, could not be read | Nothing | Check the folder, then try again |
-| `meeting.confidential` | The meeting is said confidential (`session-audio`'s `confidential`) | Nothing | Nothing to do: a confidential meeting is never sent (PDR-0007) |
+| `meeting.confidential` | The meeting is said confidential (`session-audio`'s `confidential`), and sent without `confirmed_confidential: true` | Nothing | Confirm, in the shell, that this confidential meeting may leave, then send again (PDR-0007, point 4) |
 | `meeting.no_summary` | The meeting has no minutes, or none it can read | Nothing | Write the summary first |
 | `summary.too_large` | It does not fit within the destination's bounds | Nothing | Send it as a file instead (`exporting`) |
 | `network.unreachable` | No connection: no network, the host not found, its certificate refused | Nothing | Check the connection, then try again |
@@ -203,8 +204,9 @@ version for it.
 
 - It reads `session-audio` and `minutes` by their contracts. The session's folder is only read: the
   record of a send — to which destination, when — is the consumer's (PDR-0007, decision 5).
-- `meeting.confidential` is judged before the address is: a confidential meeting is never sent, whoever
-  started the program.
+- `meeting.confidential` is judged before the address is: a confidential meeting is sent only when its
+  input says `confirmed_confidential: true`, whoever started the program — the confirmation is the
+  consumer's to ask, at each send, never remembered (PDR-0007, point 4).
 - It contacts the address alone, once, over `https:`, within 30 s, and nothing else: no proxy, no
   telemetry. For `notion`, Notion's API alone, two reads then one creation, within the same 30 s.
 - Its logs follow ADR-0007, under `KITOKEY_TRACE` when it is given: the kind, the outcome, the status
