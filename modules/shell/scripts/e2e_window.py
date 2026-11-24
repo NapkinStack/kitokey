@@ -5528,6 +5528,17 @@ def confidential_sent(now: dt.datetime) -> None:
                                              " return [c?.textContent, n?.textContent, document.activeElement?.id, c?.getAttribute('aria-describedby') ?? '']")
             check("fr: « Envoyer » and « Annuler »; the focus on « Annuler », the choice that sends nothing; « Envoyer » described by the question",
                   choices[:3] == ["Envoyer", "Annuler", "send-cancel"] and "send-confidential" in choices[3].split(), choices)
+            # The question drawn, wide and at 420 px, light and dark, for the eye (the sheet's T5).
+            size = browser.get_window_size()
+            for width in (1100, 420):
+                browser.set_window_size(width, 800)
+                time.sleep(0.4)
+                browser.execute_script("document.getElementById('send-confidential')?.scrollIntoView({block: 'center'})")
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"cn-asked-{width}-{theme}", theme)
+            browser.set_window_size(size["width"], size["height"])
+            time.sleep(0.4)
+            browser.execute_script("document.getElementById('send-cancel')?.focus()")
             ActionChains(browser).send_keys(Keys.ENTER).perform()
             closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "send-panel"), 5)
             time.sleep(1)
