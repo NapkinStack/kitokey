@@ -5290,8 +5290,8 @@ def settings_folded(now: dt.datetime) -> None:
 
 def summary_sent(now: dt.datetime) -> None:
     """CL. D110, PDR-0007 §2–§6, posting/v1: a meeting's summary sent to a destination set up in Settings, on the
-    user's gesture each time. No « Envoyer… » without a destination, on a confidential meeting, or without a
-    summary. Before a destination's first send the page says what leaves and where — its name, never its address —;
+    user's gesture each time. No « Envoyer… » without a destination or without a summary; a confidential meeting's
+    sends are CN's (D119). Before a destination's first send the page says what leaves and where — its name, never its address —;
     the next goes at once. kitokey-send is started with the meeting's folder and the destination's kind, the address
     and the meeting's name on its input only. Each outcome is said on the page with what to do; the address appears
     nowhere. A send is recorded and listed, kept when the meeting is renamed; marked confidential after, the switch
@@ -5346,7 +5346,7 @@ def summary_sent(now: dt.datetime) -> None:
         check("six destinations set up for this scenario", browser.execute_script(rows) == 6, browser.execute_script(rows))
         calls.unlink(missing_ok=True)
         page(secret_one)
-        check("a confidential meeting offers no send (PDR-0007 §4)", not browser.execute_script(offered), browser.execute_script(offered))
+        check("a confidential meeting offers « Envoyer… » too, each send asked again (PDR-0007 §4 amended, D119; CN)", browser.execute_script(offered), browser.execute_script(offered))
         page(unwritten)
         check("a meeting without its summary offers no send", not browser.execute_script(offered), browser.execute_script(offered))
         page(written)
@@ -5451,9 +5451,114 @@ def summary_sent(now: dt.datetime) -> None:
         left = browser.find_element(By.ID, "confidential-left").text
         check("marked confidential after a send: the switch says where the summary already went (PDR-0007 §4)",
               "le compte rendu à « #équipe »" in left.replace("\xa0", " "), left)
-        check("and offers no send any more", wait_for(browser, lambda b: not b.execute_script(offered), 5), browser.execute_script(offered))
+        check("and still offers « Envoyer… », its sends asked again (D119; CN)", wait_for(browser, lambda b: b.execute_script(offered), 5), browser.execute_script(offered))
     logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and secret in f.read_text(errors="ignore")]
     check("the address in no log nor state file of Kitokey (ADR-0007, PDR-0007 §1)", logged == [], logged)
+
+
+def confidential_sent(now: dt.datetime) -> None:
+    """CN. D119, PDR-0007 §4 as amended on 2026-11-24: a confidential meeting's page offers « Envoyer… » too, and each
+    send asks once more, in one sentence, that the meeting is confidential and its summary will leave this computer
+    for that destination, with « Envoyer » and « Annuler ». « Annuler » sends nothing; « Envoyer » starts kitokey-send
+    with `confirmed_confidential: true` on its input (posting/v1, D118); the question comes back at every send, never
+    remembered; the switch still says where the summary went. A meeting that is not confidential is sent as before,
+    no such field on its input. By keyboard alone, in French; the sentence in English too. Addresses are made up."""
+    print("CN. a confidential meeting's summary sent only once the user confirms, asked again every time (D119)")
+    calls = WORK / "send-calls.jsonl"
+    secret = "made-up-secret-c119"
+    offered = "return !!document.getElementById('send-open')"
+    asked = "return document.getElementById('send-confidential')?.textContent ?? null"
+    said_now = "return document.getElementById('send-said')?.textContent ?? ''"
+    made = lambda: [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+    for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
+        meetings = WORK / f"sending-confidential-{short}"
+        secret_one, open_one = meetings / "2026-11-21_09-00", meetings / "2026-11-21_10-00"
+        for folder in (secret_one, open_one):
+            session(folder, now - dt.timedelta(days=2), 30, {"local.wav": 1000})
+            (folder / "transcript.jsonl").write_text(
+                '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+                '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+            (folder / "minutes.md").write_text(
+                "---\ncontract: minutes/v1\nmade: 2026-11-21T10:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+                "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
+        (secret_one / "confidential").write_text("")
+        with Window(meetings, language, 'after = "nothing"\n') as browser:
+            def page(folder):
+                browser.execute_script("location.hash = '#/'")
+                browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+                return wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed()
+                                and b.execute_script("return !!document.querySelector('.card.minutes')"), 10)
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
+            press(browser, "destination-open")
+            Select(browser.find_element(By.ID, "destination-kind")).select_by_value("discord")
+            for field, value in (("destination-name", "#équipe"), ("destination-address", f"https://discord.example/api/webhooks/1/{secret}")):
+                element = browser.find_element(By.ID, field)
+                element.clear()
+                element.send_keys(value)
+            press(browser, "destination-add")
+            wait_for(browser, lambda b: b.execute_script("return document.querySelectorAll('#destinations li').length") == 1, 10)
+            calls.unlink(missing_ok=True)
+            page(secret_one)
+            shown = wait_for(browser, lambda b: b.execute_script(offered), 10)
+            check(f"{short}: a confidential meeting with a summary offers « Envoyer… » (D119)", shown, browser.execute_script(offered))
+
+            def choose():
+                # By keyboard alone: « Envoyer… » reached and pressed by Enter, the destination by Enter.
+                browser.execute_script("document.getElementById('send-open').focus()")
+                ActionChains(browser).send_keys(Keys.ENTER).perform()
+                wait_for(browser, lambda b: b.execute_script("return document.activeElement?.classList.contains('send-to')"), 5)
+                ActionChains(browser).send_keys(Keys.ENTER).perform()
+                return wait_for(browser, lambda b: b.execute_script(asked), 5) and browser.execute_script(asked)
+
+            question = choose() or ""
+            if short == "en":
+                check("en: the question, in one sentence: the meeting is confidential, its summary will leave this computer for “#équipe”",
+                      question == "This meeting is confidential: its summary will leave this computer for “#équipe”.", question)
+                ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+                wait_for(browser, lambda b: not b.find_elements(By.ID, "send-panel"), 5)
+                check("en: Escape closes it, nothing sent", not calls.exists(), made())
+                continue
+            check("fr: asked in one sentence: the meeting is confidential, its summary will leave this computer for « #équipe »",
+                  question.replace("\xa0", " ").replace(" ", " ") == "Cette réunion est confidentielle : son compte rendu va quitter cet ordinateur pour « #équipe ».", question)
+            choices = browser.execute_script("const c = document.getElementById('send-confirm'), n = document.getElementById('send-cancel');"
+                                             " return [c?.textContent, n?.textContent, document.activeElement?.id, c?.getAttribute('aria-describedby') ?? '']")
+            check("fr: « Envoyer » and « Annuler »; the focus on « Annuler », the choice that sends nothing; « Envoyer » described by the question",
+                  choices[:3] == ["Envoyer", "Annuler", "send-cancel"] and "send-confidential" in choices[3].split(), choices)
+            ActionChains(browser).send_keys(Keys.ENTER).perform()
+            closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "send-panel"), 5)
+            time.sleep(1)
+            check("fr: « Annuler » by Enter: nothing sent, kitokey-send never started, the focus back on « Envoyer… »",
+                  closed and not calls.exists() and browser.execute_script("return document.activeElement.id") == "send-open",
+                  [made(), browser.execute_script("return document.activeElement.id")])
+            for round_ in (1, 2):
+                again = choose()
+                check(f"fr: send {round_}: the question asked again, never remembered", bool(again), again)
+                # « Envoyer » is before « Annuler »: Shift+Tab, then Enter.
+                ActionChains(browser).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+                on = browser.execute_script("return document.activeElement.id")
+                ActionChains(browser).send_keys(Keys.ENTER).perform()
+                wait_for(browser, lambda b: b.execute_script(said_now) and not b.execute_script(said_now).endswith("…"), 15)
+                said = browser.execute_script(said_now).replace("\xa0", " ")
+                got = made()
+                check(f"fr: send {round_}: confirmed, kitokey-send started once more, `confirmed_confidential: true` on its input, the address there alone",
+                      on == "send-confirm" and len(got) == round_ and json.loads(got[-1]["input"]).get("confirmed_confidential") is True
+                      and all(secret not in arg for arg in got[-1]["args"]) and said.startswith("Envoyé à « #équipe »"), [on, got[-1:] and got[-1]["input"].replace(secret, "…"), said])
+            left = wait_for(browser, lambda b: "#équipe" in (b.execute_script("return document.getElementById('confidential-left')?.textContent ?? ''")), 10)
+            check("fr: the switch says where its summary went (PDR-0007 §4)", left,
+                  browser.execute_script("return document.getElementById('confidential-left')?.textContent ?? null"))
+            # Not confidential: sent as before — no question, no such field on the input.
+            page(open_one)
+            wait_for(browser, lambda b: b.execute_script(offered), 10)
+            press(browser, "send-open")
+            wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#send-panel button.send-to"), 5)
+            browser.execute_script("document.querySelector('#send-panel button.send-to').click()")
+            wait_for(browser, lambda b: b.execute_script(said_now) and not b.execute_script(said_now).endswith("…"), 15)
+            got = made()
+            check("fr: a meeting not confidential: no question, sent at once, no `confirmed_confidential` on its input (D119, criterion 2)",
+                  browser.execute_script(asked) is None and len(got) == 3 and "confirmed_confidential" not in json.loads(got[-1]["input"]),
+                  [browser.execute_script(asked), got[-1:] and got[-1]["input"].replace(secret, "…")])
+
 
 def destinations_kept(now: dt.datetime) -> None:
     """CK. D110, PDR-0007 §1 and §6: Settings keeps the destinations a summary can be sent to — a kind, a
@@ -14922,6 +15027,7 @@ def main() -> int:
     settings_folded(now)
     destinations_kept(now)
     summary_sent(now)
+    confidential_sent(now)
     settings_version(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)
