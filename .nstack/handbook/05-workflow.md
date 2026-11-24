@@ -353,8 +353,9 @@ the change, and the stricter applies:
     record cannot be declared: a check never reads one —, and the default branch's own `Module
     checks` run catches what was missed once it runs that module. A commit with no passing record
     of its own is the case to know: `pr-check`'s T4 says so — `nstack attest` with that commit checked out, and
-    its rows stand without running them again —, as it says a digest that differs or a run past
-    its bound. The forge's run, made at the push, comes before the head's record: where the
+    its rows stand without running them again —, as it says a digest that differs, with what
+    changed — a module consumed, a shared file; or, when no file did, the modules run or the
+    engine —, or a run past its bound. The forge's run, made at the push, comes before the head's record: where the
     ruleset requires `nstack / local checks`, it leaves a row that waits only for the head's record to that status, and says so;
   - one **explored** by hand keeps the commit its evidence was produced on, and the verifier
     adds a **`Confirmed`** column on the head commit saying **what moved since and why it leaves
@@ -399,7 +400,10 @@ commit, where the row was explored before a record held it; a move to a commit t
 ancestor is said. A row a record
 held and the sheet no longer shows is said, unless a line under the sheet says why it left —
 `Removed: S3, S4 — <why>` —: whoever edits the sheet writes it, and the approver judges it. A rebase or a squash drops the records of the commits
-it rewrites, and what they read with them. The approver decides on the sheet; where the project answers
+it rewrites, and what they read with them. Only this pull request's records are read: each names
+the pull request it was made for — its number where the forge gives it, and its branch, the one
+the checkout tracks — so a branch started on another's never reads that one's sheet. Attest on the
+pull request's branch, one tracking it, or detached; a branch of another name is another's. The approver decides on the sheet; where the project answers
 `approval: agent`, the approver of a `prototype` or `standard` module may be the verifier itself,
 an agent under another identity than the author's (`07-governance.md` §7).
 
