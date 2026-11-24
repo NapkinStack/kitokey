@@ -9,7 +9,8 @@ use crate::Meeting;
 
 /// The API's version this program speaks, pinned by `posting/v1`.
 pub const VERSION: &str = "2026-03-11";
-/// A rich text's `content`, in characters.
+/// A rich text's `content`, counted in UTF-16 code units: Notion's page does not say its unit, and a
+/// character is one or two of them, so a piece within 2000 units is within 2000 characters as well.
 pub const TEXT: usize = 2000;
 /// Rich texts in one block's `rich_text`.
 pub const RICH_TEXTS: usize = 100;
@@ -115,14 +116,28 @@ fn link(rest: &str) -> Option<(String, String, usize)> {
     Some((inner[..close].to_string(), url.to_string(), 1 + close + 2 + end + 1))
 }
 
-/// A line as Notion's rich texts, each `content` at most [`TEXT`] characters — a longer run split over
-/// several —; none when they would be more than [`RICH_TEXTS`].
+/// `text` in pieces of at most [`TEXT`] UTF-16 units, never splitting a character.
+pub fn pieces(text: &str) -> Vec<String> {
+    let mut out = vec![String::new()];
+    let mut units = 0;
+    for c in text.chars() {
+        if units + c.len_utf16() > TEXT {
+            out.push(String::new());
+            units = 0;
+        }
+        units += c.len_utf16();
+        out.last_mut().unwrap().push(c);
+    }
+    out.retain(|piece| !piece.is_empty());
+    out
+}
+
+/// A line as Notion's rich texts, each `content` within [`TEXT`] — a longer run split over several —;
+/// none when they would be more than [`RICH_TEXTS`].
 pub fn rich_text(line: &str) -> Option<Vec<Value>> {
     let mut out = Vec::new();
     for span in spans(line) {
-        let chars: Vec<char> = span.text.chars().collect();
-        for chunk in chars.chunks(TEXT) {
-            let content: String = chunk.iter().collect();
+        for content in pieces(&span.text) {
             let link = span.link.as_ref().map(|url| json!({"url": url}));
             out.push(json!({
                 "type": "text",
@@ -144,8 +159,8 @@ fn block(kind: &str, text: &str, more: Value) -> Option<Value> {
 }
 
 /// The summary as blocks, in order: each section's title a `heading_2`, then its body — `### ` a
-/// `heading_3`, an item a `bulleted_list_item` (a `to_do`, unticked, in the actions' section), `1. ` a
-/// `numbered_list_item`, `> ` a `quote`, a fenced block a `code` in `plain text`, `---` a `divider`, lines
+/// `heading_3`, an item a `bulleted_list_item` and `1. ` a `numbered_list_item` (each a `to_do`, unticked,
+/// in the actions' section), `> ` a `quote`, a fenced block a `code` in `plain text`, `---` a `divider`, lines
 /// together a `paragraph`. None when they are more than [`CHILDREN`], or a block holds too many rich texts.
 pub fn blocks(meeting: &Meeting) -> Option<Vec<Value>> {
     let mut out = Vec::new();
@@ -164,11 +179,9 @@ pub fn blocks(meeting: &Meeting) -> Option<Vec<Value>> {
         for line in body.lines() {
             if let Some(code) = fence.as_mut() {
                 if line.trim_start().starts_with("```") {
-                    let text: String = code.join("\n");
-                    let chars: Vec<char> = text.chars().collect();
-                    let rich: Vec<Value> = chars
-                        .chunks(TEXT)
-                        .map(|chunk| json!({"type": "text", "text": {"content": chunk.iter().collect::<String>()}}))
+                    let rich: Vec<Value> = pieces(&code.join("\n"))
+                        .into_iter()
+                        .map(|content| json!({"type": "text", "text": {"content": content}}))
                         .collect();
                     if rich.len() > RICH_TEXTS {
                         return None;
@@ -202,7 +215,11 @@ pub fn blocks(meeting: &Meeting) -> Option<Vec<Value>> {
                     block("bulleted_list_item", text, json!({}))
                 }
             } else if let Some(text) = numbered {
-                block("numbered_list_item", text, json!({}))
+                if actions {
+                    block("to_do", text, json!({"checked": false}))
+                } else {
+                    block("numbered_list_item", text, json!({}))
+                }
             } else if let Some(text) = trimmed.strip_prefix("> ") {
                 block("quote", text, json!({}))
             } else if trimmed == "---" || trimmed == "***" {

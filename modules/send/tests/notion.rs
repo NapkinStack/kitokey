@@ -2,7 +2,7 @@
 //! blocks, the page that holds them, each within Notion's documented limits (read 2026-11-23).
 
 use kitokey_send::Meeting;
-use kitokey_send::notion::{CHILDREN, PAYLOAD, RICH_TEXTS, TEXT, blocks, database, page, rich_text};
+use kitokey_send::notion::{CHILDREN, PAYLOAD, RICH_TEXTS, TEXT, blocks, database, page, pieces, rich_text};
 use serde_json::{Value, json};
 
 const ID: &str = "0123456789abcdef0123456789abcdef";
@@ -153,4 +153,39 @@ fn the_page_has_the_data_source_for_parent_the_title_in_its_title_property_and_a
         60
     ];
     assert!(page("ds-1", "Nom", "t", small).is_some());
+}
+
+#[test]
+fn a_piece_is_within_2000_utf16_units_so_within_2000_characters_too() {
+    // One unit first, so that the bound falls inside an emoji's two units.
+    let emoji = format!("a{}", "😀".repeat(TEXT));
+    let parts = pieces(&emoji);
+    assert!(parts.iter().all(|p| p.encode_utf16().count() <= TEXT), "a piece past 2000 units");
+    assert_eq!(parts.len(), 3);
+    assert_eq!(parts.concat(), emoji);
+}
+
+#[test]
+fn a_numbered_action_is_a_to_do_too() {
+    let out = blocks(&meeting(
+        &[("Résumé", "Fixé."), ("Actions", "1. Écrire — Léa\n2. Relancer — Marc")],
+        Some(1),
+    ))
+    .unwrap();
+    assert_eq!(kinds(&out), ["heading_2", "paragraph", "heading_2", "to_do", "to_do"]);
+}
+
+#[test]
+fn a_fence_never_closed_keeps_its_lines_as_a_paragraph() {
+    let out = blocks(&meeting(&[("Résumé", "Avant.\n\n```\nune ligne\nune autre")], None)).unwrap();
+    assert_eq!(kinds(&out), ["heading_2", "paragraph", "paragraph"]);
+    assert_eq!(text(&out[2]), "une ligne\nune autre");
+}
+
+#[test]
+fn a_code_block_past_100_pieces_is_none() {
+    let fits = format!("```\n{}\n```", "x".repeat(TEXT * RICH_TEXTS));
+    assert!(blocks(&meeting(&[("A", &fits)], None)).is_some());
+    let over = format!("```\n{}\n```", "x".repeat(TEXT * RICH_TEXTS + 1));
+    assert!(blocks(&meeting(&[("A", &over)], None)).is_none());
 }
