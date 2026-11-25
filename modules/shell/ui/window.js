@@ -3893,7 +3893,8 @@ function showSettings(shown, minutes, words) {
     adding.id = "destination-adding";
     // Its kind a tile each (#1238), as a desktop offers a few kinds: its mark or the page's icon, its name; a radio group
     // the arrows move in, its first chosen at first, as the list's first was.
-    const kindField = element("div", "field kinds");
+    // On a whole line, as the address: the three tiles side by side.
+    const kindField = element("div", "field kinds whole");
     const kindName = element("span", "name", words.destination_fields[0]);
     kindName.id = "destination-kind-name";
     const tiles = element("div", "tiles");
