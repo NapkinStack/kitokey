@@ -51,7 +51,7 @@ and nowhere else.
 | `language` | The shell, on the user's word; optional | One line, UTF-8: the language the meeting is spoken in, a code of ISO 639-1 — `fr`, `en`. Absent, or a line that is not one such code, the meeting names no language of its own. Only the shell reads it, and tells the transcription the language spoken; the steps that follow need not read it |
 | `title.txt` | The shell, on the user's word; optional | One line, UTF-8, at most 80 characters: the name the user gave the meeting, plain text, shown as text, never read as markup or as a path. Absent, blank, or more than that one line, the meeting has no name given. It is the name shown before any other: the folder keeps its own. Only the shell reads it; the steps that follow need not read it |
 | `models.json` | The shell, on the user's word; optional | The models this meeting's own transcript and minutes are made with, below — only what the user chose for it. Only the shell reads it, and names who hears and who writes accordingly; the steps that follow need not read it |
-| `speakers.json` | The shell, on the user's word; optional | The names the user gave the meeting's speakers, below (#1205). the shell and `summary` read it; the other steps need not |
+| `speakers.json` | The shell, on the user's word; optional | The names the user gave the meeting's speakers, below (#1205). Only the shell and `summary` read it; the other steps need not |
 | `minutes-previous.md`, `transcript-previous.jsonl` | The shell, when a summary or a transcript is made again; optional | The last one it replaced, kept beside the new one so the user can bring it back (D113). Only the shell reads them; the steps that follow need not read them, and no contract describes what they hold |
 | `derived/` | Consumers; optional | Whatever they make from the tracks. Not described here: nothing in it is a source |
 
@@ -71,7 +71,7 @@ meeting's own names for who spoke (#1205):
 |---|---|
 | `me`, optional | Who is on the `local` track, the person who records — shown where the shell says « Vous » |
 | `others`, optional | Who is on the `remote` track, for a call of two — shown where the shell says « Les autres » |
-| `voices`, optional | For a voice `transcript/v1` tells apart, keyed `<track>/<voice>`, its track and its label: its name. No producer tells voices apart yet: the shell writes none until one does |
+| `voices`, optional | For a voice `transcript/v1` tells apart, keyed `<track>/<voice>` — its track, `local` or `remote`, then its label as `transcript/v1` writes it, any one line, the first `/` parting them —: its name. No producer tells voices apart yet: the shell writes none until one does |
 
 - **A name** is one line, 1 to 60 characters, plain text: shown as text, never read as markup or as a path.
 - **Which name a segment takes**: its voice's name, else its speaker's — `me` for `local`, `others` for `remote` —;

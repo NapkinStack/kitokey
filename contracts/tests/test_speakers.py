@@ -24,6 +24,8 @@ def test_the_folder_may_hold_the_names_the_user_gave_its_speakers():
     assert "a name absent, the speaker keeps the shell's word for it" in page
     assert "its voice's name, else its speaker's" in page
     assert "a name the schema refuses reads as absent, and the rest of the file still reads" in page
+    assert "a file that is no JSON object reads as no file" in page
+    assert "then its label as `transcript/v1` writes it, any one line, the first `/` parting them" in page
 
 
 def test_summary_reads_the_names_and_says_each_segment_by_its_speakers_name():

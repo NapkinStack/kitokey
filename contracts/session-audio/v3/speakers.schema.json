@@ -28,7 +28,7 @@
       "description": "For a voice transcript/v1 tells apart, keyed by its track and its label: its name.",
       "type": "object",
       "propertyNames": {
-        "pattern": "^(local|remote)/[^/\\n\\r]{1,64}$"
+        "pattern": "^(local|remote)/[^\\n\\r]+$"
       },
       "additionalProperties": {
         "type": "string",

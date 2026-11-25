@@ -627,6 +627,7 @@ EXAMPLES["session-audio/v3/speakers.schema.json"] = (
         {"me": "Camille", "others": "Hugo"},
         {"others": "Jiří Novák"},
         {"voices": {"remote/1": "Léa", "local/a": "Camille"}},
+        {"voices": {"remote/a/b": "Léa", "remote/" + "v" * 65: "Hugo"}},
         {"me": "x" * 60},
     ],
     [
@@ -643,7 +644,10 @@ EXAMPLES["session-audio/v3/speakers.schema.json"] = (
         {"voices": {"remote": "Léa"}},
         {"voices": {"elsewhere/1": "Léa"}},
         {"voices": {"remote/1": ""}},
-        {"voices": {"remote/1/2": "Léa"}},
+        {"voices": {"other/1": "Léa"}},
+        {"voices": {"remote/": "Léa"}},
+        {"voices": {"remote/1": "   "}},
+        {"voices": {"remote/deux\nlignes": "Léa"}},
     ],
 )
 
