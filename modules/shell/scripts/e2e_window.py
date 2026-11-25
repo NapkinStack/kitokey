@@ -552,6 +552,20 @@ def descendants(pid: int) -> list[int]:
     return found
 
 
+def window_cpu(window: "Window") -> float:
+    """The CPU seconds the window has spent so far: its shell and its WebKit processes, read in /proc — never the
+    driver nor a stand-in it starts (#1179: a meter's cost, measured)."""
+    spent = 0
+    for pid in descendants(window.driver_process.pid):
+        with contextlib.suppress(OSError, IndexError, ValueError):
+            stat = Path(f"/proc/{pid}/stat").read_text()
+            name = stat.split("(", 1)[1].rsplit(")", 1)[0]
+            if name == "kitokey" or name.startswith(("WebKitWebProces", "WebKitNetworkPr")):
+                fields = stat.rsplit(")", 1)[1].split()
+                spent += int(fields[11]) + int(fields[12])
+    return spent / os.sysconf("SC_CLK_TCK")
+
+
 def listening(pids: list[int], port: int) -> bool:
     """Whether one of these processes is the one listening on 127.0.0.1:`port`: its socket, read in
     /proc, not whoever answers there (#943)."""
@@ -4246,6 +4260,11 @@ def heard_checked(now: dt.datetime) -> None:
                 (taping / "hush").unlink()
                 rose = wait_for(browser, lambda b: b.execute_script("return parseFloat(document.getElementById('level-others').lastElementChild.style.height)") > 0, 3)
                 check("levels risen: the meters move", rose)
+                if short == "fr" and theme == "light":
+                    # #1179: what the meters cost, read ten times a second — the window's CPU over five seconds of recording.
+                    spent = window_cpu(window)
+                    time.sleep(5)
+                    print(f"    measured: the window while recording, its meters at 10 Hz: {(window_cpu(window) - spent) / 5 * 100:.1f} % of one core")
                 # Capture's word after ten seconds: the microphone that sends nothing said at once; the meeting's silence not yet.
                 (taping / "nothing-me").touch()
                 (taping / "silent-others").touch()
