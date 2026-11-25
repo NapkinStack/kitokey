@@ -1,6 +1,6 @@
 # Kitokey — privacy policy / politique de confidentialité
 
-Last changed / dernière modification: 2026-11-23. Publisher / éditeur: c12c (NapkinStack).
+Last changed / dernière modification: 2026-11-24. Publisher / éditeur: c12c (NapkinStack).
 [English](#english) · [Français](#français)
 
 ```mermaid
@@ -8,6 +8,7 @@ flowchart LR
     M["Your microphone,<br/>your computer's sound"]:::here --> W["Kitokey,<br/>on your computer"]:::here --> F["Your meetings folder"]:::here
     W -. "only for the service you chose" .-> S["A service you named"]:::out
     W -. "only when you click" .-> D["huggingface.co,<br/>raw.githubusercontent.com"]:::out
+    W -. "only when you send it" .-> C["A channel you set up:<br/>Slack, Discord, a webhook"]:::out
     classDef here fill:#065f46,color:#fff
     classDef out fill:#7c2d12,color:#fff
 ```
@@ -27,6 +28,9 @@ server of ours, and it sends nothing anywhere unless you chose to.
 | Its transcript, its minutes, the context you wrote for it, its language, your corrections | The same folder, beside the sound |
 | Your settings | Your user's configuration folder |
 | The key of a service, if you gave one | Your system's keyring, under `com.napkinstack.Kitokey`: never in a file |
+| The webhook address of a channel you set up to send summaries to | The same keyring, under the same name: never in a file, never shown again in full |
+| Which summary you sent, to which channel's name, and when — never its address | `sends.json`, beside your settings |
+| Each new summary, if you turned on « Export every summary » — never a confidential meeting's | The folder you chose: if a service syncs or shares it, it goes where that folder goes |
 | Downloaded speech models | Your user's data folder |
 | Logs: steps, durations, hosts, models and failures — never a word of a meeting, nor a key | Your user's state folder (on Windows, the application's data) |
 | What the window's web engine keeps for itself: its cache and its own storage — no meeting, no setting | On Linux, `~/.local/share/com.napkinstack.Kitokey` |
@@ -48,6 +52,8 @@ only when you do one of these:
 | Download a speech model (a click) | A request for that file | `huggingface.co` |
 | Read the list of models again (a click) | A request for that file | `raw.githubusercontent.com` |
 | Download a model through Ollama (a click) | Ollama's own request | Ollama, a program of its own, from its registry |
+| Send a summary to a channel (« Send… » on a meeting's page, then its name; before a first send to it, « Send » once more) | The meeting's title, its summary and its actions — never the sound, never the transcript | The webhook address you pasted for that channel in Settings: Slack, Discord, or another webhook |
+| Add a date to Google Calendar (« Dates mentioned », a date ticked, then « Open in Google Calendar ») | The action's words and who, its date, the passage and the meeting's name, in the link | `calendar.google.com`, in your browser, under Google's own policy; never for a confidential meeting |
 
 On Windows, Kitokey asks the Microsoft Store whether you bought it, each time you start a
 recording: the Store answers, under Microsoft's own policy; nothing of a meeting goes with it.
@@ -57,8 +63,9 @@ it receives is under its own policy: read it before you choose it.
 
 A meeting you say **confidential** is made on this computer alone, even when a service is chosen.
 
-Kitokey sends a meeting to no channel today — no mail, no chat, no shared folder. Copying its
-minutes or its transcript puts them on your clipboard, and they go where you paste them.
+A summary goes to a channel only when you send it, once for each gesture, and never a confidential
+meeting's. Kitokey sends no mail. Copying its minutes or its transcript puts them on your clipboard,
+and they go where you paste them.
 
 There is no telemetry, no analytics, no advertising, and we receive no data about you. Should
 telemetry ever exist, it will be off until you turn it on, and will show what it sends and where.
@@ -76,6 +83,9 @@ telemetry ever exist, it will be off until you turn it on, and will show what it
   - macOS: `~/Library/Application Support/kitokey` and `~/Library/Logs/Kitokey`.
 - A key you gave stays in your system's keyring until you delete it there (under
   `com.napkinstack.Kitokey`); revoke it also at the service that issued it.
+- A channel's webhook address leaves the keyring when you remove that channel in Settings; delete the
+  webhook also in the channel, so that no one holding its address can post there. A summary already
+  sent stays in the channel: remove it there.
 - A model downloaded through Ollama is kept by Ollama: remove it there (`ollama rm <model>`).
 
 ### This website
@@ -103,6 +113,9 @@ Changes to this policy are in this file's history.
 | Sa transcription, son compte rendu, le contexte que vous avez écrit, sa langue, vos corrections | Le même dossier, à côté du son |
 | Vos réglages | Le dossier de configuration de votre utilisateur |
 | La clé d'un service, si vous en avez donné une | Le trousseau de votre système, sous `com.napkinstack.Kitokey` : jamais dans un fichier |
+| L'adresse de webhook d'un canal où vous envoyez des comptes rendus | Le même trousseau, sous le même nom : jamais dans un fichier, jamais réaffichée en entier |
+| Quel compte rendu vous avez envoyé, vers quel nom de canal, et quand — jamais son adresse | `sends.json`, à côté de vos réglages |
+| Chaque nouveau compte rendu, si vous avez activé « Exporter chaque compte rendu » — jamais celui d'une réunion confidentielle | Le dossier que vous avez choisi : si un service le synchronise ou le partage, il va là où va ce dossier |
 | Les modèles de parole téléchargés | Le dossier de données de votre utilisateur |
 | Les journaux : étapes, durées, hôtes, modèles et échecs — jamais un mot d'une réunion, ni une clé | Le dossier d'état de votre utilisateur (sous Windows, les données de l'application) |
 | Ce que le moteur web de la fenêtre garde pour lui : son cache et son propre stockage — aucune réunion, aucun réglage | Sous Linux, `~/.local/share/com.napkinstack.Kitokey` |
@@ -124,6 +137,8 @@ part que si vous faites l'un de ces choix :
 | Télécharger un modèle de parole (un clic) | La demande de ce fichier | `huggingface.co` |
 | Relire la liste des modèles (un clic) | La demande de ce fichier | `raw.githubusercontent.com` |
 | Télécharger un modèle par Ollama (un clic) | La demande d'Ollama elle-même | Ollama, un programme à part, depuis son registre |
+| Envoyer un compte rendu vers un canal (« Envoyer… » sur la page d'une réunion, puis son nom ; avant un premier envoi vers lui, « Envoyer » une fois de plus) | Le titre de la réunion, son compte rendu et ses actions — jamais le son, jamais la transcription | L'adresse de webhook collée pour ce canal dans les Réglages : Slack, Discord ou un autre webhook |
+| Ajouter une date à Google Agenda (« Dates mentionnées », une date cochée, puis « Ouvrir dans Google Agenda ») | Les mots de l'action et le « qui », sa date, le passage et le nom de la réunion, dans le lien | `calendar.google.com`, dans votre navigateur, sous la politique de Google ; jamais pour une réunion confidentielle |
 
 Sous Windows, Kitokey demande au Microsoft Store si vous l'avez acheté, à chaque enregistrement
 lancé : le Store répond, selon la politique de Microsoft ; rien d'une réunion ne part avec.
@@ -134,9 +149,9 @@ reçoit relève de sa propre politique : lisez-la avant de le choisir.
 Une réunion dite **confidentielle** est traitée sur cet ordinateur seulement, même si un service est
 choisi.
 
-Kitokey n'envoie aujourd'hui une réunion vers aucun canal — ni courriel, ni messagerie, ni dossier
-partagé. Copier son compte rendu ou sa transcription les met dans votre presse-papiers, et ils vont là
-où vous les collez.
+Un compte rendu ne part vers un canal que lorsque vous l'envoyez, une fois par geste, et jamais celui
+d'une réunion confidentielle. Kitokey n'envoie aucun courriel. Copier son compte rendu ou sa
+transcription les met dans votre presse-papiers, et ils vont là où vous les collez.
 
 Il n'y a ni télémétrie, ni mesure d'audience, ni publicité, et nous ne recevons aucune donnée sur
 vous. Si une télémétrie existait un jour, elle resterait coupée tant que vous ne l'activez pas, et
@@ -156,6 +171,9 @@ montrerait ce qu'elle envoie et où.
   - macOS : `~/Library/Application Support/kitokey` et `~/Library/Logs/Kitokey`.
 - Une clé donnée reste dans le trousseau de votre système jusqu'à ce que vous l'y supprimiez
   (sous `com.napkinstack.Kitokey`) ; révoquez-la aussi auprès du service qui l'a émise.
+- L'adresse de webhook d'un canal quitte le trousseau quand vous retirez ce canal dans les Réglages ;
+  supprimez aussi le webhook dans le canal, pour que personne ne puisse y poster avec son adresse. Un
+  compte rendu déjà envoyé reste dans le canal : retirez-le là.
 - Un modèle téléchargé par Ollama est gardé par Ollama : retirez-le là (`ollama rm <modèle>`).
 
 ### Ce site
