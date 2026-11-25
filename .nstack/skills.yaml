@@ -71,3 +71,11 @@ skills:
       The project's rules for verifying a change: the verifier's posture, running a test
       sheet against the running change, the evidence expected for each result, and what
       to report.
+
+  pause-and-resume:
+    source: .nstack/playbooks/pause-and-resume.md
+    description: >
+      The project's rules for ending and resuming a session: work committed and pushed
+      before stopping, nothing left running, holds kept, a short resume note in
+      .nstack/local/, and a restart that reads the note, renews its holds and runs
+      nstack plan once.

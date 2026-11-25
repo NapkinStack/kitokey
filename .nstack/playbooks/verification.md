@@ -34,7 +34,8 @@ description starts.
 You verify on someone's machine, beside work that goes on. Leave it as you found it.
 
 - **A copy of your own**: a working tree checked out at the head, and build outputs of your
-  own. A tree another session edits, or outputs another branch built, give results that are
+  own. Check out the pull request's branch, one tracking it, or the head detached: a record made
+  on a branch of another name is another pull request's (`.nstack/handbook/05-workflow.md` §7). A tree another session edits, or outputs another branch built, give results that are
   not this change's. Where a sandbox keeps `.git` read-only, a worktree cannot be added: a
   `git clone --shared <your clone> <scratch>` checked out at the head is that copy, `<scratch>`
   and build outputs both under your own cache (`$XDG_CACHE_HOME`, which `nstack agent run <name> --

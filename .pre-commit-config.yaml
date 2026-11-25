@@ -116,7 +116,8 @@ repos:
       # Git reads trailers from the message's last paragraph only: an Agent-Session line above a
       # blank line — before a Co-Authored-By given in its own -m, say — names no session, and
       # pr-check would say so only after the push. Git itself judges here: a message that names
-      # a session git does not read as a trailer is refused, with the correction.
+      # a session git does not read as a trailer is refused, with the correction. A rebase or a
+      # cherry-pick never runs this hook: .nstack/fitness-before-push.sh reads the same before a push.
       - id: agent-session-trailer
         name: "Agent-Session in the last paragraph: no blank line inside the trailer block"
         language: system

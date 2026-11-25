@@ -13,7 +13,8 @@
 
 - **The address is a secret**: never in an argument, a sentence, a line or a log (`tests/program.rs`
   checks every run's output for it).
-- **A confidential meeting is never sent**, judged before the address (`tests/program.rs`).
+- **A confidential meeting is sent only when its input says `confirmed_confidential: true`**, judged before
+  the address; unconfirmed, nothing is sent (`tests/program.rs`, `tests/confirmed.rs`, D118).
 - **Every resolved address is judged, the connection made to those**: `Judging`, the resolver ureq is
   given, refuses a name whose addresses hold one local address; there is no second resolution
   (`tests/address.rs`, `tests/server.rs`).
