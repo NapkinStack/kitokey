@@ -1,8 +1,10 @@
 // kitokey.com's hero carousel (D114, proposal D). Without this file the slides still swipe (CSS scroll-snap)
 // and each shows its clip's poster. With it: arrow keys, a calm crossfade on a fine pointer, and on screens of
-// 700 px and more the clip itself (AV1 WebM, else H.264 MP4), in the app's dark theme under the moon where filmed so. Each clip plays once per view, then the next
-// slide comes 0.6 s later; the drawn call of slide 1 stays 3 s, a poster alone 3.5 s. WCAG 2.2.2: autoplay pauses on hover and on focus inside, never starts under
-// reduced motion (posters only), and rests on slide 1 after two full cycles.
+// 700 px and more the clip itself (AV1 WebM, else H.264 MP4), each fetched as its slide approaches, in the app's
+// dark theme under the moon where it was filmed so, else the light one in a dark window. Each clip
+// plays once per view, then the next slide comes 0.6 s later, as it does when a clip fails; the drawn call of
+// slide 1 stays 3 s, a poster alone 3.5 s. WCAG 2.2.2: hover or focus inside pauses the slide and its clip,
+// autoplay never starts under reduced motion (posters only), and rests on slide 1 after two full cycles.
 (() => {
   "use strict";
   const slider = document.querySelector(".slider");
@@ -25,6 +27,7 @@
   };
   const mark = (n) => {
     at = n;
+    ensure(n); ensure((n + 1) % slides.length);
     if (fade) slides.forEach((s, i) => { s.classList.toggle("is-active", i === n); s.inert = i !== n; });
     slides.forEach((s, i) => {
       const v = video(i);
@@ -43,11 +46,14 @@
   track.addEventListener("keydown", (e) => {
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); go(at + (e.key === "ArrowRight" ? 1 : -1)); }
   });
-  const pause = () => { hover = true; clearTimeout(timer); };
+  // Hover or focus inside pauses the slide and its clip (WCAG 2.2.2); leaving goes on where it was.
+  const pause = () => { hover = true; clearTimeout(timer); video(at)?.pause(); };
   const resume = () => {
     hover = false;
     const v = video(at);
-    if (v && v.ended && !still()) timer = setTimeout(() => go(at + 1), HOLD); else schedule();
+    if (v && (v.ended || v.dataset.failed) && !still()) timer = setTimeout(() => go(at + 1), HOLD);
+    else if (v && !still()) v.play().catch(() => {});
+    else schedule();
   };
   slider.addEventListener("pointerenter", pause);
   slider.addEventListener("pointerleave", resume);
@@ -55,39 +61,51 @@
   slider.addEventListener("focusout", resume);
   reduce.addEventListener("change", () => mark(at));
 
-  // The clips' theme: the app's dark clips under the moon where they exist, else the light ones in a dark frame.
+  // The clips and their posters come as their slide approaches — the one shown and the next —, never all at
+  // load: stacked by the crossfade, every lazy poster would otherwise be on screen at once. A clip is added only
+  // where it plays (700 px and more, motion allowed), so a phone or a reduced-motion reader gets posters alone.
+  const play = wide.matches && !reduce.matches;
+  const ready = new Set();
+  if (fade) slides.forEach((s, i) => {
+    const img = s.querySelector("img.still");
+    if (img && i > 1) { img.dataset.src = img.getAttribute("src"); img.removeAttribute("src"); }
+  });
+  // The clips' theme: the app's dark clips under the moon where they exist, else the light ones.
   const theme = (s) => (document.documentElement.dataset.screens === "dark" && "dark" in s.dataset ? "dark" : "light");
   const named = (s, ext) => `${s.dataset.clip}-${theme(s)}.${ext}`;
-
-  // The clips: added only where they play, so a phone or a reduced-motion reader downloads posters alone.
-  const play = wide.matches && !reduce.matches;
-  const dress = () => {
-    for (const [index, s] of slides.entries()) {
-      if (!s.dataset.clip) continue; // the drawn call has no clip
-      const poster = s.querySelector("img.still");
-      if (poster) poster.src = named(s, "jpg");
-      if (!play) continue;
-      const v = s.querySelector("video");
-      if (v && v.dataset.theme === theme(s)) continue;
-      const fresh = document.createElement("video");
-      Object.assign(fresh, { muted: true, playsInline: true, preload: "none", poster: named(s, "jpg") });
-      fresh.setAttribute("muted", "");
-      fresh.dataset.theme = theme(s);
-      for (const [ext, type] of [["webm", 'video/webm; codecs="av01.0.05M.08"'], ["mp4", "video/mp4"]]) {
-        const source = document.createElement("source");
-        source.src = named(s, ext); source.type = type;
-        fresh.append(source);
-      }
-      fresh.addEventListener("ended", () => { if (index === at && !still()) timer = setTimeout(() => go(at + 1), HOLD); });
-      const old = v || poster;
-      fresh.setAttribute("aria-label", old.getAttribute("aria-label") || old.alt);
-      fresh.width = old.width; fresh.height = old.height;
-      old.replaceWith(fresh);
+  function ensure(index) {
+    const s = slides[index];
+    if (!s.dataset.clip || ready.has(index)) return; // the drawn call has no clip
+    ready.add(index);
+    dress(index);
+  }
+  function dress(index) {
+    const s = slides[index];
+    const img = s.querySelector("img.still");
+    if (img) { delete img.dataset.src; img.src = named(s, "jpg"); }
+    if (!play) return;
+    const old = s.querySelector("video") || img;
+    if (old.dataset.theme === theme(s)) return;
+    const v = document.createElement("video");
+    Object.assign(v, { muted: true, playsInline: true, preload: "none", poster: named(s, "jpg") });
+    v.setAttribute("muted", "");
+    v.dataset.theme = theme(s);
+    v.setAttribute("aria-label", old.getAttribute("aria-label") || old.alt);
+    v.width = old.width; v.height = old.height;
+    const next = () => { if (index === at && !still()) timer = setTimeout(() => go(at + 1), HOLD); };
+    for (const ext of ["webm", "mp4"]) {
+      const source = document.createElement("source");
+      source.src = named(s, ext); source.type = ext === "webm" ? 'video/webm; codecs="av01.0.05M.08"' : "video/mp4";
+      v.append(source);
     }
-    mark(at);
-  };
-  dress();
-  document.addEventListener("kitokey:screens", dress);
+    // A clip that fails to load leaves its poster and lets the carousel go on.
+    v.lastElementChild.addEventListener("error", () => { v.dataset.failed = "1"; next(); });
+    v.addEventListener("ended", next);
+    old.replaceWith(v);
+  }
+  // The moon or the sun pressed: each slide already fetched takes the other theme's poster and clip.
+  document.addEventListener("kitokey:screens", () => { for (const i of ready) dress(i); mark(at); });
+
 
   if ("IntersectionObserver" in window) {
     if (!fade) {
