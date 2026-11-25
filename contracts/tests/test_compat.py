@@ -190,3 +190,61 @@ def test_a_version_with_no_schema_and_a_schema_where_none_is_read_are_refused(tm
     }
     code, said = judged(tmp_path / "examples", {"line.schema.json": LINES}, {"line.schema.json": LINES, **examples})
     assert code == 0, said
+
+
+# An input: one JSON object the consumers write and the producer reads (`exporting/v1`, `posting/v1`).
+INPUT = {
+    "$schema": DIALECT,
+    "type": "object",
+    "properties": {"to": {"type": "string"}, "name": {"type": "string"}},
+    "required": ["to", "name"],
+}
+
+
+def test_an_input_is_judged_for_what_its_consumers_send_and_what_its_producer_reads(tmp_path):
+    def input_changed(change):
+        schema = json.loads(json.dumps(INPUT))
+        change(schema)
+        return schema
+
+    cases = {
+        # What every consumer already sends is refused: a break, which an output's rule would let through.
+        "a field added and required": (
+            lambda schema: (schema["properties"].update(dates={"type": "array"}), schema["required"].append("dates")),
+            1,
+        ),
+        # The merged producer would refuse what a consumer may now send.
+        "a required field no longer required": (lambda schema: schema["required"].remove("to"), 1),
+        "a type changed": (lambda schema: schema["properties"].update(name={"type": "integer"}), 1),
+        # Where v1 left room: added as optional, nothing sent before is refused (#1182's `dates`).
+        "a field added, optional": (
+            lambda schema: schema["properties"].update(dates={"type": "array", "minItems": 1}),
+            0,
+        ),
+        "the same schema": (lambda schema: None, 0),
+    }
+    for number, (what, (change, expected)) in enumerate(cases.items()):
+        code, said = judged(
+            tmp_path / str(number), {"input.schema.json": INPUT}, {"input.schema.json": input_changed(change)}
+        )
+        assert code == expected, f"{what}: {said}"
+        if expected:
+            assert "input.schema.json: " in said and "compatible —" not in said, f"{what}: {said}"
+        else:
+            assert "input.schema.json compatible — pages are not compared" in said, f"{what}: {said}"
+
+
+def test_the_same_change_to_an_output_is_judged_as_before(tmp_path):
+    # A field added and required: every line a consumer reads still holds what it read before.
+    output = {**INPUT, "$schema": DIALECT}
+    grown = {
+        **output,
+        "properties": {**output["properties"], "dates": {"type": "array"}},
+        "required": ["to", "name", "dates"],
+    }
+    code, said = judged(tmp_path / "grown", {"event.schema.json": output}, {"event.schema.json": grown})
+    assert code == 0 and "event.schema.json compatible" in said, said
+    # A required field no longer required: a consumer may now read a line without it.
+    loosened = {**output, "required": ["name"]}
+    code, said = judged(tmp_path / "loosened", {"event.schema.json": output}, {"event.schema.json": loosened})
+    assert code == 1 and "event.schema.json: the changed schema allows what the merged one refuses: " in said, said

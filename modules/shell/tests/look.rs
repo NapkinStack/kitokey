@@ -326,7 +326,7 @@ fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
 /// Each pair of colours the theme uses (D89's first round of drawings, *Contrast, both themes*), read
 /// from the file in both themes: text 4.5:1 (WCAG 2.2, 1.4.3), a control's edge or a meter 3:1 (1.4.11).
 /// `--line` is no pair: it divides, and borders no control (the test below).
-const PAIRS: [(&str, &str, f64); 27] = [
+const PAIRS: [(&str, &str, f64); 28] = [
     ("var(--ink)", "var(--ground)", 4.5),
     ("var(--ink)", "var(--surface)", 4.5),
     ("var(--ink)", "var(--raised)", 4.5),
@@ -360,6 +360,8 @@ const PAIRS: [(&str, &str, f64); 27] = [
     ("var(--mark-edge)", SELECTED, 3.0),
     ("var(--mark-edge)", "var(--surface)", 3.0),
     ("var(--mark-ink)", "var(--mark)", 4.5),
+    // A level's bars, each side's in its colour, on the page's ground as on the surface (#1179, 1.4.11).
+    ("var(--ok)", "var(--ground)", 3.0),
 ];
 /// The selected row's ground, as the sidebar mixes it.
 const SELECTED: &str = "color-mix(in srgb, var(--accent) 13%, var(--surface))";
@@ -394,6 +396,52 @@ fn each_pair_of_the_theme_reaches_its_threshold_in_both_themes() {
             .any(|line| line.starts_with("theme 1: var(--edge)")),
         "a faint edge passed"
     );
+}
+
+/// A level meter (#1179, « B · Trace »): its bars rounded, each never less than a dot, drawn at each reading with no
+/// transition, the newest at the right and the oldest cut at the left; the bar's trace 14 px high, the page's 24,
+/// the panel's 28; each side's bars in its colour, on no tinted track. Less motion: the global rule, and the page
+/// draws a held level (tests/meter.rs).
+#[test]
+fn a_meter_is_a_trace_of_rounded_bars_in_the_style() {
+    // A Windows checkout ends its lines with CRLF (#1042): read as LF.
+    let style = without_css_comments(STYLE).replace("\r\n", "\n");
+    let rule = |selector: &str| {
+        style
+            .split(selector)
+            .nth(1)
+            .and_then(|part| part.split('}').next())
+            .unwrap_or_else(|| panic!("no {selector}"))
+            .to_string()
+    };
+    let trace = rule("\n.trace {");
+    assert!(
+        trace.contains("justify-content: flex-end") && trace.contains("overflow: hidden"),
+        "{trace}"
+    );
+    let bar = rule("\n.trace > i {");
+    assert!(
+        bar.contains("min-height: 4px") && bar.contains("border-radius") && !bar.contains("transition"),
+        "{bar}"
+    );
+    for (track, height) in [
+        ("#small .meter .track {", 14),
+        (".page-meter > .page-level {", 24),
+        (".check-track {", 28),
+    ] {
+        assert!(rule(track).contains(&format!("height: {height}px")), "{track}{}", rule(track));
+    }
+    assert!(
+        style.contains("#level-others > i, .page-level.others > i, .check-source.far .check-track > i { background: var(--ok); }"),
+        "the meeting's bars are green otherwise: say so here"
+    );
+    // The soft bar is gone, with its fill, its tick and its easing.
+    for gone in ["\n.peak {", "\n.falling {", ".check-fill", "color-mix(in srgb, var(--accent) 14%"] {
+        assert!(!style.contains(gone), "{gone}");
+    }
+    assert!(style.contains(
+        "prefers-reduced-motion: reduce) {\n  *, *::before, *::after { animation: none !important; transition: none !important; }"
+    ));
 }
 
 #[test]

@@ -1245,6 +1245,47 @@ const elapsed = (seconds) => {
   return [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60].map((n) => String(n).padStart(2, "0")).join(":");
 };
 
+// A level meter's drawing (#1179, the decider's « B · Trace » of 2026-11-25): the last readings, 0 to 1, as bars, the
+// newest at the right, one bar a reading — read ten times a second, a bar is a tenth of a second, and the
+// trace moves left a bar a reading, as Voice Memos and Otter draw a recording. Who asks for less motion is drawn a
+// level held a second, in three steps — silent, heard, loud —, the same on every bar: nothing scrolls (D69). Pure:
+// tests/meter.rs runs it.
+function levelShown(was, reading, now, still, count) {
+  const percent = Math.round(Math.min(1, Math.max(0, reading)) * 100);
+  if (still) {
+    if (was?.held && now - was.at < 1000) return was;
+    return { bars: Array(count).fill(percent < 20 ? 0 : percent < 75 ? 50 : 90), held: true, at: now };
+  }
+  const before = was && !was.held ? was.bars : Array(count).fill(0);
+  return { bars: [...before.slice(before.length - count + 1), percent], held: false, at: now };
+}
+
+// A meter's track, the meter a screen reader reads, from 0 to 100; its bars drawn in it (`paintLevel`): four seconds
+// of them, a track showing the newest it has room for (the style's `.trace`).
+const TRACE = 40;
+function levelTrack(classes, label) {
+  const track = element("span", `trace ${classes}`);
+  track.setAttribute("role", "meter");
+  track.setAttribute("aria-label", label);
+  track.setAttribute("aria-valuemin", "0");
+  track.setAttribute("aria-valuemax", "100");
+  track.setAttribute("aria-valuenow", "0");
+  track.append(...Array.from({ length: TRACE }, () => document.createElement("i")));
+  return track;
+}
+
+// Draws a reading on a meter's track: its bars, and its value the reading itself.
+const levelsDrawn = new WeakMap();
+const lessMotion = matchMedia("(prefers-reduced-motion: reduce)");
+function paintLevel(track, reading) {
+  drawLevel(track, levelShown(levelsDrawn.get(track), reading, performance.now(), lessMotion.matches, track.children.length), reading);
+}
+function drawLevel(track, shown, reading) {
+  levelsDrawn.set(track, shown);
+  for (const [index, bar] of [...track.children].entries()) bar.style.height = `${shown.bars[index]}%`;
+  track.setAttribute("aria-valuenow", String(Math.round(Math.min(1, Math.max(0, reading)) * 100)));
+}
+
 // The page of the meeting being recorded (#1076): both sides' levels as the bar's meters, and its time,
 // read from what the bar reads ten times a second (`recording_now`). Neither is a live region — a screen
 // reader would say them ten times a second —, a meter's value is read when it is reached, as the bar's.
@@ -1253,37 +1294,38 @@ let pageLive = null;
 // The last reading of the meeting being recorded (#1133): a new drawing of its page starts from it, never from
 // « 00:00:00 » and empty meters until the next reading.
 let pageLast = null;
+// Its meters' tracks, whose traces a new drawing goes on from (#1179).
+let pageTracks = [];
 function pageLevels(name, time, words) {
   const row = element("div", "page-levels");
-  const fills = [words.small_mic, words.small_meeting].map((label, index) => {
+  const tracks = [words.small_mic, words.small_meeting].map((label, index) => {
     // Each side's label right under its own meter (#1112): a label sits with what it names.
     const column = element("div", "page-meter");
-    const track = element("span", "track page-level");
-    track.setAttribute("role", "meter");
-    track.setAttribute("aria-label", label);
-    track.setAttribute("aria-valuemin", "0");
-    track.setAttribute("aria-valuemax", "100");
-    track.setAttribute("aria-valuenow", "0");
-    const fill_ = element("span", index === 0 ? "fill here" : "fill remote");
-    track.append(fill_);
+    const track = levelTrack(index === 0 ? "track page-level" : "track page-level others", label);
     column.append(track, element("span", index === 0 ? "here" : "remote", index === 0 ? words.here_described : words.remote_described));
     row.append(column);
-    return fill_;
+    return track;
   });
   const paint = (now) => {
     time.textContent = elapsed(now.seconds);
-    for (const [index, fill_] of fills.entries()) {
-      const percent = Math.round(now.levels[index] * 100);
-      fill_.style.width = `${percent}%`;
-      fill_.parentElement.setAttribute("aria-valuenow", String(percent));
-    }
+    for (const [index, track] of tracks.entries()) paintLevel(track, now.levels[index]);
   };
-  if (pageLast?.meeting === name) paint(pageLast);
+  // Drawn again, its traces go on from the ones it replaces, never from empty (#1133).
+  if (pageLast?.meeting === name) {
+    time.textContent = elapsed(pageLast.seconds);
+    for (const [index, track] of tracks.entries()) {
+      const was = pageTracks[index] && levelsDrawn.get(pageTracks[index]);
+      if (was) drawLevel(track, was, pageLast.levels[index]);
+      else paintLevel(track, pageLast.levels[index]);
+    }
+  }
+  pageTracks = tracks;
   // The poll ends with the page or the recording, and its reading with it: a meeting deleted frees its name within
   // the minute (capture's `new_folder`), and a recording under that name must not start from this one's.
   const end = () => {
     clearInterval(pageLive);
     pageLast = null;
+    pageTracks = [];
   };
   clearInterval(pageLive);
   pageLive = setInterval(async () => {
@@ -1331,6 +1373,59 @@ function relief(segments, total, words) {
     svg.append(bar);
   }
   return svg;
+}
+
+// A meeting's waveform per voice (#1201, #1179 B), as Descript, Riverside and Voice Memos draw a recording: each
+// voice's loudness (each stretch's RMS, `peaks`), yours above the line and the meeting's below, its bars grouped to the drawing's width and
+// laid over the meeting's `total` as the playhead and a click are; each voice scaled to its own loudest, so that a
+// quiet microphone still shows when it speaks. From the peaks the shell keeps (`peaks_of`); none, who spoke stays
+// drawn from the transcript (`relief`).
+function waveform(peaks, total) {
+  const wave = element("div", "wave");
+  const bins = (peaks.local ?? peaks.remote).length;
+  const most = (values) => (values ? Math.max(1, ...values) : 1);
+  const [here, remote] = [most(peaks.local), most(peaks.remote)];
+  const tip = element("span", "tip");
+  tip.hidden = true;
+  const draw = () => {
+    const width = wave.getBoundingClientRect().width;
+    // Bars of 4 px and gaps of 2 px, as the mock-up; never more than the bins read.
+    const count = Math.max(1, Math.min(bins, Math.floor((width + 2) / 6)));
+    if (!width || wave.querySelectorAll(".col").length === count) return;
+    const columns = [];
+    for (let index = 0; index < count; index++) {
+      const [from, to] = [index, index + 1].map((edge) => ((edge / count) * total * bins) / peaks.seconds);
+      const loud = (values, top) => {
+        if (!values) return 0;
+        const part = values.slice(Math.floor(from), Math.max(Math.floor(from) + 1, Math.ceil(to)));
+        return part.length ? Math.max(...part) / top : 0;
+      };
+      const column = element("span", "col");
+      column.dataset.at = String((index / count) * total);
+      const [up, down] = [element("i", "up"), element("i", "down")];
+      up.style.height = `${Math.max(2, Math.round(loud(peaks.local, here) * 34))}px`;
+      down.style.height = `${Math.max(2, Math.round(loud(peaks.remote, remote) * 34))}px`;
+      column.append(up, down);
+      columns.push(column);
+    }
+    wave.replaceChildren(...columns, tip);
+    wave.played(wave.at ?? 0);
+  };
+  // What was played, whole: called as the playhead moves.
+  wave.played = (time) => {
+    wave.at = time;
+    for (const column of wave.querySelectorAll(".col")) column.classList.toggle("played", Number(column.dataset.at) < time);
+  };
+  wave.addEventListener("pointermove", (event) => {
+    const box = wave.getBoundingClientRect();
+    const x = Math.min(Math.max(0, event.clientX - box.left), box.width);
+    tip.style.left = `${x}px`;
+    tip.textContent = clock((x / box.width) * total);
+    tip.hidden = false;
+  });
+  wave.addEventListener("pointerleave", () => (tip.hidden = true));
+  new ResizeObserver(() => requestAnimationFrame(draw)).observe(wave);
+  return wave;
 }
 
 // A provider's host, as a model's line names it: `https://openrouter.ai/api/v1` is openrouter.ai.
@@ -2076,10 +2171,147 @@ function minutesCard(read, words, session, transcript, onPage, previous) {
   // The minutes as written, rendered by the shell: raw HTML in them is text there, a link its words.
   const body = element("div", "body");
   body.innerHTML = read.body;
-  actionRows(body, words, read.actions);
+  const mentioned = actionRows(body, words, read.actions);
   lineTimes(body, session, transcript, words);
   card.append(body);
+  datesOffer(card, mentioned, session, transcript, words);
   return card;
+}
+
+// « Dates mentionnées » (D115): the dates the actions' by when name, read by the shell against the meeting's day,
+// offered to the user's calendar. Offered only when one names a date. Nothing is ticked, and nothing leaves this
+// computer before an item is ticked and a destination chosen; a confidential meeting is offered no link (PDR-0007).
+// Granola, Otter and Fireflies list actions and leave their dates as words; Gmail and Apple Mail detect a date
+// in a message and offer to make an event of it, one at a time: here the same, the date said in full, its passage
+// beside it, the user choosing.
+function datesOffer(card, mentioned, session, transcript, words) {
+  if (mentioned.length === 0) return;
+  const button = element("button", "open", words.dates_open);
+  button.type = "button";
+  button.id = "dates-open";
+  button.hidden = true;
+  card.append(button);
+  window.__TAURI__.core
+    .invoke("dates_resolved", { name: nameOf(session), whens: mentioned.map((m) => m.when), day: null })
+    .then((resolved) => (button.hidden = !resolved?.dates.some(Boolean)))
+    .catch(() => {});
+  button.addEventListener("click", () => datesPanel(mentioned, session, transcript, words, button));
+}
+
+// What was said where an action was set: the segments from its second, two at most.
+function passageAt(transcript, second) {
+  if (second === null || transcript.state !== "present") return null;
+  const said = transcript.segments.filter((s) => s.end > second).slice(0, 2).map((s) => s.text.trim());
+  return said.length ? said.join("\n") : null;
+}
+
+function datesPanel(mentioned, session, transcript, words, back) {
+  const name = nameOf(session);
+  const dialog = element("dialog", "check-sound dates");
+  dialog.id = "dates";
+  dialog.setAttribute("aria-labelledby", "dates-title");
+  const head = element("div", "check-head");
+  const title = element("h2", "", words.dates_open);
+  title.id = "dates-title";
+  const close = iconButton("x", words.check_close, "dates-close");
+  head.append(title, close);
+  const day = element("input");
+  day.type = "date";
+  day.id = "dates-day";
+  const dayLabel = element("label", "dates-day", words.dates_day);
+  dayLabel.htmlFor = "dates-day";
+  const list = element("ul", "dates-list");
+  list.id = "dates-list";
+  const google = element("button", "primary", words.dates_google);
+  google.type = "button";
+  google.id = "dates-google";
+  google.disabled = true;
+  // Read when it opens: the switch may have changed since the page was drawn; the shell refuses it anyway.
+  google.hidden = document.getElementById("confidential-switch")?.checked === true;
+  const ics = element("button", "open", words.dates_ics);
+  ics.type = "button";
+  ics.id = "dates-ics";
+  ics.disabled = true;
+  const saved = element("p", "note");
+  saved.id = "dates-saved";
+  saved.setAttribute("role", "status");
+  const said = element("p", "note warn");
+  said.id = "dates-said";
+  said.setAttribute("role", "status");
+  said.hidden = true;
+  const goes = element("div", "dates-goes");
+  goes.append(ics, google);
+  dayLabel.append(day);
+  dialog.append(head, element("p", "note", words.dates_says), dayLabel, list, goes, saved, said);
+  const full = new Intl.DateTimeFormat(document.documentElement.lang, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  let shown = [];
+  const ticked = () => shown.filter((item) => item.box.checked);
+  const draw = async (asked) => {
+    const resolved = await window.__TAURI__.core.invoke("dates_resolved", { name, whens: mentioned.map((m) => m.when), day: asked }).catch(() => null);
+    if (!resolved) return;
+    day.value = resolved.day;
+    shown = [];
+    list.replaceChildren();
+    for (const [index, date] of resolved.dates.entries()) {
+      if (!date) continue;
+      const action = mentioned[index];
+      const item = element("li", "dates-item");
+      const box = element("input");
+      box.type = "checkbox";
+      box.addEventListener("change", () => (google.disabled = ics.disabled = ticked().length === 0));
+      const words_ = element("label", "dates-what");
+      const when = element("span", "dates-when", full.format(new Date(`${date}T00:00:00Z`)));
+      words_.append(box, when, element("span", "", action.who ? `${action.what} — ${action.who}` : action.what));
+      const passage = passageAt(transcript, action.second);
+      item.append(words_);
+      if (passage) item.append(element("blockquote", "dates-passage", passage));
+      list.append(item);
+      shown.push({ box, date, action, passage });
+    }
+    google.disabled = ics.disabled = true;
+  };
+  day.addEventListener("change", () => day.value && draw(day.value));
+  ics.addEventListener("click", async () => {
+    said.hidden = true;
+    saved.textContent = "";
+    const to = await window.__TAURI__.core.invoke("dates_file_chosen", { name }).catch(() => null);
+    if (!to) return;
+    const dates = ticked().map(({ date, action, passage }) => ({ id: `a${action.place}`, date, what: action.what, who: action.who, passage }));
+    try {
+      await window.__TAURI__.core.invoke("dates_ics", { name, to, dates });
+      saved.textContent = fill(words.dates_saved, to.split(/[\\/]/).pop());
+    } catch (why) {
+      said.textContent = fill(words.not_saved, why);
+      said.hidden = false;
+    }
+  });
+  google.addEventListener("click", async () => {
+    said.hidden = true;
+    const meeting = document.querySelector("#meeting h1")?.textContent ?? name;
+    for (const { date, action, passage } of ticked()) {
+      const item = { date, what: action.what, who: action.who, passage, meeting };
+      try {
+        await window.__TAURI__.core.invoke("date_google", { name, item });
+      } catch (why) {
+        said.textContent = why;
+        said.hidden = false;
+        return;
+      }
+    }
+  });
+  const end = () => {
+    dialog.close();
+    dialog.remove();
+    back.focus();
+  };
+  close.addEventListener("click", end);
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    end();
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+  draw(null);
 }
 
 // A line's time (D75), the shell's own mark: a small link that opens its passage and plays from that
@@ -2133,11 +2365,13 @@ function lineTimes(body, session, transcript, words) {
 function actionRows(body, words, at) {
   // Every second-level title, as the shell's reader counts them.
   const titles = body.querySelectorAll("h2");
-  if (!at || titles.length < at) return;
+  // Each row split in three whose by when is said, for « Dates mentionnées » (D115).
+  const mentioned = [];
+  if (!at || titles.length < at) return mentioned;
   const next = titles[at] ?? null;
   let list = titles[at - 1].nextElementSibling;
   while (list && list !== next && !["UL", "OL"].includes(list.tagName)) list = list.nextElementSibling;
-  if (!list || list === next) return;
+  if (!list || list === next) return mentioned;
   const table = element("table", "actions");
   const head = element("thead");
   const named = element("tr");
@@ -2153,6 +2387,8 @@ function actionRows(body, words, at) {
     const row = element("tr");
     if (parts.length === 3 && parts.every((part) => part !== "")) {
       const [what, who, when] = parts;
+      // `place`, the action's row in the minutes from one: the `.ics`'s UID keeps it (D115).
+      if (!unsettled(when)) mentioned.push({ what, who: unsettled(who) ? null : who, when, second: time ? Number(time.dataset.second) : null, place: rows.children.length + 1 });
       for (const [text, kind] of [[who, "who"], [what, "what"], [when, "when"]]) {
         // Short, on one line; long, back to the line between words, never pushing the card wider.
         const long = kind !== "what" && text.length > 18 ? " long" : "";
@@ -2171,6 +2407,7 @@ function actionRows(body, words, at) {
   }
   table.append(head, rows);
   list.replaceWith(table);
+  return mentioned;
 }
 
 const folded = (text) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -2598,6 +2835,7 @@ function playerBar(session, listened, total, words, drawing) {
     if (toggle.textContent !== said) toggle.textContent = said;
     at.textContent = clock(time);
     head.style.left = `${Math.min(100, (time / total) * 100)}%`;
+    drawing.querySelector(".wave")?.played(time);
     drawing.setAttribute("aria-valuemax", String(Number(span().toFixed(1))));
     drawing.setAttribute("aria-valuenow", String(Number(time.toFixed(1))));
     drawing.setAttribute("aria-valuetext", `${clock(time)} / ${clock(span())}`);
@@ -2809,7 +3047,19 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     const now = element("div", "live-now");
     now.append(time, pageLevels(nameOf(session), time, words));
     drawing.append(now);
-  } else if (transcript.state === "present") drawing.append(relief(said, total, words));
+  } else if (transcript.state === "present") {
+    drawing.append(relief(said, total, words));
+    // Its sound's own shape once the shell has read it (#1201): who spoke, from the transcript, until then — and for
+    // good when no track reads.
+    if (session.audio > 0)
+      window.__TAURI__.core
+        .invoke("peaks_of", { name: nameOf(session) })
+        .then((peaks) => {
+          const turns = drawing.querySelector(".relief");
+          if (peaks && turns?.isConnected) turns.replaceWith(waveform(peaks, total));
+        })
+        .catch(() => {});
+  }
   else {
     // No transcript yet (#1116, the decider): one line says when who spoke will appear, no blank canvas. Outside the
     // drawing (#1134), which is the player's slider once the sound plays: a slider's children are presentational
@@ -4396,21 +4646,13 @@ async function checkSound(words, back, lost) {
     const device = element("span", "check-device", "");
     device.id = `check-device-${id}`;
     top.append(icon(glyph), element("span", "check-name", name), device);
-    const track = element("div", "check-track");
-    const fill = element("span", "check-fill");
-    fill.id = `check-level-${id}`;
-    track.append(fill);
-    // A meter a screen reader reads as one, from 0 to 100.
-    track.setAttribute("role", "meter");
-    track.setAttribute("aria-label", name);
-    track.setAttribute("aria-valuemin", "0");
-    track.setAttribute("aria-valuemax", "100");
-    track.setAttribute("aria-valuenow", "0");
+    const track = levelTrack("check-track", name);
+    track.id = `check-level-${id}`;
     source.append(top, track);
-    return [source, device, fill, track];
+    return [source, device, track];
   };
-  const [me, meDevice, meFill, meTrack] = side("mic", words.small_mic, "me", "near");
-  const [others, othersDevice, othersFill, othersTrack] = side("volume-2", words.small_meeting, "others", "far");
+  const [me, meDevice, meFill] = side("mic", words.small_mic, "me", "near");
+  const [others, othersDevice, othersFill] = side("volume-2", words.small_meeting, "others", "far");
   const said = (glyph, id, kind) => {
     const line = element("p", `check-said ${kind}`);
     line.id = id;
@@ -4497,10 +4739,9 @@ async function checkSound(words, back, lost) {
   const paint = ({ open, heard: listened, call: held }) => {
     // Its listening ended by the shell — a recording started elsewhere, the panel given up —: it goes.
     if (!open) return end();
-    for (const [index, device, fill, track] of [[0, meDevice, meFill, meTrack], [1, othersDevice, othersFill, othersTrack]]) {
+    for (const [index, device, fill] of [[0, meDevice, meFill], [1, othersDevice, othersFill]]) {
       device.textContent = listened.unavailable[index] ? words.check_unavailable : listened.devices[index] ?? "";
-      fill.style.width = `${Math.round(listened.levels[index] * 100)}%`;
-      track.setAttribute("aria-valuenow", String(Math.round(listened.levels[index] * 100)));
+      paintLevel(fill, listened.levels[index]);
     }
     // A call holds the microphone: its sentence alone — the headset stays in its call profile after.
     bluetooth.hidden = !listened.headset || held;
@@ -4973,14 +5214,8 @@ function showSmall(words) {
   const meter = (label, id, device, glyphs, says) => {
     const row = element("span", "meter");
     row.append(icon(glyphs[0]));
-    const bar = element("span", "track");
-    bar.setAttribute("role", "meter");
-    bar.setAttribute("aria-label", label);
-    bar.setAttribute("aria-valuemin", "0");
-    bar.setAttribute("aria-valuemax", "100");
-    const fill_ = element("span", "fill");
-    fill_.id = id;
-    bar.append(fill_);
+    const bar = levelTrack("track", label);
+    bar.id = id;
     const named = element("span", "device unseen");
     named.id = device;
     row.append(bar, named);
@@ -5232,6 +5467,8 @@ function showSmall(words) {
       field.painted();
       rest.hidden = recording;
       live.hidden = !recording;
+      // A recording starts its traces from empty, never from the last one's last two seconds.
+      if (recording) for (const id of ["level-me", "level-others"]) drawLevel(document.getElementById(id), levelShown(undefined, 0, 0, false, TRACE), 0);
       // The microphone in each state's options: recording, after the context, as board 6 has it.
       if (recording) opened.after(microphone);
       else rest.prepend(microphone);
@@ -5260,12 +5497,7 @@ function showSmall(words) {
     if (micNext.textContent !== recorded) micNext.textContent = recorded;
     const whole = Math.floor(now.seconds);
     time.textContent = [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60].map((n) => String(n).padStart(2, "0")).join(":");
-    for (const [index, id] of ["level-me", "level-others"].entries()) {
-      const percent = Math.round(now.levels[index] * 100);
-      const fill_ = document.getElementById(id);
-      fill_.style.width = `${percent}%`;
-      fill_.parentElement.setAttribute("aria-valuenow", String(percent));
-    }
+    for (const [index, id] of ["level-me", "level-others"].entries()) paintLevel(document.getElementById(id), now.levels[index]);
     // Written when it changes alone: a tick that rewrites text under a click loses it in WebKitGTK.
     for (const [index, check] of checks.entries()) {
       const device = now.devices[index] ?? "";

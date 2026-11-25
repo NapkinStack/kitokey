@@ -8,6 +8,7 @@ Prints one line per check, `ok` or `FAIL`, and exits 1 on any failure.
 
 from __future__ import annotations
 
+import array
 import contextlib
 import datetime as dt
 import hashlib
@@ -145,6 +146,10 @@ sys.exit(1)
 """
 )
 SENDER.chmod(0o755)
+# The system's browser stood in (D115): it writes down the address it is handed and opens nothing.
+BROWSER = WORK / "browser"
+BROWSER.write_text('#!/bin/sh\nprintf \'%s\\n\' "$1" >> "$(dirname "$0")/browsed.txt"\n')
+BROWSER.chmod(0o755)
 HEARING = WORK / "kitokey-transcription"
 HEARING.write_text(
     """#!/bin/sh
@@ -548,6 +553,20 @@ def descendants(pid: int) -> list[int]:
     return found
 
 
+def window_cpu(window: "Window") -> float:
+    """The CPU seconds the window has spent so far: its shell and its WebKit processes, read in /proc — never the
+    driver nor a stand-in it starts (#1179: a meter's cost, measured)."""
+    spent = 0
+    for pid in descendants(window.driver_process.pid):
+        with contextlib.suppress(OSError, IndexError, ValueError):
+            stat = Path(f"/proc/{pid}/stat").read_text()
+            name = stat.split("(", 1)[1].rsplit(")", 1)[0]
+            if name == "kitokey" or name.startswith(("WebKitWebProces", "WebKitNetworkPr")):
+                fields = stat.rsplit(")", 1)[1].split()
+                spent += int(fields[11]) + int(fields[12])
+    return spent / os.sysconf("SC_CLK_TCK")
+
+
 def listening(pids: list[int], port: int) -> bool:
     """Whether one of these processes is the one listening on 127.0.0.1:`port`: its socket, read in
     /proc, not whoever answers there (#943)."""
@@ -694,7 +713,7 @@ class Window:
         self.file.write_text(f'sessions = "{sessions}"\n{opened}{greeted}{more}')
         self.env = dict(os.environ, XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
         # An Ollama and a keyring of the scenario's, never the user's own.
-        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_EXPORT=str(EXPORTER), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER))
+        self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_EXPORT=str(EXPORTER), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER), KITOKEY_BROWSER=str(BROWSER))
 
     def __enter__(self) -> webdriver.Remote:
         # One Kitokey per session: one still leaving takes this start's arguments and this one
@@ -4234,14 +4253,19 @@ def heard_checked(now: dt.datetime) -> None:
                 browser.find_element(By.ID, "small-record").click()
                 wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
                 got = browser.execute_script(meters)
-                check("a thin meter per side in the row: its icon, a 4 px track, named by its side", got == [[True, 4, me], [True, 4, others]], got)
+                check("a thin meter per side in the row: its icon, a 14 px trace (#1179), named by its side", got == [[True, 14, me], [True, 14, others]], got)
                 check("at silence, nothing said, the bar its row alone", browser.execute_script(said) == ["", ""]
                       and wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44, 3), [browser.execute_script(said), browser.execute_script("return innerHeight")])
                 before = browser.execute_script(place)
                 fit(browser, "listening")
                 (taping / "hush").unlink()
-                rose = wait_for(browser, lambda b: b.execute_script("return parseFloat(document.getElementById('level-others').style.width)") > 0, 3)
+                rose = wait_for(browser, lambda b: b.execute_script("return parseFloat(document.getElementById('level-others').lastElementChild.style.height)") > 0, 3)
                 check("levels risen: the meters move", rose)
+                if short == "fr" and theme == "light":
+                    # #1179: what the meters cost, read ten times a second — the window's CPU over five seconds of recording.
+                    spent = window_cpu(window)
+                    time.sleep(5)
+                    print(f"    measured: the window while recording, its meters at 10 Hz: {(window_cpu(window) - spent) / 5 * 100:.1f} % of one core")
                 # Capture's word after ten seconds: the microphone that sends nothing said at once; the meeting's silence not yet.
                 (taping / "nothing-me").touch()
                 (taping / "silent-others").touch()
@@ -4290,6 +4314,11 @@ def heard_checked(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, ".bar-lines .check-says") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
         time.sleep(1)
         check("less motion asked: nothing in the recording moves", browser.execute_script(MOVING) == [], browser.execute_script(MOVING))
+        # #1179: no trace scrolls; each meter a level held, in three steps, the same on every bar.
+        held = "return ['level-me', 'level-others'].map((id) => [...document.getElementById(id).children].map((i) => i.style.height))"
+        seen = [browser.execute_script(held) for _ in range(8) if time.sleep(0.15) is None]
+        check("less motion asked: no trace scrolls, each meter a level held in three steps, the same on every bar (#1179)",
+              all(len(set(bars)) == 1 and bars[0] in ("0%", "50%", "90%") for meters in seen for bars in meters), seen)
         stop_from_small(browser)
 
 
@@ -4618,7 +4647,7 @@ def sound_checked(now: dt.datetime) -> None:
                          capture_output=True, text=True).stdout.strip()
     flag = lambda name: WORK / f"listen-{name}"
     panel = ("const d = document.getElementById('check-sound'); if (!d) return null; const t = (id) => document.getElementById(id).textContent;"
-             " const w = (id) => document.getElementById(id).style.width;"
+             " const w = (id) => document.getElementById(id).lastElementChild.style.height;"
              " return {open: d.open, title: t('check-sound-title'), me: t('check-device-me'), others: t('check-device-others'),"
              " levels: [w('check-level-me'), w('check-level-others')], play: document.getElementById('check-play').disabled,"
              " active: d.contains(document.activeElement), shown: ['check-bluetooth', 'check-call', 'check-heard', 'check-missed', 'check-failed']"
@@ -5454,6 +5483,121 @@ def summary_sent(now: dt.datetime) -> None:
         check("and offers no send any more", wait_for(browser, lambda b: not b.execute_script(offered), 5), browser.execute_script(offered))
     logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and secret in f.read_text(errors="ignore")]
     check("the address in no log nor state file of Kitokey (ADR-0007, PDR-0007 §1)", logged == [], logged)
+
+
+def waveform_drawn(now: dt.datetime) -> None:
+    """CO. #1201 (#1179 B, the decider's « forme d'onde par voix »): a meeting's player drawn as each voice's
+    loudness — yours above the line, the meeting's below —, read by the shell from its tracks and kept in the
+    session's derived/ (session-audio v2 and v3), never in a v1 session's folder. It takes the turns' place without
+    moving the page; what was played is drawn whole, what remains at 0.7; the pointer is told the time it is over;
+    no track that reads, the turns stay. In French."""
+    print("CO. a meeting's player as a waveform per voice, read once and kept in derived/, the turns kept when no track reads (#1201)")
+    rate = 16_000
+
+    def tone(path: Path, level: float, on) -> None:
+        frames = bytearray()
+        for frame in range(60 * rate):
+            t = frame / rate
+            value = (level if (frame // 40) % 2 == 0 else -level) if on(t) else 0.0
+            frames += struct.pack("<h", int(value * 32767))
+        with wave.open(str(path), "wb") as made:
+            made.setnchannels(1)
+            made.setsampwidth(2)
+            made.setframerate(rate)
+            made.writeframes(bytes(frames))
+
+    def meeting(folder: Path, form: str, readable: bool) -> None:
+        session(folder, now - dt.timedelta(days=1), 1, {}, form)
+        names = ("me.wav", "others.wav") if form == "v1" else ("local.wav", "remote.wav")
+        if readable:
+            tone(folder / names[0], 0.5, lambda t: t < 30)
+            tone(folder / names[1], 0.25, lambda t: t >= 30)
+        else:
+            for name in names:
+                (folder / name).write_bytes(b"RIFF not a wave" + bytes(4096))
+        if form != "v1":
+            record = json.loads((folder / "session.json").read_text())
+            record["tracks"] = {"local": {"device": "Mic"}, "remote": {"device": "Speaker"}}
+            (folder / "session.json").write_text(json.dumps(record))
+            (folder / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n{"track":"remote","sample":0,"at":0.0}\n')
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.0,"end":30.0,"text":"Bonjour à tous."}\n'
+            '{"type":"segment","speaker":"others","track":"remote","voice":null,"start":30.0,"end":60.0,"text":"Bonjour."}\n'
+            '{"type":"complete","duration":60.0}\n')
+
+    meetings = WORK / "waveform"
+    v3, v1, unread = (meetings / name for name in ("2026-11-21_09-00", "2026-11-21_10-00", "2026-11-21_11-00"))
+    meeting(v3, "v3", True)
+    meeting(v1, "v1", True)
+    meeting(unread, "v3", False)
+    drawn = ("const w = document.querySelector('#meeting .drawing .wave'); if (!w) return null;"
+             " const cols = [...w.querySelectorAll('.col')], h = (c, s) => c.querySelector('i.' + s).getBoundingClientRect().height;"
+             " return {width: w.getBoundingClientRect().width, count: cols.length, up: cols.map(c => h(c, 'up')), down: cols.map(c => h(c, 'down')),"
+             " played: cols.filter(c => c.classList.contains('played')).length,"
+             " opacity: cols.length ? [getComputedStyle(cols[0].querySelector('i')).opacity, getComputedStyle(cols[cols.length - 1].querySelector('i')).opacity] : [],"
+             " turns: document.querySelectorAll('#meeting .drawing .relief').length, height: document.querySelector('#meeting .drawing').getBoundingClientRect().height}")
+    with Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n') as browser:
+        browser.set_window_size(1100, 800)
+
+        def page(folder: Path):
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{folder.name}")
+            wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .drawing"), 10)
+
+        page(unread)
+        time.sleep(3)
+        turns = browser.execute_script("return [document.querySelectorAll('#meeting .drawing .relief rect').length, document.querySelectorAll('#meeting .drawing .wave').length]")
+        check("no track that reads: who spoke stays drawn from the transcript, no waveform (#1201)", turns[0] == 2 and turns[1] == 0, turns)
+        check("and nothing kept for it", not (unread / "derived").exists(), sorted(p.name for p in unread.iterdir()))
+        page(v3)
+        # Its columns drawn at its first frame, once its width is known: waited for, not only its box.
+        came = wait_for(browser, lambda b: (b.execute_script(drawn) or {}).get("count", 0) > 0, 15)
+        got = browser.execute_script(drawn) or {}
+        check("its tracks read: the waveform takes the turns' place, its bars grouped to its width (#1201)",
+              came and got.get("turns") == 0 and got["count"] == min(600, int((got["width"] + 2) // 6)) and got["count"] > 50, {k: got.get(k) for k in ("turns", "count", "width")})
+        half = got.get("count", 0) // 2
+        up, down = got.get("up", []), got.get("down", [])
+        check("you above the line where you speak, the meeting below where it does; a voice silent a 2 px stub (#1201)",
+              up and min(up[:half - 1]) >= 30 and max(up[half + 1:]) <= 2.5 and max(down[:half - 1]) <= 2.5 and min(down[half + 1:]) >= 30,
+              [up[:3], up[-3:], down[:3], down[-3:]])
+        check("the drawing keeps the turns' height: nothing on the page moves when it comes", got.get("height") == 88, got.get("height"))
+        kept = v3 / "derived" / "peaks.json"
+        check("its peaks kept in the session's derived/ (session-audio/v3)", kept.is_file(), sorted(p.name for p in v3.iterdir()))
+        before = kept.stat().st_mtime_ns if kept.is_file() else None
+        # The slider, by keyboard: Home, then 30 s on; then the end.
+        browser.execute_script("document.querySelector('#meeting .drawing').focus()")
+        ActionChains(browser).send_keys(Keys.HOME).perform()
+        time.sleep(0.5)
+        start = browser.execute_script(drawn)
+        ActionChains(browser).send_keys(Keys.PAGE_UP).perform()
+        wait_for(browser, lambda b: (b.execute_script(drawn) or {}).get("played", 0) > 0, 5)
+        middle = browser.execute_script(drawn)
+        check("what was played drawn whole, what remains at 0.7: at 0 none, at 30 s half of it (#1201)",
+              start["played"] == 0 and abs(middle["played"] - middle["count"] / 2) <= 1 and middle["opacity"] == ["1", "0.7"],
+              [start["played"], middle["played"], middle["count"], middle["opacity"]])
+        # The pointer over a quarter of it is told 00:15.
+        box = browser.execute_script("const r = document.querySelector('#meeting .drawing .wave').getBoundingClientRect(); return [r.width, r.height]")
+        ActionChains(browser).move_to_element_with_offset(browser.find_element(By.CSS_SELECTOR, "#meeting .drawing .wave"), int(-box[0] / 4), 0).perform()
+        told = wait_for(browser, lambda b: b.execute_script("const t = document.querySelector('#meeting .wave .tip'); return t && !t.hidden ? t.textContent : null"), 3)
+        tip = browser.execute_script("const t = document.querySelector('#meeting .wave .tip'); return t && !t.hidden ? t.textContent : null")
+        check("the pointer over a quarter of it is told the time there, 00:15 (#1201)", bool(told) and tip in ("00:14", "00:15", "00:16"), tip)
+        for width in (1100, 420):
+            browser.set_window_size(width, 800)
+            time.sleep(0.6)
+            browser.execute_script("document.querySelector('#meeting .drawing').scrollIntoView({block: 'center'})")
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"co-waveform-{width}-{theme}", theme)
+        browser.set_window_size(1100, 800)
+        page(v1)
+        waved = wait_for(browser, lambda b: (b.execute_script(drawn) or {}).get("count", 0) > 0, 15)
+        check("a v1 session drawn too, and nothing written in its folder: version 1 names no derived/ (#1201)",
+              waved and not (v1 / "derived").exists(), sorted(p.name for p in v1.iterdir()))
+        page(v3)
+        wait_for(browser, lambda b: b.execute_script(drawn), 15)
+        check("opened again, its peaks read from derived/, not written again", kept.is_file() and kept.stat().st_mtime_ns == before,
+              [before, kept.stat().st_mtime_ns if kept.is_file() else None])
+
 
 def destinations_kept(now: dt.datetime) -> None:
     """CK. D110, PDR-0007 §1 and §6: Settings keeps the destinations a summary can be sent to — a kind, a
@@ -8819,12 +8963,14 @@ def renaming(now: dt.datetime) -> None:
         redrawn = ("const done = arguments[arguments.length - 1], old = document.getElementById('page-time');"
                    " const seen = new MutationObserver(() => { const t = document.getElementById('page-time');"
                    " if (t && t !== old) { seen.disconnect(); done({time: t.textContent,"
-                   " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow')))}); } });"
+                   " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow'))),"
+                   " bars: [...document.querySelectorAll('#meeting .page-level')].map(e => [...e.children].filter(i => parseFloat(i.style.height) > 0).length)}); } });"
                    " seen.observe(document.body, {childList: true, subtree: true}); refresh();"
                    " setTimeout(() => { seen.disconnect(); done(null); }, 4000);")
         drawn_again = browser.execute_async_script(redrawn)
-        check("while it records, drawn again: the page starts from its last reading, never « 00:00:00 » nor an empty meter (#1133)",
-              bool(drawn_again) and drawn_again["time"] != "00:00:00" and len(drawn_again["meters"]) == 2 and all(m > 0 for m in drawn_again["meters"]),
+        check("while it records, drawn again: the page starts from its last reading, never « 00:00:00 » nor an empty meter (#1133), its traces going on (#1179)",
+              bool(drawn_again) and drawn_again["time"] != "00:00:00" and len(drawn_again["meters"]) == 2 and all(m > 0 for m in drawn_again["meters"])
+              and all(b > 1 for b in drawn_again["bars"]),
               drawn_again)
         # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
         # left at the legend's right, where the range stands at rest.
@@ -8950,6 +9096,113 @@ def renaming(now: dt.datetime) -> None:
         drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and at_rest(b), 5)
         check("stopped from elsewhere, the window's button not pressed: the page draws its rest back by itself (#1076, #1134)", drawn_back,
               [again, live_again, browser.execute_script(alive), browser.execute_script(resting)])
+
+
+def dates_mentioned(now: dt.datetime) -> None:
+    """CM. « Dates mentionnées » (D115): each action's by when read against the meeting's day; ticked, to Google Calendar."""
+    print("CM. « Dates mentionnées »: the dates an action names, in full, its passage beside it, nothing ticked; the day changed, read again; "
+          "nothing leaves before a tick and a destination; none offered without a date; no link for a confidential meeting (D115)")
+    meetings = WORK / "dating"
+    # Tuesday 24 November 2026, started at 23:30 local time: its day is the 24th, whatever UTC says.
+    folder = meetings / "2026-11-24_23-30"
+    session(folder, now - dt.timedelta(days=1), 20, {"local.wav": 1000})
+    (folder / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":3.0,"text":"Bonjour."}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":4.0,"end":7.0,"text":"Inès, tu envoies le devis jeudi ?"}\n'
+        '{"type":"segment","speaker":"others","track":"remote","start":7.0,"end":9.0,"text":"Oui, jeudi."}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":10.0,"end":13.0,"text":"Marc rappelle Jiří le 12 décembre."}\n'
+        '{"type":"complete","duration":20.0}\n')
+    (folder / "minutes.md").write_text(
+        "---\ncontract: minutes/v3\nmade: 2026-11-24T23:55:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+        "## 1.\n\nLe devis part.\n\n## 2.\n\n- Envoyer le devis — Inès — jeudi [00:04]\n- Réserver la salle — non précisé — fin du mois\n"
+        "- Rappeler Jiří — Marc — 12 décembre [00:10]\n\n## 3.\n\n- Rien\n")
+    none = meetings / "2026-11-23_10-00"
+    session(none, now - dt.timedelta(days=2), 10, {"local.wav": 1000})
+    (none / "transcript.jsonl").write_text((folder / "transcript.jsonl").read_text())
+    (none / "minutes.md").write_text(
+        "---\ncontract: minutes/v1\nmade: 2026-11-23T11:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+        "## 1.\n\nRien.\n\n## 2.\n\n- Réserver la salle — Paul — bientôt\n\n## 3.\n\n- Rien\n")
+    browsed = WORK / "browsed.txt"
+    browsed.unlink(missing_ok=True)
+    panel = ("const d = document.getElementById('dates'); if (!d || !d.open) return null;"
+             " return {day: document.getElementById('dates-day').value, text: d.textContent,"
+             " items: [...d.querySelectorAll('.dates-item')].map(i => [i.querySelector('.dates-when').textContent,"
+             " i.querySelector('.dates-what').textContent.replace(i.querySelector('.dates-when').textContent, ''),"
+             " i.querySelector('.dates-passage')?.textContent ?? null, i.querySelector('input').checked]),"
+             " google: [document.getElementById('dates-google').hidden, document.getElementById('dates-google').disabled]}")
+    offered = "const b = document.getElementById('dates-open'); return b ? !b.hidden : false"
+    for language, opens, thursday, december, later in (
+        ("fr_FR.UTF-8", "Dates mentionnées", "jeudi 26 novembre 2026", "samedi 12 décembre 2026", "jeudi 3 décembre 2026"),
+        ("en_US.UTF-8", "Dates mentioned", "Thursday, November 26, 2026", "Saturday, December 12, 2026", "Thursday, December 3, 2026"),
+    ):
+        browsed.unlink(missing_ok=True)
+        (folder / "confidential").unlink(missing_ok=True)
+        with Window(meetings, language, "reminder = false\n") as browser:
+            browser.set_window_size(1100, 800)
+            browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+            shown = wait_for(browser, lambda b: b.execute_script(offered), 10)
+            check(f"{language}: offered under the actions, « {opens} »", shown and browser.find_element(By.ID, "dates-open").text == opens,
+                  browser.execute_script("return document.getElementById('dates-open')?.outerHTML"))
+            press(browser, "dates-open")
+            wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("items"), 5)
+            got = browser.execute_script(panel)
+            check(f"{language}: each date in full, the action's words, its passage; the month's end not offered; nothing ticked; "
+                  "the meeting's day shown, the 24th though it started at 23:30; no « échéance »",
+                  got["day"] == "2026-11-24" and got["items"] == [[thursday, "Envoyer le devis — Inès", "Inès, tu envoies le devis jeudi ?\nOui, jeudi.", False],
+                                                                  [december, "Rappeler Jiří — Marc", "Marc rappelle Jiří le 12 décembre.", False]]
+                  and "échéance" not in got["text"].lower() and got["google"] == [False, True], got)
+            browser.execute_script("const d = document.getElementById('dates-day'); d.value = '2026-11-27'; d.dispatchEvent(new Event('change'))")
+            moved = wait_for(browser, lambda b: ((b.execute_script(panel) or {}).get("items") or [[None]])[0][0] == later, 5)
+            check(f"{language}: the day changed to Friday the 27th, read again: « jeudi » the next Thursday", moved, browser.execute_script(panel))
+            check(f"{language}: nothing handed to the browser before a tick and a destination", not browsed.exists(), browsed.exists())
+            browser.execute_script("document.querySelector('#dates .dates-item input').click()")
+            press(browser, "dates-google")
+            handed = wait_for(browser, lambda b: browsed.exists() and browsed.read_text().strip() != "", 5)
+            address = browsed.read_text().strip() if browsed.exists() else ""
+            check(f"{language}: the ticked date alone handed to the browser: Google Calendar's screen, all day from the 3rd to the 4th",
+                  handed and address.count("\n") == 0 and address.startswith("https://calendar.google.com/calendar/render?action=TEMPLATE&text=Envoyer%20le%20devis%20%E2%80%94%20In%C3%A8s&dates=20261203/20261204&details="), address)
+            # The same tick saved as an .ics (D117's writer): the dialog stood in, the program given the ticked date alone.
+            ics = WORK / f"dates-{language[:2]}.ics"
+            ics.unlink(missing_ok=True)
+            for kept in ("export-args", "export-input"):
+                (WORK / kept).unlink(missing_ok=True)
+            browser.execute_script(
+                "const real = window.__TAURI__.core; window.__TAURI__.core = {...real, invoke: (asked, ...rest) =>"
+                " asked === 'dates_file_chosen' ? Promise.resolve(arguments[0]) : real.invoke(asked, ...rest)}", str(ics))
+            press(browser, "dates-ics")
+            written = wait_for(browser, lambda b: ics.is_file() and b.execute_script("return document.getElementById('dates-saved').textContent") != "", 10)
+            given = json.loads((WORK / "export-input").read_text()) if (WORK / "export-input").is_file() else {}
+            args = (WORK / "export-args").read_text().split() if (WORK / "export-args").is_file() else []
+            check(f"{language}: saved as an .ics: kitokey-export asked for ics, the ticked date alone on its input, its id the action's row, said done",
+                  written and args[1:5] == ["--format", "ics", "--lang", language[:2]]
+                  and given.get("dates") == [{"id": "a1", "date": "2026-12-03", "what": "Envoyer le devis", "who": "Inès",
+                                              "passage": "Inès, tu envoies le devis jeudi ?\nOui, jeudi."}]
+                  and ics.name in browser.execute_script("return document.getElementById('dates-saved').textContent"),
+                  [written, args, given.get("dates"), browser.execute_script("return document.getElementById('dates-saved').textContent")])
+            press(browser, "dates-close")
+            wait_for(browser, lambda b: b.execute_script("return !document.getElementById('dates')"), 5)
+            # A meeting whose actions name no date: nothing offered.
+            browser.execute_script(f"location.hash = '#/meeting/{none.name}'")
+            wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .minutes table.actions"), 10)
+            time.sleep(0.5)
+            check(f"{language}: no date named, « {opens} » not offered", not browser.execute_script(offered), browser.execute_script(offered))
+            # Confidential: no link offered, and the shell refuses one anyway.
+            (folder / "confidential").write_bytes(b"")
+            browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+            wait_for(browser, lambda b: b.execute_script(offered), 10)
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('confidential-switch')?.checked === true"), 5)
+            press(browser, "dates-open")
+            wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("items"), 5)
+            check(f"{language}: a confidential meeting is offered no link, the .ics still (it stays on this computer)",
+                  browser.execute_script(panel)["google"][0] is True and browser.execute_script("return document.getElementById('dates-ics').hidden") is False,
+                  browser.execute_script(panel))
+            refused = browser.execute_async_script(
+                "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('date_google', {name: arguments[0], item: "
+                "{date: '2026-12-03', what: 'x', who: null, passage: null, meeting: 'y'}}).then(() => done('opened'), (why) => done(String(why)))", folder.name)
+            check(f"{language}: and the shell refuses it", refused != "opened" and browsed.read_text().count("\n") == 1, [refused, browsed.read_text()])
+            press(browser, "dates-close")
+    (folder / "confidential").unlink(missing_ok=True)
 
 
 def actions_rows(now: dt.datetime) -> None:
@@ -12618,23 +12871,28 @@ def store_audio(folder: Path, segments: list) -> None:
     transcript says each side spoke, silence elsewhere — the same every run, so two runs draw the same."""
     random = __import__("random").Random(103)
     length = int(STORE_RATE * (segments[-1][4] + 3))
-    # Syllables at about 4 a second, one take as long as the longest line, each line its start.
+    # Syllables at about 4 a second with a breath between them, and a breath every couple of seconds, one take as long
+    # as the longest line; each line its start, said louder or softer as people do (#1201: a waveform of a voice
+    # rises and falls — every line as loud would draw a comb).
     take = bytearray(2 * int(STORE_RATE * max(end - start for *_, start, end in segments)))
     for n in range(len(take) // 2):
-        level = 0.55 + 0.45 * math.sin(2 * math.pi * 4.1 * n / STORE_RATE)
+        t = n / STORE_RATE
+        level = max(0.0, math.sin(2 * math.pi * 4.1 * t)) * (0.35 + 0.65 * abs(math.sin(2 * math.pi * 0.23 * t)))
         struct.pack_into("<h", take, 2 * n, int(9000 * level * random.uniform(-1, 1)))
     for track, who in (("local", "me"), ("remote", "others")):
-        samples = bytearray(2 * length)
+        samples = array.array("h", bytes(2 * length))
         for speaker, _, _, start, end in segments:
             if speaker != who:
                 continue
-            at, many = 2 * int(STORE_RATE * start), 2 * int(STORE_RATE * (end - start))
-            samples[at:at + many] = take[:many]
+            at, many = int(STORE_RATE * start), int(STORE_RATE * (end - start))
+            gain = random.uniform(0.4, 1.0)
+            said = array.array("h", take[:2 * many])
+            samples[at:at + many] = array.array("h", (int(v * gain) for v in said))
         with wave.open(str(folder / f"{track}.wav"), "wb") as made:
             made.setnchannels(1)
             made.setsampwidth(2)
             made.setframerate(STORE_RATE)
-            made.writeframes(bytes(samples))
+            made.writeframes(samples.tobytes())
     record = json.loads((folder / "session.json").read_text())
     record["tracks"] = {"local": {"device": "Mic"}, "remote": {"device": "Speaker"}}
     (folder / "session.json").write_text(json.dumps(record))
@@ -12656,18 +12914,6 @@ def store_hours(text: str) -> list[int]:
     on 24 hours; never a moment of a recording (« 00:45 »), which has neither."""
     return [int(hour) % 12 + (12 if half == "PM" else 0) if half else int(hour)
             for hour, half in re.findall(r"(?:· |\bà |\bat )(\d{1,2}):\d\d(?:\s*([AP]M))?", text)]
-
-
-def store_lanes(rects: list) -> tuple[int, int, float]:
-    """Who spoke as the page draws it (#1077): a bar for each segment, yours on one lane, the others' on the other —
-    how many bars each lane holds, and the share of the drawn width where both lanes have a bar at once: near
-    nothing where people take turns, all of it where two lines are drawn the same."""
-    covered = {"local": set(), "remote": set()}
-    for track, x, width, _ in rects:
-        covered.setdefault(track, set()).update(range(int(x), max(int(x) + 1, int(-(-(x + width) // 1)))))
-    both, either = covered["local"] & covered["remote"], covered["local"] | covered["remote"]
-    counts = {track: sum(1 for kind, *_ in rects if kind == track) for track in ("local", "remote")}
-    return counts["local"], counts["remote"], round(len(both) / max(1, len(either)), 3)
 
 
 def store_lasted(row: str) -> int:
@@ -12698,6 +12944,7 @@ def store_shots(now: dt.datetime) -> None:
         "return {freed: shown('.chip.gone, #no-player').length,"
         " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText,"
         " lanes: [...document.querySelectorAll('#meeting svg.relief rect')].map(r => [r.getAttribute('class'), +r.getAttribute('x'), +r.getAttribute('width'), +r.getAttribute('y')]),"
+        " wave: [...document.querySelectorAll('#meeting .drawing .wave .col')].map(c => [...c.querySelectorAll('i')].map(i => { const r = i.getBoundingClientRect(); return [r.height, r.top, r.bottom]; })),"
         " sought: [document.getElementById('search')?.value ?? '', document.getElementById('find')?.value ?? ''],"
         " marked: [shown('#meeting .transcript .lines li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent)),"
         " shown('#groups li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent))],"
@@ -12807,6 +13054,9 @@ def store_shots(now: dt.datetime) -> None:
                 # 3: a word sought in the list, only its meetings left (« retrouver n'importe quelle réunion »).
                 if shot_name == "3-list":
                     browser.find_element(By.ID, "find").send_keys(kept[index]["sought"])
+                # Its tracks read by the shell, its waveform drawn before the shot (#1201).
+                if shot_name == "1-meeting":
+                    wait_for(browser, lambda b: b.execute_script("return document.querySelectorAll('#meeting .drawing .wave .col').length") > 0, 60)
                 browser.execute_script("document.activeElement.blur(); scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
                 time.sleep(0.6)
                 browser.save_screenshot(str(store / short / f"{shot_name}.png"))
@@ -12896,15 +13146,28 @@ def store_shots(now: dt.datetime) -> None:
     cited = {f"{short}/{kind}": [int(n) for n in re.findall(r"\[@(\d+)\]", meeting["minutes"]) if int(n) >= len(store_said(meeting))]
              for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("call", said["call"]), ("kickoff", said["kickoff"]))}
     check("every moment a summary cites is one its transcript starts a line at (D103)", not any(cited.values()), cited)
-    lanes = {shot: store_lanes(page["lanes"]) for shot, page in shown.items() if shot.endswith("1-meeting.png")}
-    check("who spoke, drawn on the meeting's shot, shows the turns: each side's lane at least 4 bars, both lanes drawn at once over a tenth of the width at most (#1077)",
-          len(lanes) == 2 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in lanes.values()), lanes)
-    # « Vous » on the upper lane, « Les autres » on the lower, as the transcript's sides read top to bottom (lina, #1093).
-    tops = {shot: (max((y for kind, _, _, y in page["lanes"] if kind == "local"), default=None),
-                   min((y for kind, _, _, y in page["lanes"] if kind == "remote"), default=None))
+    # Who spoke, as the meeting's shot draws it from its tracks (#1201, in place of #1077's turns): each voice heard in at
+    # least 4 stretches of its own — a run of bars taller than the 2 px of a silence —, both at once over a tenth at most.
+    # A column holds some seconds of the meeting: where a turn passes from one voice to the other inside it, both are heard
+    # there, as they were. « At once » counts the columns both are heard in with their neighbours too: two voices drawn
+    # alike all along, what #1077 guards against, not the column a turn changes in (0.108 and 0.112 so, at 76d43f6).
+    def heard(columns: list, side: int) -> tuple[int, list[bool]]:
+        loud = [column[side][0] > 4 for column in columns]
+        return sum(1 for i, on in enumerate(loud) if on and (i == 0 or not loud[i - 1])), loud
+    waves = {}
+    for shot, page in shown.items():
+        if shot.endswith("1-meeting.png"):
+            (here, mine), (others, theirs) = heard(page["wave"], 0), heard(page["wave"], 1)
+            both = [a and b for a, b in zip(mine, theirs)]
+            held = [on and (i == 0 or both[i - 1]) and (i == len(both) - 1 or both[i + 1]) for i, on in enumerate(both)]
+            waves[shot] = (here, others, round(sum(held) / max(1, sum(a or b for a, b in zip(mine, theirs))), 3))
+    check("who spoke, drawn on the meeting's shot as its waveform: each voice heard in at least 4 stretches, both at once over a tenth at most (#1201, #1077)",
+          len(waves) == 2 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in waves.values()), waves)
+    # « Vous » above the line, « Les autres » below, as the transcript's sides read top to bottom (lina, #1093).
+    tops = {shot: (max((up[2] for up, _ in page["wave"]), default=None), min((down[1] for _, down in page["wave"]), default=None))
             for shot, page in shown.items() if shot.endswith("1-meeting.png")}
-    check("who spoke: « Vous » on the upper lane, every bar of it above every bar of « Les autres » (#1077)",
-          len(tops) == 2 and all(here is not None and others is not None and here < others for here, others in tops.values()), tops)
+    check("who spoke: « Vous » above the line, every bar of it above every bar of « Les autres » (#1201, #1077)",
+          len(tops) == 2 and all(here is not None and others is not None and here <= others for here, others in tops.values()), tops)
     lasted = {shot: [store_lasted(row) for row in page["said"]] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
     check("every meeting the list shows lasts as such a meeting does, at least 15 min (D103)",
           len(lasted) == 2 and all(len(rows) == 6 and min(rows) >= 15 for rows in lasted.values()), lasted)
@@ -14639,14 +14902,21 @@ def main() -> int:
             shot(browser, "6-small")
             fits = browser.execute_script("const e = document.scrollingElement; return [e.scrollHeight, e.clientHeight];")
             check("it holds in its window, nothing to scroll", fits[0] <= fits[1], fits)
-            moving = {browser.find_element(By.ID, "level-me").get_attribute("style") for _ in range(6) if time.sleep(0.15) is None}
+            trace = lambda b, id: b.execute_script("return [...document.getElementById(arguments[0]).children].map((i) => parseFloat(i.style.height))", id)
+            moving = {tuple(trace(browser, "level-me")) for _ in range(6) if time.sleep(0.15) is None}
             clock = browser.find_element(By.CSS_SELECTOR, "#small .time").text
             check("it shows the time recorded and the levels, moving as sound comes", clock.startswith("00:00:0") and clock != "00:00:00" and len(moving) > 1, (clock, moving))
-            check("the meeting's level too", "50%" in browser.find_element(By.ID, "level-others").get_attribute("style"))
+            check("the meeting's level too", trace(browser, "level-others")[-1] == 50, trace(browser, "level-others"))
+            # « B · Trace » (#1179): a bar a reading, the newest at the right, the ones before moved left — never redrawn otherwise.
+            before = trace(browser, "level-me")
+            wait_for(browser, lambda b: trace(b, "level-me") != before, 2)
+            after = trace(browser, "level-me")
+            check("the trace moves left a bar a reading, the newest at the right (#1179)",
+                  len(after) == len(before) == 40 and any(after[:-k] == before[k:] for k in (1, 2, 3)), [before, after])
             # Each side's colour as board 5 draws it: here in the accent, the meeting in green.
             colours = browser.execute_script(
                 "const as = (v) => { const t = document.createElement('i'); t.style.color = `var(${v})`; document.body.append(t); const c = getComputedStyle(t).color; t.remove(); return c; };"
-                " return [getComputedStyle(document.getElementById('level-me')).backgroundColor === as('--accent'), getComputedStyle(document.getElementById('level-others')).backgroundColor === as('--ok')]")
+                " return [getComputedStyle(document.querySelector('#level-me > i')).backgroundColor === as('--accent'), getComputedStyle(document.querySelector('#level-others > i')).backgroundColor === as('--ok')]")
             check("your level in the accent, the meeting's in green (board 5)", colours == [True, True], colours)
             # What each side is recorded from, named under its level, and followed (D33).
             # Read from the page: WebKitWebDriver leaves this line out of an element's text, though drawn (shot 6-small-devices).
@@ -15023,6 +15293,7 @@ def main() -> int:
     pages_seen(now)
     store_shots(now)
     actions_rows(now)
+    dates_mentioned(now)
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
@@ -15036,6 +15307,7 @@ def main() -> int:
     settings_folded(now)
     destinations_kept(now)
     summary_sent(now)
+    waveform_drawn(now)
     settings_version(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "The posting program's input",
-  "description": "posting/v1 — one JSON object on the program's input, then its end: where to send, a secret, and the meeting's name; for notion, the integration's key too. What a schema cannot say is on the contract's page: which addresses are refused.",
+  "description": "posting/v1 — one JSON object on the program's input, then its end: where to send, a secret, and the meeting's name; for notion, the integration's key too; for a confidential meeting, its confirmation. What a schema cannot say is on the contract's page: which addresses are refused.",
   "type": "object",
   "properties": {
     "address": {
@@ -25,6 +25,10 @@
       "not": {
         "pattern": "[\\n\\r]"
       }
+    },
+    "confirmed_confidential": {
+      "description": "true once the person confirmed sending a confidential meeting, for this send alone; false when absent.",
+      "type": "boolean"
     }
   },
   "required": [

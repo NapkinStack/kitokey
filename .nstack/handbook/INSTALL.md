@@ -187,7 +187,7 @@ Settings → Actions → General:
 
 - [ ] Allowed actions: GitHub's own, plus `astral-sh/setup-uv`
 - [ ] SHA-pinned actions required
-- [ ] Workflow approval for every outside contributor
+- [ ] Workflow approval for every outside contributor, public repository
 - [ ] Workflow token read-only; Actions neither creates nor approves pull requests
 
 Settings → General → Default branch:
@@ -250,7 +250,10 @@ that `git switch -c <branch> origin/main` and a plain `git push` never write `.g
 the sandbox protects. The sandbox also protects `.claude/skills/` — an agent never rewrites its own
 instructions —, so git could not write the committed skills there: the clone leaves that folder out
 of its working tree (a sparse checkout: still in every commit), and the agent gets the default
-branch's skills from a folder of its own (`--add-dir`), refreshed at each run. Unix sockets — audio, display, the session bus — stay closed unless the
+branch's skills from a folder of its own (`--add-dir`), refreshed at each run. A sandbox outside
+that clone puts mount points over the paths it protects, `.claude/skills/` among them: the tree is
+then not the commit, and `nstack attest` refuses it and names them — a record is made outside the
+sandbox, by the person in a terminal of their own, outside the agent's session, or by the decider. Unix sockets — audio, display, the session bus — stay closed unless the
 project answers `agent_sockets: true` (`.nstack/handbook/07-governance.md` §7 says the risk).
 Given your own `--settings`, it adds none and says so. A hook of yours that refuses `gh` — against your own
 account — lets an agent's session through only when its `gh` is the App's
@@ -356,10 +359,10 @@ It never reads your `gh` login by itself; to have it read with that login, for o
 nstack --help        # lists the commands
 nstack fitness       # manifests + boundaries + skills + plan + hygiene — before every commit
 nstack discover <idea-file>   # starts a discovery, for your agent
-nstack plan          # what needs a person first; then the discovery, the charter and the cycles (docs/project/), the decisions due at a closure, the project across its cycles, who holds what
+nstack plan          # what needs a person first; then the discovery, the charter and the cycles (docs/project/), the decisions due at a closure, the project across its cycles, who holds what; --prune removes the empty start branches it names
 nstack claim D<n> --session <s> --person @<you>   # takes a deliverable before its first change; nstack unclaim gives it back
                                                   # --take-over: a stale hold, or your own from another agent's session or outside nstack agent run; your agent restarted renews without it
-nstack deliver D<n> --held '#<pr>' --session <s>   # records a merged deliverable delivered; --write-states at the closure
+nstack deliver D<n> --held '#<pr>' --session <s>   # records a merged deliverable delivered, and removes its empty start branch; --write-states at the closure
 nstack agent add <name> [--clone <dir>] · nstack agent run <name> -- <command>   # an agent's own App and clone; add is a person's
 nstack agent status  # who this agent is — its App, repository, clone, gh and hooks; for a person, this project's agents
 nstack board [--dry-run]   # the cycles shown on GitHub as milestones and issues — CI runs it on every merge; --dry-run previews a proposed cycle; by hand, Run workflow, never beside it

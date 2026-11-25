@@ -30,7 +30,7 @@ use kitokey_shell::microphone;
 use kitokey_shell::{
     autostart,
     confidential::{self, Left, Wait, What},
-    context, correction, desktop, exporting, keys,
+    context, correction, dates, desktop, exporting, keys,
     licence::{self, Licence},
     log,
     meeting::{self, Read, Transcript},
@@ -431,8 +431,13 @@ fn main() {
             transcript_again,
             opened,
             open_folder,
+            dates_resolved,
+            date_google,
+            dates_file_chosen,
+            dates_ics,
             open_logs,
             diagnostic,
+            peaks_of,
             settings_shown,
             settings_saved,
             minutes_shown,
@@ -2325,6 +2330,32 @@ fn playable(shell: &Shell, folder: &Path) -> Option<String> {
         .offer_placed(tracks.into_iter().map(|track| (track.path, track.runs)).collect())
 }
 
+/// A meeting's waveform per voice (#1201): each track's peaks, read away from the window's thread — two hours
+/// of tracks in about 4 s, once — then kept in its `derived/` (`peaks`). None while it records, or when no
+/// track reads: the page then draws who spoke from its transcript. Numbers only, 0 to 255 of full scale.
+#[derive(serde::Serialize)]
+struct Waveform {
+    seconds: f64,
+    local: Option<Vec<u8>>,
+    remote: Option<Vec<u8>>,
+}
+
+#[tauri::command]
+async fn peaks_of(shell: State<'_, Shell>, name: String) -> Result<Option<Waveform>, Told> {
+    let folder = session_folder(&shell, &name)?;
+    if shell.recording.lock().unwrap().is_some() && shell.recorded.lock().unwrap().as_deref() == Some(folder.as_path()) {
+        return Ok(None);
+    }
+    let read = tauri::async_runtime::spawn_blocking(move || kitokey_shell::peaks::of(&folder))
+        .await
+        .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    Ok(read.map(|peaks| Waveform {
+        seconds: peaks.seconds,
+        local: peaks.local,
+        remote: peaks.remote,
+    }))
+}
+
 /// A meeting's diagnostic, for the page to copy: every program's log lines of its makings, then
 /// each track's level — nothing of the meeting, which no line holds (D29).
 #[tauri::command]
@@ -2466,6 +2497,117 @@ fn local_instead(app: AppHandle, shell: State<'_, Shell>, name: String, model: S
     }
     make_minutes(&app, folder);
     look_again(&app);
+    Ok(())
+}
+
+/// What a meeting's actions' *by when* name (D115): the day they are read against — the meeting's own, as its
+/// folder names it, or the one the user set — and each one's date, or none when it names none without a guess.
+#[derive(serde::Serialize)]
+struct Resolved {
+    day: String,
+    dates: Vec<Option<String>>,
+}
+
+#[tauri::command]
+fn dates_resolved(name: String, whens: Vec<String>, day: Option<String>) -> Option<Resolved> {
+    let day = match day {
+        Some(day) => chrono::NaiveDate::parse_from_str(&day, "%Y-%m-%d").ok()?,
+        None => dates::reference_day(&name)?,
+    };
+    let dated = |when: &String| dates::resolve(when, day).map(|date| date.format("%Y-%m-%d").to_string());
+    Some(Resolved {
+        day: day.format("%Y-%m-%d").to_string(),
+        dates: whens.iter().map(dated).collect(),
+    })
+}
+
+/// One ticked date, as the page shows it: its day, the action's what and who, its passage, the meeting's name.
+#[derive(serde::Deserialize)]
+struct Ticked {
+    date: String,
+    what: String,
+    who: Option<String>,
+    passage: Option<String>,
+    meeting: String,
+}
+
+/// Opens Google Calendar's own screen on a ticked date, the event pre-filled and unsaved (D115): nothing leaves
+/// before this gesture, and never a confidential meeting's words (PDR-0007): its dates go to an `.ics` alone.
+#[tauri::command]
+fn date_google(shell: State<'_, Shell>, name: String, item: Ticked) -> Result<(), Told> {
+    if confidential::marked(&session_folder(&shell, &name)?) {
+        return Err(shell.told(Failure::LinkNotOpened, "a confidential meeting is given no link"));
+    }
+    let date = chrono::NaiveDate::parse_from_str(&item.date, "%Y-%m-%d").map_err(|error| shell.told(Failure::LinkNotOpened, error))?;
+    let event = dates::Event {
+        date,
+        what: &item.what,
+        who: item.who.as_deref(),
+        passage: item.passage.as_deref(),
+        meeting: &item.meeting,
+    };
+    browsing(&shell, &dates::google(&event))
+}
+
+/// Where the ticked dates go as an `.ics`, chosen in the system's own dialog, its name the meeting's; none when the
+/// user closes it (D115). Allowed for a confidential meeting: the file stays on this computer (PDR-0007).
+#[tauri::command]
+async fn dates_file_chosen(app: AppHandle, name: String) -> Option<PathBuf> {
+    use tauri_plugin_dialog::DialogExt;
+    let folder = sessions::folder(&app.state::<Shell>().settings().sessions, &name)?;
+    let chosen = app
+        .dialog()
+        .file()
+        .set_file_name(format!("{}.ics", named(&folder)))
+        .add_filter("iCalendar", &["ics"]);
+    chosen.blocking_save_file()?.into_path().ok()
+}
+
+/// Writes the ticked dates at `to` as an `.ics`, by `kitokey-export` (`exporting/v1`'s `ics`, D115): each a
+/// whole day, its title and notes as the page shows them, its UID stable for the meeting and the action.
+#[tauri::command]
+fn dates_ics(shell: State<'_, Shell>, name: String, to: PathBuf, dates: Vec<exporting::Dated>) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let language = shell.language();
+    let said = words::exported(language);
+    let meeting = meeting_said(&folder, language);
+    let input = exporting::Input {
+        to: &to,
+        name: &meeting,
+        transcript: said.transcript,
+        me: said.me,
+        others: said.others,
+        time: said.time,
+        speaker: said.speaker,
+        text: said.text,
+        dates: Some(&dates),
+    };
+    let tag = match language {
+        Language::French => "fr",
+        Language::English => "en",
+    };
+    exporting::ics(&program("kitokey-export", "KITOKEY_EXPORT"), &folder, tag, &input)
+        .inspect(|()| tracing::info!(dates = dates.len(), "shell.dates_saved"))
+        .map_err(|why| shell.told(Failure::DatesNotSaved, why))
+}
+
+/// Opens an address in the system's browser; `KITOKEY_BROWSER` names another program, as the e2e's stand-in that
+/// writes down the address it is handed and opens nothing.
+fn browsing(shell: &Shell, address: &str) -> Result<(), Told> {
+    let opener = std::env::var_os("KITOKEY_BROWSER").map(PathBuf::from).unwrap_or_else(|| {
+        PathBuf::from(if cfg!(target_os = "macos") {
+            "open"
+        } else if cfg!(windows) {
+            "explorer"
+        } else {
+            "xdg-open"
+        })
+    });
+    let mut started = std::process::Command::new(opener)
+        .arg(address)
+        .spawn()
+        .map_err(|error| shell.told(Failure::LinkNotOpened, error))?;
+    std::thread::spawn(move || started.wait());
     Ok(())
 }
 
@@ -4347,6 +4489,7 @@ fn export_written(shell: &Shell, folder: &Path) {
         time: said.time,
         speaker: said.speaker,
         text: said.text,
+        dates: None,
     };
     let tag = match language {
         Language::French => "fr",
