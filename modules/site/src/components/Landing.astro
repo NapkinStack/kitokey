@@ -1,0 +1,150 @@
+---
+// /<lang>/: the landing (D114, proposal D validated by the decider on 2026-11-25). Every word from
+// src/lib/landing.mjs. The hero shows the record clip's first image; the carousel replaces it next.
+import Page from "../layouts/Page.astro";
+import Icons from "./Icons.astro";
+import { channels, landing as w, repo } from "../lib/landing.mjs";
+import { brand, ico } from "../lib/icons.mjs";
+
+const { lang } = Astro.props;
+const t = (key) => w[key][lang];
+const [privacyId, usesId, systemsId, faqId, installId] = t("nav").map(([id]) => id);
+const [h1a, h1b, lead] = t("hero");
+const [cta, follow] = t("cta");
+const [chH, chP, chWith] = t("channels");
+const [pEyebrow, pH, pLead] = t("privacy");
+const [localTitle, localAlt] = t("local");
+const [uEyebrow, uH, uLead] = t("uses");
+const [sEyebrow, sH, sLead, sNote] = t("systems");
+const [gEyebrow, gH, gLead, copy, osLabel, copied, failed] = t("install");
+const [needsH, needs] = t("needs");
+const [faqH, faq] = t("faq");
+const notes = t("channelNotes");
+const needsId = lang === "fr" ? "prerequis" : "prerequisites";
+const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ </span>${c.replace(/&/g, "&amp;").replace(/</g, "&lt;")}`).join("\n");
+---
+<Page lang={lang} title={t("title")} description={t("description")} path="" nav={t("nav")}>
+  <script slot="head" src="/site.js" defer is:inline></script>
+  <Icons />
+  <section class="hero" aria-labelledby="h1">
+    <div class="wrap hero-copy">
+      <h1 id="h1"><span>{h1a}</span> <span class="second">{h1b}</span></h1>
+      <p class="lead">{lead}</p>
+      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/releases`}>{follow}</a></div>
+    </div>
+    <div class="wrap">
+      <figure class="window hero-window">
+        <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">Kitokey</span></div>
+        <img class="still hero-still" src={`/clips/record-${lang}-light.jpg`} width="1280" height="720" alt={t("still")} fetchpriority="high" decoding="async" />
+      </figure>
+    </div>
+  </section>
+
+  <section class="channels" aria-labelledby="ch-h">
+    <div class="wrap">
+      <div class="card ch-card reveal">
+        <div class="ch-text"><span class="tile" set:html={ico("send")} /><h2 id="ch-h">{chH}</h2><p>{chP}</p></div>
+        <div class="ch-with"><p class="kicker">{chWith}</p>
+          <ul class="ch-logos" role="list">
+            <li><Fragment set:html={brand("slack")} /><span>Slack</span></li>
+            <li><Fragment set:html={brand("discord")} /><span>Discord</span></li>
+            <li><Fragment set:html={ico("webhook", "ico ch-hook")} /><span>Webhook</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id={privacyId} aria-labelledby={`${privacyId}-h`}>
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow">{pEyebrow}</p>
+        <span class="padlock" set:html={ico("lock", "ico ico-xl")} />
+        <h2 id={`${privacyId}-h`}>{pH}</h2>
+        <p class="lead">{pLead}</p>
+      </div>
+      <div class="privacy-grid">
+        <ul class="promises" role="list">
+          {t("promises").map(([icon, a, b]) => <li class="reveal"><Fragment set:html={ico(icon)} /><div><strong>{a}</strong><span set:html={b} /></div></li>)}
+        </ul>
+        <figure class="reveal window">
+          <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">Kitokey<span class="wt-more"> · {localTitle}</span></span></div>
+          <picture>
+            <source media="(max-width: 699px)" srcset={`/img/local-m-${lang}.webp`} width="356" height="216" />
+            <img src={`/img/local-${lang}.webp`} width="620" height="370" alt={localAlt} loading="lazy" decoding="async" />
+          </picture>
+        </figure>
+      </div>
+      <p class="note proof">{t("proof")}</p>
+    </div>
+  </section>
+
+  <section class="section" id={usesId} aria-labelledby={`${usesId}-h`}>
+    <div class="wrap">
+      <div class="section-head reveal"><p class="eyebrow">{uEyebrow}</p><h2 id={`${usesId}-h`}>{uH}</h2><p class="lead">{uLead}</p></div>
+      <div class="uses">
+        {t("cases").map((c, i) => c.length === 4
+          ? <article class={`card use u-${i} reveal`}><span class="tile" set:html={ico(c[0])} /><p class="kicker">{c[1]}</p><h3>{c[2]}</h3><p>{c[3]}</p></article>
+          : <article class="card use u-after reveal"><span class="tile" set:html={ico(c[0])} /><h3>{c[1]}</h3><p>{c[2]}</p></article>)}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id={systemsId} aria-labelledby={`${systemsId}-h`}>
+    <div class="wrap">
+      <div class="section-head reveal"><p class="eyebrow">{sEyebrow}</p><h2 id={`${systemsId}-h`}>{sH}</h2><p class="lead">{sLead}</p></div>
+      <div class="systems">
+        {t("oses").map(([logos, name, state, price, text, now]) => (
+          <article class="card os reveal">
+            <span class="os-logos" set:html={logos.map(brand).join("")} />
+            <h3>{name}</h3>
+            <p class="os-state"><span class={now ? "ok" : "soon"}>{state}</span></p>
+            <p class="os-price">{price}</p>
+            <p>{text}</p>
+            {now && <a class="btn" href={`#${installId}`}>{gEyebrow}</a>}
+          </article>
+        ))}
+      </div>
+      <p class="note">{sNote}</p>
+    </div>
+  </section>
+
+  <section class="section" id={installId} aria-labelledby="get-h">
+    <div class="wrap get">
+      <div class="section-head reveal"><p class="eyebrow">{gEyebrow}</p><h2 id="get-h">{gH}</h2><p class="lead">{gLead}</p></div>
+      <div class="code reveal" data-copied={copied} data-failed={failed}>
+        <div class="code-bar">
+          <div class="os-tabs" role="group" aria-label={osLabel}>
+            {channels.map(([os, name], i) => <button type="button" class="os-tab" data-os={os} aria-pressed={i === 0 ? "true" : "false"}><Fragment set:html={brand(os)} /><span>{name}</span></button>)}
+          </div>
+          <button class="copy" type="button" aria-describedby="copy-status" hidden>{copy}</button>
+        </div>
+        {channels.map(([os, , commands]) => <>
+          <pre class="os-code" data-os={os}><code set:html={prompt(commands)} /></pre>
+          {notes[os] && <p class="os-note" data-os={os} set:html={notes[os]} />}
+        </>)}
+        <p class="sr-only" id="copy-status" aria-live="polite"></p>
+      </div>
+      <h3 class="needs-h" id={needsId}>{needsH}</h3>
+      <ul class="needs" role="list">
+        {needs.map(([icon, a, b]) => <li class="reveal"><Fragment set:html={ico(icon)} /><div><strong>{a}</strong><span set:html={b} /></div></li>)}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id={faqId} aria-labelledby={`${faqId}-h`}>
+    <div class="wrap">
+      <div class="section-head"><h2 id={`${faqId}-h`}>{faqH}</h2></div>
+      <div class="faq">
+        {faq.map(([q, a]) => <details class="reveal"><summary>{q}</summary><p set:html={a.replace("#prerequisites", `#${needsId}`)} /></details>)}
+      </div>
+    </div>
+  </section>
+
+  <section class="final" aria-labelledby="final-h">
+    <div class="wrap">
+      <h2 id="final-h" class="reveal">{t("final")}</h2>
+      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/releases`}>{follow}</a></div>
+    </div>
+  </section>
+</Page>

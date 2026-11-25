@@ -22,7 +22,7 @@ Astro's telemetry is off in every script.
 
 - **One path out of the module**: `site.config.mjs`, `privacySource` (`docs/privacy.md`). No other file
   reaches out of `modules/site/` (`tests/space.test.mjs`).
-- **Every sentence lives in `src/lib/words.mjs`**, in English and French, with `keeps`: what keeps its
+- **Every sentence lives in `src/lib/words.mjs`** — the landing's in `src/lib/landing.mjs` —, in English and French, with `keeps`: what keeps its
   promise, a merged deliverable or a test, as `docs/store/listing.md` does. The voice:
   `modules/shell/docs/voice.md`.
 - **The look is proposal D's** (the decider, 2026-11-25): light only, the titles in Bricolage Grotesque served from
