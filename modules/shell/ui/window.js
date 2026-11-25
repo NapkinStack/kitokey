@@ -2197,6 +2197,9 @@ function minutesCard(read, words, session, transcript, onPage, previous) {
   // The minutes as written, rendered by the shell: raw HTML in them is text there, a link its words.
   const body = element("div", "body");
   body.innerHTML = read.body;
+  // A section made with nothing under it says so (#1234): a title alone reads as a summary cut short.
+  for (const title of body.querySelectorAll("h2"))
+    if (!title.nextElementSibling || title.nextElementSibling.tagName === "H2") title.after(element("p", "empty-section", words.section_empty));
   const mentioned = actionRows(body, words, read.actions);
   lineTimes(body, session, transcript, words);
   card.append(body);
