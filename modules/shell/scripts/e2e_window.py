@@ -5317,6 +5317,115 @@ def settings_folded(now: dt.datetime) -> None:
 
 
 
+def speakers_named(now: dt.datetime) -> None:
+    """CQ. #1205, session-audio/v3's speakers.json: the two sides of a complete transcript named from its card —
+    « Nommer les intervenants… », two labelled fields, Enter saves —, every line and the copy following at once, kept
+    with the meeting and read again; a field left empty gives the side back « Vous » or « Les autres »; Escape closes
+    it as it was; a folder that cannot be written says so under the fields, what was typed kept. No naming offered
+    before v3, nor while the transcript is not complete. No name is logged."""
+    print("CQ. the speakers of a transcript named on its card, kept with the meeting, the lines following (#1205)")
+    meetings = WORK / "speakers"
+    named_one, older, unfinished = (meetings / name for name in ("2026-11-21_09-00", "2026-11-21_10-00", "2026-11-21_11-00"))
+    for folder, form in ((named_one, "v3"), (older, "v2"), (unfinished, "v3")):
+        session(folder, now - dt.timedelta(days=2), 30, {"local.wav": 1000}, form=form)
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.0,"end":1.0,"text":"On commence par la 2.4."}\n'
+            '{"type":"segment","speaker":"others","track":"remote","voice":null,"start":1.5,"end":3.0,"text":"Les tests passent."}\n'
+            + ('' if folder == unfinished else '{"type":"complete","duration":3.0}\n'))
+    whos = "return [...document.querySelectorAll('#meeting .transcript .lines .who')].map(w => w.textContent)"
+    offered = "return !!document.getElementById('speakers-open')"
+    window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\n')
+    with window as browser:
+        def page(folder):
+            browser.execute_script("location.hash = '#/'")
+            wait_for(browser, lambda b: not b.find_elements(By.ID, "meeting"), 5)
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{folder.name}")
+            return wait_for(browser, lambda b: b.execute_script(
+                "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
+                " && p.querySelectorAll('.transcript .lines li').length > 0", folder.name), 10)
+
+        page(older)
+        check("a meeting before session-audio/v3 offers no naming: its version names no speakers.json",
+              not browser.execute_script(offered), browser.execute_script(offered))
+        page(unfinished)
+        check("a transcript not yet complete offers no naming", not browser.execute_script(offered), browser.execute_script(offered))
+        page(named_one)
+        check("a complete transcript of a v3 meeting: « Nommer les intervenants… » on its card, the sides as the page says them",
+              browser.execute_script(offered) and browser.execute_script(whos) == ["Vous", "Les autres"]
+              and browser.find_element(By.ID, "speakers-open").get_attribute("aria-label") == "Nommer les intervenants…",
+              [browser.execute_script(offered), browser.execute_script(whos)])
+        # By keyboard alone: the button pressed by Enter, the first field focused, its label read with it.
+        browser.execute_script("document.getElementById('speakers-open').focus()")
+        ActionChains(browser).send_keys(Keys.ENTER).perform()
+        opened = wait_for(browser, lambda b: b.find_elements(By.ID, "speakers-panel"), 5)
+        focused = browser.execute_script("return document.activeElement.id")
+        labels = browser.execute_script("return ['speaker-me', 'speaker-others'].map(id => document.getElementById(id).closest('label').textContent)")
+        check("the panel opens with the focus on « Vous »'s field, each field labelled by its side",
+              opened and focused == "speaker-me" and labels == ["Vous — votre micro", "Les autres — le son de l’appel"]
+              and browser.find_element(By.ID, "speakers-open").get_attribute("aria-expanded") == "true", [focused, labels])
+        ActionChains(browser).send_keys("Sarah").perform()
+        # Back to the window while typing (window.js's focus draws the page anew): the panel and what is typed stay.
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        time.sleep(1.5)
+        typed = browser.execute_script("return document.getElementById('speaker-me')?.value ?? null")
+        check("back to the window while naming: the panel stays, what was typed kept", typed == "Sarah", typed)
+        browser.find_element(By.ID, "speaker-me").click()
+        ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+        closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "speakers-panel"), 5)
+        check("Escape closes it as it was: nothing kept, the focus back on the button",
+              closed and not (named_one / "speakers.json").exists() and browser.execute_script(whos) == ["Vous", "Les autres"]
+              and browser.execute_script("return document.activeElement.id") == "speakers-open",
+              [closed, (named_one / "speakers.json").exists(), browser.execute_script("return document.activeElement.id")])
+        press(browser, "speakers-open")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "speaker-me"), 5)
+        browser.find_element(By.ID, "speaker-me").send_keys("  Sarah ")
+        browser.find_element(By.ID, "speaker-others").send_keys("L’équipe produit")
+        browser.find_element(By.ID, "speaker-others").send_keys(Keys.ENTER)
+        kept = wait_for(browser, lambda b: not b.find_elements(By.ID, "speakers-panel"), 5)
+        written = json.loads((named_one / "speakers.json").read_text()) if (named_one / "speakers.json").exists() else None
+        check("Enter saves: speakers.json holds both names, trimmed, as session-audio/v3 says",
+              kept and written == {"me": "Sarah", "others": "L’équipe produit"}, written)
+        check("every line names its side at once", browser.execute_script(whos) == ["Sarah", "L’équipe produit"], browser.execute_script(whos))
+        browser.execute_script("window.copied_for_test = null; Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: async (t) => { window.copied_for_test = t; }}})")
+        press(browser, "copy-transcript")
+        wait_for(browser, lambda b: b.execute_script("return window.copied_for_test"), 5)
+        copied = browser.execute_script("return window.copied_for_test") or ""
+        check("the transcript copied names them too", "Sarah" in copied and "L’équipe produit" in copied and "Vous" not in copied, copied)
+        page(older)
+        page(named_one)
+        check("read again with the meeting: the names stay", browser.execute_script(whos) == ["Sarah", "L’équipe produit"], browser.execute_script(whos))
+        press(browser, "speakers-open")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "speaker-me"), 5)
+        values = browser.execute_script("return [document.getElementById('speaker-me').value, document.getElementById('speaker-others').value]")
+        check("the fields open with the names kept", values == ["Sarah", "L’équipe produit"], values)
+        browser.find_element(By.ID, "speaker-others").clear()
+        press(browser, "speakers-save")
+        wait_for(browser, lambda b: not b.find_elements(By.ID, "speakers-panel"), 5)
+        written = json.loads((named_one / "speakers.json").read_text()) if (named_one / "speakers.json").exists() else None
+        check("a field left empty gives its side back « Les autres »; the other name kept",
+              written == {"me": "Sarah"} and browser.execute_script(whos) == ["Sarah", "Les autres"], [written, browser.execute_script(whos)])
+        # The folder unwritable: said under the fields, what was typed kept, the lines as they were.
+        named_one.chmod(0o555)
+        try:
+            press(browser, "speakers-open")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "speaker-others"), 5)
+            browser.find_element(By.ID, "speaker-others").send_keys("Camille")
+            press(browser, "speakers-save")
+            said_now = "return document.getElementById('speakers-said')?.hidden === false ? document.getElementById('speakers-said').textContent : ''"
+            wait_for(browser, lambda b: b.execute_script(said_now), 5)
+            check("not kept: one sentence says so under the fields, what was typed kept, the lines unchanged",
+                  browser.execute_script(said_now) == "Kitokey n’a pas pu enregistrer ces noms. Réessayez."
+                  and browser.find_element(By.ID, "speaker-others").get_attribute("value") == "Camille"
+                  and browser.execute_script(whos) == ["Sarah", "Les autres"],
+                  [browser.execute_script(said_now), browser.execute_script(whos)])
+        finally:
+            named_one.chmod(0o755)
+    logs = WORK / "state" / "kitokey" / "logs"
+    lines = [line for log in sorted(logs.glob("*.jsonl")) for line in log.read_text().splitlines() if "speakers_named" in line]
+    check("the naming is logged, never a name", lines and not any(name in line for line in lines for name in ("Sarah", "équipe", "Camille")), lines)
+
+
 def summary_sent(now: dt.datetime) -> None:
     """CL. D110, PDR-0007 §2–§6, posting/v1: a meeting's summary sent to a destination set up in Settings, on the
     user's gesture each time. No « Envoyer… » without a destination, on a confidential meeting, or without a
@@ -15251,6 +15360,7 @@ def main() -> int:
     settings_folded(now)
     destinations_kept(now)
     summary_sent(now)
+    speakers_named(now)
     waveform_drawn(now)
     settings_version(now)
     settings_narrow_without_model(now)
