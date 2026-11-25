@@ -553,6 +553,20 @@ def descendants(pid: int) -> list[int]:
     return found
 
 
+def window_cpu(window: "Window") -> float:
+    """The CPU seconds the window has spent so far: its shell and its WebKit processes, read in /proc — never the
+    driver nor a stand-in it starts (#1179: a meter's cost, measured)."""
+    spent = 0
+    for pid in descendants(window.driver_process.pid):
+        with contextlib.suppress(OSError, IndexError, ValueError):
+            stat = Path(f"/proc/{pid}/stat").read_text()
+            name = stat.split("(", 1)[1].rsplit(")", 1)[0]
+            if name == "kitokey" or name.startswith(("WebKitWebProces", "WebKitNetworkPr")):
+                fields = stat.rsplit(")", 1)[1].split()
+                spent += int(fields[11]) + int(fields[12])
+    return spent / os.sysconf("SC_CLK_TCK")
+
+
 def listening(pids: list[int], port: int) -> bool:
     """Whether one of these processes is the one listening on 127.0.0.1:`port`: its socket, read in
     /proc, not whoever answers there (#943)."""
@@ -4239,14 +4253,19 @@ def heard_checked(now: dt.datetime) -> None:
                 browser.find_element(By.ID, "small-record").click()
                 wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
                 got = browser.execute_script(meters)
-                check("a thin meter per side in the row: its icon, a 6 px track (#1179), named by its side", got == [[True, 6, me], [True, 6, others]], got)
+                check("a thin meter per side in the row: its icon, a 14 px trace (#1179), named by its side", got == [[True, 14, me], [True, 14, others]], got)
                 check("at silence, nothing said, the bar its row alone", browser.execute_script(said) == ["", ""]
                       and wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44, 3), [browser.execute_script(said), browser.execute_script("return innerHeight")])
                 before = browser.execute_script(place)
                 fit(browser, "listening")
                 (taping / "hush").unlink()
-                rose = wait_for(browser, lambda b: b.execute_script("return parseFloat(document.getElementById('level-others').style.width)") > 0, 3)
+                rose = wait_for(browser, lambda b: b.execute_script("return parseFloat(document.getElementById('level-others').lastElementChild.style.height)") > 0, 3)
                 check("levels risen: the meters move", rose)
+                if short == "fr" and theme == "light":
+                    # #1179: what the meters cost, read ten times a second — the window's CPU over five seconds of recording.
+                    spent = window_cpu(window)
+                    time.sleep(5)
+                    print(f"    measured: the window while recording, its meters at 10 Hz: {(window_cpu(window) - spent) / 5 * 100:.1f} % of one core")
                 # Capture's word after ten seconds: the microphone that sends nothing said at once; the meeting's silence not yet.
                 (taping / "nothing-me").touch()
                 (taping / "silent-others").touch()
@@ -4295,6 +4314,11 @@ def heard_checked(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, ".bar-lines .check-says") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
         time.sleep(1)
         check("less motion asked: nothing in the recording moves", browser.execute_script(MOVING) == [], browser.execute_script(MOVING))
+        # #1179: no trace scrolls; each meter a level held, in three steps, the same on every bar.
+        held = "return ['level-me', 'level-others'].map((id) => [...document.getElementById(id).children].map((i) => i.style.height))"
+        seen = [browser.execute_script(held) for _ in range(8) if time.sleep(0.15) is None]
+        check("less motion asked: no trace scrolls, each meter a level held in three steps, the same on every bar (#1179)",
+              all(len(set(bars)) == 1 and bars[0] in ("0%", "50%", "90%") for meters in seen for bars in meters), seen)
         stop_from_small(browser)
 
 
@@ -4623,7 +4647,7 @@ def sound_checked(now: dt.datetime) -> None:
                          capture_output=True, text=True).stdout.strip()
     flag = lambda name: WORK / f"listen-{name}"
     panel = ("const d = document.getElementById('check-sound'); if (!d) return null; const t = (id) => document.getElementById(id).textContent;"
-             " const w = (id) => document.getElementById(id).style.width;"
+             " const w = (id) => document.getElementById(id).lastElementChild.style.height;"
              " return {open: d.open, title: t('check-sound-title'), me: t('check-device-me'), others: t('check-device-others'),"
              " levels: [w('check-level-me'), w('check-level-others')], play: document.getElementById('check-play').disabled,"
              " active: d.contains(document.activeElement), shown: ['check-bluetooth', 'check-call', 'check-heard', 'check-missed', 'check-failed']"
@@ -8827,12 +8851,14 @@ def renaming(now: dt.datetime) -> None:
         redrawn = ("const done = arguments[arguments.length - 1], old = document.getElementById('page-time');"
                    " const seen = new MutationObserver(() => { const t = document.getElementById('page-time');"
                    " if (t && t !== old) { seen.disconnect(); done({time: t.textContent,"
-                   " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow')))}); } });"
+                   " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow'))),"
+                   " bars: [...document.querySelectorAll('#meeting .page-level')].map(e => [...e.children].filter(i => parseFloat(i.style.height) > 0).length)}); } });"
                    " seen.observe(document.body, {childList: true, subtree: true}); refresh();"
                    " setTimeout(() => { seen.disconnect(); done(null); }, 4000);")
         drawn_again = browser.execute_async_script(redrawn)
-        check("while it records, drawn again: the page starts from its last reading, never « 00:00:00 » nor an empty meter (#1133)",
-              bool(drawn_again) and drawn_again["time"] != "00:00:00" and len(drawn_again["meters"]) == 2 and all(m > 0 for m in drawn_again["meters"]),
+        check("while it records, drawn again: the page starts from its last reading, never « 00:00:00 » nor an empty meter (#1133), its traces going on (#1179)",
+              bool(drawn_again) and drawn_again["time"] != "00:00:00" and len(drawn_again["meters"]) == 2 and all(m > 0 for m in drawn_again["meters"])
+              and all(b > 1 for b in drawn_again["bars"]),
               drawn_again)
         # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
         # left at the legend's right, where the range stands at rest.
@@ -14762,14 +14788,21 @@ def main() -> int:
             shot(browser, "6-small")
             fits = browser.execute_script("const e = document.scrollingElement; return [e.scrollHeight, e.clientHeight];")
             check("it holds in its window, nothing to scroll", fits[0] <= fits[1], fits)
-            moving = {browser.find_element(By.ID, "level-me").get_attribute("style") for _ in range(6) if time.sleep(0.15) is None}
+            trace = lambda b, id: b.execute_script("return [...document.getElementById(arguments[0]).children].map((i) => parseFloat(i.style.height))", id)
+            moving = {tuple(trace(browser, "level-me")) for _ in range(6) if time.sleep(0.15) is None}
             clock = browser.find_element(By.CSS_SELECTOR, "#small .time").text
             check("it shows the time recorded and the levels, moving as sound comes", clock.startswith("00:00:0") and clock != "00:00:00" and len(moving) > 1, (clock, moving))
-            check("the meeting's level too", "50%" in browser.find_element(By.ID, "level-others").get_attribute("style"))
+            check("the meeting's level too", trace(browser, "level-others")[-1] == 50, trace(browser, "level-others"))
+            # « B · Trace » (#1179): a bar a reading, the newest at the right, the ones before moved left — never redrawn otherwise.
+            before = trace(browser, "level-me")
+            wait_for(browser, lambda b: trace(b, "level-me") != before, 2)
+            after = trace(browser, "level-me")
+            check("the trace moves left a bar a reading, the newest at the right (#1179)",
+                  len(after) == len(before) == 40 and any(after[:-k] == before[k:] for k in (1, 2, 3)), [before, after])
             # Each side's colour as board 5 draws it: here in the accent, the meeting in green.
             colours = browser.execute_script(
                 "const as = (v) => { const t = document.createElement('i'); t.style.color = `var(${v})`; document.body.append(t); const c = getComputedStyle(t).color; t.remove(); return c; };"
-                " return [getComputedStyle(document.getElementById('level-me')).backgroundColor === as('--accent'), getComputedStyle(document.getElementById('level-others')).backgroundColor === as('--ok')]")
+                " return [getComputedStyle(document.querySelector('#level-me > i')).backgroundColor === as('--accent'), getComputedStyle(document.querySelector('#level-others > i')).backgroundColor === as('--ok')]")
             check("your level in the accent, the meeting's in green (board 5)", colours == [True, True], colours)
             # What each side is recorded from, named under its level, and followed (D33).
             # Read from the page: WebKitWebDriver leaves this line out of an element's text, though drawn (shot 6-small-devices).

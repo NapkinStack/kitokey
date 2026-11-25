@@ -387,36 +387,34 @@ body.small-window .frame { display: none; }
 #small .danger { display: inline-grid; place-items: center; width: 28px; min-height: 28px; padding: 0; }
 #small .stop-square { width: 10px; height: 10px; border-radius: 2px; background: var(--surface); }
 #small .small-rest, #small .small-live { padding: 8px 16px 14px; border-top: 1px solid var(--line); }
-/* A thin meter for each side in the row (D90, board 5): its icon, a 4 px track; a side silent two
+/* A thin meter for each side in the row (D90, board 5): its icon, its trace 14 px high; a side silent two
    minutes, or with nothing to record, dashed and its icon crossed, said in a grey line under the row. */
 #small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; margin-left: 8px; }
 /* A meeting's page while it records (#1076, #1112): in the who-spoke area, its time large at the centre, as Voice
    Memos and Granola show a live meeting, the two sides' levels — the bar's meters — under it. */
 .live-now { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 100px; padding: 8px 0; }
 .live-time { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.2; }
-/* Two columns, each its meter over its label: the meter a block of its column's width and 4 px — never a flex item of
-   the column, whose basis would take its height (#1112, 3600377's shots). */
+/* Two columns, each its meter over its label: the meter a block of its column's width and 24 px — never a flex item
+   of the column, whose basis would take its height (#1112, 3600377's shots). */
 .page-levels { display: flex; gap: 16px; width: min(100%, 480px); }
 .page-meter { flex: 1 1 0; min-width: 120px; display: flex; flex-direction: column; gap: 6px; }
-.page-meter > .page-level { position: relative; overflow: hidden; display: block; flex: none; width: 100%; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 14%, var(--raised)); }
-.page-meter + .page-meter > .page-level { background: color-mix(in srgb, var(--ok) 14%, var(--raised)); }
-.page-level > .fill { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--accent); }
-.page-level > .fill.remote, .page-level > .fill.remote + .peak { background: var(--ok); }
+.page-meter > .page-level { display: flex; flex: none; width: 100%; height: 24px; gap: 3px; }
+.page-meter > .page-level > i { flex-basis: 4px; }
 .page-meter > .here, .page-meter > .remote { font-size: 14px; overflow-wrap: anywhere; }
 .page-meter > .here { color: var(--accent); }
 .page-meter > .remote { color: var(--ok); }
 #small .meter { display: flex; align-items: center; gap: 6px; color: var(--soft); }
-#small .meter .track { position: relative; overflow: hidden; flex: 1 1 auto; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 14%, var(--raised)); }
-#small .meter + .meter .track { background: color-mix(in srgb, var(--ok) 14%, var(--raised)); }
-#small .meter .fill { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--accent); }
-/* The meeting's in green, as board 5 draws it: as specific as the rule it follows, and after it. */
-#small .meter #level-others, #small .meter #level-others + .peak { background: var(--ok); }
-#small .meter.quiet .track { height: 0; border-top: 2px dashed var(--edge); border-radius: 0; background: none; }
-#small .meter.quiet .fill, #small .meter.quiet .peak { display: none; }
-/* A level (#1179): it rises at once and falls eased, as a VU meter (Zoom's, Meet's levels are smoothed too); its
-   loudest of the last 0.8 s a 2 px tick. Less motion: the rule at the end removes the easing, the page draws no tick. */
-.peak { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; margin-left: -2px; border-radius: 1px; background: var(--accent); }
-.falling { transition: width 600ms cubic-bezier(0.2, 0.6, 0.3, 1), left 600ms cubic-bezier(0.2, 0.6, 0.3, 1); }
+#small .meter .track { flex: 1 1 auto; height: 14px; }
+#small .meter.quiet .track { height: 0; border-top: 2px dashed var(--edge); }
+#small .meter.quiet .track > i { display: none; }
+/* A level (#1179, the decider's « B · Trace »): its last readings as rounded bars, the newest at the right, each its
+   reading's height and never less than a dot — a trace that says « it records » even in a silence. The bars of a
+   fixed width, the oldest cut at the left: the bar's 120 px show its last two seconds, a wider track more. Drawn
+   at each reading, with no transition: less motion is the page's to draw (tests/meter.rs). Each side in its colour,
+   as board 5 draws it, on the surface or the ground (3:1, tests/look.rs). */
+.trace { display: flex; align-items: center; justify-content: flex-end; gap: 2px; overflow: hidden; }
+.trace > i { flex: none; flex-basis: 3px; min-height: 4px; height: 0; border-radius: 2px; background: var(--accent); }
+#level-others > i, .page-level.others > i, .check-source.far .check-track > i { background: var(--ok); }
 #small .bar-lines { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; }
 #small .bar-lines > :last-child:not([hidden]) { margin-bottom: 8px; }
 #small .check-says { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; line-height: 1.3; color: var(--soft); }
@@ -714,10 +712,8 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .check-top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .check-name { font-weight: 600; }
 .check-device { margin-left: auto; color: var(--soft); font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.check-track { position: relative; overflow: hidden; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 14%, var(--raised)); }
-.check-source.far .check-track { background: color-mix(in srgb, var(--ok) 14%, var(--raised)); }
-.check-fill { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--accent); }
-.check-source.far .check-fill, .check-source.far .peak { background: var(--ok); }
+.check-track { height: 28px; gap: 4px; }
+.check-track > i { flex-basis: 6px; border-radius: 3px; }
 /* « Dates mentionnées » (D115): « Vérifier le son »'s panel, each date ticked or not, its passage under it. */
 .dates-day { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
 .dates-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }

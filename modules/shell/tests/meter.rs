@@ -1,13 +1,14 @@
-//! A level meter's drawing from its readings (#1179): up at once, down eased, its peak held 0.8 s; for
-//! who asks for less motion, a level held a second, in three steps, and no peak. The page's
-//! `levelShown`, read from `ui/window.js` and run by Node over a sequence of readings.
+//! A level meter's drawing from its readings (#1179, « B · Trace »): its last readings as bars, the newest at the
+//! right, moving left a bar a reading; for who asks for less motion, a level held a second, in three steps, the same
+//! on every bar. The page's `levelShown`, read from `ui/window.js` and run by Node over a sequence of readings.
 
 use std::process::Command;
 
 use serde_json::{Value, json};
 
-/// Runs `levelShown` over `readings` — [reading, milliseconds, less motion] —, each from the one before.
-fn shown(readings: &[(f64, f64, bool)]) -> Option<Vec<Value>> {
+/// Runs `levelShown` over `readings` — [reading, milliseconds, less motion] —, each from the one before, on a track
+/// of `count` bars.
+fn shown(count: usize, readings: &[(f64, f64, bool)]) -> Option<Vec<Value>> {
     let here = env!("CARGO_MANIFEST_DIR");
     let page = r#"
 const fs = require("fs");
@@ -18,11 +19,12 @@ let depth = 0, i = src.indexOf("{", start), end;
 for (; i < src.length; i++) { if (src[i] === "{") depth++; else if (src[i] === "}") { depth--; if (depth === 0) { end = i + 1; break; } } }
 const levelShown = new Function(src.slice(start, end) + "; return levelShown;")();
 let was;
-console.log(JSON.stringify(JSON.parse(process.argv[2]).map(([reading, now, still]) => (was = levelShown(was, reading, now, still)))));
+const count = Number(process.argv[3]);
+console.log(JSON.stringify(JSON.parse(process.argv[2]).map(([reading, now, still]) => (was = levelShown(was, reading, now, still, count)))));
 "#;
     let asked = serde_json::to_string(&readings.iter().map(|(r, t, s)| json!([r, t, s])).collect::<Vec<_>>()).unwrap();
     let Ok(output) = Command::new("node")
-        .args(["-e", page, &format!("{here}/ui/window.js"), &asked])
+        .args(["-e", page, &format!("{here}/ui/window.js"), &asked, &count.to_string()])
         .output()
     else {
         // As tests/model_said.rs: owed on a CI runner, which carries Node; said elsewhere.
@@ -37,59 +39,69 @@ console.log(JSON.stringify(JSON.parse(process.argv[2]).map(([reading, now, still
     Some(serde_json::from_slice(&output.stdout).unwrap())
 }
 
-fn widths(drawn: &[Value]) -> Vec<i64> {
-    drawn.iter().map(|d| d["width"].as_i64().unwrap()).collect()
+fn bars(drawn: &Value) -> Vec<i64> {
+    drawn["bars"].as_array().unwrap().iter().map(|b| b.as_i64().unwrap()).collect()
 }
 
 #[test]
-fn a_level_rises_at_once_and_falls_eased() {
-    let Some(drawn) = shown(&[(0.1, 0.0, false), (0.8, 100.0, false), (0.3, 200.0, false), (0.3, 300.0, false)]) else {
+fn a_trace_draws_its_last_readings_the_newest_at_the_right() {
+    let Some(drawn) = shown(4, &[(0.1, 0.0, false), (0.8, 100.0, false), (0.3, 200.0, false)]) else {
         return;
     };
-    assert_eq!(widths(&drawn), [10, 80, 30, 30], "{drawn:?}");
-    // The drawing is the reading; only a fall is eased, by the style's `.falling`.
-    let falling: Vec<bool> = drawn.iter().map(|d| d["falling"].as_bool().unwrap()).collect();
-    assert_eq!(falling, [false, false, true, false], "{drawn:?}");
+    // From an empty track, each reading a bar at the right, the ones before it moved left.
+    assert_eq!(bars(&drawn[0]), [0, 0, 0, 10], "{drawn:?}");
+    assert_eq!(bars(&drawn[1]), [0, 0, 10, 80], "{drawn:?}");
+    assert_eq!(bars(&drawn[2]), [0, 10, 80, 30], "{drawn:?}");
 }
 
 #[test]
-fn a_peak_stays_eight_tenths_of_a_second_then_follows() {
-    let Some(drawn) = shown(&[
-        (0.8, 0.0, false),
-        (0.3, 500.0, false),
-        (0.2, 790.0, false),
-        (0.2, 900.0, false),
-        (0.5, 1000.0, false),
-    ]) else {
+fn a_trace_keeps_as_many_bars_as_its_track_the_oldest_gone() {
+    let readings: Vec<(f64, f64, bool)> = (1..=6).map(|n| (f64::from(n) / 10.0, f64::from(n) * 100.0, false)).collect();
+    let Some(drawn) = shown(4, &readings) else {
         return;
     };
-    let peaks: Vec<i64> = drawn.iter().map(|d| d["peak"].as_i64().unwrap()).collect();
-    assert_eq!(peaks, [80, 80, 80, 20, 50], "{drawn:?}");
+    assert_eq!(bars(drawn.last().unwrap()), [30, 40, 50, 60], "{drawn:?}");
 }
 
 #[test]
 fn a_reading_out_of_range_is_drawn_inside_it() {
-    let Some(drawn) = shown(&[(1.4, 0.0, false), (-0.2, 100.0, false)]) else {
+    let Some(drawn) = shown(2, &[(1.4, 0.0, false), (-0.2, 100.0, false)]) else {
         return;
     };
-    assert_eq!(widths(&drawn), [100, 0], "{drawn:?}");
+    assert_eq!(bars(&drawn[1]), [100, 0], "{drawn:?}");
 }
 
 #[test]
-fn less_motion_holds_a_level_a_second_in_three_steps_and_no_peak() {
-    let Some(drawn) = shown(&[
-        (0.9, 0.0, true),
-        (0.1, 500.0, true),
-        (0.1, 999.0, true),
-        (0.1, 1000.0, true),
-        (0.5, 2000.0, true),
-        (0.3, 3000.0, true),
-        (0.74, 4000.0, true),
-        (0.76, 5000.0, true),
-        (0.19, 6000.0, true),
-    ]) else {
+fn less_motion_holds_a_level_a_second_in_three_steps_on_every_bar() {
+    let Some(drawn) = shown(
+        3,
+        &[
+            (0.9, 0.0, true),
+            (0.1, 500.0, true),
+            (0.1, 999.0, true),
+            (0.1, 1000.0, true),
+            (0.5, 2000.0, true),
+            (0.3, 3000.0, true),
+            (0.74, 4000.0, true),
+            (0.76, 5000.0, true),
+            (0.19, 6000.0, true),
+        ],
+    ) else {
         return;
     };
-    assert_eq!(widths(&drawn), [90, 90, 90, 0, 50, 50, 50, 90, 0], "{drawn:?}");
-    assert!(drawn.iter().all(|d| d["peak"].is_null() && d["falling"] == false), "{drawn:?}");
+    let held: Vec<Vec<i64>> = drawn.iter().map(bars).collect();
+    let steps: Vec<i64> = held.iter().map(|b| b[0]).collect();
+    assert_eq!(steps, [90, 90, 90, 0, 50, 50, 50, 90, 0], "{drawn:?}");
+    // Nothing scrolls: every bar the level held.
+    assert!(held.iter().all(|b| b.iter().all(|h| *h == b[0])), "{held:?}");
+}
+
+#[test]
+fn less_motion_asked_while_drawing_holds_the_level_and_given_back_starts_a_trace() {
+    let Some(drawn) = shown(3, &[(0.4, 0.0, false), (0.8, 100.0, true), (0.3, 200.0, false)]) else {
+        return;
+    };
+    assert_eq!(bars(&drawn[1]), [90, 90, 90], "{drawn:?}");
+    // The held level is no reading: the trace starts again from empty.
+    assert_eq!(bars(&drawn[2]), [0, 0, 30], "{drawn:?}");
 }
