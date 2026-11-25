@@ -28,12 +28,10 @@ for (const source of installSources) {
     }));
   }
 }
-// A tab's commands, in order, among the lines of one block meant for its system or for every system.
+// A tab's commands are, line for line, one block's lines meant for its system or for every system.
 const given = (os, commands) => blocks.some((block) => {
   const lines = block.filter((p) => !p.systems.length || p.systems.includes(os)).flatMap((p) => p.lines);
-  let at = 0;
-  for (const line of lines) if (line === commands[at]) at++;
-  return at === commands.length;
+  return lines.join("\n") === commands.join("\n");
 });
 
 const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8");
@@ -53,13 +51,13 @@ for (const lang of ["en", "fr"]) {
     assert.doesNotMatch(await page(lang), /\[(À MESURER|TO MEASURE)\]|class="todo"|TODO|XXX/);
   });
 
-  test(`/${lang}/: the install's commands, in order, as a README gives them for that system`, async () => {
+  test(`/${lang}/: the install's commands, line for line, as a README block gives them for that system`, async () => {
     const html = await page(lang);
     for (const [os, , commands] of channels) {
       const shown = html.match(new RegExp(`<pre class="os-code" data-os="${os}"[^>]*>([\\s\\S]*?)</pre>`))?.[1];
       assert.ok(shown, `no commands for ${os}`);
       assert.equal(text(shown).replace(/^\$ /gm, ""), commands);
-      assert.ok(given(os, commands.split("\n")), `${os}: its commands are no sequence of a README's lines for ${os}`);
+      assert.ok(given(os, commands.split("\n")), `${os}: its commands are not a README block's lines for ${os}`);
     }
   });
 
