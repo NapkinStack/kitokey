@@ -62,8 +62,8 @@ there, and a new terminal, in the clone, finds it.
   Vulkan, a built-in one being enough; 10 GB free for the two models; about 2 GB free for each hour that records,
   then about 0.2 GB kept an hour.
 - **With the service you choose**: no special hardware, the transcript and the minutes made online by an
-  OpenAI-compatible service, such as Groq — often paid, billed by that service, not by Kitokey; about 0.2 GB kept an
-  hour of meeting, its audio staying on the computer.
+  OpenAI-compatible service, such as Groq — often paid, billed by that service, not by Kitokey; about 2 GB free while an
+  hour records, then about 0.2 GB kept.
 
 How each package is made, and what a computer needs to run it — memory, disk, how long a meeting takes, measured:
 [`modules/install`](modules/install/). On macOS, GitHub's runner makes the app on every change to a program on `main`, signed ad hoc, not by Apple.
