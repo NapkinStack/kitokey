@@ -45,3 +45,13 @@ test("nothing of the review tool is built", async () => {
     assert.doesNotMatch(text, /review-bar|kitokey-review-|data-screens|[?&](site|screens|bg|slide)=/, `${file.slice(dist.length)} keeps the review tool`);
   }
 });
+
+test("the skip link hides off screen and shows at the top once focused", async () => {
+  const html = await readFile(join(dist, "en", "privacy", "index.html"), "utf8");
+  let css = "";
+  for (const [, href] of html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)) css += await readFile(join(dist, href), "utf8");
+  const rule = (selector) => css.match(new RegExp(`(?:^|})${selector.replace(/[.:]/g, "\\$&")}\\{([^}]*)\\}`))?.[1] ?? "";
+  const top = (decls) => decls.match(/(?:^|;)top:(-?[\d.]+)(?:px)?(?:;|$)/)?.[1];
+  assert.ok(Number(top(rule(".skip"))) < 0, `.skip is not off screen: ${rule(".skip")}`);
+  assert.ok(Number(top(rule(".skip:focus"))) >= 0, `.skip:focus does not bring it back: ${rule(".skip:focus") || "no rule"}`);
+});
