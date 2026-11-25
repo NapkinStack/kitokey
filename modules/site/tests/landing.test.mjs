@@ -85,11 +85,16 @@ test("the waves move for ever but pause on a button, and stand still under reduc
   assert.match(js, /IntersectionObserver/);
 });
 
-test("the clips are c16's alone, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
-  const want = KEYS.flatMap((k) => ["en", "fr"].flatMap((l) => ["jpg", "mp4", "webm"].map((e) => `${k}-${l}-light.${e}`))).sort();
+test("the clips are c16's alone, light for each slide and dark where filmed so, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
+  const set = (theme, keys) => keys.flatMap((k) => ["en", "fr"].flatMap((l) => ["jpg", "mp4", "webm"].map((e) => `${k}-${l}-${theme}.${e}`)));
   const have = (await readdir(join(dist, "clips"))).sort();
-  assert.deepEqual(have, want);
+  const darkKeys = KEYS.filter((k) => have.some((n) => n.startsWith(`${k}-`) && n.includes("-dark.")));
+  assert.deepEqual(have, [...set("light", KEYS), ...set("dark", darkKeys)].sort());
   for (const name of have) assert.ok((await stat(join(dist, "clips", name))).size <= 500 * 1024, `${name} is over 500 KiB`);
+  for (const lang of ["en", "fr"]) {
+    const html = await page(lang);
+    for (const k of KEYS) assert.equal(new RegExp(`data-clip="/clips/${k}-${lang}" data-dark`).test(html), darkKeys.includes(k), `${lang} ${k}: the moon's clip said wrong`);
+  }
 });
 
 test("the root sends a reader to the French landing, English one link away", async () => {

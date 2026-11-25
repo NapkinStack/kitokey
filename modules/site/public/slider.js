@@ -1,6 +1,6 @@
 // kitokey.com's hero carousel (D114, proposal D). Without this file the slides still swipe (CSS scroll-snap)
 // and each shows its clip's poster. With it: arrow keys, a calm crossfade on a fine pointer, and on screens of
-// 700 px and more the clip itself (AV1 WebM, else H.264 MP4). Each clip plays once per view, then the next
+// 700 px and more the clip itself (AV1 WebM, else H.264 MP4), in the app's dark theme under the moon where filmed so. Each clip plays once per view, then the next
 // slide comes 0.6 s later; the drawn call of slide 1 stays 3 s, a poster alone 3.5 s. WCAG 2.2.2: autoplay pauses on hover and on focus inside, never starts under
 // reduced motion (posters only), and rests on slide 1 after two full cycles.
 (() => {
@@ -55,25 +55,39 @@
   slider.addEventListener("focusout", resume);
   reduce.addEventListener("change", () => mark(at));
 
+  // The clips' theme: the app's dark clips under the moon where they exist, else the light ones in a dark frame.
+  const theme = (s) => (document.documentElement.dataset.screens === "dark" && "dark" in s.dataset ? "dark" : "light");
+  const named = (s, ext) => `${s.dataset.clip}-${theme(s)}.${ext}`;
+
   // The clips: added only where they play, so a phone or a reduced-motion reader downloads posters alone.
-  if (wide.matches && !reduce.matches) {
+  const play = wide.matches && !reduce.matches;
+  const dress = () => {
     for (const [index, s] of slides.entries()) {
       if (!s.dataset.clip) continue; // the drawn call has no clip
-      const img = s.querySelector("img.still");
-      const v = document.createElement("video");
-      Object.assign(v, { muted: true, playsInline: true, preload: "none", poster: img.currentSrc || img.src });
-      v.setAttribute("muted", "");
-      v.setAttribute("aria-label", img.alt);
-      v.width = img.width; v.height = img.height;
+      const poster = s.querySelector("img.still");
+      if (poster) poster.src = named(s, "jpg");
+      if (!play) continue;
+      const v = s.querySelector("video");
+      if (v && v.dataset.theme === theme(s)) continue;
+      const fresh = document.createElement("video");
+      Object.assign(fresh, { muted: true, playsInline: true, preload: "none", poster: named(s, "jpg") });
+      fresh.setAttribute("muted", "");
+      fresh.dataset.theme = theme(s);
       for (const [ext, type] of [["webm", 'video/webm; codecs="av01.0.05M.08"'], ["mp4", "video/mp4"]]) {
         const source = document.createElement("source");
-        source.src = `${s.dataset.clip}.${ext}`; source.type = type;
-        v.append(source);
+        source.src = named(s, ext); source.type = type;
+        fresh.append(source);
       }
-      v.addEventListener("ended", () => { if (index === at && !still()) timer = setTimeout(() => go(at + 1), HOLD); });
-      img.replaceWith(v);
+      fresh.addEventListener("ended", () => { if (index === at && !still()) timer = setTimeout(() => go(at + 1), HOLD); });
+      const old = v || poster;
+      fresh.setAttribute("aria-label", old.getAttribute("aria-label") || old.alt);
+      fresh.width = old.width; fresh.height = old.height;
+      old.replaceWith(fresh);
     }
-  }
+    mark(at);
+  };
+  dress();
+  document.addEventListener("kitokey:screens", dress);
 
   if ("IntersectionObserver" in window) {
     if (!fade) {

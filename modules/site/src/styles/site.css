@@ -285,6 +285,27 @@ p { text-wrap: pretty; }
 @keyframes enter { from { opacity: 0; transform: translateY(18px); } }
 @keyframes glide { from { transform: translateY(22px); } }
 
+/* ---- The dark theme (the decider's round 9): html[data-site] sets the site, html[data-screens] the app's clips;
+   public/theme.js follows the system until the visitor picks the moon or the sun. ---- */
+.theme-toggle { display: inline-grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--soft); cursor: pointer; }
+.theme-toggle:hover { color: var(--ink); background: var(--tint); }
+.theme-toggle[hidden] { display: none; }
+.theme-toggle .ico { width: 1.3rem; height: 1.3rem; }
+.theme-toggle .i-sun, html[data-site="dark"] .theme-toggle .i-moon { display: none; }
+html[data-site="dark"] .theme-toggle .i-sun { display: block; }
+html[data-site="dark"] {
+  color-scheme: dark;
+  --bg: #0A0B0F; --surface: #15181F; --tint: #1A1E28; --line: #272B35; --control: #8E97AA;
+  --ink: #F2F4F8; --soft: #A9B0BF; --accent: #8AB0FF; --accent-hover: #B0C9FF; --on-accent: #0A0B0F;
+}
+html[data-site="dark"] .mesh i { filter: blur(90px) brightness(.45) saturate(1.3); }
+html[data-site="dark"] .mesh::after { mix-blend-mode: screen; opacity: .04; }
+html[data-site="dark"] .window { background: #1A1E28; outline-color: #343B4A; box-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 40px 80px -36px rgba(0, 0, 0, .8); }
+html[data-site="dark"] .window-bar { background: linear-gradient(#2A2F3B, #222632); border-bottom-color: #343B4A; color: #C9CFDA; }
+html[data-site="dark"] .os-state .ok { color: #9BE8C0; background: #10301F; }
+html[data-site="dark"] .soon { color: #FFD58A; background: #2A2110; }
+html[data-site="dark"] .band { background: #11141D; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }

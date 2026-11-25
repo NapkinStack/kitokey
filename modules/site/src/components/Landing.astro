@@ -5,6 +5,8 @@ import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
 import Call from "./Call.astro";
 import { channels, landing as w, repo } from "../lib/landing.mjs";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { brand, ico } from "../lib/icons.mjs";
 
 const { lang } = Astro.props;
@@ -14,6 +16,8 @@ const [h1a, h1b, lead] = t("hero");
 const [cta, follow] = t("cta");
 const [sLabel, sSlide, sRole, sOf] = t("slider");
 const [callTitle] = t("call");
+// A clip filmed in the app's dark theme too (c16c-dark), when its three files are here: the moon shows it.
+const dark = (key) => ["jpg", "mp4", "webm"].every((ext) => existsSync(join(process.cwd(), "public", "clips", `${key}-${lang}-dark.${ext}`)));
 const [chH, chP, chWith] = t("channels");
 const [pEyebrow, pH, pLead] = t("privacy");
 const [localTitle, localAlt] = t("local");
@@ -41,7 +45,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
       <section class="slider" aria-roledescription={sRole} aria-label={sLabel}>
         <div class="slides" tabindex="0">
           {t("slides").map(([key, icon, kicker, h, p, alt], i, all) => (
-            <article class="slide" id={`slide-${i}`} data-clip={key === "record" ? undefined : `/clips/${key}-${lang}-light`} aria-roledescription={sSlide} aria-label={`${i + 1} ${sOf} ${all.length}, ${kicker}`}>
+            <article class="slide" id={`slide-${i}`} data-clip={key === "record" ? undefined : `/clips/${key}-${lang}`} data-dark={key !== "record" && dark(key) ? "" : undefined} aria-roledescription={sSlide} aria-label={`${i + 1} ${sOf} ${all.length}, ${kicker}`}>
               {key === "record" ? (
                 <div class="slide-media window">
                   <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">{callTitle}</span></div>

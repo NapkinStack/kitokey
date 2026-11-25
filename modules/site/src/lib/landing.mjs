@@ -57,8 +57,8 @@ const raw = {
     keeps: "the decider's round 9 (2026-11-25): each clip shows it, filmed from the app (c16c); #1179 the trace; #1205 the names; D113 the dates, .ics as RFC 5545; D116 the send; #1208 the padlock, D110 the confidential meeting",
   },
   channels: {
-    en: ["The minutes go where your team works.", "In one click, to a Slack channel, a Discord channel or your webhook. Nothing leaves without your gesture, and never a confidential meeting without your confirmation.", "Works with"],
-    fr: ["Le compte rendu part là où l’équipe travaille.", "En un clic, vers un canal Slack, un salon Discord ou votre webhook. Rien ne part sans votre geste, jamais pour une réunion confidentielle sans votre confirmation.", "Fonctionne avec"],
+    en: ["The whole team up to date, in one click.", "In one click, to a Slack channel, a Discord channel or your webhook. Nothing leaves without your gesture, and never a confidential meeting without your confirmation.", "Works with"],
+    fr: ["Toute l’équipe à jour, en un clic.", "En un clic, vers un canal Slack, un salon Discord ou votre webhook. Rien ne part sans votre geste, jamais pour une réunion confidentielle sans votre confirmation.", "Fonctionne avec"],
     keeps: "PDR-0007 and D116, the sends to a channel; D119, a confidential meeting's send asked once more",
   },
   privacy: {
