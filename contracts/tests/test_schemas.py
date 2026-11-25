@@ -619,6 +619,39 @@ EXAMPLES = {
     ),
 }
 
+# The names a person gave a meeting's speakers (#1205): the shell's file, read by the shell and by summary.
+EXAMPLES["session-audio/v3/speakers.schema.json"] = (
+    [
+        {},
+        {"me": "Camille"},
+        {"me": "Camille", "others": "Hugo"},
+        {"others": "Jiří Novák"},
+        {"voices": {"remote/1": "Léa", "local/a": "Camille"}},
+        {"voices": {"remote/a/b": "Léa", "remote/" + "v" * 65: "Hugo"}},
+        {"me": "x" * 60},
+    ],
+    [
+        "a file that is no object",
+        {"me": ""},
+        {"me": "   "},
+        {"others": "   "},
+        {"me": "deux\nlignes"},
+        {"others": "x" * 61},
+        {"me": "x" * 61},
+        {"voices": {"remote/1": "x" * 61}},
+        {"me": 3},
+        {"me": None},
+        {"voices": "Léa"},
+        {"voices": {"remote": "Léa"}},
+        {"voices": {"elsewhere/1": "Léa"}},
+        {"voices": {"remote/1": ""}},
+        {"voices": {"other/1": "Léa"}},
+        {"voices": {"remote/": "Léa"}},
+        {"voices": {"remote/1": "   "}},
+        {"voices": {"remote/deux\nlignes": "Léa"}},
+    ],
+)
+
 # A meeting's own models (D91): the shell's file, said in session-audio/v3 and read for a meeting of
 # any version.
 EXAMPLES["session-audio/v3/models.schema.json"] = (
