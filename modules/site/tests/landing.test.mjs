@@ -64,7 +64,9 @@ for (const lang of ["en", "fr"]) {
     const [call, ...clips] = slides;
     assert.doesNotMatch(call, /data-clip=/);
     assert.ok(call.includes(`role="img" aria-label="${landing.slides[lang][0][5]}"`), "the call is not described");
-    assert.equal([...call.matchAll(/<img class="ptr" src="\/img\/call-[a-z]+\.webp"/g)].length, 4);
+    const portraits = [...call.matchAll(/<img class="ptr" src="(\/img\/call-[a-z]+\.webp)"/g)].map((m) => m[1]);
+    assert.equal(portraits.length, 4);
+    for (const src of portraits) assert.ok((await stat(join(dist, src))).size > 0, `${src} not built`);
     assert.deepEqual(clips.map((s) => s.match(/data-clip="\/clips\/([a-z]+)-/)?.[1]), KEYS);
     for (const [i, s] of clips.entries()) {
       const [key, , , , , alt] = landing.slides[lang][i + 1];
