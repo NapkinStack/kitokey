@@ -30,7 +30,7 @@ use kitokey_shell::microphone;
 use kitokey_shell::{
     autostart,
     confidential::{self, Left, Wait, What},
-    context, correction, desktop, exporting, keys,
+    context, correction, dates, desktop, exporting, keys,
     licence::{self, Licence},
     log,
     meeting::{self, Read, Transcript},
@@ -43,7 +43,9 @@ use kitokey_shell::{
     registry, sending,
     sessions::{self, Listed},
     settings::{self, After, Appearance, Engine, KeepAudio, Log, Settings},
-    sound_check, speech,
+    sound_check,
+    speakers::{self, Speakers},
+    speech,
     speeds::{self, Speeds, Step},
     spoken,
     summarising::{self, Summarising},
@@ -413,6 +415,7 @@ fn main() {
             next_context,
             next_context_kept,
             language_set,
+            speakers_named,
             bar_language,
             next_language_kept,
             meeting_models_shown,
@@ -431,8 +434,13 @@ fn main() {
             transcript_again,
             opened,
             open_folder,
+            dates_resolved,
+            date_google,
+            dates_file_chosen,
+            dates_ics,
             open_logs,
             diagnostic,
+            peaks_of,
             settings_shown,
             settings_saved,
             minutes_shown,
@@ -1752,6 +1760,9 @@ struct Opened {
     models_gone: Vec<meeting_models::Step>,
     /// The last summary a redo replaced, kept beside it (D113): when it was made, and by what.
     previous_minutes: Option<Previous>,
+    /// The names the user gave its two sides (#1205); none where the meeting cannot hold them — before
+    /// session-audio/v3 —: the page then offers no naming.
+    speakers: Option<SpeakersShown>,
     /// The last transcript a redo replaced, the same way (D113).
     previous_transcript: Option<Previous>,
     /// The summary shown was made on the other version of the transcript, not the one shown (#1070):
@@ -1825,6 +1836,22 @@ struct Previous {
     model: Option<String>,
 }
 
+/// The two sides' names as the page shows them (#1205): the user's own words, none where a side keeps the page's.
+#[derive(serde::Serialize)]
+struct SpeakersShown {
+    me: Option<String>,
+    others: Option<String>,
+}
+
+impl From<Speakers> for SpeakersShown {
+    fn from(kept: Speakers) -> Self {
+        SpeakersShown {
+            me: kept.me,
+            others: kept.others,
+        }
+    }
+}
+
 #[tauri::command]
 fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
     let gone = || shell.told(Failure::MeetingGone, format!("{name} is no session"));
@@ -1834,6 +1861,13 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         .into_iter()
         .find(|listed| listed.folder == folder)
         .ok_or_else(gone)?;
+    // The last minutes a redo replaced (D113), named by id as the page names v5's sections.
+    let said = words::window(shell.language());
+    let kept_minutes = minutes::previous(
+        &folder,
+        said.minutes_sections,
+        &minutes::named_by_id(said.minutes_sections, said.structure_sections),
+    );
     Ok(Opened {
         session,
         transcript: meeting::transcript(&folder),
@@ -1848,10 +1882,7 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         apple: shell.settings().engine == Engine::SpeechAnalyzer,
         system_language: shell.system.code(),
         models_gone: gone_of(&shell.settings(), &folder),
-        previous_minutes: match {
-            let words = words::window(shell.language());
-            minutes::previous(&folder, words.minutes_sections, &minutes::named_by_id(words.minutes_sections, words.structure_sections))
-        } {
+        previous_minutes: match kept_minutes {
             Read::Present(kept) => Some(Previous {
                 made: kept.made,
                 provider: kept.provider,
@@ -1859,6 +1890,7 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
             }),
             _ => None,
         },
+        speakers: speakers::offered(&folder).then(|| SpeakersShown::from(speakers::read(&folder))),
         previous_transcript: match meeting::previous(&folder) {
             Read::Present(kept) => Some(Previous {
                 made: kept.made,
@@ -1869,6 +1901,23 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         },
         minutes_other_version: versions(&folder, words::window(shell.language()).minutes_sections).minutes_on_other(),
     })
+}
+
+/// The names the user gives a meeting's two sides (#1205), kept in its `speakers.json`: each trimmed, a blank one
+/// giving the side back its word; the names as kept are returned for the page to show. No name is logged.
+#[tauri::command]
+fn speakers_named(shell: State<'_, Shell>, name: String, me: Option<String>, others: Option<String>) -> Result<SpeakersShown, Told> {
+    let folder = session_folder(&shell, &name)?;
+    let kept = speakers::write(&folder, &Speakers { me, others }).map_err(|error| {
+        // A name the page's fields never let through, or a meeting before v3 the page offers no naming for; else the folder.
+        let failure = match error.kind() {
+            std::io::ErrorKind::InvalidInput | std::io::ErrorKind::Unsupported => Failure::Unexpected,
+            _ => Failure::MeetingFile,
+        };
+        shell.told(failure, error)
+    })?;
+    tracing::info!(me = kept.me.is_some(), others = kept.others.is_some(), "shell.speakers_named");
+    Ok(SpeakersShown::from(kept))
 }
 
 /// The steps whose own model a meeting chose and cannot have now (D91).
@@ -2397,6 +2446,32 @@ fn playable(shell: &Shell, folder: &Path) -> Option<String> {
         .offer_placed(tracks.into_iter().map(|track| (track.path, track.runs)).collect())
 }
 
+/// A meeting's waveform per voice (#1201): each track's peaks, read away from the window's thread — two hours
+/// of tracks in about 4 s, once — then kept in its `derived/` (`peaks`). None while it records, or when no
+/// track reads: the page then draws who spoke from its transcript. Numbers only, 0 to 255 of full scale.
+#[derive(serde::Serialize)]
+struct Waveform {
+    seconds: f64,
+    local: Option<Vec<u8>>,
+    remote: Option<Vec<u8>>,
+}
+
+#[tauri::command]
+async fn peaks_of(shell: State<'_, Shell>, name: String) -> Result<Option<Waveform>, Told> {
+    let folder = session_folder(&shell, &name)?;
+    if shell.recording.lock().unwrap().is_some() && shell.recorded.lock().unwrap().as_deref() == Some(folder.as_path()) {
+        return Ok(None);
+    }
+    let read = tauri::async_runtime::spawn_blocking(move || kitokey_shell::peaks::of(&folder))
+        .await
+        .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    Ok(read.map(|peaks| Waveform {
+        seconds: peaks.seconds,
+        local: peaks.local,
+        remote: peaks.remote,
+    }))
+}
+
 /// A meeting's diagnostic, for the page to copy: every program's log lines of its makings, then
 /// each track's level — nothing of the meeting, which no line holds (D29).
 #[tauri::command]
@@ -2538,6 +2613,120 @@ fn local_instead(app: AppHandle, shell: State<'_, Shell>, name: String, model: S
     }
     make_minutes(&app, folder);
     look_again(&app);
+    Ok(())
+}
+
+/// What a meeting's actions' *by when* name (D115): the day they are read against — the meeting's own, as its
+/// folder names it, or the one the user set — and each one's date, or none when it names none without a guess.
+#[derive(serde::Serialize)]
+struct Resolved {
+    day: String,
+    dates: Vec<Option<String>>,
+}
+
+#[tauri::command]
+fn dates_resolved(name: String, whens: Vec<String>, day: Option<String>) -> Option<Resolved> {
+    let day = match day {
+        Some(day) => chrono::NaiveDate::parse_from_str(&day, "%Y-%m-%d").ok()?,
+        None => dates::reference_day(&name)?,
+    };
+    let dated = |when: &String| dates::resolve(when, day).map(|date| date.format("%Y-%m-%d").to_string());
+    Some(Resolved {
+        day: day.format("%Y-%m-%d").to_string(),
+        dates: whens.iter().map(dated).collect(),
+    })
+}
+
+/// One ticked date, as the page shows it: its day, the action's what and who, its passage, the meeting's name.
+#[derive(serde::Deserialize)]
+struct Ticked {
+    date: String,
+    what: String,
+    who: Option<String>,
+    passage: Option<String>,
+    meeting: String,
+}
+
+/// Opens Google Calendar's own screen on a ticked date, the event pre-filled and unsaved (D115): nothing leaves
+/// before this gesture, and never a confidential meeting's words (PDR-0007): its dates go to an `.ics` alone.
+#[tauri::command]
+fn date_google(shell: State<'_, Shell>, name: String, item: Ticked) -> Result<(), Told> {
+    if confidential::marked(&session_folder(&shell, &name)?) {
+        return Err(shell.told(Failure::LinkNotOpened, "a confidential meeting is given no link"));
+    }
+    let date = chrono::NaiveDate::parse_from_str(&item.date, "%Y-%m-%d").map_err(|error| shell.told(Failure::LinkNotOpened, error))?;
+    let event = dates::Event {
+        date,
+        what: &item.what,
+        who: item.who.as_deref(),
+        passage: item.passage.as_deref(),
+        meeting: &item.meeting,
+    };
+    browsing(&shell, &dates::google(&event))
+}
+
+/// Where the ticked dates go as an `.ics`, chosen in the system's own dialog, its name the meeting's; none when the
+/// user closes it (D115). Allowed for a confidential meeting: the file stays on this computer (PDR-0007).
+#[tauri::command]
+async fn dates_file_chosen(app: AppHandle, name: String) -> Option<PathBuf> {
+    use tauri_plugin_dialog::DialogExt;
+    let folder = sessions::folder(&app.state::<Shell>().settings().sessions, &name)?;
+    let chosen = app
+        .dialog()
+        .file()
+        .set_file_name(format!("{}.ics", named(&folder)))
+        .add_filter("iCalendar", &["ics"]);
+    chosen.blocking_save_file()?.into_path().ok()
+}
+
+/// Writes the ticked dates at `to` as an `.ics`, by `kitokey-export` (`exporting/v1`'s `ics`, D115): each a
+/// whole day, its title and notes as the page shows them, its UID stable for the meeting and the action.
+#[tauri::command]
+fn dates_ics(shell: State<'_, Shell>, name: String, to: PathBuf, dates: Vec<exporting::Dated>) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let language = shell.language();
+    let said = words::exported(language);
+    let meeting = meeting_said(&folder, language);
+    // Each side by the name the user gave it (#1205), else the page's word.
+    let kept = speakers::read(&folder);
+    let (me, others) = kept.sides(said.me, said.others);
+    let input = exporting::Input {
+        to: &to,
+        name: &meeting,
+        transcript: said.transcript,
+        me,
+        others,
+        time: said.time,
+        speaker: said.speaker,
+        text: said.text,
+        dates: Some(&dates),
+    };
+    let tag = match language {
+        Language::French => "fr",
+        Language::English => "en",
+    };
+    exporting::ics(&program("kitokey-export", "KITOKEY_EXPORT"), &folder, tag, &input)
+        .inspect(|()| tracing::info!(dates = dates.len(), "shell.dates_saved"))
+        .map_err(|why| shell.told(Failure::DatesNotSaved, why))
+}
+
+/// Opens an address in the system's browser; `KITOKEY_BROWSER` names another program, as the e2e's stand-in that
+/// writes down the address it is handed and opens nothing.
+fn browsing(shell: &Shell, address: &str) -> Result<(), Told> {
+    let opener = std::env::var_os("KITOKEY_BROWSER").map(PathBuf::from).unwrap_or_else(|| {
+        PathBuf::from(if cfg!(target_os = "macos") {
+            "open"
+        } else if cfg!(windows) {
+            "explorer"
+        } else {
+            "xdg-open"
+        })
+    });
+    let mut started = std::process::Command::new(opener)
+        .arg(address)
+        .spawn()
+        .map_err(|error| shell.told(Failure::LinkNotOpened, error))?;
+    std::thread::spawn(move || started.wait());
     Ok(())
 }
 
@@ -3194,6 +3383,8 @@ fn sends_file() -> PathBuf {
 #[derive(serde::Serialize)]
 struct SendingShown {
     offered: bool,
+    /// Said confidential: each send is asked once more on the page, and confirmed to kitokey-send (D119).
+    confidential: bool,
     destinations: Vec<DestinationOffered>,
     sends: Vec<sending::Sent>,
     last: Vec<sending::Sent>,
@@ -3219,7 +3410,8 @@ fn sending_shown(shell: &Shell, folder: &Path) -> SendingShown {
         .collect();
     let summary = matches!(read_minutes(folder, shell.language()), Read::Present(_));
     SendingShown {
-        offered: summary && !confidential::marked(folder) && !destinations.is_empty(),
+        offered: summary && !destinations.is_empty(),
+        confidential: confidential::marked(folder),
         destinations,
         sends: sending::of(&record, meeting).into_iter().cloned().collect(),
         last: sending::last(&record, meeting).into_iter().cloned().collect(),
@@ -3238,6 +3430,8 @@ struct SentShown {
     #[serde(flatten)]
     outcome: sending::Outcome,
     sending: SendingShown,
+    /// The switch as it now reads: a confirmed send of a confidential meeting is said under it (D119).
+    confidential: ConfidentialShown,
 }
 
 /// How long the shell waits for kitokey-send: longer than its own 30 s for an answer (`posting/v1`), so that it
@@ -3245,17 +3439,26 @@ struct SentShown {
 const SEND_DEADLINE: std::time::Duration = std::time::Duration::from_secs(45);
 
 /// Sends a meeting's summary to a destination, on the user's gesture (D110, PDR-0007): a confidential meeting
-/// never — refused here before the program is started, as the program would —; the address read from the
+/// only when the user confirmed it, that once (D119, PDR-0007 §4 amended) — unconfirmed, refused here before the
+/// program is started, as the program would; confirmed, said to it (`confirmed_confidential`) —; the address read from the
 /// keyring and given on kitokey-send's input with the meeting's name, never among its arguments; one try, its
 /// outcome recorded, whatever it is. The address is never logged, nor the destination's answer.
 #[tauri::command]
-async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, destination: String) -> Result<SentShown, Told> {
+async fn summary_sent(
+    app: AppHandle,
+    shell: State<'_, Shell>,
+    name: String,
+    destination: String,
+    confirmed: Option<bool>,
+) -> Result<SentShown, Told> {
     use kitokey_shell::destinations;
     let folder = session_folder(&shell, &name)?;
-    if confidential::marked(&folder) {
+    let confidential = confidential::marked(&folder);
+    if confidential && confirmed != Some(true) {
         return Ok(SentShown {
             outcome: sending::Outcome::confidential(),
             sending: sending_shown(&shell, &folder),
+            confidential: confidential_of(&shell, &folder),
         });
     }
     let kept = shell
@@ -3270,7 +3473,7 @@ async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, des
     tracing::info!(kind, "shell.summary_sending");
     let outcome = tauri::async_runtime::spawn_blocking(move || -> Result<sending::Outcome, String> {
         let address = destinations::address(&kept.name)?.ok_or_else(|| "the destination's address is not in the keyring".to_string())?;
-        Ok(sent(&at, kind, &address, &meeting))
+        Ok(sent(&at, kind, &address, &meeting, confidential))
     })
     .await
     .map_err(|error| shell.told(Failure::Unexpected, error))?
@@ -3299,12 +3502,14 @@ async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, des
     Ok(SentShown {
         outcome,
         sending: sending_shown(&shell, &folder),
+        confidential: confidential_of(&shell, &folder),
     })
 }
 
 /// Starts kitokey-send for one send (`posting/v1`): the meeting's folder and the destination's kind as its
-/// arguments, the address and the meeting's name on its input; waits for it within `SEND_DEADLINE`.
-fn sent(folder: &Path, kind: &str, address: &str, meeting: &str) -> sending::Outcome {
+/// arguments, the address and the meeting's name on its input — and, for a confidential meeting the user
+/// confirmed, `confirmed_confidential: true` (D118, D119); waits for it within `SEND_DEADLINE`.
+fn sent(folder: &Path, kind: &str, address: &str, meeting: &str, confirmed_confidential: bool) -> sending::Outcome {
     use std::io::Write as _;
     let none = sending::Outcome::Failed {
         code: None,
@@ -3320,7 +3525,11 @@ fn sent(folder: &Path, kind: &str, address: &str, meeting: &str) -> sending::Out
     let Ok(mut child) = started else {
         return none;
     };
-    let input = serde_json::json!({ "address": address, "name": meeting }).to_string();
+    let mut input = serde_json::json!({ "address": address, "name": meeting });
+    if confirmed_confidential {
+        input["confirmed_confidential"] = serde_json::Value::Bool(true);
+    }
+    let input = input.to_string();
     if let Some(mut stdin) = child.stdin.take() {
         let _ = stdin.write_all(input.as_bytes());
     }
@@ -4425,15 +4634,19 @@ fn export_written(shell: &Shell, folder: &Path) {
     let said = words::exported(language);
     let name = meeting_said(folder, language);
     let to = chosen.join(format!("{}.md", named(folder)));
+    // Each side by the name the user gave it (#1205), else the page's word.
+    let kept = speakers::read(folder);
+    let (me, others) = kept.sides(said.me, said.others);
     let input = exporting::Input {
         to: &to,
         name: &name,
         transcript: said.transcript,
-        me: said.me,
-        others: said.others,
+        me,
+        others,
         time: said.time,
         speaker: said.speaker,
         text: said.text,
+        dates: None,
     };
     let tag = match language {
         Language::French => "fr",

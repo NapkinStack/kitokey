@@ -157,6 +157,18 @@ pub enum Outcome {
     Declined(u16),
     /// 5xx, or a status no class names.
     Failed(u16),
+    /// `notion`: 401, the integration's key refused.
+    KeyRefused,
+    /// `notion`: 404, the database not shared with the integration, or gone.
+    Unshared,
+    /// `notion`: 403, a capability missing, or the workspace over its block limit.
+    KeyRestricted,
+    /// `notion`: the database holds more than one data source.
+    Several,
+    /// `notion`: a read not answered within the bound — nothing created, unlike the POST's silence.
+    Unanswered,
+    /// `notion`: the page's request past Notion's bounds, known once the title property is read.
+    TooLarge,
 }
 
 impl Outcome {
@@ -170,7 +182,12 @@ impl Outcome {
             Outcome::Gone => "destination.gone",
             Outcome::Busy(_) => "destination.busy",
             Outcome::Declined(_) => "destination.refused",
-            Outcome::Failed(_) => "destination.failed",
+            Outcome::Failed(_) | Outcome::Unanswered => "destination.failed",
+            Outcome::KeyRefused => "key.refused",
+            Outcome::Unshared => "database.unshared",
+            Outcome::KeyRestricted => "key.restricted",
+            Outcome::Several => "database.several",
+            Outcome::TooLarge => "summary.too_large",
         })
     }
 }
@@ -240,23 +257,7 @@ pub fn admitted(addresses: &[SocketAddr], reachable: fn(IpAddr) -> bool) -> bool
 /// « may have arrived » (#1167). Windows retries a refused connection's SYN for about 2 s (curl's maintainer,
 /// daniel.haxx.se, 2024-08-14): within the program's third, 10 s.
 pub fn post(address: &Url, body: &Body, policy: Policy) -> Outcome {
-    let config = Agent::config_builder()
-        .proxy(None)
-        .max_redirects(0)
-        .http_status_as_error(false)
-        .https_only(policy.https_only)
-        .timeout_global(Some(policy.bound))
-        .timeout_connect(Some(policy.bound / 3))
-        .build();
-    let agent = Agent::with_parts(
-        config,
-        DefaultConnector::default(),
-        Judging {
-            resolver: DefaultResolver::default(),
-            reachable: policy.reachable,
-        },
-    );
-    let answer = agent
+    let answer = agent(policy)
         .post(address.as_str())
         .header("Content-Type", &body.content_type)
         .send(&body.bytes[..]);
@@ -266,21 +267,52 @@ pub fn post(address: &Url, body: &Body, policy: Policy) -> Outcome {
             match status {
                 200..=299 => Outcome::Sent,
                 401 | 403 | 404 | 410 => Outcome::Gone,
-                429 => Outcome::Busy(
-                    answer
-                        .headers()
-                        .get("retry-after")
-                        .and_then(|value| value.to_str().ok())
-                        .and_then(|value| value.trim().parse().ok()),
-                ),
+                429 => Outcome::Busy(retry_after(&answer)),
                 300..=499 => Outcome::Declined(status),
                 _ => Outcome::Failed(status),
             }
         }
-        Err(ureq::Error::Other(error)) if error.is::<LocalAddress>() => Outcome::Refused,
-        Err(ureq::Error::Other(error)) if error.is::<Unresolved>() => Outcome::Unreachable,
-        Err(error) => failed(&error),
+        Err(error) => unsent(error),
     }
+}
+
+/// `Retry-After`, in whole seconds, when the answer says it so.
+pub(crate) fn retry_after<B>(answer: &ureq::http::Response<B>) -> Option<u64> {
+    answer
+        .headers()
+        .get("retry-after")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.trim().parse().ok())
+}
+
+/// A request's error as an outcome: the judging resolver's refusals first, then [`failed`].
+pub(crate) fn unsent(error: ureq::Error) -> Outcome {
+    match error {
+        ureq::Error::Other(error) if error.is::<LocalAddress>() => Outcome::Refused,
+        ureq::Error::Other(error) if error.is::<Unresolved>() => Outcome::Unreachable,
+        error => failed(&error),
+    }
+}
+
+/// The agent every request goes through: no proxy, no redirect, its addresses judged, within the bound, its
+/// connection within a third of it.
+pub(crate) fn agent(policy: Policy) -> Agent {
+    let config = Agent::config_builder()
+        .proxy(None)
+        .max_redirects(0)
+        .http_status_as_error(false)
+        .https_only(policy.https_only)
+        .timeout_global(Some(policy.bound))
+        .timeout_connect(Some(policy.bound / 3))
+        .build();
+    Agent::with_parts(
+        config,
+        DefaultConnector::default(),
+        Judging {
+            resolver: DefaultResolver::default(),
+            reachable: policy.reachable,
+        },
+    )
 }
 
 /// Whether a failure came before anything was sent, or after: only a failure to resolve or to connect
@@ -329,10 +361,18 @@ pub enum Unsent {
 }
 
 impl Meeting {
-    /// Reads a session's folder: `session-audio`'s `confidential` first, then `minutes.md` (v1 to v5).
+    /// Reads a session's folder: `session-audio`'s `confidential` first, then `minutes.md` (v1 to v5). A
+    /// confidential meeting is refused: `read_confirmed` with `false`.
     pub fn read(folder: &Path) -> Result<Meeting, Unsent> {
+        Meeting::read_confirmed(folder, false)
+    }
+
+    /// Reads a session's folder as `read` does, a confidential meeting read too when the person confirmed it
+    /// for this send (`posting/v1`'s `confirmed_confidential`, D118; PDR-0007 point 4 amended 2026-11-24).
+    pub fn read_confirmed(folder: &Path, confirmed: bool) -> Result<Meeting, Unsent> {
         match fs::metadata(folder.join("confidential")) {
-            Ok(_) => return Err(Unsent::Confidential),
+            Ok(_) if !confirmed => return Err(Unsent::Confidential),
+            Ok(_) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(_) => return Err(Unsent::Unreadable),
         }

@@ -122,8 +122,78 @@ fn a_host_not_found_is_unreachable_and_its_sentence_holds_no_part_of_the_address
 }
 
 #[test]
+fn notion_asks_its_key_and_a_databases_link_and_its_check_takes_no_other_kind() {
+    let link = format!("https://www.notion.so/Notes-0123456789abcdef0123456789abcdef?v={SECRET}");
+    // No key: the input is not posting/v1's for notion.
+    for args in [&["--check", "--kind", "notion"][..], &["f", "--kind", "notion"]] {
+        let ran = run(args, &input(&link));
+        assert_eq!((ran.code, ran.line.as_str()), (Some(2), ""), "{args:?}");
+        assert!(ran.said.contains("« key »"), "{}", ran.said);
+    }
+    for args in [
+        &["--check", "--kind", "slack"][..],
+        &["--check", "f", "--kind", "notion"],
+        &["--check", "--check"],
+    ] {
+        let ran = run(args, &input(&link));
+        assert_eq!((ran.code, ran.line.as_str()), (Some(2), ""), "{args:?}");
+    }
+    // A link that names no database is refused before anything is contacted, its key said nowhere.
+    let keyed = |address: &str| serde_json::json!({"address": address, "name": "Réunion", "key": format!("ntn_{SECRET}")}).to_string();
+    for refused in [
+        format!("http://www.notion.so/Notes-0123456789abcdef0123456789abcdef?v={SECRET}"),
+        format!("https://www.notion.so/Notes-{SECRET}"),
+    ] {
+        let ran = run(&["--check", "--kind", "notion"], &keyed(&refused));
+        assert_eq!(ran.code, Some(1));
+        assert_eq!(ran.line, "{\"code\":\"address.refused\",\"event\":\"failed\"}\n");
+    }
+    // The meeting before the link: a confidential one is never sent to Notion either.
+    let folder = tempfile::tempdir().unwrap();
+    fs::write(folder.path().join("minutes.md"), MINUTES).unwrap();
+    fs::write(folder.path().join("confidential"), "").unwrap();
+    let ran = run(&[folder.path().to_str().unwrap(), "--kind", "notion"], &keyed(&link));
+    assert_eq!(ran.line, "{\"code\":\"meeting.confidential\",\"event\":\"failed\"}\n");
+    // A meeting that may leave, to a link that names no database: refused, nothing contacted.
+    fs::remove_file(folder.path().join("confidential")).unwrap();
+    let ran = run(
+        &[folder.path().to_str().unwrap(), "--kind", "notion"],
+        &keyed(&format!("https://www.notion.so/Notes-{SECRET}")),
+    );
+    assert_eq!(ran.line, "{\"code\":\"address.refused\",\"event\":\"failed\"}\n");
+}
+
+#[test]
 fn it_says_its_version() {
     let ran = run(&["--version"], "");
     assert_eq!(ran.code, Some(0));
     assert!(ran.line.starts_with("kitokey-send "));
+}
+
+/// D118: the field on the input, as posting/v1 says it. The meeting is still judged before the address
+/// (here a local one, which the program refuses): `meeting.confidential` unconfirmed, the address reached once
+/// confirmed; a meeting not confidential reaches the address whatever the field says; a field that is no
+/// boolean is not posting/v1's input.
+#[test]
+fn a_confidential_meeting_goes_on_only_when_its_input_says_confirmed_confidential_true() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::write(folder.path().join("minutes.md"), MINUTES).unwrap();
+    let path = folder.path().to_str().unwrap();
+    let address = format!("https://127.0.0.1/api/webhooks/1/{SECRET}");
+    let with = |confirmed: serde_json::Value| {
+        serde_json::json!({"address": address, "name": "Réunion", "confirmed_confidential": confirmed}).to_string()
+    };
+    let code = |ran: Ran| serde_json::from_str::<serde_json::Value>(&ran.line).unwrap()["code"].clone();
+    for input in [input(&address), with(false.into()), with(true.into())] {
+        assert_eq!(code(run(&[path, "--kind", "webhook"], &input)), "address.refused", "{input}");
+    }
+    fs::write(folder.path().join("confidential"), "").unwrap();
+    assert_eq!(code(run(&[path, "--kind", "webhook"], &input(&address))), "meeting.confidential");
+    assert_eq!(code(run(&[path, "--kind", "slack"], &with(false.into()))), "meeting.confidential");
+    assert_eq!(code(run(&[path, "--kind", "discord"], &with(true.into()))), "address.refused");
+    for wrong in [with("true".into()), with(1.into()), with(serde_json::Value::Null)] {
+        let ran = run(&[path, "--kind", "webhook"], &wrong);
+        assert_eq!((ran.code, ran.line.as_str()), (Some(2), ""), "{wrong}");
+        assert!(ran.said.contains("confirmed_confidential"), "{}", ran.said);
+    }
 }

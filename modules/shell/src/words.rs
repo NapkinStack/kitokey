@@ -679,6 +679,22 @@ pub struct Window {
     /// Shows: a meeting's page, as a label. When: legend of the speaking-time drawing. At most: no
     /// limit. Placeholders: none.
     pub remote_described: &'static str,
+    /// The transcript's speakers named by the user (#1205): the button that opens the two fields.
+    /// Shows: a meeting's page, as a button's tooltip and name. When: transcript card, a v3 meeting with its
+    /// transcript. At most: about 30 characters. Placeholders: none.
+    pub speakers_open: &'static str,
+    /// Shows: a meeting's page, as a button. When: the speakers' names being typed. At most: one or two words.
+    /// Placeholders: none.
+    pub speakers_save: &'static str,
+    /// Shows: a meeting's page, as a button. When: the speakers' names being typed. At most: one or two words.
+    /// Placeholders: none.
+    pub speakers_cancel: &'static str,
+    /// Shows: a meeting's page, as a hint under the fields. When: the speakers' names being typed. At most: one
+    /// line. Placeholders: none.
+    pub speakers_hint: &'static str,
+    /// Shows: a meeting's page, as an error under the fields, what was typed kept. When: the names could not be
+    /// kept in the meeting's folder. At most: one line. Placeholders: none.
+    pub speakers_not_saved: &'static str,
     /// Who spoke over the meeting, for whoever does not see the drawing.
     /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the
     /// speaking-time drawing. At most: no limit. Placeholders: none.
@@ -953,6 +969,10 @@ pub struct Window {
     /// (PDR-0007 §3). Shows: a meeting's page, the send panel. When: the destination was never sent to. At most:
     /// three lines. Placeholders: {} the destination's name.
     pub send_notice: &'static str,
+    /// A confidential meeting's send asked once more, every time (D119, PDR-0007 §4 as amended on 2026-11-24).
+    /// Shows: a meeting's page, the send panel, above « Envoyer » and « Annuler ». When: a destination is chosen
+    /// for a confidential meeting. At most: one sentence. Placeholders: {} the destination's name.
+    pub send_confidential_ask: &'static str,
     /// The button that sends after the notice. Shows: a meeting's page, the send panel. When: the notice is shown.
     /// At most: one word. Placeholders: none.
     pub send_confirm: &'static str,
@@ -974,8 +994,8 @@ pub struct Window {
     /// posting/v1's meeting.unreadable. Shows: a meeting's page, as a status. When: a send failed. At most: one
     /// line. Placeholders: none.
     pub send_unreadable: &'static str,
-    /// posting/v1's meeting.confidential. Shows: a meeting's page, as a status. When: a send asked of a
-    /// confidential meeting. At most: one line. Placeholders: none.
+    /// posting/v1's meeting.confidential. Shows: a meeting's page, as a status. When: a confidential meeting's
+    /// send not confirmed (D119). At most: one line. Placeholders: none.
     pub send_confidential: &'static str,
     /// posting/v1's meeting.no_summary. Shows: a meeting's page, as a status. When: a send failed. At most: one
     /// line. Placeholders: none.
@@ -1323,6 +1343,25 @@ pub struct Window {
     /// Shows: « Vérifier le son », as a name for a screen reader. When: icon button (tooltip):
     /// close panel. At most: no limit. Placeholders: none.
     pub check_close: &'static str,
+    /// « Dates mentionnées » (D115): the dates a summary's actions name, offered to the user's calendar.
+    /// Shows: a meeting's page, a button under its actions, and the panel's title. When: an action's by when
+    /// names a date. At most: one line. Placeholders: none.
+    pub dates_open: &'static str,
+    /// Shows: the « Dates mentionnées » panel, under its title. When: it is open. At most: two lines.
+    /// Placeholders: none.
+    pub dates_says: &'static str,
+    /// Shows: the « Dates mentionnées » panel, the label of the day the dates are read against. When: it is
+    /// open. At most: about 20 characters. Placeholders: none.
+    pub dates_day: &'static str,
+    /// Shows: the « Dates mentionnées » panel, a button. When: a meeting not confidential. At most: about 28
+    /// characters. Placeholders: none.
+    pub dates_google: &'static str,
+    /// Shows: the « Dates mentionnées » panel, a button. When: always, a confidential meeting's too. At most: about
+    /// 40 characters. Placeholders: none.
+    pub dates_ics: &'static str,
+    /// Shows: the « Dates mentionnées » panel, as a status. When: the `.ics` is written. At most: one line.
+    /// Placeholders: {} the file's name.
+    pub dates_saved: &'static str,
     /// It could not listen; or a recording runs.
     /// Shows: « Vérifier le son », as an error. When: cannot listen. At most: no limit.
     /// Placeholders: none.
@@ -2031,6 +2070,11 @@ pub fn window(language: Language) -> Window {
             voice: "voice {}",
             here_described: "You — your microphone",
             remote_described: "Others — the call’s audio",
+            speakers_open: "Name the speakers…",
+            speakers_save: "Save",
+            speakers_cancel: "Cancel",
+            speakers_hint: "Kept with this meeting. Leave a field empty to keep “You” or “Others”.",
+            speakers_not_saved: "Kitokey could not save these names. Try again.",
             who_spoke: "Who spoke when: you on top, others below",
             who_spoke_later: "Who spoke when appears once it is transcribed.",
             no_transcript: "No transcript yet.",
@@ -2124,6 +2168,7 @@ pub fn window(language: Language) -> Window {
             send_open: "Send…",
             send_to: "Send to “{}”",
             send_notice: "The title, the summary and its actions go to “{}”. Never the audio, never the transcript. A summary sent cannot be taken back.",
+            send_confidential_ask: "This meeting is confidential: its summary will leave this computer for “{}”.",
             send_confirm: "Send",
             send_cancel: "Cancel",
             send_sending: "Sending to “{}”…",
@@ -2131,7 +2176,7 @@ pub fn window(language: Language) -> Window {
             send_listed: "Sent to “{}” on {}",
             send_address_refused: "The address of “{}” is refused. Remove it, then add the channel’s https webhook address in Settings.",
             send_unreadable: "Kitokey couldn’t read this meeting. Check its folder, then try again.",
-            send_confidential: "This meeting is confidential: it’s never sent.",
+            send_confidential: "This meeting is confidential: it’s sent only once you confirm.",
             send_no_summary: "There’s no summary to send yet.",
             send_too_large: "The summary is too long for “{}”. Export it as a file instead.",
             send_offline: "No connection: nothing was sent. Check your connection, then try again.",
@@ -2252,6 +2297,12 @@ pub fn window(language: Language) -> Window {
             check_call: "A call is using the microphone, so no test sound — the call would hear it. Have someone speak in the call and watch the meter.",
             check_open_note: "The microphone stays on while this panel is open.",
             check_close: "Close",
+            dates_open: "Dates mentioned",
+            dates_says: "Tick the ones to put in your calendar. Nothing leaves this computer until you choose where.",
+            dates_day: "Meeting day",
+            dates_google: "Open in Google Calendar",
+            dates_ics: "Save as a calendar file (.ics)",
+            dates_saved: "Saved in {}.",
             check_failed: "Kitokey can’t listen to your microphone or the meeting audio right now. Close this panel and open it again.",
             check_recording: "A recording is in progress — its meters are in the recording bar.",
             free: "Free up space",
@@ -2535,6 +2586,11 @@ pub fn window(language: Language) -> Window {
             voice: "voix {}",
             here_described: "Vous — votre micro",
             remote_described: "Les autres — le son de l’appel",
+            speakers_open: "Nommer les intervenants…",
+            speakers_save: "Enregistrer",
+            speakers_cancel: "Annuler",
+            speakers_hint: "Gardés avec cette réunion. Laissez un champ vide pour garder «\u{a0}Vous\u{a0}» ou «\u{a0}Les autres\u{a0}».",
+            speakers_not_saved: "Kitokey n’a pas pu enregistrer ces noms. Réessayez.",
             who_spoke: "Temps de parole au fil de la réunion\u{a0}: vous en haut, les autres en bas",
             who_spoke_later: "Le temps de parole s’affichera après la transcription.",
             no_transcript: "Pas encore de transcription.",
@@ -2631,6 +2687,7 @@ pub fn window(language: Language) -> Window {
             send_open: "Envoyer…",
             send_to: "Envoyer à « {} »",
             send_notice: "Le titre, le compte rendu et ses actions partent vers « {} ». Jamais le son, jamais la transcription. Un compte rendu envoyé ne peut pas être repris.",
+            send_confidential_ask: "Cette réunion est confidentielle\u{a0}: son compte rendu va quitter cet ordinateur pour «\u{a0}{}\u{a0}».",
             send_confirm: "Envoyer",
             send_cancel: "Annuler",
             send_sending: "Envoi vers « {} »…",
@@ -2638,7 +2695,7 @@ pub fn window(language: Language) -> Window {
             send_listed: "Envoyé à « {} » le {}",
             send_address_refused: "L’adresse de « {} » est refusée. Retirez-la, puis ajoutez l’adresse https du webhook du canal dans les Réglages.",
             send_unreadable: "Kitokey n’a pas pu lire cette réunion. Vérifiez son dossier, puis réessayez.",
-            send_confidential: "Réunion confidentielle : elle n’est jamais envoyée.",
+            send_confidential: "Réunion confidentielle\u{a0}: elle n’est envoyée qu’après votre confirmation.",
             send_no_summary: "Pas encore de compte rendu à envoyer.",
             send_too_large: "Compte rendu trop long pour « {} ». Exportez-le en fichier à la place.",
             send_offline: "Pas de connexion : rien n’est parti. Vérifiez la connexion, puis réessayez.",
@@ -2762,6 +2819,12 @@ pub fn window(language: Language) -> Window {
             check_call: "Un appel utilise le micro\u{a0}: pas de son de test, il serait entendu dans l’appel. Faites parler quelqu’un dans l’appel et regardez la jauge.",
             check_open_note: "Le micro reste actif tant que ce panneau est ouvert.",
             check_close: "Fermer",
+            dates_open: "Dates mentionnées",
+            dates_says: "Cochez celles à mettre dans votre agenda. Rien ne quitte cet ordinateur avant que vous choisissiez où.",
+            dates_day: "Jour de la réunion",
+            dates_google: "Ouvrir dans Google Agenda",
+            dates_ics: "Enregistrer un fichier d’agenda (.ics)",
+            dates_saved: "Enregistré dans {}.",
             check_failed: "Kitokey ne parvient pas à écouter votre micro ni le son de la réunion. Fermez ce panneau et rouvrez-le.",
             check_recording: "Un enregistrement est en cours\u{a0}: ses jauges sont dans la barre d’enregistrement.",
             free: "Faire de la place",
@@ -3044,6 +3107,8 @@ pub enum Failure {
     SettingsLocked(Refused),
     SettingsUnwritten,
     FolderNotOpened,
+    LinkNotOpened,
+    DatesNotSaved,
     KeyboardSettings,
     Keyring,
     ProgramNotStarted,
@@ -3055,7 +3120,7 @@ pub enum Failure {
 }
 
 /// A failure's sentence. Most follow the page's own « not saved: » and so start in lower case; those
-/// the page shows alone, `FolderNotOpened`, `KeyboardSettings` and `SettingsLocked`, are whole.
+/// the page shows alone, `FolderNotOpened`, `LinkNotOpened`, `KeyboardSettings` and `SettingsLocked`, are whole.
 pub fn failure(failure: Failure, language: Language) -> String {
     use Language::*;
     match (failure, language) {
@@ -3130,6 +3195,10 @@ pub fn failure(failure: Failure, language: Language) -> String {
         }
         (Failure::FolderNotOpened, English) => "Couldn’t open the folder. Open it from your file manager.",
         (Failure::FolderNotOpened, French) => "Impossible d’ouvrir le dossier. Ouvrez-le depuis votre gestionnaire de fichiers.",
+        (Failure::DatesNotSaved, English) => "the calendar file wasn’t written. Choose another folder, then try again.",
+        (Failure::DatesNotSaved, French) => "le fichier d’agenda n’a pas pu être écrit. Choisissez un autre dossier, puis réessayez.",
+        (Failure::LinkNotOpened, English) => "Couldn’t open your browser. Save the dates as a calendar file instead.",
+        (Failure::LinkNotOpened, French) => "Impossible d’ouvrir le navigateur. Enregistrez plutôt les dates dans un fichier d’agenda.",
         (Failure::KeyboardSettings, English) => "Can’t open keyboard settings from here. Open them from your system settings.",
         (Failure::KeyboardSettings, French) => {
             "Impossible d’ouvrir les réglages du clavier d’ici. Ouvrez-les depuis les paramètres du système."

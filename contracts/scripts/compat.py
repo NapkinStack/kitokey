@@ -8,7 +8,10 @@ contract's pages are read by a person.
 The rule is the consumers': everything a producer may write under the changed schema must
 be something the merged schema already allowed. A field that becomes optional, is renamed
 or changes type is refused; one that is added, where the merged schema left room for it, is
-not. **What cannot be decided is refused**, with the comparator's reason. Unchanged
+not. An `input.schema.json` is the one written the other way, by the consumers for the
+producer: a change to it must neither refuse what they already send nor allow what the merged
+producer would refuse — a field is added there only as optional, where v1 left room for it.
+**What cannot be decided is refused**, with the comparator's reason. Unchanged
 structure with a changed meaning is seen by no comparison: contract tests see it.
 """
 
@@ -20,6 +23,11 @@ from pathlib import Path
 import jsoncompat
 
 DIALECT = "https://json-schema.org/draft/2020-12/schema"
+# What a counterexample shows, by who writes the document.
+BREAKS = {
+    "serializer": "the changed schema allows what the merged one refuses",
+    "both": "the changed schema and the merged one disagree on a document its consumers may write",
+}
 
 
 def schemas(folder):
@@ -41,19 +49,27 @@ def dialect(path):
     return document.get("$schema") if isinstance(document, dict) else None
 
 
+def role(name):
+    """Who writes what a schema describes, as jsoncompat names it. An `input.schema.json` is written by
+    the contract's consumers and read by its producer: a change must refuse nothing they already send
+    and allow nothing the merged producer would refuse — `both`. Every other schema is written by the
+    producer and read by the consumers: a change must allow nothing the merged one refused — `serializer`."""
+    return "both" if name == "input.schema.json" else "serializer"
+
+
 def judged(merged, changed):
     """Nothing when the changed schema is compatible with the merged one; why not, otherwise."""
     if dialect(changed) != DIALECT:
         return f"it does not say it is a schema of {DIALECT}, the one dialect the comparator reads"
     try:
         texts = merged.read_text(encoding="utf-8"), changed.read_text(encoding="utf-8")
-        found = jsoncompat.analyze_compat(*texts, "serializer")
+        found = jsoncompat.analyze_compat(*texts, role(changed.name))
     except Exception as error:  # noqa: BLE001 — whatever the comparator cannot read is refused, and said
         return f"it cannot be compared ({' '.join(str(error).split())[:300]})"
     if found["status"] == "compatible":
         return None
     if found["status"] == "incompatible" and found.get("counterexample_json"):
-        return f"the changed schema allows what the merged one refuses: {found['counterexample_json']}"
+        return f"{BREAKS[role(changed.name)]}: {found['counterexample_json']}"
     reason = found.get("reason", found["status"])
     return f"the comparison could not be decided, and what is not proven is refused ({reason})"
 

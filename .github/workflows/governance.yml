@@ -61,6 +61,8 @@ jobs:
         env:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           BASE_REF: ${{ github.base_ref }}
+          # The review budget, the decider's (2026-11-24): 800 lines; files and modules at the defaults.
+          MAX_LINES: "800"
         run: nstack pr-scope --root . --base "origin/$BASE_REF"
 
   hooks:

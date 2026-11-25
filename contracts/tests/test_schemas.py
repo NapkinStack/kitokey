@@ -619,6 +619,39 @@ EXAMPLES = {
     ),
 }
 
+# The names a person gave a meeting's speakers (#1205): the shell's file, read by the shell and by summary.
+EXAMPLES["session-audio/v3/speakers.schema.json"] = (
+    [
+        {},
+        {"me": "Camille"},
+        {"me": "Camille", "others": "Hugo"},
+        {"others": "Jiří Novák"},
+        {"voices": {"remote/1": "Léa", "local/a": "Camille"}},
+        {"voices": {"remote/a/b": "Léa", "remote/" + "v" * 65: "Hugo"}},
+        {"me": "x" * 60},
+    ],
+    [
+        "a file that is no object",
+        {"me": ""},
+        {"me": "   "},
+        {"others": "   "},
+        {"me": "deux\nlignes"},
+        {"others": "x" * 61},
+        {"me": "x" * 61},
+        {"voices": {"remote/1": "x" * 61}},
+        {"me": 3},
+        {"me": None},
+        {"voices": "Léa"},
+        {"voices": {"remote": "Léa"}},
+        {"voices": {"elsewhere/1": "Léa"}},
+        {"voices": {"remote/1": ""}},
+        {"voices": {"other/1": "Léa"}},
+        {"voices": {"remote/": "Léa"}},
+        {"voices": {"remote/1": "   "}},
+        {"voices": {"remote/deux\nlignes": "Léa"}},
+    ],
+)
+
 # A meeting's own models (D91): the shell's file, said in session-audio/v3 and read for a meeting of
 # any version.
 EXAMPLES["session-audio/v3/models.schema.json"] = (
@@ -678,6 +711,58 @@ EXAMPLES["exporting/v1/input.schema.json"][1].extend(
     + [{**_INPUT, name: f"{value}\n"} for name, value in _INPUT.items()]
 )
 
+# exporting/v1's `dates` (D117), added in place: optional, and each item as the format `ics` reads it.
+_DATE = {
+    "id": "a1",
+    "date": "2026-11-27",
+    "what": "Envoyer le devis, v2; vite",
+    "who": "Léa",
+    "passage": "Léa :\nvendredi.",
+}
+EXAMPLES["exporting/v1/input.schema.json"][0].extend(
+    [
+        {**_INPUT, "dates": [_DATE]},
+        {
+            **_INPUT,
+            "dates": [{"id": "a3", "date": "2026-12-31", "what": "Clore"}, {**_DATE, "who": None, "passage": None}],
+        },
+        {**_INPUT, "dates": [{**_DATE, "id": "0-" + "a" * 62}]},
+    ]
+)
+EXAMPLES["exporting/v1/input.schema.json"][1].extend(
+    [
+        {**_INPUT, "dates": []},
+        {**_INPUT, "dates": "2026-11-27"},
+        {**_INPUT, "dates": [_DATE, "a1"]},
+    ]
+    + [
+        {**_INPUT, "dates": [{key: value for key, value in _DATE.items() if key != name}]}
+        for name in ("id", "date", "what")
+    ]
+    + [
+        {**_INPUT, "dates": [{**_DATE, name: value}]}
+        for name, value in [
+            ("id", "A1"),
+            ("id", "-a"),
+            ("id", ""),
+            ("id", "a" * 65),
+            ("id", "a 1"),
+            ("date", "27/11/2026"),
+            ("date", "2026-1-27"),
+            ("date", "2026-11-27T10:00"),
+            ("date", 20261127),
+            ("what", ""),
+            ("what", "deux\nlignes"),
+            ("what", None),
+            ("who", ""),
+            ("who", "deux\rlignes"),
+            ("who", 3),
+            ("passage", ""),
+            ("passage", ["a"]),
+        ]
+    ]
+)
+
 # posting/v1 (D110): the input, the output's lines, and what a generic webhook receives.
 _SEND = {"address": "https://discord.com/api/webhooks/1/abc", "name": "Réunion du 20 nov. 2026"}
 EXAMPLES["posting/v1/input.schema.json"] = (
@@ -691,6 +776,13 @@ EXAMPLES["posting/v1/input.schema.json"] = (
         {"address": "https://example.com/hook", "name": "two\nlines"},
         {"address": 3, "name": "n"},
     ],
+)
+# posting/v1's `confirmed_confidential` (D118), added in place: optional, a boolean, false when absent.
+EXAMPLES["posting/v1/input.schema.json"][0].extend(
+    [{**_SEND, "confirmed_confidential": True}, {**_SEND, "confirmed_confidential": False}]
+)
+EXAMPLES["posting/v1/input.schema.json"][1].extend(
+    [{**_SEND, "confirmed_confidential": value} for value in ("true", 1, 0, None, "")]
 )
 EXAMPLES["posting/v1/event.schema.json"] = (
     [
