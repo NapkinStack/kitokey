@@ -29,10 +29,32 @@ const raw = {
     fr: ["Installer sur Linux, gratuit", "Suivre les sorties"],
     keeps: "PDR-0001, free on Linux; the repository's tags, each a release (v0.2.6, 2026-11-18)",
   },
+  slider: {
+    en: ["Kitokey, feature by feature", "slide", "carousel", "of"],
+    fr: ["Kitokey, fonction par fonction", "diapositive", "carrousel", "sur"],
+    keeps: "the carousel's own words (WAI-ARIA's carousel pattern)",
+  },
   call: {
     en: ["Video call", "(you)", "Sarah records a video call with Camille, Hugo and Léa. At the top, Kitokey’s small bar shows the elapsed time, a level trace for Sarah’s microphone and one for the call’s audio."],
     fr: ["Appel vidéo", "(vous)", "Sarah enregistre un appel vidéo avec Camille, Hugo et Léa. En haut, la petite barre de Kitokey montre le temps écoulé, une trace de niveau pour le micro de Sarah et une pour le son de l’appel."],
     keeps: "proposal D's drawn call (the decider's request, 2026-11-25): generated portraits of people who do not exist; the bar as the app draws it while recording (#1179, « B · Trace »)",
+  },
+  // The slides: the clips of c16, filmed from the app at main dad969f (shell e2e, run i-sam-film16c), in their
+  // order; the record slide shows the drawn call instead, the decider's request (2026-11-25).
+  slides: {
+    en: [["record", "mic", "Record", "One click, and you listen instead of taking notes.", "", "Sarah records a video call with Camille, Hugo and Léa. At the top, Kitokey’s small bar shows the elapsed time, a level trace for Sarah’s microphone and one for the call’s audio."],
+      ["transcript", "transcript", "Transcribe", "The whole meeting in writing, on your computer.", "", "The transcript of the Weekly product review. The two sides are renamed Sarah and Camille, Hugo and Léa, each line with its time."],
+      ["summary", "summary", "Minutes", "Decisions and actions, ready to share.", "", "The minutes of the Weekly product review, with the highlights, then Hugo’s, Camille’s and Léa’s actions and their due dates."],
+      ["dates", "calendar", "Calendar", "Deadlines in Google Calendar, or as an .ics file for your calendar.", "", "The Dates mentioned panel. A deadline is ticked, then the cursor opens Google Calendar."],
+      ["send", "send", "Share", "Shared in one gesture to Slack, Discord or your webhook.", "", "The cursor sends the minutes to the product team channel, then the Sent to line appears."],
+      ["confidential", "lock", "Confidential", "One switch, and no online AI ever sees the meeting.", "", "During a recording, the cursor turns on the Confidential switch, and the padlock shows."]],
+    fr: [["record", "mic", "Enregistrer", "Un clic, et vous écoutez au lieu de noter.", "", "Sarah enregistre un appel vidéo avec Camille, Hugo et Léa. En haut, la petite barre de Kitokey montre le temps écoulé, une trace de niveau pour le micro de Sarah et une pour le son de l’appel."],
+      ["transcript", "transcript", "Transcrire", "Toute la réunion par écrit, sur votre ordinateur.", "", "La transcription de la Revue produit de la semaine. Les deux côtés sont renommés Sarah et Camille, Hugo et Léa, chaque réplique avec son heure."],
+      ["summary", "summary", "Résumer", "Les décisions et les actions, prêtes à partager.", "", "Le compte rendu de la Revue produit de la semaine, avec les points saillants puis les actions de Hugo, Camille et Léa et leurs échéances."],
+      ["dates", "calendar", "Agenda", "Les échéances dans Google Agenda, ou en fichier .ics pour votre agenda.", "", "Le panneau Dates mentionnées. Une échéance est cochée, puis le curseur ouvre Google Agenda."],
+      ["send", "send", "Partager", "Partagé d’un geste sur Slack, Discord ou votre webhook.", "", "Le curseur envoie le compte rendu au canal de l’équipe produit, puis la ligne Envoyé à apparaît."],
+      ["confidential", "lock", "Confidentielle", "Un interrupteur, et aucune IA en ligne ne voit la réunion.", "", "Pendant un enregistrement, le curseur active l’interrupteur Confidentielle, et le cadenas s’affiche."]],
+    keeps: "the decider's round 9 (2026-11-25): each clip shows it, filmed from the app (c16c); #1179 the trace; #1205 the names; D113 the dates, .ics as RFC 5545 (Outlook and Apple Calendar named once D115 tests them); D116 the send, « Send… » then the channel: a gesture; #1208 the padlock, D110 the confidential meeting",
   },
   channels: {
     en: ["The minutes go where your team works.", "In one click, to a Slack channel, a Discord channel or your webhook. Nothing leaves without your gesture, and never a confidential meeting without your confirmation.", "Works with"],
@@ -77,6 +99,7 @@ const raw = {
       ["lock", "Lawyers, doctors, advisers", "Confidential stays in the room.", "One switch, and the call goes through no online service."],
       ["mic", "Job interview", "Watch the candidate, not your notes.", "Every answer is transcribed and the minutes keep what matters to compare interviews. Tell the candidate you are recording."],
       ["export", "Export", "As Markdown, HTML, Word or subtitles."],
+      ["play", "Play back a passage", "Click a line of the transcript to hear that moment again."],
       ["search", "Your files, at home", "Each meeting stays in Documents/Kitokey, with its recording, its transcript and its minutes."]],
     fr: [["summary", "Lancement de projet", "Repartez avec le plan.", "Qui fait quoi, et pour quand. Les actions sont dans le compte rendu et leurs dates vont dans votre agenda."],
       ["send", "Le point du matin", "Les absents sont à jour.", "Le compte rendu du point d’équipe part à l’équipe d’un geste. Personne n’a eu à prendre de notes."],
@@ -84,8 +107,9 @@ const raw = {
       ["lock", "Avocat, médecin, conseil", "Le secret reste au cabinet.", "Un interrupteur, et l’appel ne passe par aucun service en ligne."],
       ["mic", "Entretien de recrutement", "Regardez le candidat, pas vos notes.", "Chaque réponse est transcrite et le compte rendu en garde l’essentiel pour comparer les entretiens. Annoncez au candidat que vous enregistrez."],
       ["export", "Exportez", "En Markdown, HTML, Word ou sous-titres."],
+      ["play", "Réécoutez un passage", "Cliquez sur une phrase de la transcription pour réentendre ce moment."],
       ["search", "Vos fichiers, chez vous", "Chaque réunion reste dans Documents/Kitokey, avec son enregistrement, sa transcription et son compte rendu."]],
-    keeps: "minutes/v5's actions and D113's dates; D116, the send; docs/store/listing.md, one search; D110, the confidential switch; exporting/v1, md html docx srt vtt; docs/privacy.md, the meetings folder",
+    keeps: "minutes/v5's actions and D113's dates; D116, the send; docs/store/listing.md, one search; D110, the confidential switch; exporting/v1, md html docx srt vtt; D26, play from a line; docs/privacy.md, the meetings folder",
   },
   systems: {
     en: ["Systems & price", "Free on Linux. One payment elsewhere.", "No account, no subscription. Linux today, Windows and macOS next.", "No subscription. The price will be announced at launch."],

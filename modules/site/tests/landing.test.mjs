@@ -1,13 +1,15 @@
 // D114, the landing (proposal D, validated by the decider on 2026-11-25): /en/ and /fr/ hold every section
-// their nav names, nothing left to measure, the install's commands as README.md gives them, and the drawn
-// call as the hero.
+// their nav names, nothing left to measure, the install's commands as README.md gives them, and a carousel, the
+// drawn call then the app filmed (c16), each slide with its poster and its words; the clips c16's alone; the root to French.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { dist } from "./helpers.mjs";
 import { installSource } from "../site.config.mjs";
 import { channels, landing } from "../src/lib/landing.mjs";
+
+const KEYS = ["transcript", "summary", "dates", "send", "confidential"]; // the record slide is drawn
 
 // README.md's bash blocks, cut in paragraphs at blank lines, each with the system it is for: the one its
 // comments name, else those the prose just before the block names (« On Fedora 43, 44 and 45 », « On Ubuntu
@@ -55,13 +57,43 @@ for (const lang of ["en", "fr"]) {
     }
   });
 
-  test(`/${lang}/: the hero is the drawn call, described, with its four portraits`, async () => {
+  test(`/${lang}/: the hero's carousel, the drawn call then five c16 clips in their order, each with its poster and its words`, async () => {
     const html = await page(lang);
-    const call = html.match(/<figure class="window hero-window">[\s\S]*?<\/figure>/)?.[0];
-    assert.ok(call, "no hero");
-    assert.ok(call.includes(`<div class="call" role="img" aria-label="${landing.call[lang][2]}"`), "the call is not described");
+    const slides = [...html.matchAll(/<article class="slide"[\s\S]*?<\/article>/g)].map((m) => m[0]);
+    assert.equal(slides.length, 6);
+    const [call, ...clips] = slides;
+    assert.doesNotMatch(call, /data-clip=/);
+    assert.ok(call.includes(`role="img" aria-label="${landing.slides[lang][0][5]}"`), "the call is not described");
     const portraits = [...call.matchAll(/<img class="ptr" src="(\/img\/call-[a-z]+\.webp)"/g)].map((m) => m[1]);
     assert.equal(portraits.length, 4);
     for (const src of portraits) assert.ok((await stat(join(dist, src))).size > 0, `${src} not built`);
+    assert.deepEqual(clips.map((s) => s.match(/data-clip="\/clips\/([a-z]+)-/)?.[1]), KEYS);
+    for (const [i, s] of clips.entries()) {
+      const [key, , , , , alt] = landing.slides[lang][i + 1];
+      assert.match(s, new RegExp(`<img class="still" src="/clips/${key}-${lang}-light\\.jpg" width="1280" height="720"`));
+      assert.ok(s.includes(`alt="${alt}"`), `slide ${key}: its alt is not its words`);
+    }
   });
 }
+
+test("the waves move for ever but pause on a button, and stand still under reduced motion (WCAG 2.2.2)", async () => {
+  const js = await readFile(join(dist, "waves.js"), "utf8");
+  assert.match(js, /className = "waves-pause"/);
+  assert.match(js, /aria-pressed/);
+  assert.match(js, /prefers-reduced-motion: reduce/);
+  assert.match(js, /document\.hidden/);
+  assert.match(js, /IntersectionObserver/);
+});
+
+test("the clips are c16's alone, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
+  const want = KEYS.flatMap((k) => ["en", "fr"].flatMap((l) => ["jpg", "mp4", "webm"].map((e) => `${k}-${l}-light.${e}`))).sort();
+  const have = (await readdir(join(dist, "clips"))).sort();
+  assert.deepEqual(have, want);
+  for (const name of have) assert.ok((await stat(join(dist, "clips", name))).size <= 500 * 1024, `${name} is over 500 KiB`);
+});
+
+test("the root sends a reader to the French landing, English one link away", async () => {
+  const html = await readFile(join(dist, "index.html"), "utf8");
+  assert.match(html, /<meta http-equiv="refresh" content="0; url=\/fr\/"/);
+  assert.match(html, /href="\/en\/" hreflang="en"/);
+});
