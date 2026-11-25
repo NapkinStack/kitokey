@@ -2026,7 +2026,7 @@ function sendPart(card, top, actions, session, words) {
   })();
 }
 
-function minutesCard(read, words, session, transcript, onPage) {
+function minutesCard(read, words, session, transcript, onPage, previous) {
   const card = element("article", "card minutes");
   // Its title, and Refaire… beside it: the state below them never sits under a button.
   const top = element("div", "top");
@@ -2131,6 +2131,33 @@ function minutesCard(read, words, session, transcript, onPage) {
   const written = element("p", "note", words.minutes_ai);
   written.id = "minutes-ai";
   card.append(written);
+  // The last version a redo replaced (D113): brought back by one button that names its time and model;
+  // the one left becomes the previous, so the same button brings it back.
+  if (previous) {
+    const back = element("button", "open");
+    back.type = "button";
+    back.id = "minutes-previous";
+    const was = [madeOn(words, previous.made), previous.model ? modelSaid(previous.model) : ""].filter(Boolean).join(" · ");
+    back.textContent = was ? fill(words.previous_back, was) : words.previous_back.replace(/\s*\(\{\}\)$/, "");
+    const help = element("p", "says", words.previous_help);
+    help.id = "minutes-previous-help";
+    const failed = element("p", "note warn");
+    failed.hidden = true;
+    back.addEventListener("click", async () => {
+      waiting(back, true);
+      try {
+        await window.__TAURI__.core.invoke("previous_back", { name: nameOf(session), step: "minutes" });
+        await refresh();
+      } catch (why) {
+        failed.textContent = fill(words.previous_failed, why);
+        failed.hidden = false;
+        waiting(back, false);
+      }
+    });
+    const box = element("div", "previous");
+    box.append(back, help, failed);
+    card.append(box);
+  }
   // The transcript corrected after they were written (D62): said, and made again only on a click.
   const corrected = transcript.state === "present" ? Math.max(0, ...transcript.segments.map((segment) => Date.parse(segment.edited ?? "") || 0)) : 0;
   if (corrected > (Date.parse(read.made ?? "") || 0)) {
@@ -3043,7 +3070,7 @@ function trashedFocused() {
   }
 }
 
-function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, speakers }, words) {
+function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, previous_minutes, speakers }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
   const open = iconButton("folder-open", words.open_folder, "open-folder");
@@ -3150,7 +3177,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
-  columns.append(minutesCard(minutes, words, session, transcript, onPage), transcriptCard(transcript, words, session, onPage, speakers));
+  columns.append(minutesCard(minutes, words, session, transcript, onPage, previous_minutes), transcriptCard(transcript, words, session, onPage, speakers));
   // Shown again when the window comes forward: a search in progress in this meeting is kept.
   const searching = page.dataset.name === nameOf(session) ? (document.getElementById("search")?.value ?? "") : "";
   // A name being typed is kept the same way, with its refusal and where the caret was (D70).

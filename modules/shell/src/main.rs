@@ -423,6 +423,7 @@ fn main() {
             models_offered,
             next_models_kept,
             transcript_redo_own,
+            previous_back,
             title_saved,
             confidential_set,
             sending_of,
@@ -1757,9 +1758,19 @@ struct Opened {
     system_language: &'static str,
     /// The steps whose own model is gone (D91): Settings' choice makes them, said on the page.
     models_gone: Vec<meeting_models::Step>,
+    /// The last summary a redo replaced, kept beside it (D113): when it was made, and by what.
+    previous_minutes: Option<Previous>,
     /// The names the user gave its two sides (#1205); none where the meeting cannot hold them — before
     /// session-audio/v3 —: the page then offers no naming.
     speakers: Option<SpeakersShown>,
+}
+
+/// A version kept beside the one shown (D113), as its page names it.
+#[derive(serde::Serialize)]
+struct Previous {
+    made: Option<String>,
+    provider: Option<String>,
+    model: Option<String>,
 }
 
 /// The two sides' names as the page shows them (#1205): the user's own words, none where a side keeps the page's.
@@ -1787,6 +1798,13 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         .into_iter()
         .find(|listed| listed.folder == folder)
         .ok_or_else(gone)?;
+    // The last minutes a redo replaced (D113), named by id as the page names v5's sections.
+    let said = words::window(shell.language());
+    let kept_minutes = minutes::previous(
+        &folder,
+        said.minutes_sections,
+        &minutes::named_by_id(said.minutes_sections, said.structure_sections),
+    );
     Ok(Opened {
         session,
         transcript: meeting::transcript(&folder),
@@ -1801,6 +1819,14 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         apple: shell.settings().engine == Engine::SpeechAnalyzer,
         system_language: shell.system.code(),
         models_gone: gone_of(&shell.settings(), &folder),
+        previous_minutes: match kept_minutes {
+            Read::Present(kept) => Some(Previous {
+                made: kept.made,
+                provider: kept.provider,
+                model: kept.model,
+            }),
+            _ => None,
+        },
         speakers: speakers::offered(&folder).then(|| SpeakersShown::from(speakers::read(&folder))),
     })
 }
@@ -4390,11 +4416,12 @@ fn write_minutes_from(
         // Cancelled by the user (D92), and not written meanwhile: no failure, nothing told.
         let cancelled = cancel.cancelled() && matches!(made, summarising::Made::Failed(..));
         let ended_here = matches!(made, summarising::Made::Failed(..)) && !cancelled && here();
-        // Replaced, the earlier minutes go to the trash — refused, they stay beside, and it is said.
+        // Replaced, the earlier minutes are kept beside as the previous version, the one kept before
+        // going to the trash (D113) — refused, they stay where they were set aside, and it is said.
         let mut kept_beside = None;
         if let Some(previous) = previous {
             match made {
-                summarising::Made::Written(_) if trash::delete(&previous).is_err() => {
+                summarising::Made::Written(_) if keep_previous(&folder, &previous, minutes::PREVIOUS).is_err() => {
                     kept_beside = previous.file_name().map(|name| name.to_string_lossy().into_owned());
                 }
                 summarising::Made::Written(_) => {}
@@ -4444,6 +4471,45 @@ fn write_minutes_from(
         // where no window of Kitokey has the focus (D92).
         tell_made(&app, &words::minutes(&said, shell.language()), &folder, written);
     });
+}
+
+/// A version a redo replaced, set aside at `aside`, kept beside the new one under `name` in place of
+/// the trash (D113): the one kept there before goes to the trash first, so that one alone is kept.
+fn keep_previous(folder: &Path, aside: &Path, name: &str) -> std::io::Result<()> {
+    let kept = folder.join(name);
+    if kept.exists() {
+        trash::delete(&kept).map_err(std::io::Error::other)?;
+    }
+    std::fs::rename(aside, kept)
+}
+
+/// « Revenir à la version précédente » (D113): the version shown and the one kept swap, so the
+/// same gesture brings back the one left; a person's corrections are in each file, kept with it.
+/// Refused while the meeting is being made.
+#[tauri::command]
+fn previous_back(shell: State<'_, Shell>, name: String, step: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let (shown, kept) = match step.as_str() {
+        "minutes" => (folder.join("minutes.md"), folder.join(minutes::PREVIOUS)),
+        _ => return Err(shell.told(Failure::Unexpected, "no step of that name")),
+    };
+    if making(&shell, &folder) {
+        return Err(shell.told(Failure::Busy, format!("{name} is being made")));
+    }
+    let between = folder.join(format!("{}.swap", minutes::PREVIOUS));
+    let unwritten = |error: std::io::Error| shell.told(Failure::MeetingFile, error);
+    std::fs::rename(&kept, &between).map_err(unwritten)?;
+    if let Err(error) = std::fs::rename(&shown, &kept) {
+        let _ = std::fs::rename(&between, &kept);
+        return Err(unwritten(error));
+    }
+    if let Err(error) = std::fs::rename(&between, &shown) {
+        let _ = std::fs::rename(&kept, &shown);
+        let _ = std::fs::rename(&between, &kept);
+        return Err(unwritten(error));
+    }
+    tracing::info!(step, "shell.previous_back");
+    Ok(())
 }
 
 /// « Exporter chaque compte rendu » (D109): the summary just written, written to the folder chosen

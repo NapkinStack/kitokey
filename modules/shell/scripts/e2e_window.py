@@ -6675,6 +6675,118 @@ def redo_says_what_follows(now: dt.datetime) -> None:
                       heard and done and not writing.exists() and summary() == summary_before, [heard, done, writing.exists(), summary() == summary_before])
 
 
+def previous_summary_back(now: dt.datetime) -> None:
+    """CJ. D113, criterion 2, the summary: made again, the one it replaced — the last one only — stays in the
+    meeting's folder as `minutes-previous.md`, which no step reads, in place of going to the trash; the page
+    offers « Revenir à la version précédente » with its time and model, a line saying the same button brings
+    back the one left; pressed, the two swap; the next redo sends the older one to the trash. In French."""
+    print("CJ. a summary made again keeps the one it replaced, the page offering it back with its time and model; going back swaps them (D113)")
+    idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+            " && m.minutes_waiting.length === 0)")
+    back = ("const b = document.getElementById('minutes-previous'), h = document.getElementById('minutes-previous-help');"
+            " return b && b.getClientRects().length ? [b.textContent, h ? h.textContent : null] : null")
+    help_said = "La version quittée devient la précédente\u00a0: le même bouton la ramène."
+    meetings = WORK / "previous-summary"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+    (meeting / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+    first = ("---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: qwen3:14b\ncontext: null\n---\n\n"
+             "## 1.\n\nLa première version.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
+    (meeting / "minutes.md").write_text(first)
+    settings = 'after = "nothing"\nreminder = false\nminutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n'
+    previous = meeting / "minutes-previous.md"
+    asides = lambda: sorted(p.name for p in meeting.iterdir() if p.name.startswith("minutes") and p.name not in ("minutes.md", "minutes-previous.md"))
+    with Window(meetings, "fr_FR.UTF-8", settings) as browser:
+        page = lambda: (browser.execute_script("location.hash = '#/'"),
+                        browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}"),
+                        wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-state") and b.execute_script(idle), 15))
+        page()
+        check("no version replaced yet: nothing offered back (D113)", browser.execute_script(back) is None, browser.execute_script(back))
+        browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: null, model: null})", meeting.name)
+        made = wait_for(browser, lambda b: (meeting / "minutes.md").read_text() != first and b.execute_script(idle), 15)
+        second = (meeting / "minutes.md").read_text()
+        check("made again: the one replaced stays beside as minutes-previous.md, nothing else set aside (D113)",
+              made and previous.is_file() and previous.read_text() == first and asides() == [], [previous.exists(), asides()])
+        page()
+        offered = wait_for(browser, lambda b: b.execute_script(back), 10)
+        got = browser.execute_script(back) or [None, None]
+        check("the page offers « Revenir à la version précédente », with its time and model, and says the same button brings back the one left (D113)",
+              offered and got[0].startswith("Revenir à la version précédente (") and "18 oct." in got[0] and "Qwen3 14b" in got[0] and got[1] == help_said, got)
+        # Pressed when it is there; absent, the rows below fail saying so, never raise (s113bred).
+        if offered:
+            press(browser, "minutes-previous")
+        held = lambda path: path.read_text() if path.is_file() else "the file absent"
+        swapped = offered and wait_for(None, lambda b: held(meeting / "minutes.md") == first and held(previous) == second, 10)
+        shown = wait_for(browser, lambda b: "La première version." in b.execute_script(
+            "return document.querySelector('#meeting .minutes .body')?.textContent ?? ''"), 10)
+        named = wait_for(browser, lambda b: (b.execute_script(back) or [""])[0].find("Mistral") > 0, 10)
+        check("pressed: the two swap, the page shows the one brought back and offers the one left (D113)",
+              swapped and shown and named, [browser.execute_script(back) or "the button absent", asides()])
+        browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: null, model: null})", meeting.name)
+        again = wait_for(browser, lambda b: held(meeting / "minutes.md") != first and b.execute_script(idle), 15)
+        check("the next redo: the one it replaced is the previous one, the older gone from the folder (D113)",
+              again and held(previous) == first and asides() == [], [held(previous)[:60], asides()])
+        # ines' pre-read of #1065, the summary's mirrors of #1070's T8 and T9. A redo that fails, or is cancelled, leaves both
+        # versions as they were, nothing set aside, nothing in the trash.
+        trash = WORK / "data" / "Trash" / "files"
+        binned = lambda: sorted(p.name for p in trash.iterdir()) if trash.exists() else []
+        before = (held(meeting / "minutes.md"), held(previous), binned())
+        redo = lambda: browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: null, model: null})", meeting.name)
+        (WORK / "fail-minutes").touch()
+        try:
+            redo()
+            failed = wait_for(browser, lambda b: b.execute_script(idle), 15)
+        finally:
+            (WORK / "fail-minutes").unlink(missing_ok=True)
+        after_failure = (held(meeting / "minutes.md"), held(previous), binned())
+        (WORK / "hold-minutes").touch()
+        try:
+            redo()
+            holding = wait_for(None, lambda b: (WORK / "held-minutes").exists(), 15)
+            browser.execute_script("return window.__TAURI__.core.invoke('making_cancelled', {name: arguments[0]})", meeting.name)
+            cancelled = wait_for(browser, lambda b: b.execute_script(idle), 15)
+        finally:
+            (WORK / "hold-minutes").unlink(missing_ok=True)
+            (WORK / "held-minutes").unlink(missing_ok=True)
+        after_cancel = (held(meeting / "minutes.md"), held(previous), binned())
+        check("a summary's redo that fails or is cancelled leaves both versions as they were, nothing set aside, nothing in the trash (D113)",
+              failed and holding and cancelled and after_failure == before and after_cancel == before and asides() == [],
+              [failed, holding, cancelled, after_failure == before, after_cancel == before, asides()])
+        # A trash that refuses: the older version stays as minutes-previous.md, the one replaced set aside beside it, and it
+        # is said — by its notification, the window away (D92).
+        kept_older = held(previous)
+        trash.mkdir(parents=True, exist_ok=True)
+        notified = WORK / "notified-previous-summary"
+        monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                   stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+        trash.chmod(0o500)
+        try:
+            time.sleep(0.5)
+            away(browser, lambda: (redo(), wait_for(None, lambda b: "n’a pas pu aller à la corbeille" in notified.read_text(), 15)))
+            said_kept = "n’a pas pu aller à la corbeille" in notified.read_text()
+        finally:
+            trash.chmod(0o700)
+            monitor.terminate()
+        aside_now = asides()
+        check("a summary's trash that refuses: the older stays as minutes-previous.md, the one replaced set aside beside it, said (D113)",
+              said_kept and held(previous) == kept_older and len(aside_now) == 1 and aside_now[0] in notified.read_text(),
+              [said_kept, held(previous)[:60], aside_now])
+        for name in aside_now:
+            (meeting / name).unlink()
+        # Kept, it is the meeting's: in its text's weight, and in the trash with it (ines, #1062).
+        text = browser.execute_script("return window.__TAURI__.core.invoke('listed')"
+                                      ".then((l) => l.sessions.filter((s) => s.folder.endsWith(arguments[0])).map((s) => s.text))", meeting.name)
+        sizes = sum(path.stat().st_size for path in (meeting / "minutes.md", previous) if path.is_file())
+        check("the previous version counts in the meeting's text weight (D113)", previous.is_file() and len(text) == 1 and text[0] >= sizes, [text, sizes])
+        browser.execute_script("window.__TAURI__.core.invoke('freed', {names: [arguments[0]], whole: true})", meeting.name)
+        trashed = WORK / "data" / "Trash" / "files" / meeting.name
+        gone = wait_for(None, lambda b: not meeting.exists(), 10)
+        check("the meeting moved to the trash takes its previous version with it (D113)",
+              gone and (trashed / "minutes-previous.md").is_file(), [meeting.exists(), sorted(p.name for p in trashed.iterdir()) if trashed.exists() else None])
+
+
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
     shows one bar across both steps — the transcript, then its summary —, naming the step, never moving back:
@@ -14643,16 +14755,20 @@ def main() -> int:
                 return sorted(folder.glob("minutes-before-*.md")) if folder.exists() else []
 
             trash_files = WORK / "data" / "Trash" / "files"
-            redone = wait_for(browser, lambda b: aside(trash_files), 10)
+            # The minutes replaced kept beside as the previous version, no longer in the trash (D113). Waited for until
+            # nothing is left set aside: the stand-in writes the same minutes each time, so the previous kept by an
+            # earlier redo already equals them, and the new one is moved there only once the making has ended — after
+            # « minutes_written » (the attest at a6a17c4 read it in between).
+            kept_previous = asked / "minutes-previous.md"
+            redone = wait_for(browser, lambda b: kept_previous.is_file() and kept_previous.read_text() == before and not aside(asked), 10)
             check(
-                "made again with the model chosen, kept for this meeting, Settings unchanged; the minutes there in the trash",
+                "made again with the model chosen, kept for this meeting, Settings unchanged; the minutes there kept as the previous version (D113)",
                 redone
                 and json.loads((asked / "models.json").read_text()).get("minutes", {}).get("model") == "mistral:7b"
                 and (WORK / "summary-args").read_text().split()[-1] == "mistral:7b"
-                and aside(trash_files)[0].read_text() == before
                 and 'minutes_model = "qwen3:14b"' in window.file.read_text()
                 and not aside(asked),
-                ((WORK / "summary-args").read_text(), aside(trash_files), aside(trash_files) and aside(trash_files)[0].read_text()[:60], before[:60], aside(asked)),
+                ((WORK / "summary-args").read_text(), kept_previous.exists() and kept_previous.read_text()[:60], before[:60], aside(asked)),
             )
             # Made again and failing — on this computer, then online through the agreement: the minutes
             # there stay, and the notice says a redo, not a first making.
@@ -14741,7 +14857,8 @@ def main() -> int:
                   plain and "produit de compte rendu" not in state(browser) and "produit de compte rendu" not in said, (state(browser), said[-300:]))
             time.sleep(3)
             left = sorted(p.name for p in asked.glob("minutes*"))
-            check("nothing else is made after, no copy left beside", (asked / "minutes.md").read_text() == before and left == ["minutes.md"], (left, (asked / "minutes.md").read_text()[:80], (WORK / "summary-args").read_text()))
+            # The previous version the redo before kept stays (D113); no copy of the failed one.
+            check("nothing else is made after, no copy left beside", (asked / "minutes.md").read_text() == before and left == ["minutes-previous.md", "minutes.md"], (left, (asked / "minutes.md").read_text()[:80], (WORK / "summary-args").read_text()))
             window.file.write_text(settled)
             # A trash that refuses: the minutes replaced stay beside the new ones, never deleted.
             trash = WORK / "data" / "Trash"
@@ -15389,6 +15506,7 @@ def main() -> int:
     keys_first_surfaces(now)
     redo_says_what_is_wrong(now)
     redo_says_what_follows(now)
+    previous_summary_back(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)

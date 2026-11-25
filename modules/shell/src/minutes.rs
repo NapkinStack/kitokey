@@ -50,7 +50,20 @@ pub fn minutes(folder: &Path, sections: [&str; 3]) -> Read<Minutes> {
 /// The same, `minutes/v5`'s sections named as the page names their ids (`by_id`); one whose id
 /// it does not name keeps the model's title.
 pub fn minutes_named(folder: &Path, sections: [&str; 3], by_id: &[(&str, &str)]) -> Read<Minutes> {
-    match fs::read_to_string(folder.join("minutes.md")) {
+    read_from(&folder.join("minutes.md"), sections, by_id)
+}
+
+/// The last minutes a redo replaced, kept beside them under a name no step reads (D113,
+/// `minutes/v4`): what « Revenir à la version précédente » brings back.
+pub const PREVIOUS: &str = "minutes-previous.md";
+
+/// Those minutes, read as the others are.
+pub fn previous(folder: &Path, sections: [&str; 3], by_id: &[(&str, &str)]) -> Read<Minutes> {
+    read_from(&folder.join(PREVIOUS), sections, by_id)
+}
+
+fn read_from(file: &Path, sections: [&str; 3], by_id: &[(&str, &str)]) -> Read<Minutes> {
+    match fs::read_to_string(file) {
         Err(_) => Read::Absent,
         Ok(text) => parse_minutes(&text, sections, by_id).map_or(Read::Unreadable, Read::Present),
     }
