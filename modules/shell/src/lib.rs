@@ -33,6 +33,7 @@ pub mod sending;
 pub mod sessions;
 pub mod settings;
 pub mod sound_check;
+pub mod speakers;
 pub mod speech;
 pub mod speeds;
 pub mod spoken;

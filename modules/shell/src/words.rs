@@ -679,6 +679,22 @@ pub struct Window {
     /// Shows: a meeting's page, as a label. When: legend of the speaking-time drawing. At most: no
     /// limit. Placeholders: none.
     pub remote_described: &'static str,
+    /// The transcript's speakers named by the user (#1205): the button that opens the two fields.
+    /// Shows: a meeting's page, as a button's tooltip and name. When: transcript card, a v3 meeting with its
+    /// transcript. At most: about 30 characters. Placeholders: none.
+    pub speakers_open: &'static str,
+    /// Shows: a meeting's page, as a button. When: the speakers' names being typed. At most: one or two words.
+    /// Placeholders: none.
+    pub speakers_save: &'static str,
+    /// Shows: a meeting's page, as a button. When: the speakers' names being typed. At most: one or two words.
+    /// Placeholders: none.
+    pub speakers_cancel: &'static str,
+    /// Shows: a meeting's page, as a hint under the fields. When: the speakers' names being typed. At most: one
+    /// line. Placeholders: none.
+    pub speakers_hint: &'static str,
+    /// Shows: a meeting's page, as an error under the fields, what was typed kept. When: the names could not be
+    /// kept in the meeting's folder. At most: one line. Placeholders: none.
+    pub speakers_not_saved: &'static str,
     /// Who spoke over the meeting, for whoever does not see the drawing.
     /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the
     /// speaking-time drawing. At most: no limit. Placeholders: none.
@@ -953,6 +969,10 @@ pub struct Window {
     /// (PDR-0007 §3). Shows: a meeting's page, the send panel. When: the destination was never sent to. At most:
     /// three lines. Placeholders: {} the destination's name.
     pub send_notice: &'static str,
+    /// A confidential meeting's send asked once more, every time (D119, PDR-0007 §4 as amended on 2026-11-24).
+    /// Shows: a meeting's page, the send panel, above « Envoyer » and « Annuler ». When: a destination is chosen
+    /// for a confidential meeting. At most: one sentence. Placeholders: {} the destination's name.
+    pub send_confidential_ask: &'static str,
     /// The button that sends after the notice. Shows: a meeting's page, the send panel. When: the notice is shown.
     /// At most: one word. Placeholders: none.
     pub send_confirm: &'static str,
@@ -974,8 +994,8 @@ pub struct Window {
     /// posting/v1's meeting.unreadable. Shows: a meeting's page, as a status. When: a send failed. At most: one
     /// line. Placeholders: none.
     pub send_unreadable: &'static str,
-    /// posting/v1's meeting.confidential. Shows: a meeting's page, as a status. When: a send asked of a
-    /// confidential meeting. At most: one line. Placeholders: none.
+    /// posting/v1's meeting.confidential. Shows: a meeting's page, as a status. When: a confidential meeting's
+    /// send not confirmed (D119). At most: one line. Placeholders: none.
     pub send_confidential: &'static str,
     /// posting/v1's meeting.no_summary. Shows: a meeting's page, as a status. When: a send failed. At most: one
     /// line. Placeholders: none.
@@ -1425,6 +1445,16 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
     /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
+    /// Shows: a meeting's page, under its summary, as a button (D113). When: a redo replaced a version,
+    /// kept beside. At most: no limit. Placeholders: {} when that version was made and its model, as the
+    /// page's line says them.
+    pub previous_back: &'static str,
+    /// Shows: a meeting's page, under « Revenir à la version précédente », as a help line (D113). When:
+    /// the button shows. At most: no limit. Placeholders: none.
+    pub previous_help: &'static str,
+    /// Shows: a meeting's page, under « Revenir à la version précédente », as an error (D113). When: the
+    /// two versions could not swap. At most: no limit. Placeholders: {} what is wrong, as the failure says it.
+    pub previous_failed: &'static str,
     /// Shows: a meeting's page, its Redo… panel, as an error above its button (#771). When: the redo
     /// could not start. At most: no limit. Placeholders: {} what is wrong and what to do, as the failure
     /// says it.
@@ -2036,6 +2066,11 @@ pub fn window(language: Language) -> Window {
             voice: "voice {}",
             here_described: "You — your microphone",
             remote_described: "Others — the call’s audio",
+            speakers_open: "Name the speakers…",
+            speakers_save: "Save",
+            speakers_cancel: "Cancel",
+            speakers_hint: "Kept with this meeting. Leave a field empty to keep “You” or “Others”.",
+            speakers_not_saved: "Kitokey could not save these names. Try again.",
             who_spoke: "Who spoke when: you on top, others below",
             who_spoke_later: "Who spoke when appears once it is transcribed.",
             no_transcript: "No transcript yet.",
@@ -2129,6 +2164,7 @@ pub fn window(language: Language) -> Window {
             send_open: "Send…",
             send_to: "Send to “{}”",
             send_notice: "The title, the summary and its actions go to “{}”. Never the audio, never the transcript. A summary sent cannot be taken back.",
+            send_confidential_ask: "This meeting is confidential: its summary will leave this computer for “{}”.",
             send_confirm: "Send",
             send_cancel: "Cancel",
             send_sending: "Sending to “{}”…",
@@ -2136,7 +2172,7 @@ pub fn window(language: Language) -> Window {
             send_listed: "Sent to “{}” on {}",
             send_address_refused: "The address of “{}” is refused. Remove it, then add the channel’s https webhook address in Settings.",
             send_unreadable: "Kitokey couldn’t read this meeting. Check its folder, then try again.",
-            send_confidential: "This meeting is confidential: it’s never sent.",
+            send_confidential: "This meeting is confidential: it’s sent only once you confirm.",
             send_no_summary: "There’s no summary to send yet.",
             send_too_large: "The summary is too long for “{}”. Export it as a file instead.",
             send_offline: "No connection: nothing was sent. Check your connection, then try again.",
@@ -2291,6 +2327,9 @@ pub fn window(language: Language) -> Window {
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept.",
+            previous_back: "Go back to the previous version ({})",
+            previous_help: "The version you leave becomes the previous one: the same button brings it back.",
+            previous_failed: "Couldn’t go back to the previous version: {}",
             redo_not_done: "Not redone: {}",
             redo_keeps_minutes: "The current summary is kept; write it again afterwards if needed.",
             make_minutes: "Write summary",
@@ -2542,6 +2581,11 @@ pub fn window(language: Language) -> Window {
             voice: "voix {}",
             here_described: "Vous — votre micro",
             remote_described: "Les autres — le son de l’appel",
+            speakers_open: "Nommer les intervenants…",
+            speakers_save: "Enregistrer",
+            speakers_cancel: "Annuler",
+            speakers_hint: "Gardés avec cette réunion. Laissez un champ vide pour garder «\u{a0}Vous\u{a0}» ou «\u{a0}Les autres\u{a0}».",
+            speakers_not_saved: "Kitokey n’a pas pu enregistrer ces noms. Réessayez.",
             who_spoke: "Temps de parole au fil de la réunion\u{a0}: vous en haut, les autres en bas",
             who_spoke_later: "Le temps de parole s’affichera après la transcription.",
             no_transcript: "Pas encore de transcription.",
@@ -2638,6 +2682,7 @@ pub fn window(language: Language) -> Window {
             send_open: "Envoyer…",
             send_to: "Envoyer à « {} »",
             send_notice: "Le titre, le compte rendu et ses actions partent vers « {} ». Jamais le son, jamais la transcription. Un compte rendu envoyé ne peut pas être repris.",
+            send_confidential_ask: "Cette réunion est confidentielle\u{a0}: son compte rendu va quitter cet ordinateur pour «\u{a0}{}\u{a0}».",
             send_confirm: "Envoyer",
             send_cancel: "Annuler",
             send_sending: "Envoi vers « {} »…",
@@ -2645,7 +2690,7 @@ pub fn window(language: Language) -> Window {
             send_listed: "Envoyé à « {} » le {}",
             send_address_refused: "L’adresse de « {} » est refusée. Retirez-la, puis ajoutez l’adresse https du webhook du canal dans les Réglages.",
             send_unreadable: "Kitokey n’a pas pu lire cette réunion. Vérifiez son dossier, puis réessayez.",
-            send_confidential: "Réunion confidentielle : elle n’est jamais envoyée.",
+            send_confidential: "Réunion confidentielle\u{a0}: elle n’est envoyée qu’après votre confirmation.",
             send_no_summary: "Pas encore de compte rendu à envoyer.",
             send_too_large: "Compte rendu trop long pour « {} ». Exportez-le en fichier à la place.",
             send_offline: "Pas de connexion : rien n’est parti. Vérifiez la connexion, puis réessayez.",
@@ -2806,6 +2851,9 @@ pub fn window(language: Language) -> Window {
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée.",
+            previous_back: "Revenir à la version précédente ({})",
+            previous_help: "La version quittée devient la précédente\u{a0}: le même bouton la ramène.",
+            previous_failed: "Impossible de revenir à la version précédente\u{a0}: {}",
             redo_not_done: "Pas refait\u{a0}: {}",
             redo_keeps_minutes: "Le compte rendu actuel est gardé\u{202f}; refaites-le ensuite si besoin.",
             make_minutes: "Rédiger le compte rendu",

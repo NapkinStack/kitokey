@@ -94,6 +94,7 @@ function lock() {
 // font's to draw (D69). The name goes on what holds it, for assistive technology. A path's `d`, or
 // another shape as Lucide 1.14.0's icon node gives it (D89).
 const ICONS = {
+  calendar: ["M8 2v4", "M16 2v4", ["rect", { width: 18, height: 18, x: 3, y: 4, rx: 2 }], "M3 10h18"],
   check: ["M20 6 9 17l-5-5"],
   "chevron-left": ["m15 18-6-6 6-6"],
   "chevron-down": ["m6 9 6 6 6-6"],
@@ -129,6 +130,8 @@ const ICONS = {
   bluetooth: ["m7 7 10 10-5 5V2l5 5L7 17"],
   info: [["circle", { cx: 12, cy: 12, r: 10 }], "M12 16v-4", "M12 8h.01"],
   "circle-check": [["circle", { cx: 12, cy: 12, r: 10 }], "m9 12 2 2 4-4"],
+  // Lucide's user-pen (ISC): the speakers named (#1205).
+  "user-pen": ["M11.5 15H7a4 4 0 0 0-4 4v2", "M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z", ["circle", { cx: 10, cy: 7, r: 4 }]],
   pencil: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
 };
 function icon(name) {
@@ -325,7 +328,9 @@ function languageRow(save, language, languages, words, settled, apple, system, i
 }
 
 // The switch on a meeting's page, a setting of its row (D89): the file written or removed at once;
-// what had left said under the row. Its lock open while it is off, as board 4 draws it.
+// what had left said under the row. Its lock open while it is off, as board 4 draws it. Drawn again in place
+// after a confirmed send, which it then names (D119).
+let confidentialShown = null;
 function confidentialCard(session, confidential, words) {
   const name = nameOf(session);
   const card = element("label", "setting confidential");
@@ -363,11 +368,8 @@ function confidentialCard(session, confidential, words) {
       paint(shown);
       // Its lists read again, in place: no service offered once said confidential (D91, D93).
       if (pageOffered?.name === name) pageOffered.again();
-      // Said confidential: no send offered any more (PDR-0007 §4).
-      if (shown.on) {
-        document.getElementById("send-panel")?.remove();
-        document.getElementById("send-open")?.remove();
-      }
+      // Said confidential: an open send panel closed; its sends are asked again from now on (D119).
+      if (shown.on) document.getElementById("send-panel")?.remove();
     } catch {
       box.checked = !box.checked;
       said.textContent = words.confidential_not_saved;
@@ -378,6 +380,7 @@ function confidentialCard(session, confidential, words) {
   });
   card.append(element("span", "name", words.confidential_chip), box);
   paint(confidential);
+  confidentialShown = { name, paint };
   return [card, left, said, described];
 }
 
@@ -1309,6 +1312,11 @@ function pageLevels(name, time, words) {
   const paint = (now) => {
     time.textContent = elapsed(now.seconds);
     for (const [index, track] of tracks.entries()) paintLevel(track, now.levels[index]);
+    // Said confidential or no longer, by the page's switch or the bar's (#1204): its header's lock as the folder says.
+    const holds = row.closest("#meeting")?.querySelector(".meeting-title .holds");
+    const locked = holds?.querySelector(".chip.locked");
+    if (now.confidential && holds && !locked) holds.prepend(lockedChip(words));
+    if (!now.confidential) locked?.remove();
   };
   // Drawn again, its traces go on from the ones it replaces, never from empty (#1133).
   if (pageLast?.meeting === name) {
@@ -1900,7 +1908,8 @@ function startsOnPage(id, words, command) {
 // its panel, each destination by its name; before a destination's first send, what leaves and where, its
 // name and never its address; the outcome said in place, with what to do; each send listed under it. A send
 // that failed is said again from the record whenever the page is drawn — « perhaps arrived » most of all, read
-// on coming back from the channel —, as long as that destination is not sent to again.
+// on coming back from the channel —, as long as that destination is not sent to again. A confidential meeting's
+// send is asked once more every time, in one sentence, the focus on « Annuler » (D119, PDR-0007 §4 amended).
 function sendPart(card, top, actions, session, words) {
   const name = nameOf(session);
   const said = element("p", "says send-said");
@@ -1945,6 +1954,7 @@ function sendPart(card, top, actions, session, words) {
     sayFailed(shown);
     if (!shown.offered) return;
     let offered = shown.destinations;
+    let secret = shown.confidential;
     const open = iconButton("send", words.send_open, "send-open");
     open.setAttribute("aria-expanded", "false");
     open.setAttribute("aria-controls", "send-panel");
@@ -1954,15 +1964,17 @@ function sendPart(card, top, actions, session, words) {
       open.setAttribute("aria-expanded", "false");
       open.focus();
     };
-    const send = async (destination) => {
+    const send = async (destination, confirmed = false) => {
       document.getElementById("send-panel")?.remove();
       open.setAttribute("aria-expanded", "false");
       open.disabled = true;
       said.textContent = fill(words.send_sending, destination);
       try {
-        const result = await window.__TAURI__.core.invoke("summary_sent", { name, destination });
+        const result = await window.__TAURI__.core.invoke("summary_sent", { name, destination, confirmed });
         said.textContent = outcome(result, destination);
         offered = result.sending.destinations;
+        secret = result.sending.confidential;
+        if (confidentialShown?.name === name) confidentialShown.paint(result.confidential);
         listSends(result.sending);
         sayFailed(result.sending, destination);
         if (!result.sending.offered) open.remove();
@@ -1984,24 +1996,38 @@ function sendPart(card, top, actions, session, words) {
         to.type = "button";
         to.dataset.destination = destination.name;
         to.addEventListener("click", () => {
-          if (!destination.first) return send(destination.name);
+          // Said confidential since the page was drawn: its switch is the one read now.
+          secret = document.getElementById("confidential-switch")?.checked ?? secret;
+          if (!destination.first && !secret) return send(destination.name);
+          const firstSaid = [];
+          // A confidential meeting: asked once more, every time, never remembered (D119).
+          if (secret) {
+            const ask = element("p", "note send-confidential", fill(words.send_confidential_ask, destination.name));
+            ask.id = "send-confidential";
+            firstSaid.push(ask);
+          }
           // Before its first send: what leaves, and where, by its name (PDR-0007 §3).
-          const notice = element("p", "note send-notice", fill(words.send_notice, destination.name));
-          notice.id = "send-notice";
+          if (destination.first) {
+            const notice = element("p", "note send-notice", fill(words.send_notice, destination.name));
+            notice.id = "send-notice";
+            firstSaid.push(notice);
+          }
           const confirm = element("button", "primary", words.send_confirm);
           confirm.type = "button";
           confirm.id = "send-confirm";
-          // Its name read with what leaves, where, and that it cannot be taken back.
-          confirm.setAttribute("aria-describedby", "send-notice");
-          confirm.addEventListener("click", () => send(destination.name));
+          // Its name read with what is asked, what leaves, where, and that it cannot be taken back.
+          confirm.setAttribute("aria-describedby", firstSaid.map((line) => line.id).join(" "));
+          const confirmed = secret;
+          confirm.addEventListener("click", () => send(destination.name, confirmed));
           const cancel = element("button", "", words.send_cancel);
           cancel.type = "button";
           cancel.id = "send-cancel";
           cancel.addEventListener("click", close);
           const choices = element("div", "send-choices");
           choices.append(confirm, cancel);
-          panel.replaceChildren(notice, choices);
-          confirm.focus();
+          panel.replaceChildren(...firstSaid, choices);
+          // A confidential meeting's question: the focus on the choice that sends nothing.
+          (secret ? cancel : confirm).focus();
         });
         panel.append(to);
       }
@@ -2018,7 +2044,7 @@ function sendPart(card, top, actions, session, words) {
   })();
 }
 
-function minutesCard(read, words, session, transcript, onPage) {
+function minutesCard(read, words, session, transcript, onPage, previous) {
   const card = element("article", "card minutes");
   // Its title, and Refaire… beside it: the state below them never sits under a button.
   const top = element("div", "top");
@@ -2123,6 +2149,33 @@ function minutesCard(read, words, session, transcript, onPage) {
   const written = element("p", "note", words.minutes_ai);
   written.id = "minutes-ai";
   card.append(written);
+  // The last version a redo replaced (D113): brought back by one button that names its time and model;
+  // the one left becomes the previous, so the same button brings it back.
+  if (previous) {
+    const back = element("button", "open");
+    back.type = "button";
+    back.id = "minutes-previous";
+    const was = [madeOn(words, previous.made), previous.model ? modelSaid(previous.model) : ""].filter(Boolean).join(" · ");
+    back.textContent = was ? fill(words.previous_back, was) : words.previous_back.replace(/\s*\(\{\}\)$/, "");
+    const help = element("p", "says", words.previous_help);
+    help.id = "minutes-previous-help";
+    const failed = element("p", "note warn");
+    failed.hidden = true;
+    back.addEventListener("click", async () => {
+      waiting(back, true);
+      try {
+        await window.__TAURI__.core.invoke("previous_back", { name: nameOf(session), step: "minutes" });
+        await refresh();
+      } catch (why) {
+        failed.textContent = fill(words.previous_failed, why);
+        failed.hidden = false;
+        waiting(back, false);
+      }
+    });
+    const box = element("div", "previous");
+    box.append(back, help, failed);
+    card.append(box);
+  }
   // The transcript corrected after they were written (D62): said, and made again only on a click.
   const corrected = transcript.state === "present" ? Math.max(0, ...transcript.segments.map((segment) => Date.parse(segment.edited ?? "") || 0)) : 0;
   if (corrected > (Date.parse(read.made ?? "") || 0)) {
@@ -2159,11 +2212,14 @@ function minutesCard(read, words, session, transcript, onPage) {
 // beside it, the user choosing.
 function datesOffer(card, mentioned, session, transcript, words) {
   if (mentioned.length === 0) return;
-  const button = element("button", "open", words.dates_open);
-  button.type = "button";
-  button.id = "dates-open";
+  // Among the summary's actions, as « Envoyer… » and « Copier » are (#1213, D89): a calendar, its tooltip and name the
+  // words, before « Copier »; never a bar of its own under the summary.
+  const button = iconButton("calendar", words.dates_open, "dates-open");
   button.hidden = true;
-  card.append(button);
+  const actions = card.querySelector(".minutes-actions");
+  const copy = actions?.querySelector("#copy-minutes");
+  if (copy) copy.before(button);
+  else (actions ?? card).append(button);
   window.__TAURI__.core
     .invoke("dates_resolved", { name: nameOf(session), whens: mentioned.map((m) => m.when), day: null })
     .then((resolved) => (button.hidden = !resolved?.dates.some(Boolean)))
@@ -2460,13 +2516,93 @@ function tookAndCost(read, words) {
   return said;
 }
 
-// Who said a line, as the page names them: the track, and the voice within it when one was told.
-function whoSaid(segment, words) {
-  const side = segment.track === "local" ? words.here : words.remote;
+// Who said a line, as the page names them: the track — by the name the user gave its side (#1205), else the
+// page's word —, and the voice within it when one was told.
+function whoSaid(segment, words, names) {
+  const side = segment.track === "local" ? names?.me ?? words.here : names?.others ?? words.remote;
   return segment.voice === null ? side : `${side} · ${fill(words.voice, segment.voice)}`;
 }
 
-function transcriptCard(read, words, session, onPage) {
+// The button that opens the speakers' names, and its panel under the card's top (#1205): Enter saves, Escape or
+// « Annuler » closes it as it was; a name refused or not kept is said under the fields, what was typed kept.
+function speakersButton(card, names, read, words, session) {
+  const open = iconButton("user-pen", words.speakers_open, "speakers-open");
+  open.setAttribute("aria-expanded", "false");
+  open.setAttribute("aria-controls", "speakers-panel");
+  const close = () => {
+    document.getElementById("speakers-panel")?.remove();
+    open.setAttribute("aria-expanded", "false");
+    open.focus();
+  };
+  open.addEventListener("click", () => {
+    if (document.getElementById("speakers-panel")) return close();
+    const panel = element("form", "fields speakers-panel");
+    panel.id = "speakers-panel";
+    panel.setAttribute("aria-label", words.speakers_open);
+    // Settings' own fields (guidedField): labelled by their side, the page's word as the placeholder.
+    const field = (id, label, value, placeholder) => {
+      const [row, input] = guidedField(id, label, "text", value, false);
+      input.maxLength = 60;
+      input.placeholder = placeholder;
+      input.autocomplete = "off";
+      return [row, input];
+    };
+    const [meRow, me] = field("speaker-me", words.here_described, names.me, words.here);
+    const [othersRow, others] = field("speaker-others", words.remote_described, names.others, words.remote);
+    const hint = element("p", "note", words.speakers_hint);
+    hint.id = "speakers-hint";
+    me.setAttribute("aria-describedby", "speakers-hint");
+    others.setAttribute("aria-describedby", "speakers-hint");
+    const said = element("p", "note warn", "");
+    said.id = "speakers-said";
+    said.setAttribute("role", "alert");
+    said.hidden = true;
+    const save = element("button", "primary", words.speakers_save);
+    save.type = "submit";
+    save.id = "speakers-save";
+    const cancel = element("button", "", words.speakers_cancel);
+    cancel.type = "button";
+    cancel.id = "speakers-cancel";
+    cancel.addEventListener("click", close);
+    const choices = element("div", "speakers-choices");
+    choices.append(save, cancel);
+    panel.append(meRow, othersRow, hint, said, choices);
+    panel.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      close();
+    });
+    panel.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      save.disabled = true;
+      try {
+        const kept = await window.__TAURI__.core.invoke("speakers_named", { name: nameOf(session), me: me.value, others: others.value });
+        names.me = kept.me;
+        names.others = kept.others;
+        // Every line, and what a copy takes, names them now.
+        const lines = card.querySelectorAll(".lines li");
+        read.segments.forEach((segment, index) => {
+          const who = lines[index]?.querySelector(".who");
+          if (who) who.textContent = whoSaid(segment, words, names);
+        });
+        close();
+      } catch {
+        said.textContent = words.speakers_not_saved;
+        said.hidden = false;
+      } finally {
+        save.disabled = false;
+      }
+    });
+    card.querySelector(".top").after(panel);
+    open.setAttribute("aria-expanded", "true");
+    me.focus();
+  });
+  return open;
+}
+
+function transcriptCard(read, words, session, onPage, speakers) {
+  // The sides' names as kept (#1205): none where the meeting cannot hold them; renamed in place below.
+  const names = speakers ? { ...speakers } : null;
   const card = element("aside", "card transcript");
   card.setAttribute("aria-label", words.transcript_title);
   const top = element("div", "top");
@@ -2516,7 +2652,7 @@ function transcriptCard(read, words, session, onPage) {
   let said = 0;
   copy.addEventListener("click", async () => {
     const mine = ++said;
-    const lines = read.segments.map((segment) => fill(words.transcript_copied_line, clock(segment.start), whoSaid(segment, words), segment.text));
+    const lines = read.segments.map((segment) => fill(words.transcript_copied_line, clock(segment.start), whoSaid(segment, words, names), segment.text));
     try {
       await navigator.clipboard.writeText(`${lines.join("\n")}\n`);
       copied.textContent = words.minutes_copied;
@@ -2526,6 +2662,9 @@ function transcriptCard(read, words, session, onPage) {
     }
   });
   top.append(finding, copied, copy, redo);
+  // Nommer les intervenants… (#1205), once complete: the two sides' names in two labelled fields, as Otter and
+  // Zoom rename a speaker from the transcript; kept with the meeting, every line following at once.
+  if (names && read.complete) top.append(speakersButton(card, names, read, words, session));
   const heard = element("div", "made");
   // A service names its host as who heard (D43): said as the minutes' maker is, never « on this
   // computer » — a host of one word (`http://transcriber/v1`) is a service too. This computer's
@@ -2596,7 +2735,7 @@ function transcriptCard(read, words, session, onPage) {
         if (!event.repeat) from();
       });
     }
-    const who = whoSaid(segment, words);
+    const who = whoSaid(segment, words, names);
     const said = element("div", "said");
     const text = element("span", "text", segment.text);
     said.append(element("span", `who ${segment.track}`, who), text);
@@ -2949,7 +3088,7 @@ function trashedFocused() {
   }
 }
 
-function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone }, words) {
+function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, previous_minutes, speakers }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
   const open = iconButton("folder-open", words.open_folder, "open-folder");
@@ -3001,7 +3140,11 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const lasts = element("span", "lasts");
   if (session.seconds !== null) lasts.append(element("span", "length", length(session.seconds)));
   if (session.audio > 0) lasts.append(element("span", "weighs", fill(words.audio_weighs, size(session.audio, words))));
-  title.append(named, lasts, holdings(session, words, true));
+  const held = holdings(session, words, true);
+  // While it records, said confidential (#1204, D60): the lock and its word first, beside « Enregistrement », as the
+  // bar shows it; at rest, the page's own switch says it.
+  if (session.confidential && session.state === "recording") held.prepend(lockedChip(words));
+  title.append(named, lasts, held);
   head.append(title, top);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
@@ -3052,7 +3195,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
-  columns.append(minutesCard(minutes, words, session, transcript, onPage), transcriptCard(transcript, words, session, onPage));
+  columns.append(minutesCard(minutes, words, session, transcript, onPage, previous_minutes), transcriptCard(transcript, words, session, onPage, speakers));
   // Shown again when the window comes forward: a search in progress in this meeting is kept.
   const searching = page.dataset.name === nameOf(session) ? (document.getElementById("search")?.value ?? "") : "";
   // A name being typed is kept the same way, with its refusal and where the caret was (D70).
@@ -5230,6 +5373,16 @@ function showSmall(words) {
   );
   meters.hidden = true;
   time.after(meters);
+  // Said confidential (#1204, D60): a lock in the row while it records, named for a screen reader and in its tooltip,
+  // as a row's mark in the list — the bar has no room for its word, the switch under « Plus d’options » says it whole.
+  const locked = element("span", "bar-locked");
+  locked.id = "small-locked";
+  locked.setAttribute("role", "img");
+  locked.setAttribute("aria-label", words.confidential_name);
+  locked.title = words.confidential_name;
+  locked.append(lock());
+  locked.hidden = true;
+  meters.after(locked);
   const note = element("p", "says", words.small_note);
   note.id = "small-note";
   note.hidden = true;
@@ -5440,6 +5593,8 @@ function showSmall(words) {
       field.painted();
       rest.hidden = recording;
       live.hidden = !recording;
+      // At rest, no lock: the next recording says its own.
+      if (!recording) locked.hidden = true;
       // A recording starts its traces from empty, never from the last one's last two seconds.
       if (recording) for (const id of ["level-me", "level-others"]) drawLevel(document.getElementById(id), levelShown(undefined, 0, 0, false, TRACE), 0);
       // The microphone in each state's options: recording, after the context, as board 6 has it.
@@ -5523,6 +5678,8 @@ function showSmall(words) {
       secret.row.classList.toggle("on", now.confidential);
     }
     if (Date.now() - mark.refused >= 5000) marked();
+    // The lock as the switch stands: the folder's word, or a turn not yet kept.
+    locked.hidden = !(recording && secret.box.checked);
     // Said confidential, or no longer: « Avancé » offers otherwise — no service then (D60) —, drawn
     // again as it was, open or closed.
     if (now.meeting !== null && now.confidential !== shownConfidential) {
@@ -6310,7 +6467,9 @@ window.addEventListener("focus", () => {
   // The assistant too: its answers are not drawn over.
   const choosing = !document.getElementById("welcome").hidden
     || document.querySelector("#settings:not([hidden]) #minutes-unsaved:not([hidden])")
-    || [...document.querySelectorAll("#settings:not([hidden]) .fields input")].some((input) => input.value !== input.defaultValue);
+    || [...document.querySelectorAll("#settings:not([hidden]) .fields input")].some((input) => input.value !== input.defaultValue)
+    // The speakers being named (#1205): what is typed stays.
+    || document.getElementById("speakers-panel");
   // Back from a list's menu, not from elsewhere: nothing drawn anew (#944).
   const menu = inMenu;
   inMenu = false;
