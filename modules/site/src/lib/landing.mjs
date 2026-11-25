@@ -145,13 +145,13 @@ const raw = {
   hardware: {
     en: [["lock", "Everything on your computer", "Confidentiality assured, your data stays with you.",
       ["16 GB of memory at least, 24 to 32 GB to work in comfort", "A graphics card with Vulkan, a built-in one being enough", "10 GB free for the two models", "About 2 GB free for each hour that records, then 0.2 GB kept an hour"]],
-      ["unlock", "With the service you choose", "The transcript on your computer, the minutes written online.",
-      ["8 GB of memory", "4 GB free, then about 2 GB for each hour that records", "A graphics card with Vulkan advised, a built-in one being enough", "The service is often paid, billed by it, not by Kitokey"]]],
+      ["unlock", "With the service you choose", "No special hardware. The transcript and the minutes are made online.",
+      ["An OpenAI-compatible service, such as Groq", "Often paid, billed by that service, not by Kitokey", "About 0.2 GB per hour of meeting kept (the audio stays with you)"]]],
     fr: [["lock", "Tout sur votre ordinateur", "Confidentialité assurée, vos données restent chez vous.",
       ["16 Go de mémoire au moins, 24 à 32 Go pour être à l’aise", "Une carte graphique Vulkan, même intégrée", "10 Go libres pour les deux modèles", "Environ 2 Go libres par heure qui s’enregistre, puis 0,2 Go gardés par heure"]],
-      ["unlock", "Avec le service de votre choix", "La transcription sur votre ordinateur, le compte rendu écrit en ligne.",
-      ["8 Go de mémoire", "4 Go libres, puis environ 2 Go par heure qui s’enregistre", "Une carte graphique Vulkan conseillée, même intégrée", "Le service est souvent payant, facturé par lui, pas par Kitokey"]]],
-    keeps: "modules/install/README.md, « What a computer needs », measured on 2026-11-25 (#1217): its two profiles; « 8 GB » there said not measured; ADR-0013, a service the user names, its cost theirs",
+      ["unlock", "Avec le service de votre choix", "Aucun matériel particulier. La transcription et le compte rendu se font en ligne.",
+      ["Un service compatible OpenAI, comme Groq", "Souvent payant, facturé par ce service, pas par Kitokey", "Environ 0,2 Go par heure de réunion gardée (l’audio reste chez vous)"]]],
+    keeps: "modules/install/README.md, « What a computer needs », measured on 2026-11-25 (#1217): everything on the computer, and 0.2 GB kept an hour; ADR-0013, a transcription service the user names (Groq among them), ADR-0013 and the minutes' services, their cost the user's; the decider's « no special hardware » (2026-11-25)",
   },
   faq: {
     en: ["Frequently asked questions", [
