@@ -2,7 +2,7 @@
 // and each shows its clip's poster. With it: arrow keys, a calm crossfade on a fine pointer, and on screens of
 // 700 px and more the clip itself (AV1 WebM, else H.264 MP4), each fetched as its slide approaches, in the app's
 // dark theme under the moon where it was filmed so, else the light one in a dark window. Each clip
-// plays once per view, then the next slide comes 0.6 s later, as it does when a clip fails; the drawn call of
+// plays once per view, then the next slide comes 0.6 s later; a clip that fails leaves its poster 3.5 s; the drawn call of
 // slide 1 stays 3 s, a poster alone 3.5 s. WCAG 2.2.2: hover or focus inside pauses the slide and its clip,
 // autoplay never starts under reduced motion (posters only), and rests on slide 1 after two full cycles.
 (() => {
@@ -22,7 +22,8 @@
   const video = (i) => slides[i].querySelector("video");
   const schedule = () => {
     clearTimeout(timer);
-    if (still() || video(at)) return; // a clip's « ended » moves on
+    const v = video(at);
+    if (still() || (v && !v.dataset.failed)) return; // a clip's « ended » moves on; a failed one waits as a poster
     timer = setTimeout(() => go(at + 1), at === 0 ? FIRST : STILL);
   };
   const mark = (n) => {
@@ -51,7 +52,8 @@
   const resume = () => {
     hover = false;
     const v = video(at);
-    if (v && (v.ended || v.dataset.failed) && !still()) timer = setTimeout(() => go(at + 1), HOLD);
+    if (v && v.ended && !still()) timer = setTimeout(() => go(at + 1), HOLD);
+    else if (v && v.dataset.failed) schedule();
     else if (v && !still()) v.play().catch(() => {});
     else schedule();
   };
@@ -98,8 +100,12 @@
       source.src = named(s, ext); source.type = ext === "webm" ? 'video/webm; codecs="av01.0.05M.08"' : "video/mp4";
       v.append(source);
     }
-    // A clip that fails to load leaves its poster and lets the carousel go on.
-    v.lastElementChild.addEventListener("error", () => { v.dataset.failed = "1"; next(); });
+    // A clip that fails to load leaves its poster, shown as long as a poster alone, then the carousel goes on:
+    // when nothing loads, the slides never race past (marc, #1228's sheet).
+    v.lastElementChild.addEventListener("error", () => {
+      v.dataset.failed = "1";
+      if (index === at) schedule();
+    });
     v.addEventListener("ended", next);
     old.replaceWith(v);
   }
