@@ -67,8 +67,8 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
         <div class="ch-text"><span class="tile" set:html={ico("send")} /><h2 id="ch-h">{chH}</h2><p>{chP}</p></div>
         <div class="ch-with"><p class="kicker">{chWith}</p>
           <ul class="ch-logos" role="list">
-            <li><Fragment set:html={ico("channel", "ico ch-hook")} /><span>Slack</span></li>
-            <li><Fragment set:html={brand("discord")} /><span>Discord</span></li>
+            <li><span>Slack</span></li>
+            <li><img class="os-logo" src="/img/brands/discord-symbol-blurple.svg" width="127" height="96" alt="" /><span>Discord</span></li>
             <li><Fragment set:html={ico("webhook", "ico ch-hook")} /><span>Webhook</span></li>
           </ul>
         </div>
