@@ -104,3 +104,18 @@ test("the root sends a reader to the French landing, English one link away", asy
   assert.match(html, /<meta http-equiv="refresh" content="0; url=\/fr\/"/);
   assert.match(html, /href="\/en\/" hreflang="en"/);
 });
+
+test("each hardware card says, in both languages, the figures README.md gives its way of working, and only those", async () => {
+  const readme = await readFile(installSource, "utf8");
+  const section = readme.slice(readme.indexOf("**What a computer needs**"));
+  const way = (title) => section.match(new RegExp(`- \\*\\*${title}\\*\\*:([\\s\\S]*?)(?=\\n- \\*\\*|\\n\\n)`))?.[1] ?? "";
+  const figures = (text) => [...text.matchAll(/\d+(?:[.,]\d+)?/g)].map((m) => m[0].replace(",", ".")).sort();
+  const ways = [way("Everything on the computer"), way("With the service you choose")];
+  assert.ok(ways.every(Boolean), "README.md names no such way");
+  for (const lang of ["en", "fr"]) {
+    landing.hardware[lang].forEach(([, title, , lines], i) => {
+      assert.deepEqual(figures(lines.join(" ")), figures(ways[i]), `${lang}, « ${title} »: its figures are not README.md's`);
+      assert.equal(/vulkan/i.test(lines.join(" ")), /vulkan/i.test(ways[i]), `${lang}, « ${title} »: Vulkan said or not as README.md does`);
+    });
+  }
+});
