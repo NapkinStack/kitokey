@@ -9526,6 +9526,9 @@ def actions_rows(now: dt.datetime) -> None:
             "const th = [...document.querySelectorAll('#meeting table.actions thead th')];"
             "return [th.map(t => t.textContent), th.every(t => { const r = t.getBoundingClientRect(); return r.width <= 1 && r.height <= 1; })]")
         check("no visible headers: Qui, Quoi, Pour quand their names for assistive technology", heads == [["Qui", "Quoi", "Pour quand"], True], heads)
+        # A section with items says nothing of being empty (#1234): « Rien de noté » only where nothing was made.
+        empties = browser.execute_script("return document.querySelectorAll('#meeting .minutes .body .empty-section').length")
+        check("a summary whose sections all hold items says « Rien de noté » nowhere (#1234)", empties == 0, empties)
         looks = browser.execute_script(
             "const of = (v) => { const p = document.createElement('span'); p.style.color = `var(${v})`; document.querySelector('#meeting').append(p);"
             " const c = getComputedStyle(p).color; p.remove(); return c; };"
