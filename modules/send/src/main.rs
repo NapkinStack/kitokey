@@ -107,9 +107,9 @@ fn asked() -> Result<Asked, Refused> {
     Ok(Asked::Send(folder, kind))
 }
 
-/// The input: the address, the meeting's name and, for Notion, the integration's key, each on one line
-/// (`input.schema.json`).
-fn input(notion: bool) -> Result<(String, String, Option<String>), Refused> {
+/// The input: the address, the meeting's name and, for Notion, the integration's key, each on one line; and
+/// whether a confidential meeting is confirmed for this send, a boolean, `false` when absent (`input.schema.json`).
+fn input(notion: bool) -> Result<(String, String, Option<String>, bool), Refused> {
     let wrong = |why: &str| Refused(format!("the input is not posting/v1's: {why}"), None);
     let mut text = String::new();
     io::stdin().read_to_string(&mut text).map_err(|_| wrong("it could not be read"))?;
@@ -119,13 +119,18 @@ fn input(notion: bool) -> Result<(String, String, Option<String>), Refused> {
         _ => Err(wrong(&format!("« {name} » missing, empty or on more than one line"))),
     };
     let key = if notion { Some(field("key")?) } else { None };
-    Ok((field("address")?, field("name")?, key))
+    let confirmed = match object.get("confirmed_confidential") {
+        None => false,
+        Some(Value::Bool(confirmed)) => *confirmed,
+        Some(_) => return Err(wrong("« confirmed_confidential » is no boolean")),
+    };
+    Ok((field("address")?, field("name")?, key, confirmed))
 }
 
 fn run() -> Result<Value, Refused> {
     let asked = asked()?;
     let notion = matches!(asked, Asked::Check(Some(To::Notion)) | Asked::Send(_, To::Notion));
-    let (address, name, key) = input(notion)?;
+    let (address, name, key, confirmed) = input(notion)?;
     let api = || url::Url::parse(notion::API).expect("Notion's API is a URL");
     let database = || notion::database(&address).ok_or_else(|| failed("the link is not https: or names no database", "address.refused"));
     let (folder, to) = match asked {
@@ -140,9 +145,13 @@ fn run() -> Result<Value, Refused> {
         }
         Asked::Send(folder, to) => (folder, to),
     };
-    // The meeting before the address: a confidential meeting is never sent, whatever the address.
-    let meeting = Meeting::read(&folder).map_err(|unsent| match unsent {
-        Unsent::Confidential => failed("the meeting is said confidential: it is never sent", "meeting.confidential"),
+    // The meeting before the address: a confidential meeting is sent only once the person confirmed it, for
+    // this send (D118), whatever the address.
+    let meeting = Meeting::read_confirmed(&folder, confirmed).map_err(|unsent| match unsent {
+        Unsent::Confidential => failed(
+            "the meeting is said confidential and this send is not confirmed",
+            "meeting.confidential",
+        ),
         Unsent::NoSummary => failed("the meeting has no summary to send", "meeting.no_summary"),
         Unsent::Unreadable => failed("the session's folder could not be read", "meeting.unreadable"),
     })?;
