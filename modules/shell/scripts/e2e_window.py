@@ -12090,10 +12090,10 @@ def confidential_kept(now: dt.datetime) -> None:
         seen(browser, "d60-4-list-light")
         # Its audio freed (#1233): its player draws two dotted lanes, yours and the others', and says why under them — no
         # turn drawn on a sound that is not there, which read as a fault (a block at the start of a long meeting).
-        lanes = wait_for(browser, lambda b: b.execute_script(
-            "const d = document.querySelector('#meeting .drawn .drawing'); if (!d) return null;"
-            "return [d.querySelectorAll('rect, .col').length, [...d.querySelectorAll('line')].map(l => [l.getAttribute('class'), getComputedStyle(l).strokeDasharray]),"
-            " document.getElementById('no-player')?.innerText || '']"), 10)
+        lanes_read = ("const d = document.querySelector('#meeting .drawn .drawing'); if (!d) return null;"
+                      "return [d.querySelectorAll('rect, .col').length, [...d.querySelectorAll('line')].map(l => [l.getAttribute('class'), getComputedStyle(l).strokeDasharray]),"
+                      " document.getElementById('no-player')?.innerText || '']")
+        lanes = wait_for(browser, lambda b: b.execute_script(lanes_read), 10) and browser.execute_script(lanes_read)
         check("no audio: its player two dotted lanes, yours and the others', no turn drawn, and why said under them (#1233)",
               lanes and lanes[0] == 0 and [c for c, _ in lanes[1]] == ["local", "remote"] and all(dash not in ("", "none") for _, dash in lanes[1])
               and "supprimé" in lanes[2], lanes)
