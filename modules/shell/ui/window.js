@@ -94,6 +94,7 @@ function lock() {
 // font's to draw (D69). The name goes on what holds it, for assistive technology. A path's `d`, or
 // another shape as Lucide 1.14.0's icon node gives it (D89).
 const ICONS = {
+  calendar: ["M8 2v4", "M16 2v4", ["rect", { width: 18, height: 18, x: 3, y: 4, rx: 2 }], "M3 10h18"],
   check: ["M20 6 9 17l-5-5"],
   "chevron-left": ["m15 18-6-6 6-6"],
   "chevron-down": ["m6 9 6 6 6-6"],
@@ -129,6 +130,8 @@ const ICONS = {
   bluetooth: ["m7 7 10 10-5 5V2l5 5L7 17"],
   info: [["circle", { cx: 12, cy: 12, r: 10 }], "M12 16v-4", "M12 8h.01"],
   "circle-check": [["circle", { cx: 12, cy: 12, r: 10 }], "m9 12 2 2 4-4"],
+  // Lucide's user-pen (ISC): the speakers named (#1205).
+  "user-pen": ["M11.5 15H7a4 4 0 0 0-4 4v2", "M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z", ["circle", { cx: 10, cy: 7, r: 4 }]],
   pencil: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
 };
 function icon(name) {
@@ -1245,36 +1248,45 @@ const elapsed = (seconds) => {
   return [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60].map((n) => String(n).padStart(2, "0")).join(":");
 };
 
-// A level meter's drawing from a reading, 0 to 1, given the one drawn before (#1179): the reading drawn at once,
-// a fall eased by the style's `.falling`, as a VU meter — Zoom's and Meet's levels are smoothed too —, and the
-// loudest of the last 0.8 s kept as a tick. Who asks for less motion is drawn a level held a second, in three
-// steps — silent, heard, loud —, and no tick: nothing moves ten times a second (D69). Pure: tests/meter.rs runs it.
-function levelShown(was, reading, now, still) {
+// A level meter's drawing (#1179, the decider's « B · Trace » of 2026-11-25): the last readings, 0 to 1, as bars, the
+// newest at the right, one bar a reading — read ten times a second, a bar is a tenth of a second, and the
+// trace moves left a bar a reading, as Voice Memos and Otter draw a recording. Who asks for less motion is drawn a
+// level held a second, in three steps — silent, heard, loud —, the same on every bar: nothing scrolls (D69). Pure:
+// tests/meter.rs runs it.
+function levelShown(was, reading, now, still, count) {
   const percent = Math.round(Math.min(1, Math.max(0, reading)) * 100);
   if (still) {
-    if (was && was.peak === null && now - was.at < 1000) return was;
-    return { width: percent < 20 ? 0 : percent < 75 ? 50 : 90, falling: false, peak: null, at: now };
+    if (was?.held && now - was.at < 1000) return was;
+    return { bars: Array(count).fill(percent < 20 ? 0 : percent < 75 ? 50 : 90), held: true, at: now };
   }
-  const kept = was && was.peak !== null && percent < was.peak && now - was.at <= 800;
-  return { width: percent, falling: Boolean(was) && percent < was.width, peak: kept ? was.peak : percent, at: kept ? was.at : now };
+  const before = was && !was.held ? was.bars : Array(count).fill(0);
+  return { bars: [...before.slice(before.length - count + 1), percent], held: false, at: now };
 }
 
-// Draws a reading on a meter's fill, its track the meter a screen reader reads (its value the reading itself), its
-// tick the fill's next sibling.
+// A meter's track, the meter a screen reader reads, from 0 to 100; its bars drawn in it (`paintLevel`): four seconds
+// of them, a track showing the newest it has room for (the style's `.trace`).
+const TRACE = 40;
+function levelTrack(classes, label) {
+  const track = element("span", `trace ${classes}`);
+  track.setAttribute("role", "meter");
+  track.setAttribute("aria-label", label);
+  track.setAttribute("aria-valuemin", "0");
+  track.setAttribute("aria-valuemax", "100");
+  track.setAttribute("aria-valuenow", "0");
+  track.append(...Array.from({ length: TRACE }, () => document.createElement("i")));
+  return track;
+}
+
+// Draws a reading on a meter's track: its bars, and its value the reading itself.
 const levelsDrawn = new WeakMap();
 const lessMotion = matchMedia("(prefers-reduced-motion: reduce)");
-function paintLevel(fill_, reading) {
-  const shown = levelShown(levelsDrawn.get(fill_), reading, performance.now(), lessMotion.matches);
-  levelsDrawn.set(fill_, shown);
-  fill_.classList.toggle("falling", shown.falling);
-  fill_.style.width = `${shown.width}%`;
-  const tick = fill_.nextElementSibling;
-  if (tick) {
-    tick.classList.toggle("falling", shown.falling);
-    tick.hidden = shown.peak === null || shown.peak <= shown.width;
-    tick.style.left = `${shown.peak ?? 0}%`;
-  }
-  fill_.parentElement.setAttribute("aria-valuenow", String(Math.round(Math.min(1, Math.max(0, reading)) * 100)));
+function paintLevel(track, reading) {
+  drawLevel(track, levelShown(levelsDrawn.get(track), reading, performance.now(), lessMotion.matches, track.children.length), reading);
+}
+function drawLevel(track, shown, reading) {
+  levelsDrawn.set(track, shown);
+  for (const [index, bar] of [...track.children].entries()) bar.style.height = `${shown.bars[index]}%`;
+  track.setAttribute("aria-valuenow", String(Math.round(Math.min(1, Math.max(0, reading)) * 100)));
 }
 
 // The page of the meeting being recorded (#1076): both sides' levels as the bar's meters, and its time,
@@ -1285,33 +1297,43 @@ let pageLive = null;
 // The last reading of the meeting being recorded (#1133): a new drawing of its page starts from it, never from
 // « 00:00:00 » and empty meters until the next reading.
 let pageLast = null;
+// Its meters' tracks, whose traces a new drawing goes on from (#1179).
+let pageTracks = [];
 function pageLevels(name, time, words) {
   const row = element("div", "page-levels");
-  const fills = [words.small_mic, words.small_meeting].map((label, index) => {
+  const tracks = [words.small_mic, words.small_meeting].map((label, index) => {
     // Each side's label right under its own meter (#1112): a label sits with what it names.
     const column = element("div", "page-meter");
-    const track = element("span", "track page-level");
-    track.setAttribute("role", "meter");
-    track.setAttribute("aria-label", label);
-    track.setAttribute("aria-valuemin", "0");
-    track.setAttribute("aria-valuemax", "100");
-    track.setAttribute("aria-valuenow", "0");
-    const fill_ = element("span", index === 0 ? "fill here" : "fill remote");
-    track.append(fill_, element("span", "peak"));
+    const track = levelTrack(index === 0 ? "track page-level" : "track page-level others", label);
     column.append(track, element("span", index === 0 ? "here" : "remote", index === 0 ? words.here_described : words.remote_described));
     row.append(column);
-    return fill_;
+    return track;
   });
   const paint = (now) => {
     time.textContent = elapsed(now.seconds);
-    for (const [index, fill_] of fills.entries()) paintLevel(fill_, now.levels[index]);
+    for (const [index, track] of tracks.entries()) paintLevel(track, now.levels[index]);
+    // Said confidential or no longer, by the page's switch or the bar's (#1204): its header's lock as the folder says.
+    const holds = row.closest("#meeting")?.querySelector(".meeting-title .holds");
+    const locked = holds?.querySelector(".chip.locked");
+    if (now.confidential && holds && !locked) holds.prepend(lockedChip(words));
+    if (!now.confidential) locked?.remove();
   };
-  if (pageLast?.meeting === name) paint(pageLast);
+  // Drawn again, its traces go on from the ones it replaces, never from empty (#1133).
+  if (pageLast?.meeting === name) {
+    time.textContent = elapsed(pageLast.seconds);
+    for (const [index, track] of tracks.entries()) {
+      const was = pageTracks[index] && levelsDrawn.get(pageTracks[index]);
+      if (was) drawLevel(track, was, pageLast.levels[index]);
+      else paintLevel(track, pageLast.levels[index]);
+    }
+  }
+  pageTracks = tracks;
   // The poll ends with the page or the recording, and its reading with it: a meeting deleted frees its name within
   // the minute (capture's `new_folder`), and a recording under that name must not start from this one's.
   const end = () => {
     clearInterval(pageLive);
     pageLast = null;
+    pageTracks = [];
   };
   clearInterval(pageLive);
   pageLive = setInterval(async () => {
@@ -1359,6 +1381,59 @@ function relief(segments, total, words) {
     svg.append(bar);
   }
   return svg;
+}
+
+// A meeting's waveform per voice (#1201, #1179 B), as Descript, Riverside and Voice Memos draw a recording: each
+// voice's loudness (each stretch's RMS, `peaks`), yours above the line and the meeting's below, its bars grouped to the drawing's width and
+// laid over the meeting's `total` as the playhead and a click are; each voice scaled to its own loudest, so that a
+// quiet microphone still shows when it speaks. From the peaks the shell keeps (`peaks_of`); none, who spoke stays
+// drawn from the transcript (`relief`).
+function waveform(peaks, total) {
+  const wave = element("div", "wave");
+  const bins = (peaks.local ?? peaks.remote).length;
+  const most = (values) => (values ? Math.max(1, ...values) : 1);
+  const [here, remote] = [most(peaks.local), most(peaks.remote)];
+  const tip = element("span", "tip");
+  tip.hidden = true;
+  const draw = () => {
+    const width = wave.getBoundingClientRect().width;
+    // Bars of 4 px and gaps of 2 px, as the mock-up; never more than the bins read.
+    const count = Math.max(1, Math.min(bins, Math.floor((width + 2) / 6)));
+    if (!width || wave.querySelectorAll(".col").length === count) return;
+    const columns = [];
+    for (let index = 0; index < count; index++) {
+      const [from, to] = [index, index + 1].map((edge) => ((edge / count) * total * bins) / peaks.seconds);
+      const loud = (values, top) => {
+        if (!values) return 0;
+        const part = values.slice(Math.floor(from), Math.max(Math.floor(from) + 1, Math.ceil(to)));
+        return part.length ? Math.max(...part) / top : 0;
+      };
+      const column = element("span", "col");
+      column.dataset.at = String((index / count) * total);
+      const [up, down] = [element("i", "up"), element("i", "down")];
+      up.style.height = `${Math.max(2, Math.round(loud(peaks.local, here) * 34))}px`;
+      down.style.height = `${Math.max(2, Math.round(loud(peaks.remote, remote) * 34))}px`;
+      column.append(up, down);
+      columns.push(column);
+    }
+    wave.replaceChildren(...columns, tip);
+    wave.played(wave.at ?? 0);
+  };
+  // What was played, whole: called as the playhead moves.
+  wave.played = (time) => {
+    wave.at = time;
+    for (const column of wave.querySelectorAll(".col")) column.classList.toggle("played", Number(column.dataset.at) < time);
+  };
+  wave.addEventListener("pointermove", (event) => {
+    const box = wave.getBoundingClientRect();
+    const x = Math.min(Math.max(0, event.clientX - box.left), box.width);
+    tip.style.left = `${x}px`;
+    tip.textContent = clock((x / box.width) * total);
+    tip.hidden = false;
+  });
+  wave.addEventListener("pointerleave", () => (tip.hidden = true));
+  new ResizeObserver(() => requestAnimationFrame(draw)).observe(wave);
+  return wave;
 }
 
 // A provider's host, as a model's line names it: `https://openrouter.ai/api/v1` is openrouter.ai.
@@ -1969,7 +2044,7 @@ function sendPart(card, top, actions, session, words) {
   })();
 }
 
-function minutesCard(read, words, session, transcript, onPage) {
+function minutesCard(read, words, session, transcript, onPage, previous) {
   const card = element("article", "card minutes");
   // Its title, and Refaire… beside it: the state below them never sits under a button.
   const top = element("div", "top");
@@ -2074,6 +2149,33 @@ function minutesCard(read, words, session, transcript, onPage) {
   const written = element("p", "note", words.minutes_ai);
   written.id = "minutes-ai";
   card.append(written);
+  // The last version a redo replaced (D113): brought back by one button that names its time and model;
+  // the one left becomes the previous, so the same button brings it back.
+  if (previous) {
+    const back = element("button", "open");
+    back.type = "button";
+    back.id = "minutes-previous";
+    const was = [madeOn(words, previous.made), previous.model ? modelSaid(previous.model) : ""].filter(Boolean).join(" · ");
+    back.textContent = was ? fill(words.previous_back, was) : words.previous_back.replace(/\s*\(\{\}\)$/, "");
+    const help = element("p", "says", words.previous_help);
+    help.id = "minutes-previous-help";
+    const failed = element("p", "note warn");
+    failed.hidden = true;
+    back.addEventListener("click", async () => {
+      waiting(back, true);
+      try {
+        await window.__TAURI__.core.invoke("previous_back", { name: nameOf(session), step: "minutes" });
+        await refresh();
+      } catch (why) {
+        failed.textContent = fill(words.previous_failed, why);
+        failed.hidden = false;
+        waiting(back, false);
+      }
+    });
+    const box = element("div", "previous");
+    box.append(back, help, failed);
+    card.append(box);
+  }
   // The transcript corrected after they were written (D62): said, and made again only on a click.
   const corrected = transcript.state === "present" ? Math.max(0, ...transcript.segments.map((segment) => Date.parse(segment.edited ?? "") || 0)) : 0;
   if (corrected > (Date.parse(read.made ?? "") || 0)) {
@@ -2110,11 +2212,14 @@ function minutesCard(read, words, session, transcript, onPage) {
 // beside it, the user choosing.
 function datesOffer(card, mentioned, session, transcript, words) {
   if (mentioned.length === 0) return;
-  const button = element("button", "open", words.dates_open);
-  button.type = "button";
-  button.id = "dates-open";
+  // Among the summary's actions, as « Envoyer… » and « Copier » are (#1213, D89): a calendar, its tooltip and name the
+  // words, before « Copier »; never a bar of its own under the summary.
+  const button = iconButton("calendar", words.dates_open, "dates-open");
   button.hidden = true;
-  card.append(button);
+  const actions = card.querySelector(".minutes-actions");
+  const copy = actions?.querySelector("#copy-minutes");
+  if (copy) copy.before(button);
+  else (actions ?? card).append(button);
   window.__TAURI__.core
     .invoke("dates_resolved", { name: nameOf(session), whens: mentioned.map((m) => m.when), day: null })
     .then((resolved) => (button.hidden = !resolved?.dates.some(Boolean)))
@@ -2411,13 +2516,93 @@ function tookAndCost(read, words) {
   return said;
 }
 
-// Who said a line, as the page names them: the track, and the voice within it when one was told.
-function whoSaid(segment, words) {
-  const side = segment.track === "local" ? words.here : words.remote;
+// Who said a line, as the page names them: the track — by the name the user gave its side (#1205), else the
+// page's word —, and the voice within it when one was told.
+function whoSaid(segment, words, names) {
+  const side = segment.track === "local" ? names?.me ?? words.here : names?.others ?? words.remote;
   return segment.voice === null ? side : `${side} · ${fill(words.voice, segment.voice)}`;
 }
 
-function transcriptCard(read, words, session, onPage) {
+// The button that opens the speakers' names, and its panel under the card's top (#1205): Enter saves, Escape or
+// « Annuler » closes it as it was; a name refused or not kept is said under the fields, what was typed kept.
+function speakersButton(card, names, read, words, session) {
+  const open = iconButton("user-pen", words.speakers_open, "speakers-open");
+  open.setAttribute("aria-expanded", "false");
+  open.setAttribute("aria-controls", "speakers-panel");
+  const close = () => {
+    document.getElementById("speakers-panel")?.remove();
+    open.setAttribute("aria-expanded", "false");
+    open.focus();
+  };
+  open.addEventListener("click", () => {
+    if (document.getElementById("speakers-panel")) return close();
+    const panel = element("form", "fields speakers-panel");
+    panel.id = "speakers-panel";
+    panel.setAttribute("aria-label", words.speakers_open);
+    // Settings' own fields (guidedField): labelled by their side, the page's word as the placeholder.
+    const field = (id, label, value, placeholder) => {
+      const [row, input] = guidedField(id, label, "text", value, false);
+      input.maxLength = 60;
+      input.placeholder = placeholder;
+      input.autocomplete = "off";
+      return [row, input];
+    };
+    const [meRow, me] = field("speaker-me", words.here_described, names.me, words.here);
+    const [othersRow, others] = field("speaker-others", words.remote_described, names.others, words.remote);
+    const hint = element("p", "note", words.speakers_hint);
+    hint.id = "speakers-hint";
+    me.setAttribute("aria-describedby", "speakers-hint");
+    others.setAttribute("aria-describedby", "speakers-hint");
+    const said = element("p", "note warn", "");
+    said.id = "speakers-said";
+    said.setAttribute("role", "alert");
+    said.hidden = true;
+    const save = element("button", "primary", words.speakers_save);
+    save.type = "submit";
+    save.id = "speakers-save";
+    const cancel = element("button", "", words.speakers_cancel);
+    cancel.type = "button";
+    cancel.id = "speakers-cancel";
+    cancel.addEventListener("click", close);
+    const choices = element("div", "speakers-choices");
+    choices.append(save, cancel);
+    panel.append(meRow, othersRow, hint, said, choices);
+    panel.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      close();
+    });
+    panel.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      save.disabled = true;
+      try {
+        const kept = await window.__TAURI__.core.invoke("speakers_named", { name: nameOf(session), me: me.value, others: others.value });
+        names.me = kept.me;
+        names.others = kept.others;
+        // Every line, and what a copy takes, names them now.
+        const lines = card.querySelectorAll(".lines li");
+        read.segments.forEach((segment, index) => {
+          const who = lines[index]?.querySelector(".who");
+          if (who) who.textContent = whoSaid(segment, words, names);
+        });
+        close();
+      } catch {
+        said.textContent = words.speakers_not_saved;
+        said.hidden = false;
+      } finally {
+        save.disabled = false;
+      }
+    });
+    card.querySelector(".top").after(panel);
+    open.setAttribute("aria-expanded", "true");
+    me.focus();
+  });
+  return open;
+}
+
+function transcriptCard(read, words, session, onPage, speakers) {
+  // The sides' names as kept (#1205): none where the meeting cannot hold them; renamed in place below.
+  const names = speakers ? { ...speakers } : null;
   const card = element("aside", "card transcript");
   card.setAttribute("aria-label", words.transcript_title);
   const top = element("div", "top");
@@ -2467,7 +2652,7 @@ function transcriptCard(read, words, session, onPage) {
   let said = 0;
   copy.addEventListener("click", async () => {
     const mine = ++said;
-    const lines = read.segments.map((segment) => fill(words.transcript_copied_line, clock(segment.start), whoSaid(segment, words), segment.text));
+    const lines = read.segments.map((segment) => fill(words.transcript_copied_line, clock(segment.start), whoSaid(segment, words, names), segment.text));
     try {
       await navigator.clipboard.writeText(`${lines.join("\n")}\n`);
       copied.textContent = words.minutes_copied;
@@ -2477,6 +2662,9 @@ function transcriptCard(read, words, session, onPage) {
     }
   });
   top.append(finding, copied, copy, redo);
+  // Nommer les intervenants… (#1205), once complete: the two sides' names in two labelled fields, as Otter and
+  // Zoom rename a speaker from the transcript; kept with the meeting, every line following at once.
+  if (names && read.complete) top.append(speakersButton(card, names, read, words, session));
   const heard = element("div", "made");
   // A service names its host as who heard (D43): said as the minutes' maker is, never « on this
   // computer » — a host of one word (`http://transcriber/v1`) is a service too. This computer's
@@ -2547,7 +2735,7 @@ function transcriptCard(read, words, session, onPage) {
         if (!event.repeat) from();
       });
     }
-    const who = whoSaid(segment, words);
+    const who = whoSaid(segment, words, names);
     const said = element("div", "said");
     const text = element("span", "text", segment.text);
     said.append(element("span", `who ${segment.track}`, who), text);
@@ -2759,6 +2947,7 @@ function playerBar(session, listened, total, words, drawing) {
     if (toggle.textContent !== said) toggle.textContent = said;
     at.textContent = clock(time);
     head.style.left = `${Math.min(100, (time / total) * 100)}%`;
+    drawing.querySelector(".wave")?.played(time);
     drawing.setAttribute("aria-valuemax", String(Number(span().toFixed(1))));
     drawing.setAttribute("aria-valuenow", String(Number(time.toFixed(1))));
     drawing.setAttribute("aria-valuetext", `${clock(time)} / ${clock(span())}`);
@@ -2899,7 +3088,7 @@ function trashedFocused() {
   }
 }
 
-function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone }, words) {
+function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, previous_minutes, speakers }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
   const open = iconButton("folder-open", words.open_folder, "open-folder");
@@ -2951,7 +3140,11 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const lasts = element("span", "lasts");
   if (session.seconds !== null) lasts.append(element("span", "length", length(session.seconds)));
   if (session.audio > 0) lasts.append(element("span", "weighs", fill(words.audio_weighs, size(session.audio, words))));
-  title.append(named, lasts, holdings(session, words, true));
+  const held = holdings(session, words, true);
+  // While it records, said confidential (#1204, D60): the lock and its word first, beside « Enregistrement », as the
+  // bar shows it; at rest, the page's own switch says it.
+  if (session.confidential && session.state === "recording") held.prepend(lockedChip(words));
+  title.append(named, lasts, held);
   head.append(title, top);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
@@ -2970,7 +3163,19 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     const now = element("div", "live-now");
     now.append(time, pageLevels(nameOf(session), time, words));
     drawing.append(now);
-  } else if (transcript.state === "present") drawing.append(relief(said, total, words));
+  } else if (transcript.state === "present") {
+    drawing.append(relief(said, total, words));
+    // Its sound's own shape once the shell has read it (#1201): who spoke, from the transcript, until then — and for
+    // good when no track reads.
+    if (session.audio > 0)
+      window.__TAURI__.core
+        .invoke("peaks_of", { name: nameOf(session) })
+        .then((peaks) => {
+          const turns = drawing.querySelector(".relief");
+          if (peaks && turns?.isConnected) turns.replaceWith(waveform(peaks, total));
+        })
+        .catch(() => {});
+  }
   else {
     // No transcript yet (#1116, the decider): one line says when who spoke will appear, no blank canvas. Outside the
     // drawing (#1134), which is the player's slider once the sound plays: a slider's children are presentational
@@ -2990,7 +3195,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
-  columns.append(minutesCard(minutes, words, session, transcript, onPage), transcriptCard(transcript, words, session, onPage));
+  columns.append(minutesCard(minutes, words, session, transcript, onPage, previous_minutes), transcriptCard(transcript, words, session, onPage, speakers));
   // Shown again when the window comes forward: a search in progress in this meeting is kept.
   const searching = page.dataset.name === nameOf(session) ? (document.getElementById("search")?.value ?? "") : "";
   // A name being typed is kept the same way, with its refusal and where the caret was (D70).
@@ -4557,18 +4762,10 @@ async function checkSound(words, back, lost) {
     const device = element("span", "check-device", "");
     device.id = `check-device-${id}`;
     top.append(icon(glyph), element("span", "check-name", name), device);
-    const track = element("div", "check-track");
-    const fill = element("span", "check-fill");
-    fill.id = `check-level-${id}`;
-    track.append(fill, element("span", "peak"));
-    // A meter a screen reader reads as one, from 0 to 100.
-    track.setAttribute("role", "meter");
-    track.setAttribute("aria-label", name);
-    track.setAttribute("aria-valuemin", "0");
-    track.setAttribute("aria-valuemax", "100");
-    track.setAttribute("aria-valuenow", "0");
+    const track = levelTrack("check-track", name);
+    track.id = `check-level-${id}`;
     source.append(top, track);
-    return [source, device, fill];
+    return [source, device, track];
   };
   const [me, meDevice, meFill] = side("mic", words.small_mic, "me", "near");
   const [others, othersDevice, othersFill] = side("volume-2", words.small_meeting, "others", "far");
@@ -5133,14 +5330,8 @@ function showSmall(words) {
   const meter = (label, id, device, glyphs, says) => {
     const row = element("span", "meter");
     row.append(icon(glyphs[0]));
-    const bar = element("span", "track");
-    bar.setAttribute("role", "meter");
-    bar.setAttribute("aria-label", label);
-    bar.setAttribute("aria-valuemin", "0");
-    bar.setAttribute("aria-valuemax", "100");
-    const fill_ = element("span", "fill");
-    fill_.id = id;
-    bar.append(fill_, element("span", "peak"));
+    const bar = levelTrack("track", label);
+    bar.id = id;
     const named = element("span", "device unseen");
     named.id = device;
     row.append(bar, named);
@@ -5182,6 +5373,16 @@ function showSmall(words) {
   );
   meters.hidden = true;
   time.after(meters);
+  // Said confidential (#1204, D60): a lock in the row while it records, named for a screen reader and in its tooltip,
+  // as a row's mark in the list — the bar has no room for its word, the switch under « Plus d’options » says it whole.
+  const locked = element("span", "bar-locked");
+  locked.id = "small-locked";
+  locked.setAttribute("role", "img");
+  locked.setAttribute("aria-label", words.confidential_name);
+  locked.title = words.confidential_name;
+  locked.append(lock());
+  locked.hidden = true;
+  meters.after(locked);
   const note = element("p", "says", words.small_note);
   note.id = "small-note";
   note.hidden = true;
@@ -5392,6 +5593,10 @@ function showSmall(words) {
       field.painted();
       rest.hidden = recording;
       live.hidden = !recording;
+      // At rest, no lock: the next recording says its own.
+      if (!recording) locked.hidden = true;
+      // A recording starts its traces from empty, never from the last one's last two seconds.
+      if (recording) for (const id of ["level-me", "level-others"]) drawLevel(document.getElementById(id), levelShown(undefined, 0, 0, false, TRACE), 0);
       // The microphone in each state's options: recording, after the context, as board 6 has it.
       if (recording) opened.after(microphone);
       else rest.prepend(microphone);
@@ -5473,6 +5678,8 @@ function showSmall(words) {
       secret.row.classList.toggle("on", now.confidential);
     }
     if (Date.now() - mark.refused >= 5000) marked();
+    // The lock as the switch stands: the folder's word, or a turn not yet kept.
+    locked.hidden = !(recording && secret.box.checked);
     // Said confidential, or no longer: « Avancé » offers otherwise — no service then (D60) —, drawn
     // again as it was, open or closed.
     if (now.meeting !== null && now.confidential !== shownConfidential) {
@@ -6260,7 +6467,9 @@ window.addEventListener("focus", () => {
   // The assistant too: its answers are not drawn over.
   const choosing = !document.getElementById("welcome").hidden
     || document.querySelector("#settings:not([hidden]) #minutes-unsaved:not([hidden])")
-    || [...document.querySelectorAll("#settings:not([hidden]) .fields input")].some((input) => input.value !== input.defaultValue);
+    || [...document.querySelectorAll("#settings:not([hidden]) .fields input")].some((input) => input.value !== input.defaultValue)
+    // The speakers being named (#1205): what is typed stays.
+    || document.getElementById("speakers-panel");
   // Back from a list's menu, not from elsewhere: nothing drawn anew (#944).
   const menu = inMenu;
   inMenu = false;

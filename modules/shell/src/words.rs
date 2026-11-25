@@ -679,6 +679,22 @@ pub struct Window {
     /// Shows: a meeting's page, as a label. When: legend of the speaking-time drawing. At most: no
     /// limit. Placeholders: none.
     pub remote_described: &'static str,
+    /// The transcript's speakers named by the user (#1205): the button that opens the two fields.
+    /// Shows: a meeting's page, as a button's tooltip and name. When: transcript card, a v3 meeting with its
+    /// transcript. At most: about 30 characters. Placeholders: none.
+    pub speakers_open: &'static str,
+    /// Shows: a meeting's page, as a button. When: the speakers' names being typed. At most: one or two words.
+    /// Placeholders: none.
+    pub speakers_save: &'static str,
+    /// Shows: a meeting's page, as a button. When: the speakers' names being typed. At most: one or two words.
+    /// Placeholders: none.
+    pub speakers_cancel: &'static str,
+    /// Shows: a meeting's page, as a hint under the fields. When: the speakers' names being typed. At most: one
+    /// line. Placeholders: none.
+    pub speakers_hint: &'static str,
+    /// Shows: a meeting's page, as an error under the fields, what was typed kept. When: the names could not be
+    /// kept in the meeting's folder. At most: one line. Placeholders: none.
+    pub speakers_not_saved: &'static str,
     /// Who spoke over the meeting, for whoever does not see the drawing.
     /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the
     /// speaking-time drawing. At most: no limit. Placeholders: none.
@@ -1429,6 +1445,16 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
     /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
+    /// Shows: a meeting's page, under its summary, as a button (D113). When: a redo replaced a version,
+    /// kept beside. At most: no limit. Placeholders: {} when that version was made and its model, as the
+    /// page's line says them.
+    pub previous_back: &'static str,
+    /// Shows: a meeting's page, under « Revenir à la version précédente », as a help line (D113). When:
+    /// the button shows. At most: no limit. Placeholders: none.
+    pub previous_help: &'static str,
+    /// Shows: a meeting's page, under « Revenir à la version précédente », as an error (D113). When: the
+    /// two versions could not swap. At most: no limit. Placeholders: {} what is wrong, as the failure says it.
+    pub previous_failed: &'static str,
     /// Shows: a meeting's page, its Redo… panel, as an error above its button (#771). When: the redo
     /// could not start. At most: no limit. Placeholders: {} what is wrong and what to do, as the failure
     /// says it.
@@ -2040,6 +2066,11 @@ pub fn window(language: Language) -> Window {
             voice: "voice {}",
             here_described: "You — your microphone",
             remote_described: "Others — the call’s audio",
+            speakers_open: "Name the speakers…",
+            speakers_save: "Save",
+            speakers_cancel: "Cancel",
+            speakers_hint: "Kept with this meeting. Leave a field empty to keep “You” or “Others”.",
+            speakers_not_saved: "Kitokey could not save these names. Try again.",
             who_spoke: "Who spoke when: you on top, others below",
             who_spoke_later: "Who spoke when appears once it is transcribed.",
             no_transcript: "No transcript yet.",
@@ -2296,6 +2327,9 @@ pub fn window(language: Language) -> Window {
             on_computer: "on this computer",
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept.",
+            previous_back: "Go back to the previous version ({})",
+            previous_help: "The version you leave becomes the previous one: the same button brings it back.",
+            previous_failed: "Couldn’t go back to the previous version: {}",
             redo_not_done: "Not redone: {}",
             redo_keeps_minutes: "The current summary is kept; write it again afterwards if needed.",
             make_minutes: "Write summary",
@@ -2547,6 +2581,11 @@ pub fn window(language: Language) -> Window {
             voice: "voix {}",
             here_described: "Vous — votre micro",
             remote_described: "Les autres — le son de l’appel",
+            speakers_open: "Nommer les intervenants…",
+            speakers_save: "Enregistrer",
+            speakers_cancel: "Annuler",
+            speakers_hint: "Gardés avec cette réunion. Laissez un champ vide pour garder «\u{a0}Vous\u{a0}» ou «\u{a0}Les autres\u{a0}».",
+            speakers_not_saved: "Kitokey n’a pas pu enregistrer ces noms. Réessayez.",
             who_spoke: "Temps de parole au fil de la réunion\u{a0}: vous en haut, les autres en bas",
             who_spoke_later: "Le temps de parole s’affichera après la transcription.",
             no_transcript: "Pas encore de transcription.",
@@ -2812,6 +2851,9 @@ pub fn window(language: Language) -> Window {
             on_computer: "sur cet ordinateur",
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée.",
+            previous_back: "Revenir à la version précédente ({})",
+            previous_help: "La version quittée devient la précédente\u{a0}: le même bouton la ramène.",
+            previous_failed: "Impossible de revenir à la version précédente\u{a0}: {}",
             redo_not_done: "Pas refait\u{a0}: {}",
             redo_keeps_minutes: "Le compte rendu actuel est gardé\u{202f}; refaites-le ensuite si besoin.",
             make_minutes: "Rédiger le compte rendu",

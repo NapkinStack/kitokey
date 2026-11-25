@@ -25,7 +25,7 @@ server of ours, and it sends nothing anywhere unless you chose to.
 | What | Where |
 |---|---|
 | The sound of a meeting: your microphone and what your computer plays, as two tracks | Your meetings folder: `Documents/Kitokey` unless you choose another; if you used Kitokey under its earlier name, Wholeheard, they stay in `Documents/Wholeheard` |
-| Its transcript, its minutes, the context you wrote for it, its language, your corrections | The same folder, beside the sound |
+| Its transcript, its minutes, the context you wrote for it, its language, your corrections, the names you gave its speakers | The same folder, beside the sound |
 | Your settings | Your user's configuration folder |
 | The key of a service, if you gave one | Your system's keyring, under `com.napkinstack.Kitokey`: never in a file |
 | The webhook address of a channel you set up to send summaries to | The same keyring, under the same name: never in a file, never shown again in full |
@@ -47,7 +47,7 @@ only when you do one of these:
 | Your choice | What is sent | To |
 |---|---|---|
 | A service to transcribe | The meeting's sound, and its context and language | The service you chose: `openrouter.ai`, `api.openai.com` |
-| A service to write the minutes | The transcript and the context | The service you chose: `openrouter.ai`, `api.openai.com`, `api.mistral.ai`, or the address you typed |
+| A service to write the minutes | The transcript, the names you gave its speakers and the context | The service you chose: `openrouter.ai`, `api.openai.com`, `api.mistral.ai`, or the address you typed |
 | Test the service chosen for the minutes (« Test », a click) | A short sentence, nothing from your meetings | That service |
 | Download a speech model (a click) | A request for that file | `huggingface.co` |
 | Read the list of models again (a click) | A request for that file | `raw.githubusercontent.com` |
@@ -111,7 +111,7 @@ Changes to this policy are in this file's history.
 | Quoi | Où |
 |---|---|
 | Le son d'une réunion : votre micro et ce que votre ordinateur joue, en deux pistes | Votre dossier de réunions : `Documents/Kitokey`, sauf si vous en choisissez un autre ; si vous utilisiez Kitokey sous son ancien nom, Wholeheard, elles restent dans `Documents/Wholeheard` |
-| Sa transcription, son compte rendu, le contexte que vous avez écrit, sa langue, vos corrections | Le même dossier, à côté du son |
+| Sa transcription, son compte rendu, le contexte que vous avez écrit, sa langue, vos corrections, les noms que vous avez donnés aux intervenants | Le même dossier, à côté du son |
 | Vos réglages | Le dossier de configuration de votre utilisateur |
 | La clé d'un service, si vous en avez donné une | Le trousseau de votre système, sous `com.napkinstack.Kitokey` : jamais dans un fichier |
 | L'adresse de webhook d'un canal où vous envoyez des comptes rendus | Le même trousseau, sous le même nom : jamais dans un fichier, jamais réaffichée en entier |
@@ -133,7 +133,7 @@ part que si vous faites l'un de ces choix :
 | Votre choix | Ce qui est envoyé | Vers |
 |---|---|---|
 | Un service pour transcrire | Le son de la réunion, son contexte et sa langue | Le service choisi : `openrouter.ai`, `api.openai.com` |
-| Un service pour écrire le compte rendu | La transcription et le contexte | Le service choisi : `openrouter.ai`, `api.openai.com`, `api.mistral.ai`, ou l'adresse saisie |
+| Un service pour écrire le compte rendu | La transcription, les noms que vous avez donnés aux intervenants et le contexte | Le service choisi : `openrouter.ai`, `api.openai.com`, `api.mistral.ai`, ou l'adresse saisie |
 | Tester le service choisi pour le compte rendu (« Tester », un clic) | Une courte phrase, rien de vos réunions | Ce service |
 | Télécharger un modèle de parole (un clic) | La demande de ce fichier | `huggingface.co` |
 | Relire la liste des modèles (un clic) | La demande de ce fichier | `raw.githubusercontent.com` |

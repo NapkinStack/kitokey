@@ -43,7 +43,9 @@ use kitokey_shell::{
     registry, sending,
     sessions::{self, Listed},
     settings::{self, After, Appearance, Engine, KeepAudio, Log, Settings},
-    sound_check, speech,
+    sound_check,
+    speakers::{self, Speakers},
+    speech,
     speeds::{self, Speeds, Step},
     spoken,
     summarising::{self, Summarising},
@@ -413,6 +415,7 @@ fn main() {
             next_context,
             next_context_kept,
             language_set,
+            speakers_named,
             bar_language,
             next_language_kept,
             meeting_models_shown,
@@ -420,6 +423,7 @@ fn main() {
             models_offered,
             next_models_kept,
             transcript_redo_own,
+            previous_back,
             title_saved,
             confidential_set,
             sending_of,
@@ -436,6 +440,7 @@ fn main() {
             dates_ics,
             open_logs,
             diagnostic,
+            peaks_of,
             settings_shown,
             settings_saved,
             minutes_shown,
@@ -1753,6 +1758,35 @@ struct Opened {
     system_language: &'static str,
     /// The steps whose own model is gone (D91): Settings' choice makes them, said on the page.
     models_gone: Vec<meeting_models::Step>,
+    /// The last summary a redo replaced, kept beside it (D113): when it was made, and by what.
+    previous_minutes: Option<Previous>,
+    /// The names the user gave its two sides (#1205); none where the meeting cannot hold them — before
+    /// session-audio/v3 —: the page then offers no naming.
+    speakers: Option<SpeakersShown>,
+}
+
+/// A version kept beside the one shown (D113), as its page names it.
+#[derive(serde::Serialize)]
+struct Previous {
+    made: Option<String>,
+    provider: Option<String>,
+    model: Option<String>,
+}
+
+/// The two sides' names as the page shows them (#1205): the user's own words, none where a side keeps the page's.
+#[derive(serde::Serialize)]
+struct SpeakersShown {
+    me: Option<String>,
+    others: Option<String>,
+}
+
+impl From<Speakers> for SpeakersShown {
+    fn from(kept: Speakers) -> Self {
+        SpeakersShown {
+            me: kept.me,
+            others: kept.others,
+        }
+    }
 }
 
 #[tauri::command]
@@ -1764,6 +1798,13 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         .into_iter()
         .find(|listed| listed.folder == folder)
         .ok_or_else(gone)?;
+    // The last minutes a redo replaced (D113), named by id as the page names v5's sections.
+    let said = words::window(shell.language());
+    let kept_minutes = minutes::previous(
+        &folder,
+        said.minutes_sections,
+        &minutes::named_by_id(said.minutes_sections, said.structure_sections),
+    );
     Ok(Opened {
         session,
         transcript: meeting::transcript(&folder),
@@ -1778,7 +1819,33 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         apple: shell.settings().engine == Engine::SpeechAnalyzer,
         system_language: shell.system.code(),
         models_gone: gone_of(&shell.settings(), &folder),
+        previous_minutes: match kept_minutes {
+            Read::Present(kept) => Some(Previous {
+                made: kept.made,
+                provider: kept.provider,
+                model: kept.model,
+            }),
+            _ => None,
+        },
+        speakers: speakers::offered(&folder).then(|| SpeakersShown::from(speakers::read(&folder))),
     })
+}
+
+/// The names the user gives a meeting's two sides (#1205), kept in its `speakers.json`: each trimmed, a blank one
+/// giving the side back its word; the names as kept are returned for the page to show. No name is logged.
+#[tauri::command]
+fn speakers_named(shell: State<'_, Shell>, name: String, me: Option<String>, others: Option<String>) -> Result<SpeakersShown, Told> {
+    let folder = session_folder(&shell, &name)?;
+    let kept = speakers::write(&folder, &Speakers { me, others }).map_err(|error| {
+        // A name the page's fields never let through, or a meeting before v3 the page offers no naming for; else the folder.
+        let failure = match error.kind() {
+            std::io::ErrorKind::InvalidInput | std::io::ErrorKind::Unsupported => Failure::Unexpected,
+            _ => Failure::MeetingFile,
+        };
+        shell.told(failure, error)
+    })?;
+    tracing::info!(me = kept.me.is_some(), others = kept.others.is_some(), "shell.speakers_named");
+    Ok(SpeakersShown::from(kept))
 }
 
 /// The steps whose own model a meeting chose and cannot have now (D91).
@@ -2307,6 +2374,32 @@ fn playable(shell: &Shell, folder: &Path) -> Option<String> {
         .offer_placed(tracks.into_iter().map(|track| (track.path, track.runs)).collect())
 }
 
+/// A meeting's waveform per voice (#1201): each track's peaks, read away from the window's thread — two hours
+/// of tracks in about 4 s, once — then kept in its `derived/` (`peaks`). None while it records, or when no
+/// track reads: the page then draws who spoke from its transcript. Numbers only, 0 to 255 of full scale.
+#[derive(serde::Serialize)]
+struct Waveform {
+    seconds: f64,
+    local: Option<Vec<u8>>,
+    remote: Option<Vec<u8>>,
+}
+
+#[tauri::command]
+async fn peaks_of(shell: State<'_, Shell>, name: String) -> Result<Option<Waveform>, Told> {
+    let folder = session_folder(&shell, &name)?;
+    if shell.recording.lock().unwrap().is_some() && shell.recorded.lock().unwrap().as_deref() == Some(folder.as_path()) {
+        return Ok(None);
+    }
+    let read = tauri::async_runtime::spawn_blocking(move || kitokey_shell::peaks::of(&folder))
+        .await
+        .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    Ok(read.map(|peaks| Waveform {
+        seconds: peaks.seconds,
+        local: peaks.local,
+        remote: peaks.remote,
+    }))
+}
+
 /// A meeting's diagnostic, for the page to copy: every program's log lines of its makings, then
 /// each track's level — nothing of the meeting, which no line holds (D29).
 #[tauri::command]
@@ -2522,12 +2615,15 @@ fn dates_ics(shell: State<'_, Shell>, name: String, to: PathBuf, dates: Vec<expo
     let language = shell.language();
     let said = words::exported(language);
     let meeting = meeting_said(&folder, language);
+    // Each side by the name the user gave it (#1205), else the page's word.
+    let kept = speakers::read(&folder);
+    let (me, others) = kept.sides(said.me, said.others);
     let input = exporting::Input {
         to: &to,
         name: &meeting,
         transcript: said.transcript,
-        me: said.me,
-        others: said.others,
+        me,
+        others,
         time: said.time,
         speaker: said.speaker,
         text: said.text,
@@ -4340,11 +4436,12 @@ fn write_minutes_from(
         // Cancelled by the user (D92), and not written meanwhile: no failure, nothing told.
         let cancelled = cancel.cancelled() && matches!(made, summarising::Made::Failed(..));
         let ended_here = matches!(made, summarising::Made::Failed(..)) && !cancelled && here();
-        // Replaced, the earlier minutes go to the trash — refused, they stay beside, and it is said.
+        // Replaced, the earlier minutes are kept beside as the previous version, the one kept before
+        // going to the trash (D113) — refused, they stay where they were set aside, and it is said.
         let mut kept_beside = None;
         if let Some(previous) = previous {
             match made {
-                summarising::Made::Written(_) if trash::delete(&previous).is_err() => {
+                summarising::Made::Written(_) if keep_previous(&folder, &previous, minutes::PREVIOUS).is_err() => {
                     kept_beside = previous.file_name().map(|name| name.to_string_lossy().into_owned());
                 }
                 summarising::Made::Written(_) => {}
@@ -4396,6 +4493,45 @@ fn write_minutes_from(
     });
 }
 
+/// A version a redo replaced, set aside at `aside`, kept beside the new one under `name` in place of
+/// the trash (D113): the one kept there before goes to the trash first, so that one alone is kept.
+fn keep_previous(folder: &Path, aside: &Path, name: &str) -> std::io::Result<()> {
+    let kept = folder.join(name);
+    if kept.exists() {
+        trash::delete(&kept).map_err(std::io::Error::other)?;
+    }
+    std::fs::rename(aside, kept)
+}
+
+/// « Revenir à la version précédente » (D113): the version shown and the one kept swap, so the
+/// same gesture brings back the one left; a person's corrections are in each file, kept with it.
+/// Refused while the meeting is being made.
+#[tauri::command]
+fn previous_back(shell: State<'_, Shell>, name: String, step: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let (shown, kept) = match step.as_str() {
+        "minutes" => (folder.join("minutes.md"), folder.join(minutes::PREVIOUS)),
+        _ => return Err(shell.told(Failure::Unexpected, "no step of that name")),
+    };
+    if making(&shell, &folder) {
+        return Err(shell.told(Failure::Busy, format!("{name} is being made")));
+    }
+    let between = folder.join(format!("{}.swap", minutes::PREVIOUS));
+    let unwritten = |error: std::io::Error| shell.told(Failure::MeetingFile, error);
+    std::fs::rename(&kept, &between).map_err(unwritten)?;
+    if let Err(error) = std::fs::rename(&shown, &kept) {
+        let _ = std::fs::rename(&between, &kept);
+        return Err(unwritten(error));
+    }
+    if let Err(error) = std::fs::rename(&between, &shown) {
+        let _ = std::fs::rename(&kept, &shown);
+        let _ = std::fs::rename(&between, &kept);
+        return Err(unwritten(error));
+    }
+    tracing::info!(step, "shell.previous_back");
+    Ok(())
+}
+
 /// « Exporter chaque compte rendu » (D109): the summary just written, written to the folder chosen
 /// too, by `kitokey-export` (`exporting/v1`), named by its meeting's folder; never a confidential
 /// meeting's, a folder chosen being one a service may copy (D60). Not written there, it is said on
@@ -4411,12 +4547,15 @@ fn export_written(shell: &Shell, folder: &Path) {
     let said = words::exported(language);
     let name = meeting_said(folder, language);
     let to = chosen.join(format!("{}.md", named(folder)));
+    // Each side by the name the user gave it (#1205), else the page's word.
+    let kept = speakers::read(folder);
+    let (me, others) = kept.sides(said.me, said.others);
     let input = exporting::Input {
         to: &to,
         name: &name,
         transcript: said.transcript,
-        me: said.me,
-        others: said.others,
+        me,
+        others,
         time: said.time,
         speaker: said.speaker,
         text: said.text,
