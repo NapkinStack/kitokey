@@ -60,7 +60,7 @@ machine: [`docs/privacy.md`](docs/privacy.md).
 | The minutes of a transcript, from the provider you chose: `kitokey-summary <session> --provider <address> --model <name>` | [`modules/summary`](modules/summary/) |
 
 Each source is kept as your system delivers it, at its own rate and channels, in 24 bits —
-about 2 GB an hour on a laptop ([ADR-0004](docs/adr/0004-the-audio-as-recorded-is-kept-everything-else-is-derived.md)).
+about 1,037 MB an hour on a laptop ([ADR-0004](docs/adr/0004-the-audio-as-recorded-is-kept-everything-else-is-derived.md)).
 **Known**: the engine on the machine still writes a few words where nobody speaks, and on a
 lively meeting misses or mishears about one word in four.
 
