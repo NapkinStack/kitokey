@@ -16,3 +16,8 @@ export const languages = ["en", "fr"];
 // Where the policy's relative links (support.md, …) point once on the site: the source's folder on GitHub.
 export const privacyLinks = process.env.PRIVACY_LINKS ?? "https://github.com/NapkinStack/kitokey/blob/main/docs/";
 export const privacyHistory = process.env.PRIVACY_HISTORY ?? "https://github.com/NapkinStack/kitokey/commits/main/docs/privacy.md";
+
+// Where the landing's install commands come from, read by its test alone (D114): modules/install/README.md and
+// the repository's README.md. Split out of the repository, INSTALL_SOURCES names them, separated by ":".
+export const installSources = (process.env.INSTALL_SOURCES ?? "../install/README.md:../../README.md")
+  .split(":").map((path) => resolve(path));

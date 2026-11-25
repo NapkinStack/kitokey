@@ -1,8 +1,9 @@
 ---
 // /<lang>/: the landing (D114, proposal D validated by the decider on 2026-11-25). Every word from
-// src/lib/landing.mjs. The hero shows the record clip's first image; the carousel replaces it next.
+// src/lib/landing.mjs. The hero shows the drawn call; the carousel puts it first among the clips next.
 import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
+import Call from "./Call.astro";
 import { channels, landing as w, repo } from "../lib/landing.mjs";
 import { brand, ico } from "../lib/icons.mjs";
 
@@ -30,12 +31,12 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
     <div class="wrap hero-copy">
       <h1 id="h1"><span>{h1a}</span> <span class="second">{h1b}</span></h1>
       <p class="lead">{lead}</p>
-      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/releases`}>{follow}</a></div>
+      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/tags`}>{follow}</a></div>
     </div>
     <div class="wrap">
       <figure class="window hero-window">
-        <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">Kitokey</span></div>
-        <img class="still hero-still" src={`/clips/record-${lang}-light.jpg`} width="1280" height="720" alt={t("still")} fetchpriority="high" decoding="async" />
+        <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">{w.call[lang][0]}</span></div>
+        <Call lang={lang} />
       </figure>
     </div>
   </section>
@@ -144,7 +145,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
   <section class="final" aria-labelledby="final-h">
     <div class="wrap">
       <h2 id="final-h" class="reveal">{t("final")}</h2>
-      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/releases`}>{follow}</a></div>
+      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/tags`}>{follow}</a></div>
     </div>
   </section>
 </Page>
