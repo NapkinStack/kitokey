@@ -1376,7 +1376,7 @@ function relief(segments, total, words) {
 }
 
 // A meeting's waveform per voice (#1201, #1179 B), as Descript, Riverside and Voice Memos draw a recording: each
-// voice's loudest sound, yours above the line and the meeting's below, its bars grouped to the drawing's width and
+// voice's loudness (each stretch's RMS, `peaks`), yours above the line and the meeting's below, its bars grouped to the drawing's width and
 // laid over the meeting's `total` as the playhead and a click are; each voice scaled to its own loudest, so that a
 // quiet microphone still shows when it speaks. From the peaks the shell keeps (`peaks_of`); none, who spoke stays
 // drawn from the transcript (`relief`).

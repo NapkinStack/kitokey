@@ -155,6 +155,20 @@ fn a_track_that_changed_is_read_again() {
 }
 
 #[test]
+fn a_clock_that_changed_reads_them_again() {
+    // The meeting's track moved by its clock after a first read: what was kept no longer places it.
+    let folder = tempfile::tempdir().unwrap();
+    halves(folder.path());
+    assert!((peaks::of(folder.path()).unwrap().seconds - 10.0).abs() < 0.01);
+    fs::write(
+        folder.path().join("clock.jsonl"),
+        "{\"track\":\"local\",\"sample\":0,\"at\":0.0}\n{\"track\":\"remote\",\"sample\":0,\"at\":2.0}\n",
+    )
+    .unwrap();
+    assert!((peaks::of(folder.path()).unwrap().seconds - 12.0).abs() < 0.01);
+}
+
+#[test]
 fn a_track_kept_as_flac_gives_the_same_peaks() {
     let (wavs, flacs) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
     halves(wavs.path());
