@@ -1,6 +1,6 @@
 ---
 // /<lang>/: the landing (D114, proposal D validated by the decider on 2026-11-25). Every word from
-// src/lib/landing.mjs. The hero's carousel: the drawn call, then six c16 clips, each slide's poster first.
+// src/lib/landing.mjs. The hero's carousel: the drawn call, then five c16 clips, each slide's poster first.
 import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
 import Call from "./Call.astro";
@@ -53,7 +53,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
                   <img class="still" src={`/clips/${key}-${lang}-light.jpg`} width="1280" height="720" alt={alt} loading="lazy" decoding="async" />
                 </div>
               )}
-              <div class="slide-card"><span class="tile" set:html={ico(icon)} /><p class="kicker">{kicker}</p><h2>{h}</h2><p>{p}</p></div>
+              <div class="slide-card"><span class="tile" set:html={ico(icon)} /><p class="kicker">{kicker}</p><h2>{h}</h2>{p && <p>{p}</p>}</div>
             </article>
           ))}
         </div>
