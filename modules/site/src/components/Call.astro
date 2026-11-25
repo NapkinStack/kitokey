@@ -1,0 +1,22 @@
+---
+// The drawn call (proposal D, the decider's request of 2026-11-25): a neutral, unbranded video call of four —
+// generated portraits of people who do not exist (OpenRouter, 2026-11-25), Camille speaking, Sarah (you) — and
+// Kitokey's compact bar over it, smaller and still: the dot, the time, a level trace for each side (#1179), stop.
+import { landing } from "../lib/landing.mjs";
+import { ico } from "../lib/icons.mjs";
+
+const { lang } = Astro.props;
+const [, you, alt] = landing.call[lang];
+const people = [["camille", "Camille"], ["hugo", "Hugo"], ["lea", "Léa"], ["vous", null]];
+const trace = (seed) => {
+  const heights = [2, 2, 2, 2, 6 + seed, 10, 7, 12 - seed, 5, 2, 2, 8, 11, 6, 9 - (seed % 3), 4];
+  return `<svg class="tr" viewBox="0 0 64 18" aria-hidden="true">${heights.map((h, i) => `<rect x="${i * 4}" y="${(9 - h / 2).toFixed(1)}" width="2.2" height="${h}" rx="1.1"/>`).join("")}</svg>`;
+};
+const speaker = '<svg class="ico mb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h4l5-4v13l-5-4H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M16.5 9a4 4 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+---
+<div class="call" role="img" aria-label={alt}>
+  <div class="kbar" aria-hidden="true"><span class="mb-dot"></span><span class="mb-time">00:16:42</span><span class="kb-tr kb-me" set:html={ico("mic", "ico mb-ico") + trace(1)} /><span class="kb-tr kb-call" set:html={speaker + trace(4)} /><span class="mb-stop"><span class="mb-square"></span></span></div>
+  <div class="grid">
+    {people.map(([file, name], n) => <div class={`ctile${n === 0 ? " speaking" : ""}`}><img class="ptr" src={`/img/call-${file}.webp`} width="960" height="540" alt="" decoding="async" /><span class="who">{name ?? <>Sarah <small>{you}</small></>}</span></div>)}
+  </div>
+</div>
