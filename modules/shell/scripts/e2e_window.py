@@ -12925,6 +12925,21 @@ def pages_seen(now: dt.datetime) -> None:
                     check(f"{theme}, {width} px: {page} shown", bool(there))
                     browser.execute_script("document.getElementById('list').scrollTop = 0; scrollTo(0, 0)")
                     time.sleep(0.4)
+                    if page == "settings":
+                        # A folder as the desktop's own choosers show one (#1232): its icon, one line in the body's font, its
+                        # own name whole — the path before it cut with « … » when it does not fit —, the whole path its tooltip.
+                        folder = browser.execute_script(
+                            "const b = document.getElementById('sessions-shown'), last = b.querySelector('.last'), box = b.getBoundingClientRect();"
+                            "const lh = parseFloat(getComputedStyle(b).lineHeight) || 20;"
+                            "return {icon: !!b.querySelector('svg'), mono: getComputedStyle(b).fontFamily.includes('monospace'),"
+                            " lines: Math.round((b.querySelector('.lead')?.getBoundingClientRect().height ?? box.height) / lh),"
+                            " last: last ? [last.textContent, last.getBoundingClientRect().right <= box.right + 0.5, last.scrollWidth <= last.clientWidth] : null,"
+                            " tip: b.title, value: document.getElementById('sessions').value,"
+                            " none: getComputedStyle(document.getElementById('export-shown')).fontFamily.includes('monospace')}")
+                        check(f"{theme}, {width} px: the meetings' folder an icon and one line in the body's font, its name whole, its path the tooltip (#1232)",
+                              folder["icon"] and not folder["mono"] and folder["lines"] == 1 and folder["last"]
+                              and folder["last"][0] == folder["value"].rstrip("/").rsplit("/", 1)[-1] and folder["last"][1] and folder["last"][2]
+                              and folder["tip"] == folder["value"] and not folder["none"], folder)
                     shot_themed(browser, f"d89-{page}-{width}-{theme}", theme)
 
 
