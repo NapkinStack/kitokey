@@ -14755,9 +14755,12 @@ def main() -> int:
                 return sorted(folder.glob("minutes-before-*.md")) if folder.exists() else []
 
             trash_files = WORK / "data" / "Trash" / "files"
-            # The minutes replaced kept beside as the previous version, no longer in the trash (D113).
+            # The minutes replaced kept beside as the previous version, no longer in the trash (D113). Waited for until
+            # nothing is left set aside: the stand-in writes the same minutes each time, so the previous kept by an
+            # earlier redo already equals them, and the new one is moved there only once the making has ended — after
+            # « minutes_written » (the attest at a6a17c4 read it in between).
             kept_previous = asked / "minutes-previous.md"
-            redone = wait_for(browser, lambda b: kept_previous.is_file() and kept_previous.read_text() == before, 10)
+            redone = wait_for(browser, lambda b: kept_previous.is_file() and kept_previous.read_text() == before and not aside(asked), 10)
             check(
                 "made again with the model chosen, kept for this meeting, Settings unchanged; the minutes there kept as the previous version (D113)",
                 redone
