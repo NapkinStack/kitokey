@@ -20,7 +20,8 @@ def test_the_folder_may_hold_the_names_the_user_gave_its_speakers():
     row = next(line for line in SESSION.splitlines() if line.startswith("| `speakers.json` |"))
     assert "The shell, on the user's word; optional" in row
     assert "the shell and `summary` read it" in row
-    page = flat(SESSION)
+    # Its own section, not models.json's, which says some of the same.
+    page = flat(SESSION.split("**`speakers.json`**", 1)[1].split("**`models.json`**", 1)[0])
     assert "a name absent, the speaker keeps the shell's word for it" in page
     assert "its voice's name, else its speaker's" in page
     assert "a name the schema refuses reads as absent, and the rest of the file still reads" in page

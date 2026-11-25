@@ -634,6 +634,7 @@ EXAMPLES["session-audio/v3/speakers.schema.json"] = (
         "a file that is no object",
         {"me": ""},
         {"me": "   "},
+        {"others": "   "},
         {"me": "deux\nlignes"},
         {"others": "x" * 61},
         {"me": "x" * 61},
