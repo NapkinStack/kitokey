@@ -34,7 +34,7 @@ flowchart LR
 
 A library and its program: a meeting's folder read into one model, every format written from it
 (D108). It writes Markdown, HTML, DOCX, subtitles (SRT, WebVTT) and a tagged PDF (PDF/UA-1) through typst,
-in the system's fonts — static faces first, a variable one only where no static face has the letters
+in the system's static faces — a letter only a variable face has is `pdf.no_font`, never written Thin
 (`chosen()`). The words a file shows
 that no contract carries — « Transcription », who spoke — are given by its caller. Beside them, an iCalendar
 file (RFC 5545, D117): the dates a meeting's actions mention, resolved by the shell, one all-day event each.

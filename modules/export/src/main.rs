@@ -224,8 +224,12 @@ fn export() -> Result<Value, Refused> {
         "vtt" => vtt(&meeting, include, &labels, &asked.lang).into_bytes(),
         "pdf" => {
             let system = System::read();
-            let taken = chosen(&meeting, include, &labels, &name, &system.infos(), Some(&system.sans()))
-                .map_err(|_| Refused("no font of the system has the meeting's letters".into(), Some("pdf.no_font")))?;
+            let taken = chosen(&meeting, include, &labels, &name, &system.infos(), Some(&system.sans())).map_err(|_| {
+                Refused(
+                    "no static font of the system has the meeting's letters: install static fonts of its script".into(),
+                    Some("pdf.no_font"),
+                )
+            })?;
             let faces = system.faces(&taken);
             // typst's message may quote the meeting: the sentence says none of it.
             pdf(&meeting, include, &labels, &asked.lang, &name, &faces)

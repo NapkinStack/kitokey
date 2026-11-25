@@ -76,8 +76,10 @@ impl AsRef<[u8]> for Shared {
     }
 }
 
-/// The faces the meeting needs, among `faces` — what the system's are, read without keeping them —, by their place in it: static faces first,
-/// a variable face only where no static one has a character, at its default instance (`exporting/v1`).
+/// The faces the meeting needs, among `faces` — what the system's are, read without keeping them —, by their place
+/// in it: static faces alone. A variable face is never taken — its default instance can be its lightest weight
+/// (Thin for Noto Sans CJK); a letter only a variable face has is no letter the program has (`exporting/v1`, the
+/// decider on 2026-11-25).
 /// The family `sans` names — the system's sans-serif — comes first when it has any; then, each time,
 /// the family that has the most of what is still missing, the first given on a tie. Every face of a
 /// family taken comes with it, its bold for the headings. A letter no face has is `Err`, that letter:
@@ -98,39 +100,34 @@ pub fn chosen(
     missing.sort_unstable();
     missing.dedup();
     let mut taken: Vec<usize> = Vec::new();
-    for variable in [false, true] {
-        // The families of this kind, in the order first given.
-        let mut families: Vec<&str> = Vec::new();
-        for info in faces {
-            if info.flags.contains(FontFlags::VARIABLE) == variable && !families.contains(&info.family.as_str()) {
-                families.push(&info.family);
-            }
+    let fixed = |i: usize| !faces[i].flags.contains(FontFlags::VARIABLE);
+    // The static faces' families, in the order first given.
+    let mut families: Vec<&str> = Vec::new();
+    for (i, info) in faces.iter().enumerate() {
+        if fixed(i) && !families.contains(&info.family.as_str()) {
+            families.push(&info.family);
         }
-        let of = |family: &str| -> Vec<usize> {
-            (0..faces.len())
-                .filter(|&i| faces[i].family == family && faces[i].flags.contains(FontFlags::VARIABLE) == variable)
-                .collect()
-        };
-        let has = |family: &str, c: char| of(family).iter().any(|&i| faces[i].coverage.contains(c as u32));
-        loop {
-            let count = |family: &str| missing.iter().filter(|&&c| has(family, c)).count();
-            let best = sans
-                .filter(|&sans| !variable && taken.is_empty() && families.contains(&sans) && count(sans) > 0)
-                .or_else(|| {
-                    families
-                        .iter()
-                        .copied()
-                        .map(|family| (count(family), family))
-                        .filter(|&(n, _)| n > 0)
-                        .rev()
-                        .max_by_key(|&(n, _)| n)
-                        .map(|(_, family)| family)
-                });
-            let Some(family) = best else { break };
-            missing.retain(|&c| !has(family, c));
-            taken.extend(of(family));
-            families.retain(|&f| f != family);
-        }
+    }
+    let of = |family: &str| -> Vec<usize> { (0..faces.len()).filter(|&i| faces[i].family == family && fixed(i)).collect() };
+    let has = |family: &str, c: char| of(family).iter().any(|&i| faces[i].coverage.contains(c as u32));
+    loop {
+        let count = |family: &str| missing.iter().filter(|&&c| has(family, c)).count();
+        let best = sans
+            .filter(|&sans| taken.is_empty() && families.contains(&sans) && count(sans) > 0)
+            .or_else(|| {
+                families
+                    .iter()
+                    .copied()
+                    .map(|family| (count(family), family))
+                    .filter(|&(n, _)| n > 0)
+                    .rev()
+                    .max_by_key(|&(n, _)| n)
+                    .map(|(_, family)| family)
+            });
+        let Some(family) = best else { break };
+        missing.retain(|&c| !has(family, c));
+        taken.extend(of(family));
+        families.retain(|&f| f != family);
     }
     match missing.into_iter().find(|c| c.is_alphabetic()) {
         Some(letter) => Err(letter),

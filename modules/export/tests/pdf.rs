@@ -227,11 +227,13 @@ fn static_faces_are_chosen_before_a_variable_one_of_the_same_letters() {
 }
 
 #[test]
-fn a_variable_face_is_chosen_where_no_static_one_has_the_letters() {
-    // The summary's CJK alone, which the variable subset has; the transcript's other CJK left out.
+fn a_letter_only_a_variable_face_has_is_refused_never_written_in_its_default_instance() {
+    // The summary's CJK alone, which the variable subset has and no static face here: refused by its first
+    // letter, never written Thin (the decider, 2026-11-25).
     let names = ["NotoSans-Regular-subset.ttf", "NotoSans-Bold-subset.ttf", VARIABLE];
     let only_latin_and_these = meeting(MINUTES, "");
-    assert_eq!(choose(&only_latin_and_these, &names, Some("Noto Sans")).unwrap(), names);
+    let refused = choose(&only_latin_and_these, &names, Some("Noto Sans")).unwrap_err();
+    assert!(('\u{4e00}'..='\u{9fff}').contains(&refused), "a CJK letter: {refused:?}");
 }
 
 #[test]

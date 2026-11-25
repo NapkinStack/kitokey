@@ -455,7 +455,7 @@ fn pdf_is_written_with_the_systems_static_faces_before_a_variable_one() {
 
 #[cfg(target_os = "linux")]
 #[test]
-fn pdf_takes_a_variable_face_where_no_static_one_has_the_letters() {
+fn a_letter_only_a_variable_face_has_is_pdf_no_font_never_its_thin_default() {
     let dir = tempfile::tempdir().unwrap();
     let folder = meeting(dir.path());
     fs::write(
@@ -479,14 +479,12 @@ fn pdf_takes_a_variable_face_where_no_static_one_has_the_letters() {
         &words(&to).to_string(),
     );
 
-    assert!(ran.success, "{}", ran.said);
-    let written = fs::read(&to).unwrap();
-    assert!(pdf_extract::extract_text_from_mem(&written).unwrap().contains("会议纪要"));
-    assert!(
-        embedded(&written).iter().any(|f| f == "NotoSansCJKsc-Thin"),
-        "{:?}",
-        embedded(&written)
-    );
+    // The decider, 2026-11-25: refused rather than written in the variable face's default, Thin.
+    assert_eq!(ran.code, Some(1));
+    assert_eq!(ran.lines, [json!({"event": "failed", "code": "pdf.no_font"})]);
+    assert!(ran.said.contains("static"), "the sentence says what is missing: {}", ran.said);
+    assert!(!ran.said.contains('会'), "the sentence says no word of the meeting: {}", ran.said);
+    assert!(!to.exists(), "nothing written");
 }
 
 #[cfg(target_os = "linux")]
