@@ -153,7 +153,7 @@ const raw = {
       ["How long do the minutes take?", "It depends on your computer and the length of the call, because the work happens on your machine and not on a server. Think minutes rather than seconds."],
       ["Does it work on Wayland, with PipeWire?", "Yes, on GNOME (Wayland), with sound through PipeWire. That is the environment its end-to-end tests run in. Other desktops are not tested yet."],
       ["Am I allowed to record a call?", "It is up to you to tell the participants you are recording and to get their consent. It is common courtesy, and often the law. Kitokey reminds you, and the reminder can be turned off."],
-      ["Which languages are transcribed?", "Kitokey detects the spoken language, or you set it for each meeting: English, French, German, Spanish, Italian, Portuguese, Dutch, Arabic, and many more that Whisper hears."]]],
+      ["Which languages are transcribed?", "Kitokey detects the spoken language, among the many Whisper hears, or you choose it for a meeting among eight: English, French, German, Spanish, Italian, Portuguese, Dutch and Arabic."]]],
     fr: ["Questions fréquentes", [
       ["Faut-il installer quelque chose dans Zoom, Meet ou Teams ?", "Non. Kitokey enregistre le son de votre ordinateur. Il fonctionne avec n’importe quelle application d’appel et aucun robot ne rejoint la réunion."],
       ["Kitokey reconnaît-il chaque participant ?", "Non. Il sépare deux côtés, votre micro (Vous) et le son de l’appel (Les autres), et vous pouvez renommer chacun. Il ne distingue pas les voix des autres participants entre elles."],
@@ -164,7 +164,7 @@ const raw = {
       ["Combien de temps faut-il pour le compte rendu ?", "Cela dépend de votre ordinateur et de la durée de l’appel, car le travail se fait sur votre machine et pas sur un serveur. Comptez des minutes plutôt que des secondes."],
       ["Fonctionne-t-il sous Wayland, avec PipeWire ?", "Oui, sous GNOME (Wayland), le son passe par PipeWire. C’est l’environnement où tournent ses tests de bout en bout. Les autres bureaux ne sont pas encore testés."],
       ["Ai-je le droit d’enregistrer un appel ?", "C’est à vous d’annoncer l’enregistrement aux participants et d’obtenir leur accord. C’est la règle de bon sens, et souvent celle de la loi. Kitokey vous le rappelle, et ce rappel peut se désactiver."],
-      ["Quelles langues sont transcrites ?", "Kitokey détecte la langue parlée, ou vous la choisissez pour chaque réunion : le français, l’anglais, l’allemand, l’espagnol, l’italien, le portugais, le néerlandais, l’arabe, et bien d’autres que Whisper entend."]]],
+      ["Quelles langues sont transcrites ?", "Kitokey détecte la langue parlée, parmi les nombreuses que Whisper entend, ou vous la choisissez pour une réunion parmi huit : le français, l’anglais, l’allemand, l’espagnol, l’italien, le portugais, le néerlandais et l’arabe."]]],
     keeps: "docs/support.md (Ollama, the folder); #1211 and #1205, the two sides named; words.rs minutes_ai; docs/privacy.md, the reminder; cycle 01, GNOME on Wayland; spoken.rs, the eight languages offered and any other of ISO 639-1, none said: the engine detects it (D64, D65)",
   },
   final: {

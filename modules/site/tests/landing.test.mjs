@@ -11,13 +11,30 @@ import { channels, landing } from "../src/lib/landing.mjs";
 
 const KEYS = ["transcript", "summary", "dates", "player", "send", "confidential"]; // the record slide is drawn
 
-// Every command line the READMEs' bash blocks give, its comment dropped.
-const given = new Set();
+// The READMEs' bash blocks, cut in paragraphs at blank lines, each with the system it is for: the one its
+// comments name, else the one its section's heading names, else none — a paragraph for every system.
+const SYSTEMS = ["fedora", "ubuntu"];
+const named = (text) => SYSTEMS.filter((s) => text.toLowerCase().includes(s));
+const blocks = [];
 for (const source of installSources) {
-  for (const [, block] of (await readFile(source, "utf8")).matchAll(/```bash\n([\s\S]*?)```/g)) {
-    for (const line of block.split("\n")) if (line.trim()) given.add(line.replace(/\s+#.*$/, "").trim());
+  let heading = "";
+  for (const [, title, block] of (await readFile(source, "utf8")).matchAll(/^#+ (.*)$|```bash\n([\s\S]*?)```/gm)) {
+    if (title !== undefined) { heading = title; continue; }
+    blocks.push(block.split(/\n\s*\n/).map((paragraph) => {
+      const lines = paragraph.split("\n").filter((l) => l.trim());
+      const own = named(lines.map((l) => l.match(/#(.*)$/)?.[1] ?? "").join(" "));
+      const systems = own.length ? own : named(heading).length === 1 ? named(heading) : [];
+      return { systems, lines: lines.map((l) => l.replace(/\s+#.*$/, "").trim()) };
+    }));
   }
 }
+// A tab's commands, in order, among the lines of one block meant for its system or for every system.
+const given = (os, commands) => blocks.some((block) => {
+  const lines = block.filter((p) => !p.systems.length || p.systems.includes(os)).flatMap((p) => p.lines);
+  let at = 0;
+  for (const line of lines) if (line === commands[at]) at++;
+  return at === commands.length;
+});
 
 const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8");
 const text = (html) => html.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&gt;/g, ">").replace(/&lt;/g, "<");
@@ -36,13 +53,13 @@ for (const lang of ["en", "fr"]) {
     assert.doesNotMatch(await page(lang), /\[(À MESURER|TO MEASURE)\]|class="todo"|TODO|XXX/);
   });
 
-  test(`/${lang}/: the install's commands, each a line of the install's READMEs`, async () => {
+  test(`/${lang}/: the install's commands, in order, as a README gives them for that system`, async () => {
     const html = await page(lang);
     for (const [os, , commands] of channels) {
       const shown = html.match(new RegExp(`<pre class="os-code" data-os="${os}"[^>]*>([\\s\\S]*?)</pre>`))?.[1];
       assert.ok(shown, `no commands for ${os}`);
       assert.equal(text(shown).replace(/^\$ /gm, ""), commands);
-      for (const line of commands.split("\n")) assert.ok(given.has(line), `${os}: « ${line} » is in no README`);
+      assert.ok(given(os, commands.split("\n")), `${os}: its commands are no sequence of a README's lines for ${os}`);
     }
   });
 
