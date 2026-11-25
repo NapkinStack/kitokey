@@ -28,8 +28,18 @@ that you are recording**: Kitokey shows them nothing.
 
 ## Install it
 
-On Fedora and on Ubuntu 24.04, from a package built from this repository — none is published yet. Needs `git`,
-[`uv`](https://docs.astral.sh/uv/) and `podman`:
+**On Fedora 43, 44 and 45**, from Copr, with the system's updates — version 0.2.6, built by Copr on 2026-11-18
+from the tag `v0.2.6`:
+
+```bash
+sudo dnf copr enable @napkinstack/kitokey
+sudo dnf install kitokey
+```
+
+**On Ubuntu 24.04 and Debian 13**, from a package built from this repository — none is published for them yet
+(#1214). The `.deb` made for Ubuntu 24.04 also installs and starts on Debian 13, not on Debian 12
+([`modules/install`](modules/install/#on-debian)). Building needs `git`, [`uv`](https://docs.astral.sh/uv/) and
+`podman`:
 
 ```bash
 git clone https://github.com/NapkinStack/kitokey && cd kitokey
@@ -45,9 +55,8 @@ sudo apt install ./dist/install/kitokey_*_amd64.deb
 If `nstack` is then not found, uv's folder of tools is not on your `PATH` yet: `uv tool update-shell` puts it
 there, and a new terminal, in the clone, finds it.
 
-How each package is made: [`modules/install`](modules/install/). Fedora's package from Copr, with dnf and the system's
-updates, is [cycle 07](docs/project/cycles/07-wholeheard-from-the-systems-updater.md)'s, and nothing is published
-yet. On macOS, GitHub's runner makes the app on every change to a program on `main`, signed ad hoc, not by Apple.
+How each package is made, and what a computer needs to run it — memory, disk, how long a meeting takes, measured:
+[`modules/install`](modules/install/). On macOS, GitHub's runner makes the app on every change to a program on `main`, signed ad hoc, not by Apple.
 On Windows, it makes a zip and an MSIX package for the Microsoft Store, not submitted yet. Each waits on a
 colleague's trial, in the cycles after it. What a build holds and what leaves your
 machine: [`docs/privacy.md`](docs/privacy.md).
