@@ -54,6 +54,28 @@ fn without_names_the_request_is_the_one_sent_before() {
 }
 
 #[test]
+fn the_rule_follows_the_sides_sentence_whole_and_nothing_else_moves() {
+    // The sides' rule is D5's third criterion: the name's rule comes right after its last words, never inside it,
+    // and the request is otherwise the one sent before, but for the names on the lines.
+    let segments = read_transcript(TRANSCRIPT).unwrap();
+    let before = request_in(&segments, Some("Quatre personnes."), None);
+    let asked = request_named(
+        &segments,
+        Some("Quatre personnes."),
+        None,
+        &named(Some("Sarah"), Some("L’équipe produit")),
+    );
+    let at = asked.find(RULE).unwrap();
+    assert!(asked[..at].ends_with("or the names the meeting or the context gives.\n"), "{asked}");
+    assert!(before.starts_with(&asked[..at]), "{asked}");
+    let unnamed = asked
+        .replacen(&format!("{RULE}\n"), "", 1)
+        .replace("me (Sarah):", "me:")
+        .replace("others (L’équipe produit):", "others:");
+    assert_eq!(unnamed, before);
+}
+
+#[test]
 fn speakers_json_is_read_as_the_contract_says() {
     let folder = tempfile::tempdir().unwrap();
     let at = folder.path().join("speakers.json");
