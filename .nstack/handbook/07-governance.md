@@ -301,7 +301,8 @@ run on the commit in git (`refs/notes/nstack/checks`, pushed with the branch), s
 as `nstack / local checks`, a name no CI job has. Such a change is **attested**, never
 *checked*: the record makes a claim traceable — who ran it, on which commit, with what output
 — not true. Whether a record stands in for the forge's CI is the decider's word, the project's
-answer `checks: attested` in `.copier-answers.yml`, changed in a pull request; `pr-check` then
+answer `checks: attested` in `.copier-answers.yml`, changed in a pull request (`nstack config checks
+attested` lays it on a branch); `pr-check` then
 requires a complete, passed record of the head (A1, A2) — on the workstation and in the forge's
 CI alike, which reads the record from the remote's notes with the job's token: an unattested head
 is red there too. A record CI cannot read — no token, a remote that refuses — is said as a
@@ -418,7 +419,8 @@ adds "require approval of the most recent reviewable push", or a second reviewer
 
 **Where another agent approves.** A project whose agents each work under an identity of
 their own may answer `approval: agent` in `.copier-answers.yml` — the
-decider's word, changed in a pull request a human approves. A change to a `prototype` or `standard`
+decider's word, changed in a pull request a human approves: `nstack config approval agent` lays it on
+a branch, the code owners file following it. A change to a `prototype` or `standard`
 module is then approved by a human **or** by another agent — under an identity that is neither its
 author's nor its last pusher's, whoever runs it; everything else still waits for a human code owner.
 The forge does the sorting, path by path:

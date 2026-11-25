@@ -99,8 +99,14 @@ generation instead of observing the damage afterwards.
 > The project's real throughput is its verification throughput, not its generation
 > throughput.
 
-The budget is an explicit ceiling, set for the project — the `MAX_LINES` and `MAX_FILES`
-environment variables of the pull request's scope check, 400 lines and 15 files by default. Adjusting it per module, by criticality, is not automated: it
+The budget is an explicit ceiling, set for the project: its answers `review_budget_lines` and
+`review_budget_files`, 400 lines and 15 files by default, read alike by CI and by `nstack attest`.
+The decider changes them — `nstack config review_budget_lines 600` lays the change on a branch, for
+a pull request a human approves. `MAX_LINES` and `MAX_FILES` in the environment override them for
+one run; the scope check says which source it took. The default follows SmartBear's study of 2,500
+reviews at Cisco (Cohen, *Best Kept Secrets of Peer Code Review*, 2006): past 200 to 400 lines in one
+review, the rate at which a reviewer finds defects drops. A larger budget is the
+decider's to choose, knowing that. Adjusting it per module, by criticality, is not automated: it
 is in the automation backlog. It covers:
 
 | Dimension | Indicative ceiling |
