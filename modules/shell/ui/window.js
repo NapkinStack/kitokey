@@ -119,6 +119,7 @@ const ICONS = {
   copy: [["rect", { width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2 }], "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"],
   "rotate-ccw": ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5"],
   "trash-2": ["M10 11v6", "M14 11v6", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
+  folder: ["M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"],
   "folder-open": ["m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"],
   ellipsis: [["circle", { cx: 12, cy: 12, r: 1 }], ["circle", { cx: 19, cy: 12, r: 1 }], ["circle", { cx: 5, cy: 12, r: 1 }]],
   "message-square-text": ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z", "M7 11h10", "M7 15h6", "M7 7h8"],
@@ -1881,6 +1882,17 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
   pick.addEventListener("change", changed);
   name();
   return [pick, said];
+}
+
+// A folder as the desktop's choosers show one (#1232): its icon, then its path on one line — the folders before its
+// own cut with « … » when the line is short, its own name always whole —, the whole path its tooltip.
+function pathShown(said, whole) {
+  const shown = element("button", "path");
+  const cut = said.lastIndexOf(" / ");
+  const [lead, last] = cut < 0 ? ["", said] : [said.slice(0, cut + 3), said.slice(cut + 3)];
+  shown.append(icon("folder"), element("span", "lead", lead), element("span", "last", last));
+  shown.title = whole;
+  return shown;
 }
 
 // The one button beside a version's list that starts its making again with the model chosen (D93).
@@ -4430,7 +4442,7 @@ function showSettings(shown, minutes, words) {
   path.hidden = true;
   // Shown as the board says it — Dossier personnel / Kitokey —; a click makes it a path to type.
   const said = shown.sessions_said.replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
-  const folderShown = element("button", "path", shown.sessions_said.startsWith("/") ? `/ ${said}` : said);
+  const folderShown = pathShown(shown.sessions_said.startsWith("/") ? `/ ${said}` : said, shown.sessions_said);
   folderShown.type = "button";
   whereSaid.id = "sessions-label";
   folderShown.setAttribute("aria-labelledby", "sessions-label sessions-shown");
@@ -4473,11 +4485,9 @@ function showSettings(shown, minutes, words) {
   exportPath.spellcheck = false;
   exportPath.hidden = true;
   const exportAs = (shown.export_said ?? "").replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
-  const exportShown = element(
-    "button",
-    "path",
-    shown.export_said === null ? words.export_none : shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs,
-  );
+  const exportShown =
+    shown.export_said === null ? element("button", "path none", words.export_none)
+    : pathShown(shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs, shown.export_said);
   exportShown.type = "button";
   exportShown.id = "export-shown";
   exportShown.setAttribute("aria-labelledby", "export-label export-shown");

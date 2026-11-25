@@ -184,7 +184,7 @@ mark { background: var(--mark); color: var(--mark-ink); box-shadow: inset 0 -2px
    wider than its card — a choice narrows to it, and what holds an unbreakable string breaks
    anywhere: a folder's path, a model's id, a host; never a label's words (#782). */
 #settings { max-width: 720px; width: 100%; margin-inline: auto; }
-#settings .path, #settings code, #offered .name { overflow-wrap: anywhere; }
+#settings code, #offered .name { overflow-wrap: anywhere; }
 /* A list's choice longer than its room — « … pas encore sur cet ordinateur » at 420 px — cut inside the list:
    WebKitGTK lays a menulist's whole text out past its box, and the page scrolled sideways; paint containment
    keeps that overflow in the list (#868). The whole choice stays its tooltip, and the state is said under it. */
@@ -273,7 +273,11 @@ select:hover, select:focus { border-color: var(--edge); }
 .sending > .disclose-advanced { align-self: flex-start; }
 .fields > .field.whole { flex-basis: 100%; }
 .tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); }
-.path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; }
+.path { flex: 1 1 240px; min-width: 0; display: flex; align-items: center; gap: 6px; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: text; }
+/* Its folders before its own cut first (#1232): the name the user chose stays whole. */
+.path .lead { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+.path .last { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+.path svg { flex: none; width: 16px; height: 16px; }
 .path:hover { border-color: var(--edge); color: var(--ink); }
 
 /* The sidebar's gesture and the list's rows (D11's first board). */
