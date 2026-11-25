@@ -81,6 +81,9 @@ not measured:
   the transcription's times are those of clean speech.
 - Each program was the release build of `main` at b66cadd, timed with `/usr/bin/time -v`, alone on the machine.
   Ollama ran apart, its processes' memory read every half second.
+- The minutes' time is that of the same meeting: its 148 turns, the same sentences drawn from the same seed, given
+  to `kitokey-summary` as a transcript (a request of 38,171 characters, against 39,011 from the transcribed
+  audio). Ollama ran on the built-in graphics through Vulkan, every one of the model's 37 layers on it.
 - The disk figures come from the headers and sizes of the meetings on that laptop, with no content read.
 - The transcription's own README gives the same order on a real meeting of 5 minutes: 34 to 38 s with Vulkan,
   230 s on the processor.
