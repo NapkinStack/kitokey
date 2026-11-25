@@ -5640,6 +5640,10 @@ def confidential_sent(now: dt.datetime) -> None:
             page(secret_one)
             shown = wait_for(browser, lambda b: b.execute_script(offered), 10)
             check(f"{short}: a confidential meeting with a summary offers « Envoyer… » (D119)", shown, browser.execute_script(offered))
+            # One destination: « Envoyer… » says where in its name and tooltip (#1239), its panel as before.
+            where = {"fr": "Envoyer à «\xa0#équipe\xa0»…", "en": "Send to “#équipe”…"}[short]
+            named_send = browser.execute_script("const b = document.getElementById('send-open'); return b ? [b.getAttribute('aria-label'), b.title] : null")
+            check(f"{short}: one destination, « Envoyer… » names it: « {where} » (#1239)", named_send == [where, where], named_send)
 
             def choose():
                 # By keyboard alone: « Envoyer… » reached and pressed by Enter, the destination by Enter. Absent, it
@@ -9428,8 +9432,10 @@ def dates_mentioned(now: dt.datetime) -> None:
                 " return b ? {icon: b.classList.contains('icon-button'), row: !!row, before: !!copy && row === copy.parentElement"
                 " && !!(b.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING), text: b.textContent.trim(),"
                 " name: b.getAttribute('aria-label'), tip: b.title, calendar: !!b.querySelector('svg rect') && b.querySelectorAll('svg path').length === 3} : null")
-            check(f"{language}: offered among the summary's actions, an icon — a calendar — named « {opens} » and its tooltip the same, before « Copier » (#1213)",
-                  shown and form == {"icon": True, "row": True, "before": True, "text": "", "name": opens, "tip": opens, "calendar": True}, form)
+            # Its count beside the calendar (#1239): how many dates it offers, read at a glance; its name and tooltip say both.
+            counted = f"{opens} (2)"
+            check(f"{language}: offered among the summary's actions, a calendar and its count « 2 », named « {counted} » and its tooltip the same, before « Copier » (#1213, #1239)",
+                  shown and form == {"icon": True, "row": True, "before": True, "text": "2", "name": counted, "tip": counted, "calendar": True}, form)
             if language.startswith("fr"):
                 browser.execute_script("document.querySelector('#meeting .card.minutes').scrollIntoView({block: 'start'})")
                 shot(browser, "cm-dates-offered-light")
