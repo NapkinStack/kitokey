@@ -436,6 +436,7 @@ fn main() {
             dates_ics,
             open_logs,
             diagnostic,
+            peaks_of,
             settings_shown,
             settings_saved,
             minutes_shown,
@@ -2305,6 +2306,32 @@ fn playable(shell: &Shell, folder: &Path) -> Option<String> {
     served
         .as_ref()?
         .offer_placed(tracks.into_iter().map(|track| (track.path, track.runs)).collect())
+}
+
+/// A meeting's waveform per voice (#1201): each track's peaks, read away from the window's thread — two hours
+/// of tracks in about 4 s, once — then kept in its `derived/` (`peaks`). None while it records, or when no
+/// track reads: the page then draws who spoke from its transcript. Numbers only, 0 to 255 of full scale.
+#[derive(serde::Serialize)]
+struct Waveform {
+    seconds: f64,
+    local: Option<Vec<u8>>,
+    remote: Option<Vec<u8>>,
+}
+
+#[tauri::command]
+async fn peaks_of(shell: State<'_, Shell>, name: String) -> Result<Option<Waveform>, Told> {
+    let folder = session_folder(&shell, &name)?;
+    if shell.recording.lock().unwrap().is_some() && shell.recorded.lock().unwrap().as_deref() == Some(folder.as_path()) {
+        return Ok(None);
+    }
+    let read = tauri::async_runtime::spawn_blocking(move || kitokey_shell::peaks::of(&folder))
+        .await
+        .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    Ok(read.map(|peaks| Waveform {
+        seconds: peaks.seconds,
+        local: peaks.local,
+        remote: peaks.remote,
+    }))
 }
 
 /// A meeting's diagnostic, for the page to copy: every program's log lines of its makings, then
