@@ -2589,12 +2589,15 @@ fn dates_ics(shell: State<'_, Shell>, name: String, to: PathBuf, dates: Vec<expo
     let language = shell.language();
     let said = words::exported(language);
     let meeting = meeting_said(&folder, language);
+    // Each side by the name the user gave it (#1205), else the page's word.
+    let kept = speakers::read(&folder);
+    let (me, others) = kept.sides(said.me, said.others);
     let input = exporting::Input {
         to: &to,
         name: &meeting,
         transcript: said.transcript,
-        me: said.me,
-        others: said.others,
+        me,
+        others,
         time: said.time,
         speaker: said.speaker,
         text: said.text,
@@ -4458,12 +4461,15 @@ fn export_written(shell: &Shell, folder: &Path) {
     let said = words::exported(language);
     let name = meeting_said(folder, language);
     let to = chosen.join(format!("{}.md", named(folder)));
+    // Each side by the name the user gave it (#1205), else the page's word.
+    let kept = speakers::read(folder);
+    let (me, others) = kept.sides(said.me, said.others);
     let input = exporting::Input {
         to: &to,
         name: &name,
         transcript: said.transcript,
-        me: said.me,
-        others: said.others,
+        me,
+        others,
         time: said.time,
         speaker: said.speaker,
         text: said.text,

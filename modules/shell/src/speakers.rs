@@ -21,6 +21,14 @@ pub struct Speakers {
     pub others: Option<String>,
 }
 
+impl Speakers {
+    /// Each side by its name, else by the words given for it — what `kitokey-export` is handed as
+    /// `exporting/v1`'s `me` and `others`.
+    pub fn sides<'a>(&'a self, me: &'a str, others: &'a str) -> (&'a str, &'a str) {
+        (self.me.as_deref().unwrap_or(me), self.others.as_deref().unwrap_or(others))
+    }
+}
+
 /// A name as the contract allows it: one line, 1 to 60 characters, not blank.
 fn allowed(name: &str) -> bool {
     !name.trim().is_empty() && name.chars().count() <= LONGEST && !name.contains(['\n', '\r'])

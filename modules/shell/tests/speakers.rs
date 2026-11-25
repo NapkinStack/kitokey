@@ -115,3 +115,14 @@ fn renaming_keeps_the_voices_another_producer_wrote() {
         serde_json::json!({"me": "Sarah", "voices": {"remote/1": "Hugo"}})
     );
 }
+
+#[test]
+fn each_side_is_said_by_its_name_else_by_the_words_given() {
+    // What the shell hands kitokey-export (exporting/v1's `me` and `others`): the names kept, else its words.
+    assert_eq!(named(Some("Sarah"), None).sides("Vous", "Les autres"), ("Sarah", "Les autres"));
+    assert_eq!(
+        named(None, Some("L’équipe produit")).sides("You", "Others"),
+        ("You", "L’équipe produit")
+    );
+    assert_eq!(Speakers::default().sides("Vous", "Les autres"), ("Vous", "Les autres"));
+}
