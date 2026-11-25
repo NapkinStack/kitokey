@@ -94,6 +94,7 @@ function lock() {
 // font's to draw (D69). The name goes on what holds it, for assistive technology. A path's `d`, or
 // another shape as Lucide 1.14.0's icon node gives it (D89).
 const ICONS = {
+  calendar: ["M8 2v4", "M16 2v4", ["rect", { width: 18, height: 18, x: 3, y: 4, rx: 2 }], "M3 10h18"],
   check: ["M20 6 9 17l-5-5"],
   "chevron-left": ["m15 18-6-6 6-6"],
   "chevron-down": ["m6 9 6 6 6-6"],
@@ -2166,11 +2167,14 @@ function minutesCard(read, words, session, transcript, onPage) {
 // beside it, the user choosing.
 function datesOffer(card, mentioned, session, transcript, words) {
   if (mentioned.length === 0) return;
-  const button = element("button", "open", words.dates_open);
-  button.type = "button";
-  button.id = "dates-open";
+  // Among the summary's actions, as « Envoyer… » and « Copier » are (#1213, D89): a calendar, its tooltip and name the
+  // words, before « Copier »; never a bar of its own under the summary.
+  const button = iconButton("calendar", words.dates_open, "dates-open");
   button.hidden = true;
-  card.append(button);
+  const actions = card.querySelector(".minutes-actions");
+  const copy = actions?.querySelector("#copy-minutes");
+  if (copy) copy.before(button);
+  else (actions ?? card).append(button);
   window.__TAURI__.core
     .invoke("dates_resolved", { name: nameOf(session), whens: mentioned.map((m) => m.when), day: null })
     .then((resolved) => (button.hidden = !resolved?.dates.some(Boolean)))
