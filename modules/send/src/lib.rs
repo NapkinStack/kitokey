@@ -361,10 +361,18 @@ pub enum Unsent {
 }
 
 impl Meeting {
-    /// Reads a session's folder: `session-audio`'s `confidential` first, then `minutes.md` (v1 to v5).
+    /// Reads a session's folder: `session-audio`'s `confidential` first, then `minutes.md` (v1 to v5). A
+    /// confidential meeting is refused: `read_confirmed` with `false`.
     pub fn read(folder: &Path) -> Result<Meeting, Unsent> {
+        Meeting::read_confirmed(folder, false)
+    }
+
+    /// Reads a session's folder as `read` does, a confidential meeting read too when the person confirmed it
+    /// for this send (`posting/v1`'s `confirmed_confidential`, D118; PDR-0007 point 4 amended 2026-11-24).
+    pub fn read_confirmed(folder: &Path, confirmed: bool) -> Result<Meeting, Unsent> {
         match fs::metadata(folder.join("confidential")) {
-            Ok(_) => return Err(Unsent::Confidential),
+            Ok(_) if !confirmed => return Err(Unsent::Confidential),
+            Ok(_) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(_) => return Err(Unsent::Unreadable),
         }

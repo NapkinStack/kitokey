@@ -169,3 +169,31 @@ fn it_says_its_version() {
     assert_eq!(ran.code, Some(0));
     assert!(ran.line.starts_with("kitokey-send "));
 }
+
+/// D118: the field on the input, as posting/v1 says it. The meeting is still judged before the address
+/// (here a local one, which the program refuses): `meeting.confidential` unconfirmed, the address reached once
+/// confirmed; a meeting not confidential reaches the address whatever the field says; a field that is no
+/// boolean is not posting/v1's input.
+#[test]
+fn a_confidential_meeting_goes_on_only_when_its_input_says_confirmed_confidential_true() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::write(folder.path().join("minutes.md"), MINUTES).unwrap();
+    let path = folder.path().to_str().unwrap();
+    let address = format!("https://127.0.0.1/api/webhooks/1/{SECRET}");
+    let with = |confirmed: serde_json::Value| {
+        serde_json::json!({"address": address, "name": "Réunion", "confirmed_confidential": confirmed}).to_string()
+    };
+    let code = |ran: Ran| serde_json::from_str::<serde_json::Value>(&ran.line).unwrap()["code"].clone();
+    for input in [input(&address), with(false.into()), with(true.into())] {
+        assert_eq!(code(run(&[path, "--kind", "webhook"], &input)), "address.refused", "{input}");
+    }
+    fs::write(folder.path().join("confidential"), "").unwrap();
+    assert_eq!(code(run(&[path, "--kind", "webhook"], &input(&address))), "meeting.confidential");
+    assert_eq!(code(run(&[path, "--kind", "slack"], &with(false.into()))), "meeting.confidential");
+    assert_eq!(code(run(&[path, "--kind", "discord"], &with(true.into()))), "address.refused");
+    for wrong in [with("true".into()), with(1.into()), with(serde_json::Value::Null)] {
+        let ran = run(&[path, "--kind", "webhook"], &wrong);
+        assert_eq!((ran.code, ran.line.as_str()), (Some(2), ""), "{wrong}");
+        assert!(ran.said.contains("confirmed_confidential"), "{}", ran.said);
+    }
+}

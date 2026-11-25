@@ -7,7 +7,7 @@ module:
 
   # ONE sentence. If it needs an "and", the module probably does two things.
   responsibility: >
-    Sends a meeting's summary to a channel the user set up, once, on their gesture, never a confidential one.
+    Sends a meeting's summary to a channel the user set up, once, on their gesture; a confidential one once confirmed.
 
   owner: "NapkinStack/maintainers"          # a GitHub team, organisation/team; a user only without an organisation
   contact: "@NapkinStack/maintainers"

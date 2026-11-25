@@ -1,8 +1,10 @@
 # send
 
 Sends a meeting's summary to a channel the user set up — a webhook, Discord's, Slack's incoming
-webhook, or a Notion database (D116) — once, on their gesture, never a confidential meeting (D110,
-[PDR-0007](../../docs/pdr/0007-a-summary-leaves-for-a-channel-on-a-gesture-never-a-confidential-one.md)).
+webhook, or a Notion database (D116) — once, on their gesture; a confidential meeting only when the shell
+says the person confirmed it, for that send (D110, D118,
+[PDR-0007](../../docs/pdr/0007-a-summary-leaves-for-a-channel-on-a-gesture-never-a-confidential-one.md), point 4
+amended 2026-11-24).
 Who owns it and how critical it is: its [MANIFEST.yaml](./MANIFEST.yaml).
 
 ```mermaid
