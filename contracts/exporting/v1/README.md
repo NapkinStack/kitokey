@@ -79,8 +79,9 @@ written as a space. No time, no time zone, no alarm, no `METHOD`: a file a calen
 An `ics` with no `dates`, with an `id` twice, or with a day no calendar has, is an input that is not this
 page's: the sentence alone, no code (*Failing*).
 
-**The fonts of a PDF** are the system's, static faces first; a variable face only where no static
-one has the letters, at its default weight, and logged. None ships with the program.
+**The fonts of a PDF** are the system's static faces. A letter that only a variable face of the system has
+is a letter the program does not have: `pdf.no_font`, nothing written — never a variable face's default
+instance, which can be its lightest weight (the decider, 2026-11-25). None ships with the program.
 
 ## What it carries
 
@@ -106,7 +107,7 @@ closed.
 | `meeting.unreadable` | The session's folder, or a file in it, could not be read | Check the folder, then try again |
 | `meeting.empty` | Nothing to write: neither summary nor transcript, as asked or as there — never for `ics`, whose dates are the file | Include the summary or the transcript, or make them first |
 | `file.unwritable` | The file could not be written where asked: no room, no right, the folder gone | Choose another place, or free space |
-| `pdf.no_font` | No font of the system has the meeting's letters | Install the fonts of its script |
+| `pdf.no_font` | No static font of the system has the meeting's letters — a variable font's are not used | Install static fonts of its script; on Fedora, for Chinese, Japanese and Korean: `sudo dnf install google-noto-sans-cjk-fonts` |
 | `pdf.failed` | The PDF could not be laid out | Export in another format; the logs hold the detail |
 
 A consumer reads a code this page does not list as no code: a later code is added here, never a
