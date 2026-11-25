@@ -30,8 +30,13 @@ order of the events, and what each means, are said here and nowhere else.
 ## How it is started
 
 - **Minutes**: `kitokey-summary <session-folder> --provider <address> --model <name>`, the
-  options in any order. It reads the folder's `transcript.jsonl` (`transcript/v1`) and its
-  `context.txt`, when there is one, and writes the folder's `minutes.md` (`minutes/v4`).
+  options in any order. It reads the folder's `transcript.jsonl` (`transcript/v1`), its
+  `context.txt` and its `speakers.json` (`session-audio/v3`), when there are, and writes the folder's
+  `minutes.md` (`minutes/v4`).
+- **Speakers named** (#1205): a segment is said by its speaker's name as `speakers.json` gives it — its voice's,
+  else its speaker's —, so the minutes say who does what by name; a speaker without one by the program's own word
+  for it. A meeting without `speakers.json` is read as before. `minutes/v4` and `v5` are unchanged: who does an
+  action is already their free text.
 - **Minutes in a structure** (D111): the same, with `--structure <name>`, one of the six structures
   `minutes/v5` names — `general`, `one_to_one`, `stand_up`, `client_call`, `interview`,
   `project_review`. It then writes `minutes/v5` in that structure. A name it does not know is a
