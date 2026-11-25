@@ -1776,6 +1776,13 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         .into_iter()
         .find(|listed| listed.folder == folder)
         .ok_or_else(gone)?;
+    // The last minutes a redo replaced (D113), named by id as the page names v5's sections.
+    let said = words::window(shell.language());
+    let kept_minutes = minutes::previous(
+        &folder,
+        said.minutes_sections,
+        &minutes::named_by_id(said.minutes_sections, said.structure_sections),
+    );
     Ok(Opened {
         session,
         transcript: meeting::transcript(&folder),
@@ -1790,10 +1797,7 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         apple: shell.settings().engine == Engine::SpeechAnalyzer,
         system_language: shell.system.code(),
         models_gone: gone_of(&shell.settings(), &folder),
-        previous_minutes: match {
-            let words = words::window(shell.language());
-            minutes::previous(&folder, words.minutes_sections, &minutes::named_by_id(words.minutes_sections, words.structure_sections))
-        } {
+        previous_minutes: match kept_minutes {
             Read::Present(kept) => Some(Previous {
                 made: kept.made,
                 provider: kept.provider,
