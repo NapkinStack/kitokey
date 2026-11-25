@@ -176,3 +176,29 @@ fn what_is_included_is_the_callers_choice() {
         "{text}"
     );
 }
+
+/// A tab or another control character no font draws — `transcript/v1` allows them in a line — never stops the PDF:
+/// PDF/UA-1 refuses a character without its glyph, so a tab is written as a space and the others are left out,
+/// in the title, the minutes and the transcript alike (sam's survivor on #1212).
+#[test]
+fn a_tab_or_a_control_character_is_written_as_a_space_or_left_out_never_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("session.json"), SESSION).unwrap();
+    fs::write(
+        dir.path().join("minutes.md"),
+        "---\ncontract: minutes/v4\nmade: 2026-11-20T10:05:00+01:00\nprovider: \"local\"\nmodel: \"qwen3:8b\"\ncontext: null\ntitle: \"Prix\\tet\\u0007 essai\"\n---\n\n## Points\n\nLe\tprix\u{1b} fixé.\n\n```\nun\tdeux\n```\n",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("transcript.jsonl"),
+        "{\"type\":\"segment\",\"speaker\":\"me\",\"track\":\"local\",\"voice\":null,\"start\":1.0,\"end\":2.0,\"text\":\"Bon\\tjour\\u0007 à\\u001b[31m tous.\"}\n",
+    )
+    .unwrap();
+    let meeting = Meeting::read(dir.path()).unwrap();
+    let bytes = pdf(&meeting, Include::all(), &labels(), "fr", "Réunion\tdu\u{7} 20", &fonts())
+        .expect("a PDF, whatever control characters the meeting holds");
+    let text = read(&bytes);
+    for said in ["Réunion du 20", "Le prix fixé.", "un deux", "Bon jour à[31m tous."] {
+        assert!(text.contains(said), "« {said} » not in: {text}");
+    }
+}
