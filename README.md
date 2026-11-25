@@ -28,7 +28,7 @@ that you are recording**: Kitokey shows them nothing.
 
 ## Install it
 
-On Fedora and on Ubuntu 24.04, from a package built from this repository — none is published yet. Needs `git`,
+On Fedora and on Ubuntu 24.04, from a package built from this repository — none are published yet. Needs `git`,
 [`uv`](https://docs.astral.sh/uv/) and `podman`:
 
 ```bash
