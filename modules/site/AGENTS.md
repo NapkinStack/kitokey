@@ -20,9 +20,10 @@ Astro's telemetry is off in every script.
 
 ## Internal conventions nobody could guess
 
-- **One path out of the module**: `site.config.mjs`, `privacySource` (`docs/privacy.md`). No other file
+- **One file reaches out of the module**: `site.config.mjs` — `privacySource` (`docs/privacy.md`), and for the
+  landing's test alone, `installSource` (the repository's `README.md`, no module's). No other file
   reaches out of `modules/site/` (`tests/space.test.mjs`).
-- **Every sentence lives in `src/lib/words.mjs`**, in English and French, with `keeps`: what keeps its
+- **Every sentence lives in `src/lib/words.mjs`** — the landing's in `src/lib/landing.mjs` —, in English and French, with `keeps`: what keeps its
   promise, a merged deliverable or a test, as `docs/store/listing.md` does. The voice:
   `modules/shell/docs/voice.md`.
 - **The look is proposal D's** (the decider, 2026-11-25): light only, the titles in Bricolage Grotesque served from
@@ -49,5 +50,5 @@ Out of the repository, whole (D114, criterion 1):
 ```sh
 git subtree split --prefix=modules/site -b site-alone
 git worktree add ../site-alone site-alone && cd ../site-alone
-npm ci && PRIVACY_SOURCE=/path/to/privacy.md npm test
+npm ci && PRIVACY_SOURCE=/path/to/privacy.md INSTALL_SOURCE=/path/to/README.md npm test
 ```
