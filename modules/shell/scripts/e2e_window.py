@@ -5527,7 +5527,8 @@ def waveform_drawn(now: dt.datetime) -> None:
         check("no track that reads: who spoke stays drawn from the transcript, no waveform (#1201)", turns[0] == 2 and turns[1] == 0, turns)
         check("and nothing kept for it", not (unread / "derived").exists(), sorted(p.name for p in unread.iterdir()))
         page(v3)
-        came = wait_for(browser, lambda b: b.execute_script(drawn), 15)
+        # Its columns drawn at its first frame, once its width is known: waited for, not only its box.
+        came = wait_for(browser, lambda b: (b.execute_script(drawn) or {}).get("count", 0) > 0, 15)
         got = browser.execute_script(drawn) or {}
         check("its tracks read: the waveform takes the turns' place, its bars grouped to its width (#1201)",
               came and got.get("turns") == 0 and got["count"] == min(600, int((got["width"] + 2) // 6)) and got["count"] > 50, {k: got.get(k) for k in ("turns", "count", "width")})
