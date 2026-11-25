@@ -272,7 +272,7 @@ select:hover, select:focus { border-color: var(--edge); }
 .sending h3 { margin: 0; font-size: 15px; }
 .sending > .disclose-advanced { align-self: flex-start; }
 .fields > .field.whole { flex-basis: 100%; }
-.tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); }
+.tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); white-space: nowrap; flex: none; }
 .path { flex: 1 1 240px; min-width: 0; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; cursor: text; }
 .path:hover { border-color: var(--edge); color: var(--ink); }
 
