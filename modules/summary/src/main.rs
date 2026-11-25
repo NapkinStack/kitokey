@@ -24,7 +24,8 @@ use std::{
 };
 
 use kitokey_summary::{
-    Made, Refused, Structure, TEST, log, minutes_in, provider::Provider, read_transcript, reported, request_in, structure, write_minutes,
+    Made, Refused, Structure, TEST, log, minutes_in, provider::Provider, read_transcript, reported, request_named, speakers, structure,
+    write_minutes,
 };
 use serde_json::json;
 use tracing::{error, info, warn};
@@ -162,7 +163,9 @@ fn summarise(folder: &Path, address: &str, model: &str, structure: Option<&Struc
             ));
         }
     };
-    let asked = request_in(&segments, context.as_deref(), structure);
+    // The names the user gave its two sides (#1205): none, the request sent before.
+    let names = speakers(folder);
+    let asked = request_named(&segments, context.as_deref(), structure, &names);
     info!(segments = segments.len(), context = context.is_some(), "summary.read");
 
     let key = key()?;

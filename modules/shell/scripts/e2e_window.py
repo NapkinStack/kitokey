@@ -5317,6 +5317,115 @@ def settings_folded(now: dt.datetime) -> None:
 
 
 
+def speakers_named(now: dt.datetime) -> None:
+    """CQ. #1205, session-audio/v3's speakers.json: the two sides of a complete transcript named from its card —
+    « Nommer les intervenants… », two labelled fields, Enter saves —, every line and the copy following at once, kept
+    with the meeting and read again; a field left empty gives the side back « Vous » or « Les autres »; Escape closes
+    it as it was; a folder that cannot be written says so under the fields, what was typed kept. No naming offered
+    before v3, nor while the transcript is not complete. No name is logged."""
+    print("CQ. the speakers of a transcript named on its card, kept with the meeting, the lines following (#1205)")
+    meetings = WORK / "speakers"
+    named_one, older, unfinished = (meetings / name for name in ("2026-11-21_09-00", "2026-11-21_10-00", "2026-11-21_11-00"))
+    for folder, form in ((named_one, "v3"), (older, "v2"), (unfinished, "v3")):
+        session(folder, now - dt.timedelta(days=2), 30, {"local.wav": 1000}, form=form)
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.0,"end":1.0,"text":"On commence par la 2.4."}\n'
+            '{"type":"segment","speaker":"others","track":"remote","voice":null,"start":1.5,"end":3.0,"text":"Les tests passent."}\n'
+            + ('' if folder == unfinished else '{"type":"complete","duration":3.0}\n'))
+    whos = "return [...document.querySelectorAll('#meeting .transcript .lines .who')].map(w => w.textContent)"
+    offered = "return !!document.getElementById('speakers-open')"
+    window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\n')
+    with window as browser:
+        def page(folder):
+            browser.execute_script("location.hash = '#/'")
+            wait_for(browser, lambda b: not b.find_elements(By.ID, "meeting"), 5)
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{folder.name}")
+            return wait_for(browser, lambda b: b.execute_script(
+                "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
+                " && p.querySelectorAll('.transcript .lines li').length > 0", folder.name), 10)
+
+        page(older)
+        check("a meeting before session-audio/v3 offers no naming: its version names no speakers.json",
+              not browser.execute_script(offered), browser.execute_script(offered))
+        page(unfinished)
+        check("a transcript not yet complete offers no naming", not browser.execute_script(offered), browser.execute_script(offered))
+        page(named_one)
+        check("a complete transcript of a v3 meeting: « Nommer les intervenants… » on its card, the sides as the page says them",
+              browser.execute_script(offered) and browser.execute_script(whos) == ["Vous", "Les autres"]
+              and browser.find_element(By.ID, "speakers-open").get_attribute("aria-label") == "Nommer les intervenants…",
+              [browser.execute_script(offered), browser.execute_script(whos)])
+        # By keyboard alone: the button pressed by Enter, the first field focused, its label read with it.
+        browser.execute_script("document.getElementById('speakers-open').focus()")
+        ActionChains(browser).send_keys(Keys.ENTER).perform()
+        opened = wait_for(browser, lambda b: b.find_elements(By.ID, "speakers-panel"), 5)
+        focused = browser.execute_script("return document.activeElement.id")
+        labels = browser.execute_script("return ['speaker-me', 'speaker-others'].map(id => document.getElementById(id).closest('label').textContent)")
+        check("the panel opens with the focus on « Vous »'s field, each field labelled by its side",
+              opened and focused == "speaker-me" and labels == ["Vous — votre micro", "Les autres — le son de l’appel"]
+              and browser.find_element(By.ID, "speakers-open").get_attribute("aria-expanded") == "true", [focused, labels])
+        ActionChains(browser).send_keys("Sarah").perform()
+        # Back to the window while typing (window.js's focus draws the page anew): the panel and what is typed stay.
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        time.sleep(1.5)
+        typed = browser.execute_script("return document.getElementById('speaker-me')?.value ?? null")
+        check("back to the window while naming: the panel stays, what was typed kept", typed == "Sarah", typed)
+        browser.find_element(By.ID, "speaker-me").click()
+        ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+        closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "speakers-panel"), 5)
+        check("Escape closes it as it was: nothing kept, the focus back on the button",
+              closed and not (named_one / "speakers.json").exists() and browser.execute_script(whos) == ["Vous", "Les autres"]
+              and browser.execute_script("return document.activeElement.id") == "speakers-open",
+              [closed, (named_one / "speakers.json").exists(), browser.execute_script("return document.activeElement.id")])
+        press(browser, "speakers-open")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "speaker-me"), 5)
+        browser.find_element(By.ID, "speaker-me").send_keys("  Sarah ")
+        browser.find_element(By.ID, "speaker-others").send_keys("L’équipe produit")
+        browser.find_element(By.ID, "speaker-others").send_keys(Keys.ENTER)
+        kept = wait_for(browser, lambda b: not b.find_elements(By.ID, "speakers-panel"), 5)
+        written = json.loads((named_one / "speakers.json").read_text()) if (named_one / "speakers.json").exists() else None
+        check("Enter saves: speakers.json holds both names, trimmed, as session-audio/v3 says",
+              kept and written == {"me": "Sarah", "others": "L’équipe produit"}, written)
+        check("every line names its side at once", browser.execute_script(whos) == ["Sarah", "L’équipe produit"], browser.execute_script(whos))
+        browser.execute_script("window.copied_for_test = null; Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: async (t) => { window.copied_for_test = t; }}})")
+        press(browser, "copy-transcript")
+        wait_for(browser, lambda b: b.execute_script("return window.copied_for_test"), 5)
+        copied = browser.execute_script("return window.copied_for_test") or ""
+        check("the transcript copied names them too", "Sarah" in copied and "L’équipe produit" in copied and "Vous" not in copied, copied)
+        page(older)
+        page(named_one)
+        check("read again with the meeting: the names stay", browser.execute_script(whos) == ["Sarah", "L’équipe produit"], browser.execute_script(whos))
+        press(browser, "speakers-open")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "speaker-me"), 5)
+        values = browser.execute_script("return [document.getElementById('speaker-me').value, document.getElementById('speaker-others').value]")
+        check("the fields open with the names kept", values == ["Sarah", "L’équipe produit"], values)
+        browser.find_element(By.ID, "speaker-others").clear()
+        press(browser, "speakers-save")
+        wait_for(browser, lambda b: not b.find_elements(By.ID, "speakers-panel"), 5)
+        written = json.loads((named_one / "speakers.json").read_text()) if (named_one / "speakers.json").exists() else None
+        check("a field left empty gives its side back « Les autres »; the other name kept",
+              written == {"me": "Sarah"} and browser.execute_script(whos) == ["Sarah", "Les autres"], [written, browser.execute_script(whos)])
+        # The folder unwritable: said under the fields, what was typed kept, the lines as they were.
+        named_one.chmod(0o555)
+        try:
+            press(browser, "speakers-open")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "speaker-others"), 5)
+            browser.find_element(By.ID, "speaker-others").send_keys("Camille")
+            press(browser, "speakers-save")
+            said_now = "return document.getElementById('speakers-said')?.hidden === false ? document.getElementById('speakers-said').textContent : ''"
+            wait_for(browser, lambda b: b.execute_script(said_now), 5)
+            check("not kept: one sentence says so under the fields, what was typed kept, the lines unchanged",
+                  browser.execute_script(said_now) == "Kitokey n’a pas pu enregistrer ces noms. Réessayez."
+                  and browser.find_element(By.ID, "speaker-others").get_attribute("value") == "Camille"
+                  and browser.execute_script(whos) == ["Sarah", "Les autres"],
+                  [browser.execute_script(said_now), browser.execute_script(whos)])
+        finally:
+            named_one.chmod(0o755)
+    logs = WORK / "state" / "kitokey" / "logs"
+    lines = [line for log in sorted(logs.glob("*.jsonl")) for line in log.read_text().splitlines() if "speakers_named" in line]
+    check("the naming is logged, never a name", lines and not any(name in line for line in lines for name in ("Sarah", "équipe", "Camille")), lines)
+
+
 def summary_sent(now: dt.datetime) -> None:
     """CL. D110, PDR-0007 §2–§6, posting/v1: a meeting's summary sent to a destination set up in Settings, on the
     user's gesture each time. No « Envoyer… » without a destination, on a confidential meeting, or without a
@@ -8860,6 +8969,16 @@ def renaming(now: dt.datetime) -> None:
               bool(drawn_again) and drawn_again["time"] != "00:00:00" and len(drawn_again["meters"]) == 2 and all(m > 0 for m in drawn_again["meters"])
               and all(b > 1 for b in drawn_again["bars"]),
               drawn_again)
+        # #1204: said confidential while it records, its header says it — the lock and its word first, beside « Enregistrement »;
+        # no longer, gone.
+        chips = "return [...document.querySelectorAll('#meeting .meeting-title .holds .chip')].map(c => [c.classList.contains('locked'), !!c.querySelector('svg.lock'), c.textContent.trim()])"
+        browser.find_element(By.ID, "confidential-switch").click()
+        said = wait_for(browser, lambda b: (b.execute_script(chips) or [[False]])[0][0], 5)
+        check("while it records, said confidential: its header shows the lock and « Confidentielle » first, beside « Enregistrement » (#1204)",
+              said and browser.execute_script(chips)[:2] == [[True, True, "Confidentielle"], [False, False, "Enregistrement"]], browser.execute_script(chips))
+        browser.find_element(By.ID, "confidential-switch").click()
+        gone = wait_for(browser, lambda b: b.execute_script(chips)[0] == [False, False, "Enregistrement"] and not any(c[0] for c in b.execute_script(chips)), 5)
+        check("no longer confidential: the header's lock gone (#1204)", gone and not (recording / "confidential").exists(), browser.execute_script(chips))
         # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
         # left at the legend's right, where the range stands at rest.
         big = ("const t = document.getElementById('page-time'), d = document.querySelector('#meeting .drawing'), h = document.querySelector('#meeting h1'),"
@@ -8984,6 +9103,48 @@ def renaming(now: dt.datetime) -> None:
         drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and at_rest(b), 5)
         check("stopped from elsewhere, the window's button not pressed: the page draws its rest back by itself (#1076, #1134)", drawn_back,
               [again, live_again, browser.execute_script(alive), browser.execute_script(resting)])
+
+
+def confidential_locked(now: dt.datetime) -> None:
+    """CP. #1204: while a confidential meeting records, the bar shows a lock, named, at 3:1 at least; never at rest."""
+    print("CP. a confidential meeting recording: a lock in the bar's row, named for a screen reader, 3:1 at least, in both themes; "
+          "gone when it is no longer confidential, and at rest (#1204)")
+    lock = ("const l = document.getElementById('small-locked'); if (!l) return null; const r = l.getBoundingClientRect();"
+            " const ground = (e) => { while (e) { const c = getComputedStyle(e).backgroundColor; if (c && !c.endsWith(', 0)') && c !== 'transparent') return c; e = e.parentElement; } return 'rgb(255, 255, 255)'; };"
+            " return {shown: l.getClientRects().length > 0, role: l.getAttribute('role'), label: l.getAttribute('aria-label'), title: l.title,"
+            " drawn: !!l.querySelector('svg'), colour: getComputedStyle(l).color, ground: ground(l),"
+            " inside: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5, size: [Math.round(r.width), Math.round(r.height)],"
+            " row: l.closest('.bar-row') !== null}")
+    rgb = lambda text: [float(n) for n in re.findall(r"[\d.]+", text)[:3]]
+    for language, named in (("fr_FR.UTF-8", "Réunion confidentielle"), ("en_US.UTF-8", "Confidential meeting")):
+        short = language[:2]
+        for theme in ("light", "dark"):
+            taping = WORK / f"locked-{short}-{theme}"
+            taping.mkdir()
+            window = Window(taping, language, 'after = "nothing"\nreminder = false\n', small=True)
+            if theme == "dark":
+                window.env.update(GTK_THEME="Adwaita:dark")
+            with window as browser:
+                check(f"{short}, {theme}: at rest, no lock", not (browser.execute_script(lock) or {}).get("shown"), browser.execute_script(lock))
+                browser.find_element(By.ID, "small-record").click()
+                wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
+                time.sleep(0.5)
+                check(f"{short}, {theme}: recording, not confidential: no lock", not browser.execute_script(lock)["shown"], browser.execute_script(lock))
+                browser.execute_script("document.getElementById('small-confidential').click()")
+                shown = wait_for(browser, lambda b: b.execute_script(lock)["shown"], 3)
+                got = browser.execute_script(lock)
+                ratio = contrast(rgb(got["colour"]), rgb(got["ground"]))
+                check(f"{short}, {theme}: said confidential, a lock in the row, named « {named} » for a screen reader and in its tooltip, inside the bar",
+                      shown and got["role"] == "img" and got["label"] == named and got["title"] == named and got["drawn"] and got["inside"] and got["row"], got)
+                check(f"{short}, {theme}: the lock at 3:1 at least on the bar ({ratio:.2f})", ratio >= 3.0, got)
+                shot_themed(browser, f"cp-locked-{short}-{theme}", theme)
+                browser.execute_script("document.getElementById('small-confidential').click()")
+                check(f"{short}, {theme}: no longer confidential: the lock gone", wait_for(browser, lambda b: not b.execute_script(lock)["shown"], 3), browser.execute_script(lock))
+                browser.execute_script("document.getElementById('small-confidential').click()")
+                wait_for(browser, lambda b: b.execute_script(lock)["shown"], 3)
+                stop_from_small(browser)
+                rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+                check(f"{short}, {theme}: stopped, at rest: no lock", rest and not browser.execute_script(lock)["shown"], browser.execute_script(lock))
 
 
 def dates_mentioned(now: dt.datetime) -> None:
@@ -15195,6 +15356,7 @@ def main() -> int:
     store_shots(now)
     actions_rows(now)
     dates_mentioned(now)
+    confidential_locked(now)
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
@@ -15208,6 +15370,7 @@ def main() -> int:
     settings_folded(now)
     destinations_kept(now)
     summary_sent(now)
+    speakers_named(now)
     waveform_drawn(now)
     settings_version(now)
     settings_narrow_without_model(now)

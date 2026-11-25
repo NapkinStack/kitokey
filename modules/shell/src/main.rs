@@ -43,7 +43,9 @@ use kitokey_shell::{
     registry, sending,
     sessions::{self, Listed},
     settings::{self, After, Appearance, Engine, KeepAudio, Log, Settings},
-    sound_check, speech,
+    sound_check,
+    speakers::{self, Speakers},
+    speech,
     speeds::{self, Speeds, Step},
     spoken,
     summarising::{self, Summarising},
@@ -413,6 +415,7 @@ fn main() {
             next_context,
             next_context_kept,
             language_set,
+            speakers_named,
             bar_language,
             next_language_kept,
             meeting_models_shown,
@@ -1754,6 +1757,25 @@ struct Opened {
     system_language: &'static str,
     /// The steps whose own model is gone (D91): Settings' choice makes them, said on the page.
     models_gone: Vec<meeting_models::Step>,
+    /// The names the user gave its two sides (#1205); none where the meeting cannot hold them — before
+    /// session-audio/v3 —: the page then offers no naming.
+    speakers: Option<SpeakersShown>,
+}
+
+/// The two sides' names as the page shows them (#1205): the user's own words, none where a side keeps the page's.
+#[derive(serde::Serialize)]
+struct SpeakersShown {
+    me: Option<String>,
+    others: Option<String>,
+}
+
+impl From<Speakers> for SpeakersShown {
+    fn from(kept: Speakers) -> Self {
+        SpeakersShown {
+            me: kept.me,
+            others: kept.others,
+        }
+    }
 }
 
 #[tauri::command]
@@ -1779,7 +1801,25 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
         apple: shell.settings().engine == Engine::SpeechAnalyzer,
         system_language: shell.system.code(),
         models_gone: gone_of(&shell.settings(), &folder),
+        speakers: speakers::offered(&folder).then(|| SpeakersShown::from(speakers::read(&folder))),
     })
+}
+
+/// The names the user gives a meeting's two sides (#1205), kept in its `speakers.json`: each trimmed, a blank one
+/// giving the side back its word; the names as kept are returned for the page to show. No name is logged.
+#[tauri::command]
+fn speakers_named(shell: State<'_, Shell>, name: String, me: Option<String>, others: Option<String>) -> Result<SpeakersShown, Told> {
+    let folder = session_folder(&shell, &name)?;
+    let kept = speakers::write(&folder, &Speakers { me, others }).map_err(|error| {
+        // A name the page's fields never let through, or a meeting before v3 the page offers no naming for; else the folder.
+        let failure = match error.kind() {
+            std::io::ErrorKind::InvalidInput | std::io::ErrorKind::Unsupported => Failure::Unexpected,
+            _ => Failure::MeetingFile,
+        };
+        shell.told(failure, error)
+    })?;
+    tracing::info!(me = kept.me.is_some(), others = kept.others.is_some(), "shell.speakers_named");
+    Ok(SpeakersShown::from(kept))
 }
 
 /// The steps whose own model a meeting chose and cannot have now (D91).
@@ -2549,12 +2589,15 @@ fn dates_ics(shell: State<'_, Shell>, name: String, to: PathBuf, dates: Vec<expo
     let language = shell.language();
     let said = words::exported(language);
     let meeting = meeting_said(&folder, language);
+    // Each side by the name the user gave it (#1205), else the page's word.
+    let kept = speakers::read(&folder);
+    let (me, others) = kept.sides(said.me, said.others);
     let input = exporting::Input {
         to: &to,
         name: &meeting,
         transcript: said.transcript,
-        me: said.me,
-        others: said.others,
+        me,
+        others,
         time: said.time,
         speaker: said.speaker,
         text: said.text,
@@ -4418,12 +4461,15 @@ fn export_written(shell: &Shell, folder: &Path) {
     let said = words::exported(language);
     let name = meeting_said(folder, language);
     let to = chosen.join(format!("{}.md", named(folder)));
+    // Each side by the name the user gave it (#1205), else the page's word.
+    let kept = speakers::read(folder);
+    let (me, others) = kept.sides(said.me, said.others);
     let input = exporting::Input {
         to: &to,
         name: &name,
         transcript: said.transcript,
-        me: said.me,
-        others: said.others,
+        me,
+        others,
         time: said.time,
         speaker: said.speaker,
         text: said.text,

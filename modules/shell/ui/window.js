@@ -130,6 +130,8 @@ const ICONS = {
   bluetooth: ["m7 7 10 10-5 5V2l5 5L7 17"],
   info: [["circle", { cx: 12, cy: 12, r: 10 }], "M12 16v-4", "M12 8h.01"],
   "circle-check": [["circle", { cx: 12, cy: 12, r: 10 }], "m9 12 2 2 4-4"],
+  // Lucide's user-pen (ISC): the speakers named (#1205).
+  "user-pen": ["M11.5 15H7a4 4 0 0 0-4 4v2", "M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z", ["circle", { cx: 10, cy: 7, r: 4 }]],
   pencil: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
 };
 function icon(name) {
@@ -1310,6 +1312,11 @@ function pageLevels(name, time, words) {
   const paint = (now) => {
     time.textContent = elapsed(now.seconds);
     for (const [index, track] of tracks.entries()) paintLevel(track, now.levels[index]);
+    // Said confidential or no longer, by the page's switch or the bar's (#1204): its header's lock as the folder says.
+    const holds = row.closest("#meeting")?.querySelector(".meeting-title .holds");
+    const locked = holds?.querySelector(".chip.locked");
+    if (now.confidential && holds && !locked) holds.prepend(lockedChip(words));
+    if (!now.confidential) locked?.remove();
   };
   // Drawn again, its traces go on from the ones it replaces, never from empty (#1133).
   if (pageLast?.meeting === name) {
@@ -2464,13 +2471,93 @@ function tookAndCost(read, words) {
   return said;
 }
 
-// Who said a line, as the page names them: the track, and the voice within it when one was told.
-function whoSaid(segment, words) {
-  const side = segment.track === "local" ? words.here : words.remote;
+// Who said a line, as the page names them: the track — by the name the user gave its side (#1205), else the
+// page's word —, and the voice within it when one was told.
+function whoSaid(segment, words, names) {
+  const side = segment.track === "local" ? names?.me ?? words.here : names?.others ?? words.remote;
   return segment.voice === null ? side : `${side} · ${fill(words.voice, segment.voice)}`;
 }
 
-function transcriptCard(read, words, session, onPage) {
+// The button that opens the speakers' names, and its panel under the card's top (#1205): Enter saves, Escape or
+// « Annuler » closes it as it was; a name refused or not kept is said under the fields, what was typed kept.
+function speakersButton(card, names, read, words, session) {
+  const open = iconButton("user-pen", words.speakers_open, "speakers-open");
+  open.setAttribute("aria-expanded", "false");
+  open.setAttribute("aria-controls", "speakers-panel");
+  const close = () => {
+    document.getElementById("speakers-panel")?.remove();
+    open.setAttribute("aria-expanded", "false");
+    open.focus();
+  };
+  open.addEventListener("click", () => {
+    if (document.getElementById("speakers-panel")) return close();
+    const panel = element("form", "fields speakers-panel");
+    panel.id = "speakers-panel";
+    panel.setAttribute("aria-label", words.speakers_open);
+    // Settings' own fields (guidedField): labelled by their side, the page's word as the placeholder.
+    const field = (id, label, value, placeholder) => {
+      const [row, input] = guidedField(id, label, "text", value, false);
+      input.maxLength = 60;
+      input.placeholder = placeholder;
+      input.autocomplete = "off";
+      return [row, input];
+    };
+    const [meRow, me] = field("speaker-me", words.here_described, names.me, words.here);
+    const [othersRow, others] = field("speaker-others", words.remote_described, names.others, words.remote);
+    const hint = element("p", "note", words.speakers_hint);
+    hint.id = "speakers-hint";
+    me.setAttribute("aria-describedby", "speakers-hint");
+    others.setAttribute("aria-describedby", "speakers-hint");
+    const said = element("p", "note warn", "");
+    said.id = "speakers-said";
+    said.setAttribute("role", "alert");
+    said.hidden = true;
+    const save = element("button", "primary", words.speakers_save);
+    save.type = "submit";
+    save.id = "speakers-save";
+    const cancel = element("button", "", words.speakers_cancel);
+    cancel.type = "button";
+    cancel.id = "speakers-cancel";
+    cancel.addEventListener("click", close);
+    const choices = element("div", "speakers-choices");
+    choices.append(save, cancel);
+    panel.append(meRow, othersRow, hint, said, choices);
+    panel.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      close();
+    });
+    panel.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      save.disabled = true;
+      try {
+        const kept = await window.__TAURI__.core.invoke("speakers_named", { name: nameOf(session), me: me.value, others: others.value });
+        names.me = kept.me;
+        names.others = kept.others;
+        // Every line, and what a copy takes, names them now.
+        const lines = card.querySelectorAll(".lines li");
+        read.segments.forEach((segment, index) => {
+          const who = lines[index]?.querySelector(".who");
+          if (who) who.textContent = whoSaid(segment, words, names);
+        });
+        close();
+      } catch {
+        said.textContent = words.speakers_not_saved;
+        said.hidden = false;
+      } finally {
+        save.disabled = false;
+      }
+    });
+    card.querySelector(".top").after(panel);
+    open.setAttribute("aria-expanded", "true");
+    me.focus();
+  });
+  return open;
+}
+
+function transcriptCard(read, words, session, onPage, speakers) {
+  // The sides' names as kept (#1205): none where the meeting cannot hold them; renamed in place below.
+  const names = speakers ? { ...speakers } : null;
   const card = element("aside", "card transcript");
   card.setAttribute("aria-label", words.transcript_title);
   const top = element("div", "top");
@@ -2520,7 +2607,7 @@ function transcriptCard(read, words, session, onPage) {
   let said = 0;
   copy.addEventListener("click", async () => {
     const mine = ++said;
-    const lines = read.segments.map((segment) => fill(words.transcript_copied_line, clock(segment.start), whoSaid(segment, words), segment.text));
+    const lines = read.segments.map((segment) => fill(words.transcript_copied_line, clock(segment.start), whoSaid(segment, words, names), segment.text));
     try {
       await navigator.clipboard.writeText(`${lines.join("\n")}\n`);
       copied.textContent = words.minutes_copied;
@@ -2530,6 +2617,9 @@ function transcriptCard(read, words, session, onPage) {
     }
   });
   top.append(finding, copied, copy, redo);
+  // Nommer les intervenants… (#1205), once complete: the two sides' names in two labelled fields, as Otter and
+  // Zoom rename a speaker from the transcript; kept with the meeting, every line following at once.
+  if (names && read.complete) top.append(speakersButton(card, names, read, words, session));
   const heard = element("div", "made");
   // A service names its host as who heard (D43): said as the minutes' maker is, never « on this
   // computer » — a host of one word (`http://transcriber/v1`) is a service too. This computer's
@@ -2600,7 +2690,7 @@ function transcriptCard(read, words, session, onPage) {
         if (!event.repeat) from();
       });
     }
-    const who = whoSaid(segment, words);
+    const who = whoSaid(segment, words, names);
     const said = element("div", "said");
     const text = element("span", "text", segment.text);
     said.append(element("span", `who ${segment.track}`, who), text);
@@ -2953,7 +3043,7 @@ function trashedFocused() {
   }
 }
 
-function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone }, words) {
+function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, speakers }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
   const open = iconButton("folder-open", words.open_folder, "open-folder");
@@ -3005,7 +3095,11 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const lasts = element("span", "lasts");
   if (session.seconds !== null) lasts.append(element("span", "length", length(session.seconds)));
   if (session.audio > 0) lasts.append(element("span", "weighs", fill(words.audio_weighs, size(session.audio, words))));
-  title.append(named, lasts, holdings(session, words, true));
+  const held = holdings(session, words, true);
+  // While it records, said confidential (#1204, D60): the lock and its word first, beside « Enregistrement », as the
+  // bar shows it; at rest, the page's own switch says it.
+  if (session.confidential && session.state === "recording") held.prepend(lockedChip(words));
+  title.append(named, lasts, held);
   head.append(title, top);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
@@ -3056,7 +3150,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
-  columns.append(minutesCard(minutes, words, session, transcript, onPage), transcriptCard(transcript, words, session, onPage));
+  columns.append(minutesCard(minutes, words, session, transcript, onPage), transcriptCard(transcript, words, session, onPage, speakers));
   // Shown again when the window comes forward: a search in progress in this meeting is kept.
   const searching = page.dataset.name === nameOf(session) ? (document.getElementById("search")?.value ?? "") : "";
   // A name being typed is kept the same way, with its refusal and where the caret was (D70).
@@ -5234,6 +5328,16 @@ function showSmall(words) {
   );
   meters.hidden = true;
   time.after(meters);
+  // Said confidential (#1204, D60): a lock in the row while it records, named for a screen reader and in its tooltip,
+  // as a row's mark in the list — the bar has no room for its word, the switch under « Plus d’options » says it whole.
+  const locked = element("span", "bar-locked");
+  locked.id = "small-locked";
+  locked.setAttribute("role", "img");
+  locked.setAttribute("aria-label", words.confidential_name);
+  locked.title = words.confidential_name;
+  locked.append(lock());
+  locked.hidden = true;
+  meters.after(locked);
   const note = element("p", "says", words.small_note);
   note.id = "small-note";
   note.hidden = true;
@@ -5444,6 +5548,8 @@ function showSmall(words) {
       field.painted();
       rest.hidden = recording;
       live.hidden = !recording;
+      // At rest, no lock: the next recording says its own.
+      if (!recording) locked.hidden = true;
       // A recording starts its traces from empty, never from the last one's last two seconds.
       if (recording) for (const id of ["level-me", "level-others"]) drawLevel(document.getElementById(id), levelShown(undefined, 0, 0, false, TRACE), 0);
       // The microphone in each state's options: recording, after the context, as board 6 has it.
@@ -5527,6 +5633,8 @@ function showSmall(words) {
       secret.row.classList.toggle("on", now.confidential);
     }
     if (Date.now() - mark.refused >= 5000) marked();
+    // The lock as the switch stands: the folder's word, or a turn not yet kept.
+    locked.hidden = !(recording && secret.box.checked);
     // Said confidential, or no longer: « Avancé » offers otherwise — no service then (D60) —, drawn
     // again as it was, open or closed.
     if (now.meeting !== null && now.confidential !== shownConfidential) {
@@ -6314,7 +6422,9 @@ window.addEventListener("focus", () => {
   // The assistant too: its answers are not drawn over.
   const choosing = !document.getElementById("welcome").hidden
     || document.querySelector("#settings:not([hidden]) #minutes-unsaved:not([hidden])")
-    || [...document.querySelectorAll("#settings:not([hidden]) .fields input")].some((input) => input.value !== input.defaultValue);
+    || [...document.querySelectorAll("#settings:not([hidden]) .fields input")].some((input) => input.value !== input.defaultValue)
+    // The speakers being named (#1205): what is typed stays.
+    || document.getElementById("speakers-panel");
   // Back from a list's menu, not from elsewhere: nothing drawn anew (#944).
   const menu = inMenu;
   inMenu = false;

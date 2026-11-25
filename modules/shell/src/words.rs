@@ -679,6 +679,22 @@ pub struct Window {
     /// Shows: a meeting's page, as a label. When: legend of the speaking-time drawing. At most: no
     /// limit. Placeholders: none.
     pub remote_described: &'static str,
+    /// The transcript's speakers named by the user (#1205): the button that opens the two fields.
+    /// Shows: a meeting's page, as a button's tooltip and name. When: transcript card, a v3 meeting with its
+    /// transcript. At most: about 30 characters. Placeholders: none.
+    pub speakers_open: &'static str,
+    /// Shows: a meeting's page, as a button. When: the speakers' names being typed. At most: one or two words.
+    /// Placeholders: none.
+    pub speakers_save: &'static str,
+    /// Shows: a meeting's page, as a button. When: the speakers' names being typed. At most: one or two words.
+    /// Placeholders: none.
+    pub speakers_cancel: &'static str,
+    /// Shows: a meeting's page, as a hint under the fields. When: the speakers' names being typed. At most: one
+    /// line. Placeholders: none.
+    pub speakers_hint: &'static str,
+    /// Shows: a meeting's page, as an error under the fields, what was typed kept. When: the names could not be
+    /// kept in the meeting's folder. At most: one line. Placeholders: none.
+    pub speakers_not_saved: &'static str,
     /// Who spoke over the meeting, for whoever does not see the drawing.
     /// Shows: a meeting's page, as a name for a screen reader. When: screen reader: the
     /// speaking-time drawing. At most: no limit. Placeholders: none.
@@ -2036,6 +2052,11 @@ pub fn window(language: Language) -> Window {
             voice: "voice {}",
             here_described: "You — your microphone",
             remote_described: "Others — the call’s audio",
+            speakers_open: "Name the speakers…",
+            speakers_save: "Save",
+            speakers_cancel: "Cancel",
+            speakers_hint: "Kept with this meeting. Leave a field empty to keep “You” or “Others”.",
+            speakers_not_saved: "Kitokey could not save these names. Try again.",
             who_spoke: "Who spoke when: you on top, others below",
             who_spoke_later: "Who spoke when appears once it is transcribed.",
             no_transcript: "No transcript yet.",
@@ -2542,6 +2563,11 @@ pub fn window(language: Language) -> Window {
             voice: "voix {}",
             here_described: "Vous — votre micro",
             remote_described: "Les autres — le son de l’appel",
+            speakers_open: "Nommer les intervenants…",
+            speakers_save: "Enregistrer",
+            speakers_cancel: "Annuler",
+            speakers_hint: "Gardés avec cette réunion. Laissez un champ vide pour garder «\u{a0}Vous\u{a0}» ou «\u{a0}Les autres\u{a0}».",
+            speakers_not_saved: "Kitokey n’a pas pu enregistrer ces noms. Réessayez.",
             who_spoke: "Temps de parole au fil de la réunion\u{a0}: vous en haut, les autres en bas",
             who_spoke_later: "Le temps de parole s’affichera après la transcription.",
             no_transcript: "Pas encore de transcription.",
