@@ -133,7 +133,7 @@ const raw = {
   channelNotes: {
     en: { debian: "On Debian 13, the package built for Ubuntu 24.04 installs and starts. Debian 12 is not supported yet.", ubuntu: "On Ubuntu 24.04, build the package. It needs <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> and <code>podman</code>. If <code>nstack</code> is then not found, <code>uv tool update-shell</code> puts it on your path. The build takes a while." },
     fr: { debian: "Sur Debian 13, le paquet construit pour Ubuntu 24.04 s’installe et démarre. Debian 12 n’est pas encore pris en charge.", ubuntu: "Sur Ubuntu 24.04, compilez le paquet. Il faut <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> et <code>podman</code>. Si <code>nstack</code> est ensuite introuvable, <code>uv tool update-shell</code> le met dans votre chemin. La construction prend un moment." },
-    keeps: "README.md: « Needs git, uv and podman », and uv tool update-shell when nstack is not found; modules/install/README.md, « On Debian »: 13 installs and starts, 12 refused (#1214)",
+    keeps: "README.md: « Needs git, uv and podman », and uv tool update-shell when nstack is not found; README.md, « Install it »: the Ubuntu package installs and starts on Debian 13, not on 12 (#1214)",
   },
   needs: {
     en: ["Prerequisites", [["transcript", "Transcription.", "At first start, its model (874 MB) downloads in one click."],
@@ -151,7 +151,7 @@ const raw = {
       ["16 Go de mémoire au moins, 24 à 32 Go pour être à l’aise", "Une carte graphique Vulkan, même intégrée", "10 Go libres pour les deux modèles", "Environ 2 Go libres par heure qui s’enregistre, puis 0,2 Go gardés par heure"]],
       ["unlock", "Avec le service de votre choix", "Aucun matériel particulier. La transcription et le compte rendu se font en ligne.",
       ["Un service compatible OpenAI, comme Groq", "Souvent payant, facturé par ce service, pas par Kitokey", "Environ 0,2 Go par heure de réunion gardée (l’audio reste chez vous)"]]],
-    keeps: "modules/install/README.md, « What a computer needs », measured on 2026-11-25 (#1217): everything on the computer, and 0.2 GB kept an hour; ADR-0013, a transcription service the user names (Groq among them), ADR-0013 and the minutes' services, their cost the user's; the decider's « no special hardware » (2026-11-25)",
+    keeps: "README.md, « What a computer needs », measured on 2026-11-25: its two ways; ADR-0013, a transcription service the user names (Groq among them), ADR-0013 and the minutes' services, their cost the user's; the decider's « no special hardware » (2026-11-25)",
   },
   faq: {
     en: ["Frequently asked questions", [
