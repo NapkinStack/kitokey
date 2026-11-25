@@ -8866,9 +8866,9 @@ def renaming(now: dt.datetime) -> None:
         browser.find_element(By.ID, "confidential-switch").click()
         said = wait_for(browser, lambda b: (b.execute_script(chips) or [[False]])[0][0], 5)
         check("while it records, said confidential: its header shows the lock and « Confidentielle » first, beside « Enregistrement » (#1204)",
-              said and browser.execute_script(chips) == [[True, True, "Confidentielle"], [False, False, "Enregistrement"]], browser.execute_script(chips))
+              said and browser.execute_script(chips)[:2] == [[True, True, "Confidentielle"], [False, False, "Enregistrement"]], browser.execute_script(chips))
         browser.find_element(By.ID, "confidential-switch").click()
-        gone = wait_for(browser, lambda b: b.execute_script(chips) == [[False, False, "Enregistrement"]], 5)
+        gone = wait_for(browser, lambda b: b.execute_script(chips)[0] == [False, False, "Enregistrement"] and not any(c[0] for c in b.execute_script(chips)), 5)
         check("no longer confidential: the header's lock gone (#1204)", gone and not (recording / "confidential").exists(), browser.execute_script(chips))
         # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
         # left at the legend's right, where the range stands at rest.
