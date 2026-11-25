@@ -3321,6 +3321,8 @@ struct SendingShown {
 #[derive(serde::Serialize)]
 struct DestinationOffered {
     name: String,
+    /// Its kind, for its mark in the panel (#1238).
+    kind: kitokey_shell::destinations::Kind,
     first: bool,
 }
 
@@ -3333,6 +3335,7 @@ fn sending_shown(shell: &Shell, folder: &Path) -> SendingShown {
         .iter()
         .map(|kept| DestinationOffered {
             name: kept.name.clone(),
+            kind: kept.kind,
             first: !sending::ever(&record, &kept.name),
         })
         .collect();
