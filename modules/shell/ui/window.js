@@ -2140,7 +2140,8 @@ function minutesCard(read, words, session, transcript, onPage, previous) {
     was.id = "page-minutes-was";
     box.append(was, go);
     // The version's model: the one its line names, made here unless a host says otherwise.
-    const version = { said: by, is: (chosen, offered) => chosen.model === read.model
+    // Its list names the model alone when the line says « sur cet ordinateur » after it (#1231).
+    const version = { said: placed ? modelSaid(read.model) : by, is: (chosen, offered) => chosen.model === read.model
       && (read.provider && read.provider !== "local" ? via(chosen.provider) === read.provider : chosen.provider === offered.ollama_address) };
     const [pick, said] = modelOnPage(onPage, words, "minutes", version, go, words.redo_minutes_do, words.redo_title, box);
     card.append(lineWith(maker, pick), said, box);
