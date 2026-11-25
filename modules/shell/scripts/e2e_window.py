@@ -12966,8 +12966,10 @@ def store_shots(now: dt.datetime) -> None:
                 continue
             lines = [{"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0",
                       "language": short, "context": None},
-                     *({"type": "segment", "speaker": who, "track": "local" if who == "me" else "remote", "voice": voice,
-                        "start": start, "end": end, "text": text} for who, voice, text, start, end in segments),
+                     # No voice told (#1206): the app tells no voice apart yet — transcription writes « voice »: null —, so
+                     # the Store's screenshots show « Vous » and « Les autres » alone, never « voix 1 ».
+                     *({"type": "segment", "speaker": who, "track": "local" if who == "me" else "remote", "voice": None,
+                        "start": start, "end": end, "text": text} for who, _voice, text, start, end in segments),
                      {"type": "complete", "duration": segments[-1][4] + 3}]
             (folder / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
             store_audio(folder, segments)
@@ -13077,6 +13079,9 @@ def store_shots(now: dt.datetime) -> None:
     check("Settings' screenshot says the meetings' folder in the user's home, never the run's own path (D103)",
           len(settings) == 2 and all(folder and not folder.startswith("/") for folder in settings.values()), settings)
     hours = {shot: store_hours(page["text"]) for shot, page in shown.items()}
+    told = {shot: re.findall(r"·\s*(?:voix|voice)\s*\d", page["text"]) for shot, page in shown.items()}
+    check("no screenshot tells a voice apart — « Vous » and « Les autres » alone, as the app draws a real meeting (#1206)",
+          len(told) == 8 and not any(told.values()), {shot: said for shot, said in told.items() if said})
     check("every screenshot dates its meetings (D103)", len(hours) == 8 and all(hours.values()),
           [shot for shot, said in hours.items() if not said])
     check("every meeting and summary the screenshots date is of the working day, 8 h to 19 h (D103)",
