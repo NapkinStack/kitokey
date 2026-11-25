@@ -370,6 +370,10 @@ body.small-window .frame { display: none; }
 #small { max-width: none; padding: 0; gap: 0; }
 #small .bar-row { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 8px 0 12px; }
 #small .bar-space { flex: 1 1 auto; }
+/* Said confidential while it records (#1204): the lock in the meeting's green, as « Confidentielle »'s chip (3:1 on the
+   surface at least, tests/look.rs). */
+#small .bar-locked { display: inline-flex; flex: none; margin-left: 8px; color: var(--ok); }
+#small .bar-locked .lock { color: inherit; }
 #small .bar-row .icon-button { width: 28px; min-height: 28px; }
 /* The mark alone, in the accent: the handle; recording, its dot red and larger (the decider, 2026-11-08). */
 #small .handle { display: grid; place-items: center; margin-right: 8px; color: var(--accent); cursor: grab; }

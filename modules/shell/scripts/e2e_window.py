@@ -8860,6 +8860,16 @@ def renaming(now: dt.datetime) -> None:
               bool(drawn_again) and drawn_again["time"] != "00:00:00" and len(drawn_again["meters"]) == 2 and all(m > 0 for m in drawn_again["meters"])
               and all(b > 1 for b in drawn_again["bars"]),
               drawn_again)
+        # #1204: said confidential while it records, its header says it — the lock and its word first, beside « Enregistrement »;
+        # no longer, gone.
+        chips = "return [...document.querySelectorAll('#meeting .meeting-title .holds .chip')].map(c => [c.classList.contains('locked'), !!c.querySelector('svg.lock'), c.textContent.trim()])"
+        browser.find_element(By.ID, "confidential-switch").click()
+        said = wait_for(browser, lambda b: (b.execute_script(chips) or [[False]])[0][0], 5)
+        check("while it records, said confidential: its header shows the lock and « Confidentielle » first, beside « Enregistrement » (#1204)",
+              said and browser.execute_script(chips) == [[True, True, "Confidentielle"], [False, False, "Enregistrement"]], browser.execute_script(chips))
+        browser.find_element(By.ID, "confidential-switch").click()
+        gone = wait_for(browser, lambda b: b.execute_script(chips) == [[False, False, "Enregistrement"]], 5)
+        check("no longer confidential: the header's lock gone (#1204)", gone and not (recording / "confidential").exists(), browser.execute_script(chips))
         # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
         # left at the legend's right, where the range stands at rest.
         big = ("const t = document.getElementById('page-time'), d = document.querySelector('#meeting .drawing'), h = document.querySelector('#meeting h1'),"
@@ -8984,6 +8994,48 @@ def renaming(now: dt.datetime) -> None:
         drawn_back = live_again and wait_for(browser, lambda b: b.execute_script(alive) is None and at_rest(b), 5)
         check("stopped from elsewhere, the window's button not pressed: the page draws its rest back by itself (#1076, #1134)", drawn_back,
               [again, live_again, browser.execute_script(alive), browser.execute_script(resting)])
+
+
+def confidential_locked(now: dt.datetime) -> None:
+    """CP. #1204: while a confidential meeting records, the bar shows a lock, named, at 3:1 at least; never at rest."""
+    print("CP. a confidential meeting recording: a lock in the bar's row, named for a screen reader, 3:1 at least, in both themes; "
+          "gone when it is no longer confidential, and at rest (#1204)")
+    lock = ("const l = document.getElementById('small-locked'); if (!l) return null; const r = l.getBoundingClientRect();"
+            " const ground = (e) => { while (e) { const c = getComputedStyle(e).backgroundColor; if (c && !c.endsWith(', 0)') && c !== 'transparent') return c; e = e.parentElement; } return 'rgb(255, 255, 255)'; };"
+            " return {shown: l.getClientRects().length > 0, role: l.getAttribute('role'), label: l.getAttribute('aria-label'), title: l.title,"
+            " drawn: !!l.querySelector('svg'), colour: getComputedStyle(l).color, ground: ground(l),"
+            " inside: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5, size: [Math.round(r.width), Math.round(r.height)],"
+            " row: l.closest('.bar-row') !== null}")
+    rgb = lambda text: [float(n) for n in re.findall(r"[\d.]+", text)[:3]]
+    for language, named in (("fr_FR.UTF-8", "Réunion confidentielle"), ("en_US.UTF-8", "Confidential meeting")):
+        short = language[:2]
+        for theme in ("light", "dark"):
+            taping = WORK / f"locked-{short}-{theme}"
+            taping.mkdir()
+            window = Window(taping, language, 'after = "nothing"\nreminder = false\n', small=True)
+            if theme == "dark":
+                window.env.update(GTK_THEME="Adwaita:dark")
+            with window as browser:
+                check(f"{short}, {theme}: at rest, no lock", not (browser.execute_script(lock) or {}).get("shown"), browser.execute_script(lock))
+                browser.find_element(By.ID, "small-record").click()
+                wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
+                time.sleep(0.5)
+                check(f"{short}, {theme}: recording, not confidential: no lock", not browser.execute_script(lock)["shown"], browser.execute_script(lock))
+                browser.execute_script("document.getElementById('small-confidential').click()")
+                shown = wait_for(browser, lambda b: b.execute_script(lock)["shown"], 3)
+                got = browser.execute_script(lock)
+                ratio = contrast(rgb(got["colour"]), rgb(got["ground"]))
+                check(f"{short}, {theme}: said confidential, a lock in the row, named « {named} » for a screen reader and in its tooltip, inside the bar",
+                      shown and got["role"] == "img" and got["label"] == named and got["title"] == named and got["drawn"] and got["inside"] and got["row"], got)
+                check(f"{short}, {theme}: the lock at 3:1 at least on the bar ({ratio:.2f})", ratio >= 3.0, got)
+                shot_themed(browser, f"cp-locked-{short}-{theme}", theme)
+                browser.execute_script("document.getElementById('small-confidential').click()")
+                check(f"{short}, {theme}: no longer confidential: the lock gone", wait_for(browser, lambda b: not b.execute_script(lock)["shown"], 3), browser.execute_script(lock))
+                browser.execute_script("document.getElementById('small-confidential').click()")
+                wait_for(browser, lambda b: b.execute_script(lock)["shown"], 3)
+                stop_from_small(browser)
+                rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+                check(f"{short}, {theme}: stopped, at rest: no lock", rest and not browser.execute_script(lock)["shown"], browser.execute_script(lock))
 
 
 def dates_mentioned(now: dt.datetime) -> None:
@@ -15180,6 +15232,7 @@ def main() -> int:
     store_shots(now)
     actions_rows(now)
     dates_mentioned(now)
+    confidential_locked(now)
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
