@@ -11,10 +11,12 @@ export const ICONS = {
   search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
   export: '<path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',
   play: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z" fill="currentColor" stroke="none"/>',
+  unlock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 7.6-1.8"/><circle cx="12" cy="15.5" r="1.2" fill="currentColor" stroke="none"/>',
   webhook: '<circle cx="6.5" cy="17" r="2.6"/><circle cx="17.5" cy="17" r="2.6"/><circle cx="12" cy="6.5" r="2.6"/><path d="M10.6 8.8 7.8 14.6M13.4 8.8l2.8 5.8M9.1 17h5.8"/>',
   code: '<path d="m9 7-5 5 5 5M15 7l5 5-5 5"/>',
 };
 export const BRANDS = {
+  debian: '<path d="M13.6 20.2c-4.6.4-8.3-3-8.6-7.3-.3-4.5 3-8.3 7.6-8.6 3.9-.2 7 2.5 7.3 6.2.2 3.1-2 5.6-4.9 5.8-2.4.1-4.3-1.6-4.4-3.8-.1-1.8 1.2-3.3 2.9-3.4 1.3-.1 2.3.8 2.4 2" fill="none" stroke="#D70A53" stroke-width="2.1" stroke-linecap="round"/>',
   fedora: '<circle cx="12" cy="12" r="11" fill="#3C6EB4"/><path d="M12.2 18.5V10a3 3 0 0 1 3-3M8.8 12.3h6.4" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/>',
   windows: '<g fill="#0078D4"><rect x="2.5" y="2.5" width="9" height="9" rx=".6"/><rect x="12.5" y="2.5" width="9" height="9" rx=".6"/><rect x="2.5" y="12.5" width="9" height="9" rx=".6"/><rect x="12.5" y="12.5" width="9" height="9" rx=".6"/></g>',
   ubuntu: '<circle cx="12" cy="12" r="11" fill="#E95420"/><circle cx="12" cy="12" r="5.2" fill="none" stroke="#fff" stroke-width="1.8"/><circle cx="6.4" cy="12" r="1.9" fill="#fff" stroke="#E95420" stroke-width="1"/><circle cx="14.8" cy="7.1" r="1.9" fill="#fff" stroke="#E95420" stroke-width="1"/><circle cx="14.8" cy="16.9" r="1.9" fill="#fff" stroke="#E95420" stroke-width="1"/>',

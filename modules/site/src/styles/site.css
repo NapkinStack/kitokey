@@ -246,6 +246,10 @@ p { text-wrap: pretty; }
 .needs .ico { color: var(--accent); margin-top: .1rem; }
 .needs strong { display: block; }
 .needs span { color: var(--soft); }
+.hw { display: grid; gap: 16px; margin-top: 1.6rem; }
+.hw-card h4 { font-family: var(--titles); font-size: 1.15rem; letter-spacing: -.015em; }
+.hw-card ul { margin: .2rem 0 0; padding-left: 1.1rem; color: var(--soft); display: grid; gap: .35rem; }
+@media (min-width: 760px) { .hw { grid-template-columns: 1fr 1fr; } }
 
 .faq { max-width: 860px; margin: 0 auto; border-top: 1px solid var(--line); }
 .faq details { border-bottom: 1px solid var(--line); }

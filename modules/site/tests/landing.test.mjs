@@ -28,9 +28,11 @@ for (const source of installSources) {
     }));
   }
 }
-// A tab's commands are, line for line, one block's lines meant for its system or for every system.
+// A tab's commands are, line for line, one block's lines meant for its system or for every system. Debian 13
+// takes Ubuntu's package (modules/install/README.md, « On Debian »).
+const BUILT_AS = { debian: "ubuntu" };
 const given = (os, commands) => blocks.some((block) => {
-  const lines = block.filter((p) => !p.systems.length || p.systems.includes(os)).flatMap((p) => p.lines);
+  const lines = block.filter((p) => !p.systems.length || p.systems.includes(BUILT_AS[os] ?? os)).flatMap((p) => p.lines);
   return lines.join("\n") === commands.join("\n");
 });
 

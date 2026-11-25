@@ -117,13 +117,13 @@ const raw = {
     keeps: "PDR-0001: free on Linux, paid once on macOS and Windows",
   },
   oses: {
-    en: [[["fedora", "ubuntu"], "Linux", "Available", "Free", "Fedora and Ubuntu.", true],
+    en: [[["fedora", "ubuntu", "debian"], "Linux", "Available", "Free", "Fedora, Ubuntu and Debian 13.", true],
       [["windows"], "Windows", "Coming soon", "One-time purchase", "A free trial, then a single payment. Coming to the Microsoft Store.", false],
       [["apple"], "macOS", "Coming soon", "One-time purchase", "A free trial, then a single payment.", false]],
-    fr: [[["fedora", "ubuntu"], "Linux", "Disponible", "Gratuit", "Fedora et Ubuntu.", true],
+    fr: [[["fedora", "ubuntu", "debian"], "Linux", "Disponible", "Gratuit", "Fedora, Ubuntu et Debian 13.", true],
       [["windows"], "Windows", "Bientôt", "Achat unique", "Un essai gratuit, puis un seul paiement. À venir dans le Microsoft Store.", false],
       [["apple"], "macOS", "Bientôt", "Achat unique", "Un essai gratuit, puis un seul paiement.", false]],
-    keeps: "modules/install/README.md (Fedora, Copr) and README.md (Ubuntu 24.04); PDR-0001 and PDR-0005, the Store's unlimited trial; ADR-0017, macOS sold once",
+    keeps: "README.md, « Install it »: Fedora from Copr, Ubuntu 24.04 and Debian 13 (modules/install/README.md, « On Debian »); PDR-0001 and PDR-0005, the Store's unlimited trial; ADR-0017, macOS sold once",
   },
   install: {
     en: ["Install", "Install Kitokey.", "Pick your system, open a terminal and paste the commands.", "Copy", "System", "Copied", "Select and copy"],
@@ -131,9 +131,9 @@ const raw = {
     keeps: "modules/install/README.md (Copr, D78) and README.md (Ubuntu), the commands below",
   },
   channelNotes: {
-    en: { ubuntu: "On Ubuntu 24.04, build the package. It needs <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> and <code>podman</code>. If <code>nstack</code> is then not found, <code>uv tool update-shell</code> puts it on your path. The build takes a while." },
-    fr: { ubuntu: "Sur Ubuntu 24.04, compilez le paquet. Il faut <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> et <code>podman</code>. Si <code>nstack</code> est ensuite introuvable, <code>uv tool update-shell</code> le met dans votre chemin. La construction prend un moment." },
-    keeps: "README.md: « Needs git, uv and podman », and uv tool update-shell when nstack is not found",
+    en: { debian: "On Debian 13, the package built for Ubuntu 24.04 installs and starts. Debian 12 is not supported yet.", ubuntu: "On Ubuntu 24.04, build the package. It needs <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> and <code>podman</code>. If <code>nstack</code> is then not found, <code>uv tool update-shell</code> puts it on your path. The build takes a while." },
+    fr: { debian: "Sur Debian 13, le paquet construit pour Ubuntu 24.04 s’installe et démarre. Debian 12 n’est pas encore pris en charge.", ubuntu: "Sur Ubuntu 24.04, compilez le paquet. Il faut <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> et <code>podman</code>. Si <code>nstack</code> est ensuite introuvable, <code>uv tool update-shell</code> le met dans votre chemin. La construction prend un moment." },
+    keeps: "README.md: « Needs git, uv and podman », and uv tool update-shell when nstack is not found; modules/install/README.md, « On Debian »: 13 installs and starts, 12 refused (#1214)",
   },
   needs: {
     en: ["Prerequisites", [["transcript", "Transcription.", "At first start, its model (874 MB) downloads in one click."],
@@ -141,6 +141,17 @@ const raw = {
     fr: ["Prérequis", [["transcript", "La transcription.", "Au premier démarrage, son modèle (874 Mo) se télécharge en un clic."],
       ["summary", "Ollama, pour le compte rendu.", "<a href=\"https://ollama.com/download\">Installez Ollama</a>, qui est gratuit. Kitokey propose ensuite son modèle, Qwen3 8B (environ 5 Go), téléchargé en un clic."]]],
     keeps: "ADR-0003, the 874 MB model; cycle 03, qwen3:8b about 5 GB fetched through Ollama; docs/support.md",
+  },
+  hardware: {
+    en: [["lock", "Everything on your computer", "Confidentiality assured, your data stays with you.",
+      ["16 GB of memory at least, 24 to 32 GB to work in comfort", "A graphics card with Vulkan, a built-in one being enough", "10 GB free for the two models", "About 2 GB free for each hour that records, then 0.2 GB kept an hour"]],
+      ["unlock", "With the service you choose", "The transcript on your computer, the minutes written online.",
+      ["8 GB of memory", "4 GB free, then about 2 GB for each hour that records", "A graphics card with Vulkan advised, a built-in one being enough", "The service is often paid, billed by it, not by Kitokey"]]],
+    fr: [["lock", "Tout sur votre ordinateur", "Confidentialité assurée, vos données restent chez vous.",
+      ["16 Go de mémoire au moins, 24 à 32 Go pour être à l’aise", "Une carte graphique Vulkan, même intégrée", "10 Go libres pour les deux modèles", "Environ 2 Go libres par heure qui s’enregistre, puis 0,2 Go gardés par heure"]],
+      ["unlock", "Avec le service de votre choix", "La transcription sur votre ordinateur, le compte rendu écrit en ligne.",
+      ["8 Go de mémoire", "4 Go libres, puis environ 2 Go par heure qui s’enregistre", "Une carte graphique Vulkan conseillée, même intégrée", "Le service est souvent payant, facturé par lui, pas par Kitokey"]]],
+    keeps: "modules/install/README.md, « What a computer needs », measured on 2026-11-25 (#1217): its two profiles; « 8 GB » there said not measured; ADR-0013, a service the user names, its cost theirs",
   },
   faq: {
     en: ["Frequently asked questions", [
@@ -188,8 +199,9 @@ function typo(v) {
 export const landing = Object.fromEntries(Object.entries(raw).map(([k, w]) => [k, { ...w, fr: typo(w.fr) }]));
 export const repo = REPO;
 // The install's commands: Fedora from Copr (modules/install/README.md, D78, published 2026-11-18); Ubuntu built as
-// README.md says, until a repository is published.
+// README.md says, until a repository is published; Debian 13 takes Ubuntu's package (modules/install/README.md, « On Debian »).
 export const channels = [
   ["fedora", "Fedora", "sudo dnf copr enable @napkinstack/kitokey\nsudo dnf install kitokey"],
   ["ubuntu", "Ubuntu 24.04", "git clone https://github.com/NapkinStack/kitokey && cd kitokey\nbash .nstack/install-engine.sh\nKITOKEY_TARGET=ubuntu-24.04 nstack release\nsudo apt install ./dist/install/kitokey_*_amd64.deb"],
+  ["debian", "Debian 13", "git clone https://github.com/NapkinStack/kitokey && cd kitokey\nbash .nstack/install-engine.sh\nKITOKEY_TARGET=ubuntu-24.04 nstack release\nsudo apt install ./dist/install/kitokey_*_amd64.deb"],
 ];

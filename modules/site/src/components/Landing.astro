@@ -150,6 +150,9 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
       <ul class="needs" role="list">
         {needs.map(([icon, a, b]) => <li class="reveal"><Fragment set:html={ico(icon)} /><div><strong>{a}</strong><span set:html={b} /></div></li>)}
       </ul>
+      <div class="hw">
+        {t("hardware").map(([icon, h, sub, lines]) => <div class="card hw-card reveal"><span class="tile" set:html={ico(icon)} /><h4>{h}</h4><p>{sub}</p><ul>{lines.map((x) => <li>{x}</li>)}</ul></div>)}
+      </div>
     </div>
   </section>
 
