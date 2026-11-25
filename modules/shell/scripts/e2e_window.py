@@ -9030,8 +9030,18 @@ def dates_mentioned(now: dt.datetime) -> None:
             browser.set_window_size(1100, 800)
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             shown = wait_for(browser, lambda b: b.execute_script(offered), 10)
-            check(f"{language}: offered under the actions, « {opens} »", shown and browser.find_element(By.ID, "dates-open").text == opens,
-                  browser.execute_script("return document.getElementById('dates-open')?.outerHTML"))
+            # Among the summary's actions, as « Envoyer… » and « Copier » are (#1213, the decider): an icon, a calendar, its
+            # name and tooltip the words, before « Copier » — never a bar of its own under the summary.
+            form = browser.execute_script(
+                "const b = document.getElementById('dates-open'), row = b?.closest('.minutes-actions'), copy = document.getElementById('copy-minutes');"
+                " return b ? {icon: b.classList.contains('icon-button'), row: !!row, before: !!copy && row === copy.parentElement"
+                " && !!(b.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING), text: b.textContent.trim(),"
+                " name: b.getAttribute('aria-label'), tip: b.title, calendar: !!b.querySelector('svg rect') && b.querySelectorAll('svg path').length === 3} : null")
+            check(f"{language}: offered among the summary's actions, an icon — a calendar — named « {opens} » and its tooltip the same, before « Copier » (#1213)",
+                  shown and form == {"icon": True, "row": True, "before": True, "text": "", "name": opens, "tip": opens, "calendar": True}, form)
+            if language.startswith("fr"):
+                browser.execute_script("document.querySelector('#meeting .card.minutes').scrollIntoView({block: 'start'})")
+                shot(browser, "cm-dates-offered-light")
             press(browser, "dates-open")
             wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("items"), 5)
             got = browser.execute_script(panel)
