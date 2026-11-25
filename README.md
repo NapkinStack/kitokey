@@ -28,8 +28,8 @@ that you are recording**: Kitokey shows them nothing.
 
 ## Install it
 
-**On Fedora 43, 44 and 45**, from Copr, with the system's updates — version 0.2.6, built by Copr on 2026-11-18
-from the tag `v0.2.6`:
+**On Fedora 43, 44 and 45**, from Copr, with the system's updates — each tag `v‹version›` on `main` is built there
+([`modules/install`](modules/install/#on-fedora-from-copr-d78)):
 
 ```bash
 sudo dnf copr enable @napkinstack/kitokey
