@@ -42,6 +42,9 @@ KITOKEY_TARGET=ubuntu-24.04 nstack release         # Ubuntu: built in its contai
 sudo apt install ./dist/install/kitokey_*_amd64.deb
 ```
 
+If `nstack` is then not found, uv's folder of tools is not on your `PATH` yet: `uv tool update-shell` puts it
+there, and a new terminal, in the clone, finds it.
+
 How each package is made: [`modules/install`](modules/install/). Fedora's package from Copr, with dnf and the system's
 updates, is [cycle 07](docs/project/cycles/07-wholeheard-from-the-systems-updater.md)'s, and nothing is published
 yet. On macOS, GitHub's runner makes the app on every change to a program on `main`, signed ad hoc, not by Apple.
