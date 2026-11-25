@@ -28,9 +28,13 @@ that you are recording**: Kitokey shows them nothing.
 
 ## Install it
 
-On Fedora and Ubuntu, from a package built from this repository — none is published yet:
+On Fedora and on Ubuntu 24.04, from a package built from this repository — none is published yet. Needs `git`,
+[`uv`](https://docs.astral.sh/uv/) and `podman`:
 
 ```bash
+git clone https://github.com/NapkinStack/kitokey && cd kitokey
+bash .nstack/install-engine.sh                        # nstack, at the version this repository records
+
 nstack release                                        # Fedora: every program, then the rpm
 sudo dnf install ./dist/install/kitokey-*.x86_64.rpm
 
@@ -38,7 +42,7 @@ KITOKEY_TARGET=ubuntu-24.04 nstack release         # Ubuntu: built in its contai
 sudo apt install ./dist/install/kitokey_*_amd64.deb
 ```
 
-Needs `podman` ([`modules/install`](modules/install/)). Fedora's package from Copr, with dnf and the system's
+How each package is made: [`modules/install`](modules/install/). Fedora's package from Copr, with dnf and the system's
 updates, is [cycle 07](docs/project/cycles/07-wholeheard-from-the-systems-updater.md)'s, and nothing is published
 yet. On macOS, GitHub's runner makes the app on every change to a program on `main`, signed ad hoc, not by Apple.
 On Windows, it makes a zip and an MSIX package for the Microsoft Store, not submitted yet. Each waits on a
