@@ -7062,11 +7062,24 @@ def previous_transcript_back(now: dt.datetime) -> None:
         check("no previous summary: once back, the page says the summary was made on the other version, never as this one's (#1070, T10)",
               alone and said_other and browser.execute_script(other) == "Compte rendu fait sur l’autre version" and "Sur la deuxième." in held(minutes_now),
               [alone, browser.execute_script(other)])
-        # Kept, it is the meeting's: in its text's weight, and in the trash with it.
-        text = browser.execute_script("return window.__TAURI__.core.invoke('listed')"
-                                      ".then((l) => l.sessions.filter((s) => s.folder.endsWith(arguments[0])).map((s) => s.text))", meeting.name)
-        sizes = sum(path.stat().st_size for path in (current, previous) if path.is_file())
-        check("the previous transcript counts in the meeting's text weight (D113)", previous.is_file() and len(text) == 1 and text[0] >= sizes, [text, sizes])
+        # Kept, it is the meeting's: in its text's weight, and in the trash with it. Weighed with it and without it — set
+        # outside the folder a moment, then back —: the difference is its size exactly (ines, #1225: « at least the two
+        # transcripts » held whatever was counted, the summaries and session.json covering the gap).
+        weight = lambda: browser.execute_script("return window.__TAURI__.core.invoke('listed')"
+                                                ".then((l) => l.sessions.filter((s) => s.folder.endsWith(arguments[0])).map((s) => s.text))", meeting.name)
+        kept_size = previous.stat().st_size if previous.is_file() else None
+        with_it = weight()
+        outside = WORK / f"{meeting.name}-transcript-previous.jsonl"
+        if previous.is_file():
+            previous.rename(outside)
+        try:
+            without_it = weight()
+        finally:
+            if outside.is_file():
+                outside.rename(previous)
+        check("the previous transcript counts in the meeting's text weight, its size exactly (D113)",
+              kept_size is not None and len(with_it) == 1 and len(without_it) == 1 and with_it[0] - without_it[0] == kept_size,
+              [with_it, without_it, kept_size])
         browser.execute_script("window.__TAURI__.core.invoke('freed', {names: [arguments[0]], whole: true})", meeting.name)
         # Its trash is under the data folder this scenario names for its models.
         trashed = data / "Trash" / "files" / meeting.name
