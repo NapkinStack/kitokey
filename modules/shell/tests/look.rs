@@ -326,7 +326,7 @@ fn what_moves_moves_shortly_and_not_for_who_asked_it_not_to() {
 /// Each pair of colours the theme uses (D89's first round of drawings, *Contrast, both themes*), read
 /// from the file in both themes: text 4.5:1 (WCAG 2.2, 1.4.3), a control's edge or a meter 3:1 (1.4.11).
 /// `--line` is no pair: it divides, and borders no control (the test below).
-const PAIRS: [(&str, &str, f64); 29] = [
+const PAIRS: [(&str, &str, f64); 28] = [
     ("var(--ink)", "var(--ground)", 4.5),
     ("var(--ink)", "var(--surface)", 4.5),
     ("var(--ink)", "var(--raised)", 4.5),
@@ -360,13 +360,9 @@ const PAIRS: [(&str, &str, f64); 29] = [
     ("var(--mark-edge)", SELECTED, 3.0),
     ("var(--mark-edge)", "var(--surface)", 3.0),
     ("var(--mark-ink)", "var(--mark)", 4.5),
-    // A level on its track, tinted with its own colour (#1179): the level seen against it (1.4.11).
-    ("var(--accent)", TINT_HERE, 3.0),
-    ("var(--ok)", TINT_REMOTE, 3.0),
+    // A level's bars, each side's in its colour, on the page's ground as on the surface (#1179, 1.4.11).
+    ("var(--ok)", "var(--ground)", 3.0),
 ];
-/// Each side's track, as the meters mix it (#1179).
-const TINT_HERE: &str = "color-mix(in srgb, var(--accent) 14%, var(--raised))";
-const TINT_REMOTE: &str = "color-mix(in srgb, var(--ok) 14%, var(--raised))";
 /// The selected row's ground, as the sidebar mixes it.
 const SELECTED: &str = "color-mix(in srgb, var(--accent) 13%, var(--surface))";
 
@@ -402,12 +398,12 @@ fn each_pair_of_the_theme_reaches_its_threshold_in_both_themes() {
     );
 }
 
-/// A level meter (#1179): it rises at once — no transition on its fill —, and falls eased by `.falling`, in
-/// 300 to 800 ms (a VU meter's fall, as Zoom's and Meet's levels); the bar's and the page's tracks 6 px, the
-/// panel's 8, each tinted with its side's colour. Less motion: the global rule removes the easing, and the
-/// page draws a held level (tests/meter.rs).
+/// A level meter (#1179, « B · Trace »): its bars rounded, each never less than a dot, drawn at each reading with no
+/// transition, the newest at the right and the oldest cut at the left; the bar's trace 14 px high, the page's 24,
+/// the panel's 28; each side's bars in its colour, on no tinted track. Less motion: the global rule, and the page
+/// draws a held level (tests/meter.rs).
 #[test]
-fn a_meter_rises_at_once_and_falls_eased_in_the_style() {
+fn a_meter_is_a_trace_of_rounded_bars_in_the_style() {
     // A Windows checkout ends its lines with CRLF (#1042): read as LF.
     let style = without_css_comments(STYLE).replace("\r\n", "\n");
     let rule = |selector: &str| {
@@ -418,29 +414,31 @@ fn a_meter_rises_at_once_and_falls_eased_in_the_style() {
             .unwrap_or_else(|| panic!("no {selector}"))
             .to_string()
     };
-    for fill in ["#small .meter .fill {", ".page-level > .fill {", ".check-fill {"] {
-        assert!(!rule(fill).contains("transition"), "{fill}{}", rule(fill));
-    }
-    let falling = rule(".falling {");
-    let ms: Vec<u32> = falling
-        .split("ms")
-        .filter_map(|part| part.rsplit(' ').next()?.parse().ok())
-        .collect();
-    assert!(!ms.is_empty() && ms.iter().all(|ms| (300..=800).contains(ms)), "{falling}");
+    let trace = rule("\n.trace {");
+    assert!(
+        trace.contains("justify-content: flex-end") && trace.contains("overflow: hidden"),
+        "{trace}"
+    );
+    let bar = rule("\n.trace > i {");
+    assert!(
+        bar.contains("min-height: 4px") && bar.contains("border-radius") && !bar.contains("transition"),
+        "{bar}"
+    );
     for (track, height) in [
-        ("#small .meter .track {", 6),
-        (".page-meter > .page-level {", 6),
-        (".check-track {", 8),
+        ("#small .meter .track {", 14),
+        (".page-meter > .page-level {", 24),
+        (".check-track {", 28),
     ] {
         assert!(rule(track).contains(&format!("height: {height}px")), "{track}{}", rule(track));
     }
     assert!(
-        style.contains(TINT_HERE) && style.contains(TINT_REMOTE),
-        "the tracks are tinted otherwise: say so here"
+        style.contains("#level-others > i, .page-level.remote > i, .check-source.far .check-track > i { background: var(--ok); }"),
+        "the meeting's bars are green otherwise: say so here"
     );
-    // The tick tells the loudest moment: drawn whole, its colour on its track is the fill's pair above (1.4.11, lina,
-    // #1185: at 0.6 it fell to 2.20–2.79).
-    assert!(!rule("\n.peak {").contains("opacity"), "{}", rule("\n.peak {"));
+    // The soft bar is gone, with its fill, its tick and its easing.
+    for gone in ["\n.peak {", "\n.falling {", ".check-fill", "color-mix(in srgb, var(--accent) 14%"] {
+        assert!(!style.contains(gone), "{gone}");
+    }
     assert!(style.contains(
         "prefers-reduced-motion: reduce) {\n  *, *::before, *::after { animation: none !important; transition: none !important; }"
     ));

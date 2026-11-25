@@ -1245,36 +1245,45 @@ const elapsed = (seconds) => {
   return [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60].map((n) => String(n).padStart(2, "0")).join(":");
 };
 
-// A level meter's drawing from a reading, 0 to 1, given the one drawn before (#1179): the reading drawn at once,
-// a fall eased by the style's `.falling`, as a VU meter — Zoom's and Meet's levels are smoothed too —, and the
-// loudest of the last 0.8 s kept as a tick. Who asks for less motion is drawn a level held a second, in three
-// steps — silent, heard, loud —, and no tick: nothing moves ten times a second (D69). Pure: tests/meter.rs runs it.
-function levelShown(was, reading, now, still) {
+// A level meter's drawing (#1179, the decider's « B · Trace » of 2026-11-25): the last readings, 0 to 1, as bars, the
+// newest at the right, one bar a reading — read ten times a second, a bar is a tenth of a second, and the
+// trace moves left a bar a reading, as Voice Memos and Otter draw a recording. Who asks for less motion is drawn a
+// level held a second, in three steps — silent, heard, loud —, the same on every bar: nothing scrolls (D69). Pure:
+// tests/meter.rs runs it.
+function levelShown(was, reading, now, still, count) {
   const percent = Math.round(Math.min(1, Math.max(0, reading)) * 100);
   if (still) {
-    if (was && was.peak === null && now - was.at < 1000) return was;
-    return { width: percent < 20 ? 0 : percent < 75 ? 50 : 90, falling: false, peak: null, at: now };
+    if (was?.held && now - was.at < 1000) return was;
+    return { bars: Array(count).fill(percent < 20 ? 0 : percent < 75 ? 50 : 90), held: true, at: now };
   }
-  const kept = was && was.peak !== null && percent < was.peak && now - was.at <= 800;
-  return { width: percent, falling: Boolean(was) && percent < was.width, peak: kept ? was.peak : percent, at: kept ? was.at : now };
+  const before = was && !was.held ? was.bars : Array(count).fill(0);
+  return { bars: [...before.slice(before.length - count + 1), percent], held: false, at: now };
 }
 
-// Draws a reading on a meter's fill, its track the meter a screen reader reads (its value the reading itself), its
-// tick the fill's next sibling.
+// A meter's track, the meter a screen reader reads, from 0 to 100; its bars drawn in it (`paintLevel`): four seconds
+// of them, a track showing the newest it has room for (the style's `.trace`).
+const TRACE = 40;
+function levelTrack(classes, label) {
+  const track = element("span", `trace ${classes}`);
+  track.setAttribute("role", "meter");
+  track.setAttribute("aria-label", label);
+  track.setAttribute("aria-valuemin", "0");
+  track.setAttribute("aria-valuemax", "100");
+  track.setAttribute("aria-valuenow", "0");
+  track.append(...Array.from({ length: TRACE }, () => document.createElement("i")));
+  return track;
+}
+
+// Draws a reading on a meter's track: its bars, and its value the reading itself.
 const levelsDrawn = new WeakMap();
 const lessMotion = matchMedia("(prefers-reduced-motion: reduce)");
-function paintLevel(fill_, reading) {
-  const shown = levelShown(levelsDrawn.get(fill_), reading, performance.now(), lessMotion.matches);
-  levelsDrawn.set(fill_, shown);
-  fill_.classList.toggle("falling", shown.falling);
-  fill_.style.width = `${shown.width}%`;
-  const tick = fill_.nextElementSibling;
-  if (tick) {
-    tick.classList.toggle("falling", shown.falling);
-    tick.hidden = shown.peak === null || shown.peak <= shown.width;
-    tick.style.left = `${shown.peak ?? 0}%`;
-  }
-  fill_.parentElement.setAttribute("aria-valuenow", String(Math.round(Math.min(1, Math.max(0, reading)) * 100)));
+function paintLevel(track, reading) {
+  drawLevel(track, levelShown(levelsDrawn.get(track), reading, performance.now(), lessMotion.matches, track.children.length), reading);
+}
+function drawLevel(track, shown, reading) {
+  levelsDrawn.set(track, shown);
+  for (const [index, bar] of [...track.children].entries()) bar.style.height = `${shown.bars[index]}%`;
+  track.setAttribute("aria-valuenow", String(Math.round(Math.min(1, Math.max(0, reading)) * 100)));
 }
 
 // The page of the meeting being recorded (#1076): both sides' levels as the bar's meters, and its time,
@@ -1285,33 +1294,38 @@ let pageLive = null;
 // The last reading of the meeting being recorded (#1133): a new drawing of its page starts from it, never from
 // « 00:00:00 » and empty meters until the next reading.
 let pageLast = null;
+// Its meters' tracks, whose traces a new drawing goes on from (#1179).
+let pageTracks = [];
 function pageLevels(name, time, words) {
   const row = element("div", "page-levels");
-  const fills = [words.small_mic, words.small_meeting].map((label, index) => {
+  const tracks = [words.small_mic, words.small_meeting].map((label, index) => {
     // Each side's label right under its own meter (#1112): a label sits with what it names.
     const column = element("div", "page-meter");
-    const track = element("span", "track page-level");
-    track.setAttribute("role", "meter");
-    track.setAttribute("aria-label", label);
-    track.setAttribute("aria-valuemin", "0");
-    track.setAttribute("aria-valuemax", "100");
-    track.setAttribute("aria-valuenow", "0");
-    const fill_ = element("span", index === 0 ? "fill here" : "fill remote");
-    track.append(fill_, element("span", "peak"));
+    const track = levelTrack(`track page-level ${index === 0 ? "here" : "remote"}`, label);
     column.append(track, element("span", index === 0 ? "here" : "remote", index === 0 ? words.here_described : words.remote_described));
     row.append(column);
-    return fill_;
+    return track;
   });
   const paint = (now) => {
     time.textContent = elapsed(now.seconds);
-    for (const [index, fill_] of fills.entries()) paintLevel(fill_, now.levels[index]);
+    for (const [index, track] of tracks.entries()) paintLevel(track, now.levels[index]);
   };
-  if (pageLast?.meeting === name) paint(pageLast);
+  // Drawn again, its traces go on from the ones it replaces, never from empty (#1133).
+  if (pageLast?.meeting === name) {
+    time.textContent = elapsed(pageLast.seconds);
+    for (const [index, track] of tracks.entries()) {
+      const was = pageTracks[index] && levelsDrawn.get(pageTracks[index]);
+      if (was) drawLevel(track, was, pageLast.levels[index]);
+      else paintLevel(track, pageLast.levels[index]);
+    }
+  }
+  pageTracks = tracks;
   // The poll ends with the page or the recording, and its reading with it: a meeting deleted frees its name within
   // the minute (capture's `new_folder`), and a recording under that name must not start from this one's.
   const end = () => {
     clearInterval(pageLive);
     pageLast = null;
+    pageTracks = [];
   };
   clearInterval(pageLive);
   pageLive = setInterval(async () => {
@@ -4539,18 +4553,10 @@ async function checkSound(words, back, lost) {
     const device = element("span", "check-device", "");
     device.id = `check-device-${id}`;
     top.append(icon(glyph), element("span", "check-name", name), device);
-    const track = element("div", "check-track");
-    const fill = element("span", "check-fill");
-    fill.id = `check-level-${id}`;
-    track.append(fill, element("span", "peak"));
-    // A meter a screen reader reads as one, from 0 to 100.
-    track.setAttribute("role", "meter");
-    track.setAttribute("aria-label", name);
-    track.setAttribute("aria-valuemin", "0");
-    track.setAttribute("aria-valuemax", "100");
-    track.setAttribute("aria-valuenow", "0");
+    const track = levelTrack("check-track", name);
+    track.id = `check-level-${id}`;
     source.append(top, track);
-    return [source, device, fill];
+    return [source, device, track];
   };
   const [me, meDevice, meFill] = side("mic", words.small_mic, "me", "near");
   const [others, othersDevice, othersFill] = side("volume-2", words.small_meeting, "others", "far");
@@ -5115,14 +5121,8 @@ function showSmall(words) {
   const meter = (label, id, device, glyphs, says) => {
     const row = element("span", "meter");
     row.append(icon(glyphs[0]));
-    const bar = element("span", "track");
-    bar.setAttribute("role", "meter");
-    bar.setAttribute("aria-label", label);
-    bar.setAttribute("aria-valuemin", "0");
-    bar.setAttribute("aria-valuemax", "100");
-    const fill_ = element("span", "fill");
-    fill_.id = id;
-    bar.append(fill_, element("span", "peak"));
+    const bar = levelTrack("track", label);
+    bar.id = id;
     const named = element("span", "device unseen");
     named.id = device;
     row.append(bar, named);
@@ -5374,6 +5374,8 @@ function showSmall(words) {
       field.painted();
       rest.hidden = recording;
       live.hidden = !recording;
+      // A recording starts its traces from empty, never from the last one's last two seconds.
+      if (recording) for (const id of ["level-me", "level-others"]) drawLevel(document.getElementById(id), levelShown(undefined, 0, 0, false, TRACE), 0);
       // The microphone in each state's options: recording, after the context, as board 6 has it.
       if (recording) opened.after(microphone);
       else rest.prepend(microphone);
