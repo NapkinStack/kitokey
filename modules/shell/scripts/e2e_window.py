@@ -5459,6 +5459,120 @@ def summary_sent(now: dt.datetime) -> None:
     logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and secret in f.read_text(errors="ignore")]
     check("the address in no log nor state file of Kitokey (ADR-0007, PDR-0007 §1)", logged == [], logged)
 
+
+def waveform_drawn(now: dt.datetime) -> None:
+    """CO. #1201 (#1179 B, the decider's « forme d'onde par voix »): a meeting's player drawn as each voice's
+    loudness — yours above the line, the meeting's below —, read by the shell from its tracks and kept in the
+    session's derived/ (session-audio v2 and v3), never in a v1 session's folder. It takes the turns' place without
+    moving the page; what was played is drawn whole, what remains at 0.7; the pointer is told the time it is over;
+    no track that reads, the turns stay. In French."""
+    print("CO. a meeting's player as a waveform per voice, read once and kept in derived/, the turns kept when no track reads (#1201)")
+    rate = 16_000
+
+    def tone(path: Path, level: float, on) -> None:
+        frames = bytearray()
+        for frame in range(60 * rate):
+            t = frame / rate
+            value = (level if (frame // 40) % 2 == 0 else -level) if on(t) else 0.0
+            frames += struct.pack("<h", int(value * 32767))
+        with wave.open(str(path), "wb") as made:
+            made.setnchannels(1)
+            made.setsampwidth(2)
+            made.setframerate(rate)
+            made.writeframes(bytes(frames))
+
+    def meeting(folder: Path, form: str, readable: bool) -> None:
+        session(folder, now - dt.timedelta(days=1), 1, {}, form)
+        names = ("me.wav", "others.wav") if form == "v1" else ("local.wav", "remote.wav")
+        if readable:
+            tone(folder / names[0], 0.5, lambda t: t < 30)
+            tone(folder / names[1], 0.25, lambda t: t >= 30)
+        else:
+            for name in names:
+                (folder / name).write_bytes(b"RIFF not a wave" + bytes(4096))
+        if form != "v1":
+            record = json.loads((folder / "session.json").read_text())
+            record["tracks"] = {"local": {"device": "Mic"}, "remote": {"device": "Speaker"}}
+            (folder / "session.json").write_text(json.dumps(record))
+            (folder / "clock.jsonl").write_text('{"track":"local","sample":0,"at":0.0}\n{"track":"remote","sample":0,"at":0.0}\n')
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.0,"end":30.0,"text":"Bonjour à tous."}\n'
+            '{"type":"segment","speaker":"others","track":"remote","voice":null,"start":30.0,"end":60.0,"text":"Bonjour."}\n'
+            '{"type":"complete","duration":60.0}\n')
+
+    meetings = WORK / "waveform"
+    v3, v1, unread = (meetings / name for name in ("2026-11-21_09-00", "2026-11-21_10-00", "2026-11-21_11-00"))
+    meeting(v3, "v3", True)
+    meeting(v1, "v1", True)
+    meeting(unread, "v3", False)
+    drawn = ("const w = document.querySelector('#meeting .drawing .wave'); if (!w) return null;"
+             " const cols = [...w.querySelectorAll('.col')], h = (c, s) => c.querySelector('i.' + s).getBoundingClientRect().height;"
+             " return {width: w.getBoundingClientRect().width, count: cols.length, up: cols.map(c => h(c, 'up')), down: cols.map(c => h(c, 'down')),"
+             " played: cols.filter(c => c.classList.contains('played')).length,"
+             " opacity: cols.length ? [getComputedStyle(cols[0].querySelector('i')).opacity, getComputedStyle(cols[cols.length - 1].querySelector('i')).opacity] : [],"
+             " turns: document.querySelectorAll('#meeting .drawing .relief').length, height: document.querySelector('#meeting .drawing').getBoundingClientRect().height}")
+    with Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n') as browser:
+        browser.set_window_size(1100, 800)
+
+        def page(folder: Path):
+            browser.execute_script("location.hash = '#/'")
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{folder.name}")
+            wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .drawing"), 10)
+
+        page(unread)
+        time.sleep(3)
+        turns = browser.execute_script("return [document.querySelectorAll('#meeting .drawing .relief rect').length, document.querySelectorAll('#meeting .drawing .wave').length]")
+        check("no track that reads: who spoke stays drawn from the transcript, no waveform (#1201)", turns[0] == 2 and turns[1] == 0, turns)
+        check("and nothing kept for it", not (unread / "derived").exists(), sorted(p.name for p in unread.iterdir()))
+        page(v3)
+        came = wait_for(browser, lambda b: b.execute_script(drawn), 15)
+        got = browser.execute_script(drawn) or {}
+        check("its tracks read: the waveform takes the turns' place, its bars grouped to its width (#1201)",
+              came and got.get("turns") == 0 and got["count"] == min(600, int((got["width"] + 2) // 6)) and got["count"] > 50, {k: got.get(k) for k in ("turns", "count", "width")})
+        half = got.get("count", 0) // 2
+        up, down = got.get("up", []), got.get("down", [])
+        check("you above the line where you speak, the meeting below where it does; a voice silent a 2 px stub (#1201)",
+              up and min(up[:half - 1]) >= 30 and max(up[half + 1:]) <= 2.5 and max(down[:half - 1]) <= 2.5 and min(down[half + 1:]) >= 30,
+              [up[:3], up[-3:], down[:3], down[-3:]])
+        check("the drawing keeps the turns' height: nothing on the page moves when it comes", got.get("height") == 88, got.get("height"))
+        kept = v3 / "derived" / "peaks.json"
+        check("its peaks kept in the session's derived/ (session-audio/v3)", kept.is_file(), sorted(p.name for p in v3.iterdir()))
+        before = kept.stat().st_mtime_ns if kept.is_file() else None
+        # The slider, by keyboard: Home, then 30 s on; then the end.
+        browser.execute_script("document.querySelector('#meeting .drawing').focus()")
+        ActionChains(browser).send_keys(Keys.HOME).perform()
+        time.sleep(0.5)
+        start = browser.execute_script(drawn)
+        ActionChains(browser).send_keys(Keys.PAGE_UP).perform()
+        wait_for(browser, lambda b: (b.execute_script(drawn) or {}).get("played", 0) > 0, 5)
+        middle = browser.execute_script(drawn)
+        check("what was played drawn whole, what remains at 0.7: at 0 none, at 30 s half of it (#1201)",
+              start["played"] == 0 and abs(middle["played"] - middle["count"] / 2) <= 1 and middle["opacity"] == ["1", "0.7"],
+              [start["played"], middle["played"], middle["count"], middle["opacity"]])
+        # The pointer over a quarter of it is told 00:15.
+        box = browser.execute_script("const r = document.querySelector('#meeting .drawing .wave').getBoundingClientRect(); return [r.width, r.height]")
+        ActionChains(browser).move_to_element_with_offset(browser.find_element(By.CSS_SELECTOR, "#meeting .drawing .wave"), int(-box[0] / 4), 0).perform()
+        told = wait_for(browser, lambda b: b.execute_script("const t = document.querySelector('#meeting .wave .tip'); return t && !t.hidden ? t.textContent : null"), 3)
+        tip = browser.execute_script("const t = document.querySelector('#meeting .wave .tip'); return t && !t.hidden ? t.textContent : null")
+        check("the pointer over a quarter of it is told the time there, 00:15 (#1201)", bool(told) and tip in ("00:14", "00:15", "00:16"), tip)
+        for width in (1100, 420):
+            browser.set_window_size(width, 800)
+            time.sleep(0.6)
+            browser.execute_script("document.querySelector('#meeting .drawing').scrollIntoView({block: 'center'})")
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"co-waveform-{width}-{theme}", theme)
+        browser.set_window_size(1100, 800)
+        page(v1)
+        waved = wait_for(browser, lambda b: (b.execute_script(drawn) or {}).get("count", 0) > 0, 15)
+        check("a v1 session drawn too, and nothing written in its folder: version 1 names no derived/ (#1201)",
+              waved and not (v1 / "derived").exists(), sorted(p.name for p in v1.iterdir()))
+        page(v3)
+        wait_for(browser, lambda b: b.execute_script(drawn), 15)
+        check("opened again, its peaks read from derived/, not written again", kept.is_file() and kept.stat().st_mtime_ns == before,
+              [before, kept.stat().st_mtime_ns if kept.is_file() else None])
+
+
 def destinations_kept(now: dt.datetime) -> None:
     """CK. D110, PDR-0007 §1 and §6: Settings keeps the destinations a summary can be sent to — a kind, a
     name, the address pasted. The address is judged by kitokey-send --check, given on its input and never
@@ -12657,18 +12771,6 @@ def store_hours(text: str) -> list[int]:
             for hour, half in re.findall(r"(?:· |\bà |\bat )(\d{1,2}):\d\d(?:\s*([AP]M))?", text)]
 
 
-def store_lanes(rects: list) -> tuple[int, int, float]:
-    """Who spoke as the page draws it (#1077): a bar for each segment, yours on one lane, the others' on the other —
-    how many bars each lane holds, and the share of the drawn width where both lanes have a bar at once: near
-    nothing where people take turns, all of it where two lines are drawn the same."""
-    covered = {"local": set(), "remote": set()}
-    for track, x, width, _ in rects:
-        covered.setdefault(track, set()).update(range(int(x), max(int(x) + 1, int(-(-(x + width) // 1)))))
-    both, either = covered["local"] & covered["remote"], covered["local"] | covered["remote"]
-    counts = {track: sum(1 for kind, *_ in rects if kind == track) for track in ("local", "remote")}
-    return counts["local"], counts["remote"], round(len(both) / max(1, len(either)), 3)
-
-
 def store_lasted(row: str) -> int:
     """A list row's length, in minutes, as it says it: « 25 min », « 1 h 05 »."""
     hours, minutes = re.search(r"(\d+)\s*h\b", row), re.search(r"(\d+)\s*min\b", row)
@@ -12697,6 +12799,7 @@ def store_shots(now: dt.datetime) -> None:
         "return {freed: shown('.chip.gone, #no-player').length,"
         " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText,"
         " lanes: [...document.querySelectorAll('#meeting svg.relief rect')].map(r => [r.getAttribute('class'), +r.getAttribute('x'), +r.getAttribute('width'), +r.getAttribute('y')]),"
+        " wave: [...document.querySelectorAll('#meeting .drawing .wave .col')].map(c => [...c.querySelectorAll('i')].map(i => { const r = i.getBoundingClientRect(); return [r.height, r.top, r.bottom]; })),"
         " sought: [document.getElementById('search')?.value ?? '', document.getElementById('find')?.value ?? ''],"
         " marked: [shown('#meeting .transcript .lines li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent)),"
         " shown('#groups li').map(l => [...l.querySelectorAll('mark')].map(m => m.textContent))],"
@@ -12806,6 +12909,9 @@ def store_shots(now: dt.datetime) -> None:
                 # 3: a word sought in the list, only its meetings left (« retrouver n'importe quelle réunion »).
                 if shot_name == "3-list":
                     browser.find_element(By.ID, "find").send_keys(kept[index]["sought"])
+                # Its tracks read by the shell, its waveform drawn before the shot (#1201).
+                if shot_name == "1-meeting":
+                    wait_for(browser, lambda b: b.execute_script("return document.querySelectorAll('#meeting .drawing .wave .col').length") > 0, 60)
                 browser.execute_script("document.activeElement.blur(); scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
                 time.sleep(0.6)
                 browser.save_screenshot(str(store / short / f"{shot_name}.png"))
@@ -12895,15 +13001,23 @@ def store_shots(now: dt.datetime) -> None:
     cited = {f"{short}/{kind}": [int(n) for n in re.findall(r"\[@(\d+)\]", meeting["minutes"]) if int(n) >= len(store_said(meeting))]
              for short, said in STORE_MEETINGS.items() for kind, meeting in (("opened", said), ("call", said["call"]), ("kickoff", said["kickoff"]))}
     check("every moment a summary cites is one its transcript starts a line at (D103)", not any(cited.values()), cited)
-    lanes = {shot: store_lanes(page["lanes"]) for shot, page in shown.items() if shot.endswith("1-meeting.png")}
-    check("who spoke, drawn on the meeting's shot, shows the turns: each side's lane at least 4 bars, both lanes drawn at once over a tenth of the width at most (#1077)",
-          len(lanes) == 2 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in lanes.values()), lanes)
-    # « Vous » on the upper lane, « Les autres » on the lower, as the transcript's sides read top to bottom (lina, #1093).
-    tops = {shot: (max((y for kind, _, _, y in page["lanes"] if kind == "local"), default=None),
-                   min((y for kind, _, _, y in page["lanes"] if kind == "remote"), default=None))
+    # Who spoke, as the meeting's shot draws it from its tracks (#1201, in place of #1077's turns): each voice heard in at
+    # least 4 stretches of its own — a run of bars taller than the 2 px of a silence —, both at once over a tenth at most.
+    def heard(columns: list, side: int) -> tuple[int, list[bool]]:
+        loud = [column[side][0] > 4 for column in columns]
+        return sum(1 for i, on in enumerate(loud) if on and (i == 0 or not loud[i - 1])), loud
+    waves = {}
+    for shot, page in shown.items():
+        if shot.endswith("1-meeting.png"):
+            (here, mine), (others, theirs) = heard(page["wave"], 0), heard(page["wave"], 1)
+            waves[shot] = (here, others, round(sum(a and b for a, b in zip(mine, theirs)) / max(1, sum(a or b for a, b in zip(mine, theirs))), 3))
+    check("who spoke, drawn on the meeting's shot as its waveform: each voice heard in at least 4 stretches, both at once over a tenth at most (#1201, #1077)",
+          len(waves) == 2 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in waves.values()), waves)
+    # « Vous » above the line, « Les autres » below, as the transcript's sides read top to bottom (lina, #1093).
+    tops = {shot: (max((up[2] for up, _ in page["wave"]), default=None), min((down[1] for _, down in page["wave"]), default=None))
             for shot, page in shown.items() if shot.endswith("1-meeting.png")}
-    check("who spoke: « Vous » on the upper lane, every bar of it above every bar of « Les autres » (#1077)",
-          len(tops) == 2 and all(here is not None and others is not None and here < others for here, others in tops.values()), tops)
+    check("who spoke: « Vous » above the line, every bar of it above every bar of « Les autres » (#1201, #1077)",
+          len(tops) == 2 and all(here is not None and others is not None and here <= others for here, others in tops.values()), tops)
     lasted = {shot: [store_lasted(row) for row in page["said"]] for shot, page in shown.items() if shot.endswith("1-meeting.png")}
     check("every meeting the list shows lasts as such a meeting does, at least 15 min (D103)",
           len(lasted) == 2 and all(len(rows) == 6 and min(rows) >= 15 for rows in lasted.values()), lasted)
@@ -15034,6 +15148,7 @@ def main() -> int:
     settings_folded(now)
     destinations_kept(now)
     summary_sent(now)
+    waveform_drawn(now)
     settings_version(now)
     settings_narrow_without_model(now)
     appearance_chosen(now)

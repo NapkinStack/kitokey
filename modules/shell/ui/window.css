@@ -296,6 +296,18 @@ select:hover, select:focus { border-color: var(--edge); }
 .drawn .drawing.bare::before { content: ""; position: absolute; left: 0; right: 0; top: 9px; height: 6px; border-radius: 3px; background: var(--edge); }
 .drawn .drawing.bare .playhead { top: 9px; bottom: 9px; }
 .drawn .drawing.bare:not([role="slider"]) { display: none; }
+/* A meeting's waveform per voice (#1201, #1179 B, ines's m1179b): yours above the line, the meeting's below, bars of
+   4 px at most; what was played whole, what remains at 0.7 — still 3:1 on the card in both themes (WCAG 2.2 1.4.11),
+   where the mock-up's 0.38 fell to 1.75:1. Its height that of the turns it replaces: nothing moves when it comes. */
+.drawn .wave { position: relative; display: flex; align-items: stretch; gap: 2px; height: 88px; padding: 8px 0; }
+.wave .col { flex: 1 1 0; min-width: 0; display: grid; grid-template-rows: 1fr 1fr; justify-items: center; row-gap: 2px; }
+.wave .col i { width: 100%; max-width: 4px; border-radius: 2px; opacity: 0.7; }
+.wave .col i.up { align-self: end; background: var(--accent); }
+.wave .col i.down { align-self: start; background: var(--ok); }
+.wave .col.played i { opacity: 1; }
+/* The time the pointer is over, as SoundCloud's and Descript's players say it; for the pointer alone: the slider says
+   its own time to a screen reader. */
+.wave .tip { position: absolute; bottom: calc(100% + 4px); transform: translateX(-50%); padding: 2px 6px; border-radius: 6px; background: var(--ink); color: var(--surface); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
 .drawn .playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.7; pointer-events: none; }
 .drawn .player { display: flex; align-items: center; gap: 12px; }
 .drawn .player .at { font: 12.5px ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }

@@ -1361,6 +1361,59 @@ function relief(segments, total, words) {
   return svg;
 }
 
+// A meeting's waveform per voice (#1201, #1179 B), as Descript, Riverside and Voice Memos draw a recording: each
+// voice's loudest sound, yours above the line and the meeting's below, its bars grouped to the drawing's width and
+// laid over the meeting's `total` as the playhead and a click are; each voice scaled to its own loudest, so that a
+// quiet microphone still shows when it speaks. From the peaks the shell keeps (`peaks_of`); none, who spoke stays
+// drawn from the transcript (`relief`).
+function waveform(peaks, total) {
+  const wave = element("div", "wave");
+  const bins = (peaks.local ?? peaks.remote).length;
+  const most = (values) => (values ? Math.max(1, ...values) : 1);
+  const [here, remote] = [most(peaks.local), most(peaks.remote)];
+  const tip = element("span", "tip");
+  tip.hidden = true;
+  const draw = () => {
+    const width = wave.getBoundingClientRect().width;
+    // Bars of 4 px and gaps of 2 px, as the mock-up; never more than the bins read.
+    const count = Math.max(1, Math.min(bins, Math.floor((width + 2) / 6)));
+    if (!width || wave.querySelectorAll(".col").length === count) return;
+    const columns = [];
+    for (let index = 0; index < count; index++) {
+      const [from, to] = [index, index + 1].map((edge) => ((edge / count) * total * bins) / peaks.seconds);
+      const loud = (values, top) => {
+        if (!values) return 0;
+        const part = values.slice(Math.floor(from), Math.max(Math.floor(from) + 1, Math.ceil(to)));
+        return part.length ? Math.max(...part) / top : 0;
+      };
+      const column = element("span", "col");
+      column.dataset.at = String((index / count) * total);
+      const [up, down] = [element("i", "up"), element("i", "down")];
+      up.style.height = `${Math.max(2, Math.round(loud(peaks.local, here) * 34))}px`;
+      down.style.height = `${Math.max(2, Math.round(loud(peaks.remote, remote) * 34))}px`;
+      column.append(up, down);
+      columns.push(column);
+    }
+    wave.replaceChildren(...columns, tip);
+    wave.played(wave.at ?? 0);
+  };
+  // What was played, whole: called as the playhead moves.
+  wave.played = (time) => {
+    wave.at = time;
+    for (const column of wave.querySelectorAll(".col")) column.classList.toggle("played", Number(column.dataset.at) < time);
+  };
+  wave.addEventListener("pointermove", (event) => {
+    const box = wave.getBoundingClientRect();
+    const x = Math.min(Math.max(0, event.clientX - box.left), box.width);
+    tip.style.left = `${x}px`;
+    tip.textContent = clock((x / box.width) * total);
+    tip.hidden = false;
+  });
+  wave.addEventListener("pointerleave", () => (tip.hidden = true));
+  new ResizeObserver(() => requestAnimationFrame(draw)).observe(wave);
+  return wave;
+}
+
 // A provider's host, as a model's line names it: `https://openrouter.ai/api/v1` is openrouter.ai.
 function via(provider) {
   try {
@@ -2741,6 +2794,7 @@ function playerBar(session, listened, total, words, drawing) {
     if (toggle.textContent !== said) toggle.textContent = said;
     at.textContent = clock(time);
     head.style.left = `${Math.min(100, (time / total) * 100)}%`;
+    drawing.querySelector(".wave")?.played(time);
     drawing.setAttribute("aria-valuemax", String(Number(span().toFixed(1))));
     drawing.setAttribute("aria-valuenow", String(Number(time.toFixed(1))));
     drawing.setAttribute("aria-valuetext", `${clock(time)} / ${clock(span())}`);
@@ -2952,7 +3006,19 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     const now = element("div", "live-now");
     now.append(time, pageLevels(nameOf(session), time, words));
     drawing.append(now);
-  } else if (transcript.state === "present") drawing.append(relief(said, total, words));
+  } else if (transcript.state === "present") {
+    drawing.append(relief(said, total, words));
+    // Its sound's own shape once the shell has read it (#1201): who spoke, from the transcript, until then — and for
+    // good when no track reads.
+    if (session.audio > 0)
+      window.__TAURI__.core
+        .invoke("peaks_of", { name: nameOf(session) })
+        .then((peaks) => {
+          const turns = drawing.querySelector(".relief");
+          if (peaks && turns?.isConnected) turns.replaceWith(waveform(peaks, total));
+        })
+        .catch(() => {});
+  }
   else {
     // No transcript yet (#1116, the decider): one line says when who spoke will appear, no blank canvas. Outside the
     // drawing (#1134), which is the player's slider once the sound plays: a slider's children are presentational
