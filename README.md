@@ -28,8 +28,18 @@ that you are recording**: Kitokey shows them nothing.
 
 ## Install it
 
-On Fedora and on Ubuntu 24.04, from a package built from this repository — none is published yet. Needs `git`,
-[`uv`](https://docs.astral.sh/uv/) and `podman`:
+**On Fedora 43, 44 and 45**, from Copr, with the system's updates — each tag `v‹version›` on `main` is built there
+([`modules/install`](modules/install/#on-fedora-from-copr-d78)):
+
+```bash
+sudo dnf copr enable @napkinstack/kitokey
+sudo dnf install kitokey
+```
+
+**On Ubuntu 24.04 and Debian 13**, from a package built from this repository — none is published for them yet
+(#1214). The `.deb` made for Ubuntu 24.04 also installs and starts on Debian 13, not on Debian 12
+([`modules/install`](modules/install/#on-debian)). Building needs `git`, [`uv`](https://docs.astral.sh/uv/) and
+`podman`:
 
 ```bash
 git clone https://github.com/NapkinStack/kitokey && cd kitokey
@@ -45,9 +55,8 @@ sudo apt install ./dist/install/kitokey_*_amd64.deb
 If `nstack` is then not found, uv's folder of tools is not on your `PATH` yet: `uv tool update-shell` puts it
 there, and a new terminal, in the clone, finds it.
 
-How each package is made: [`modules/install`](modules/install/). Fedora's package from Copr, with dnf and the system's
-updates, is [cycle 07](docs/project/cycles/07-wholeheard-from-the-systems-updater.md)'s, and nothing is published
-yet. On macOS, GitHub's runner makes the app on every change to a program on `main`, signed ad hoc, not by Apple.
+How each package is made, and what a computer needs to run it — memory, disk, how long a meeting takes, measured:
+[`modules/install`](modules/install/). On macOS, GitHub's runner makes the app on every change to a program on `main`, signed ad hoc, not by Apple.
 On Windows, it makes a zip and an MSIX package for the Microsoft Store, not submitted yet. Each waits on a
 colleague's trial, in the cycles after it. What a build holds and what leaves your
 machine: [`docs/privacy.md`](docs/privacy.md).
@@ -59,8 +68,10 @@ machine: [`docs/privacy.md`](docs/privacy.md).
 | The transcript of a session, on the machine: `kitokey-transcription <session> --model <file>` | [`modules/transcription`](modules/transcription/) |
 | The minutes of a transcript, from the provider you chose: `kitokey-summary <session> --provider <address> --model <name>` | [`modules/summary`](modules/summary/) |
 
-Each source is kept as your system delivers it, at its own rate and channels, in 24 bits —
-about 2 GB an hour on a laptop ([ADR-0004](docs/adr/0004-the-audio-as-recorded-is-kept-everything-else-is-derived.md)).
+Each source is kept as your system delivers it, at its own rate and channels, in 24 bits
+([ADR-0004](docs/adr/0004-the-audio-as-recorded-is-kept-everything-else-is-derived.md)): about 2 GB free while an
+hour records, then about 0.2 GB kept an hour once the meeting stops, compressed without loss (FLAC) — measured on
+2026-11-25 on a laptop's meetings (#1216). Meetings recorded before FLAC stay as recorded (#1215).
 **Known**: the engine on the machine still writes a few words where nobody speaks, and on a
 lively meeting misses or mishears about one word in four.
 
