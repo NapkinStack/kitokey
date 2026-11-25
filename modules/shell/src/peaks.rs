@@ -1,10 +1,12 @@
-//! A meeting's waveform per voice (#1201, #1179 B): each track's loudest sample in each of `BINS`
+//! A meeting's waveform per voice (#1201, #1179 B): each track's loudness — its RMS — in each of `BINS`
 //! stretches of the meeting, each track placed where the session's clock puts it (`meeting::tracks`,
 //! read as the player reads it, `mix`). Read once, then kept in the session's `derived/`, which
 //! `session-audio/v2` and `v3` leave to their consumers (« Whatever they make from the tracks. Not
 //! described here: nothing in it is a source »), and read from there while the tracks and the clock
 //! stay as they were. Version 1 names no `derived/`: its peaks are read each time and kept nowhere.
-//! Numbers only: nothing a person said can be heard back from them.
+//! Numbers only: nothing a person said can be heard back from them. The RMS, not the loudest sample: a
+//! stretch holds seconds of a meeting, and any few seconds of speech reach about the same peak — every
+//! bar would stand as tall; its RMS falls with pauses and quiet words, as a voice does.
 
 use std::{
     fs,
@@ -22,7 +24,7 @@ pub const BINS: usize = 600;
 /// Where the peaks are kept, in the session's folder.
 pub const KEPT: &str = "derived/peaks.json";
 
-/// Each voice's peaks over the meeting, 0 to 255 of full scale; a voice whose track does not read,
+/// Each voice's loudness over the meeting, its RMS 0 to 255 of full scale; a voice whose track does not read,
 /// none. `seconds` is the meeting's span the bins divide.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Peaks {
@@ -129,12 +131,13 @@ fn read(tracks: &[meeting::Track]) -> Option<Peaks> {
     (peaks.local.is_some() || peaks.remote.is_some()).then_some(peaks)
 }
 
-/// The mix's loudest sample in each of `BINS` stretches of `seconds`, read ten seconds at a time.
+/// The mix's RMS in each of `BINS` stretches of `seconds`, read ten seconds at a time.
 fn binned(mix: &Mix, seconds: f64) -> std::io::Result<Vec<u8>> {
     const HEADER: u64 = 44;
     let rate = u64::from(mix.rate());
     let per_bin = seconds * mix.rate() as f64 / BINS as f64;
-    let mut bins = vec![0u16; BINS];
+    // Each stretch's sum of squares and how many samples it holds.
+    let mut bins = vec![(0f64, 0u64); BINS];
     let piece = 10 * rate;
     let mut frame = 0u64;
     while frame < mix.frames() {
@@ -143,15 +146,17 @@ fn binned(mix: &Mix, seconds: f64) -> std::io::Result<Vec<u8>> {
         for (index, pair) in bytes.as_chunks::<2>().0.iter().enumerate() {
             let at = frame + index as u64;
             let bin = ((at as f64 / per_bin) as usize).min(BINS - 1);
-            let level = i16::from_le_bytes(*pair).unsigned_abs();
-            if level > bins[bin] {
-                bins[bin] = level;
-            }
+            let level = f64::from(i16::from_le_bytes(*pair));
+            bins[bin].0 += level * level;
+            bins[bin].1 += 1;
         }
         frame += count;
     }
     Ok(bins
         .into_iter()
-        .map(|level| ((f64::from(level) / 32767.0) * 255.0).round().min(255.0) as u8)
+        .map(|(squares, count)| {
+            let rms = if count == 0 { 0.0 } else { (squares / count as f64).sqrt() };
+            ((rms / 32767.0) * 255.0).round().min(255.0) as u8
+        })
         .collect())
 }

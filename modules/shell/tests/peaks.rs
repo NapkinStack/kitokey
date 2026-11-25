@@ -1,4 +1,4 @@
-//! A meeting's waveform per voice (#1201, #1179 B): each track's peaks over the meeting, read once
+//! A meeting's waveform per voice (#1201, #1179 B): each track's loudness (RMS) over the meeting, read once
 //! and kept in the session's `derived/` (`session-audio/v2` and `v3`: « Consumers; optional |
 //! Whatever they make from the tracks »), placed where the session's clock puts each track. A v1
 //! session has no `derived/`: its peaks are read and kept nowhere.
@@ -34,7 +34,7 @@ fn wav(path: &Path, rate: u32, seconds: f64, value: impl Fn(f64) -> f32) {
     fs::write(path, file).unwrap();
 }
 
-/// A square wave of `level` while `on` says so, silence otherwise: its peak is `level` exactly.
+/// A square wave of `level` while `on` says so, silence otherwise: its RMS is `level` exactly.
 fn square(level: f32, on: impl Fn(f64) -> bool) -> impl Fn(f64) -> f32 {
     move |t| {
         if !on(t) {
@@ -78,7 +78,7 @@ fn each_voice_is_its_track_s_peaks_over_the_meeting() {
     let (local, remote) = (drawn.local.unwrap(), drawn.remote.unwrap());
     assert_eq!((local.len(), remote.len()), (BINS, BINS));
     assert!((drawn.seconds - 10.0).abs() < 0.01, "{}", drawn.seconds);
-    // A peak of 0.5 is 128 of 255, 0.25 is 64; silence is 0. The bin holding 5.0 s is either's.
+    // An RMS of 0.5 is 128 of 255, 0.25 is 64; silence is 0. The bin holding 5.0 s is either's.
     let (first, second) = (..BINS / 2 - 1, BINS / 2 + 1..);
     assert!(local[first].iter().all(|v| (127..=128).contains(v)), "{:?}", &local[..8]);
     assert!(local[second.clone()].iter().all(|v| *v == 0), "{:?}", &local[BINS - 8..]);
@@ -122,6 +122,25 @@ fn read_once_they_are_kept_in_derived_and_read_from_there_again() {
     let again = peaks::of(folder.path()).unwrap();
     assert_eq!(again.local.as_ref().unwrap()[0], 7);
     assert_eq!(again.remote, first.remote);
+}
+
+#[test]
+fn a_stretch_half_silent_is_drawn_quieter_than_one_spoken_through() {
+    // The RMS, not the peak: speech with pauses is lower than speech all along, though its peak is the same. Spoken
+    // one millisecond in two in the second half: each stretch of it, 16.7 ms, half silent.
+    let folder = tempfile::tempdir().unwrap();
+    session(folder.path(), "v3");
+    wav(
+        &folder.path().join("local.wav"),
+        16_000,
+        10.0,
+        square(0.5, |t| t < 5.0 || (t * 1000.0) as i64 % 2 == 0),
+    );
+    let local = peaks::of(folder.path()).unwrap().local.unwrap();
+    let (through, paused) = (local[BINS / 4], local[3 * BINS / 4]);
+    assert!((127..=128).contains(&through), "{through}");
+    // Half of the stretch silent: the RMS of 0.5 over half of it, 0.5 / √2, 90 of 255 — the bin may hold a little more.
+    assert!((80..=100).contains(&paused), "{paused}");
 }
 
 #[test]

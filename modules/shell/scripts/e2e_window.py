@@ -8,6 +8,7 @@ Prints one line per check, `ok` or `FAIL`, and exits 1 on any failure.
 
 from __future__ import annotations
 
+import array
 import contextlib
 import datetime as dt
 import hashlib
@@ -12731,23 +12732,28 @@ def store_audio(folder: Path, segments: list) -> None:
     transcript says each side spoke, silence elsewhere — the same every run, so two runs draw the same."""
     random = __import__("random").Random(103)
     length = int(STORE_RATE * (segments[-1][4] + 3))
-    # Syllables at about 4 a second, one take as long as the longest line, each line its start.
+    # Syllables at about 4 a second with a breath between them, and a breath every couple of seconds, one take as long
+    # as the longest line; each line its start, said louder or softer as people do (#1201: a waveform of a voice
+    # rises and falls — every line as loud would draw a comb).
     take = bytearray(2 * int(STORE_RATE * max(end - start for *_, start, end in segments)))
     for n in range(len(take) // 2):
-        level = 0.55 + 0.45 * math.sin(2 * math.pi * 4.1 * n / STORE_RATE)
+        t = n / STORE_RATE
+        level = max(0.0, math.sin(2 * math.pi * 4.1 * t)) * (0.35 + 0.65 * abs(math.sin(2 * math.pi * 0.23 * t)))
         struct.pack_into("<h", take, 2 * n, int(9000 * level * random.uniform(-1, 1)))
     for track, who in (("local", "me"), ("remote", "others")):
-        samples = bytearray(2 * length)
+        samples = array.array("h", bytes(2 * length))
         for speaker, _, _, start, end in segments:
             if speaker != who:
                 continue
-            at, many = 2 * int(STORE_RATE * start), 2 * int(STORE_RATE * (end - start))
-            samples[at:at + many] = take[:many]
+            at, many = int(STORE_RATE * start), int(STORE_RATE * (end - start))
+            gain = random.uniform(0.4, 1.0)
+            said = array.array("h", take[:2 * many])
+            samples[at:at + many] = array.array("h", (int(v * gain) for v in said))
         with wave.open(str(folder / f"{track}.wav"), "wb") as made:
             made.setnchannels(1)
             made.setsampwidth(2)
             made.setframerate(STORE_RATE)
-            made.writeframes(bytes(samples))
+            made.writeframes(samples.tobytes())
     record = json.loads((folder / "session.json").read_text())
     record["tracks"] = {"local": {"device": "Mic"}, "remote": {"device": "Speaker"}}
     (folder / "session.json").write_text(json.dumps(record))
@@ -13003,6 +13009,9 @@ def store_shots(now: dt.datetime) -> None:
     check("every moment a summary cites is one its transcript starts a line at (D103)", not any(cited.values()), cited)
     # Who spoke, as the meeting's shot draws it from its tracks (#1201, in place of #1077's turns): each voice heard in at
     # least 4 stretches of its own — a run of bars taller than the 2 px of a silence —, both at once over a tenth at most.
+    # A column holds some seconds of the meeting: where a turn passes from one voice to the other inside it, both are heard
+    # there, as they were. « At once » counts the columns both are heard in with their neighbours too: two voices drawn
+    # alike all along, what #1077 guards against, not the column a turn changes in (0.108 and 0.112 so, at 76d43f6).
     def heard(columns: list, side: int) -> tuple[int, list[bool]]:
         loud = [column[side][0] > 4 for column in columns]
         return sum(1 for i, on in enumerate(loud) if on and (i == 0 or not loud[i - 1])), loud
@@ -13010,7 +13019,9 @@ def store_shots(now: dt.datetime) -> None:
     for shot, page in shown.items():
         if shot.endswith("1-meeting.png"):
             (here, mine), (others, theirs) = heard(page["wave"], 0), heard(page["wave"], 1)
-            waves[shot] = (here, others, round(sum(a and b for a, b in zip(mine, theirs)) / max(1, sum(a or b for a, b in zip(mine, theirs))), 3))
+            both = [a and b for a, b in zip(mine, theirs)]
+            held = [on and (i == 0 or both[i - 1]) and (i == len(both) - 1 or both[i + 1]) for i, on in enumerate(both)]
+            waves[shot] = (here, others, round(sum(held) / max(1, sum(a or b for a, b in zip(mine, theirs))), 3))
     check("who spoke, drawn on the meeting's shot as its waveform: each voice heard in at least 4 stretches, both at once over a tenth at most (#1201, #1077)",
           len(waves) == 2 and all(here >= 4 and others >= 4 and both <= 0.1 for here, others, both in waves.values()), waves)
     # « Vous » above the line, « Les autres » below, as the transcript's sides read top to bottom (lina, #1093).
