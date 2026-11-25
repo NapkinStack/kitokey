@@ -402,7 +402,7 @@ body.small-window .frame { display: none; }
    as board 5 draws it, on the surface or the ground (3:1, tests/look.rs). */
 .trace { display: flex; align-items: center; justify-content: flex-end; gap: 2px; overflow: hidden; }
 .trace > i { flex: none; flex-basis: 3px; min-height: 4px; height: 0; border-radius: 2px; background: var(--accent); }
-#level-others > i, .page-level.remote > i, .check-source.far .check-track > i { background: var(--ok); }
+#level-others > i, .page-level.others > i, .check-source.far .check-track > i { background: var(--ok); }
 #small .bar-lines { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; }
 #small .bar-lines > :last-child:not([hidden]) { margin-bottom: 8px; }
 #small .check-says { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; line-height: 1.3; color: var(--soft); }

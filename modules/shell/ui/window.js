@@ -1301,7 +1301,7 @@ function pageLevels(name, time, words) {
   const tracks = [words.small_mic, words.small_meeting].map((label, index) => {
     // Each side's label right under its own meter (#1112): a label sits with what it names.
     const column = element("div", "page-meter");
-    const track = levelTrack(`track page-level ${index === 0 ? "here" : "remote"}`, label);
+    const track = levelTrack(index === 0 ? "track page-level" : "track page-level others", label);
     column.append(track, element("span", index === 0 ? "here" : "remote", index === 0 ? words.here_described : words.remote_described));
     row.append(column);
     return track;

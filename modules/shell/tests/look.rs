@@ -432,7 +432,7 @@ fn a_meter_is_a_trace_of_rounded_bars_in_the_style() {
         assert!(rule(track).contains(&format!("height: {height}px")), "{track}{}", rule(track));
     }
     assert!(
-        style.contains("#level-others > i, .page-level.remote > i, .check-source.far .check-track > i { background: var(--ok); }"),
+        style.contains("#level-others > i, .page-level.others > i, .check-source.far .check-track > i { background: var(--ok); }"),
         "the meeting's bars are green otherwise: say so here"
     );
     // The soft bar is gone, with its fill, its tick and its easing.
