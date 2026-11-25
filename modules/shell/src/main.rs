@@ -3311,6 +3311,8 @@ fn sends_file() -> PathBuf {
 #[derive(serde::Serialize)]
 struct SendingShown {
     offered: bool,
+    /// Said confidential: each send is asked once more on the page, and confirmed to kitokey-send (D119).
+    confidential: bool,
     destinations: Vec<DestinationOffered>,
     sends: Vec<sending::Sent>,
     last: Vec<sending::Sent>,
@@ -3336,7 +3338,8 @@ fn sending_shown(shell: &Shell, folder: &Path) -> SendingShown {
         .collect();
     let summary = matches!(read_minutes(folder, shell.language()), Read::Present(_));
     SendingShown {
-        offered: summary && !confidential::marked(folder) && !destinations.is_empty(),
+        offered: summary && !destinations.is_empty(),
+        confidential: confidential::marked(folder),
         destinations,
         sends: sending::of(&record, meeting).into_iter().cloned().collect(),
         last: sending::last(&record, meeting).into_iter().cloned().collect(),
@@ -3355,6 +3358,8 @@ struct SentShown {
     #[serde(flatten)]
     outcome: sending::Outcome,
     sending: SendingShown,
+    /// The switch as it now reads: a confirmed send of a confidential meeting is said under it (D119).
+    confidential: ConfidentialShown,
 }
 
 /// How long the shell waits for kitokey-send: longer than its own 30 s for an answer (`posting/v1`), so that it
@@ -3362,17 +3367,26 @@ struct SentShown {
 const SEND_DEADLINE: std::time::Duration = std::time::Duration::from_secs(45);
 
 /// Sends a meeting's summary to a destination, on the user's gesture (D110, PDR-0007): a confidential meeting
-/// never — refused here before the program is started, as the program would —; the address read from the
+/// only when the user confirmed it, that once (D119, PDR-0007 §4 amended) — unconfirmed, refused here before the
+/// program is started, as the program would; confirmed, said to it (`confirmed_confidential`) —; the address read from the
 /// keyring and given on kitokey-send's input with the meeting's name, never among its arguments; one try, its
 /// outcome recorded, whatever it is. The address is never logged, nor the destination's answer.
 #[tauri::command]
-async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, destination: String) -> Result<SentShown, Told> {
+async fn summary_sent(
+    app: AppHandle,
+    shell: State<'_, Shell>,
+    name: String,
+    destination: String,
+    confirmed: Option<bool>,
+) -> Result<SentShown, Told> {
     use kitokey_shell::destinations;
     let folder = session_folder(&shell, &name)?;
-    if confidential::marked(&folder) {
+    let confidential = confidential::marked(&folder);
+    if confidential && confirmed != Some(true) {
         return Ok(SentShown {
             outcome: sending::Outcome::confidential(),
             sending: sending_shown(&shell, &folder),
+            confidential: confidential_of(&shell, &folder),
         });
     }
     let kept = shell
@@ -3387,7 +3401,7 @@ async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, des
     tracing::info!(kind, "shell.summary_sending");
     let outcome = tauri::async_runtime::spawn_blocking(move || -> Result<sending::Outcome, String> {
         let address = destinations::address(&kept.name)?.ok_or_else(|| "the destination's address is not in the keyring".to_string())?;
-        Ok(sent(&at, kind, &address, &meeting))
+        Ok(sent(&at, kind, &address, &meeting, confidential))
     })
     .await
     .map_err(|error| shell.told(Failure::Unexpected, error))?
@@ -3416,12 +3430,14 @@ async fn summary_sent(app: AppHandle, shell: State<'_, Shell>, name: String, des
     Ok(SentShown {
         outcome,
         sending: sending_shown(&shell, &folder),
+        confidential: confidential_of(&shell, &folder),
     })
 }
 
 /// Starts kitokey-send for one send (`posting/v1`): the meeting's folder and the destination's kind as its
-/// arguments, the address and the meeting's name on its input; waits for it within `SEND_DEADLINE`.
-fn sent(folder: &Path, kind: &str, address: &str, meeting: &str) -> sending::Outcome {
+/// arguments, the address and the meeting's name on its input — and, for a confidential meeting the user
+/// confirmed, `confirmed_confidential: true` (D118, D119); waits for it within `SEND_DEADLINE`.
+fn sent(folder: &Path, kind: &str, address: &str, meeting: &str, confirmed_confidential: bool) -> sending::Outcome {
     use std::io::Write as _;
     let none = sending::Outcome::Failed {
         code: None,
@@ -3437,7 +3453,11 @@ fn sent(folder: &Path, kind: &str, address: &str, meeting: &str) -> sending::Out
     let Ok(mut child) = started else {
         return none;
     };
-    let input = serde_json::json!({ "address": address, "name": meeting }).to_string();
+    let mut input = serde_json::json!({ "address": address, "name": meeting });
+    if confirmed_confidential {
+        input["confirmed_confidential"] = serde_json::Value::Bool(true);
+    }
+    let input = input.to_string();
     if let Some(mut stdin) = child.stdin.take() {
         let _ = stdin.write_all(input.as_bytes());
     }

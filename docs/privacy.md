@@ -1,6 +1,6 @@
 # Kitokey — privacy policy / politique de confidentialité
 
-Last changed / dernière modification: 2026-11-24. Publisher / éditeur: c12c (NapkinStack).
+Last changed / dernière modification: 2026-11-25. Publisher / éditeur: c12c (NapkinStack).
 [English](#english) · [Français](#français)
 
 ```mermaid
@@ -52,7 +52,7 @@ only when you do one of these:
 | Download a speech model (a click) | A request for that file | `huggingface.co` |
 | Read the list of models again (a click) | A request for that file | `raw.githubusercontent.com` |
 | Download a model through Ollama (a click) | Ollama's own request | Ollama, a program of its own, from its registry |
-| Send a summary to a channel (« Send… » on a meeting's page, then its name; before a first send to it, « Send » once more) | The meeting's title, its summary and its actions — never the sound, never the transcript | The webhook address you pasted for that channel in Settings: Slack, Discord, or another webhook |
+| Send a summary to a channel (« Send… » on a meeting's page, then its name; before a first send to it, and every time for a confidential meeting, « Send » once more) | The meeting's title, its summary and its actions — never the sound, never the transcript | The webhook address you pasted for that channel in Settings: Slack, Discord, or another webhook |
 | Add a date to Google Calendar (« Dates mentioned », a date ticked, then « Open in Google Calendar ») | The action's words and who, its date, the passage and the meeting's name, in the link | `calendar.google.com`, in your browser, under Google's own policy; never for a confidential meeting |
 
 On Windows, Kitokey asks the Microsoft Store whether you bought it, each time you start a
@@ -63,8 +63,9 @@ it receives is under its own policy: read it before you choose it.
 
 A meeting you say **confidential** is made on this computer alone, even when a service is chosen.
 
-A summary goes to a channel only when you send it, once for each gesture, and never a confidential
-meeting's. Kitokey sends no mail. Copying its minutes or its transcript puts them on your clipboard,
+A summary goes to a channel only when you send it, once for each gesture. A confidential meeting's
+goes only after you confirm it once more, every time: Kitokey asks before each of its sends, and
+never remembers your answer. Kitokey sends no mail. Copying its minutes or its transcript puts them on your clipboard,
 and they go where you paste them.
 
 There is no telemetry, no analytics, no advertising, and we receive no data about you. Should
@@ -137,7 +138,7 @@ part que si vous faites l'un de ces choix :
 | Télécharger un modèle de parole (un clic) | La demande de ce fichier | `huggingface.co` |
 | Relire la liste des modèles (un clic) | La demande de ce fichier | `raw.githubusercontent.com` |
 | Télécharger un modèle par Ollama (un clic) | La demande d'Ollama elle-même | Ollama, un programme à part, depuis son registre |
-| Envoyer un compte rendu vers un canal (« Envoyer… » sur la page d'une réunion, puis son nom ; avant un premier envoi vers lui, « Envoyer » une fois de plus) | Le titre de la réunion, son compte rendu et ses actions — jamais le son, jamais la transcription | L'adresse de webhook collée pour ce canal dans les Réglages : Slack, Discord ou un autre webhook |
+| Envoyer un compte rendu vers un canal (« Envoyer… » sur la page d'une réunion, puis son nom ; avant un premier envoi vers lui, et à chaque fois pour une réunion confidentielle, « Envoyer » une fois de plus) | Le titre de la réunion, son compte rendu et ses actions — jamais le son, jamais la transcription | L'adresse de webhook collée pour ce canal dans les Réglages : Slack, Discord ou un autre webhook |
 | Ajouter une date à Google Agenda (« Dates mentionnées », une date cochée, puis « Ouvrir dans Google Agenda ») | Les mots de l'action et le « qui », sa date, le passage et le nom de la réunion, dans le lien | `calendar.google.com`, dans votre navigateur, sous la politique de Google ; jamais pour une réunion confidentielle |
 
 Sous Windows, Kitokey demande au Microsoft Store si vous l'avez acheté, à chaque enregistrement
@@ -149,8 +150,9 @@ reçoit relève de sa propre politique : lisez-la avant de le choisir.
 Une réunion dite **confidentielle** est traitée sur cet ordinateur seulement, même si un service est
 choisi.
 
-Un compte rendu ne part vers un canal que lorsque vous l'envoyez, une fois par geste, et jamais celui
-d'une réunion confidentielle. Kitokey n'envoie aucun courriel. Copier son compte rendu ou sa
+Un compte rendu ne part vers un canal que lorsque vous l'envoyez, une fois par geste. Celui d'une
+réunion confidentielle ne part qu'après une confirmation de plus, à chaque fois : Kitokey la demande
+avant chacun de ses envois, et ne retient jamais votre réponse. Kitokey n'envoie aucun courriel. Copier son compte rendu ou sa
 transcription les met dans votre presse-papiers, et ils vont là où vous les collez.
 
 Il n'y a ni télémétrie, ni mesure d'audience, ni publicité, et nous ne recevons aucune donnée sur

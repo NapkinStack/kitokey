@@ -328,7 +328,9 @@ function languageRow(save, language, languages, words, settled, apple, system, i
 }
 
 // The switch on a meeting's page, a setting of its row (D89): the file written or removed at once;
-// what had left said under the row. Its lock open while it is off, as board 4 draws it.
+// what had left said under the row. Its lock open while it is off, as board 4 draws it. Drawn again in place
+// after a confirmed send, which it then names (D119).
+let confidentialShown = null;
 function confidentialCard(session, confidential, words) {
   const name = nameOf(session);
   const card = element("label", "setting confidential");
@@ -366,11 +368,8 @@ function confidentialCard(session, confidential, words) {
       paint(shown);
       // Its lists read again, in place: no service offered once said confidential (D91, D93).
       if (pageOffered?.name === name) pageOffered.again();
-      // Said confidential: no send offered any more (PDR-0007 §4).
-      if (shown.on) {
-        document.getElementById("send-panel")?.remove();
-        document.getElementById("send-open")?.remove();
-      }
+      // Said confidential: an open send panel closed; its sends are asked again from now on (D119).
+      if (shown.on) document.getElementById("send-panel")?.remove();
     } catch {
       box.checked = !box.checked;
       said.textContent = words.confidential_not_saved;
@@ -381,6 +380,7 @@ function confidentialCard(session, confidential, words) {
   });
   card.append(element("span", "name", words.confidential_chip), box);
   paint(confidential);
+  confidentialShown = { name, paint };
   return [card, left, said, described];
 }
 
@@ -1908,7 +1908,8 @@ function startsOnPage(id, words, command) {
 // its panel, each destination by its name; before a destination's first send, what leaves and where, its
 // name and never its address; the outcome said in place, with what to do; each send listed under it. A send
 // that failed is said again from the record whenever the page is drawn — « perhaps arrived » most of all, read
-// on coming back from the channel —, as long as that destination is not sent to again.
+// on coming back from the channel —, as long as that destination is not sent to again. A confidential meeting's
+// send is asked once more every time, in one sentence, the focus on « Annuler » (D119, PDR-0007 §4 amended).
 function sendPart(card, top, actions, session, words) {
   const name = nameOf(session);
   const said = element("p", "says send-said");
@@ -1953,6 +1954,7 @@ function sendPart(card, top, actions, session, words) {
     sayFailed(shown);
     if (!shown.offered) return;
     let offered = shown.destinations;
+    let secret = shown.confidential;
     const open = iconButton("send", words.send_open, "send-open");
     open.setAttribute("aria-expanded", "false");
     open.setAttribute("aria-controls", "send-panel");
@@ -1962,15 +1964,17 @@ function sendPart(card, top, actions, session, words) {
       open.setAttribute("aria-expanded", "false");
       open.focus();
     };
-    const send = async (destination) => {
+    const send = async (destination, confirmed = false) => {
       document.getElementById("send-panel")?.remove();
       open.setAttribute("aria-expanded", "false");
       open.disabled = true;
       said.textContent = fill(words.send_sending, destination);
       try {
-        const result = await window.__TAURI__.core.invoke("summary_sent", { name, destination });
+        const result = await window.__TAURI__.core.invoke("summary_sent", { name, destination, confirmed });
         said.textContent = outcome(result, destination);
         offered = result.sending.destinations;
+        secret = result.sending.confidential;
+        if (confidentialShown?.name === name) confidentialShown.paint(result.confidential);
         listSends(result.sending);
         sayFailed(result.sending, destination);
         if (!result.sending.offered) open.remove();
@@ -1992,24 +1996,38 @@ function sendPart(card, top, actions, session, words) {
         to.type = "button";
         to.dataset.destination = destination.name;
         to.addEventListener("click", () => {
-          if (!destination.first) return send(destination.name);
+          // Said confidential since the page was drawn: its switch is the one read now.
+          secret = document.getElementById("confidential-switch")?.checked ?? secret;
+          if (!destination.first && !secret) return send(destination.name);
+          const firstSaid = [];
+          // A confidential meeting: asked once more, every time, never remembered (D119).
+          if (secret) {
+            const ask = element("p", "note send-confidential", fill(words.send_confidential_ask, destination.name));
+            ask.id = "send-confidential";
+            firstSaid.push(ask);
+          }
           // Before its first send: what leaves, and where, by its name (PDR-0007 §3).
-          const notice = element("p", "note send-notice", fill(words.send_notice, destination.name));
-          notice.id = "send-notice";
+          if (destination.first) {
+            const notice = element("p", "note send-notice", fill(words.send_notice, destination.name));
+            notice.id = "send-notice";
+            firstSaid.push(notice);
+          }
           const confirm = element("button", "primary", words.send_confirm);
           confirm.type = "button";
           confirm.id = "send-confirm";
-          // Its name read with what leaves, where, and that it cannot be taken back.
-          confirm.setAttribute("aria-describedby", "send-notice");
-          confirm.addEventListener("click", () => send(destination.name));
+          // Its name read with what is asked, what leaves, where, and that it cannot be taken back.
+          confirm.setAttribute("aria-describedby", firstSaid.map((line) => line.id).join(" "));
+          const confirmed = secret;
+          confirm.addEventListener("click", () => send(destination.name, confirmed));
           const cancel = element("button", "", words.send_cancel);
           cancel.type = "button";
           cancel.id = "send-cancel";
           cancel.addEventListener("click", close);
           const choices = element("div", "send-choices");
           choices.append(confirm, cancel);
-          panel.replaceChildren(notice, choices);
-          confirm.focus();
+          panel.replaceChildren(...firstSaid, choices);
+          // A confidential meeting's question: the focus on the choice that sends nothing.
+          (secret ? cancel : confirm).focus();
         });
         panel.append(to);
       }

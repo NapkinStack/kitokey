@@ -969,6 +969,10 @@ pub struct Window {
     /// (PDR-0007 §3). Shows: a meeting's page, the send panel. When: the destination was never sent to. At most:
     /// three lines. Placeholders: {} the destination's name.
     pub send_notice: &'static str,
+    /// A confidential meeting's send asked once more, every time (D119, PDR-0007 §4 as amended on 2026-11-24).
+    /// Shows: a meeting's page, the send panel, above « Envoyer » and « Annuler ». When: a destination is chosen
+    /// for a confidential meeting. At most: one sentence. Placeholders: {} the destination's name.
+    pub send_confidential_ask: &'static str,
     /// The button that sends after the notice. Shows: a meeting's page, the send panel. When: the notice is shown.
     /// At most: one word. Placeholders: none.
     pub send_confirm: &'static str,
@@ -990,8 +994,8 @@ pub struct Window {
     /// posting/v1's meeting.unreadable. Shows: a meeting's page, as a status. When: a send failed. At most: one
     /// line. Placeholders: none.
     pub send_unreadable: &'static str,
-    /// posting/v1's meeting.confidential. Shows: a meeting's page, as a status. When: a send asked of a
-    /// confidential meeting. At most: one line. Placeholders: none.
+    /// posting/v1's meeting.confidential. Shows: a meeting's page, as a status. When: a confidential meeting's
+    /// send not confirmed (D119). At most: one line. Placeholders: none.
     pub send_confidential: &'static str,
     /// posting/v1's meeting.no_summary. Shows: a meeting's page, as a status. When: a send failed. At most: one
     /// line. Placeholders: none.
@@ -2160,6 +2164,7 @@ pub fn window(language: Language) -> Window {
             send_open: "Send…",
             send_to: "Send to “{}”",
             send_notice: "The title, the summary and its actions go to “{}”. Never the audio, never the transcript. A summary sent cannot be taken back.",
+            send_confidential_ask: "This meeting is confidential: its summary will leave this computer for “{}”.",
             send_confirm: "Send",
             send_cancel: "Cancel",
             send_sending: "Sending to “{}”…",
@@ -2167,7 +2172,7 @@ pub fn window(language: Language) -> Window {
             send_listed: "Sent to “{}” on {}",
             send_address_refused: "The address of “{}” is refused. Remove it, then add the channel’s https webhook address in Settings.",
             send_unreadable: "Kitokey couldn’t read this meeting. Check its folder, then try again.",
-            send_confidential: "This meeting is confidential: it’s never sent.",
+            send_confidential: "This meeting is confidential: it’s sent only once you confirm.",
             send_no_summary: "There’s no summary to send yet.",
             send_too_large: "The summary is too long for “{}”. Export it as a file instead.",
             send_offline: "No connection: nothing was sent. Check your connection, then try again.",
@@ -2677,6 +2682,7 @@ pub fn window(language: Language) -> Window {
             send_open: "Envoyer…",
             send_to: "Envoyer à « {} »",
             send_notice: "Le titre, le compte rendu et ses actions partent vers « {} ». Jamais le son, jamais la transcription. Un compte rendu envoyé ne peut pas être repris.",
+            send_confidential_ask: "Cette réunion est confidentielle\u{a0}: son compte rendu va quitter cet ordinateur pour «\u{a0}{}\u{a0}».",
             send_confirm: "Envoyer",
             send_cancel: "Annuler",
             send_sending: "Envoi vers « {} »…",
@@ -2684,7 +2690,7 @@ pub fn window(language: Language) -> Window {
             send_listed: "Envoyé à « {} » le {}",
             send_address_refused: "L’adresse de « {} » est refusée. Retirez-la, puis ajoutez l’adresse https du webhook du canal dans les Réglages.",
             send_unreadable: "Kitokey n’a pas pu lire cette réunion. Vérifiez son dossier, puis réessayez.",
-            send_confidential: "Réunion confidentielle : elle n’est jamais envoyée.",
+            send_confidential: "Réunion confidentielle\u{a0}: elle n’est envoyée qu’après votre confirmation.",
             send_no_summary: "Pas encore de compte rendu à envoyer.",
             send_too_large: "Compte rendu trop long pour « {} ». Exportez-le en fichier à la place.",
             send_offline: "Pas de connexion : rien n’est parti. Vérifiez la connexion, puis réessayez.",
