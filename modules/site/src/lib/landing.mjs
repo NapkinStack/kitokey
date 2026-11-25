@@ -123,12 +123,12 @@ const raw = {
     fr: [[["fedora", "ubuntu"], "Linux", "Disponible", "Gratuit", "Fedora et Ubuntu.", true],
       [["windows"], "Windows", "Bientôt", "Achat unique", "Un essai gratuit, puis un seul paiement. À venir dans le Microsoft Store.", false],
       [["apple"], "macOS", "Bientôt", "Achat unique", "Un essai gratuit, puis un seul paiement.", false]],
-    keeps: "modules/install/README.md (Fedora, Copr) and README.md (Ubuntu 24.04); PDR-0001 and PDR-0005, the Store's unlimited trial; ADR-0017, macOS sold once",
+    keeps: "README.md, « Install it »: Fedora from Copr, Ubuntu 24.04; PDR-0001 and PDR-0005, the Store's unlimited trial; ADR-0017, macOS sold once",
   },
   install: {
     en: ["Install", "Install Kitokey.", "Pick your system, open a terminal and paste the commands.", "Copy", "System", "Copied", "Select and copy"],
     fr: ["Installer", "Installez Kitokey.", "Choisissez votre système, ouvrez un terminal et collez les commandes.", "Copier", "Système", "Copié", "Sélectionnez et copiez"],
-    keeps: "modules/install/README.md (Copr, D78) and README.md (Ubuntu), the commands below",
+    keeps: "README.md, « Install it », the commands below",
   },
   channelNotes: {
     en: { ubuntu: "On Ubuntu 24.04, build the package. It needs <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> and <code>podman</code>. If <code>nstack</code> is then not found, <code>uv tool update-shell</code> puts it on your path. The build takes a while." },
@@ -187,7 +187,7 @@ function typo(v) {
 
 export const landing = Object.fromEntries(Object.entries(raw).map(([k, w]) => [k, { ...w, fr: typo(w.fr) }]));
 export const repo = REPO;
-// The install's commands: Fedora from Copr (modules/install/README.md, D78, published 2026-11-18); Ubuntu built as
+// The install's commands, as README.md gives them: Fedora from Copr (D78, published 2026-11-18); Ubuntu built as
 // README.md says, until a repository is published.
 export const channels = [
   ["fedora", "Fedora", "sudo dnf copr enable @napkinstack/kitokey\nsudo dnf install kitokey"],
