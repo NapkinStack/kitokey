@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "speakers.json: the names a person gave a meeting's speakers",
+  "description": "session-audio/v3 — written by the shell on the user's word, read by the shell and by summary (summarising/v1). What a schema cannot say is on the contract's page: that a name absent keeps the shell's word for the speaker, that a voice's name comes before its speaker's, and that a part this schema refuses reads as absent.",
+  "type": "object",
+  "properties": {
+    "me": {
+      "description": "Who is on the local track, the person who records: shown for « Vous ».",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60,
+      "pattern": "\\S",
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "others": {
+      "description": "Who is on the remote track, for a call of two: shown for « Les autres ».",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60,
+      "pattern": "\\S",
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "voices": {
+      "description": "For a voice transcript/v1 tells apart, keyed by its track and its label: its name.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^(local|remote)/[^/\\n\\r]{1,64}$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 60,
+        "pattern": "\\S",
+        "not": {
+          "pattern": "[\\n\\r]"
+        }
+      }
+    }
+  }
+}
