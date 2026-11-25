@@ -1,0 +1,109 @@
+$ pdfinfo p3-meeting-059b101.pdf
+Title:           Prix & essai
+Creator:         Typst 0.15.1
+Custom Metadata: no
+Metadata Stream: yes
+Tagged:          yes
+UserProperties:  no
+Suspects:        no
+Form:            none
+JavaScript:      no
+Pages:           1
+Encrypted:       no
+Page size:       595.276 x 841.89 pts (A4)
+Page rot:        0
+File size:       41165 bytes
+Optimized:       no
+PDF version:     1.7
+
+$ pdfinfo -struct p3-meeting-059b101.pdf
+Document
+  H1 "Prix & essai" (block)
+  H2 "Points forts" (block)
+  P (block)
+    Span (inline)
+  H3 "Annexe" (block)
+  L (block):
+     /ListNumbering /Circle
+    LI (block)
+      Lbl (block)
+      LBody (block)
+  H2 "Actions" (block)
+  L (block):
+     /ListNumbering /Circle
+    LI (block)
+      Lbl (block)
+      LBody (block)
+  H2 "Transcription" (block)
+  Table (block):
+     /BBox [76.0751 498.796 381.36 599.286]
+    THead
+      TR
+        TH <U1x0y0>:
+           /Scope /Column
+           /Headers []
+          Span (inline)
+        TH <U1x1y0>:
+           /Scope /Column
+           /Headers []
+          Span (inline)
+        TH <U1x2y0>:
+           /Scope /Column
+           /Headers []
+          Span (inline)
+    TBody
+      TR
+        TD:
+           /Headers [(U1x0y0)]
+        TD:
+           /Headers [(U1x1y0)]
+        TD:
+           /Headers [(U1x2y0)]
+      TR
+        TD:
+           /Headers [(U1x0y0)]
+        TD:
+           /Headers [(U1x1y0)]
+        TD:
+           /Headers [(U1x2y0)]
+      TR
+        TD:
+           /Headers [(U1x0y0)]
+        TD:
+           /Headers [(U1x1y0)]
+        TD:
+           /Headers [(U1x2y0)]
+      TR
+        TD:
+           /Headers [(U1x0y0)]
+        TD:
+           /Headers [(U1x1y0)]
+        TD:
+           /Headers [(U1x2y0)]
+      TR
+        TD:
+           /Headers [(U1x0y0)]
+        TD:
+           /Headers [(U1x1y0)]
+        TD:
+           /Headers [(U1x2y0)]
+
+$ pdftotext -layout p3-meeting-059b101.pdf -
+Prix & essai
+Points forts
+Le prix est fixé : 49 €, « Kitokey ». <script>x</script> voir pixel
+
+Annexe
+• Écrire la page — Sam — vendredi
+
+Actions
+• 会议纪要
+
+Transcription
+ Temps Qui              Texte
+ 00:01    Moi           Bonjour à tous.
+ 00:04    Les autres Здравствуйте, коллеги.
+ 00:09    Les autres 价格确定，下周发布。
+ 00:12    Moi           Parfait   👍🎉
+ 00:14    Les autres 5 $ * 2 = #10 [env.] _x_ \ @ref <lab> "q"
+
