@@ -745,3 +745,6 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .trash-ask .trash-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .trash-ask .trash-choices button { white-space: nowrap; }
 .trash-ask .note:empty { display: none; }
+/* « Dates mentionnées » with its count (#1239): the calendar and the number in one pill, the row's height. */
+.icon-button.counted { width: auto; grid-auto-flow: column; gap: 4px; padding: 0 8px; }
+.icon-button .count { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
