@@ -260,6 +260,46 @@ pub fn structure(name: &str) -> Option<&'static Structure> {
     STRUCTURES.iter().find(|structure| structure.name == name)
 }
 
+/// The names a person gave the meeting's two sides (#1205), as `speakers.json` of `session-audio/v3` holds them;
+/// none, the side keeps the transcript's word alone. No producer tells voices apart yet: their names are not read.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Names {
+    pub me: Option<String>,
+    pub others: Option<String>,
+}
+
+/// The rule said with the names, after the one on the transcript's two words (#1205).
+const NAMED: &str = "A name in brackets after \"me\" or \"others\" is the one the user gave that side: write it for them.\n";
+/// Where it goes: the end of the rule on "me" and "others".
+const AFTER_SIDES: &str = "or the names the meeting or the context gives.\n";
+
+/// A name as `session-audio/v3` allows it: one line, 1 to 60 characters, not blank.
+fn allowed(name: &str) -> bool {
+    !name.trim().is_empty() && name.chars().count() <= 60 && !name.contains(['\n', '\r'])
+}
+
+/// The names a meeting's folder holds: each the contract allows, else none; a `speakers.json` absent, unreadable or
+/// that is no JSON object, none at all — the meeting read as before.
+pub fn speakers(folder: &Path) -> Names {
+    let Some(object) = fs::read(folder.join("speakers.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&bytes).ok())
+    else {
+        return Names::default();
+    };
+    let name = |key: &str| {
+        object
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .filter(|name| allowed(name))
+            .map(str::to_string)
+    };
+    Names {
+        me: name("me"),
+        others: name("others"),
+    }
+}
+
 /// What a provider is asked for `minutes/v4`: [`request_in`] without a structure.
 pub fn request(segments: &[Segment], context: Option<&str>) -> String {
     request_in(segments, context, None)
@@ -268,6 +308,12 @@ pub fn request(segments: &[Segment], context: Option<&str>) -> String {
 /// What a provider is asked: the rules, the structure's sections when there is one (`minutes/v5`),
 /// v4's three otherwise, the context the user attached, the meeting.
 pub fn request_in(segments: &[Segment], context: Option<&str>, structure: Option<&Structure>) -> String {
+    request_named(segments, context, structure, &Names::default())
+}
+
+/// [`request_in`], each line saying its side's name beside the transcript's word, « me (Sarah) », and one rule saying
+/// what that name is (#1205). Without a name, the request is [`request_in`]'s, byte for byte.
+pub fn request_named(segments: &[Segment], context: Option<&str>, structure: Option<&Structure>, names: &Names) -> String {
     let mut asked = String::from(
         "You write the minutes of a meeting from its transcript.\n\
          Write everything in the language the meeting is held in, the three titles included: \
@@ -349,16 +395,20 @@ pub fn request_in(segments: &[Segment], context: Option<&str>, structure: Option
     if let Some(context) = context.map(str::trim).filter(|context| !context.is_empty()) {
         asked.push_str(&format!("Context given by the user:\n{context}\n\n"));
     }
+    if (names.me.is_some() || names.others.is_some())
+        && let Some(at) = asked.find(AFTER_SIDES)
+    {
+        asked.insert_str(at + AFTER_SIDES.len(), NAMED);
+    }
     asked.push_str("Transcript:\n");
     for segment in segments {
         let seconds = segment.start as u64;
-        asked.push_str(&format!(
-            "[{:02}:{:02}] {}: {}\n",
-            seconds / 60,
-            seconds % 60,
-            segment.speaker,
-            segment.text
-        ));
+        let name = if segment.speaker == "me" { &names.me } else { &names.others };
+        let who = match name {
+            Some(name) => format!("{} ({name})", segment.speaker),
+            None => segment.speaker.clone(),
+        };
+        asked.push_str(&format!("[{:02}:{:02}] {}: {}\n", seconds / 60, seconds % 60, who, segment.text));
     }
     asked
 }
