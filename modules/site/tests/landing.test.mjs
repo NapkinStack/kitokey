@@ -9,7 +9,7 @@ import { dist } from "./helpers.mjs";
 import { installSources } from "../site.config.mjs";
 import { channels, landing } from "../src/lib/landing.mjs";
 
-const KEYS = ["transcript", "summary", "dates", "player", "send", "confidential"]; // the record slide is drawn
+const KEYS = ["transcript", "summary", "dates", "send", "confidential"]; // the record slide is drawn
 
 // The READMEs' bash blocks, cut in paragraphs at blank lines, each with the system it is for: the one its
 // comments name, else the one its section's heading names, else none — a paragraph for every system.
@@ -61,10 +61,10 @@ for (const lang of ["en", "fr"]) {
     }
   });
 
-  test(`/${lang}/: the hero's carousel, the drawn call then six c16 clips in their order, each with its poster and its words`, async () => {
+  test(`/${lang}/: the hero's carousel, the drawn call then five c16 clips in their order, each with its poster and its words`, async () => {
     const html = await page(lang);
     const slides = [...html.matchAll(/<article class="slide"[\s\S]*?<\/article>/g)].map((m) => m[0]);
-    assert.equal(slides.length, 7);
+    assert.equal(slides.length, 6);
     const [call, ...clips] = slides;
     assert.doesNotMatch(call, /data-clip=/);
     assert.ok(call.includes(`role="img" aria-label="${landing.slides[lang][0][5]}"`), "the call is not described");
@@ -77,6 +77,15 @@ for (const lang of ["en", "fr"]) {
     }
   });
 }
+
+test("the waves move for ever but pause on a button, and stand still under reduced motion (WCAG 2.2.2)", async () => {
+  const js = await readFile(join(dist, "waves.js"), "utf8");
+  assert.match(js, /className = "waves-pause"/);
+  assert.match(js, /aria-pressed/);
+  assert.match(js, /prefers-reduced-motion: reduce/);
+  assert.match(js, /document\.hidden/);
+  assert.match(js, /IntersectionObserver/);
+});
 
 test("the clips are c16's alone, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
   const want = KEYS.flatMap((k) => ["en", "fr"].flatMap((l) => ["jpg", "mp4", "webm"].map((e) => `${k}-${l}-light.${e}`))).sort();

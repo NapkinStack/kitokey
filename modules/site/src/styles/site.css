@@ -122,7 +122,12 @@ p { text-wrap: pretty; }
 .hero h1 .second { color: var(--accent); }
 .hero .lead { margin: 1.2rem auto 0; max-width: 44rem; }
 .hero-cta { display: flex; flex-wrap: wrap; gap: .9rem 1.4rem; justify-content: center; align-items: center; margin-top: 1.6rem; }
-.hero-copy .waves { position: absolute; left: calc(50% - 50vw); width: 100vw; top: -8%; height: 70%; z-index: -1; pointer-events: none; opacity: .16; }
+.hero-copy .waves { position: absolute; left: calc(50% - 50vw); width: 100vw; top: -10%; height: 80%; z-index: -1; pointer-events: none; opacity: .17; }
+/* The waves' pause (WCAG 2.2.2), small, in the hero's corner; public/waves.js adds it. */
+.waves-pause { position: absolute; right: 16px; top: 12px; z-index: 3; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 80%, transparent); color: var(--soft); cursor: pointer; display: grid; place-items: center; opacity: .7; }
+.waves-pause:hover, .waves-pause:focus-visible { opacity: 1; color: var(--ink); }
+.waves-pause i { width: 8px; height: 10px; border-left: 2.5px solid currentColor; border-right: 2.5px solid currentColor; }
+.waves-pause[aria-pressed="true"] i { width: 0; height: 0; border-right: 0; border-left: 8px solid currentColor; border-top: 5px solid transparent; border-bottom: 5px solid transparent; margin-left: 2px; }
 
 /* The hero's carousel: one feature per slide, native swipe (scroll-snap); public/slider.js adds the rest. */
 .slider { margin: clamp(2rem, 1.5rem + 2vw, 3rem) auto 0; max-width: 1120px; position: relative; }
@@ -216,6 +221,7 @@ p { text-wrap: pretty; }
 .use.u-3 { background: linear-gradient(160deg, var(--tint), var(--surface) 70%); }
 @media (min-width: 760px) { .uses { grid-template-columns: repeat(6, 1fr); } .use, .uses .use.u-after { grid-column: span 3; } }
 @media (min-width: 1100px) { .use { grid-column: span 2; } .use.u-3, .use.u-4 { grid-column: span 3; } }
+@media (min-width: 1100px) { .uses .use.u-after { grid-column: span 2; } }
 
 .systems { display: grid; gap: 16px; }
 @media (min-width: 860px) { .systems { grid-template-columns: repeat(3, 1fr); } }
