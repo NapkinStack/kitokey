@@ -3180,9 +3180,9 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     const now = element("div", "live-now");
     now.append(time, pageLevels(nameOf(session), time, words));
     drawing.append(now);
-  } else if (transcript.state === "present" && !listened) {
-    // No sound to play (#1233) — freed, or there and unreadable —: its two lanes dotted, why said under them
-    // (`playerBar`). Turns drawn over a sound that is not there read as a fault: a block alone at a long meeting's start.
+  } else if (transcript.state === "present" && session.audio === 0) {
+    // Its sound freed (#1233): its two lanes dotted, why said under them (`playerBar`). Turns drawn over a sound that
+    // is gone read as a fault: a block alone at a meeting's start. A sound there but unreadable keeps them (#1201).
     drawing.append(quietLanes());
   } else if (transcript.state === "present") {
     drawing.append(relief(said, total, words));
