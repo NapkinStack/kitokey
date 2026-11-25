@@ -39,6 +39,14 @@ Only what you choose, on a click:
 The first start offers the speech model; nothing is downloaded before you choose it. Everything
 that leaves your computer, and to which host, is in the [privacy policy](privacy.md).
 
+### Does Kitokey use my graphics card?
+
+When Ollama runs the minutes' model, it uses the machine's graphics card when it can and
+skips it without saying: on recent integrated graphics, e.g. an AMD Radeon 860M, it runs on the
+processor unless `OLLAMA_IGPU_ENABLE=1` is set. Kitokey does not set that; if the inference ran
+on the processor while a graphics card was available and skipped, the meeting's page says so in
+its diagnostic, and the provider's own instructions tell how to enable it.
+
 ### How does the free trial work?
 
 Kitokey is free for 14 days and 10 meetings, whichever comes last. Settings show what is left.
