@@ -5994,6 +5994,11 @@ def settings_narrow_without_model(now: dt.datetime) -> None:
             check(f"{short}, 420 px, no model on this computer: the choice whole as the list's tooltip, the state said under it (#868)",
                   said[0] == said[1] and said[0] and said[0].endswith(whole) and said[2] and whole.split()[0] in said[2].lower(), said)
             browser.execute_script("document.getElementById('model').scrollIntoView({block: 'center'})")
+            # A short word in its tag stays on one line at 420 px (#1235): « intégré » broke as « intégr / é ».
+            tags = browser.execute_script(
+                "return [...document.querySelectorAll('#settings code.tag')].filter(t => t.offsetParent).map(t => [t.textContent, t.getClientRects().length,"
+                " Math.round(t.getBoundingClientRect().height / (parseFloat(getComputedStyle(t).lineHeight) || 16))])")
+            check(f"{short}, 420 px: each tag one line, never broken inside its word (#1235)", tags and all(rects == 1 and rows == 1 for _, rects, rows in tags), tags)
             shot(browser, f"868-settings-420-{short}")
             # « Avancé » as a person reaches it: scrolled to, then clicked where it shows.
             toggle = browser.find_element(By.ID, "general-advanced")
