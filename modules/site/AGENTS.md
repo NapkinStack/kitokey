@@ -16,7 +16,7 @@ Astro's telemetry is off in every script.
 
 - It runs nothing on a server: `astro build` writes static files, no adapter, no function.
 - It writes no policy of its own: `/privacy/` is `docs/privacy.md`, read at build time.
-- It asks nothing of another domain: no analytics, no CDN, no web font, no embed.
+- It asks nothing of another domain: no analytics, no CDN, no font from another host, no embed.
 
 ## Internal conventions nobody could guess
 
@@ -25,7 +25,9 @@ Astro's telemetry is off in every script.
 - **Every sentence lives in `src/lib/words.mjs`**, in English and French, with `keeps`: what keeps its
   promise, a merged deliverable or a test, as `docs/store/listing.md` does. The voice:
   `modules/shell/docs/voice.md`.
-- **The look is the app's**: `src/styles/site.css` copies the tokens of the shell's window stylesheet.
+- **The look is proposal D's** (the decider, 2026-11-25): light only, the titles in Bricolage Grotesque served from
+  `public/fonts/` with its licence beside it, the text in the system's font, the aurora mesh behind every page.
+  `src/layouts/Page.astro` is every page's frame: a page passes `kind` for its `<main>`.
 - **Closed until the decider opens it**: every page `noindex`, `robots.txt` `Disallow: /`. `SITE_OPEN=1`
   builds the opening's site; the opening's commit makes it the default and changes `tests/closed.test.mjs`.
 
