@@ -1309,6 +1309,11 @@ function pageLevels(name, time, words) {
   const paint = (now) => {
     time.textContent = elapsed(now.seconds);
     for (const [index, track] of tracks.entries()) paintLevel(track, now.levels[index]);
+    // Said confidential or no longer, by the page's switch or the bar's (#1204): its header's lock as the folder says.
+    const holds = row.closest("#meeting")?.querySelector(".meeting-title .holds");
+    const locked = holds?.querySelector(".chip.locked");
+    if (now.confidential && holds && !locked) holds.prepend(lockedChip(words));
+    if (!now.confidential) locked?.remove();
   };
   // Drawn again, its traces go on from the ones it replaces, never from empty (#1133).
   if (pageLast?.meeting === name) {
@@ -3001,7 +3006,11 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const lasts = element("span", "lasts");
   if (session.seconds !== null) lasts.append(element("span", "length", length(session.seconds)));
   if (session.audio > 0) lasts.append(element("span", "weighs", fill(words.audio_weighs, size(session.audio, words))));
-  title.append(named, lasts, holdings(session, words, true));
+  const held = holdings(session, words, true);
+  // While it records, said confidential (#1204, D60): the lock and its word first, beside « Enregistrement », as the
+  // bar shows it; at rest, the page's own switch says it.
+  if (session.confidential && session.state === "recording") held.prepend(lockedChip(words));
+  title.append(named, lasts, held);
   head.append(title, top);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
@@ -5230,6 +5239,16 @@ function showSmall(words) {
   );
   meters.hidden = true;
   time.after(meters);
+  // Said confidential (#1204, D60): a lock in the row while it records, named for a screen reader and in its tooltip,
+  // as a row's mark in the list — the bar has no room for its word, the switch under « Plus d’options » says it whole.
+  const locked = element("span", "bar-locked");
+  locked.id = "small-locked";
+  locked.setAttribute("role", "img");
+  locked.setAttribute("aria-label", words.confidential_name);
+  locked.title = words.confidential_name;
+  locked.append(lock());
+  locked.hidden = true;
+  meters.after(locked);
   const note = element("p", "says", words.small_note);
   note.id = "small-note";
   note.hidden = true;
@@ -5440,6 +5459,8 @@ function showSmall(words) {
       field.painted();
       rest.hidden = recording;
       live.hidden = !recording;
+      // At rest, no lock: the next recording says its own.
+      if (!recording) locked.hidden = true;
       // A recording starts its traces from empty, never from the last one's last two seconds.
       if (recording) for (const id of ["level-me", "level-others"]) drawLevel(document.getElementById(id), levelShown(undefined, 0, 0, false, TRACE), 0);
       // The microphone in each state's options: recording, after the context, as board 6 has it.
@@ -5523,6 +5544,8 @@ function showSmall(words) {
       secret.row.classList.toggle("on", now.confidential);
     }
     if (Date.now() - mark.refused >= 5000) marked();
+    // The lock as the switch stands: the folder's word, or a turn not yet kept.
+    locked.hidden = !(recording && secret.box.checked);
     // Said confidential, or no longer: « Avancé » offers otherwise — no service then (D60) —, drawn
     // again as it was, open or closed.
     if (now.meeting !== null && now.confidential !== shownConfidential) {
