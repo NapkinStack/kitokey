@@ -1,6 +1,6 @@
 // D114, the landing (proposal D, validated by the decider on 2026-11-25): /en/ and /fr/ hold every section
-// their nav names, nothing left to measure, the install's commands as the module gives them, and a carousel of
-// the app filmed (c16), each slide with its poster and its words; the clips c16's alone; the root to French.
+// their nav names, nothing left to measure, the install's commands as the module gives them, and a carousel, the
+// drawn call then the app filmed (c16), each slide with its poster and its words; the clips c16's alone; the root to French.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir, stat } from "node:fs/promises";
@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { dist } from "./helpers.mjs";
 import { channels, landing } from "../src/lib/landing.mjs";
 
-const KEYS = ["record", "transcript", "summary", "dates", "player", "send", "confidential"];
+const KEYS = ["transcript", "summary", "dates", "player", "send", "confidential"]; // the record slide is drawn
 
 const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8");
 const text = (html) => html.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&gt;/g, ">").replace(/&lt;/g, "<");
@@ -36,12 +36,17 @@ for (const lang of ["en", "fr"]) {
     }
   });
 
-  test(`/${lang}/: the hero's carousel shows the seven c16 clips in their order, each with its poster and its words`, async () => {
+  test(`/${lang}/: the hero's carousel, the drawn call then six c16 clips in their order, each with its poster and its words`, async () => {
     const html = await page(lang);
     const slides = [...html.matchAll(/<article class="slide"[\s\S]*?<\/article>/g)].map((m) => m[0]);
-    assert.deepEqual(slides.map((s) => s.match(/data-clip="\/clips\/([a-z]+)-/)?.[1]), KEYS);
-    for (const [i, s] of slides.entries()) {
-      const [key, , , , , alt] = landing.slides[lang][i];
+    assert.equal(slides.length, 7);
+    const [call, ...clips] = slides;
+    assert.doesNotMatch(call, /data-clip=/);
+    assert.ok(call.includes(`role="img" aria-label="${landing.slides[lang][0][5]}"`), "the call is not described");
+    assert.equal([...call.matchAll(/<img class="ptr" src="\/img\/call-[a-z]+\.webp"/g)].length, 4);
+    assert.deepEqual(clips.map((s) => s.match(/data-clip="\/clips\/([a-z]+)-/)?.[1]), KEYS);
+    for (const [i, s] of clips.entries()) {
+      const [key, , , , , alt] = landing.slides[lang][i + 1];
       assert.match(s, new RegExp(`<img class="still" src="/clips/${key}-${lang}-light\\.jpg" width="1280" height="720"`));
       assert.ok(s.includes(`alt="${alt}"`), `slide ${key}: its alt is not its words`);
     }

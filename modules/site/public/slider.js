@@ -1,7 +1,7 @@
 // kitokey.com's hero carousel (D114, proposal D). Without this file the slides still swipe (CSS scroll-snap)
 // and each shows its clip's poster. With it: arrow keys, a calm crossfade on a fine pointer, and on screens of
 // 700 px and more the clip itself (AV1 WebM, else H.264 MP4). Each clip plays once per view, then the next
-// slide comes 0.6 s later. WCAG 2.2.2: autoplay pauses on hover and on focus inside, never starts under
+// slide comes 0.6 s later; the drawn call of slide 1 stays 3 s, a poster alone 3.5 s. WCAG 2.2.2: autoplay pauses on hover and on focus inside, never starts under
 // reduced motion (posters only), and rests on slide 1 after two full cycles.
 (() => {
   "use strict";
@@ -12,7 +12,7 @@
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
   const wide = matchMedia("(min-width: 700px)");
   const fade = matchMedia("(hover: hover) and (pointer: fine)").matches;
-  const HOLD = 600, STILL = 3500, CYCLES = 2;
+  const HOLD = 600, FIRST = 3000, STILL = 3500, CYCLES = 2;
   let at = 0, timer = null, seen = false, hover = false, held = false, shown = 0;
   if (fade) slider.classList.add("fade");
 
@@ -21,7 +21,7 @@
   const schedule = () => {
     clearTimeout(timer);
     if (still() || video(at)) return; // a clip's « ended » moves on
-    timer = setTimeout(() => go(at + 1), STILL);
+    timer = setTimeout(() => go(at + 1), at === 0 ? FIRST : STILL);
   };
   const mark = (n) => {
     at = n;
@@ -58,6 +58,7 @@
   // The clips: added only where they play, so a phone or a reduced-motion reader downloads posters alone.
   if (wide.matches && !reduce.matches) {
     for (const [index, s] of slides.entries()) {
+      if (!s.dataset.clip) continue; // the drawn call has no clip
       const img = s.querySelector("img.still");
       const v = document.createElement("video");
       Object.assign(v, { muted: true, playsInline: true, preload: "none", poster: img.currentSrc || img.src });

@@ -34,7 +34,13 @@ const raw = {
     fr: ["Kitokey, fonction par fonction", "diapositive", "carrousel", "sur"],
     keeps: "the carousel's own words (WAI-ARIA's carousel pattern)",
   },
-  // The seven clips of c16, filmed from the app at main dad969f (shell e2e, run i-sam-film16c), in their order.
+  call: {
+    en: ["Video call", "(you)"],
+    fr: ["Appel vidéo", "(vous)"],
+    keeps: "the record slide's drawn call (proposal D, the decider's request): generated portraits of people who do not exist",
+  },
+  // The slides: the clips of c16, filmed from the app at main dad969f (shell e2e, run i-sam-film16c), in their
+  // order; the record slide shows the drawn call instead, the decider's request (2026-11-25).
   slides: {
     en: [["record", "mic", "Record", "One click, and the call is recorded.", "Your microphone on one side, the call’s audio on the other. No bot joins the meeting.", "Sarah records a video call with Camille, Hugo and Léa. At the top, Kitokey’s small bar shows the elapsed time, a level trace for Sarah’s microphone and one for the call’s audio."],
       ["transcript", "transcript", "Transcribe", "The whole meeting, transcribed on your computer.", "Every line carries its time. Name the two sides, here Sarah on one, Camille, Hugo and Léa on the other.", "The transcript of the weekly team check-in. The two sides are renamed Sarah and Camille, Hugo and Léa, each line with its time."],
