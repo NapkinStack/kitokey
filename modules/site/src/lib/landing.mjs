@@ -27,7 +27,7 @@ const raw = {
   cta: {
     en: ["Install on Linux, free", "Follow the releases"],
     fr: ["Installer sur Linux, gratuit", "Suivre les sorties"],
-    keeps: "PDR-0001, free on Linux; the repository's releases",
+    keeps: "PDR-0001, free on Linux; the repository's tags, each a release (v0.2.6, 2026-11-18)",
   },
   slider: {
     en: ["Kitokey, feature by feature", "slide", "carousel", "of"],
@@ -35,9 +35,9 @@ const raw = {
     keeps: "the carousel's own words (WAI-ARIA's carousel pattern)",
   },
   call: {
-    en: ["Video call", "(you)"],
-    fr: ["Appel vidéo", "(vous)"],
-    keeps: "the record slide's drawn call (proposal D, the decider's request): generated portraits of people who do not exist",
+    en: ["Video call", "(you)", "Sarah records a video call with Camille, Hugo and Léa. At the top, Kitokey’s small bar shows the elapsed time, a level trace for Sarah’s microphone and one for the call’s audio."],
+    fr: ["Appel vidéo", "(vous)", "Sarah enregistre un appel vidéo avec Camille, Hugo et Léa. En haut, la petite barre de Kitokey montre le temps écoulé, une trace de niveau pour le micro de Sarah et une pour le son de l’appel."],
+    keeps: "proposal D's drawn call (the decider's request, 2026-11-25): generated portraits of people who do not exist; the bar as the app draws it while recording (#1179, « B · Trace »)",
   },
   // The slides: the clips of c16, filmed from the app at main dad969f (shell e2e, run i-sam-film16c), in their
   // order; the record slide shows the drawn call instead, the decider's request (2026-11-25).
@@ -80,9 +80,9 @@ const raw = {
     keeps: "docs/privacy.md (a confidential meeting made on this computer alone, D110); ADR-0013, a service the user names with their key; LICENSE",
   },
   proof: {
-    en: "Only what you ask for leaves. The models you download (huggingface.co and Ollama’s registry), the list of models (raw.githubusercontent.com) and the minutes you send. This site uses no cookie and no tracker.",
-    fr: "Ne sortent que ce que vous demandez. Les modèles que vous téléchargez (huggingface.co et le registre d’Ollama), la liste des modèles (raw.githubusercontent.com) et les comptes rendus que vous envoyez. Ce site n’utilise ni cookie ni traceur.",
-    keeps: "docs/privacy.md, its table of hosts and « This website »; tests/own-domain.test.mjs",
+    en: "Only what you ask for leaves. A meeting’s sound and its transcript, to the online service you chose to transcribe it or write its minutes. The models you download (huggingface.co and Ollama’s registry), the list of models (raw.githubusercontent.com) and the minutes you send. This site uses no cookie and no tracker.",
+    fr: "Ne sortent que ce que vous demandez. Le son et la transcription d’une réunion, vers le service en ligne que vous avez choisi pour la transcrire ou en écrire le compte rendu. Les modèles que vous téléchargez (huggingface.co et le registre d’Ollama), la liste des modèles (raw.githubusercontent.com) et les comptes rendus que vous envoyez. Ce site n’utilise ni cookie ni traceur.",
+    keeps: "docs/privacy.md, its table of what leaves and to which host, and « This website »; tests/own-domain.test.mjs",
   },
   local: {
     en: ["Settings", "Model settings. For transcription, On this computer is chosen. Whisper, 874 MB, works offline and nothing is sent."],
@@ -131,9 +131,9 @@ const raw = {
     keeps: "modules/install/README.md (Copr, D78) and README.md (Ubuntu), the commands below",
   },
   channelNotes: {
-    en: { ubuntu: "On Ubuntu 24.04, build the package. It needs <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> and <code>podman</code>. The build takes a while." },
-    fr: { ubuntu: "Sur Ubuntu 24.04, compilez le paquet. Il faut <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> et <code>podman</code>. La construction prend un moment." },
-    keeps: "README.md: « Needs git, uv and podman », none published yet",
+    en: { ubuntu: "On Ubuntu 24.04, build the package. It needs <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> and <code>podman</code>. If <code>nstack</code> is then not found, <code>uv tool update-shell</code> puts it on your path. The build takes a while." },
+    fr: { ubuntu: "Sur Ubuntu 24.04, compilez le paquet. Il faut <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> et <code>podman</code>. Si <code>nstack</code> est ensuite introuvable, <code>uv tool update-shell</code> le met dans votre chemin. La construction prend un moment." },
+    keeps: "README.md: « Needs git, uv and podman », and uv tool update-shell when nstack is not found",
   },
   needs: {
     en: ["Prerequisites", [["transcript", "Transcription.", "At first start, its model (874 MB) downloads in one click."],
@@ -153,7 +153,7 @@ const raw = {
       ["How long do the minutes take?", "It depends on your computer and the length of the call, because the work happens on your machine and not on a server. Think minutes rather than seconds."],
       ["Does it work on Wayland, with PipeWire?", "Yes, on GNOME (Wayland), with sound through PipeWire. That is the environment its end-to-end tests run in. Other desktops are not tested yet."],
       ["Am I allowed to record a call?", "It is up to you to tell the participants you are recording and to get their consent. It is common courtesy, and often the law. Kitokey reminds you, and the reminder can be turned off."],
-      ["Which languages are transcribed?", "English and French, on your computer. An online service you choose detects the spoken language."]]],
+      ["Which languages are transcribed?", "Kitokey detects the spoken language, or you set it for each meeting: English, French, German, Spanish, Italian, Portuguese, Dutch, Arabic, and many more that Whisper hears."]]],
     fr: ["Questions fréquentes", [
       ["Faut-il installer quelque chose dans Zoom, Meet ou Teams ?", "Non. Kitokey enregistre le son de votre ordinateur. Il fonctionne avec n’importe quelle application d’appel et aucun robot ne rejoint la réunion."],
       ["Kitokey reconnaît-il chaque participant ?", "Non. Il sépare deux côtés, votre micro (Vous) et le son de l’appel (Les autres), et vous pouvez renommer chacun. Il ne distingue pas les voix des autres participants entre elles."],
@@ -164,8 +164,8 @@ const raw = {
       ["Combien de temps faut-il pour le compte rendu ?", "Cela dépend de votre ordinateur et de la durée de l’appel, car le travail se fait sur votre machine et pas sur un serveur. Comptez des minutes plutôt que des secondes."],
       ["Fonctionne-t-il sous Wayland, avec PipeWire ?", "Oui, sous GNOME (Wayland), le son passe par PipeWire. C’est l’environnement où tournent ses tests de bout en bout. Les autres bureaux ne sont pas encore testés."],
       ["Ai-je le droit d’enregistrer un appel ?", "C’est à vous d’annoncer l’enregistrement aux participants et d’obtenir leur accord. C’est la règle de bon sens, et souvent celle de la loi. Kitokey vous le rappelle, et ce rappel peut se désactiver."],
-      ["Quelles langues sont transcrites ?", "Le français et l’anglais, sur votre ordinateur. Un service en ligne de votre choix détecte la langue parlée."]]],
-    keeps: "docs/support.md (Ollama, the folder); #1211 and #1205, the two sides named; words.rs minutes_ai; docs/privacy.md, the reminder; cycle 01, GNOME on Wayland; transcription.rs, French and English locally, a service detects (D64, D65)",
+      ["Quelles langues sont transcrites ?", "Kitokey détecte la langue parlée, ou vous la choisissez pour chaque réunion : le français, l’anglais, l’allemand, l’espagnol, l’italien, le portugais, le néerlandais, l’arabe, et bien d’autres que Whisper entend."]]],
+    keeps: "docs/support.md (Ollama, the folder); #1211 and #1205, the two sides named; words.rs minutes_ai; docs/privacy.md, the reminder; cycle 01, GNOME on Wayland; spoken.rs, the eight languages offered and any other of ISO 639-1, none said: the engine detects it (D64, D65)",
   },
   final: {
     en: "Try it on your next call.",

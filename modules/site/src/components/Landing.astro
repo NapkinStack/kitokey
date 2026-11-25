@@ -3,6 +3,7 @@
 // src/lib/landing.mjs. The hero's carousel: the drawn call, then six c16 clips, each slide's poster first.
 import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
+import Call from "./Call.astro";
 import { channels, landing as w, repo } from "../lib/landing.mjs";
 import { brand, ico } from "../lib/icons.mjs";
 
@@ -12,16 +13,7 @@ const [privacyId, usesId, systemsId, faqId, installId] = t("nav").map(([id]) => 
 const [h1a, h1b, lead] = t("hero");
 const [cta, follow] = t("cta");
 const [sLabel, sSlide, sRole, sOf] = t("slider");
-const [callTitle, you] = t("call");
-// The record slide's call: generated portraits of people who do not exist (OpenRouter, 2026-11-25), as in
-// proposal D; Camille speaks. Over it, Kitokey's compact bar, drawn and still: the dot, the time, a level trace
-// for each side (the app's « B · Trace », #1179), stop.
-const CALL = [["camille", "Camille"], ["hugo", "Hugo"], ["lea", "Léa"], ["vous", null]];
-const trace = (seed) => {
-  const heights = [2, 2, 2, 2, 6 + seed, 10, 7, 12 - seed, 5, 2, 2, 8, 11, 6, 9 - (seed % 3), 4];
-  return `<svg class="tr" viewBox="0 0 64 18" aria-hidden="true">${heights.map((h, i) => `<rect x="${i * 4}" y="${(9 - h / 2).toFixed(1)}" width="2.2" height="${h}" rx="1.1"/>`).join("")}</svg>`;
-};
-const speaker = '<svg class="ico mb-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h4l5-4v13l-5-4H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M16.5 9a4 4 0 0 1 0 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const [callTitle] = t("call");
 const [chH, chP, chWith] = t("channels");
 const [pEyebrow, pH, pLead] = t("privacy");
 const [localTitle, localAlt] = t("local");
@@ -43,7 +35,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
     <div class="wrap hero-copy">
       <h1 id="h1"><span>{h1a}</span> <span class="second">{h1b}</span></h1>
       <p class="lead">{lead}</p>
-      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/releases`}>{follow}</a></div>
+      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/tags`}>{follow}</a></div>
     </div>
     <div class="wrap">
       <section class="slider" aria-roledescription={sRole} aria-label={sLabel}>
@@ -53,12 +45,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
               {key === "record" ? (
                 <div class="slide-media window">
                   <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">{callTitle}</span></div>
-                  <div class="call" role="img" aria-label={alt}>
-                    <div class="kbar" aria-hidden="true"><span class="mb-dot"></span><span class="mb-time">00:16:42</span><span class="kb-tr kb-me"><Fragment set:html={ico("mic", "ico mb-ico") + trace(1)} /></span><span class="kb-tr kb-call"><Fragment set:html={speaker + trace(4)} /></span><span class="mb-stop"><span class="mb-square"></span></span></div>
-                    <div class="grid">
-                      {CALL.map(([file, name], n) => <div class={`ctile${n === 0 ? " speaking" : ""}`}><img class="ptr" src={`/img/call-${file}.webp`} width="960" height="540" alt="" decoding="async" /><span class="who">{name ?? <>Sarah <small>{you}</small></>}</span></div>)}
-                    </div>
-                  </div>
+                  <Call lang={lang} />
                 </div>
               ) : (
                 <div class="slide-media window">
@@ -178,7 +165,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
   <section class="final" aria-labelledby="final-h">
     <div class="wrap">
       <h2 id="final-h" class="reveal">{t("final")}</h2>
-      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/releases`}>{follow}</a></div>
+      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/tags`}>{follow}</a></div>
     </div>
   </section>
 </Page>

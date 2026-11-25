@@ -138,8 +138,8 @@ p { text-wrap: pretty; }
 .slide-card h2 { font-size: clamp(1.35rem, 1.1rem + 1vw, 1.9rem); font-weight: 760; }
 .slide-card p:not(.kicker) { color: var(--soft); }
 @media (min-width: 900px) { .slide { grid-template-columns: minmax(0, 1.75fr) minmax(260px, 1fr); gap: 28px; } }
-/* The record slide: a neutral, unbranded video call of four, drawn here, generated portraits of people who do not
-   exist, with Kitokey's compact bar on top, smaller and still. */
+
+/* The drawn call: four tiles, generated portraits, Kitokey's compact bar on top, smaller and still. */
 .call { position: relative; flex: 1; min-height: 0; background: #1C1F26; padding: 14px; display: flex; }
 .call .grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; }
 .call .ctile { position: relative; border-radius: 12px; overflow: hidden; background: #2A2E37; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }

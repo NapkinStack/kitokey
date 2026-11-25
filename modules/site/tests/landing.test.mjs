@@ -6,9 +6,18 @@ import assert from "node:assert/strict";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { dist } from "./helpers.mjs";
+import { installSources } from "../site.config.mjs";
 import { channels, landing } from "../src/lib/landing.mjs";
 
 const KEYS = ["transcript", "summary", "dates", "player", "send", "confidential"]; // the record slide is drawn
+
+// Every command line the READMEs' bash blocks give, its comment dropped.
+const given = new Set();
+for (const source of installSources) {
+  for (const [, block] of (await readFile(source, "utf8")).matchAll(/```bash\n([\s\S]*?)```/g)) {
+    for (const line of block.split("\n")) if (line.trim()) given.add(line.replace(/\s+#.*$/, "").trim());
+  }
+}
 
 const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8");
 const text = (html) => html.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&gt;/g, ">").replace(/&lt;/g, "<");
@@ -27,12 +36,13 @@ for (const lang of ["en", "fr"]) {
     assert.doesNotMatch(await page(lang), /\[(À MESURER|TO MEASURE)\]|class="todo"|TODO|XXX/);
   });
 
-  test(`/${lang}/: the install's commands, as the module gives them`, async () => {
+  test(`/${lang}/: the install's commands, each a line of the install's READMEs`, async () => {
     const html = await page(lang);
     for (const [os, , commands] of channels) {
       const shown = html.match(new RegExp(`<pre class="os-code" data-os="${os}"[^>]*>([\\s\\S]*?)</pre>`))?.[1];
       assert.ok(shown, `no commands for ${os}`);
       assert.equal(text(shown).replace(/^\$ /gm, ""), commands);
+      for (const line of commands.split("\n")) assert.ok(given.has(line), `${os}: « ${line} » is in no README`);
     }
   });
 
