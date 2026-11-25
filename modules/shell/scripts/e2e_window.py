@@ -12092,9 +12092,9 @@ def confidential_kept(now: dt.datetime) -> None:
         # The last meeting, drawn beside the list already: its page may be drawn again under the driver.
         shown = wait_for(browser, lambda b: b.find_elements(By.ID, "confidential-switch"), 10)
         # Its summary's sections, made with nothing under them (#1234): each says so, never a bare title.
-        sections = wait_for(browser, lambda b: b.execute_script(
-            "return [...document.querySelectorAll('#meeting .minutes .body h2')].map(h => [h.textContent,"
-            " h.nextElementSibling && h.nextElementSibling.tagName !== 'H2' ? h.nextElementSibling.textContent : null])") or None, 10)
+        sections_read = ("return [...document.querySelectorAll('#meeting .minutes .body h2')].map(h => [h.textContent,"
+                         " h.nextElementSibling && h.nextElementSibling.tagName !== 'H2' ? h.nextElementSibling.textContent : null])")
+        sections = wait_for(browser, lambda b: b.execute_script(sections_read), 10) and browser.execute_script(sections_read)
         check("a summary's section with nothing under it says « Rien de noté », never its title alone (#1234)",
               sections and len(sections) == 3 and all(said == "Rien de noté" for _, said in sections), sections)
         check("its page says it, the switch on, nothing said to have left",
