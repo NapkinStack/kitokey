@@ -1,35 +1,31 @@
 // D114, the landing (proposal D, validated by the decider on 2026-11-25): /en/ and /fr/ hold every section
-// their nav names, nothing left to measure, the install's commands as the module gives them, and a carousel, the
+// their nav names, nothing left to measure, the install's commands as README.md gives them, and a carousel, the
 // drawn call then the app filmed (c16), each slide with its poster and its words; the clips c16's alone; the root to French.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { dist } from "./helpers.mjs";
-import { installSources } from "../site.config.mjs";
+import { installSource } from "../site.config.mjs";
 import { channels, landing } from "../src/lib/landing.mjs";
 
 const KEYS = ["transcript", "summary", "dates", "player", "send", "confidential"]; // the record slide is drawn
 
-// The READMEs' bash blocks, cut in paragraphs at blank lines, each with the system it is for: the one its
-// comments name, else the one its section's heading names, else none — a paragraph for every system.
+// README.md's bash blocks, cut in paragraphs at blank lines, each with the system it is for: the one its
+// comments name, else those the prose just before the block names (« On Fedora 43, 44 and 45 », « On Ubuntu
+// 24.04 … »), else every system.
 const SYSTEMS = ["fedora", "ubuntu"];
 const named = (text) => SYSTEMS.filter((s) => text.toLowerCase().includes(s));
 const blocks = [];
-for (const source of installSources) {
-  let heading = "";
-  for (const [, title, block] of (await readFile(source, "utf8")).matchAll(/^#+ (.*)$|```bash\n([\s\S]*?)```/gm)) {
-    if (title !== undefined) { heading = title; continue; }
-    blocks.push(block.split(/\n\s*\n/).map((paragraph) => {
-      const lines = paragraph.split("\n").filter((l) => l.trim());
-      const own = named(lines.map((l) => l.match(/#(.*)$/)?.[1] ?? "").join(" "));
-      const systems = own.length ? own : named(heading).length === 1 ? named(heading) : [];
-      return { systems, lines: lines.map((l) => l.replace(/\s+#.*$/, "").trim()) };
-    }));
-  }
+for (const [, before, block] of (await readFile(installSource, "utf8")).matchAll(/([^\n]+(?:\n[^\n]+)*)\n+```bash\n([\s\S]*?)```/g)) {
+  blocks.push(block.split(/\n\s*\n/).map((paragraph) => {
+    const lines = paragraph.split("\n").filter((l) => l.trim());
+    const own = named(lines.map((l) => l.match(/#(.*)$/)?.[1] ?? "").join(" "));
+    return { systems: own.length ? own : named(before), lines: lines.map((l) => l.replace(/\s+#.*$/, "").trim()) };
+  }));
 }
 // A tab's commands are, line for line, one block's lines meant for its system or for every system. Debian 13
-// takes Ubuntu's package (modules/install/README.md, « On Debian »).
+// takes Ubuntu's package (README.md, « Install it »).
 const BUILT_AS = { debian: "ubuntu" };
 const given = (os, commands) => blocks.some((block) => {
   const lines = block.filter((p) => !p.systems.length || p.systems.includes(BUILT_AS[os] ?? os)).flatMap((p) => p.lines);
@@ -53,13 +49,13 @@ for (const lang of ["en", "fr"]) {
     assert.doesNotMatch(await page(lang), /\[(À MESURER|TO MEASURE)\]|class="todo"|TODO|XXX/);
   });
 
-  test(`/${lang}/: the install's commands, line for line, as a README block gives them for that system`, async () => {
+  test(`/${lang}/: the install's commands, line for line, as a block of README.md gives them for that system`, async () => {
     const html = await page(lang);
     for (const [os, , commands] of channels) {
       const shown = html.match(new RegExp(`<pre class="os-code" data-os="${os}"[^>]*>([\\s\\S]*?)</pre>`))?.[1];
       assert.ok(shown, `no commands for ${os}`);
       assert.equal(text(shown).replace(/^\$ /gm, ""), commands);
-      assert.ok(given(os, commands.split("\n")), `${os}: its commands are not a README block's lines for ${os}`);
+      assert.ok(given(os, commands.split("\n")), `${os}: its commands are not a README.md block's lines for ${os}`);
     }
   });
 
