@@ -9546,6 +9546,18 @@ def actions_rows(now: dt.datetime) -> None:
         time.sleep(0.5)
         browser.execute_script("document.querySelector('#meeting .minutes').scrollIntoView({block: 'start'})")
         time.sleep(0.3)
+        # Who made each version, said once (#1231): « sur cet ordinateur » never both in the list and after it, and
+        # each list as wide as the name it shows — never as wide as its longest option.
+        makers = browser.execute_script(
+            "const shown = (n) => n.nodeName === 'SELECT' ? (n.options[n.selectedIndex]?.textContent ?? '') : n.nodeType === 3 ? n.textContent"
+            " : [...n.childNodes].map(shown).join('');"
+            "const c = document.createElement('canvas').getContext('2d');"
+            "return [...document.querySelectorAll('#meeting .maker')].filter(p => p.querySelector('select.page-model')).map(p => {"
+            " const s = p.querySelector('select.page-model'), st = getComputedStyle(s);"
+            " c.font = `${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;"
+            " return [shown(p), Math.round(s.getBoundingClientRect().width - c.measureText(s.options[s.selectedIndex]?.textContent ?? '').width)]; })")
+        check("each version's maker said once — « sur cet ordinateur » not repeated after its list — and its list as wide as the name shown (#1231)",
+              len(makers) == 2 and all(said.count("sur cet ordinateur") <= 1 and 0 <= room <= 16 for said, room in makers), makers)
         shot(browser, "d46-actions-rows")
         # In a structure (minutes/v5, D111): the actions are the section their id names — the fourth
         # here, never the second by place —, each section titled as the page names its id.
