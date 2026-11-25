@@ -1,12 +1,14 @@
 // D114, the landing (proposal D, validated by the decider on 2026-11-25): /en/ and /fr/ hold every section
-// their nav names, nothing left to measure, the install's commands as the module gives them, and a hero still
-// that is the app filmed, with its size and its words.
+// their nav names, nothing left to measure, the install's commands as the module gives them, and a carousel of
+// the app filmed (c16), each slide with its poster and its words; the clips c16's alone; the root to French.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { dist } from "./helpers.mjs";
 import { channels, landing } from "../src/lib/landing.mjs";
+
+const KEYS = ["record", "transcript", "summary", "dates", "player", "send", "confidential"];
 
 const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8");
 const text = (html) => html.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&gt;/g, ">").replace(/&lt;/g, "<");
@@ -34,13 +36,27 @@ for (const lang of ["en", "fr"]) {
     }
   });
 
-  test(`/${lang}/: the hero's still is the record clip's first image, sized, and described`, async () => {
+  test(`/${lang}/: the hero's carousel shows the seven c16 clips in their order, each with its poster and its words`, async () => {
     const html = await page(lang);
-    const img = html.match(/<img class="still hero-still"[^>]*>/)?.[0];
-    assert.ok(img, "no hero still");
-    assert.match(img, new RegExp(`src="/clips/record-${lang}-light\\.jpg"`));
-    assert.match(img, /width="1280" height="720"/);
-    assert.ok(img.includes(`alt="${landing.still[lang]}"`), "its alt is not the still's words");
-    assert.ok((await stat(join(dist, "clips", `record-${lang}-light.jpg`))).size <= 500 * 1024);
+    const slides = [...html.matchAll(/<article class="slide"[\s\S]*?<\/article>/g)].map((m) => m[0]);
+    assert.deepEqual(slides.map((s) => s.match(/data-clip="\/clips\/([a-z]+)-/)?.[1]), KEYS);
+    for (const [i, s] of slides.entries()) {
+      const [key, , , , , alt] = landing.slides[lang][i];
+      assert.match(s, new RegExp(`<img class="still" src="/clips/${key}-${lang}-light\\.jpg" width="1280" height="720"`));
+      assert.ok(s.includes(`alt="${alt}"`), `slide ${key}: its alt is not its words`);
+    }
   });
 }
+
+test("the clips are c16's alone, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
+  const want = KEYS.flatMap((k) => ["en", "fr"].flatMap((l) => ["jpg", "mp4", "webm"].map((e) => `${k}-${l}-light.${e}`))).sort();
+  const have = (await readdir(join(dist, "clips"))).sort();
+  assert.deepEqual(have, want);
+  for (const name of have) assert.ok((await stat(join(dist, "clips", name))).size <= 500 * 1024, `${name} is over 500 KiB`);
+});
+
+test("the root sends a reader to the French landing, English one link away", async () => {
+  const html = await readFile(join(dist, "index.html"), "utf8");
+  assert.match(html, /<meta http-equiv="refresh" content="0; url=\/fr\/"/);
+  assert.match(html, /href="\/en\/" hreflang="en"/);
+});

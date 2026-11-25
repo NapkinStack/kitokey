@@ -29,10 +29,28 @@ const raw = {
     fr: ["Installer sur Linux, gratuit", "Suivre les sorties"],
     keeps: "PDR-0001, free on Linux; the repository's releases",
   },
-  still: {
-    en: "Sarah records a video call with Camille, Hugo and Léa. At the top, Kitokey’s small bar shows the elapsed time, a level trace for Sarah’s microphone and one for the call’s audio.",
-    fr: "Sarah enregistre un appel vidéo avec Camille, Hugo et Léa. En haut, la petite barre de Kitokey montre le temps écoulé, une trace de niveau pour le micro de Sarah et une pour le son de l’appel.",
-    keeps: "the c16 record clip's first image, filmed from the app at main dad969f (shell e2e, film run i-sam-film16c)",
+  slider: {
+    en: ["Kitokey, feature by feature", "slide", "carousel", "of"],
+    fr: ["Kitokey, fonction par fonction", "diapositive", "carrousel", "sur"],
+    keeps: "the carousel's own words (WAI-ARIA's carousel pattern)",
+  },
+  // The seven clips of c16, filmed from the app at main dad969f (shell e2e, run i-sam-film16c), in their order.
+  slides: {
+    en: [["record", "mic", "Record", "One click, and the call is recorded.", "Your microphone on one side, the call’s audio on the other. No bot joins the meeting.", "Sarah records a video call with Camille, Hugo and Léa. At the top, Kitokey’s small bar shows the elapsed time, a level trace for Sarah’s microphone and one for the call’s audio."],
+      ["transcript", "transcript", "Transcribe", "The whole meeting, transcribed on your computer.", "Every line carries its time. Name the two sides, here Sarah on one, Camille, Hugo and Léa on the other.", "The transcript of the weekly team check-in. The two sides are renamed Sarah and Camille, Hugo and Léa, each line with its time."],
+      ["summary", "summary", "Minutes", "The minutes, ready to read.", "Highlights, actions, who does what and by when.", "The minutes of the weekly team check-in, with the highlights, then Hugo’s, Camille’s and Léa’s actions and their due dates."],
+      ["dates", "calendar", "Calendar", "Dates mentioned go to your calendar.", "Tick the deadlines, then save them as an .ics file or open them in Google Calendar.", "The Dates mentioned panel. A deadline is ticked, then the cursor opens Google Calendar."],
+      ["player", "play", "Play back", "Click a line, and you hear it.", "Your voice and the others’ are on two tracks. Play back any passage.", "The cursor clicks one of Sarah’s lines, and that passage plays. The two tracks, Sarah in blue, Camille, Hugo and Léa in green."],
+      ["send", "send", "Send", "The minutes go to your team.", "Pick a Slack, Discord or webhook channel. Kitokey notes where and when it sent them.", "The cursor sends the minutes to the product team channel, then the Sent to line appears."],
+      ["confidential", "lock", "Confidential", "One switch for what must not leave.", "Turn it on, even while recording, and the meeting goes through no online service.", "During a recording, the cursor turns on the Confidential switch, and the padlock shows."]],
+    fr: [["record", "mic", "Enregistrer", "Un clic, et l’appel est enregistré.", "Votre micro d’un côté, le son de l’appel de l’autre. Aucun robot ne rejoint la réunion.", "Sarah enregistre un appel vidéo avec Camille, Hugo et Léa. En haut, la petite barre de Kitokey montre le temps écoulé, une trace de niveau pour le micro de Sarah et une pour le son de l’appel."],
+      ["transcript", "transcript", "Transcrire", "Toute la réunion, transcrite sur votre ordinateur.", "Chaque phrase porte son heure. Nommez les deux côtés, ici Sarah d’un côté, Camille, Hugo et Léa de l’autre.", "La transcription du point d’équipe hebdo. Les deux côtés sont renommés Sarah et Camille, Hugo et Léa, chaque réplique avec son heure."],
+      ["summary", "summary", "Résumer", "Le compte rendu, prêt à relire.", "Points saillants, actions, qui fait quoi et pour quand.", "Le compte rendu du point d’équipe hebdo, avec les points saillants puis les actions de Hugo, Camille et Léa et leurs échéances."],
+      ["dates", "calendar", "Agenda", "Les dates dites vont dans votre agenda.", "Cochez les échéances, puis enregistrez-les en fichier .ics ou ouvrez-les dans Google Agenda.", "Le panneau Dates mentionnées. Une échéance est cochée, puis le curseur ouvre Google Agenda."],
+      ["player", "play", "Réécouter", "Cliquez sur une phrase, vous l’entendez.", "Votre voix et celle des autres sont sur deux pistes. Réécoutez n’importe quel passage.", "Le curseur clique une phrase de Sarah, et le passage est lu. Les deux pistes, Sarah en bleu, Camille, Hugo et Léa en vert."],
+      ["send", "send", "Envoyer", "Le compte rendu part à l’équipe.", "Choisissez un canal Slack, Discord ou webhook. Kitokey note où et quand il l’a envoyé.", "Le curseur envoie le compte rendu au canal de l’équipe produit, puis la ligne Envoyé à apparaît."],
+      ["confidential", "lock", "Confidentielle", "Un interrupteur pour ce qui ne doit pas sortir.", "Même pendant l’enregistrement, activez-le, et la réunion ne passe par aucun service en ligne.", "Pendant un enregistrement, le curseur active l’interrupteur Confidentielle, et le cadenas s’affiche."]],
+    keeps: "each clip shows it, filmed from the app (c16c); #1179 the trace; #1205 the names; D113 the dates; D26 play from a line; D116 the send and sends.json; #1208 the padlock, D110 the confidential meeting",
   },
   channels: {
     en: ["The minutes go where your team works.", "In one click, to a Slack channel, a Discord channel or your webhook. Nothing leaves without your gesture, and never a confidential meeting without your confirmation.", "Works with"],

@@ -122,7 +122,28 @@ p { text-wrap: pretty; }
 .hero h1 .second { color: var(--accent); }
 .hero .lead { margin: 1.2rem auto 0; max-width: 44rem; }
 .hero-cta { display: flex; flex-wrap: wrap; gap: .9rem 1.4rem; justify-content: center; align-items: center; margin-top: 1.6rem; }
-.hero-window { max-width: 1120px; margin: clamp(2rem, 1.5rem + 2vw, 3rem) auto 0; }
+.hero-copy .waves { position: absolute; left: calc(50% - 50vw); width: 100vw; top: -8%; height: 70%; z-index: -1; pointer-events: none; opacity: .16; }
+
+/* The hero's carousel: one feature per slide, native swipe (scroll-snap); public/slider.js adds the rest. */
+.slider { margin: clamp(2rem, 1.5rem + 2vw, 3rem) auto 0; max-width: 1120px; position: relative; }
+.slides { display: flex; gap: 24px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; padding: 8px 4px 72px; margin-bottom: -40px; outline-offset: 4px; }
+.slides::-webkit-scrollbar { display: none; }
+.slide { flex: 0 0 100%; scroll-snap-align: center; display: grid; gap: 18px; align-items: center; min-width: 0; }
+.slide > * { min-width: 0; }
+.slide-media { aspect-ratio: 16 / 9.6; display: flex; flex-direction: column; }
+.slide-media img, .slide-media video { flex: 1; min-height: 0; width: 100%; object-fit: cover; object-position: top left; }
+.slide-card { background: var(--surface); outline: 1px solid var(--line); border-radius: var(--radius); padding: 1.6rem; display: flex; flex-direction: column; gap: .6rem;
+  box-shadow: 0 1px 2px rgba(17, 19, 24, .05), 0 20px 40px -28px rgba(17, 19, 24, .25); }
+.slide-card > * { margin: 0; }
+.slide-card h2 { font-size: clamp(1.35rem, 1.1rem + 1vw, 1.9rem); font-weight: 760; }
+.slide-card p:not(.kicker) { color: var(--soft); }
+@media (min-width: 900px) { .slide { grid-template-columns: minmax(0, 1.75fr) minmax(260px, 1fr); gap: 28px; } }
+/* A calm change on a fine pointer (the decider, 2026-11-25): slides crossfade with a slight scale-in; touch swipes. */
+.slider.fade .slides { display: grid; overflow: visible; scroll-snap-type: none; }
+.slider.fade .slide { grid-area: 1 / 1; opacity: 0; transform: scale(.98); visibility: hidden;
+  transition: opacity .6s cubic-bezier(.22, .61, .36, 1), transform .6s cubic-bezier(.22, .61, .36, 1), visibility 0s .6s; }
+.slider.fade .slide.is-active { opacity: 1; transform: none; visibility: visible;
+  transition: opacity .6s cubic-bezier(.22, .61, .36, 1), transform .6s cubic-bezier(.22, .61, .36, 1); }
 
 /* Window chrome around every real screen: light, rounded top corners, a soft cool shadow. */
 .window { margin: 0; border-radius: 12px 12px 0 0; overflow: hidden; background: #FFFFFF; outline: 1px solid rgba(17, 19, 24, .1);

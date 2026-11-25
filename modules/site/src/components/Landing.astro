@@ -1,6 +1,6 @@
 ---
 // /<lang>/: the landing (D114, proposal D validated by the decider on 2026-11-25). Every word from
-// src/lib/landing.mjs. The hero shows the record clip's first image; the carousel replaces it next.
+// src/lib/landing.mjs. The hero's carousel shows the seven c16 clips, each slide's poster first.
 import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
 import { channels, landing as w, repo } from "../lib/landing.mjs";
@@ -11,6 +11,7 @@ const t = (key) => w[key][lang];
 const [privacyId, usesId, systemsId, faqId, installId] = t("nav").map(([id]) => id);
 const [h1a, h1b, lead] = t("hero");
 const [cta, follow] = t("cta");
+const [sLabel, sSlide, sRole, sOf] = t("slider");
 const [chH, chP, chWith] = t("channels");
 const [pEyebrow, pH, pLead] = t("privacy");
 const [localTitle, localAlt] = t("local");
@@ -25,6 +26,8 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
 ---
 <Page lang={lang} title={t("title")} description={t("description")} path="" nav={t("nav")}>
   <script slot="head" src="/site.js" defer is:inline></script>
+  <script slot="head" src="/slider.js" defer is:inline></script>
+  <script slot="head" src="/waves.js" defer is:inline></script>
   <Icons />
   <section class="hero" aria-labelledby="h1">
     <div class="wrap hero-copy">
@@ -33,10 +36,19 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
       <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/releases`}>{follow}</a></div>
     </div>
     <div class="wrap">
-      <figure class="window hero-window">
-        <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">Kitokey</span></div>
-        <img class="still hero-still" src={`/clips/record-${lang}-light.jpg`} width="1280" height="720" alt={t("still")} fetchpriority="high" decoding="async" />
-      </figure>
+      <section class="slider" aria-roledescription={sRole} aria-label={sLabel}>
+        <div class="slides" tabindex="0">
+          {t("slides").map(([key, icon, kicker, h, p, alt], i, all) => (
+            <article class="slide" id={`slide-${i}`} data-clip={`/clips/${key}-${lang}-light`} aria-roledescription={sSlide} aria-label={`${i + 1} ${sOf} ${all.length}, ${kicker}`}>
+              <div class="slide-media window">
+                <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">Kitokey</span></div>
+                <img class="still" src={`/clips/${key}-${lang}-light.jpg`} width="1280" height="720" alt={alt} loading={i ? "lazy" : "eager"} fetchpriority={i ? "auto" : "high"} decoding="async" />
+              </div>
+              <div class="slide-card"><span class="tile" set:html={ico(icon)} /><p class="kicker">{kicker}</p><h2>{h}</h2><p>{p}</p></div>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   </section>
 
