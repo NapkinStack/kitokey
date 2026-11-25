@@ -1,24 +1,94 @@
-/* The app's look (the shell's window stylesheet, copied once — ADR-0019): its tokens, the system's font, its two themes. */
-:root {
-  color-scheme: light dark;
-  --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
-  --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A;
+/* kitokey.com — the frame every page shares (proposal D, validated by the decider on 2026-11-25). Static,
+   self-hosted, nothing from another domain. Titles: Bricolage Grotesque (SIL OFL, public/fonts/OFL-Bricolage.txt);
+   text: the system's font. The site is light: the decider's choice. Motion: transform and opacity only, and
+   none under prefers-reduced-motion. */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/fonts/bricolage-latin.woff2") format("woff2");
+  font-weight: 500 800;
+  font-display: swap;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
-    --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C;
-  }
+:root {
+  color-scheme: light;
+  --bg: #FBFBFD; --surface: #FFFFFF; --tint: #EEF2FB; --line: #E3E6EC; --control: #7D8699;
+  --ink: #111318; --soft: #50576A; --accent: #2253CF; --accent-hover: #1A44AD; --on-accent: #FFFFFF;
+  --titles: "Bricolage Grotesque", system-ui, sans-serif;
+  --radius: 28px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 4.5rem; overflow-x: clip; -webkit-text-size-adjust: 100%; }
 body {
-  margin: 0; background: var(--ground); color: var(--ink);
-  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
+  margin: 0; background: var(--bg); color: var(--ink); overflow-x: clip;
+  font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
-a { color: var(--accent); }
-header, main, footer { max-width: 60rem; margin: 0 auto; padding: 1.5rem 1rem; }
-header { display: flex; justify-content: space-between; align-items: center; }
-.brand { font-weight: 700; font-size: 1.25rem; color: var(--ink); text-decoration: none; }
-footer { color: var(--soft); border-top: 1px solid var(--line); }
-table { border-collapse: collapse; width: 100%; }
-th, td { border: 1px solid var(--line); padding: .5rem; text-align: left; vertical-align: top; }
+img, video { display: block; max-width: 100%; height: auto; }
+a { color: var(--accent); text-underline-offset: .18em; }
+a:hover { color: var(--accent-hover); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+h1, h2, h3 { font-family: var(--titles); letter-spacing: -.025em; line-height: 1.06; margin: 0; text-wrap: balance; }
+p { text-wrap: pretty; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: 16px; top: -100px; z-index: 100; background: var(--accent); color: var(--on-accent); padding: .6rem 1rem; border-radius: 999px; }
+.skip:focus { top: 10px; color: var(--on-accent); }
+.wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+@media (min-width: 700px) { .wrap { padding: 0 32px; } }
+
+/* ---- The local nav, sticky ---- */
+.site-header {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px);
+  border-bottom: 1px solid var(--line);
+}
+.nav { display: flex; align-items: center; gap: .5rem; min-height: 56px; }
+.brand { display: inline-flex; align-items: center; gap: .55rem; color: var(--ink); text-decoration: none; font-family: var(--titles); font-weight: 780; font-size: 1.3rem; letter-spacing: -.03em; margin-right: auto; min-height: 44px; }
+.brand img { width: 28px; height: 28px; }
+.lang { display: inline-flex; align-items: center; gap: .45rem; color: var(--soft); text-decoration: none; font-size: .9rem; padding: .7rem .4rem; min-height: 44px; }
+.flag { width: 24px; height: 16px; border-radius: 3px; display: block; box-shadow: 0 0 0 1px rgba(17, 19, 24, .12); }
+.lang-code { font-size: .85rem; font-weight: 600; }
+
+/* ---- The background: a soft aurora mesh fixed behind the page, four blurred brand-colour blobs that move with
+   the page's scroll (a scroll timeline), and a fine static grain over them. Still under reduced motion. ---- */
+.mesh { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.mesh::after { content: ""; position: absolute; inset: 0; background: url("/grain.png") repeat; opacity: .05; mix-blend-mode: multiply; }
+.mesh i { position: absolute; display: block; width: 58vmax; height: 46vmax; border-radius: 50%; filter: blur(80px); opacity: .55; }
+.mesh .m1 { background: radial-gradient(closest-side, #9DB8FF, transparent); left: -14vmax; top: -18vmax; }
+.mesh .m2 { background: radial-gradient(closest-side, #CDB8FF, transparent); right: -16vmax; top: -10vmax; }
+.mesh .m3 { background: radial-gradient(closest-side, #FFC9BE, transparent); left: 20vw; top: 40vh; opacity: .35; }
+.mesh .m4 { background: radial-gradient(closest-side, #A8E6CF, transparent); right: 8vw; bottom: -26vmax; opacity: .3; }
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .mesh i { animation-timing-function: linear; animation-fill-mode: both; animation-timeline: scroll(root); }
+    .mesh .m1 { animation-name: tour-1; } .mesh .m2 { animation-name: tour-2; } .mesh .m3 { animation-name: tour-3; } .mesh .m4 { animation-name: tour-4; }
+  }
+}
+@keyframes tour-1 { 0% { transform: none; opacity: .55; } 35% { transform: translate3d(40vw, 30vh, 0) scale(1.2); opacity: .35; } 70% { transform: translate3d(10vw, 70vh, 0) scale(.9); opacity: .5; } 100% { transform: translate3d(50vw, 90vh, 0) scale(1.1); opacity: .3; } }
+@keyframes tour-2 { 0% { transform: none; opacity: .55; } 35% { transform: translate3d(-30vw, 50vh, 0) scale(.85); opacity: .45; } 70% { transform: translate3d(-55vw, 20vh, 0) scale(1.25); opacity: .3; } 100% { transform: translate3d(-20vw, 70vh, 0); opacity: .5; } }
+@keyframes tour-3 { 0% { transform: none; opacity: .2; } 35% { transform: translate3d(-15vw, -30vh, 0) scale(1.3); opacity: .5; } 70% { transform: translate3d(25vw, -10vh, 0) scale(1); opacity: .35; } 100% { transform: translate3d(-20vw, 10vh, 0) scale(1.2); opacity: .45; } }
+@keyframes tour-4 { 0% { opacity: .1; } 50% { transform: translate3d(-40vw, -60vh, 0) scale(1.2); opacity: .45; } 100% { transform: translate3d(-10vw, -40vh, 0) scale(.9); opacity: .3; } }
+
+/* ---- A page of text: the privacy policy ---- */
+.prose { max-width: 50rem; padding-top: clamp(2.5rem, 1.5rem + 4vw, 5rem); padding-bottom: clamp(3rem, 2rem + 4vw, 6rem); }
+.prose h1 { font-size: clamp(2.4rem, 1.5rem + 3.6vw, 4rem); font-weight: 800; letter-spacing: -.04em; }
+.prose h2 { font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); font-weight: 740; margin: 2.6rem 0 .8rem; }
+.prose .changed { color: var(--soft); margin: 1rem 0 2rem; }
+.prose table { border-collapse: collapse; width: 100%; background: var(--surface); border-radius: 12px; overflow: hidden; outline: 1px solid var(--line); }
+.prose th, .prose td { border-bottom: 1px solid var(--line); padding: .7rem .8rem; text-align: left; vertical-align: top; }
+.prose th { background: var(--tint); font-weight: 650; }
+.prose code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: .92em; overflow-wrap: anywhere; }
+@media (max-width: 699px) { .prose table { display: block; overflow-x: auto; } }
+
+/* ---- Footer ---- */
+.site-footer { border-top: 1px solid var(--line); padding: 2.5rem 0 3rem; font-size: .92rem; color: var(--soft); }
+.foot { display: grid; gap: 1.2rem; }
+.foot p { margin: .4rem 0 0; }
+.foot .brand { font-size: 1.1rem; margin: 0; }
+.foot ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .3rem 1.4rem; }
+.foot ul a { display: inline-block; padding: .6rem 0; }
+@media (min-width: 800px) { .foot { grid-template-columns: 1fr auto; align-items: center; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
