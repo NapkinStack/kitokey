@@ -97,3 +97,15 @@ test("the root sends a reader to the French landing, English one link away", asy
   assert.match(html, /<meta http-equiv="refresh" content="0; url=\/fr\/"/);
   assert.match(html, /href="\/en\/" hreflang="en"/);
 });
+
+// Slack's terms forbid distributing its logo without a written licence (« Don't distribute or otherwise make
+// available our logos », read by the coordinator, 2026-11-26): until the decider settles it, the site names Slack
+// in words beside a neutral pictogram, never its mark — its four colours drawn together.
+test("no page draws Slack's mark", async () => {
+  for (const lang of ["en", "fr"]) {
+    const html = await page(lang);
+    const colours = ["#E01E5A", "#36C5F0", "#2EB67D", "#ECB22E"].filter((c) => html.toUpperCase().includes(c));
+    assert.ok(colours.length < 2, `/${lang}/ draws Slack's colours together: ${colours}`);
+    assert.match(html, /<span>Slack<\/span>/, `/${lang}/ names Slack no more`);
+  }
+});
