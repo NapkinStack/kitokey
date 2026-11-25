@@ -1889,8 +1889,9 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
 function pathShown(said, whole) {
   const shown = element("button", "path");
   const cut = said.lastIndexOf(" / ");
-  const [lead, last] = cut < 0 ? ["", said] : [said.slice(0, cut + 3), said.slice(cut + 3)];
-  shown.append(icon("folder"), element("span", "lead", lead), element("span", "last", last));
+  const [lead, last] = cut < 0 ? ["", said] : [said.slice(0, cut), said.slice(cut + 3)];
+  // The separator before its own name its own, never eaten by the ellipsis: « … / pages ».
+  shown.append(icon("folder"), element("span", "lead", lead), element("span", "sep", cut < 0 ? "" : " / "), element("span", "last", last));
   shown.title = whole;
   return shown;
 }
