@@ -16,16 +16,19 @@ Astro's telemetry is off in every script.
 
 - It runs nothing on a server: `astro build` writes static files, no adapter, no function.
 - It writes no policy of its own: `/privacy/` is `docs/privacy.md`, read at build time.
-- It asks nothing of another domain: no analytics, no CDN, no web font, no embed.
+- It asks nothing of another domain: no analytics, no CDN, no font from another host, no embed.
 
 ## Internal conventions nobody could guess
 
-- **One path out of the module**: `site.config.mjs`, `privacySource` (`docs/privacy.md`). No other file
+- **One file reaches out of the module**: `site.config.mjs` — `privacySource` (`docs/privacy.md`), and for the
+  landing's test alone, `installSource` (the repository's `README.md`, no module's). No other file
   reaches out of `modules/site/` (`tests/space.test.mjs`).
-- **Every sentence lives in `src/lib/words.mjs`**, in English and French, with `keeps`: what keeps its
+- **Every sentence lives in `src/lib/words.mjs`** — the landing's in `src/lib/landing.mjs` —, in English and French, with `keeps`: what keeps its
   promise, a merged deliverable or a test, as `docs/store/listing.md` does. The voice:
   `modules/shell/docs/voice.md`.
-- **The look is the app's**: `src/styles/site.css` copies the tokens of the shell's window stylesheet.
+- **The look is proposal D's** (the decider, 2026-11-25): light only, the titles in Bricolage Grotesque served from
+  `public/fonts/` with its licence beside it, the text in the system's font, the aurora mesh behind every page.
+  `src/layouts/Page.astro` is every page's frame: a page passes `kind` for its `<main>`.
 - **Closed until the decider opens it**: every page `noindex`, `robots.txt` `Disallow: /`. `SITE_OPEN=1`
   builds the opening's site; the opening's commit makes it the default and changes `tests/closed.test.mjs`.
 
@@ -47,5 +50,5 @@ Out of the repository, whole (D114, criterion 1):
 ```sh
 git subtree split --prefix=modules/site -b site-alone
 git worktree add ../site-alone site-alone && cd ../site-alone
-npm ci && PRIVACY_SOURCE=/path/to/privacy.md npm test
+npm ci && PRIVACY_SOURCE=/path/to/privacy.md INSTALL_SOURCE=/path/to/README.md npm test
 ```

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64">
+  <title>Kitokey</title>
+  <!-- Kitokey's mark (D89, accepted 2026-11-08: docs/project/drawings/d89-d90-mark-k-stem): the K,
+       stroke 3.2 on a 24 grid, its stem capped by the record dot as wide as the stroke and cut
+       from it by an empty gap of 1.3. The one source of every icon: scripts/icons.sh. -->
+  <rect width="64" height="64" rx="14" fill="#2253CF"/>
+  <g transform="translate(10 10) scale(1.8333)" fill="#FFFFFF">
+    <path d="M4.9 8.019A2.9 2.9 0 0 0 8.1 8.019V20A1.6 1.6 0 0 1 4.9 20Z"/>
+    <circle cx="6.5" cy="5.6" r="1.6"/>
+    <path d="M6.5 14.2 17 4M9.8 11 17.3 20" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
