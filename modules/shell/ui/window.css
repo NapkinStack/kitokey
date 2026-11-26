@@ -128,6 +128,9 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 mark { background: var(--mark); color: var(--mark-ink); box-shadow: inset 0 -2px 0 var(--mark-edge); border-radius: 2px; }
 .relief .local { fill: var(--accent); }
 .relief .remote { fill: var(--ok); }
+.relief.quiet line { stroke-width: 2px; stroke-dasharray: 2 6; stroke-linecap: round; }
+.relief.quiet .local { stroke: var(--accent); }
+.relief.quiet .remote { stroke: var(--ok); }
 .drawn .legend .here { color: var(--accent); }
 .drawn .legend .remote { color: var(--ok); }
 /* The minutes, then the transcript; side by side once the pane is 1000 px wide, together as wide as
@@ -272,7 +275,7 @@ select:hover, select:focus { border-color: var(--edge); }
 .sending h3 { margin: 0; font-size: 15px; }
 .sending > .disclose-advanced { align-self: flex-start; }
 .fields > .field.whole { flex-basis: 100%; }
-.tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); }
+.tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); white-space: nowrap; flex: none; }
 .path { flex: 1 1 240px; min-width: 0; display: flex; align-items: center; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: text; }
 /* Its folders before its own cut first (#1232): the name the user chose stays whole. */
 .path .lead { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
