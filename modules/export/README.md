@@ -19,6 +19,8 @@ flowchart LR
     D --> O["a Word document"]:::out
     M --> V["srt() · vtt()"]:::module
     V --> U["subtitles: the transcript alone"]:::out
+    M --> Q["pdf()"]:::module
+    Q --> R["a tagged PDF"]:::out
     C["the dates the shell<br/>hands over (its input)"]:::file --> I["ics()"]:::module
     M -->|"the meeting's name"| I
     I --> K["a calendar: one all-day<br/>event per date"]:::out
@@ -31,7 +33,8 @@ flowchart LR
 **Legend** — grey: a meeting's files and the contract each follows, and the dates its caller gives · green: this module · blue: what it writes.
 
 A library and its program: a meeting's folder read into one model, every format written from it
-(D108). It writes Markdown, HTML, DOCX and subtitles (SRT, WebVTT) today; a PDF follows. The words a file shows
+(D108). It writes Markdown, HTML, DOCX and subtitles (SRT, WebVTT) today, and its library a tagged PDF (PDF/UA-1)
+through typst with the fonts its caller gives; the program writes it next. The words a file shows
 that no contract carries — « Transcription », who spoke — are given by its caller. Beside them, an iCalendar
 file (RFC 5545, D117): the dates a meeting's actions mention, resolved by the shell, one all-day event each.
 

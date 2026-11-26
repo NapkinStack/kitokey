@@ -8,7 +8,9 @@
 #   cargo install --locked cargo-about --version 0.9.3 --features cli
 #   cargo about generate --locked --fail about.hbs --output-file THIRD-PARTY-NOTICES.html
 accepted = [
+    "0BSD",
     "Apache-2.0",
+    "BSD-2-Clause",
     "BSD-3-Clause",
     "MIT",
     "Unicode-3.0",
@@ -21,3 +23,13 @@ ignore-build-dependencies = true
 ignore-dev-dependencies = true
 # kitokey-export itself is the project's, under LICENSE: not a third party.
 private = { ignore = true }
+
+# kamadak-exif states BSD-2-Clause, its licence text in LICENSE: cargo-about read it from a source file,
+# code and all, which tests/notices.rs refuses.
+[kamadak-exif.clarify]
+license = "BSD-2-Clause"
+
+[[kamadak-exif.clarify.files]]
+path = "LICENSE"
+license = "BSD-2-Clause"
+checksum = "17c496a77909a1f26006427d27e58a1d1514baa6a332240aa5fc543e3fa7295d"
