@@ -1525,11 +1525,17 @@ def service_named(now: dt.datetime) -> None:
         offered = lambda b, id_: b.execute_script("return [...document.querySelectorAll(arguments[0])].map(o => [o.value, o.textContent])", f"#{id_} option")
         names = [said_ for _, said_ in offered(browser, "transcription-service")]
         check("the services that hear are offered by name, as the minutes' are: OpenRouter, OpenAI", names == ["OpenRouter", "OpenAI"], names)
+        # The service chosen shows its mark beside the list (#1238): OpenRouter's glyph as given — Ink on light —; OpenAI's not
+        # cleared for an app (« Use the logo … with permission »), an icon of the page's.
+        mark = "const f = document.getElementById('transcription-service')?.parentElement; return f ? (f.querySelector('.service-mark img')?.getAttribute('src') ?? (f.querySelector('.service-mark svg') ? 'icon' : null)) : null"
+        chose_router = browser.execute_script(mark)
         # Another choice: what was said of the last goes at once, on the same page.
         browser.execute_script("document.getElementById('transcription-test').click()")
         wait_for(browser, lambda b: b.execute_script(said).startswith(hears), 10)
         choose(browser, "transcription-service", "1")
         check("another service chosen: the last answer goes at once", browser.execute_script(said) == "", browser.execute_script(said))
+        check("the service chosen shows its mark beside its list: OpenRouter's glyph, OpenAI an icon of the page's (#1238)",
+              chose_router == "brands/openrouter-glyph-ink.svg" and browser.execute_script(mark) == "icon", [chose_router, browser.execute_script(mark)])
         choose(browser, "transcription-service", "0")
         # Another service chosen while Tester asks: its button at once, the old answer never said, even drawn anew.
         browser.execute_script("window.answer = null; window.answered = 0; window.__TAURI__.core = window.held; document.getElementById('transcription-test').click()")
@@ -5473,7 +5479,7 @@ def summary_sent(now: dt.datetime) -> None:
         press(browser, "destination-open")
         rows = "return document.querySelectorAll('#destinations li').length"
         for kind, name, address in destinations:
-            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            browser.execute_script("document.getElementById(arguments[0]).click()", f"destination-kind-{kind}")
             for field, value in (("destination-name", name), ("destination-address", address)):
                 element = browser.find_element(By.ID, field)
                 element.clear()
@@ -5482,6 +5488,9 @@ def summary_sent(now: dt.datetime) -> None:
             press(browser, "destination-add")
             wait_for(browser, lambda b: b.execute_script(rows) == had + 1, 10)
         check("six destinations set up for this scenario", browser.execute_script(rows) == 6, browser.execute_script(rows))
+        kept_marks = browser.execute_script("return [...document.querySelectorAll('#destinations li')].map(e => e.querySelector('img')?.getAttribute('src') ?? (e.querySelector('svg') ? 'icon' : null))")
+        check("Settings list each destination with its kind's mark: Discord's own, the others an icon of the page's (#1238)",
+              kept_marks == ["brands/discord-symbol.svg", "icon", "icon", "icon", "icon", "icon"], kept_marks)
         calls.unlink(missing_ok=True)
         page(secret_one)
         check("a confidential meeting offers « Envoyer… » too, each send asked again (PDR-0007 §4 amended, D119; CN)", browser.execute_script(offered), browser.execute_script(offered))
@@ -5496,6 +5505,11 @@ def summary_sent(now: dt.datetime) -> None:
         ActionChains(browser).send_keys(Keys.ENTER).perform()
         listed = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#send-panel button.send-to"), 5)
         names = browser.execute_script("return [...document.querySelectorAll('#send-panel button.send-to')].map(b => b.textContent)") if listed else []
+        # Each destination with its kind's mark (#1238): Discord's own, the others an icon of the page's — in the panel and in Settings.
+        marks = "return [...document.querySelectorAll(arguments[0])].map(e => e.querySelector('img')?.getAttribute('src') ?? (e.querySelector('svg') ? 'icon' : null))"
+        check("the panel shows each destination's mark: Discord's own, the others an icon of the page's (#1238)",
+              listed and browser.execute_script(marks, "#send-panel button.send-to") == ["brands/discord-symbol.svg", "icon", "icon", "icon", "icon", "icon"],
+              browser.execute_script(marks, "#send-panel button.send-to") if listed else None)
         check("the panel offers each destination by its name, « Envoyer à « #équipe » », by keyboard alone",
               names[:1] == ["Envoyer à «\xa0#équipe\xa0»"] and len(names) == 6
               and browser.execute_script("return document.activeElement.classList.contains('send-to')"), names)
@@ -5629,7 +5643,7 @@ def confidential_sent(now: dt.datetime) -> None:
             browser.execute_script("location.hash = '#/settings'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
             press(browser, "destination-open")
-            Select(browser.find_element(By.ID, "destination-kind")).select_by_value("discord")
+            browser.execute_script("document.getElementById('destination-kind-discord').click()")
             for field, value in (("destination-name", "#équipe"), ("destination-address", f"https://discord.example/api/webhooks/1/{secret}")):
                 element = browser.find_element(By.ID, field)
                 element.clear()
@@ -5874,13 +5888,20 @@ def destinations_kept(now: dt.datetime) -> None:
         after = browser.execute_script(folded) if drawn else None
         check("folded at first, no address shown; « Ajouter une destination » unfolds it, the focus in its first field (E5, ARIA APG)",
               before is not None and before[:3] == ["false", "destination-adding", False]
-              and opened and after == ["true", "destination-adding", True, "destination-kind"], (before, after))
+              and opened and after == ["true", "destination-adding", True, "destination-kind-webhook"], (before, after))
+        # The kind a tile each (#1238), as the desktop's choices of a kind are: Discord its own mark, unaltered; Webhook and
+        # Slack an icon of the page's, Slack's mark not cleared for an app (its Brand Terms) — its name in words.
+        tiles = browser.execute_script(
+            "return [...document.querySelectorAll('#destination-adding [role=radiogroup] .tile')].map(t => [t.querySelector('input')?.value,"
+            " t.textContent.trim(), t.querySelector('img')?.getAttribute('src') ?? null, !!t.querySelector('svg')])") if drawn else None
+        check("the kind of a destination three tiles: Webhook and Slack with an icon of the page's, Discord with its own mark (#1238)",
+              tiles == [["webhook", "Webhook", None, True], ["discord", "Discord", "brands/discord-symbol.svg", False], ["slack", "Slack", None, True]], tiles)
         rows = "return [...document.querySelectorAll('#destinations li')].map(li => li.innerText)"
         check("none yet: the card says so", drawn and browser.execute_script(rows) == []
               and "Aucune destination" in browser.find_element(By.ID, "destinations-said").text, browser.execute_script(rows) if drawn else None)
 
         def add(kind, name, address):
-            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            browser.execute_script("document.getElementById(arguments[0]).click()", f"destination-kind-{kind}")
             for field, value in (("destination-name", name), ("destination-address", address)):
                 element = browser.find_element(By.ID, field)
                 element.clear()
@@ -5913,7 +5934,7 @@ def destinations_kept(now: dt.datetime) -> None:
                   and json.loads(judged[1]["input"])["address"] == good, [call["args"] for call in judged])
             # A second destination under a name already kept: said, and refused before any address is judged.
             # Back across 840 px the page is drawn again (#777): the form is filled once that drawing is done.
-            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-kind')"), 10)
+            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-kind-webhook')"), 10)
             add("discord", "#équipe", good.replace("T00", "T01"))
             # Read by script: a destination kept by mistake draws the card again, and a node held would be stale.
             said_now = "return document.getElementById('destination-said')?.textContent ?? null"
@@ -5994,6 +6015,10 @@ def settings_narrow_without_model(now: dt.datetime) -> None:
             check(f"{short}, 420 px, no model on this computer: the choice whole as the list's tooltip, the state said under it (#868)",
                   said[0] == said[1] and said[0] and said[0].endswith(whole) and said[2] and whole.split()[0] in said[2].lower(), said)
             browser.execute_script("document.getElementById('model').scrollIntoView({block: 'center'})")
+            # A model fetched from Hugging Face says so by its mark too (#1238), the host still in its words.
+            hf = browser.execute_script("const b = document.getElementById('model-fetch'); return b ? [b.querySelector('img')?.getAttribute('src') ?? null, b.textContent] : null")
+            check(f"{short}: the model's download shows Hugging Face's mark, its host in its words (#1238)",
+                  hf and hf[0] == "brands/huggingface.svg" and "huggingface.co" in hf[1], hf)
             shot(browser, f"868-settings-420-{short}")
             # « Avancé » as a person reaches it: scrolled to, then clicked where it shows.
             toggle = browser.find_element(By.ID, "general-advanced")

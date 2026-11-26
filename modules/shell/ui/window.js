@@ -119,6 +119,11 @@ const ICONS = {
   copy: [["rect", { width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2 }], "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"],
   "rotate-ccw": ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5"],
   "trash-2": ["M10 11v6", "M14 11v6", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
+  // Lucide's webhook, hash and globe (ISC, ui/LUCIDE-LICENSE): a webhook, a channel, an online service — the page's own,
+  // where a brand's mark is not cleared for an app (#1238).
+  webhook: ["M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2", "m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06", "m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"],
+  hash: ["M4 9h16", "M4 15h16", "M10 3 8 21", "M16 3l-2 18"],
+  globe: [["circle", { cx: 12, cy: 12, r: 10 }], "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20"],
   "folder-open": ["m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"],
   ellipsis: [["circle", { cx: 12, cy: 12, r: 1 }], ["circle", { cx: 19, cy: 12, r: 1 }], ["circle", { cx: 5, cy: 12, r: 1 }]],
   "message-square-text": ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z", "M7 11h10", "M7 15h6", "M7 7h8"],
@@ -225,6 +230,36 @@ function iconButton(glyph, name, id) {
   button.setAttribute("aria-label", name);
   button.append(icon(glyph));
   return button;
+}
+
+// A brand's own mark where Kitokey names its service (#1238): Discord's, OpenRouter's and Hugging Face's, the files
+// their owners give, unaltered (ui/brands/BRANDS.md) — OpenRouter's Ink on light and Cloud on dark, as its page says.
+// Any other brand: an icon of the page's (`fallback`), its name in the words beside it. Decorative: the words name it.
+const BRANDS = { discord: ["discord-symbol.svg"], openrouter: ["openrouter-glyph-ink.svg", "openrouter-glyph-cloud.svg"], huggingface: ["huggingface.svg"] };
+function brandMark(brand, fallback) {
+  const files = BRANDS[brand];
+  if (!files) return icon(fallback);
+  const mark = element("span", "brand-mark");
+  files.forEach((file, index) => {
+    const image = element("img", files.length > 1 ? (index ? "on-dark" : "on-light") : "");
+    image.src = `brands/${file}`;
+    image.alt = "";
+    mark.append(image);
+  });
+  return mark;
+}
+// A destination's kind, its mark or the page's icon: a webhook, Slack's channel.
+const kindMark = (kind) => brandMark(kind, kind === "slack" ? "hash" : "webhook");
+// The service chosen in a list, its mark beside it (#1238): OpenRouter's own, any other an icon of the page's — its name
+// the list's. Painted again at each choice.
+function serviceMarked(pick, name) {
+  const row = element("span", "with-mark");
+  pick.replaceWith(row);
+  const mark = element("span", "service-mark");
+  const paint = () => mark.replaceChildren(brandMark((name() ?? "").toLowerCase().replace(/\s+/g, ""), "globe"));
+  row.append(mark, pick);
+  pick.addEventListener("change", paint);
+  paint();
 }
 
 function readySaid(text) {
@@ -591,6 +626,8 @@ function modelFetch(busy = false, said = words.model_offer) {
   const fetch_ = element("button", "open", fill(said, size(makings.model_offer_bytes, words), makings.model_offer_host));
   fetch_.type = "button";
   fetch_.id = "model-fetch";
+  // Fetched from Hugging Face: its mark before the words, which still name the host (#1238).
+  if (/(^|\.)huggingface\.co$/.test(makings.model_offer_host ?? "")) fetch_.prepend(brandMark("huggingface"));
   fetch_.disabled = busy;
   fetch_.addEventListener("click", async () => {
     // Where the user is, read before the button goes: what says the model coming takes its place (D101).
@@ -2039,6 +2076,7 @@ function sendPart(card, top, actions, session, words) {
       panel.setAttribute("aria-label", words.send_open);
       for (const destination of offered) {
         const to = element("button", "send-to", fill(words.send_to, destination.name));
+        to.prepend(kindMark(destination.kind));
         to.type = "button";
         to.dataset.destination = destination.name;
         to.addEventListener("click", () => {
@@ -3622,6 +3660,7 @@ function minutesRow(minutes, words, locked) {
   const [serviceWrap, servicePick] = listed("minutes-service", words.service_name);
   minutes.online.forEach((service, index) => option(servicePick, String(index), service.name));
   servicePick.value = guided.minutes.chosen.service ?? String(Math.max(online, 0));
+  serviceMarked(servicePick, () => minutes.online[Number(servicePick.value)]?.name);
   const [keyWrap, key] = field("minutes-key", words.key, "password", "");
   key.autocomplete = "off";
   const keyTest = button("minutes-key-test", words.key_test, false);
@@ -3881,15 +3920,36 @@ function showSettings(shown, minutes, words) {
           none.textContent = fill(words.not_saved, why);
         }),
       );
-      row.append(rowSaid, forget);
+      row.append(kindMark(destination.kind), rowSaid, forget);
       kept.append(row);
     });
     // The add form apart from the list, its fields the Settings' own (guidedField, guidedList); the
     // address on a whole line, long enough to read back what was pasted.
     const adding = element("div", "fields adding");
     adding.id = "destination-adding";
-    const [kindField, kind] = guidedList("destination-kind", words.destination_fields[0], locked);
-    for (const [value, index] of Object.entries(kinds)) guidedOption(kind, value, words.destination_kinds[index]);
+    // Its kind a tile each (#1238), as a desktop offers a few kinds: its mark or the page's icon, its name; a radio group
+    // the arrows move in, its first chosen at first, as the list's first was.
+    // On a whole line, as the address: the three tiles side by side.
+    const kindField = element("div", "field kinds whole");
+    const kindName = element("span", "name", words.destination_fields[0]);
+    kindName.id = "destination-kind-name";
+    const tiles = element("div", "tiles");
+    tiles.setAttribute("role", "radiogroup");
+    tiles.setAttribute("aria-labelledby", "destination-kind-name");
+    for (const [value, index] of Object.entries(kinds)) {
+      const tile = element("label", "tile");
+      const input = element("input");
+      input.type = "radio";
+      input.name = "destination-kind";
+      input.value = value;
+      input.id = `destination-kind-${value}`;
+      input.checked = index === 0;
+      input.disabled = locked;
+      tile.append(input, kindMark(value), element("span", "", words.destination_kinds[index]));
+      tiles.append(tile);
+    }
+    kindField.append(kindName, tiles);
+    const kind = { get value() { return tiles.querySelector("input:checked")?.value ?? "webhook"; }, focus: () => tiles.querySelector("input:checked")?.focus() };
     const [namedField, named] = guidedField("destination-name", words.destination_fields[1], "text", "", locked);
     named.maxLength = 40;
     named.autocomplete = "off";
@@ -4079,6 +4139,7 @@ function showSettings(shown, minutes, words) {
   const [serviceWrap, servicePick] = guidedList("transcription-service", words.service_name, locked);
   shown.hearing.forEach((hearing, index) => guidedOption(servicePick, String(index), hearing.name));
   servicePick.value = guided.transcription.chosen.service ?? String(Math.max(preset, 0));
+  serviceMarked(servicePick, () => shown.hearing[Number(servicePick.value)]?.name);
   const hearing = () => shown.hearing[Number(servicePick.value)];
   const [keyWrap, serviceKey] = guidedField("transcription-key", words.service_key, "password", "", locked);
   serviceKey.autocomplete = "off";
