@@ -1,3 +1,5 @@
+> From outside the organisation? Read *From outside the organisation* in `CONTRIBUTING.md` first.
+
 # <title: what this changes, from the behaviour's point of view>
 
 Closes #

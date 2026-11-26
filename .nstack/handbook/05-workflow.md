@@ -99,8 +99,15 @@ generation instead of observing the damage afterwards.
 > The project's real throughput is its verification throughput, not its generation
 > throughput.
 
-The budget is an explicit ceiling, set for the project — the `MAX_LINES` and `MAX_FILES`
-environment variables of the pull request's scope check, 400 lines and 15 files by default. Adjusting it per module, by criticality, is not automated: it
+The budget is an explicit ceiling, set for the project: its answers `review_budget_lines` and
+`review_budget_files`, 400 lines and 15 files by default, read alike by CI and by `nstack attest`,
+as the base branch holds them: a pull request never sets the budget it is measured by. The decider
+changes them — `nstack config review_budget_lines 600` lays the change on a branch, for a pull
+request a human approves; the pull requests after its merge are measured by it. `MAX_LINES` and
+`MAX_FILES` in the environment override them for one run; the scope check says which source it took. The default follows SmartBear's study of 2,500
+reviews at Cisco (Cohen, *Best Kept Secrets of Peer Code Review*, 2006): past 200 to 400 lines in one
+review, the rate at which a reviewer finds defects drops. A larger budget is the
+decider's to choose, knowing that. Adjusting it per module, by criticality, is not automated: it
 is in the automation backlog. It covers:
 
 | Dimension | Indicative ceiling |
@@ -320,7 +327,10 @@ carries a **test sheet** in its description. Editing
 only a module's description — its manifest, `AGENTS.md`, `README.md`, `docs/` — changes no
 behaviour and needs no sheet, a framework update included; a manifest that moves the module's
 criticality or its user-visible surface does change the module. Both are read before and after
-the change, and the stricter applies:
+the change, and the stricter applies.
+
+The rows below are an example, from a sign-in module. A sheet's own scenarios come from the
+acceptance criteria of its deliverable.
 
 | # | Given · when · then | Kind | Result | Evidence | Commit | Confirmed |
 |---|---|---|---|---|---|---|
@@ -337,7 +347,10 @@ the change, and the stricter applies:
   the sessions their `Agent-Session` trailers name — and refuses a match: a declaration
   checked against the history, not a proof of identity. Each person named must have a hand on
   the pull request — an edit of its description, a review or a comment —: a name written over
-  the author's own results is refused.
+  the author's own results is refused. The trailers are read on the pull request's own commits:
+  a squash merge writes the default branch's commit itself, and GitHub puts its co-authors in a
+  paragraph after them — the session stays in the message, no longer as git reads a trailer.
+  `git log -E --grep '^Agent-Session: <id>$'` finds a session's changes there.
 - **No result without evidence**, tied to the commit tested. A new commit does not send the
   whole sheet back:
   - a commit whose files are exactly the head's **is** the head: a hash changed by a merge
@@ -347,12 +360,16 @@ the change, and the stricter applies:
     attested, it stands when nothing its modules read moved since its run: the records of its
     commit and of the head hold the same `inputs` digest — the modules run, those they consume
     from or assemble, the files outside the modules, `contracts/` and `platform/` included, the
-    project's records (`docs/project/`, `docs/adr/`, `docs/pdr/`) left out, the engine and the
+    project's records (`docs/project/`, `docs/adr/`, `docs/pdr/`) and the Markdown files at the
+    repository's root (`README.md`, `CHANGELOG.md`…) left out, the engine and the
     person — and the run is at most 7 days old, the default branch moved by 20 commits at most. A
     module that reads something it does not declare is the risk: declare it in `consumes` — a
     record cannot be declared: a check never reads one —, and the default branch's own `Module
-    checks` run catches what was missed once it runs that module. A commit with no passing record
-    of its own is the case to know: `pr-check`'s T4 says so — `nstack attest` with that commit checked out, and
+    checks` run catches what was missed once it runs that module. A commit with no record at all stands
+    when git gives the same inputs digest at that commit and at the head, the commit is in the head's
+    history, and it is as fresh as a record would have to be (the bounds above); otherwise T4 says what
+    changed. A commit whose record exists and passed nothing, or that cannot be read from git, is the case
+    to know: `pr-check`'s T4 says so — `nstack attest` with that commit checked out, and
     its rows stand without running them again —, as it says a digest that differs, with what
     changed — a module consumed, a shared file; or, when no file did, the modules run or the
     engine —, or a run past its bound. The forge's run, made at the push, comes before the head's record: where the
@@ -388,7 +405,8 @@ the change, and the stricter applies:
 
 **`Confirmed` is optional**: a sheet no fix has disturbed never carries it. A later confirmation
 joins an earlier one in the same cell, after a `;`, each clause starting with its commit:
-`651e249 — <what moved>; deb508f — <what moved>`. The engine's pull
+`651e249 — <what moved>; deb508f — <what moved>` — a colon or a comma after the commit reads the
+same; a refusal quotes the cell it read. The engine's pull
 request check reads the sheet in CI: missing, unfilled, without evidence, verified before the
 head and not confirmed on it, failed. Where checks are attested, each record also keeps the sheet's
 rows as it read them, and the check compares the description with them: an **explored** row whose

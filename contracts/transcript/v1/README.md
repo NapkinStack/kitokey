@@ -36,7 +36,7 @@ may rewrite a segment's `text` (below). Every line has a `type`.
 | `type` | When | Fields |
 |---|---|---|
 | `header` | First line, once | `contract`: `transcript/v1` · `engine` and `model`: what transcribed · `language`: the language asked for, or `null` when detected · `context`: the text the engine received, or `null` |
-| `segment` | Each stretch of speech | `speaker`: `me` or `others` · `track`: the track it was heard on, `local` for `me`, `remote` for `others` · `voice`: which voice within the track, `null` until voices are told apart · `start` and `end`: seconds from the session's `started`, to the hundredth · `text`: what was said, one line · `edited`, optional: when a person corrected `text`, RFC 3339 with its offset |
+| `segment` | Each stretch of speech | `speaker`: `me` or `others` · `track`: the track it was heard on, `local` for `me`, `remote` for `others` · `voice`: which voice within the track, `null` until voices are told apart · `start` and `end`: seconds from the session's `started`, to the hundredth · `text`: what was said, one line · `edited`, optional: when a person corrected `text`, RFC 3339 with its offset · `given`, optional: when a person gave this segment its `voice`, RFC 3339 with its offset; it comes with `voice`, never without |
 | `covered` | After each span is done | `speaker` · `until`: seconds; every segment of that speaker that starts before `until` is in the file |
 | `complete` | Last line, once | `duration`: seconds of audio transcribed · `made`, optional: when the transcript was made whole, RFC 3339 with its offset — absent in a transcript made before it was written · `made_in`, optional: the time the one step that made it whole took, in seconds, from its start to its last line — absent when it was made in several steps (live) or not measured · `cost`, optional: the price the service reported for the making, a JSON number at least zero, as it reported it — never an estimate, absent when it reported none · `currency`, optional: that price's currency, an ISO 4217 code; `cost` and `currency` come both or neither |
 
@@ -44,7 +44,8 @@ may rewrite a segment's `text` (below). Every line has a `type`.
   that wants the meeting sorts the segments by `start`.
 - **A segment is known by `speaker` and `start`.** No two segments share both.
 - **Who spoke is two questions** (ADR-0004, rule 6): which track — certain, `track`; which
-  voice within it — estimated, `voice`. `null` is a voice not told: no producer of this
+  voice within it — `voice`, estimated by the producer, or given by a person: `given` says when a
+  person gave it, and a voice without it is the producer's. `null` is a voice not told: no producer of this
   version tells voices apart yet, and once one does, `null` still says the voice of that
   segment could not be told. A voice told is a label of one line, the same for one voice
   throughout a transcript, and a label of its track only: `1` on `local` and `1` on `remote`
@@ -57,7 +58,24 @@ may rewrite a segment's `text` (below). Every line has a `type`.
 - **A correction, once complete** (ADR-0014). After its `complete` line, and never while it is made
   again, the shell may rewrite one segment's `text` on the user's word and set its `edited` to when:
   the file replaced whole — written beside, then renamed —, its lines in the same order, nothing else
-  changed. A reader reads the text as it finds it; `edited` absent is the text as heard.
+  changed but a voice given, below. A reader reads the text as it finds it; `edited` absent is the text as heard.
+- **A voice given, once complete** (#1244). After its `complete` line, and never while it is made again,
+  the shell may set one segment's `voice` on the user's word and set its `given` to when: a label of
+  one line as above, of the person's own, or `null` for a voice the person says is not known. A
+  person's labels and a producer's never meet: a label a person gives starts with `#`, and a producer
+  never writes one that does — the schema cannot say it, the comparator deciding no condition between
+  two fields. Naming a voice the producer told gives it to each of its segments, a label of the person's
+  own on each with its `given`: a producer's label holds within one transcript only, and a name kept on
+  it would pass to someone else once the transcript is made again. The file replaced whole, as for a
+  correction, its lines in the same order, nothing else changed. A reader reads the voice as it finds
+  it, given or told.
+- **A given voice outlives a transcript made again** (D113). A transcript made again writes new
+  segments, with new times, so a given voice is not known by `speaker` and `start`: it is known by
+  its track and its stretch of the clock, from `start` to `end`, both ends included. Once the new
+  transcript is complete, a new segment of the same track whose middle falls within a given segment's
+  stretch takes its `voice` and `given` — when it falls within two, those of the one given last, its
+  `given` read as an instant, not as text. The shell carries them over, not the producer, and a given segment that no
+  new segment falls within is said to the user, never dropped silently.
 - **What the making cost, in time and money, is said only when known** (D97). `made_in` is the
   producer's own measure of one step that made the whole transcript, from its start to its last
   line — a transcript made again, or made after the recording. A transcript made in several steps,
@@ -94,10 +112,15 @@ version for it. [`test.schema.json`](./test.schema.json) says what the line is.
 ## What it never does
 
 - It never rewrites or removes a line while it is made. Once complete, it never removes one, and
-  rewrites one only for a person's correction of its `text` — a better transcript by an engine is
+  rewrites one only for a person's correction of its `text` or a voice a person gave it — a better transcript by an engine is
   another file, made again from the audio.
 - It never names a person: `me` is whoever recorded, `others` is everyone else, however many
   they are.
+- It never writes or keeps a voice's embedding, nor any measure taken from a voice's sound — an
+  embedding, a print —, and never compares voices across meetings (a confidence a producer gives a
+  label is not one, and this version carries none): a voice is a label, told within one transcript or given by a person. A
+  template kept to recognise a person again is biometric data (GDPR art. 9; EDPB Guidelines 3/2019,
+  §80–82); a producer that tells voices apart keeps what it measures in memory, for that run alone.
 - It never promises that the segments of `me` and `others` do not overlap: people speak at
   once.
 - A reader never relies on a line that does not end with a line feed — it was being written —

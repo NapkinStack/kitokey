@@ -253,7 +253,9 @@ fn heading(level: HeadingLevel) -> usize {
     (level as usize).max(3)
 }
 
-/// A string as a typst string literal: said as it is, never read as markup.
+/// A string as a typst string literal: said as it is, never read as markup. A line break stays one (a code
+/// block's); a tab is a space and any other control character is left out: no font draws them, and PDF/UA-1
+/// refuses a character without its glyph — the whole file with it (`tests/pdf.rs`).
 fn literal(text: &str) -> String {
     let mut out = String::with_capacity(text.len() + 2);
     out.push('"');
@@ -261,7 +263,9 @@ fn literal(text: &str) -> String {
         match c {
             '\\' => out += "\\\\",
             '"' => out += "\\\"",
-            c if c.is_control() => out += &format!("\\u{{{:x}}}", c as u32),
+            '\n' => out += "\\n",
+            '\t' => out.push(' '),
+            c if c.is_control() => {}
             c => out.push(c),
         }
     }

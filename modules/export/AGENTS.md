@@ -41,7 +41,8 @@ Delivers the files of a session to where the user wants them.
   alike). A cause of the contract is its `failed` line and exit 1. Each format joins `WRITTEN` with its
   writer; the shell offers only those listed.
 - Every word reaches typst as a string literal, never as markup (`pdf::literal`): a transcript saying
-  `$`, `#` or `]` is written as said (`tests/pdf.rs`).
+  `$`, `#` or `]` is written as said (`tests/pdf.rs`). A tab is a space and other control characters are left
+  out: PDF/UA-1 refuses a character no font draws, and the whole file with it.
 - `pdf()` reads no font: the caller gives them, in the order it prefers them. The tests give their own,
   static subsets in `tests/fonts/`.
 

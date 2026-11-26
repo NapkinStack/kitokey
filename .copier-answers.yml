@@ -1,8 +1,9 @@
 # The project creation answers and the NapkinStack version (_commit).
 # Lines starting with _ are Copier's: changed by nstack update, never by hand.
-# The project's answers below — checks and hold_days among them — are the decider's: changed by hand, in a
-# pull request; nstack update keeps them (.nstack/handbook/07-governance.md §7).
-_commit: v0.34.9
+# The project's answers below — checks, approval, hold_days, agent_sockets, the review budget — are the decider's:
+# `nstack config` lists them and lays a change on a branch, for a pull request a human approves;
+# nstack update keeps them (.nstack/handbook/07-governance.md §7).
+_commit: v0.34.13
 _src_path: https://github.com/NapkinStack/engineering-os.git
 agent_sockets: false
 approval: agent
@@ -12,3 +13,5 @@ github_repo: NapkinStack/kitokey
 hold_days: 7
 owner_team: NapkinStack/maintainers
 project_name: Kitokey
+review_budget_files: 15
+review_budget_lines: 400

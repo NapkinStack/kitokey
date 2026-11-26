@@ -60,7 +60,20 @@ pub enum Read<T> {
 
 /// The transcript of a session's folder.
 pub fn transcript(folder: &Path) -> Read<Transcript> {
-    let Ok(text) = fs::read_to_string(folder.join("transcript.jsonl")) else {
+    read_from(&folder.join("transcript.jsonl"))
+}
+
+/// The last transcript a redo replaced, kept beside it under a name no step reads (D113,
+/// `session-audio/v3`): what « Revenir à la version précédente » brings back.
+pub const PREVIOUS: &str = "transcript-previous.jsonl";
+
+/// That transcript, read as the other is.
+pub fn previous(folder: &Path) -> Read<Transcript> {
+    read_from(&folder.join(PREVIOUS))
+}
+
+fn read_from(file: &Path) -> Read<Transcript> {
+    let Ok(text) = fs::read_to_string(file) else {
         return Read::Absent;
     };
     // Each line ends with a line feed: a last one without is still being written, and waits.
