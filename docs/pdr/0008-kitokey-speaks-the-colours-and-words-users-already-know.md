@@ -42,7 +42,7 @@ Every colour and every word of Kitokey means one thing, the thing the market alr
 | GNOME, libadwaita [style classes](https://gnome.pages.gitlab.gnome.org/libadwaita/doc/main/style-classes.html), `.destructive-action`; [GNOME HIG, buttons](https://developer.gnome.org/hig/patterns/controls/buttons.html) | « destructive colors », a warning to the user; one suggested or destructive button per view | The same red role on Linux, one per view |
 | Firefox private browsing, [Mozilla bug 588655](https://bugzilla.mozilla.org/show_bug.cgi?id=588655) (2010) | Purple as « an ambient and peripheral cue » that private browsing is on, with its mask | Violet and a lock for « Confidentielle », Kitokey's private mode |
 | Recording indicators: iOS's red dot while recording ([TidBITS, 2018](https://tidbits.com/2018/05/23/tipbits-make-sure-your-iphone-is-capturing-video/)); Kitokey's own test `red_says_a_recording_and_nothing_else` (`modules/shell/tests/look.rs`) | A red dot says « this is being recorded » | The red dot for a recording, as today |
-| Two voices: the audit's design-system proposal (§3), blue and amber as the colour-blind-safe pair | — *(an assumption of the audit, not read at a primary source: to verify in D120)* | « Vous » blue, « Les autres » amber |
+| Two voices: the audit's design-system proposal (§3), blue and amber as the colour-blind-safe pair | — *(an assumption of the audit, not read at a primary source: to verify in D120)* | « Vous » blue; « Les autres » teal in light, golden amber in dark |
 | Granola, [model selection](https://docs.granola.ai/help-center/getting-more-from-your-notes/understanding-model-selection-in-granola-chat), « Auto »; Granola and Notion call summary shapes [templates](https://docs.granola.ai/help-center/taking-notes/customise-notes-with-templates) | One word for the AI, another for the shape; « Auto » by default | « moteur » for the AI, « format » for the shape, never « modèle » for both |
 
 **The convention the user already knows:** red deletes and records, a private mode wears its own colour,
@@ -60,9 +60,11 @@ the AI is chosen « Auto » unless one cares.
 
 ## Decision
 
-1. **Two voices**: « Vous » (the microphone) is drawn in **blue**, « Les autres » (the call's sound) in **amber**
-   — in the waveform, the meters, the legend and the transcript. Green no longer means a voice.
-2. **Red** says two things only: **a recording** (its dot, Stop), and **an action that destroys** (« Mettre à la
+1. **Two voices**: « Vous » (the microphone) is drawn in **blue**, « Les autres » (the call's sound) in **teal**
+   in the light theme and **golden amber** in the dark one (the decider, on the mock-up, 2026-11-26) — in the
+   waveform, the meters, the legend and the transcript. Green no longer means a voice.
+2. **Red** says two things only: **a recording** (its live dot alone — Stop is calm and neutral, the decider on
+   the mock-up, 2026-11-26), and **an action that destroys** (« Mettre à la
    corbeille », « Supprimer », « Oublier la destination »), which always opens a confirmation whose default is
    « Annuler ». A destructive action is never the primary action of a view. The test that reserved red to
    recording (`red_says_a_recording_and_nothing_else`) is rewritten to these two roles, never dropped.
@@ -81,7 +83,7 @@ reads the role, never a value.
 
 **Acceptance criteria** *(cycle 12's D120 and D124 hold them)*:
 
-- [ ] Given the design system's tokens, when the window draws a waveform, a meter or a transcript line, then « Vous » takes the role blue and « Les autres » the role amber, in both themes, each 3:1 against its ground at least
+- [ ] Given the design system's tokens, when the window draws a waveform, a meter or a transcript line, then « Vous » takes the role blue and « Les autres » teal in the light theme and golden amber in the dark one, each 3:1 against its ground at least
 - [ ] Given any button whose action deletes, when it is pressed, then a confirmation opens, « Annuler » focused, and the button bears the destructive role; no other button bears it
 - [ ] Given « Confidentielle » on, when any surface shows it, then it is violet with the lock, and violet appears nowhere else
 - [ ] Given the window's sentences in both languages, when they are read by `tests/words.rs`, then « modèle » / « model » names no AI and no summary shape shown to the user
