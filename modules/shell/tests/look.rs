@@ -150,35 +150,42 @@ fn hex(text: &str) -> Rgb {
     [digit(1), digit(3), digit(5)]
 }
 
-/// Each theme's tokens, read from the style's `:root` rules (D120): a primitive's `#RRGGBB`, a role's
-/// `light-dark(light, dark)`, an alias's `var(--…)`. A colour token this test cannot read is refused, or it
-/// would say nothing of all that use it; a token of another kind (a size, a duration) is no colour.
+/// The tokens one rule declares, in its order.
+fn tokens(block: &str) -> Vec<(String, String)> {
+    block
+        .split(';')
+        .filter_map(|one| one.split_once(':'))
+        .filter(|(name, _)| name.trim().starts_with("--"))
+        .map(|(name, value)| (name.trim().to_string(), value.trim().to_string()))
+        .collect()
+}
+
+/// Each theme's tokens, read from the style (D120): the light ones on `:root`, the dark ones laid over them
+/// under `prefers-color-scheme: dark`; a primitive's `#RRGGBB`, a role's or an alias's `var(--…)`. A colour
+/// token this test cannot read is refused, or it would say nothing of all that use it.
 fn themes(style: &str) -> [BTreeMap<String, Rgb>; 2] {
-    let declared: Vec<(String, String)> = rules(style)
-        .into_iter()
+    let all = rules(style);
+    let light: Vec<(String, String)> = all
+        .iter()
         .filter(|(selector, _)| selector == ":root")
-        .flat_map(|(_, body)| {
-            body.split(';')
-                .filter_map(|one| one.split_once(':'))
-                .filter(|(name, _)| name.trim().starts_with("--"))
-                .map(|(name, value)| (name.trim().to_string(), value.trim().to_string()))
-                .collect::<Vec<_>>()
-        })
+        .flat_map(|(_, body)| tokens(body))
         .collect();
-    let mut themes = [BTreeMap::new(), BTreeMap::new()];
-    for (index, theme) in themes.iter_mut().enumerate() {
-        // An alias may name a token declared after it: read until nothing more resolves.
+    let dark: Vec<(String, String)> = all
+        .iter()
+        .filter(|(selector, _)| {
+            selector.contains("prefers-color-scheme: dark") && selector.ends_with(":root")
+                || selector.starts_with("@media (prefers-color-scheme: dark)") && selector.ends_with(":root:not([data-theme=\"light\"])")
+        })
+        .flat_map(|(_, body)| tokens(body))
+        .collect();
+    [light.clone(), [light, dark].concat()].map(|declared| {
+        let written: BTreeMap<String, String> = declared.into_iter().collect();
+        let mut theme = BTreeMap::new();
+        // An alias may name a token written after it: read until nothing more resolves.
         loop {
             let before = theme.len();
-            for (name, value) in &declared {
-                let side = match value.strip_prefix("light-dark(").and_then(|rest| rest.strip_suffix(')')) {
-                    Some(both) => {
-                        let (light, dark) = both.split_once(',').unwrap_or_else(|| panic!("{name}: {value} is no light-dark()"));
-                        [light, dark][index].trim()
-                    }
-                    None => value.as_str(),
-                };
-                if let Some(colour) = self::value(side, theme) {
+            for (name, text) in &written {
+                if let Some(colour) = value(text, &theme) {
                     theme.insert(name.clone(), colour);
                 }
             }
@@ -186,12 +193,12 @@ fn themes(style: &str) -> [BTreeMap<String, Rgb>; 2] {
                 break;
             }
         }
-        for (name, value) in &declared {
-            let a_colour = value.starts_with('#') || value.starts_with("light-dark(") || value.starts_with("var(");
-            assert!(!a_colour || theme.contains_key(name), "{name}: {value} cannot be read");
+        for (name, text) in &written {
+            let a_colour = text.starts_with('#') || text.starts_with("var(");
+            assert!(!a_colour || theme.contains_key(name), "{name}: {text} cannot be read");
         }
-    }
-    themes
+        theme
+    })
 }
 
 /// A value of the style in a theme: `#RRGGBB`, a token, or `color-mix` of two as the style writes it.
@@ -292,13 +299,15 @@ fn each_themes_text_reaches_aa_on_what_it_is_written_on() {
 
 #[test]
 fn a_pair_below_aa_is_refused() {
-    let style = ":root { --ground: light-dark(#FFFFFF, #000000); --surface: light-dark(#FFFFFF, #000000); --raised: light-dark(#FFFFFF, #000000); --ink: light-dark(#000000, #FFFFFF); --pale: light-dark(#BBBBBB, #444444); }\n\
+    let style = ":root { --ground: #FFFFFF; --surface: #FFFFFF; --raised: #FFFFFF; --ink: #000000; --pale: #BBBBBB; }\n\
+                 @media (prefers-color-scheme: dark) { :root { --ground: #000000; --surface: #000000; --raised: #000000; --ink: #FFFFFF; --pale: #444444; } }\n\
                  .good { color: var(--ink); }\n.bad { color: var(--pale); }\n.big { color: var(--pale); font-size: 30px; }";
     let faint = too_faint(style);
     assert!(faint.iter().any(|line| line.contains(".bad")), "{faint:?}");
     assert!(!faint.iter().any(|line| line.contains(".good")), "{faint:?}");
     assert!((contrast([0.0; 3], [255.0; 3]) - 21.0).abs() < 0.01);
-    let unread = ":root { --ground: light-dark(#FFFFFF, #000000); --surface: light-dark(#FFFFFF, #000000); --raised: light-dark(#FFFFFF, #000000); --ink: light-dark(#000000, #FFFFFF); }\n\
+    let unread = ":root { --ground: #FFFFFF; --surface: #FFFFFF; --raised: #FFFFFF; --ink: #000000; }\n\
+                  @media (prefers-color-scheme: dark) { :root { --ground: #000000; --surface: #000000; --raised: #000000; --ink: #FFFFFF; } }\n\
                   .a { color: rgb(1, 2, 3); }\n.b { color: var(--ink); background: linear-gradient(red, blue); }\n.c { color: var(--ink); opacity: 0.2; }\n\
                   .d { color: var(--ink); -webkit-text-fill-color: #888888; background-color: #888888; }\n.e { color: var(--ink); color: #FEFEFE; background: #FFFFFF; }";
     let refused = too_faint(unread);
@@ -402,7 +411,7 @@ fn each_pair_of_the_theme_reaches_its_threshold_in_both_themes() {
     assert!(STYLE.contains(SELECTED), "the selected row is mixed otherwise: say so here");
     assert_eq!(below_their_threshold(STYLE), Vec::<String>::new());
     // An edge as faint as a divider is refused, in the dark theme as in the light one.
-    let faint = STYLE.replacen("light-dark(var(--gray-450), var(--gray-500))", "light-dark(var(--gray-450), var(--gray-800))", 1);
+    let faint = STYLE.replacen("--color-edge: var(--gray-500)", "--color-edge: var(--gray-800)", 1);
     assert!(
         below_their_threshold(&faint)
             .iter()
@@ -660,23 +669,25 @@ fn colours_in_page(page: &str) -> Vec<String> {
 }
 
 /// Dark chosen in Settings whatever the system says (D98) is the system's dark itself, token for
-/// token: Settings' choice sets the colour scheme and nothing else, and each role names its dark value
-/// once, in `light-dark()` (D120) — a palette of its own would drift from the one the thresholds read.
+/// token: a palette of its own would drift from the one the thresholds above are read on.
 #[test]
 fn the_dark_chosen_in_settings_is_the_systems_dark() {
-    let chosen: Vec<(String, String)> = rules(STYLE).into_iter().filter(|(selector, _)| selector.contains("data-theme")).collect();
-    for (selector, body) in &chosen {
-        if selector.ends_with(":root") {
-            assert_eq!(body.trim(), format!("color-scheme: {};", if selector.contains("dark") { "dark" } else { "light" }), "{selector}");
-        }
-    }
-    assert!(chosen.iter().any(|(selector, _)| selector == "[data-theme=\"dark\"]:root"), "no dark chosen");
-    let elsewhere: Vec<String> = rules(STYLE)
-        .into_iter()
-        .filter(|(selector, body)| selector != ":root" && body.split(';').any(|one| one.trim().starts_with("--")))
-        .map(|(selector, _)| selector)
-        .collect();
-    assert_eq!(elsewhere, Vec::<String>::new(), "a palette of its own");
+    let forced = STYLE
+        .split_once(":root[data-theme=\"dark\"] {")
+        .unwrap()
+        .1
+        .split_once('}')
+        .unwrap()
+        .0;
+    let system = STYLE
+        .split_once(":root:not([data-theme=\"light\"]) {")
+        .unwrap()
+        .1
+        .split_once('}')
+        .unwrap()
+        .0;
+    assert!(!tokens(system).is_empty());
+    assert_eq!(tokens(forced), tokens(system));
 }
 
 #[test]
@@ -1106,10 +1117,28 @@ const OUTSIDE: &str = include_str!("../ui/window.css");
 const RATCHET: &str = include_str!("look-outside-tokens.txt");
 /// The properties whose value is a size, a radius, a shadow or a duration (D120).
 const SIZED: [&str; 23] = [
-    "font", "font-size", "border-radius", "border-top-left-radius", "border-top-right-radius",
-    "border-bottom-left-radius", "border-bottom-right-radius", "box-shadow", "transition",
-    "transition-duration", "transition-delay", "animation", "animation-duration", "animation-delay",
-    "margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding", "gap", "row-gap",
+    "font",
+    "font-size",
+    "border-radius",
+    "border-top-left-radius",
+    "border-top-right-radius",
+    "border-bottom-left-radius",
+    "border-bottom-right-radius",
+    "box-shadow",
+    "transition",
+    "transition-duration",
+    "transition-delay",
+    "animation",
+    "animation-duration",
+    "animation-delay",
+    "margin",
+    "margin-top",
+    "margin-right",
+    "margin-bottom",
+    "margin-left",
+    "padding",
+    "gap",
+    "row-gap",
     "column-gap",
 ];
 /// The literals that are no choice of a design: nothing, a hairline, a focus offset, a whole, a half.
@@ -1124,8 +1153,10 @@ fn outside_the_tokens(style: &str) -> Vec<String> {
                 found.push(format!("{selector}: {property} is a token outside tokens.css"));
                 continue;
             }
-            let words: Vec<&str> =
-                value.split(|c: char| c.is_whitespace() || ",()/".contains(c)).filter(|w| !w.is_empty()).collect();
+            let words: Vec<&str> = value
+                .split(|c: char| c.is_whitespace() || ",()/".contains(c))
+                .filter(|w| !w.is_empty())
+                .collect();
             for word in &words {
                 let hex = word.starts_with('#') && [4, 5, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit());
                 if hex || ["rgb", "rgba", "hsl", "hsla", "color-mix"].contains(word) {
@@ -1141,7 +1172,10 @@ fn outside_the_tokens(style: &str) -> Vec<String> {
                 let end = bare[at..].find(')').map_or(bare.len(), |end| at + end + 1);
                 bare.replace_range(at..end, " ");
             }
-            for word in bare.split(|c: char| c.is_whitespace() || ",()/".contains(c)).filter(|w| !w.is_empty()) {
+            for word in bare
+                .split(|c: char| c.is_whitespace() || ",()/".contains(c))
+                .filter(|w| !w.is_empty())
+            {
                 let digits = word.trim_end_matches(|c: char| c.is_ascii_alphabetic() || c == '%');
                 let (number, unit) = (digits.trim_start_matches('-'), &word[digits.len()..]);
                 if number.parse::<f64>().is_err() || (unit.is_empty() && property != "font-size") {
@@ -1163,8 +1197,16 @@ fn only_the_tokens_hold_a_value() {
     for one in &found {
         println!("outside tokens.css: {one}");
     }
-    assert!(found.len() <= ratchet, "{} values outside tokens.css, the ratchet allows {ratchet}: read them with --nocapture", found.len());
-    assert!(found.len() >= ratchet, "{} values outside tokens.css: lower tests/look-outside-tokens.txt to it", found.len());
+    assert!(
+        found.len() <= ratchet,
+        "{} values outside tokens.css, the ratchet allows {ratchet}: read them with --nocapture",
+        found.len()
+    );
+    assert!(
+        found.len() >= ratchet,
+        "{} values outside tokens.css: lower tests/look-outside-tokens.txt to it",
+        found.len()
+    );
 }
 
 #[test]
@@ -1173,7 +1215,14 @@ fn a_value_outside_the_tokens_is_counted() {
                  .b { color: var(--ink); padding: var(--space-2); border-radius: 50%; border: 1px solid var(--line); }\n\
                  .c { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); --x: #000000; font: 15px/1.45 system-ui; }";
     let found = outside_the_tokens(style);
-    for expected in [".a: color: #fff", ".a: margin: 4px", ".a: transition: 0.2s", ".c: background: color-mix", ".c: --x", ".c: font: 15px"] {
+    for expected in [
+        ".a: color: #fff",
+        ".a: margin: 4px",
+        ".a: transition: 0.2s",
+        ".c: background: color-mix",
+        ".c: --x",
+        ".c: font: 15px",
+    ] {
         assert!(found.iter().any(|one| one.starts_with(expected)), "{expected}: {found:?}");
     }
     assert!(!found.iter().any(|one| one.starts_with(".b")), "{found:?}");

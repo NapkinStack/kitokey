@@ -483,16 +483,18 @@ def redo_offered(browser, panel: str, step: str) -> list[str]:
 
 
 def shot_themed(browser, name: str, theme: str) -> None:
-    """A screenshot in its theme: the system's, or, where the desktop shows the other one, the theme's
-    colour scheme put on the page — each role reads it through `light-dark()` (D120) —, a dark one on a
-    light desktop as a light one on a dark desktop (D89)."""
+    """A screenshot in its theme: the system's, or, where the desktop shows the other one, the theme
+    chosen on the page as Settings chooses it (D98, `ui/tokens.css`) — a dark one on a light desktop as a
+    light one on a dark desktop (D89) —, then the page's own choice put back."""
     forced = (theme == "dark") != browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
     if forced:
-        browser.execute_script("document.documentElement.style.cssText = 'color-scheme: ' + arguments[0]", theme)
+        was = browser.execute_script("const was = document.documentElement.getAttribute('data-theme'); "
+                                     "document.documentElement.setAttribute('data-theme', arguments[0]); return was", theme)
         time.sleep(0.3)
     shot(browser, name)
     if forced:
-        browser.execute_script("document.documentElement.style.cssText = ''")
+        browser.execute_script("if (arguments[0] === null) document.documentElement.removeAttribute('data-theme'); "
+                               "else document.documentElement.setAttribute('data-theme', arguments[0])", was)
 
 
 def stop_from_small(browser) -> None:

@@ -1,15 +1,13 @@
 /* Kitokey's tokens (D120): the one file that holds a value. Primitives, then the roles that read them,
    then the window's older names, each an alias of its role. A rule reads a role, never a primitive.
 
-   The theme: `color-scheme` says which one holds — the system's (no attribute), or the one chosen in
-   Settings (D98) —, and each role names its light and its dark value once, in `light-dark()` (CSS
-   Color 5): one dark side for both ways in, the system's and Settings'. */
-:root { color-scheme: light dark; }
-[data-theme="light"]:root { color-scheme: light; }
-[data-theme="dark"]:root { color-scheme: dark; }
+   The theme: the roles' light values on `:root`; their dark ones under the system's dark, unless
+   Settings chose light, and under Settings' dark (D98) — the same list in both, held by
+   tests/look.rs. */
 
 /* Primitives: the palette, named by hue and lightness. */
 :root {
+  color-scheme: light dark;
   --white: #FFFFFF;
   --gray-25: #F2F4F7; --gray-50: #EEF1F5; --gray-75: #EEF0F4; --gray-100: #E3E7EE; --gray-150: #D9DDE5;
   --gray-300: #AAB1BF; --gray-450: #808898; --gray-500: #737B8C; --gray-650: #4C5464; --gray-750: #3A4050;
@@ -20,29 +18,29 @@
   --yellow-200: #FDE68A; --amber-400: #FBBF24;
 }
 
-/* Roles: what a colour says, its light value, then its dark one. */
+/* Roles: what a colour says, in the light theme. */
 :root {
-  --color-ground: light-dark(var(--gray-25), var(--gray-950));
-  --color-surface: light-dark(var(--white), var(--gray-900));
-  --color-raised: light-dark(var(--gray-50), var(--gray-850));
+  --color-ground: var(--gray-25);
+  --color-surface: var(--white);
+  --color-raised: var(--gray-50);
   /* Divides, and only that. */
-  --color-divider: light-dark(var(--gray-150), var(--gray-800));
-  --color-text: light-dark(var(--gray-950), var(--gray-75));
-  --color-text-soft: light-dark(var(--gray-650), var(--gray-300));
-  --color-accent: light-dark(var(--blue-700), var(--blue-300));
-  --color-success: light-dark(var(--green-700), var(--green-300));
+  --color-divider: var(--gray-150);
+  --color-text: var(--gray-950);
+  --color-text-soft: var(--gray-650);
+  --color-accent: var(--blue-700);
+  --color-success: var(--green-700);
   /* A recording (D89; PDR-0008). */
-  --color-live: light-dark(var(--red-700), var(--red-300));
+  --color-live: var(--red-700);
   /* A field's, a list's, a switch's border, 3:1 on each ground (D89). */
-  --color-edge: light-dark(var(--gray-450), var(--gray-500));
+  --color-edge: var(--gray-450);
   /* A secondary button hovered, then pressed (#1094): a step darker each, the text still at 4.5:1. */
-  --color-hover: light-dark(var(--gray-100), var(--gray-825));
-  --color-pressed: light-dark(var(--gray-150), var(--gray-750));
+  --color-hover: var(--gray-100);
+  --color-pressed: var(--gray-150);
   /* The word a search found (#1078): a pale yellow under the text, as find-in-page marks it; seen on a
      selected row by its edge, the text's 2 px underline; in dark the amber is its own edge (#1093). */
-  --color-mark: light-dark(var(--yellow-200), var(--amber-400));
-  --color-mark-text: light-dark(var(--gray-950), var(--gray-900));
-  --color-mark-edge: light-dark(var(--gray-950), var(--amber-400));
+  --color-mark: var(--yellow-200);
+  --color-mark-text: var(--gray-950);
+  --color-mark-edge: var(--gray-950);
 }
 
 /* The window's older names, until each rule reads its role (D120). */
@@ -52,4 +50,24 @@
   --accent: var(--color-accent); --ok: var(--color-success); --red: var(--color-live);
   --edge: var(--color-edge); --hover: var(--color-hover); --pressed: var(--color-pressed);
   --mark: var(--color-mark); --mark-ink: var(--color-mark-text); --mark-edge: var(--color-mark-edge);
+}
+
+/* The dark theme: the same roles, written once here, then again under Settings' dark. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-ground: var(--gray-950); --color-surface: var(--gray-900); --color-raised: var(--gray-850);
+    --color-divider: var(--gray-800); --color-text: var(--gray-75); --color-text-soft: var(--gray-300);
+    --color-accent: var(--blue-300); --color-success: var(--green-300); --color-live: var(--red-300);
+    --color-edge: var(--gray-500); --color-hover: var(--gray-825); --color-pressed: var(--gray-750);
+    --color-mark: var(--amber-400); --color-mark-text: var(--gray-900); --color-mark-edge: var(--amber-400);
+  }
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-ground: var(--gray-950); --color-surface: var(--gray-900); --color-raised: var(--gray-850);
+  --color-divider: var(--gray-800); --color-text: var(--gray-75); --color-text-soft: var(--gray-300);
+  --color-accent: var(--blue-300); --color-success: var(--green-300); --color-live: var(--red-300);
+  --color-edge: var(--gray-500); --color-hover: var(--gray-825); --color-pressed: var(--gray-750);
+  --color-mark: var(--amber-400); --color-mark-text: var(--gray-900); --color-mark-edge: var(--amber-400);
 }
