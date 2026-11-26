@@ -14753,7 +14753,9 @@ def main() -> int:
         # key goes to the scenario's own keyring, which lives as long as the program.
         class Tags(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
-                body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+                # What it holds, as a check sets it (D122's « Auto »): nothing, or the recommended one second.
+                held = [] if (WORK / "ollama-empty").exists() else ["mistral:7b", "qwen3:8b"] if (WORK / "ollama-recommended").exists() else ["qwen3:14b", "mistral:7b"]
+                body = json.dumps({"models": [{"name": name} for name in held]}).encode()
                 self.send_response(200)
                 self.send_header("content-length", str(len(body)))
                 self.end_headers()
@@ -15126,6 +15128,8 @@ def main() -> int:
             invoke("minutes_redo", {"name": "2026-10-18_14-00", "provider": f"{ollama}/v1", "model": "mistral:7b"})
             wait_for(browser, lambda b: makings()["minutes"] is not None, 3)
             window.file.write_text(unchosen)
+            # No one chosen, and « Auto » not ready — Ollama here holding no model (D122).
+            (WORK / "ollama-empty").touch()
             invoke("minutes_asked", {"name": "2026-10-18_11-00"})
             wait_for(browser, lambda b: makings()["minutes_waiting"] == ["2026-10-18_11-00"], 3)
             (WORK / "slow-minutes").unlink()
@@ -15133,6 +15137,16 @@ def main() -> int:
             time.sleep(1)
             check("taken from the line with no one chosen: said on its page, no settings window opened over the user",
                   unsaid and browser.execute_script("return location.hash") == "#/meeting/2026-10-18_11-00", (makings(), browser.execute_script("return location.hash")))
+            # No one chosen, Ollama here holding the recommended model: « Auto » writes with it, and with
+            # it rather than the first held; nothing written to the settings (D122).
+            (WORK / "ollama-empty").unlink()
+            (WORK / "ollama-recommended").touch()
+            invoke("minutes_asked", {"name": "2026-10-18_11-00"})
+            auto_ = wait_for(browser, lambda b: makings()["minutes"] is None and not makings()["minutes_waiting"] and (WORK / "summary-args").read_text().split()[-1] == "qwen3:8b", 15)
+            (WORK / "ollama-recommended").unlink()
+            check("no one chosen, Ollama holding the recommended model: « Auto » writes with it here, Settings left as they were (D122)",
+                  auto_ and f"{ollama}/v1" in (WORK / "summary-args").read_text() and "minutes_provider" not in window.file.read_text(),
+                  (makings(), (WORK / "summary-args").read_text(), window.file.read_text()))
             window.file.write_text(settled)
             # The trash emptied of these, as the user would: the next check counts its own.
             for made_before in (WORK / "data" / "Trash" / "files").glob("minutes-before-*.md"):

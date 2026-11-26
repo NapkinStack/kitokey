@@ -11,7 +11,10 @@ use std::path::Path;
 use serde_json::Value;
 
 mod ics;
+mod pdf;
 pub use ics::{Dated, ics};
+pub use pdf::{Data, Face, chosen, pdf};
+pub use typst::text::FontInfo;
 
 /// What the caller asks to be written.
 #[derive(Clone, Copy, Debug)]
