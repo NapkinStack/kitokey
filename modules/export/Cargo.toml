@@ -8,6 +8,7 @@ publish = false
 docx-rs = { version = "0.4.22", default-features = false }
 pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html"] }
 serde_json = "1.0.154"
+fontdb = "0.23.0"
 typst = "=0.15.1"
 typst-layout = "=0.15.1"
 typst-pdf = "=0.15.1"
@@ -24,3 +25,12 @@ zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 [[bin]]
 name = "kitokey-export"
 path = "src/main.rs"
+
+# The size profile D108's spike measured (issue 129, the decider's word of 2026-11-20): typst makes the
+# program large, and the package is a download.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

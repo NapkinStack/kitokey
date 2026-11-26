@@ -5,12 +5,14 @@
 //! it prefers them; this module reads none from the system.
 
 use pulldown_cmark::{Event, HeadingLevel, Tag, TagEnd};
+use std::sync::Arc;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime, Duration};
 use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
-use typst::text::{Font, FontBook};
+
+use typst::text::{Font, FontBook, FontFlags, FontInfo};
 use typst::utils::LazyHash;
-use typst::{Library, LibraryExt, World};
+use typst::{Library, LibraryExt, World, WorldExt};
 use typst_layout::PagedDocument;
 use typst_pdf::{PdfOptions, PdfStandard, PdfStandards};
 
@@ -19,8 +21,11 @@ use crate::{Include, Labels, Meeting, Speaker, time};
 /// The meeting as a PDF/UA-1 document: its title and language set, « heading 1 » the meeting, « heading
 /// 2 » each section and the transcript, a model's own headings under them; the transcript a table its
 /// head marked as such. As in the page, a model's raw HTML, links and images are said as their words.
-pub fn pdf(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, name: &str, fonts: &[Vec<u8>]) -> Result<Vec<u8>, String> {
-    let fonts: Vec<Font> = fonts.iter().flat_map(|font| Font::iter(Bytes::new(font.clone()))).collect();
+pub fn pdf(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, name: &str, fonts: &[Face]) -> Result<Vec<u8>, String> {
+    let fonts: Vec<Font> = fonts
+        .iter()
+        .filter_map(|face| Font::new(Bytes::new(Shared(face.data.clone())), face.index))
+        .collect();
     let book = FontBook::from_fonts(&fonts);
     let mut families: Vec<String> = Vec::new();
     for font in &fonts {
@@ -41,7 +46,9 @@ pub fn pdf(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, nam
             source(meeting, include, labels, lang, name, &families),
         ),
     };
-    let document = typst::compile::<PagedDocument>(&world).output.map_err(said)?;
+    let document = typst::compile::<PagedDocument>(&world)
+        .output
+        .map_err(|errors| said(&world, errors))?;
     let standards = PdfStandards::new(&[PdfStandard::Ua_1]).map_err(|error| error.message().to_string())?;
     typst_pdf::pdf(
         &document,
@@ -50,15 +57,131 @@ pub fn pdf(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, nam
             ..PdfOptions::default()
         },
     )
-    .map_err(said)
+    .map_err(|errors| said(&world, errors))
 }
 
-fn said(errors: impl IntoIterator<Item = typst::diag::SourceDiagnostic>) -> String {
+/// A font file's bytes, shared: a system's font mapped once, a collection's faces reading the same bytes.
+pub type Data = Arc<dyn AsRef<[u8]> + Send + Sync>;
+
+/// One face of a font file: the file's bytes, and the face's place in it (0 but in a collection).
+#[derive(Clone)]
+pub struct Face {
+    pub data: Data,
+    pub index: u32,
+}
+
+struct Shared(Data);
+
+impl AsRef<[u8]> for Shared {
+    fn as_ref(&self) -> &[u8] {
+        (*self.0).as_ref()
+    }
+}
+
+/// The faces the meeting needs, among `faces` — what the system's are, read without keeping them —, by their place
+/// in it: static faces alone. A variable face is never taken — its default instance can be its lightest weight
+/// (Thin for Noto Sans CJK); a letter only a variable face has is no letter the program has (`exporting/v1`, the
+/// decider on 2026-11-25).
+/// The family `sans` names — the system's sans-serif — comes first when it has any; then, each time,
+/// the family that has the most of what is still missing, the first given on a tie. Every face of a
+/// family taken comes with it, its bold for the headings. A letter no face has is `Err`, that letter:
+/// the PDF would show a box for a word. A symbol no face has — an emoji — is drawn as a box, the rest
+/// written.
+pub fn chosen(
+    meeting: &Meeting,
+    include: Include,
+    labels: &Labels,
+    name: &str,
+    faces: &[FontInfo],
+    sans: Option<&str>,
+) -> Result<Vec<usize>, char> {
+    let mut missing: Vec<char> = source(meeting, include, labels, "", name, &[])
+        .chars()
+        .filter(|&c| !invisible(c))
+        .collect();
+    missing.sort_unstable();
+    missing.dedup();
+    let mut taken: Vec<usize> = Vec::new();
+    let fixed = |i: usize| !faces[i].flags.contains(FontFlags::VARIABLE);
+    // The static faces' families, in the order first given.
+    let mut families: Vec<&str> = Vec::new();
+    for (i, info) in faces.iter().enumerate() {
+        if fixed(i) && !families.contains(&info.family.as_str()) {
+            families.push(&info.family);
+        }
+    }
+    let of = |family: &str| -> Vec<usize> { (0..faces.len()).filter(|&i| faces[i].family == family && fixed(i)).collect() };
+    let has = |family: &str, c: char| of(family).iter().any(|&i| faces[i].coverage.contains(c as u32));
+    loop {
+        let count = |family: &str| missing.iter().filter(|&&c| has(family, c)).count();
+        let best = sans
+            .filter(|&sans| taken.is_empty() && families.contains(&sans) && count(sans) > 0)
+            .or_else(|| {
+                families
+                    .iter()
+                    .copied()
+                    .map(|family| (count(family), family))
+                    .filter(|&(n, _)| n > 0)
+                    .rev()
+                    .max_by_key(|&(n, _)| n)
+                    .map(|(_, family)| family)
+            });
+        let Some(family) = best else { break };
+        missing.retain(|&c| !has(family, c));
+        taken.extend(of(family));
+        families.retain(|&f| f != family);
+    }
+    match missing.into_iter().find(|c| c.is_alphabetic()) {
+        Some(letter) => Err(letter),
+        None => Ok(taken),
+    }
+}
+
+/// A character no face draws: white space, a control, a joiner or a variation selector.
+fn invisible(c: char) -> bool {
+    c.is_whitespace()
+        || c.is_control()
+        || matches!(c, '\u{ad}' | '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2060}'..='\u{206f}' | '\u{fe00}'..='\u{fe0f}' | '\u{feff}' | '\u{e0000}'..='\u{e0fff}')
+}
+
+fn said(world: &Paper, errors: impl IntoIterator<Item = typst::diag::SourceDiagnostic>) -> String {
     errors
         .into_iter()
-        .map(|error| error.message.to_string())
+        .map(|error| {
+            let place = world
+                .range(error.span)
+                .and_then(|range| world.main.lines().byte_to_line_column(range.start));
+            detail(&error.message, place)
+        })
         .collect::<Vec<_>>()
         .join("; ")
+}
+
+/// What a log may keep of one of typst's errors (`exporting/v1`, ADR-0007): its kind, the message up to
+/// its first colon with anything quoted taken out, and its place in the source Kitokey wrote, line and
+/// column counted from 1. Never what follows the colon, nor a quoted part: either may be the meeting's
+/// words.
+fn detail(message: &str, place: Option<(usize, usize)>) -> String {
+    let head = message.split(':').next().unwrap_or_default();
+    let mut kind = String::new();
+    let mut closing: Option<char> = None;
+    for c in head.chars() {
+        match closing {
+            Some(close) if c == close => closing = None,
+            Some(_) => {}
+            None => match c {
+                '`' | '"' => closing = Some(c),
+                '“' => closing = Some('”'),
+                '«' => closing = Some('»'),
+                _ => kind.push(c),
+            },
+        }
+    }
+    let kind = kind.split_whitespace().collect::<Vec<_>>().join(" ");
+    match place {
+        Some((line, column)) => format!("typst: {kind}, line {}, column {}", line + 1, column + 1),
+        None => format!("typst: {kind}"),
+    }
 }
 
 /// The document as typst code: each word a string literal.
@@ -217,5 +340,32 @@ impl World for Paper {
     }
     fn today(&self, _: Option<Duration>) -> Option<Datetime> {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::detail;
+
+    /// The detail keeps the kind and the place, never a word of the meeting: a witness « Témoin » given
+    /// after the colon, between backticks or in quotes is not in it (lina's B2 on #1279).
+    #[test]
+    fn a_failure_s_detail_keeps_its_kind_and_place_never_the_meeting_s_words() {
+        for message in [
+            "unknown variable: Témoin",
+            "expected comma, found `Témoin`",
+            "cannot shape \"Témoin\"",
+            "PDF/UA-1 error: Témoin has no alt text",
+        ] {
+            let said = detail(message, Some((2, 4)));
+            assert!(!said.contains("Témoin"), "{said}");
+            assert!(said.ends_with("line 3, column 5"), "{said}");
+        }
+        assert_eq!(
+            detail("unknown variable: Témoin", Some((2, 4))),
+            "typst: unknown variable, line 3, column 5"
+        );
+        assert_eq!(detail("expected comma, found `Témoin`", None), "typst: expected comma, found");
+        assert_eq!(detail("PDF/UA-1 error: Témoin has no alt text", None), "typst: PDF/UA-1 error");
     }
 }
