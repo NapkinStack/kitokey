@@ -24,6 +24,19 @@ test("each page skips to its content, offers the other language and names the so
   }
 });
 
+test("each page offers the moon and the sun, named, hidden until its script runs, the theme set before the page paints", async () => {
+  for (const file of await pages()) {
+    if (route(file) === "/") continue;
+    const html = await readFile(file, "utf8");
+    const toggle = html.match(/<button type="button" class="theme-toggle"[^>]*>/)?.[0];
+    assert.ok(toggle, `${route(file)}: no theme toggle`);
+    assert.match(toggle, /aria-pressed="false"/);
+    assert.match(toggle, /data-dark="[^"]+" data-light="[^"]+" aria-label="[^"]+" hidden/);
+    const head = html.slice(0, html.indexOf("</head>"));
+    assert.match(head, /<script src="\/theme\.js"><\/script>/, `${route(file)}: theme.js not in <head>, or deferred`);
+  }
+});
+
 test("the titles' face ships with its licence", async () => {
   const fonts = await readdir(join(dist, "fonts"));
   assert.ok(fonts.includes("bricolage-latin.woff2"), "no face");
