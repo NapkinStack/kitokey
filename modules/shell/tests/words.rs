@@ -2988,3 +2988,54 @@ fn every_sentence_of_the_window_is_read_by_the_code() {
         .collect();
     assert!(unread.is_empty(), "sentences no code reads: remove them\n{unread:?}");
 }
+
+/// D124's first contradiction: a confidential meeting's send is asked once more, then sent (D119); no sentence
+/// says it is never sent.
+#[test]
+fn a_confidential_meeting_is_said_asked_once_more_never_never_sent() {
+    for (language, never, confirm) in [
+        (Language::English, "never a confidential", "confirm"),
+        (Language::French, "jamais une réunion confidentielle", "confirmation"),
+    ] {
+        let window = words::window(language);
+        for sentence in sentences()
+            .iter()
+            .filter(|sentence| sentence.french == Some(language == Language::French))
+        {
+            assert!(!sentence.text.contains(never), "{}", sentence.name());
+        }
+        assert!(window.destinations_said.contains(confirm), "{}", window.destinations_said);
+        assert!(window.send_confidential.contains(confirm), "{}", window.send_confidential);
+    }
+}
+
+/// D124's second: making room says one thing, what goes to the trash and can come back. The whole meeting's
+/// line and the note under it both say the trash; neither says nothing is kept.
+#[test]
+fn making_room_says_the_trash_and_never_that_nothing_is_kept() {
+    for (language, trash, kept) in [
+        (Language::English, "trash", "nothing is kept"),
+        (Language::French, "corbeille", "rien n’est conservé"),
+    ] {
+        let window = words::window(language);
+        for said in [window.free_whole[1], window.free_note] {
+            assert!(said.contains(trash), "{said}");
+            assert!(!said.to_lowercase().contains(kept), "{said}");
+        }
+    }
+}
+
+/// D124's third: a summary too long for a channel offers what the window has. Until D121 offers « Exporter en
+/// PDF », that is the meeting's copy, by its button's own verb; never an export the meeting's page does not
+/// offer.
+#[test]
+fn a_summary_too_long_for_a_channel_offers_its_copy_never_an_export_the_page_lacks() {
+    for (language, verb) in [(Language::English, "Copy"), (Language::French, "Copiez")] {
+        let window = words::window(language);
+        assert!(window.copy_minutes.starts_with(&verb[..4]), "{}", window.copy_minutes);
+        assert!(window.send_too_large.contains(verb), "{}", window.send_too_large);
+        for export in ["Export", "export", "PDF"] {
+            assert!(!window.send_too_large.contains(export), "{}", window.send_too_large);
+        }
+    }
+}
