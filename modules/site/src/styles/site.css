@@ -198,6 +198,7 @@ p { text-wrap: pretty; }
 .ch-logos { list-style: none; margin: .7rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 1.6rem; }
 .ch-logos li { display: inline-flex; align-items: center; gap: .6rem; font-weight: 650; font-size: 1.05rem; color: var(--ink); }
 .ch-logos .os-logo, .ch-hook { width: 2.2rem; height: 2.2rem; }
+.ch-logos img.os-logo { width: auto; height: 1.7rem; } /* a brand's own file keeps its proportions */
 .ch-hook { color: var(--soft); }
 @media (min-width: 900px) { .ch-card { grid-template-columns: 1.4fr 1fr; } }
 
