@@ -140,8 +140,20 @@ def test_the_comparator_refuses_a_schemas_breaks_wherever_they_are(path, tmp_pat
 # a capture that knows it (#361); a `device`'s `headset`, said by a capture that listens (D88); a
 # `complete`'s `made`, in a transcript written before it was (D93); its `made_in`, `cost` and
 # `currency`, said only when the producer knows them (D97); a `failed`'s `retry_after`, said when the
-# destination said it (posting/v1).
-OPTIONAL = {"stopped", "track", "voice", "nothing", "headset", "made", "made_in", "cost", "currency", "retry_after"}
+# destination said it (posting/v1); a segment's `given`, when a person gave its voice (#1244).
+OPTIONAL = {
+    "stopped",
+    "track",
+    "voice",
+    "nothing",
+    "headset",
+    "made",
+    "made_in",
+    "cost",
+    "currency",
+    "retry_after",
+    "given",
+}
 SHOWN_AS_LINES = {
     "transcript/v1/line.schema.json",
     "recording/v1/event.schema.json",
@@ -194,6 +206,16 @@ EXAMPLES = {
                 "text": "x",
             },
             {"type": "segment", "speaker": "me", "start": 7.0, "end": 8.0, "text": "Written before the track."},
+            {
+                "type": "segment",
+                "speaker": "others",
+                "track": "remote",
+                "voice": "3",
+                "given": "2026-11-26T10:02:00+01:00",
+                "start": 8.0,
+                "end": 9.0,
+                "text": "A voice a person gave.",
+            },
             {"type": "covered", "speaker": "me", "until": 30.0},
             {"type": "complete", "duration": 1912.4},
             {"type": "complete", "duration": 1912.4, "made": "2026-11-13T09:42:10+01:00"},
@@ -224,6 +246,34 @@ EXAMPLES = {
             {"type": "segment", "speaker": "me", "voice": True, "start": 0.0, "end": 3.2, "text": "x"},
             {"type": "segment", "speaker": "me", "voice": ["1"], "start": 0.0, "end": 3.2, "text": "x"},
             {"type": "segment", "speaker": "me", "voice": "a\rb", "start": 0.0, "end": 3.2, "text": "x"},
+            {
+                "type": "segment",
+                "speaker": "me",
+                "given": "2026-11-26T10:02:00+01:00",
+                "start": 0.0,
+                "end": 3.2,
+                "text": "x",
+            },
+            {"type": "segment", "speaker": "me", "voice": "1", "given": "", "start": 0.0, "end": 3.2, "text": "x"},
+            {"type": "segment", "speaker": "me", "voice": "1", "given": None, "start": 0.0, "end": 3.2, "text": "x"},
+            {
+                "type": "segment",
+                "speaker": "me",
+                "voice": "1",
+                "given": 1763023330,
+                "start": 0.0,
+                "end": 3.2,
+                "text": "x",
+            },
+            {
+                "type": "segment",
+                "speaker": "me",
+                "voice": "1",
+                "given": "2026-11-26T10:02:00+01:00\n",
+                "start": 0.0,
+                "end": 3.2,
+                "text": "x",
+            },
             {"type": "covered", "speaker": "anyone", "until": 30.0},
             {"type": "complete", "duration": -1},
             {"type": "complete", "duration": 1.0, "made": ""},
