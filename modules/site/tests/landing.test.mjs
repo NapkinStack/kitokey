@@ -144,3 +144,17 @@ test("each hardware card says, in both languages, the figures README.md gives it
     });
   }
 });
+
+// The export's card promises only what the window offers today: Markdown, the one format the shell asks the
+// export for; HTML, Word, subtitles and PDF come back to the page with the screen that offers them (D121). The
+// site declares no contract of the export's (D108).
+test("the export card promises Markdown alone, the one format the window offers", () => {
+  for (const [language, said] of [["en", "As Markdown."], ["fr", "En Markdown."]]) {
+    const card = landing.cases[language].find(([icon]) => icon === "export");
+    assert.equal(card[2], said, language);
+    for (const format of ["HTML", "Word", "subtitles", "sous-titres", "PDF"]) {
+      assert.ok(!card.join(" ").includes(format), `${language}: ${format}`);
+    }
+  }
+  assert.ok(!/docx|srt|vtt/.test(landing.cases.keeps), landing.cases.keeps);
+});
