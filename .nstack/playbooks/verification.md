@@ -86,7 +86,8 @@ You verify on someone's machine, beside work that goes on. Leave it as you found
 5. **Only then read the diff**, to explain a failure — never to decide a result — and ask one
    question of its tests: **is the entry point a real user calls exercised the way they call
    it?** A suite that always passes what the user never passes is green on a path nobody takes.
-6. **Report** the failures first — observed, expected, evidence — then any optional
+6. **Confirm what the sheet cannot say**: the change delivers the deliverable it names (its acceptance criteria, not another change's), a code change carries its oracle, and the summary claims only what was run.
+7. **Report** the failures first — observed, expected, evidence — then any optional
    remark, marked as such.
 
 ### Mutants
