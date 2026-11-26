@@ -113,6 +113,7 @@ fn the_notices_carry_lucides_and_montserrats_licences_as_their_files_say() {
     for (file, text) in [
         ("ui/LUCIDE-LICENSE", include_str!("../ui/LUCIDE-LICENSE")),
         ("ui/MONTSERRAT-OFL.txt", include_str!("../ui/MONTSERRAT-OFL.txt")),
+        ("ui/BRICOLAGE-OFL.txt", include_str!("../ui/BRICOLAGE-OFL.txt")),
     ] {
         let escaped = text
             .replace("\r\n", "\n")

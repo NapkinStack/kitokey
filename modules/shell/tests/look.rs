@@ -138,11 +138,21 @@ fn no_glyph_stands_for_an_icon_in_the_page() {
 
 #[test]
 fn nothing_is_fetched_for_an_icon() {
-    let style = without_css_comments(STYLE);
-    assert!(
-        !style.contains("url("),
-        "the page's policy refuses it, and a test of a value would not see it"
-    );
+    // One `url(` alone: a face of the package's own (D120), in its `@font-face`, a file beside the page — the
+    // policy, `default-src 'self'`, lets that one through; an icon fetched would be another (D69).
+    for (selector, body) in rules(STYLE) {
+        for fetched in body.split("url(").skip(1) {
+            let file = fetched.split(')').next().unwrap_or_default().trim_matches(['"', '\'', ' ']);
+            assert!(
+                selector == "@font-face" && !file.contains([':', '/']) && file.ends_with(".woff2"),
+                "{selector} fetches {file}"
+            );
+            assert!(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui").join(file).is_file(),
+                "{file} is not in ui/"
+            );
+        }
+    }
     assert!(!HTML.contains("src=\"http") && !HTML.contains("href=\"http"));
     assert!(include_str!("../ui/LUCIDE-LICENSE").contains("ISC License"));
 }
@@ -419,7 +429,7 @@ fn each_pair_of_the_theme_reaches_its_threshold_in_both_themes() {
     assert!(STYLE.contains(SELECTED), "the selected row is mixed otherwise: say so here");
     assert_eq!(below_their_threshold(STYLE), Vec::<String>::new());
     // An edge as faint as a divider is refused, in the dark theme as in the light one.
-    let faint = STYLE.replacen("--color-edge: var(--gray-500)", "--color-edge: var(--gray-800)", 1);
+    let faint = STYLE.replacen("--edge: var(--gray-500)", "--edge: var(--gray-800)", 1);
     assert!(
         below_their_threshold(&faint)
             .iter()
@@ -627,7 +637,13 @@ fn names_a_colour(text: &str) -> bool {
 fn red_outside_a_recording(style: &str) -> Vec<String> {
     rules(style)
         .into_iter()
-        .filter(|(selector, _)| !selector.ends_with(":root") && !RECORDING.contains(&selector.as_str()))
+        // The tokens' own blocks name the red; they draw nothing.
+        .filter(|(selector, _)| {
+            !(selector.ends_with(":root")
+                || selector.ends_with(":root:not([data-theme=\"light\"])")
+                || selector.ends_with(":root[data-theme=\"dark\"]"))
+                && !RECORDING.contains(&selector.as_str())
+        })
         .filter(|(_, body)| {
             let body = body.to_lowercase();
             let literal = names_a_colour(&body)
