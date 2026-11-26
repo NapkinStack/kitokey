@@ -375,6 +375,33 @@ fn system(dir: &Path, fonts: &[&str]) -> std::path::PathBuf {
     conf
 }
 
+/// A PDF typst cannot lay out is `pdf.failed`, and its detail is for the logs: the kind of typst's error and its
+/// place, never a word of the meeting (`exporting/v1`, ADR-0007; lina's B2 on #1279). A language tag typst
+/// does not take, the arguments' check letting it through, is such a failure.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_pdf_typst_cannot_lay_out_is_pdf_failed_its_detail_in_the_log_without_the_meeting() {
+    let dir = tempfile::tempdir().unwrap();
+    let folder = meeting(dir.path());
+    let conf = system(dir.path(), &["NotoSans-Regular-subset.ttf", "NotoSans-Bold-subset.ttf"]);
+    let to = dir.path().join("réunion.pdf");
+
+    let ran = run_on(
+        &conf,
+        &[folder.to_str().unwrap(), "--format", "pdf", "--lang", "zzzzzzzz"],
+        &words(&to).to_string(),
+    );
+
+    assert!(!ran.success);
+    assert_eq!(ran.lines, [json!({"event": "failed", "code": "pdf.failed"})]);
+    assert!(ran.said.contains("the PDF could not be laid out (typst: "), "{}", ran.said);
+    assert!(ran.said.contains(", line "), "the place of typst's error: {}", ran.said);
+    for witness in ["Prix", "essai", "Bonjour", "Réunion"] {
+        assert!(!ran.said.contains(witness), "« {witness} » in the log: {}", ran.said);
+    }
+    assert!(!to.exists());
+}
+
 #[cfg(target_os = "linux")]
 fn run_on(conf: &Path, args: &[&str], input: &str) -> Ran {
     let child = Command::new(env!("CARGO_BIN_EXE_kitokey-export"))

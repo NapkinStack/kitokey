@@ -12,7 +12,7 @@ use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
 
 use typst::text::{Font, FontBook, FontFlags, FontInfo};
 use typst::utils::LazyHash;
-use typst::{Library, LibraryExt, World};
+use typst::{Library, LibraryExt, World, WorldExt};
 use typst_layout::PagedDocument;
 use typst_pdf::{PdfOptions, PdfStandard, PdfStandards};
 
@@ -46,7 +46,9 @@ pub fn pdf(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, nam
             source(meeting, include, labels, lang, name, &families),
         ),
     };
-    let document = typst::compile::<PagedDocument>(&world).output.map_err(said)?;
+    let document = typst::compile::<PagedDocument>(&world)
+        .output
+        .map_err(|errors| said(&world, errors))?;
     let standards = PdfStandards::new(&[PdfStandard::Ua_1]).map_err(|error| error.message().to_string())?;
     typst_pdf::pdf(
         &document,
@@ -55,7 +57,7 @@ pub fn pdf(meeting: &Meeting, include: Include, labels: &Labels, lang: &str, nam
             ..PdfOptions::default()
         },
     )
-    .map_err(said)
+    .map_err(|errors| said(&world, errors))
 }
 
 /// A font file's bytes, shared: a system's font mapped once, a collection's faces reading the same bytes.
@@ -142,12 +144,44 @@ fn invisible(c: char) -> bool {
         || matches!(c, '\u{ad}' | '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2060}'..='\u{206f}' | '\u{fe00}'..='\u{fe0f}' | '\u{feff}' | '\u{e0000}'..='\u{e0fff}')
 }
 
-fn said(errors: impl IntoIterator<Item = typst::diag::SourceDiagnostic>) -> String {
+fn said(world: &Paper, errors: impl IntoIterator<Item = typst::diag::SourceDiagnostic>) -> String {
     errors
         .into_iter()
-        .map(|error| error.message.to_string())
+        .map(|error| {
+            let place = world
+                .range(error.span)
+                .and_then(|range| world.main.lines().byte_to_line_column(range.start));
+            detail(&error.message, place)
+        })
         .collect::<Vec<_>>()
         .join("; ")
+}
+
+/// What a log may keep of one of typst's errors (`exporting/v1`, ADR-0007): its kind, the message up to
+/// its first colon with anything quoted taken out, and its place in the source Kitokey wrote, line and
+/// column counted from 1. Never what follows the colon, nor a quoted part: either may be the meeting's
+/// words.
+fn detail(message: &str, place: Option<(usize, usize)>) -> String {
+    let head = message.split(':').next().unwrap_or_default();
+    let mut kind = String::new();
+    let mut closing: Option<char> = None;
+    for c in head.chars() {
+        match closing {
+            Some(close) if c == close => closing = None,
+            Some(_) => {}
+            None => match c {
+                '`' | '"' => closing = Some(c),
+                '“' => closing = Some('”'),
+                '«' => closing = Some('»'),
+                _ => kind.push(c),
+            },
+        }
+    }
+    let kind = kind.split_whitespace().collect::<Vec<_>>().join(" ");
+    match place {
+        Some((line, column)) => format!("typst: {kind}, line {}, column {}", line + 1, column + 1),
+        None => format!("typst: {kind}"),
+    }
 }
 
 /// The document as typst code: each word a string literal.
@@ -306,5 +340,32 @@ impl World for Paper {
     }
     fn today(&self, _: Option<Duration>) -> Option<Datetime> {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::detail;
+
+    /// The detail keeps the kind and the place, never a word of the meeting: a witness « Témoin » given
+    /// after the colon, between backticks or in quotes is not in it (lina's B2 on #1279).
+    #[test]
+    fn a_failure_s_detail_keeps_its_kind_and_place_never_the_meeting_s_words() {
+        for message in [
+            "unknown variable: Témoin",
+            "expected comma, found `Témoin`",
+            "cannot shape \"Témoin\"",
+            "PDF/UA-1 error: Témoin has no alt text",
+        ] {
+            let said = detail(message, Some((2, 4)));
+            assert!(!said.contains("Témoin"), "{said}");
+            assert!(said.ends_with("line 3, column 5"), "{said}");
+        }
+        assert_eq!(
+            detail("unknown variable: Témoin", Some((2, 4))),
+            "typst: unknown variable, line 3, column 5"
+        );
+        assert_eq!(detail("expected comma, found `Témoin`", None), "typst: expected comma, found");
+        assert_eq!(detail("PDF/UA-1 error: Témoin has no alt text", None), "typst: PDF/UA-1 error");
     }
 }

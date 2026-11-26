@@ -231,9 +231,10 @@ fn export() -> Result<Value, Refused> {
                 )
             })?;
             let faces = system.faces(&taken);
-            // typst's message may quote the meeting: the sentence says none of it.
+            // typst's detail, its kind and its place alone, for the logs (`exporting/v1`): `pdf()` keeps no
+            // word of the meeting in it.
             pdf(&meeting, include, &labels, &asked.lang, &name, &faces)
-                .map_err(|_| Refused("the PDF could not be laid out".into(), Some("pdf.failed")))?
+                .map_err(|detail| Refused(format!("the PDF could not be laid out ({detail})"), Some("pdf.failed")))?
         }
         other => unreachable!("{other} is refused with the arguments"),
     };

@@ -235,6 +235,32 @@ fn choose(meeting: &Meeting, names: &[&str], sans: Option<&str>) -> Result<Vec<S
         .map(|taken| taken.into_iter().map(|i| names[i].to_string()).collect())
 }
 
+/// Two families with as many of the missing letters: the one given first is taken, and the other, left with
+/// nothing to add, is not (`chosen()`'s tie, lina's B2 on #1279). Given in either order, the first wins; the
+/// meeting's CJK and emoji are their own faces'.
+#[test]
+fn of_two_families_with_as_many_letters_the_first_given_is_taken() {
+    let read = |name: &str| FontInfo::new(&fs::read(format!("{}/tests/fonts/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap(), 0).unwrap();
+    let mut twin = read("NotoSans-Regular-subset.ttf");
+    twin.family = "Noto Sans Twin".into();
+    let regular = read("NotoSans-Regular-subset.ttf");
+    let others = [read("NotoSansSC-Regular-subset.otf"), read("NotoColorEmoji-subset.ttf")];
+    let meeting = meeting(MINUTES, TRANSCRIPT);
+    let taken = |first: &FontInfo, second: &FontInfo| {
+        let faces = [first.clone(), second.clone(), others[0].clone(), others[1].clone()];
+        chosen(&meeting, Include::all(), &labels(), "Réunion du 20 nov. 2026", &faces, None).unwrap()
+    };
+    for (first, second) in [(&twin, &regular), (&regular, &twin)] {
+        let taken = taken(first, second);
+        assert!(
+            taken.contains(&0) && !taken.contains(&1),
+            "{} given first, {} taken: {taken:?}",
+            first.family,
+            second.family
+        );
+    }
+}
+
 #[test]
 fn static_faces_are_chosen_before_a_variable_one_of_the_same_letters() {
     let names = [
