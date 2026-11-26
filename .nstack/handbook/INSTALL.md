@@ -101,7 +101,8 @@ nowhere and installs the version the project records; a `pre-commit` of another 
 never touches. Then run the `uv tool install` line above again for X.Y.Z.
 
 An agent passes its session — `nstack update --session <its identifier>` — and the commit
-carries the trailer every commit of an agent carries (`AGENTS.md`, *Identity*).
+carries the trailer every commit of an agent carries (`AGENTS.md`, *Identity*). In an agent's run
+(`nstack agent run`), `update` without it refuses before it writes anything.
 
 **When: at a cycle's boundary** — close the cycle, take the update, then accept the next one.
 Upgrading mid-cycle changes the judge while a cycle is being judged.
@@ -187,7 +188,7 @@ Settings → Actions → General:
 
 - [ ] Allowed actions: GitHub's own, plus `astral-sh/setup-uv`
 - [ ] SHA-pinned actions required
-- [ ] Workflow approval for every outside contributor, public repository
+- [ ] Workflow approval for every outside contributor, public repository — approve a fork's workflows from the pull request's page, which releases all its runs; a run's own page releases that run only
 - [ ] Workflow token read-only; Actions neither creates nor approves pull requests
 
 Settings → General → Default branch:
@@ -344,7 +345,7 @@ It never reads your `gh` login by itself; to have it read with that login, for o
 | `.nstack/forms/` | The forms a command or a playbook copies: charter, cycle, decision, rules | Agents and commands |
 | `.nstack/handbook/` | **The handbook**: the why behind every rule | Humans, once |
 | `docs/adr/`, `docs/pdr/` | The decisions taken, with their success criterion | Everyone, on demand |
-| `.copier-answers.yml` | The NapkinStack version and the creation answers | The `_` lines: `nstack update`, never by hand. The answers: the decider, by hand, in a pull request |
+| `.copier-answers.yml` | The NapkinStack version and the creation answers | The `_` lines: `nstack update`, never by hand. The answers: the decider, with `nstack config`, in a pull request |
 | `.github/` | What makes the rules non-bypassable | GitHub |
 
 > **`.nstack/handbook/` is never loaded into an agent's context.** It is the human reference.
@@ -390,6 +391,7 @@ nstack modules --changed-since <base>   # the modules with a file changed, as CI
 nstack modules --changed-since <base> --with-contract-sides   # ... and both sides of a changed contract
 nstack compat [module] --base <base>    # a contract version consumed or stable: the merged proof
 nstack update [--ref <tag>]   # brings the project to another version of NapkinStack; --forge moves it to another forge
+nstack config [<setting> [<value>]]   # the decider's settings: lists them, reads one, lays a change on a branch for review
 # check, test and run of a module: the `commands` section of its MANIFEST.yaml
 ```
 
@@ -459,7 +461,8 @@ Wiring them, and `run`, onto your own tooling is your job. The **names** never c
 - [ ] The `check` and `test` commands of every module, in its `MANIFEST.yaml`
 - [ ] The contract format chosen, and the contract tests and the comparator behind
       `commands.compat` that go with it
-- [ ] The review budget values (400 lines / 15 files are a starting point)
+- [ ] The review budget (400 lines / 15 files are a starting point): `nstack config review_budget_lines <n>`
+      and `review_budget_files <n>`, if yours differs
 - [ ] Re-read the `description` fields in `.nstack/skills.yaml` — they are what triggers
       the skills, and they must speak your domain's vocabulary
 - [ ] The `e2e` command of every user-facing module, and the tools that drive a browser or
