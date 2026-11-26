@@ -10,7 +10,8 @@ use oxc_parser::Parser;
 use oxc_span::SourceType;
 
 const PAGE: &str = include_str!("../ui/window.js");
-const STYLE: &str = include_str!("../ui/window.css");
+/// The style as the page loads it: the tokens, then the window's rules (D120).
+const STYLE: &str = concat!(include_str!("../ui/tokens.css"), "\n", include_str!("../ui/window.css"));
 const HTML: &str = include_str!("../ui/index.html");
 /// The glyphs a font would draw as an icon (UX review §8), and the back arrow beside them; the
 /// sidebar's fold arrows and a line's pencil, Lucide's since D89.
@@ -149,34 +150,55 @@ fn hex(text: &str) -> Rgb {
     [digit(1), digit(3), digit(5)]
 }
 
-/// The tokens in one block: one this test cannot read is refused, or it would say nothing of all that use it.
-fn tokens(block: &str) -> BTreeMap<String, Rgb> {
+/// The tokens one rule declares, in its order.
+fn tokens(block: &str) -> Vec<(String, String)> {
     block
         .split(';')
         .filter_map(|one| one.split_once(':'))
         .filter(|(name, _)| name.trim().starts_with("--"))
-        .map(|(name, value)| {
-            let value = value.trim();
-            assert!(value.len() == 7 && value.starts_with('#'), "{name}: {value} is no #RRGGBB");
-            (name.trim().to_string(), hex(value))
-        })
+        .map(|(name, value)| (name.trim().to_string(), value.trim().to_string()))
         .collect()
 }
 
-/// Each theme's tokens, read from the file.
+/// Each theme's tokens, read from the style (D120): the light ones on `:root`, the dark ones laid over them
+/// under `prefers-color-scheme: dark`; a primitive's `#RRGGBB`, a role's or an alias's `var(--…)`. A colour
+/// token this test cannot read is refused, or it would say nothing of all that use it.
 fn themes(style: &str) -> [BTreeMap<String, Rgb>; 2] {
-    let light = style.split_once(":root {").unwrap().1.split_once('}').unwrap().0;
-    let dark = style
-        .split_once("prefers-color-scheme: dark")
-        .unwrap()
-        .1
-        .split_once(":root {")
-        .unwrap()
-        .1
-        .split_once('}')
-        .unwrap()
-        .0;
-    [tokens(light), tokens(dark)]
+    let all = rules(style);
+    let light: Vec<(String, String)> = all
+        .iter()
+        .filter(|(selector, _)| selector == ":root")
+        .flat_map(|(_, body)| tokens(body))
+        .collect();
+    let dark: Vec<(String, String)> = all
+        .iter()
+        .filter(|(selector, _)| {
+            selector.contains("prefers-color-scheme: dark") && selector.ends_with(":root")
+                || selector.starts_with("@media (prefers-color-scheme: dark)") && selector.ends_with(":root:not([data-theme=\"light\"])")
+        })
+        .flat_map(|(_, body)| tokens(body))
+        .collect();
+    [light.clone(), [light, dark].concat()].map(|declared| {
+        let written: BTreeMap<String, String> = declared.into_iter().collect();
+        let mut theme = BTreeMap::new();
+        // An alias may name a token written after it: read until nothing more resolves.
+        loop {
+            let before = theme.len();
+            for (name, text) in &written {
+                if let Some(colour) = value(text, &theme) {
+                    theme.insert(name.clone(), colour);
+                }
+            }
+            if theme.len() == before {
+                break;
+            }
+        }
+        for (name, text) in &written {
+            let a_colour = text.starts_with('#') || text.starts_with("var(");
+            assert!(!a_colour || theme.contains_key(name), "{name}: {text} cannot be read");
+        }
+        theme
+    })
 }
 
 /// A value of the style in a theme: `#RRGGBB`, a token, or `color-mix` of two as the style writes it.
@@ -389,7 +411,7 @@ fn each_pair_of_the_theme_reaches_its_threshold_in_both_themes() {
     assert!(STYLE.contains(SELECTED), "the selected row is mixed otherwise: say so here");
     assert_eq!(below_their_threshold(STYLE), Vec::<String>::new());
     // An edge as faint as a divider is refused, in the dark theme as in the light one.
-    let faint = STYLE.replacen("--edge: #737B8C", "--edge: #343946", 1);
+    let faint = STYLE.replacen("--color-edge: var(--gray-500)", "--color-edge: var(--gray-800)", 1);
     assert!(
         below_their_threshold(&faint)
             .iter()
@@ -651,14 +673,21 @@ fn colours_in_page(page: &str) -> Vec<String> {
 #[test]
 fn the_dark_chosen_in_settings_is_the_systems_dark() {
     let forced = STYLE
-        .split_once("[data-theme=\"dark\"]:root {")
+        .split_once(":root[data-theme=\"dark\"] {")
         .unwrap()
         .1
         .split_once('}')
         .unwrap()
         .0;
-    let [_, dark] = themes(STYLE);
-    assert_eq!(tokens(forced), dark);
+    let system = STYLE
+        .split_once(":root:not([data-theme=\"light\"]) {")
+        .unwrap()
+        .1
+        .split_once('}')
+        .unwrap()
+        .0;
+    assert!(!tokens(system).is_empty());
+    assert_eq!(tokens(forced), tokens(system));
 }
 
 #[test]
@@ -1079,4 +1108,152 @@ fn the_focus_ring_is_unchanged() {
         Some("3px solid var(--accent)")
     );
     assert_eq!(declared(STYLE, "button:focus-visible", "outline-offset").as_deref(), Some("2px"));
+}
+
+/// D120: `ui/tokens.css` alone holds a value. What the rest of the style writes out — a colour, or a
+/// size, a radius, a shadow or a duration not read from a `var(--…)` — is counted, each place said.
+const OUTSIDE: &str = include_str!("../ui/window.css");
+/// The count is a ratchet: it may only go down, to zero at cycle 12's closure (D120).
+const RATCHET: &str = include_str!("look-outside-tokens.txt");
+/// The properties whose value is a size, a radius, a shadow or a duration (D120).
+const SIZED: [&str; 23] = [
+    "font",
+    "font-size",
+    "border-radius",
+    "border-top-left-radius",
+    "border-top-right-radius",
+    "border-bottom-left-radius",
+    "border-bottom-right-radius",
+    "box-shadow",
+    "transition",
+    "transition-duration",
+    "transition-delay",
+    "animation",
+    "animation-duration",
+    "animation-delay",
+    "margin",
+    "margin-top",
+    "margin-right",
+    "margin-bottom",
+    "margin-left",
+    "padding",
+    "gap",
+    "row-gap",
+    "column-gap",
+];
+/// The literals that are no choice of a design: nothing, a hairline, a focus offset, a whole, a half.
+const PLAIN: [&str; 5] = ["0", "1px", "2px", "100%", "50%"];
+
+fn outside_the_tokens(style: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    for (selector, body) in rules(style) {
+        for (property, value) in body.split(';').filter_map(|one| one.split_once(':')) {
+            let (property, value) = (property.trim(), value.trim().to_lowercase());
+            if property.starts_with("--") {
+                found.push(format!("{selector}: {property} is a token outside tokens.css"));
+                continue;
+            }
+            let words: Vec<&str> = value
+                .split(|c: char| c.is_whitespace() || ",()/".contains(c))
+                .filter(|w| !w.is_empty())
+                .collect();
+            for word in &words {
+                let hex = word.starts_with('#') && [4, 5, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit());
+                if hex || ["rgb", "rgba", "hsl", "hsla", "color-mix"].contains(word) {
+                    found.push(format!("{selector}: {property}: {word}"));
+                }
+            }
+            if !SIZED.contains(&property) {
+                continue;
+            }
+            // What a var() reads is a token; its fallback is not.
+            let mut bare = value.clone();
+            while let Some(at) = bare.find("var(") {
+                let end = bare[at..].find(')').map_or(bare.len(), |end| at + end + 1);
+                bare.replace_range(at..end, " ");
+            }
+            for word in bare
+                .split(|c: char| c.is_whitespace() || ",()/".contains(c))
+                .filter(|w| !w.is_empty())
+            {
+                let digits = word.trim_end_matches(|c: char| c.is_ascii_alphabetic() || c == '%');
+                let (number, unit) = (digits.trim_start_matches('-'), &word[digits.len()..]);
+                if number.parse::<f64>().is_err() || (unit.is_empty() && property != "font-size") {
+                    continue;
+                }
+                if !PLAIN.contains(&word.trim_start_matches('-')) && number.parse::<f64>() != Ok(0.0) {
+                    found.push(format!("{selector}: {property}: {word}"));
+                }
+            }
+        }
+    }
+    found
+}
+
+#[test]
+fn only_the_tokens_hold_a_value() {
+    let found = outside_the_tokens(OUTSIDE);
+    let ratchet: usize = RATCHET.trim().parse().expect("look-outside-tokens.txt holds a count");
+    for one in &found {
+        println!("outside tokens.css: {one}");
+    }
+    assert!(
+        found.len() <= ratchet,
+        "{} values outside tokens.css, the ratchet allows {ratchet}: read them with --nocapture",
+        found.len()
+    );
+    assert!(
+        found.len() >= ratchet,
+        "{} values outside tokens.css: lower tests/look-outside-tokens.txt to it",
+        found.len()
+    );
+}
+
+#[test]
+fn a_value_outside_the_tokens_is_counted() {
+    let style = ".a { color: #FFF; margin: 0 4px; transition: opacity 0.2s; }\n\
+                 .b { color: var(--ink); padding: var(--space-2); border-radius: 50%; border: 1px solid var(--line); }\n\
+                 .c { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); --x: #000000; font: 15px/1.45 system-ui; }";
+    let found = outside_the_tokens(style);
+    for expected in [
+        ".a: color: #fff",
+        ".a: margin: 4px",
+        ".a: transition: 0.2s",
+        ".c: background: color-mix",
+        ".c: --x",
+        ".c: font: 15px",
+    ] {
+        assert!(found.iter().any(|one| one.starts_with(expected)), "{expected}: {found:?}");
+    }
+    assert!(!found.iter().any(|one| one.starts_with(".b")), "{found:?}");
+    assert_eq!(found.len(), 6, "{found:?}");
+}
+
+/// D120 changes nothing drawn: each of the window's older names is the value it had before `tokens.css`
+/// (main at 7603231), light, then dark — the system's, and Settings' as `themes()` reads the same list.
+const BEFORE: [(&str, &str, &str); 15] = [
+    ("--ground", "#F2F4F7", "#15171C"),
+    ("--surface", "#FFFFFF", "#1E2129"),
+    ("--raised", "#EEF1F5", "#282C37"),
+    ("--line", "#D9DDE5", "#343946"),
+    ("--ink", "#15171C", "#EEF0F4"),
+    ("--soft", "#4C5464", "#AAB1BF"),
+    ("--accent", "#2253CF", "#8AB0FF"),
+    ("--ok", "#16794A", "#63D49C"),
+    ("--red", "#C2352D", "#FF7A72"),
+    ("--edge", "#808898", "#737B8C"),
+    ("--hover", "#E3E7EE", "#313644"),
+    ("--pressed", "#D9DDE5", "#3A4050"),
+    ("--mark", "#FDE68A", "#FBBF24"),
+    ("--mark-ink", "#15171C", "#1E2129"),
+    ("--mark-edge", "#15171C", "#FBBF24"),
+];
+
+#[test]
+fn each_older_name_keeps_the_value_it_had() {
+    let [light, dark] = themes(STYLE);
+    for (name, was_light, was_dark) in BEFORE {
+        assert_eq!(light.get(name), Some(&hex(was_light)), "{name} in the light theme");
+        assert_eq!(dark.get(name), Some(&hex(was_dark)), "{name} in the dark theme");
+    }
 }

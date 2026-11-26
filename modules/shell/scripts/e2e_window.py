@@ -329,7 +329,7 @@ const r = p.getBoundingClientRect(), cs = getComputedStyle(p);
 const left = r.left + p.clientLeft + parseFloat(cs.paddingLeft), right = r.left + p.clientLeft + p.clientWidth - parseFloat(cs.paddingRight);
 return [s.left, s.right, left, right]"""
 MONTHS_FR = "janvier février mars avril mai juin juillet août septembre octobre novembre décembre".split()
-# The page's ground, as `ui/window.css` sets it in each theme.
+# The page's ground, as `ui/tokens.css` sets it in each theme.
 GROUND = {"light": "rgb(242, 244, 247)", "dark": "rgb(21, 23, 28)"}
 # The lines saying who made a version, as they read (D93): a model a list in its line is said by the
 # option chosen — an element's text would hold every option of the list.
@@ -483,16 +483,19 @@ def redo_offered(browser, panel: str, step: str) -> list[str]:
 
 
 def tokens(theme: str) -> str:
-    """A theme's colours as `ui/window.css` sets them: the light ones first, the dark ones under
-    `prefers-color-scheme: dark`."""
-    css = (Path(__file__).parent.parent / "ui" / "window.css").read_text()
-    start = css.index(":root {", 0 if theme == "light" else css.index("prefers-color-scheme: dark")) + len(":root {")
-    return css[start:css.index("}", start)].replace("\n", " ").strip()
+    """A theme's roles as `ui/tokens.css` sets them: the light ones on `:root`, the dark ones under
+    Settings' dark (the same list as the system's, held by tests/look.rs)."""
+    css = re.sub(r"/\*.*?\*/", "", (Path(__file__).parent.parent / "ui" / "tokens.css").read_text(), flags=re.S)
+    start = css.index("--color-ground") if theme == "light" else css.index(':root[data-theme="dark"] {') + len(':root[data-theme="dark"] {')
+    block = css[start:css.index("}", start)].replace("color-scheme: dark;", "")
+    return " ".join(block.split())
 
 
 def shot_themed(browser, name: str, theme: str) -> None:
     """A screenshot in its theme: the system's, or, where the desktop shows the other one, the theme's
-    colours put on the page — a dark one on a light desktop as a light one on a dark desktop (D89)."""
+    roles put on the page itself — a dark one on a light desktop as a light one on a dark desktop (D89).
+    On the element's own style, as Settings' choice (D98) is not: the page applying that choice again
+    while the screenshot is taken changes nothing."""
     forced = (theme == "dark") != browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
     if forced:
         browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
