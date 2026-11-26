@@ -1941,18 +1941,23 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
 
 // A folder as the desktop's choosers show one (#1232): its icon, then its path on one line — the folders before its
 // own cut with « … » when the line is short, its own name always whole —, the whole path its tooltip.
-function pathShown(said, whole) {
+function pathShown(said, whole, id) {
   const shown = element("button", "path");
+  shown.id = id;
   const cut = said.lastIndexOf(" / ");
   const [lead, last] = cut < 0 ? ["", said] : [said.slice(0, cut), said.slice(cut + 3)];
   // The separator before its own name its own, never eaten by the ellipsis: « … / pages ».
   const leadShown = element("span", "lead", lead);
-  // Its name the whole path, as before the page cut it (ines, #1232): a screen reader hears every folder; what is
-  // drawn, cut, is hidden from it.
   const drawn = element("span", "drawn-path");
-  drawn.setAttribute("aria-hidden", "true");
   drawn.append(leadShown, element("span", "sep", cut < 0 ? "" : " / "), element("span", "last", last));
-  shown.append(icon("folder"), element("span", "unseen", said), drawn);
+  shown.append(icon("folder"), drawn);
+  // Its name what it shows (WCAG 2.5.3); the whole path its description, heard after it (ines, #1232) — an element
+  // `hidden`, read by the description's reference, neither drawn nor measured.
+  const heard = element("span", "", said);
+  heard.id = `${id}-path`;
+  heard.hidden = true;
+  shown.setAttribute("aria-describedby", heard.id);
+  shown.append(heard);
   shown.title = whole;
   // Cut in its middle to the room it has (#1232), as a path bar does — « / home / … / window » —: the folders after
   // the first dropped one by one, then all but « … »; nothing hidden past its box (D95's measure), re-cut at each size.
@@ -4595,7 +4600,7 @@ function showSettings(shown, minutes, words) {
   path.hidden = true;
   // Shown as the board says it — Dossier personnel / Kitokey —; a click makes it a path to type.
   const said = shown.sessions_said.replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
-  const folderShown = pathShown(shown.sessions_said.startsWith("/") ? `/ ${said}` : said, shown.sessions_said);
+  const folderShown = pathShown(shown.sessions_said.startsWith("/") ? `/ ${said}` : said, shown.sessions_said, "sessions-shown");
   folderShown.type = "button";
   whereSaid.id = "sessions-label";
   folderShown.setAttribute("aria-labelledby", "sessions-label sessions-shown");
@@ -4640,7 +4645,7 @@ function showSettings(shown, minutes, words) {
   const exportAs = (shown.export_said ?? "").replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
   const exportShown =
     shown.export_said === null ? element("button", "path none", words.export_none)
-    : pathShown(shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs, shown.export_said);
+    : pathShown(shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs, shown.export_said, "export-shown");
   exportShown.type = "button";
   exportShown.id = "export-shown";
   exportShown.setAttribute("aria-labelledby", "export-label export-shown");
