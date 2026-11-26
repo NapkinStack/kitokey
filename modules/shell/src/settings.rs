@@ -179,7 +179,8 @@ impl Default for Settings {
         Self {
             reminder: true,
             sessions: documents.join("Kitokey"),
-            after: After::Transcript,
+            // A new install's first meeting gets its summary without a click (D126).
+            after: After::Minutes,
             model: data.join("kitokey").join("models").join(MODEL),
             engine: Engine::Whisper,
             transcription_provider: None,
@@ -408,7 +409,8 @@ pub fn read(path: &Path) -> Result<Settings, Unread> {
     settings.after = match (written.after, written.transcript) {
         (Some(after), _) => after,
         (None, Some(false)) => After::Nothing,
-        (None, _) => settings.after,
+        // A file that names no choice was written before D126, when the transcript alone followed.
+        (None, _) => After::Transcript,
     };
     settings.minutes_provider = written.minutes_provider.filter(|named| !named.trim().is_empty());
     settings.minutes_model = written.minutes_model.filter(|named| !named.trim().is_empty());
@@ -471,9 +473,13 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     // Through a link, the file it points to.
     let path = &fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     let before = read(path).map_err(|why| refused(why.detail))?;
+    let mut new = false;
     let mut document = match fs::read_to_string(path) {
         Ok(text) => text.parse::<DocumentMut>().map_err(|error| refused(error.to_string()))?,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => DocumentMut::new(),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            new = true;
+            DocumentMut::new()
+        }
         Err(error) => return Err(error),
     };
     // Sets a key to a value, keeping the comment its line had.
@@ -537,7 +543,8 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
             }
         }
     }
-    if settings.after != before.after {
+    // Written with the file's first line: a file that names no choice is read as one from before D126.
+    if settings.after != before.after || new {
         set(
             &mut document,
             "after",
