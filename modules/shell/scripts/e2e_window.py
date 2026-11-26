@@ -1525,11 +1525,17 @@ def service_named(now: dt.datetime) -> None:
         offered = lambda b, id_: b.execute_script("return [...document.querySelectorAll(arguments[0])].map(o => [o.value, o.textContent])", f"#{id_} option")
         names = [said_ for _, said_ in offered(browser, "transcription-service")]
         check("the services that hear are offered by name, as the minutes' are: OpenRouter, OpenAI", names == ["OpenRouter", "OpenAI"], names)
+        # The service chosen shows its mark beside the list (#1238): OpenRouter's glyph as given — Ink on light —; OpenAI's not
+        # cleared for an app (« Use the logo … with permission »), an icon of the page's.
+        mark = "const f = document.getElementById('transcription-service')?.parentElement; return f ? (f.querySelector('.service-mark img')?.getAttribute('src') ?? (f.querySelector('.service-mark svg') ? 'icon' : null)) : null"
+        chose_router = browser.execute_script(mark)
         # Another choice: what was said of the last goes at once, on the same page.
         browser.execute_script("document.getElementById('transcription-test').click()")
         wait_for(browser, lambda b: b.execute_script(said).startswith(hears), 10)
         choose(browser, "transcription-service", "1")
         check("another service chosen: the last answer goes at once", browser.execute_script(said) == "", browser.execute_script(said))
+        check("the service chosen shows its mark beside its list: OpenRouter's glyph, OpenAI an icon of the page's (#1238)",
+              chose_router == "brands/openrouter-glyph-ink.svg" and browser.execute_script(mark) == "icon", [chose_router, browser.execute_script(mark)])
         choose(browser, "transcription-service", "0")
         # Another service chosen while Tester asks: its button at once, the old answer never said, even drawn anew.
         browser.execute_script("window.answer = null; window.answered = 0; window.__TAURI__.core = window.held; document.getElementById('transcription-test').click()")
@@ -5473,7 +5479,7 @@ def summary_sent(now: dt.datetime) -> None:
         press(browser, "destination-open")
         rows = "return document.querySelectorAll('#destinations li').length"
         for kind, name, address in destinations:
-            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            browser.execute_script("document.getElementById(arguments[0]).click()", f"destination-kind-{kind}")
             for field, value in (("destination-name", name), ("destination-address", address)):
                 element = browser.find_element(By.ID, field)
                 element.clear()
@@ -5482,6 +5488,9 @@ def summary_sent(now: dt.datetime) -> None:
             press(browser, "destination-add")
             wait_for(browser, lambda b: b.execute_script(rows) == had + 1, 10)
         check("six destinations set up for this scenario", browser.execute_script(rows) == 6, browser.execute_script(rows))
+        kept_marks = browser.execute_script("return [...document.querySelectorAll('#destinations li')].map(e => e.querySelector('img')?.getAttribute('src') ?? (e.querySelector('svg') ? 'icon' : null))")
+        check("Settings list each destination with its kind's mark: Discord's own, the others an icon of the page's (#1238)",
+              kept_marks == ["brands/discord-symbol.svg", "icon", "icon", "icon", "icon", "icon"], kept_marks)
         calls.unlink(missing_ok=True)
         page(secret_one)
         check("a confidential meeting offers « Envoyer… » too, each send asked again (PDR-0007 §4 amended, D119; CN)", browser.execute_script(offered), browser.execute_script(offered))
@@ -5491,11 +5500,19 @@ def summary_sent(now: dt.datetime) -> None:
         check("a summary, destinations set up, not confidential: « Envoyer… » among its actions",
               browser.execute_script(offered) and browser.execute_script(
                   "return !!document.getElementById('send-open').closest('.minutes-actions')"), browser.execute_script(offered))
+        # Several destinations: « Envoyer… » names none of them (#1239, marc) — the panel does; a name only when there is one.
+        several = browser.execute_script("const b = document.getElementById('send-open'); return b ? [b.getAttribute('aria-label'), b.title] : null")
+        check("six destinations: « Envoyer… » keeps its name and tooltip, naming none of them (#1239)", several == ["Envoyer…", "Envoyer…"], several)
         # By keyboard alone: the button reached and pressed by Enter, the panel's first destination focused.
         browser.execute_script("document.getElementById('send-open').focus()")
         ActionChains(browser).send_keys(Keys.ENTER).perform()
         listed = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#send-panel button.send-to"), 5)
         names = browser.execute_script("return [...document.querySelectorAll('#send-panel button.send-to')].map(b => b.textContent)") if listed else []
+        # Each destination with its kind's mark (#1238): Discord's own, the others an icon of the page's — in the panel and in Settings.
+        marks = "return [...document.querySelectorAll(arguments[0])].map(e => e.querySelector('img')?.getAttribute('src') ?? (e.querySelector('svg') ? 'icon' : null))"
+        check("the panel shows each destination's mark: Discord's own, the others an icon of the page's (#1238)",
+              listed and browser.execute_script(marks, "#send-panel button.send-to") == ["brands/discord-symbol.svg", "icon", "icon", "icon", "icon", "icon"],
+              browser.execute_script(marks, "#send-panel button.send-to") if listed else None)
         check("the panel offers each destination by its name, « Envoyer à « #équipe » », by keyboard alone",
               names[:1] == ["Envoyer à «\xa0#équipe\xa0»"] and len(names) == 6
               and browser.execute_script("return document.activeElement.classList.contains('send-to')"), names)
@@ -5629,7 +5646,7 @@ def confidential_sent(now: dt.datetime) -> None:
             browser.execute_script("location.hash = '#/settings'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
             press(browser, "destination-open")
-            Select(browser.find_element(By.ID, "destination-kind")).select_by_value("discord")
+            browser.execute_script("document.getElementById('destination-kind-discord').click()")
             for field, value in (("destination-name", "#équipe"), ("destination-address", f"https://discord.example/api/webhooks/1/{secret}")):
                 element = browser.find_element(By.ID, field)
                 element.clear()
@@ -5640,6 +5657,10 @@ def confidential_sent(now: dt.datetime) -> None:
             page(secret_one)
             shown = wait_for(browser, lambda b: b.execute_script(offered), 10)
             check(f"{short}: a confidential meeting with a summary offers « Envoyer… » (D119)", shown, browser.execute_script(offered))
+            # One destination: « Envoyer… » says where in its name and tooltip (#1239), its panel as before.
+            where = {"fr": "Envoyer à «\xa0#équipe\xa0»…", "en": "Send to “#équipe”…"}[short]
+            named_send = browser.execute_script("const b = document.getElementById('send-open'); return b ? [b.getAttribute('aria-label'), b.title] : null")
+            check(f"{short}: one destination, « Envoyer… » names it: « {where} » (#1239)", named_send == [where, where], named_send)
 
             def choose():
                 # By keyboard alone: « Envoyer… » reached and pressed by Enter, the destination by Enter. Absent, it
@@ -5874,13 +5895,20 @@ def destinations_kept(now: dt.datetime) -> None:
         after = browser.execute_script(folded) if drawn else None
         check("folded at first, no address shown; « Ajouter une destination » unfolds it, the focus in its first field (E5, ARIA APG)",
               before is not None and before[:3] == ["false", "destination-adding", False]
-              and opened and after == ["true", "destination-adding", True, "destination-kind"], (before, after))
+              and opened and after == ["true", "destination-adding", True, "destination-kind-webhook"], (before, after))
+        # The kind a tile each (#1238), as the desktop's choices of a kind are: Discord its own mark, unaltered; Webhook and
+        # Slack an icon of the page's, Slack's mark not cleared for an app (its Brand Terms) — its name in words.
+        tiles = browser.execute_script(
+            "return [...document.querySelectorAll('#destination-adding [role=radiogroup] .tile')].map(t => [t.querySelector('input')?.value,"
+            " t.textContent.trim(), t.querySelector('img')?.getAttribute('src') ?? null, !!t.querySelector('svg')])") if drawn else None
+        check("the kind of a destination three tiles: Webhook and Slack with an icon of the page's, Discord with its own mark (#1238)",
+              tiles == [["webhook", "Webhook", None, True], ["discord", "Discord", "brands/discord-symbol.svg", False], ["slack", "Slack", None, True]], tiles)
         rows = "return [...document.querySelectorAll('#destinations li')].map(li => li.innerText)"
         check("none yet: the card says so", drawn and browser.execute_script(rows) == []
               and "Aucune destination" in browser.find_element(By.ID, "destinations-said").text, browser.execute_script(rows) if drawn else None)
 
         def add(kind, name, address):
-            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            browser.execute_script("document.getElementById(arguments[0]).click()", f"destination-kind-{kind}")
             for field, value in (("destination-name", name), ("destination-address", address)):
                 element = browser.find_element(By.ID, field)
                 element.clear()
@@ -5913,7 +5941,7 @@ def destinations_kept(now: dt.datetime) -> None:
                   and json.loads(judged[1]["input"])["address"] == good, [call["args"] for call in judged])
             # A second destination under a name already kept: said, and refused before any address is judged.
             # Back across 840 px the page is drawn again (#777): the form is filled once that drawing is done.
-            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-kind')"), 10)
+            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-kind-webhook')"), 10)
             add("discord", "#équipe", good.replace("T00", "T01"))
             # Read by script: a destination kept by mistake draws the card again, and a node held would be stale.
             said_now = "return document.getElementById('destination-said')?.textContent ?? null"
@@ -5994,6 +6022,10 @@ def settings_narrow_without_model(now: dt.datetime) -> None:
             check(f"{short}, 420 px, no model on this computer: the choice whole as the list's tooltip, the state said under it (#868)",
                   said[0] == said[1] and said[0] and said[0].endswith(whole) and said[2] and whole.split()[0] in said[2].lower(), said)
             browser.execute_script("document.getElementById('model').scrollIntoView({block: 'center'})")
+            # A model fetched from Hugging Face says so by its mark too (#1238), the host still in its words.
+            hf = browser.execute_script("const b = document.getElementById('model-fetch'); return b ? [b.querySelector('img')?.getAttribute('src') ?? null, b.textContent] : null")
+            check(f"{short}: the model's download shows Hugging Face's mark, its host in its words (#1238)",
+                  hf and hf[0] == "brands/huggingface.svg" and "huggingface.co" in hf[1], hf)
             shot(browser, f"868-settings-420-{short}")
             # « Avancé » as a person reaches it: scrolled to, then clicked where it shows.
             toggle = browser.find_element(By.ID, "general-advanced")
@@ -9610,8 +9642,10 @@ def dates_mentioned(now: dt.datetime) -> None:
                 " return b ? {icon: b.classList.contains('icon-button'), row: !!row, before: !!copy && row === copy.parentElement"
                 " && !!(b.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING), text: b.textContent.trim(),"
                 " name: b.getAttribute('aria-label'), tip: b.title, calendar: !!b.querySelector('svg rect') && b.querySelectorAll('svg path').length === 3} : null")
-            check(f"{language}: offered among the summary's actions, an icon — a calendar — named « {opens} » and its tooltip the same, before « Copier » (#1213)",
-                  shown and form == {"icon": True, "row": True, "before": True, "text": "", "name": opens, "tip": opens, "calendar": True}, form)
+            # Its count beside the calendar (#1239): how many dates it offers, read at a glance; its name and tooltip say both.
+            counted = {"Dates mentionnées": "2 dates mentionnées", "Dates mentioned": "2 dates mentioned"}[opens]
+            check(f"{language}: offered among the summary's actions, a calendar and its count « 2 », named « {counted} » and its tooltip the same, before « Copier » (#1213, #1239)",
+                  shown and form == {"icon": True, "row": True, "before": True, "text": "2", "name": counted, "tip": counted, "calendar": True}, form)
             if language.startswith("fr"):
                 browser.execute_script("document.querySelector('#meeting .card.minutes').scrollIntoView({block: 'start'})")
                 shot(browser, "cm-dates-offered-light")
@@ -9708,6 +9742,9 @@ def actions_rows(now: dt.datetime) -> None:
             "const th = [...document.querySelectorAll('#meeting table.actions thead th')];"
             "return [th.map(t => t.textContent), th.every(t => { const r = t.getBoundingClientRect(); return r.width <= 1 && r.height <= 1; })]")
         check("no visible headers: Qui, Quoi, Pour quand their names for assistive technology", heads == [["Qui", "Quoi", "Pour quand"], True], heads)
+        # A section with items says nothing of being empty (#1234): « Rien de noté » only where nothing was made.
+        empties = browser.execute_script("return document.querySelectorAll('#meeting .minutes .body .empty-section').length")
+        check("a summary whose sections all hold items says « Rien de noté » nowhere (#1234)", empties == 0, empties)
         looks = browser.execute_script(
             "const of = (v) => { const p = document.createElement('span'); p.style.color = `var(${v})`; document.querySelector('#meeting').append(p);"
             " const c = getComputedStyle(p).color; p.remove(); return c; };"
@@ -12285,6 +12322,12 @@ def confidential_kept(now: dt.datetime) -> None:
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         # The last meeting, drawn beside the list already: its page may be drawn again under the driver.
         shown = wait_for(browser, lambda b: b.find_elements(By.ID, "confidential-switch"), 10)
+        # Its summary's sections, made with nothing under them (#1234): each says so, never a bare title.
+        sections_read = ("return [...document.querySelectorAll('#meeting .minutes .body h2')].map(h => [h.textContent,"
+                         " h.nextElementSibling && h.nextElementSibling.tagName !== 'H2' ? h.nextElementSibling.textContent : null])")
+        sections = wait_for(browser, lambda b: b.execute_script(sections_read), 10) and browser.execute_script(sections_read)
+        check("a summary's section with nothing under it says « Rien de noté », never its title alone (#1234)",
+              sections and len(sections) == 3 and all(said == "Rien de noté" for _, said in sections), sections)
         check("its page says it, the switch on, nothing said to have left",
               shown and read(browser, lambda b: switch(b, "confidential-switch").is_selected())
               and browser.execute_script(left) == "")
