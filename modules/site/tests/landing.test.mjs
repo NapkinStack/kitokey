@@ -1,6 +1,6 @@
 // D114, the landing (proposal D, validated by the decider on 2026-11-25): /en/ and /fr/ hold every section
 // their nav names, nothing left to measure, the install's commands as README.md gives them, and a carousel, the
-// drawn call then the app filmed (c17), each slide with its poster and its words; the clips c17's alone; the root to French.
+// drawn call then the app filmed (c18), each slide with its poster and its words; the clips c18's alone; the root to French.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir, stat } from "node:fs/promises";
@@ -60,7 +60,7 @@ for (const lang of ["en", "fr"]) {
     }
   });
 
-  test(`/${lang}/: the hero's carousel, the drawn call then five c17 clips in their order, each with its poster and its words`, async () => {
+  test(`/${lang}/: the hero's carousel, the drawn call then five c18 clips in their order, each with its poster and its words`, async () => {
     const html = await page(lang);
     const slides = [...html.matchAll(/<article class="slide"[\s\S]*?<\/article>/g)].map((m) => m[0]);
     assert.equal(slides.length, 6);
@@ -88,19 +88,19 @@ test("the waves move for ever but pause on a button, and stand still under reduc
   assert.match(js, /IntersectionObserver/);
 });
 
-// c17's files as encoded from run i-sam-film17c-93e4f96 (main 93e4f96), their sha256 each: another capture's clip,
+// c18's files as encoded from run i-sam-film18c-17618c9 (main 17618c9), their sha256 each: another capture's clip,
 // even of the same name, fails here.
-const C17 = Object.fromEntries((await readFile(new URL("./clips-c17.sha256", import.meta.url), "utf8")).trim().split("\n").map((l) => l.split(/\s+/).reverse()));
+const C18 = Object.fromEntries((await readFile(new URL("./clips-c18.sha256", import.meta.url), "utf8")).trim().split("\n").map((l) => l.split(/\s+/).reverse()));
 
-test("the clips are c17's alone, light and dark for each slide, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
+test("the clips are c18's alone, light and dark for each slide, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
   const set = (theme, keys) => keys.flatMap((k) => ["en", "fr"].flatMap((l) => ["jpg", "mp4", "webm"].map((e) => `${k}-${l}-${theme}.${e}`)));
   const have = (await readdir(join(dist, "clips"))).sort();
   assert.deepEqual(have, [...set("light", KEYS), ...set("dark", KEYS)].sort());
-  assert.deepEqual(Object.keys(C17).sort(), have);
+  assert.deepEqual(Object.keys(C18).sort(), have);
   for (const name of have) {
     const bytes = await readFile(join(dist, "clips", name));
     assert.ok(bytes.length <= 500 * 1024, `${name} is over 500 KiB`);
-    assert.equal(createHash("sha256").update(bytes).digest("hex"), C17[name], `${name} is not c17's`);
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), C18[name], `${name} is not c18's`);
   }
   for (const lang of ["en", "fr"]) {
     const html = await page(lang);
