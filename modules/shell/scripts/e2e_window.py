@@ -5550,8 +5550,17 @@ def summary_sent(now: dt.datetime) -> None:
         check("« Envoyer » is described by the notice: a screen reader says what leaves before it is pressed",
               described[:1] and described[0][0] == "send-notice" and "ne peut pas être repris" in (described[0][1] or ""), described)
         # Selenium's text gives U+00A0 as a space: each read below compares with spaces.
-        said = browser.find_element(By.ID, "send-said").text
-        check("sent: said on the page, the destination by its name", said.replace("\xa0", " ").startswith("Envoyé à « #équipe »"), said)
+        # Said once (#1252): the send listed under the summary is the line the eye reads; the outcome still told to a
+        # screen reader by its status, never shown a second time above that same line.
+        said = browser.execute_script("return document.getElementById('send-said')?.textContent ?? ''")
+        check("sent: told to a screen reader by its status, the destination by its name", said.replace("\xa0", " ").startswith("Envoyé à « #équipe »"), said)
+        # innerText keeps a line clipped for screen readers alone (.unseen): that one is not shown, and is set aside.
+        shown_lines = browser.execute_script(
+            "const card = document.querySelector('#meeting .card.minutes'); if (!card) return null;"
+            "const unseen = [...card.querySelectorAll('.unseen')].map(e => e.textContent);"
+            "return card.innerText.split('\\n').filter(l => { const at = unseen.indexOf(l); if (at < 0) return true; unseen.splice(at, 1); return false; })"
+            ".filter(l => l.replace(/\\u00a0/g, ' ').startsWith('Envoyé à « #équipe »'))")
+        check("sent and listed: the send shown once, its line in the list — never its notice above it too (#1252)", len(shown_lines) == 1, shown_lines)
         made = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
         check("kitokey-send started with the meeting's folder and --kind discord; the address and the name on its input only (posting/v1)",
               len(made) == 1 and made[0]["args"][0].endswith(written.name) and made[0]["args"][1:] == ["--kind", "discord"]
