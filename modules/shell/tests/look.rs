@@ -1080,3 +1080,84 @@ fn the_focus_ring_is_unchanged() {
     );
     assert_eq!(declared(STYLE, "button:focus-visible", "outline-offset").as_deref(), Some("2px"));
 }
+
+/// D120: `ui/tokens.css` alone holds a value. What the rest of the style writes out — a colour, or a
+/// size, a radius, a shadow or a duration not read from a `var(--…)` — is counted, each place said.
+const OUTSIDE: &str = include_str!("../ui/window.css");
+/// The count is a ratchet: it may only go down, to zero at cycle 12's closure (D120).
+const RATCHET: &str = include_str!("look-outside-tokens.txt");
+/// The properties whose value is a size, a radius, a shadow or a duration (D120).
+const SIZED: [&str; 23] = [
+    "font", "font-size", "border-radius", "border-top-left-radius", "border-top-right-radius",
+    "border-bottom-left-radius", "border-bottom-right-radius", "box-shadow", "transition",
+    "transition-duration", "transition-delay", "animation", "animation-duration", "animation-delay",
+    "margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding", "gap", "row-gap",
+    "column-gap",
+];
+/// The literals that are no choice of a design: nothing, a hairline, a focus offset, a whole, a half.
+const PLAIN: [&str; 5] = ["0", "1px", "2px", "100%", "50%"];
+
+fn outside_the_tokens(style: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    for (selector, body) in rules(style) {
+        for (property, value) in body.split(';').filter_map(|one| one.split_once(':')) {
+            let (property, value) = (property.trim(), value.trim().to_lowercase());
+            if property.starts_with("--") {
+                found.push(format!("{selector}: {property} is a token outside tokens.css"));
+                continue;
+            }
+            let words: Vec<&str> =
+                value.split(|c: char| c.is_whitespace() || ",()/".contains(c)).filter(|w| !w.is_empty()).collect();
+            for word in &words {
+                let hex = word.starts_with('#') && [4, 5, 7, 9].contains(&word.len()) && word[1..].chars().all(|c| c.is_ascii_hexdigit());
+                if hex || ["rgb", "rgba", "hsl", "hsla", "color-mix"].contains(word) {
+                    found.push(format!("{selector}: {property}: {word}"));
+                }
+            }
+            if !SIZED.contains(&property) {
+                continue;
+            }
+            // What a var() reads is a token; its fallback is not.
+            let mut bare = value.clone();
+            while let Some(at) = bare.find("var(") {
+                let end = bare[at..].find(')').map_or(bare.len(), |end| at + end + 1);
+                bare.replace_range(at..end, " ");
+            }
+            for word in bare.split(|c: char| c.is_whitespace() || ",()/".contains(c)).filter(|w| !w.is_empty()) {
+                let digits = word.trim_end_matches(|c: char| c.is_ascii_alphabetic() || c == '%');
+                let (number, unit) = (digits.trim_start_matches('-'), &word[digits.len()..]);
+                if number.parse::<f64>().is_err() || (unit.is_empty() && property != "font-size") {
+                    continue;
+                }
+                if !PLAIN.contains(&word.trim_start_matches('-')) && number.parse::<f64>() != Ok(0.0) {
+                    found.push(format!("{selector}: {property}: {word}"));
+                }
+            }
+        }
+    }
+    found
+}
+
+#[test]
+fn only_the_tokens_hold_a_value() {
+    let found = outside_the_tokens(OUTSIDE);
+    let ratchet: usize = RATCHET.trim().parse().expect("look-outside-tokens.txt holds a count");
+    for one in &found {
+        println!("outside tokens.css: {one}");
+    }
+    assert!(found.len() <= ratchet, "{} values outside tokens.css, the ratchet allows {ratchet}: read them with --nocapture", found.len());
+    assert!(found.len() >= ratchet, "{} values outside tokens.css: lower tests/look-outside-tokens.txt to it", found.len());
+}
+
+#[test]
+fn a_value_outside_the_tokens_is_counted() {
+    let style = ".a { color: #FFF; margin: 0 4px; transition: opacity 0.2s; }\n\
+                 .b { color: var(--ink); padding: var(--space-2); border-radius: 50%; border: 1px solid var(--line); }\n\
+                 .c { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); --x: #000000; font: 15px/1.45 system-ui; }";
+    let found = outside_the_tokens(style);
+    for expected in [".a: color: #fff", ".a: margin: 4px", ".a: transition: 0.2s", ".c: background: color-mix", ".c: --x", ".c: font: 15px"] {
+        assert!(found.iter().any(|one| one.starts_with(expected)), "{expected}: {found:?}");
+    }
+    assert!(!found.iter().any(|one| one.starts_with(".b")), "{found:?}");
+    assert_eq!(found.len(), 6, "{found:?}");
+}
