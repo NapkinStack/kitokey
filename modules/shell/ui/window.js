@@ -1958,7 +1958,10 @@ function pathShown(said, whole) {
     for (let dropped = 1; leadShown.scrollWidth > leadShown.clientWidth + 1 && dropped <= parts.length; dropped++)
       leadShown.textContent = dropped >= parts.length - 1 ? "…" : [parts[0], "…", ...parts.slice(dropped + 1)].join(" / ");
   };
-  new ResizeObserver(() => requestAnimationFrame(fit)).observe(shown);
+  // In the observer's own turn, before the frame is painted: the box's size never depends on its text (one line,
+  // its width the row's), so no loop; and once the page's fonts are in, which widen the text.
+  new ResizeObserver(fit).observe(shown);
+  document.fonts.ready.then(fit);
   return shown;
 }
 

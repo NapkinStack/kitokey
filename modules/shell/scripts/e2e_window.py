@@ -11111,6 +11111,8 @@ def two_panes(now: dt.datetime) -> None:
         for width in (1920, 840, 600, 420):
             browser.set_window_size(width, 900)
             drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "app-language") and b.find_element(By.ID, "app-language").is_displayed(), 10)
+            # Measured once the page has drawn at that width — a folder's path is cut to it by the page (#1232).
+            wait_for(browser, lambda b: b.execute_script(SETTINGS_OVERFLOW) == [], 3)
             over = browser.execute_script(SETTINGS_OVERFLOW)
             check(f"Settings, {width} px wide: nothing past its card or the window, each box measured (D95, #782)", drawn and over == [], over)
             # The top of Settings, before anything below is scrolled to.
