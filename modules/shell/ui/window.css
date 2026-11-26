@@ -745,3 +745,5 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .trash-ask .trash-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .trash-ask .trash-choices button { white-space: nowrap; }
 .trash-ask .note:empty { display: none; }
+/* A summary's section with nothing in it (#1234): said, in the soft colour. */
+.minutes .body .empty-section { color: var(--soft); }

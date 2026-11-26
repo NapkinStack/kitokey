@@ -1486,6 +1486,9 @@ pub struct Window {
     /// Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) 11.16, #1092).
     /// When: a summary is shown. At most: one line. Placeholders: none.
     pub minutes_ai: &'static str,
+    /// Shows: under a summary's section title, in the soft colour (#1234). When: the section was made with
+    /// nothing in it. At most: 20 characters. Placeholders: none.
+    pub section_empty: &'static str,
     /// Shows: a meeting's page, above the button that makes the transcript again, the model that made
     /// the one shown (D93). When: another model is chosen in its line. At most: no limit.
     /// Placeholders: {} the model, as its line says it.
@@ -2342,6 +2345,7 @@ pub fn window(language: Language) -> Window {
             make_minutes_with: "Write summary with {}",
             minutes_made_with: "This summary was written with {}.",
             minutes_ai: "Written by AI: read it before you share it.",
+            section_empty: "Nothing noted",
             transcript_made_with: "This transcript was made with {}.",
             minutes_making: "Writing summary",
             minutes_waiting: "Queued · {} ahead",
@@ -2867,6 +2871,7 @@ pub fn window(language: Language) -> Window {
             make_minutes_with: "Rédiger le compte rendu avec {}",
             minutes_made_with: "Ce compte rendu a été fait avec {}.",
             minutes_ai: "Rédigé par une IA\u{a0}: relisez-le avant de le partager.",
+            section_empty: "Rien de noté",
             transcript_made_with: "Cette transcription a été faite avec {}.",
             minutes_making: "Rédaction du compte rendu",
             minutes_waiting: "En attente · {} avant",
