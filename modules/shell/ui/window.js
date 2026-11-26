@@ -2107,7 +2107,9 @@ function sendPart(card, top, actions, session, words) {
       document.getElementById("send-panel")?.remove();
       open.setAttribute("aria-expanded", "false");
       open.disabled = true;
+      said.classList.remove("unseen");
       said.textContent = fill(words.send_sending, destination);
+      const before = sends.childElementCount;
       try {
         const result = await window.__TAURI__.core.invoke("summary_sent", { name, destination, confirmed });
         said.textContent = outcome(result, destination);
@@ -2117,9 +2119,13 @@ function sendPart(card, top, actions, session, words) {
         secret = result.sending.confidential;
         if (confidentialShown?.name === name) confidentialShown.paint(result.confidential);
         listSends(result.sending);
+        // Sent and listed: its line under the summary says it, and the notice is told to a screen reader only (#1252) —
+        // never the same send twice in a row. Sent but not recorded (its record unwritable): the notice stays shown.
+        said.classList.toggle("unseen", result.outcome === "sent" && sends.childElementCount > before);
         sayFailed(result.sending, destination);
         if (!result.sending.offered) open.remove();
       } catch {
+        said.classList.remove("unseen");
         said.textContent = words.send_not_sent;
       } finally {
         open.disabled = false;
