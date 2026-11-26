@@ -6031,6 +6031,11 @@ def settings_narrow_without_model(now: dt.datetime) -> None:
             check(f"{short}, 420 px, no model on this computer: the choice whole as the list's tooltip, the state said under it (#868)",
                   said[0] == said[1] and said[0] and said[0].endswith(whole) and said[2] and whole.split()[0] in said[2].lower(), said)
             browser.execute_script("document.getElementById('model').scrollIntoView({block: 'center'})")
+            # A short word in its tag stays on one line at 420 px (#1235): « intégré » broke as « intégr / é ».
+            tags = browser.execute_script(
+                "return [...document.querySelectorAll('#settings code.tag')].filter(t => t.offsetParent).map(t => [t.textContent, t.getClientRects().length,"
+                " Math.round(t.getBoundingClientRect().height / (parseFloat(getComputedStyle(t).lineHeight) || 16))])")
+            check(f"{short}, 420 px: each tag one line, never broken inside its word (#1235)", tags and all(rects == 1 and rows == 1 for _, rects, rows in tags), tags)
             # A model fetched from Hugging Face says so by its mark too (#1238), the host still in its words.
             hf = browser.execute_script("const b = document.getElementById('model-fetch'); return b ? [b.querySelector('img')?.getAttribute('src') ?? null, b.textContent] : null")
             check(f"{short}: the model's download shows Hugging Face's mark, its host in its words (#1238)",
@@ -11115,6 +11120,8 @@ def two_panes(now: dt.datetime) -> None:
         for width in (1920, 840, 600, 420):
             browser.set_window_size(width, 900)
             drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "app-language") and b.find_element(By.ID, "app-language").is_displayed(), 10)
+            # Measured once the page has drawn at that width — a folder's path is cut to it by the page (#1232).
+            wait_for(browser, lambda b: b.execute_script(SETTINGS_OVERFLOW) == [], 3)
             over = browser.execute_script(SETTINGS_OVERFLOW)
             check(f"Settings, {width} px wide: nothing past its card or the window, each box measured (D95, #782)", drawn and over == [], over)
             # The top of Settings, before anything below is scrolled to.
@@ -13180,6 +13187,26 @@ def pages_seen(now: dt.datetime) -> None:
                     check(f"{theme}, {width} px: {page} shown", bool(there))
                     browser.execute_script("document.getElementById('list').scrollTop = 0; scrollTo(0, 0)")
                     time.sleep(0.4)
+                    if page == "settings":
+                        # A folder as the desktop's own choosers show one (#1232): its icon, one line in the body's font, its
+                        # own name whole — the path before it cut with « … » when it does not fit —, the whole path its tooltip.
+                        folder = browser.execute_script(
+                            "const b = document.getElementById('sessions-shown'), last = b.querySelector('.last'), box = b.getBoundingClientRect();"
+                            "const lh = parseFloat(getComputedStyle(b).lineHeight) || 20;"
+                            "return {icon: !!b.querySelector('svg'), mono: getComputedStyle(b).fontFamily.includes('monospace'),"
+                            " lines: Math.round((b.querySelector('.lead')?.getBoundingClientRect().height ?? box.height) / lh),"
+                            " last: last ? [last.textContent, last.getBoundingClientRect().right <= box.right + 0.5, last.scrollWidth <= last.clientWidth] : null,"
+                            " tip: b.title, value: document.getElementById('sessions').value, heard: document.getElementById(b.getAttribute('aria-describedby') ?? '')?.textContent ?? null,"
+                            " hidden: !!document.getElementById(b.getAttribute('aria-describedby') ?? '')?.hidden,"
+                            " none: getComputedStyle(document.getElementById('export-shown')).fontFamily.includes('monospace')}")
+                        check(f"{theme}, {width} px: the meetings' folder an icon and one line in the body's font, its name whole, its path the tooltip (#1232)",
+                              folder["icon"] and not folder["mono"] and folder["lines"] == 1 and folder["last"]
+                              and folder["last"][0] == folder["value"].rstrip("/").rsplit("/", 1)[-1] and folder["last"][1] and folder["last"][2]
+                              and folder["tip"] == folder["value"] and not folder["none"], folder)
+                        # Heard whole (ines, #1232): its name what it shows (WCAG 2.5.3), its description every folder, as people say it.
+                        whole_said = ("/ " if folder["value"].startswith("/") else "") + " / ".join(p for p in folder["value"].split("/") if p)
+                        check(f"{theme}, {width} px: the meetings' folder heard whole by a screen reader, its whole path its description (#1232)",
+                              folder["heard"] == whole_said and folder["hidden"], [folder["heard"], whole_said, folder["hidden"]])
                     shot_themed(browser, f"d89-{page}-{width}-{theme}", theme)
 
 
@@ -13486,7 +13513,7 @@ def store_shots(now: dt.datetime) -> None:
     seen = lambda browser, shot: shown.update({shot: browser.execute_script(
         "const shown = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent);"
         "return {freed: shown('.chip.gone, #no-player').length,"
-        " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText,"
+        " folder: document.getElementById('sessions-shown-path')?.textContent ?? null, text: document.body.innerText,"
         " lanes: [...document.querySelectorAll('#meeting svg.relief rect')].map(r => [r.getAttribute('class'), +r.getAttribute('x'), +r.getAttribute('width'), +r.getAttribute('y')]),"
         " wave: [...document.querySelectorAll('#meeting .drawing .wave .col')].map(c => [...c.querySelectorAll('i')].map(i => { const r = i.getBoundingClientRect(); return [r.height, r.top, r.bottom]; })),"
         " sought: [document.getElementById('search')?.value ?? '', document.getElementById('find')?.value ?? ''],"
@@ -14550,7 +14577,8 @@ def main() -> int:
             )
             # The sessions' folder: typed, made when it is not there, and what the list reads.
             elsewhere = WORK / "elsewhere" / "Kitokey"
-            spoken = browser.find_element(By.ID, "sessions-shown").get_attribute("textContent")
+            # Its name as heard, the whole path (#1232); what is drawn may be cut in its middle.
+            spoken = browser.execute_script("return document.getElementById('sessions-shown-path')?.textContent ?? null")
             # Outside the home folder, from the root: / tmp / … / chosen.
             check("the sessions' folder is shown as people say it", spoken == "/ " + " / ".join(chosen.parts[1:]), spoken)
 

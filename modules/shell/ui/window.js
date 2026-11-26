@@ -119,6 +119,7 @@ const ICONS = {
   copy: [["rect", { width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2 }], "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"],
   "rotate-ccw": ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5"],
   "trash-2": ["M10 11v6", "M14 11v6", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
+  folder: ["M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"],
   // Lucide's webhook, hash and globe (ISC, ui/LUCIDE-LICENSE): a webhook, a channel, an online service — the page's own,
   // where a brand's mark is not cleared for an app (#1238).
   webhook: ["M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2", "m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06", "m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"],
@@ -1936,6 +1937,42 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
   pick.addEventListener("change", changed);
   name();
   return [pick, said];
+}
+
+// A folder as the desktop's choosers show one (#1232): its icon, then its path on one line — the folders before its
+// own cut with « … » when the line is short, its own name always whole —, the whole path its tooltip.
+function pathShown(said, whole, id) {
+  const shown = element("button", "path");
+  shown.id = id;
+  const cut = said.lastIndexOf(" / ");
+  const [lead, last] = cut < 0 ? ["", said] : [said.slice(0, cut), said.slice(cut + 3)];
+  // The separator before its own name its own, never eaten by the ellipsis: « … / pages ».
+  const leadShown = element("span", "lead", lead);
+  const drawn = element("span", "drawn-path");
+  drawn.append(leadShown, element("span", "sep", cut < 0 ? "" : " / "), element("span", "last", last));
+  shown.append(icon("folder"), drawn);
+  // Its name what it shows (WCAG 2.5.3); the whole path its description, heard after it (ines, #1232) — an element
+  // `hidden`, read by the description's reference, neither drawn nor measured.
+  const heard = element("span", "", said);
+  heard.id = `${id}-path`;
+  heard.hidden = true;
+  shown.setAttribute("aria-describedby", heard.id);
+  shown.append(heard);
+  shown.title = whole;
+  // Cut in its middle to the room it has (#1232), as a path bar does — « / home / … / window » —: the folders after
+  // the first dropped one by one, then all but « … »; nothing hidden past its box (D95's measure), re-cut at each size.
+  const parts = lead.split(" / ");
+  const fit = () => {
+    if (!leadShown.isConnected) return;
+    leadShown.textContent = lead;
+    for (let dropped = 1; leadShown.scrollWidth > leadShown.clientWidth + 1 && dropped <= parts.length; dropped++)
+      leadShown.textContent = dropped >= parts.length - 1 ? "…" : [parts[0], "…", ...parts.slice(dropped + 1)].join(" / ");
+  };
+  // At the next frame, never in the observer's own turn — a change of text there is reported by the browser as a
+  // loop, an error of the page —; and once the page's fonts are in, which widen the text.
+  new ResizeObserver(() => requestAnimationFrame(fit)).observe(shown);
+  document.fonts.ready.then(fit);
+  return shown;
 }
 
 // A list in a sentence as wide as the name it shows, never as its longest option (#1231): a native list takes its
@@ -4569,7 +4606,7 @@ function showSettings(shown, minutes, words) {
   path.hidden = true;
   // Shown as the board says it — Dossier personnel / Kitokey —; a click makes it a path to type.
   const said = shown.sessions_said.replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
-  const folderShown = element("button", "path", shown.sessions_said.startsWith("/") ? `/ ${said}` : said);
+  const folderShown = pathShown(shown.sessions_said.startsWith("/") ? `/ ${said}` : said, shown.sessions_said, "sessions-shown");
   folderShown.type = "button";
   whereSaid.id = "sessions-label";
   folderShown.setAttribute("aria-labelledby", "sessions-label sessions-shown");
@@ -4612,11 +4649,9 @@ function showSettings(shown, minutes, words) {
   exportPath.spellcheck = false;
   exportPath.hidden = true;
   const exportAs = (shown.export_said ?? "").replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
-  const exportShown = element(
-    "button",
-    "path",
-    shown.export_said === null ? words.export_none : shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs,
-  );
+  const exportShown =
+    shown.export_said === null ? element("button", "path none", words.export_none)
+    : pathShown(shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs, shown.export_said, "export-shown");
   exportShown.type = "button";
   exportShown.id = "export-shown";
   exportShown.setAttribute("aria-labelledby", "export-label export-shown");
