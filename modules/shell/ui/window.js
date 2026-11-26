@@ -2038,7 +2038,9 @@ function sendPart(card, top, actions, session, words) {
     if (!shown.offered) return;
     let offered = shown.destinations;
     let secret = shown.confidential;
-    const open = iconButton("send", words.send_open, "send-open");
+    // One destination: named where « Envoyer… » is read, its tooltip and name (#1239); several, the panel names them.
+    const sendName = () => (offered.length === 1 ? `${fill(words.send_to, offered[0].name)}…` : words.send_open);
+    const open = iconButton("send", sendName(), "send-open");
     open.setAttribute("aria-expanded", "false");
     open.setAttribute("aria-controls", "send-panel");
     actions.prepend(open);
@@ -2056,6 +2058,8 @@ function sendPart(card, top, actions, session, words) {
         const result = await window.__TAURI__.core.invoke("summary_sent", { name, destination, confirmed });
         said.textContent = outcome(result, destination);
         offered = result.sending.destinations;
+        open.title = sendName();
+        open.setAttribute("aria-label", open.title);
         secret = result.sending.confidential;
         if (confidentialShown?.name === name) confidentialShown.paint(result.confidential);
         listSends(result.sending);
@@ -2290,7 +2294,18 @@ function datesOffer(card, mentioned, session, transcript, words) {
   else (actions ?? card).append(button);
   window.__TAURI__.core
     .invoke("dates_resolved", { name: nameOf(session), whens: mentioned.map((m) => m.when), day: null })
-    .then((resolved) => (button.hidden = !resolved?.dates.some(Boolean)))
+    .then((resolved) => {
+      // Its count beside the calendar (#1239), as a mail app counts what waits: how many dates, at a glance; its name
+      // and tooltip begin with what it shows — « 2 dates mentionnées » (WCAG 2.5.3, Label in Name).
+      const count = resolved?.dates.filter(Boolean).length ?? 0;
+      button.hidden = count === 0;
+      if (count === 0) return;
+      const said = fill(words.dates_counted[count === 1 ? 0 : 1], count);
+      button.title = said;
+      button.setAttribute("aria-label", said);
+      button.classList.add("counted");
+      button.append(element("span", "count", String(count)));
+    })
     .catch(() => {});
   button.addEventListener("click", () => datesPanel(mentioned, session, transcript, words, button));
 }

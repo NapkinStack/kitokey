@@ -745,6 +745,9 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .trash-ask .trash-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .trash-ask .trash-choices button { white-space: nowrap; }
 .trash-ask .note:empty { display: none; }
+/* « Dates mentionnées » with its count (#1239): the calendar and the number in one pill, the row's height. */
+.icon-button.counted { width: auto; grid-auto-flow: column; gap: 4px; padding: 0 8px; }
+.icon-button .count { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 /* A brand's mark, as its owner gives it (#1238): 16 px, never recoloured; OpenRouter's Ink on light, Cloud on dark. */
 .brand-mark { display: inline-flex; flex: none; }
 .brand-mark img { width: 16px; height: 16px; object-fit: contain; }
