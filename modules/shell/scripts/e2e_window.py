@@ -6022,6 +6022,11 @@ def settings_narrow_without_model(now: dt.datetime) -> None:
             check(f"{short}, 420 px, no model on this computer: the choice whole as the list's tooltip, the state said under it (#868)",
                   said[0] == said[1] and said[0] and said[0].endswith(whole) and said[2] and whole.split()[0] in said[2].lower(), said)
             browser.execute_script("document.getElementById('model').scrollIntoView({block: 'center'})")
+            # A short word in its tag stays on one line at 420 px (#1235): « intégré » broke as « intégr / é ».
+            tags = browser.execute_script(
+                "return [...document.querySelectorAll('#settings code.tag')].filter(t => t.offsetParent).map(t => [t.textContent, t.getClientRects().length,"
+                " Math.round(t.getBoundingClientRect().height / (parseFloat(getComputedStyle(t).lineHeight) || 16))])")
+            check(f"{short}, 420 px: each tag one line, never broken inside its word (#1235)", tags and all(rects == 1 and rows == 1 for _, rects, rows in tags), tags)
             # A model fetched from Hugging Face says so by its mark too (#1238), the host still in its words.
             hf = browser.execute_script("const b = document.getElementById('model-fetch'); return b ? [b.querySelector('img')?.getAttribute('src') ?? null, b.textContent] : null")
             check(f"{short}: the model's download shows Hugging Face's mark, its host in its words (#1238)",
@@ -12319,6 +12324,15 @@ def confidential_kept(now: dt.datetime) -> None:
         chips = browser.execute_script("return [...document.querySelectorAll('.session .mark.locked')].map(c => [c.getAttribute('aria-label'), c.title, !!c.querySelector('svg')])")
         check("the list shows the meeting with a lock, its word its name and tooltip (D89)", chips == [["Confidentielle", "Confidentielle", True]], chips)
         seen(browser, "d60-4-list-light")
+        # Its audio freed (#1233): its player draws two dotted lanes, yours and the others', and says why under them — no
+        # turn drawn on a sound that is not there, which read as a fault (a block at the start of a long meeting).
+        lanes_read = ("const d = document.querySelector('#meeting .drawn .drawing'); if (!d) return null;"
+                      "return [d.querySelectorAll('rect, .col').length, [...d.querySelectorAll('line')].map(l => [l.getAttribute('class'), getComputedStyle(l).strokeDasharray]),"
+                      " document.getElementById('no-player')?.innerText || '']")
+        lanes = wait_for(browser, lambda b: b.execute_script(lanes_read), 10) and browser.execute_script(lanes_read)
+        check("no audio: its player two dotted lanes, yours and the others', no turn drawn, and why said under them (#1233)",
+              lanes and lanes[0] == 0 and [c for c, _ in lanes[1]] == ["local", "remote"] and all(dash not in ("", "none") for _, dash in lanes[1])
+              and "supprimé" in lanes[2], lanes)
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         # The last meeting, drawn beside the list already: its page may be drawn again under the driver.
         shown = wait_for(browser, lambda b: b.find_elements(By.ID, "confidential-switch"), 10)

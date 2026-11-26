@@ -1420,6 +1420,23 @@ function relief(segments, total, words) {
   return svg;
 }
 
+// A meeting with no sound to play (#1233): its two lanes, yours above and the others' below, dotted — the
+// convention of a track with nothing on it —, at the height the turns or the waveform take, so nothing moves.
+function quietLanes() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 1100 88");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("relief", "quiet");
+  for (const [track, y] of [["local", 26], ["remote", 62]]) {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    for (const [name, value] of [["x1", 0], ["x2", 1100], ["y1", y], ["y2", y], ["class", track], ["vector-effect", "non-scaling-stroke"]])
+      line.setAttribute(name, value);
+    svg.append(line);
+  }
+  return svg;
+}
+
 // A meeting's waveform per voice (#1201, #1179 B), as Descript, Riverside and Voice Memos draw a recording: each
 // voice's loudness (each stretch's RMS, `peaks`), yours above the line and the meeting's below, its bars grouped to the drawing's width and
 // laid over the meeting's `total` as the playhead and a click are; each voice scaled to its own loudest, so that a
@@ -3252,6 +3269,10 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     const now = element("div", "live-now");
     now.append(time, pageLevels(nameOf(session), time, words));
     drawing.append(now);
+  } else if (transcript.state === "present" && session.audio === 0) {
+    // Its sound freed (#1233): its two lanes dotted, why said under them (`playerBar`). Turns drawn over a sound that
+    // is gone read as a fault: a block alone at a meeting's start. A sound there but unreadable keeps them (#1201).
+    drawing.append(quietLanes());
   } else if (transcript.state === "present") {
     drawing.append(relief(said, total, words));
     // Its sound's own shape once the shell has read it (#1201): who spoke, from the transcript, until then — and for
