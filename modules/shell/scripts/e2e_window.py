@@ -12319,6 +12319,15 @@ def confidential_kept(now: dt.datetime) -> None:
         chips = browser.execute_script("return [...document.querySelectorAll('.session .mark.locked')].map(c => [c.getAttribute('aria-label'), c.title, !!c.querySelector('svg')])")
         check("the list shows the meeting with a lock, its word its name and tooltip (D89)", chips == [["Confidentielle", "Confidentielle", True]], chips)
         seen(browser, "d60-4-list-light")
+        # Its audio freed (#1233): its player draws two dotted lanes, yours and the others', and says why under them — no
+        # turn drawn on a sound that is not there, which read as a fault (a block at the start of a long meeting).
+        lanes_read = ("const d = document.querySelector('#meeting .drawn .drawing'); if (!d) return null;"
+                      "return [d.querySelectorAll('rect, .col').length, [...d.querySelectorAll('line')].map(l => [l.getAttribute('class'), getComputedStyle(l).strokeDasharray]),"
+                      " document.getElementById('no-player')?.innerText || '']")
+        lanes = wait_for(browser, lambda b: b.execute_script(lanes_read), 10) and browser.execute_script(lanes_read)
+        check("no audio: its player two dotted lanes, yours and the others', no turn drawn, and why said under them (#1233)",
+              lanes and lanes[0] == 0 and [c for c, _ in lanes[1]] == ["local", "remote"] and all(dash not in ("", "none") for _, dash in lanes[1])
+              and "supprimé" in lanes[2], lanes)
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         # The last meeting, drawn beside the list already: its page may be drawn again under the driver.
         shown = wait_for(browser, lambda b: b.find_elements(By.ID, "confidential-switch"), 10)
