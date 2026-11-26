@@ -1947,7 +1947,12 @@ function pathShown(said, whole) {
   const [lead, last] = cut < 0 ? ["", said] : [said.slice(0, cut), said.slice(cut + 3)];
   // The separator before its own name its own, never eaten by the ellipsis: « … / pages ».
   const leadShown = element("span", "lead", lead);
-  shown.append(icon("folder"), leadShown, element("span", "sep", cut < 0 ? "" : " / "), element("span", "last", last));
+  // Its name the whole path, as before the page cut it (ines, #1232): a screen reader hears every folder; what is
+  // drawn, cut, is hidden from it.
+  const drawn = element("span", "drawn-path");
+  drawn.setAttribute("aria-hidden", "true");
+  drawn.append(leadShown, element("span", "sep", cut < 0 ? "" : " / "), element("span", "last", last));
+  shown.append(icon("folder"), element("span", "unseen", said), drawn);
   shown.title = whole;
   // Cut in its middle to the room it has (#1232), as a path bar does — « / home / … / window » —: the folders after
   // the first dropped one by one, then all but « … »; nothing hidden past its box (D95's measure), re-cut at each size.
