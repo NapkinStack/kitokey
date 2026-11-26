@@ -1,0 +1,4 @@
+{"type":"segment","speaker":"me","track":"local","voice":null,"start":1.0,"end":3.0,"text":"Bonjour à tous, on commence."}
+{"type":"segment","speaker":"others","track":"remote","voice":null,"start":3.5,"end":6.0,"text":"Здравствуйте, начнём с цены."}
+{"type":"segment","speaker":"others","track":"remote","voice":null,"start":6.5,"end":9.0,"text":"大家好，我们来谈价格。"}
+{"type":"segment","speaker":"me","track":"local","voice":null,"start":9.5,"end":11.0,"text":"Parfait 👍 merci."}
