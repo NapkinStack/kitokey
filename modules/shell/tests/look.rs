@@ -11,7 +11,15 @@ use oxc_span::SourceType;
 
 const PAGE: &str = include_str!("../ui/window.js");
 /// The style as the page loads it: the tokens, then the window's rules (D120).
-const STYLE: &str = concat!(include_str!("../ui/tokens.css"), "\n", include_str!("../ui/window.css"));
+const STYLE: &str = concat!(
+    include_str!("../ui/tokens.css"),
+    "\n",
+    include_str!("../ui/window.css"),
+    "\n",
+    include_str!("../ui/components.css")
+);
+/// D120: the design system's components, which read its roles and scales alone.
+const COMPONENTS: &str = include_str!("../ui/components.css");
 const HTML: &str = include_str!("../ui/index.html");
 /// The glyphs a font would draw as an icon (UX review §8), and the back arrow beside them; the
 /// sidebar's fold arrows and a line's pencil, Lucide's since D89.
@@ -1256,4 +1264,154 @@ fn each_older_name_keeps_the_value_it_had() {
         assert_eq!(light.get(name), Some(&hex(was_light)), "{name} in the light theme");
         assert_eq!(dark.get(name), Some(&hex(was_dark)), "{name} in the dark theme");
     }
+}
+
+/// D120's roles (PDR-0008; the v5 mock-up the decider accepted on 2026-11-26), each in both themes.
+const ROLES: [&str; 25] = [
+    "--color-canvas",
+    "--color-surface",
+    "--color-sunken",
+    "--color-raised",
+    "--color-hover",
+    "--color-pressed",
+    "--color-tint",
+    "--color-divider",
+    "--color-edge",
+    "--color-text",
+    "--color-text-soft",
+    "--color-text-faint",
+    "--color-accent",
+    "--color-accent-hover",
+    "--color-on-accent",
+    "--color-success",
+    "--color-warning",
+    "--color-warning-ground",
+    "--color-record",
+    "--color-destructive",
+    "--color-on-destructive",
+    "--color-private",
+    "--color-private-ground",
+    "--color-voice-you",
+    "--color-voice-others",
+];
+
+/// Each pair a component draws, and its threshold (WCAG 2.2): words 4.5:1 (1.4.3); an edge, a voice's
+/// trace, a recording's dot, the focus ring 3:1 (1.4.11).
+const ROLE_PAIRS: [(&str, &str, f64); 30] = [
+    ("--color-text", "--color-canvas", 4.5),
+    ("--color-text", "--color-surface", 4.5),
+    ("--color-text", "--color-raised", 4.5),
+    ("--color-text", "--color-hover", 4.5),
+    ("--color-text", "--color-pressed", 4.5),
+    ("--color-text", "--color-tint", 4.5),
+    ("--color-text", "--color-warning-ground", 4.5),
+    ("--color-text", "--color-private-ground", 4.5),
+    ("--color-text-soft", "--color-canvas", 4.5),
+    ("--color-text-soft", "--color-surface", 4.5),
+    ("--color-text-soft", "--color-raised", 4.5),
+    ("--color-text-faint", "--color-surface", 4.5),
+    ("--color-text-faint", "--color-raised", 4.5),
+    ("--color-accent", "--color-surface", 4.5),
+    ("--color-accent", "--color-tint", 4.5),
+    ("--color-on-accent", "--color-accent", 4.5),
+    ("--color-on-accent", "--color-accent-hover", 4.5),
+    ("--color-on-destructive", "--color-destructive", 4.5),
+    ("--color-success", "--color-surface", 4.5),
+    ("--color-warning", "--color-warning-ground", 4.5),
+    ("--color-private", "--color-private-ground", 4.5),
+    ("--color-private", "--color-surface", 4.5),
+    ("--color-edge", "--color-surface", 3.0),
+    ("--color-edge", "--color-canvas", 3.0),
+    ("--color-accent", "--color-canvas", 3.0),
+    ("--color-record", "--color-surface", 3.0),
+    ("--color-voice-you", "--color-surface", 3.0),
+    ("--color-voice-others", "--color-surface", 3.0),
+    ("--color-voice-you", "--color-canvas", 3.0),
+    ("--color-voice-others", "--color-canvas", 3.0),
+];
+
+#[test]
+fn the_roles_reach_their_contrast_in_both_themes() {
+    let themes = themes(STYLE);
+    let mut below = Vec::new();
+    for (index, theme) in themes.iter().enumerate() {
+        for role in ROLES {
+            assert!(theme.contains_key(role), "theme {index}: {role} is no colour of the tokens");
+        }
+        for (front, ground, need) in ROLE_PAIRS {
+            let ratio = contrast(theme[front], theme[ground]);
+            if ratio < need {
+                below.push(format!("theme {index}: {front} on {ground} {ratio:.2} < {need}"));
+            }
+        }
+    }
+    assert_eq!(below, Vec::<String>::new());
+}
+
+/// PDR-0008: « Vous » the accent's blue; « Les autres » teal in the light theme, golden amber in the dark
+/// one; green success alone, no voice; red a recording's and a deletion's, the same red.
+#[test]
+fn each_colour_says_one_thing() {
+    let [light, dark] = themes(STYLE);
+    for (index, theme) in [&light, &dark].into_iter().enumerate() {
+        assert_eq!(theme["--color-voice-you"], theme["--color-accent"], "theme {index}");
+        assert_ne!(
+            theme["--color-voice-others"], theme["--color-success"],
+            "theme {index}: green is no voice"
+        );
+        assert_eq!(theme["--color-destructive"], theme["--color-record"], "theme {index}");
+    }
+    // Teal: green and blue over red; golden amber: red over green over blue.
+    let [r, g, b] = light["--color-voice-others"];
+    assert!(g > r && b > r, "light « Les autres » is no teal: {r} {g} {b}");
+    let [r, g, b] = dark["--color-voice-others"];
+    assert!(r > g && g > b, "dark « Les autres » is no golden amber: {r} {g} {b}");
+}
+
+/// A component reads a role or a scale, never a primitive nor one of the window's older names: the names
+/// it may read, by their prefix.
+const READ: [&str; 8] = ["--color-", "--sp-", "--r-", "--fs-", "--d-", "--e", "--font-", "--ease-"];
+
+fn read_outside_the_roles(style: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    for (selector, body) in rules(style) {
+        for read in body.split("var(").skip(1) {
+            let name = read.split([')', ',']).next().unwrap_or_default().trim();
+            if !READ.iter().any(|prefix| name.starts_with(prefix)) {
+                found.push(format!("{selector}: {name}"));
+            }
+        }
+    }
+    found
+}
+
+#[test]
+fn a_component_reads_roles_and_scales_alone() {
+    for drawn in [".button", ".banner", ".dialog", ".engine-card"] {
+        assert!(
+            rules(COMPONENTS).iter().any(|(selector, _)| selector.starts_with(drawn)),
+            "{drawn} is not drawn"
+        );
+    }
+    assert_eq!(outside_the_tokens(COMPONENTS), Vec::<String>::new());
+    assert_eq!(read_outside_the_roles(COMPONENTS), Vec::<String>::new());
+    let wrong = read_outside_the_roles(".a { color: var(--ink); background: var(--gray-25); border-color: var(--color-edge); }");
+    assert_eq!(wrong, [".a: --ink", ".a: --gray-25"]);
+}
+
+/// PDR-0008 §2: the components' red is a recording's or a deletion's, each by its role and its selector.
+#[test]
+fn a_components_red_is_a_recording_or_a_deletion() {
+    let mut found = Vec::new();
+    for (selector, body) in rules(COMPONENTS) {
+        let record = body.contains("--color-record");
+        let destructive = body.contains("--color-destructive") || body.contains("--color-on-destructive");
+        if record && !selector.split(',').all(|one| one.trim().starts_with(".button.record")) {
+            found.push(format!("{selector}: a recording's red"));
+        }
+        if destructive && !selector.split(',').all(|one| one.trim().starts_with(".button.destructive")) {
+            found.push(format!("{selector}: a deletion's red"));
+        }
+    }
+    assert_eq!(found, Vec::<String>::new());
 }

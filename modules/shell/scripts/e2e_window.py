@@ -6489,6 +6489,67 @@ def axe_first_surfaces(now: dt.datetime) -> None:
                     check(f"{short}, {theme}: {what}, no violation of axe's WCAG 2.2 A and AA rules (D106)",
                           shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
 
+# D120's gallery: each component and the states it is shown in (criterion 3).
+GALLERY = {
+    "button": ("primary", "secondary", "ghost", "icon", "destructive", "hover", "pressed", "focus", "disabled"),
+    "banner": ("info", "private", "warning"),
+    "dialog": ("confirm", "destructive"),
+}
+
+
+def gallery_shown(now: dt.datetime) -> None:
+    """CT. D120, criterion 3: the gallery (`#/gallery`, linked from nowhere) shows each component of
+    `ui/components.css` in each of its states, in French and English, light and dark, at 420 and 1100 px;
+    axe-core finds no violation of its WCAG 2.2 A and AA rules there. Its titles in Bricolage Grotesque, its
+    words in the system's face; its dialog the platform's own, « Annuler » focused, Escape closing it."""
+    print("CT. the design system's gallery: each component in each state, both languages and themes, no axe violation (D120)")
+    dark = "return matchMedia('(prefers-color-scheme: dark)').matches"
+    shown_in = ("return [...document.querySelectorAll('#gallery [data-component]')].filter((e) => e.getClientRects().length)"
+                ".map((e) => e.dataset.component + ':' + e.dataset.state)")
+    for (language, short), theme in itertools.product((("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")), ("light", "dark")):
+        window = Window(WORK / f"gallery-{short}-{theme}", language, "reminder = false\n")
+        window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+        with window as browser:
+            browser.set_window_size(1100, 800)
+            browser.execute_script("location.hash = '#/gallery'")
+            drawn = wait_for(browser, lambda b: b.find_element(By.ID, "gallery").is_displayed(), 10)
+            check(f"{short}, {theme}: the gallery alone in the window", drawn and not browser.find_element(By.ID, "frame").is_displayed()
+                  and browser.execute_script(dark) == (theme == "dark"), (drawn, browser.execute_script(dark)))
+            shown = browser.execute_script(shown_in)
+            wanted = [f"{component}:{state}" for component, states in GALLERY.items() for state in states]
+            check(f"{short}, {theme}: each component in each of its states", all(one in shown for one in wanted),
+                  sorted(set(wanted) - set(shown)))
+            heights = browser.execute_script("return [...document.querySelectorAll('#gallery .button')].filter((e) => e.getClientRects().length)"
+                                             ".map((e) => Math.round(e.getBoundingClientRect().height))")
+            check(f"{short}, {theme}: each button 32 px high (D89)", heights and set(heights) == {32}, heights)
+            faces = browser.execute_async_script(
+                "const done = arguments[0]; document.fonts.ready.then(() => done(["
+                "document.fonts.check('700 20px \"Bricolage Grotesque\"'),"
+                "getComputedStyle(document.querySelector('#gallery h1')).fontFamily,"
+                "getComputedStyle(document.querySelector('#gallery p')).fontFamily]))")
+            check(f"{short}, {theme}: the titles in Bricolage Grotesque, loaded; the words in the system's face",
+                  faces[0] and faces[1].startswith('"Bricolage Grotesque"') and "Bricolage" not in faces[2], faces)
+            # The dialog the platform draws (`<dialog>`, modal): « Annuler » focused, Escape closes it, the focus back.
+            opener = browser.find_element(By.ID, "gallery-dialog-open")
+            opener.click()
+            opened = wait_for(browser, lambda b: b.execute_script("return !!document.querySelector('dialog[open]')"), 5)
+            focused = browser.execute_script("const e = document.activeElement; return [e.dataset.role, e.closest('dialog') !== null]")
+            check(f"{short}, {theme}: the dialog opened modal, its cancel focused (PDR-0008)", opened and focused == ["cancel", True], (opened, focused))
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            closed = wait_for(browser, lambda b: b.execute_script("return !document.querySelector('dialog[open]')"), 5)
+            check(f"{short}, {theme}: Escape closes it, the focus back on what opened it",
+                  closed and browser.execute_script("return document.activeElement.id") == "gallery-dialog-open",
+                  (closed, browser.execute_script("return document.activeElement.id")))
+            found = axe_violations(browser)
+            check(f"{short}, {theme}: no violation of axe's WCAG 2.2 A and AA rules (D120)", found == [], found)
+            for width in (420, 1100):
+                browser.set_window_size(width, 800)
+                time.sleep(0.3)
+                wide = browser.execute_script("return document.documentElement.scrollWidth <= innerWidth")
+                check(f"{short}, {theme}: at {width} px nothing overflows", wide, browser.execute_script("return [document.documentElement.scrollWidth, innerWidth]"))
+                shot(browser, f"ct-gallery-{width}-{short}-{theme}")
+
+
 # What acts, by a tag or a role: what CE reaches, marks and measures (WCAG 2.1.1, 2.5.8).
 KEY_ACTING = ("a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=link],"
               " [role=checkbox], [role=radio], [role=switch], [role=slider], [role=tab], [role=menuitem], [role=textbox]")
@@ -15921,6 +15982,7 @@ def main() -> int:
     bar_after_stop(now)
     summaries_to_a_folder(now)
     axe_first_surfaces(now)
+    gallery_shown(now)
     keys_first_surfaces(now)
     redo_says_what_is_wrong(now)
     redo_says_what_follows(now)
