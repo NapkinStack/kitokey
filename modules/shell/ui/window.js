@@ -2296,11 +2296,11 @@ function datesOffer(card, mentioned, session, transcript, words) {
     .invoke("dates_resolved", { name: nameOf(session), whens: mentioned.map((m) => m.when), day: null })
     .then((resolved) => {
       // Its count beside the calendar (#1239), as a mail app counts what waits: how many dates, at a glance; its name
-      // and tooltip say both — « Dates mentionnées (2) ».
+      // and tooltip begin with what it shows — « 2 dates mentionnées » (WCAG 2.5.3, Label in Name).
       const count = resolved?.dates.filter(Boolean).length ?? 0;
       button.hidden = count === 0;
       if (count === 0) return;
-      const said = `${words.dates_open} (${count})`;
+      const said = fill(words.dates_counted[count === 1 ? 0 : 1], count);
       button.title = said;
       button.setAttribute("aria-label", said);
       button.classList.add("counted");

@@ -9643,7 +9643,7 @@ def dates_mentioned(now: dt.datetime) -> None:
                 " && !!(b.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING), text: b.textContent.trim(),"
                 " name: b.getAttribute('aria-label'), tip: b.title, calendar: !!b.querySelector('svg rect') && b.querySelectorAll('svg path').length === 3} : null")
             # Its count beside the calendar (#1239): how many dates it offers, read at a glance; its name and tooltip say both.
-            counted = f"{opens} (2)"
+            counted = {"Dates mentionnées": "2 dates mentionnées", "Dates mentioned": "2 dates mentioned"}[opens]
             check(f"{language}: offered among the summary's actions, a calendar and its count « 2 », named « {counted} » and its tooltip the same, before « Copier » (#1213, #1239)",
                   shown and form == {"icon": True, "row": True, "before": True, "text": "2", "name": counted, "tip": counted, "calendar": True}, form)
             if language.startswith("fr"):
