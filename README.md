@@ -55,6 +55,16 @@ sudo apt install ./dist/install/kitokey_*_amd64.deb
 If `nstack` is then not found, uv's folder of tools is not on your `PATH` yet: `uv tool update-shell` puts it
 there, and a new terminal, in the clone, finds it.
 
+**What a computer needs**, in short (measured on one laptop on 2026-11-25; the figures and how:
+[`modules/install`](modules/install/#what-a-computer-needs)):
+
+- **Everything on the computer**: 16 GB of memory at least, 24 to 32 GB to work in comfort; a graphics card with
+  Vulkan, a built-in one being enough; 10 GB free for the two models; about 2 GB free for each hour that records,
+  then about 0.2 GB kept an hour.
+- **With the service you choose**: no special hardware, the transcript and the minutes made online by an
+  OpenAI-compatible service, such as Groq — often paid, billed by that service, not by Kitokey; about 2 GB free while an
+  hour records, then about 0.2 GB kept.
+
 How each package is made, and what a computer needs to run it — memory, disk, how long a meeting takes, measured:
 [`modules/install`](modules/install/). On macOS, GitHub's runner makes the app on every change to a program on `main`, signed ad hoc, not by Apple.
 On Windows, it makes a zip and an MSIX package for the Microsoft Store, not submitted yet. Each waits on a

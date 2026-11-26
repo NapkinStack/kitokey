@@ -1763,6 +1763,69 @@ struct Opened {
     /// The names the user gave its two sides (#1205); none where the meeting cannot hold them — before
     /// session-audio/v3 —: the page then offers no naming.
     speakers: Option<SpeakersShown>,
+    /// The last transcript a redo replaced, the same way (D113).
+    previous_transcript: Option<Previous>,
+    /// The summary shown was made on the other version of the transcript, not the one shown (#1070):
+    /// the page says so beside it, never presenting it as this one's.
+    minutes_other_version: bool,
+}
+
+/// When each file of a meeting's two versions was made (D113, #1070): the transcript shown and the one
+/// kept, the summary shown and the one kept — none where the file is absent or says no time.
+struct Versions {
+    transcript: Option<chrono::DateTime<chrono::FixedOffset>>,
+    transcript_kept: Option<chrono::DateTime<chrono::FixedOffset>>,
+    minutes: Option<chrono::DateTime<chrono::FixedOffset>>,
+    minutes_kept: Option<chrono::DateTime<chrono::FixedOffset>>,
+}
+
+fn versions(folder: &Path, sections: [&str; 3]) -> Versions {
+    let at = |made: Option<String>| made.and_then(|made| chrono::DateTime::parse_from_rfc3339(&made).ok());
+    let of_transcript = |read: Read<Transcript>| match read {
+        Read::Present(made) => at(made.made),
+        _ => None,
+    };
+    let of_minutes = |read: Read<Minutes>| match read {
+        Read::Present(made) => at(made.made),
+        _ => None,
+    };
+    Versions {
+        transcript: of_transcript(meeting::transcript(folder)),
+        transcript_kept: of_transcript(meeting::previous(folder)),
+        minutes: of_minutes(minutes::minutes(folder, sections)),
+        minutes_kept: of_minutes(minutes::previous(folder, sections, &[])),
+    }
+}
+
+/// Whether a summary made at `summary` was made on the transcript made at `transcript`, the other
+/// version of it made at `other` (#1070): after it, and before the other when the other came later.
+fn made_on(
+    summary: chrono::DateTime<chrono::FixedOffset>,
+    transcript: chrono::DateTime<chrono::FixedOffset>,
+    other: Option<chrono::DateTime<chrono::FixedOffset>>,
+) -> bool {
+    summary >= transcript && !other.is_some_and(|other| other > transcript && summary >= other)
+}
+
+impl Versions {
+    /// A transcript and the summary made from it are one version (#1070, the coordinator's decision,
+    /// 2026-11-21): going back swaps both pairs when each summary was made on its transcript.
+    fn paired(&self) -> bool {
+        match (self.transcript, self.transcript_kept, self.minutes, self.minutes_kept) {
+            (Some(shown), Some(kept), Some(minutes), Some(minutes_kept)) => {
+                made_on(minutes, shown, Some(kept)) && made_on(minutes_kept, kept, Some(shown))
+            }
+            _ => false,
+        }
+    }
+
+    /// The summary shown was made on the transcript kept, not on the one shown.
+    fn minutes_on_other(&self) -> bool {
+        match (self.transcript, self.transcript_kept, self.minutes) {
+            (Some(shown), Some(kept), Some(minutes)) => made_on(minutes, kept, Some(shown)) && !made_on(minutes, shown, Some(kept)),
+            _ => false,
+        }
+    }
 }
 
 /// A version kept beside the one shown (D113), as its page names it.
@@ -1828,6 +1891,15 @@ fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
             _ => None,
         },
         speakers: speakers::offered(&folder).then(|| SpeakersShown::from(speakers::read(&folder))),
+        previous_transcript: match meeting::previous(&folder) {
+            Read::Present(kept) => Some(Previous {
+                made: kept.made,
+                provider: kept.engine,
+                model: kept.model,
+            }),
+            _ => None,
+        },
+        minutes_other_version: versions(&folder, words::window(shell.language()).minutes_sections).minutes_on_other(),
     })
 }
 
@@ -3321,6 +3393,8 @@ struct SendingShown {
 #[derive(serde::Serialize)]
 struct DestinationOffered {
     name: String,
+    /// Its kind, for its mark in the panel (#1238).
+    kind: kitokey_shell::destinations::Kind,
     first: bool,
 }
 
@@ -3333,6 +3407,7 @@ fn sending_shown(shell: &Shell, folder: &Path) -> SendingShown {
         .iter()
         .map(|kept| DestinationOffered {
             name: kept.name.clone(),
+            kind: kept.kind,
             first: !sending::ever(&record, &kept.name),
         })
         .collect();
@@ -4511,24 +4586,39 @@ fn previous_back(shell: State<'_, Shell>, name: String, step: String) -> Result<
     let folder = session_folder(&shell, &name)?;
     let (shown, kept) = match step.as_str() {
         "minutes" => (folder.join("minutes.md"), folder.join(minutes::PREVIOUS)),
+        "transcript" => (folder.join("transcript.jsonl"), folder.join(meeting::PREVIOUS)),
         _ => return Err(shell.told(Failure::Unexpected, "no step of that name")),
     };
     if making(&shell, &folder) {
         return Err(shell.told(Failure::Busy, format!("{name} is being made")));
     }
-    let between = folder.join(format!("{}.swap", minutes::PREVIOUS));
+    // A transcript and the summary made from it are one version (#1070): they go back together.
+    let paired = step == "transcript" && versions(&folder, words::window(shell.language()).minutes_sections).paired();
     let unwritten = |error: std::io::Error| shell.told(Failure::MeetingFile, error);
-    std::fs::rename(&kept, &between).map_err(unwritten)?;
-    if let Err(error) = std::fs::rename(&shown, &kept) {
-        let _ = std::fs::rename(&between, &kept);
+    swap(&shown, &kept).map_err(unwritten)?;
+    // The summary not swapped, the transcript goes back as it was: never one half of a version.
+    if paired && let Err(error) = swap(&folder.join("minutes.md"), &folder.join(minutes::PREVIOUS)) {
+        let _ = swap(&shown, &kept);
         return Err(unwritten(error));
     }
-    if let Err(error) = std::fs::rename(&between, &shown) {
-        let _ = std::fs::rename(&kept, &shown);
-        let _ = std::fs::rename(&between, &kept);
-        return Err(unwritten(error));
+    tracing::info!(step, paired, "shell.previous_back");
+    Ok(())
+}
+
+/// The version shown and the one kept beside it trade places, through a third name; on a failure,
+/// each is put back where it was.
+fn swap(shown: &Path, kept: &Path) -> std::io::Result<()> {
+    let between = kept.with_extension("swap");
+    std::fs::rename(kept, &between)?;
+    if let Err(error) = std::fs::rename(shown, kept) {
+        let _ = std::fs::rename(&between, kept);
+        return Err(error);
     }
-    tracing::info!(step, "shell.previous_back");
+    if let Err(error) = std::fs::rename(&between, shown) {
+        let _ = std::fs::rename(kept, shown);
+        let _ = std::fs::rename(&between, kept);
+        return Err(error);
+    }
     Ok(())
 }
 
@@ -5086,8 +5176,9 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
         let here = heard(&shell, &folder, &made, cancel.cancelled());
         drop(running);
         transcribing(&app, false);
-        // Replaced, the earlier transcript goes to the trash — refused, it stays beside, and it is
-        // said; not replaced, it is put back — failing that, it is said where it is.
+        // Replaced, the earlier transcript is kept beside as the previous version, the one kept before
+        // going to the trash (D113) — refused, it stays where it was set aside, and it is said; not
+        // replaced, it is put back — failing that, it is said where it is.
         let mut kept_beside = None;
         let redoing = shell.redoing.lock().unwrap().take();
         // Cancelled with none whole before it: what it began is no version, nor taken up by the
@@ -5099,7 +5190,7 @@ fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) 
             let name = previous.file_name().map(|name| name.to_string_lossy().into_owned());
             let written = matches!(made, Made::Written(_));
             if let Some(not_put_back) = sessions::settle(&current, &previous, written, |previous| {
-                trash::delete(previous).map_err(std::io::Error::other)
+                keep_previous(&folder, previous, meeting::PREVIOUS)
             }) {
                 kept_beside = name.map(|name| (name, not_put_back));
             }
