@@ -14186,9 +14186,12 @@ def engine_cards_drawn(now: dt.datetime) -> None:
         check("the scopes drawn by engineCards(), from models_offered", isinstance(auto, list), auto)
         cards = {key: browser.execute_script(read, key) for key in ("settings-write", "settings-transcribe", "meeting-write", "confidential-write", "first")}
         every = [card for key in cards if cards[key] for card in cards[key]["cards"]]
+        groups = [{card["radio"][0] for card in cards[key]["cards"]} for key in cards if cards[key]]
+        check("each scope one group of radios of its own: one name in a scope, none shared between two",
+              all(len(names) == 1 for names in groups) and len(set().union(*groups)) == len(groups), groups)
         check("one structure in every scope: a fieldset per job, its legend, a native radio in each card's label, its state on the card, « Détails » behind",
               all(cards.values()) and all(c["legend"] for c in cards.values()) and every
-              and all(card["radio"] and card["radio"][0] == f"engine-{card['job']}" and not card["radio"][3] and card["name"] and card["state"] in ("ready", "download", "install", "key")
+              and all(card["radio"] and card["radio"][0].startswith(f"engine-{card['job']}-") and not card["radio"][3] and card["name"] and card["state"] in ("ready", "download", "install", "key")
                       and card["at"] in ("here", "online") and card["said"] and card["details"] for card in every),
               cards)
         write = cards["settings-write"]["cards"]

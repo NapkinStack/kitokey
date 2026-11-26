@@ -8,13 +8,13 @@
 
 // One card. `value` is what its radio stands for — "" for « Auto » or « Par défaut » —, `state` one of
 // ready, download, install, key; `at`: here or online.
-function engineCard(job, { engine, value, name, at, state, said, facts, mark, details, checked }) {
+function engineCard(job, group, { engine, value, name, at, state, said, facts, mark, details, checked }) {
   const card = element("div", "engine-card");
   Object.assign(card.dataset, { engine, job, state, where: at });
   const label = element("label");
   const radio = element("input");
   radio.type = "radio";
-  radio.name = `engine-${job}`;
+  radio.name = group;
   radio.value = value;
   radio.checked = checked;
   label.append(radio, element("span", "name", name));
@@ -28,7 +28,12 @@ function engineCard(job, { engine, value, name, at, state, said, facts, mark, de
   return card;
 }
 
+// Each group of radios its own name: radios of one name with no form are one group in the whole
+// document, and two groups on one page — a dialog over Settings — would uncheck each other.
+let engineGroups = 0;
+
 function engineCards({ job, offered, words, scope, services = [] }) {
+  const group = `engine-${job}-${(engineGroups += 1)}`;
   const box = element("fieldset", "engine-cards");
   box.dataset.job = job;
   box.append(element("legend", "", job === "write" ? words.engine_write : words.engine_transcribe));
@@ -100,7 +105,7 @@ function engineCards({ job, offered, words, scope, services = [] }) {
       }
     }
   }
-  for (const card of cards) box.append(engineCard(job, card));
+  for (const card of cards) box.append(engineCard(job, group, card));
   const told = [];
   box.addEventListener("change", (event) => {
     const radio = event.target;
