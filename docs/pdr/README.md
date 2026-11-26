@@ -5,6 +5,7 @@ What this product must do, and why — never how. What a record holds and how it
 
 | No. | Title | Status | Criterion to check on |
 |---|---|---|---|
+| [0008](./0008-kitokey-speaks-the-colours-and-words-users-already-know.md) | Kitokey speaks the colours and the words its users already know: two voices blue and amber, red for recording and deleting, violet for confidential, « moteur » and « format » | Proposed (2026-11-26) | 2027-03-31: each colour in one meaning on cycle 12's screenshots, no user confusing a deletion, a recording or a confidential meeting |
 | [0007](./0007-a-summary-leaves-for-a-channel-on-a-gesture-never-a-confidential-one.md) | A summary leaves for a channel on the user's gesture, each time; a confidential meeting never does | Accepted (2026-11-20) | 2027-01-31: summaries sent to a channel the colleagues use, none without a gesture, none confidential, no address outside the keyring |
 | [0006](./0006-the-product-is-named-kitokey.md) | The product is named Kitokey: one name said the same in French and in English | Accepted (2026-11-04) | 2026-12-31: the trademark search clear, kitokey.com and .app held, the Store's name reserved; 2027-06-30: no opposition |
 | [0005](./0005-on-windows-the-trial-ends-without-locking-the-meetings.md) | On Windows, the trial ends without locking the meetings: the Store's unlimited trial, limited by Wholeheard | Accepted (2026-11-03) | 2027-06-30: a purchase made after the trial ended, and no report of meetings locked |
