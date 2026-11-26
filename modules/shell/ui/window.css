@@ -748,3 +748,27 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .trash-ask .trash-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .trash-ask .trash-choices button { white-space: nowrap; }
 .trash-ask .note:empty { display: none; }
+/* « Dates mentionnées » with its count (#1239): the calendar and the number in one pill, the row's height. */
+.icon-button.counted { width: auto; grid-auto-flow: column; gap: 4px; padding: 0 8px; }
+.icon-button .count { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* A brand's mark, as its owner gives it (#1238): 16 px, never recoloured; OpenRouter's Ink on light, Cloud on dark. */
+.brand-mark { display: inline-flex; flex: none; }
+.brand-mark img { width: 16px; height: 16px; object-fit: contain; }
+.brand-mark .on-dark { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .brand-mark .on-light { display: none; } :root:not([data-theme="light"]) .brand-mark .on-dark { display: inline; } }
+:root[data-theme="dark"] .brand-mark .on-light { display: none; }
+:root[data-theme="dark"] .brand-mark .on-dark { display: inline; }
+/* A destination's kind, a tile each (#1238). */
+.kinds .tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+.kinds .tile { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--edge); border-radius: 10px; cursor: pointer; }
+.kinds .tile:has(input:checked) { border-color: var(--accent); background: var(--raised); }
+.kinds .tile:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.kinds .tile input { margin: 0; accent-color: var(--accent); }
+.kinds .tile .glyph, .send-to .glyph, #destinations .glyph, .service-mark .glyph { width: 16px; height: 16px; flex: none; }
+#destinations li > .brand-mark, #destinations li > .glyph { align-self: center; margin-right: 8px; }
+.send-to { display: inline-flex; align-items: center; gap: 8px; }
+#model-fetch .brand-mark { margin-right: 8px; vertical-align: -3px; }
+.with-mark { display: flex; align-items: center; gap: 8px; }
+.with-mark select { flex: 1 1 auto; min-width: 0; }
+/* A summary's section with nothing in it (#1234): said, in the soft colour. */
+.minutes .body .empty-section { color: var(--soft); }

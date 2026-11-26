@@ -119,6 +119,11 @@ const ICONS = {
   copy: [["rect", { width: 14, height: 14, x: 8, y: 8, rx: 2, ry: 2 }], "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"],
   "rotate-ccw": ["M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5"],
   "trash-2": ["M10 11v6", "M14 11v6", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
+  // Lucide's webhook, hash and globe (ISC, ui/LUCIDE-LICENSE): a webhook, a channel, an online service — the page's own,
+  // where a brand's mark is not cleared for an app (#1238).
+  webhook: ["M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2", "m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06", "m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"],
+  hash: ["M4 9h16", "M4 15h16", "M10 3 8 21", "M16 3l-2 18"],
+  globe: [["circle", { cx: 12, cy: 12, r: 10 }], "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20"],
   "folder-open": ["m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"],
   ellipsis: [["circle", { cx: 12, cy: 12, r: 1 }], ["circle", { cx: 19, cy: 12, r: 1 }], ["circle", { cx: 5, cy: 12, r: 1 }]],
   "message-square-text": ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z", "M7 11h10", "M7 15h6", "M7 7h8"],
@@ -225,6 +230,36 @@ function iconButton(glyph, name, id) {
   button.setAttribute("aria-label", name);
   button.append(icon(glyph));
   return button;
+}
+
+// A brand's own mark where Kitokey names its service (#1238): Discord's, OpenRouter's and Hugging Face's, the files
+// their owners give, unaltered (ui/brands/BRANDS.md) — OpenRouter's Ink on light and Cloud on dark, as its page says.
+// Any other brand: an icon of the page's (`fallback`), its name in the words beside it. Decorative: the words name it.
+const BRANDS = { discord: ["discord-symbol.svg"], openrouter: ["openrouter-glyph-ink.svg", "openrouter-glyph-cloud.svg"], huggingface: ["huggingface.svg"] };
+function brandMark(brand, fallback) {
+  const files = BRANDS[brand];
+  if (!files) return icon(fallback);
+  const mark = element("span", "brand-mark");
+  files.forEach((file, index) => {
+    const image = element("img", files.length > 1 ? (index ? "on-dark" : "on-light") : "");
+    image.src = `brands/${file}`;
+    image.alt = "";
+    mark.append(image);
+  });
+  return mark;
+}
+// A destination's kind, its mark or the page's icon: a webhook, Slack's channel.
+const kindMark = (kind) => brandMark(kind, kind === "slack" ? "hash" : "webhook");
+// The service chosen in a list, its mark beside it (#1238): OpenRouter's own, any other an icon of the page's — its name
+// the list's. Painted again at each choice.
+function serviceMarked(pick, name) {
+  const row = element("span", "with-mark");
+  pick.replaceWith(row);
+  const mark = element("span", "service-mark");
+  const paint = () => mark.replaceChildren(brandMark((name() ?? "").toLowerCase().replace(/\s+/g, ""), "globe"));
+  row.append(mark, pick);
+  pick.addEventListener("change", paint);
+  paint();
 }
 
 function readySaid(text) {
@@ -591,6 +626,8 @@ function modelFetch(busy = false, said = words.model_offer) {
   const fetch_ = element("button", "open", fill(said, size(makings.model_offer_bytes, words), makings.model_offer_host));
   fetch_.type = "button";
   fetch_.id = "model-fetch";
+  // Fetched from Hugging Face: its mark before the words, which still name the host (#1238).
+  if (/(^|\.)huggingface\.co$/.test(makings.model_offer_host ?? "")) fetch_.prepend(brandMark("huggingface"));
   fetch_.disabled = busy;
   fetch_.addEventListener("click", async () => {
     // Where the user is, read before the button goes: what says the model coming takes its place (D101).
@@ -1839,6 +1876,7 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
     go.textContent = model ? fill(doing, model) : fallback;
     if (version) box.hidden = pick.value === made;
     pick.title = pick.options[pick.selectedIndex]?.textContent ?? "";
+    fitToChoice(pick);
   };
   if (version) box.hidden = true;
   const listed = (offered) => {
@@ -1900,6 +1938,23 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
   return [pick, said];
 }
 
+// A list in a sentence as wide as the name it shows, never as its longest option (#1231): a native list takes its
+// longest option's width, « m » then followed by a gap as wide as « Whisper large v3 turbo ». Narrower than its
+// line, the CSS's max-width cuts it with an ellipsis. Measured once on the page, and again once its fonts are in.
+const fitting = document.createElement("canvas").getContext("2d");
+function fitToChoice(pick, frames = 10) {
+  if (!pick.isConnected) {
+    if (frames > 0) requestAnimationFrame(() => fitToChoice(pick, frames - 1));
+    return;
+  }
+  const style = getComputedStyle(pick);
+  fitting.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  const text = pick.options[pick.selectedIndex]?.textContent ?? "";
+  const room = ["paddingLeft", "paddingRight", "borderLeftWidth", "borderRightWidth"].reduce((sum, side) => sum + (parseFloat(style[side]) || 0), 0);
+  pick.style.width = `${Math.ceil(fitting.measureText(text).width + room)}px`;
+  if (document.fonts.status !== "loaded") document.fonts.ready.then(() => fitToChoice(pick, 0));
+}
+
 // The one button beside a version's list that starts its making again with the model chosen (D93).
 function startsOnPage(id, words, command) {
   const go = element("button", "primary");
@@ -1918,6 +1973,34 @@ function startsOnPage(id, words, command) {
     waiting(go, false);
   });
   return go;
+}
+
+// The last version a redo replaced (D113): brought back by one button that names its time and model;
+// the one left becomes the previous, so the same button brings it back.
+function previousBack(words, session, step, previous, model) {
+  const back = element("button", "open");
+  back.type = "button";
+  back.id = `${step}-previous`;
+  const was = [madeOn(words, previous.made), model].filter(Boolean).join(" · ");
+  back.textContent = was ? fill(words.previous_back, was) : words.previous_back.replace(/\s*\(\{\}\)$/, "");
+  const help = element("p", "says", words.previous_help);
+  help.id = `${step}-previous-help`;
+  const failed = element("p", "note warn");
+  failed.hidden = true;
+  back.addEventListener("click", async () => {
+    waiting(back, true);
+    try {
+      await window.__TAURI__.core.invoke("previous_back", { name: nameOf(session), step });
+      await refresh();
+    } catch (why) {
+      failed.textContent = fill(words.previous_failed, why);
+      failed.hidden = false;
+      waiting(back, false);
+    }
+  });
+  const box = element("div", "previous");
+  box.append(back, help, failed);
+  return box;
 }
 
 // A meeting's summary sent to a destination the user set up (D110, PDR-0007), on their gesture each time:
@@ -1972,7 +2055,9 @@ function sendPart(card, top, actions, session, words) {
     if (!shown.offered) return;
     let offered = shown.destinations;
     let secret = shown.confidential;
-    const open = iconButton("send", words.send_open, "send-open");
+    // One destination: named where « Envoyer… » is read, its tooltip and name (#1239); several, the panel names them.
+    const sendName = () => (offered.length === 1 ? `${fill(words.send_to, offered[0].name)}…` : words.send_open);
+    const open = iconButton("send", sendName(), "send-open");
     open.setAttribute("aria-expanded", "false");
     open.setAttribute("aria-controls", "send-panel");
     actions.prepend(open);
@@ -1990,6 +2075,8 @@ function sendPart(card, top, actions, session, words) {
         const result = await window.__TAURI__.core.invoke("summary_sent", { name, destination, confirmed });
         said.textContent = outcome(result, destination);
         offered = result.sending.destinations;
+        open.title = sendName();
+        open.setAttribute("aria-label", open.title);
         secret = result.sending.confidential;
         if (confidentialShown?.name === name) confidentialShown.paint(result.confidential);
         listSends(result.sending);
@@ -2010,6 +2097,7 @@ function sendPart(card, top, actions, session, words) {
       panel.setAttribute("aria-label", words.send_open);
       for (const destination of offered) {
         const to = element("button", "send-to", fill(words.send_to, destination.name));
+        to.prepend(kindMark(destination.kind));
         to.type = "button";
         to.dataset.destination = destination.name;
         to.addEventListener("click", () => {
@@ -2061,7 +2149,7 @@ function sendPart(card, top, actions, session, words) {
   })();
 }
 
-function minutesCard(read, words, session, transcript, onPage, previous) {
+function minutesCard(read, words, session, transcript, onPage, previous, otherVersion = false) {
   const card = element("article", "card minutes");
   // Its title, and Refaire… beside it: the state below them never sits under a button.
   const top = element("div", "top");
@@ -2157,7 +2245,8 @@ function minutesCard(read, words, session, transcript, onPage, previous) {
     was.id = "page-minutes-was";
     box.append(was, go);
     // The version's model: the one its line names, made here unless a host says otherwise.
-    const version = { said: by, is: (chosen, offered) => chosen.model === read.model
+    // Its list names the model alone when the line says « sur cet ordinateur » after it (#1231).
+    const version = { said: placed ? modelSaid(read.model) : by, is: (chosen, offered) => chosen.model === read.model
       && (read.provider && read.provider !== "local" ? via(chosen.provider) === read.provider : chosen.provider === offered.ollama_address) };
     const [pick, said] = modelOnPage(onPage, words, "minutes", version, go, words.redo_minutes_do, words.redo_title, box);
     card.append(lineWith(maker, pick), said, box);
@@ -2166,33 +2255,13 @@ function minutesCard(read, words, session, transcript, onPage, previous) {
   const written = element("p", "note", words.minutes_ai);
   written.id = "minutes-ai";
   card.append(written);
-  // The last version a redo replaced (D113): brought back by one button that names its time and model;
-  // the one left becomes the previous, so the same button brings it back.
-  if (previous) {
-    const back = element("button", "open");
-    back.type = "button";
-    back.id = "minutes-previous";
-    const was = [madeOn(words, previous.made), previous.model ? modelSaid(previous.model) : ""].filter(Boolean).join(" · ");
-    back.textContent = was ? fill(words.previous_back, was) : words.previous_back.replace(/\s*\(\{\}\)$/, "");
-    const help = element("p", "says", words.previous_help);
-    help.id = "minutes-previous-help";
-    const failed = element("p", "note warn");
-    failed.hidden = true;
-    back.addEventListener("click", async () => {
-      waiting(back, true);
-      try {
-        await window.__TAURI__.core.invoke("previous_back", { name: nameOf(session), step: "minutes" });
-        await refresh();
-      } catch (why) {
-        failed.textContent = fill(words.previous_failed, why);
-        failed.hidden = false;
-        waiting(back, false);
-      }
-    });
-    const box = element("div", "previous");
-    box.append(back, help, failed);
-    card.append(box);
+  // Made on the other version of the transcript, not the one shown (#1070): said, never passed off as its own.
+  if (otherVersion) {
+    const other = element("p", "note", words.minutes_other_version);
+    other.id = "minutes-other-version";
+    card.append(other);
   }
+  if (previous) card.append(previousBack(words, session, "minutes", previous, previous.model ? modelSaid(previous.model) : ""));
   // The transcript corrected after they were written (D62): said, and made again only on a click.
   const corrected = transcript.state === "present" ? Math.max(0, ...transcript.segments.map((segment) => Date.parse(segment.edited ?? "") || 0)) : 0;
   if (corrected > (Date.parse(read.made ?? "") || 0)) {
@@ -2214,6 +2283,9 @@ function minutesCard(read, words, session, transcript, onPage, previous) {
   // The minutes as written, rendered by the shell: raw HTML in them is text there, a link its words.
   const body = element("div", "body");
   body.innerHTML = read.body;
+  // A section made with nothing under it says so (#1234): a title alone reads as a summary cut short.
+  for (const title of body.querySelectorAll("h2"))
+    if (!title.nextElementSibling || title.nextElementSibling.tagName === "H2") title.after(element("p", "empty-section", words.section_empty));
   const mentioned = actionRows(body, words, read.actions);
   lineTimes(body, session, transcript, words);
   card.append(body);
@@ -2239,7 +2311,18 @@ function datesOffer(card, mentioned, session, transcript, words) {
   else (actions ?? card).append(button);
   window.__TAURI__.core
     .invoke("dates_resolved", { name: nameOf(session), whens: mentioned.map((m) => m.when), day: null })
-    .then((resolved) => (button.hidden = !resolved?.dates.some(Boolean)))
+    .then((resolved) => {
+      // Its count beside the calendar (#1239), as a mail app counts what waits: how many dates, at a glance; its name
+      // and tooltip begin with what it shows — « 2 dates mentionnées » (WCAG 2.5.3, Label in Name).
+      const count = resolved?.dates.filter(Boolean).length ?? 0;
+      button.hidden = count === 0;
+      if (count === 0) return;
+      const said = fill(words.dates_counted[count === 1 ? 0 : 1], count);
+      button.title = said;
+      button.setAttribute("aria-label", said);
+      button.classList.add("counted");
+      button.append(element("span", "count", String(count)));
+    })
     .catch(() => {});
   button.addEventListener("click", () => datesPanel(mentioned, session, transcript, words, button));
 }
@@ -2617,7 +2700,7 @@ function speakersButton(card, names, read, words, session) {
   return open;
 }
 
-function transcriptCard(read, words, session, onPage, speakers) {
+function transcriptCard(read, words, session, onPage, previous, speakers) {
   // The sides' names as kept (#1205): none where the meeting cannot hold them; renamed in place below.
   const names = speakers ? { ...speakers } : null;
   const card = element("aside", "card transcript");
@@ -2711,6 +2794,12 @@ function transcriptCard(read, words, session, onPage, speakers) {
     heard.append(lineWith(heardSaid + tookAndCost(read, words), pick), said, box);
   } else heard.append(element("p", "maker", heardSaid + tookAndCost(read, words)));
   card.append(heard);
+  // Its model said as its own line says it: a service's by its host, this computer's by its name.
+  if (previous) {
+    const elsewhere = previous.provider && !["whisper.cpp", "SpeechAnalyzer"].includes(previous.provider);
+    const model = elsewhere ? (previous.model || "—") + fill(words.written_via, previous.provider) : previous.model ? spoken(previous.model) : previous.provider || "";
+    card.append(previousBack(words, session, "transcript", previous, model));
+  }
   if (!read.complete) card.append(element("p", "note", words.being_made));
   if (read.unread > 0) card.append(element("p", "note", fill(words.unread, read.unread)));
   const lines = element("ol", "lines");
@@ -3105,7 +3194,7 @@ function trashedFocused() {
   }
 }
 
-function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, previous_minutes, speakers }, words) {
+function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, previous_minutes, previous_transcript, minutes_other_version, speakers }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
   const open = iconButton("folder-open", words.open_folder, "open-folder");
@@ -3216,7 +3305,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const columns = element("div", "columns");
   // The models each line offers, read once for both (D93).
   const onPage = pageModels(session);
-  columns.append(minutesCard(minutes, words, session, transcript, onPage, previous_minutes), transcriptCard(transcript, words, session, onPage, speakers));
+  columns.append(minutesCard(minutes, words, session, transcript, onPage, previous_minutes, minutes_other_version), transcriptCard(transcript, words, session, onPage, previous_transcript, speakers));
   // Shown again when the window comes forward: a search in progress in this meeting is kept.
   const searching = page.dataset.name === nameOf(session) ? (document.getElementById("search")?.value ?? "") : "";
   // A name being typed is kept the same way, with its refusal and where the caret was (D70).
@@ -3607,6 +3696,7 @@ function minutesRow(minutes, words, locked) {
   const [serviceWrap, servicePick] = listed("minutes-service", words.service_name);
   minutes.online.forEach((service, index) => option(servicePick, String(index), service.name));
   servicePick.value = guided.minutes.chosen.service ?? String(Math.max(online, 0));
+  serviceMarked(servicePick, () => minutes.online[Number(servicePick.value)]?.name);
   const [keyWrap, key] = field("minutes-key", words.key, "password", "");
   key.autocomplete = "off";
   const keyTest = button("minutes-key-test", words.key_test, false);
@@ -3866,15 +3956,36 @@ function showSettings(shown, minutes, words) {
           none.textContent = fill(words.not_saved, why);
         }),
       );
-      row.append(rowSaid, forget);
+      row.append(kindMark(destination.kind), rowSaid, forget);
       kept.append(row);
     });
     // The add form apart from the list, its fields the Settings' own (guidedField, guidedList); the
     // address on a whole line, long enough to read back what was pasted.
     const adding = element("div", "fields adding");
     adding.id = "destination-adding";
-    const [kindField, kind] = guidedList("destination-kind", words.destination_fields[0], locked);
-    for (const [value, index] of Object.entries(kinds)) guidedOption(kind, value, words.destination_kinds[index]);
+    // Its kind a tile each (#1238), as a desktop offers a few kinds: its mark or the page's icon, its name; a radio group
+    // the arrows move in, its first chosen at first, as the list's first was.
+    // On a whole line, as the address: the three tiles side by side.
+    const kindField = element("div", "field kinds whole");
+    const kindName = element("span", "name", words.destination_fields[0]);
+    kindName.id = "destination-kind-name";
+    const tiles = element("div", "tiles");
+    tiles.setAttribute("role", "radiogroup");
+    tiles.setAttribute("aria-labelledby", "destination-kind-name");
+    for (const [value, index] of Object.entries(kinds)) {
+      const tile = element("label", "tile");
+      const input = element("input");
+      input.type = "radio";
+      input.name = "destination-kind";
+      input.value = value;
+      input.id = `destination-kind-${value}`;
+      input.checked = index === 0;
+      input.disabled = locked;
+      tile.append(input, kindMark(value), element("span", "", words.destination_kinds[index]));
+      tiles.append(tile);
+    }
+    kindField.append(kindName, tiles);
+    const kind = { get value() { return tiles.querySelector("input:checked")?.value ?? "webhook"; }, focus: () => tiles.querySelector("input:checked")?.focus() };
     const [namedField, named] = guidedField("destination-name", words.destination_fields[1], "text", "", locked);
     named.maxLength = 40;
     named.autocomplete = "off";
@@ -4064,6 +4175,7 @@ function showSettings(shown, minutes, words) {
   const [serviceWrap, servicePick] = guidedList("transcription-service", words.service_name, locked);
   shown.hearing.forEach((hearing, index) => guidedOption(servicePick, String(index), hearing.name));
   servicePick.value = guided.transcription.chosen.service ?? String(Math.max(preset, 0));
+  serviceMarked(servicePick, () => shown.hearing[Number(servicePick.value)]?.name);
   const hearing = () => shown.hearing[Number(servicePick.value)];
   const [keyWrap, serviceKey] = guidedField("transcription-key", words.service_key, "password", "", locked);
   serviceKey.autocomplete = "off";

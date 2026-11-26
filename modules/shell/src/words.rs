@@ -1347,6 +1347,10 @@ pub struct Window {
     /// Shows: a meeting's page, a button under its actions, and the panel's title. When: an action's by when
     /// names a date. At most: one line. Placeholders: none.
     pub dates_open: &'static str,
+    /// Shows: « Dates mentionnées »'s name and tooltip once it shows its count (#1239), the count first — what the
+    /// button shows is where its name begins (WCAG 2.5.3, axe's label-content-name-mismatch). When: one date, then
+    /// several. At most: one line. Placeholders: {} the count.
+    pub dates_counted: [&'static str; 2],
     /// Shows: the « Dates mentionnées » panel, under its title. When: it is open. At most: two lines.
     /// Placeholders: none.
     pub dates_says: &'static str,
@@ -1445,10 +1449,14 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: what happens to the current
     /// transcript. At most: no limit. Placeholders: none.
     pub redo_transcript_note: &'static str,
-    /// Shows: a meeting's page, under its summary, as a button (D113). When: a redo replaced a version,
+    /// Shows: a meeting's page, under its summary or its transcript, as a button (D113). When: a redo replaced a version,
     /// kept beside. At most: no limit. Placeholders: {} when that version was made and its model, as the
     /// page's line says them.
     pub previous_back: &'static str,
+    /// Shows: a meeting's page, under its summary's line (#1070). When: the summary shown was made on the
+    /// other version of the transcript — gone back to without its own summary. At most: one line.
+    /// Placeholders: none.
+    pub minutes_other_version: &'static str,
     /// Shows: a meeting's page, under « Revenir à la version précédente », as a help line (D113). When:
     /// the button shows. At most: no limit. Placeholders: none.
     pub previous_help: &'static str,
@@ -1482,6 +1490,9 @@ pub struct Window {
     /// Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) 11.16, #1092).
     /// When: a summary is shown. At most: one line. Placeholders: none.
     pub minutes_ai: &'static str,
+    /// Shows: under a summary's section title, in the soft colour (#1234). When: the section was made with
+    /// nothing in it. At most: 20 characters. Placeholders: none.
+    pub section_empty: &'static str,
     /// Shows: a meeting's page, above the button that makes the transcript again, the model that made
     /// the one shown (D93). When: another model is chosen in its line. At most: no limit.
     /// Placeholders: {} the model, as its line says it.
@@ -2294,6 +2305,7 @@ pub fn window(language: Language) -> Window {
             check_open_note: "The microphone stays on while this panel is open.",
             check_close: "Close",
             dates_open: "Dates mentioned",
+            dates_counted: ["{} date mentioned", "{} dates mentioned"],
             dates_says: "Tick the ones to put in your calendar. Nothing leaves this computer until you choose where.",
             dates_day: "Meeting day",
             dates_google: "Open in Google Calendar",
@@ -2328,6 +2340,7 @@ pub fn window(language: Language) -> Window {
             redo_transcript_title: "Write the transcript again",
             redo_transcript_note: "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept.",
             previous_back: "Go back to the previous version ({})",
+            minutes_other_version: "Summary made from the other version",
             previous_help: "The version you leave becomes the previous one: the same button brings it back.",
             previous_failed: "Couldn’t go back to the previous version: {}",
             redo_not_done: "Not redone: {}",
@@ -2337,6 +2350,7 @@ pub fn window(language: Language) -> Window {
             make_minutes_with: "Write summary with {}",
             minutes_made_with: "This summary was written with {}.",
             minutes_ai: "Written by AI: read it before you share it.",
+            section_empty: "Nothing noted",
             transcript_made_with: "This transcript was made with {}.",
             minutes_making: "Writing summary",
             minutes_waiting: "Queued · {} ahead",
@@ -2815,6 +2829,7 @@ pub fn window(language: Language) -> Window {
             check_open_note: "Le micro reste actif tant que ce panneau est ouvert.",
             check_close: "Fermer",
             dates_open: "Dates mentionnées",
+            dates_counted: ["{} date mentionnée", "{} dates mentionnées"],
             dates_says: "Cochez celles à mettre dans votre agenda. Rien ne quitte cet ordinateur avant que vous choisissiez où.",
             dates_day: "Jour de la réunion",
             dates_google: "Ouvrir dans Google Agenda",
@@ -2852,6 +2867,7 @@ pub fn window(language: Language) -> Window {
             redo_transcript_title: "Refaire la transcription",
             redo_transcript_note: "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée.",
             previous_back: "Revenir à la version précédente ({})",
+            minutes_other_version: "Compte rendu fait sur l’autre version",
             previous_help: "La version quittée devient la précédente\u{a0}: le même bouton la ramène.",
             previous_failed: "Impossible de revenir à la version précédente\u{a0}: {}",
             redo_not_done: "Pas refait\u{a0}: {}",
@@ -2861,6 +2877,7 @@ pub fn window(language: Language) -> Window {
             make_minutes_with: "Rédiger le compte rendu avec {}",
             minutes_made_with: "Ce compte rendu a été fait avec {}.",
             minutes_ai: "Rédigé par une IA\u{a0}: relisez-le avant de le partager.",
+            section_empty: "Rien de noté",
             transcript_made_with: "Cette transcription a été faite avec {}.",
             minutes_making: "Rédaction du compte rendu",
             minutes_waiting: "En attente · {} avant",
