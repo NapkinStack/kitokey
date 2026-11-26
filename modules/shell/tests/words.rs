@@ -1730,6 +1730,300 @@ fn no_sentence_says_a_word_the_lexicon_refuses() {
     still_wrong("lexicon", wrong);
 }
 
+/// What D124's rules can tell apart in a sentence (`docs/voice.md`, V1, V3, V6): each rule a
+/// sentence breaks, by its name. A test reads the literal only: what fills a placeholder is the
+/// review's.
+fn broken(text: &str) -> Vec<&'static str> {
+    let mut rules = Vec::new();
+    let lower = text.to_lowercase();
+    // Each word as written, quotes and the punctuation around it left out.
+    let tokens: Vec<&str> = text
+        .split(|c: char| c.is_whitespace())
+        .map(|token| token.trim_matches(|c: char| "«»“”‘’\"'(),;!?.:".contains(c)))
+        .filter(|token| !token.is_empty())
+        .collect();
+    let words: Vec<&str> = lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    if text.contains('\u{2014}') {
+        rules.push("dash");
+    }
+    let arrow = |c: char| matches!(c, '\u{2190}'..='\u{21ff}' | '\u{27f0}'..='\u{27ff}' | '\u{2900}'..='\u{297f}');
+    if text.chars().any(arrow) || text.contains("->") || text.contains("=>") {
+        rules.push("arrow");
+    }
+    if text.contains('\u{2026}') || text.contains("...") {
+        rules.push("ellipsis");
+    }
+    if words.iter().any(|word| ["modèle", "modèles", "model", "models"].contains(word)) {
+        rules.push("model");
+    }
+    const DOMAINS: [&str; 9] = ["com", "ai", "io", "co", "org", "net", "fr", "dev", "app"];
+    let domain = |token: &str| {
+        let parts: Vec<&str> = token.split('.').collect();
+        parts.len() > 1
+            && parts
+                .iter()
+                .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'))
+            && DOMAINS.contains(&parts[parts.len() - 1].to_ascii_lowercase().as_str())
+    };
+    let address = |token: &str| {
+        token.split('.').count() == 4
+            && token
+                .split('.')
+                .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+    };
+    if text.contains("://")
+        || words.contains(&"localhost")
+        || tokens
+            .iter()
+            .any(|token| domain(token) || address(token.split(':').next().unwrap()))
+    {
+        rules.push("host");
+    }
+    // A port: a colon after a letter or a digit, then three digits or more (a time has two); a colon
+    // after a space, then digits (« port :8080 »); or the word « port » followed by digits, with or
+    // without its colon (« le port 8080 », "port: 8080").
+    let digits_after = |rest: &str| rest.chars().take_while(char::is_ascii_digit).count();
+    let port = text.char_indices().any(|(at, c)| {
+        let before = text[..at].chars().next_back();
+        c == ':'
+            && (before.is_some_and(char::is_alphanumeric) && digits_after(&text[at + 1..]) >= 3
+                || before.is_some_and(char::is_whitespace) && digits_after(&text[at + 1..]) >= 2)
+    }) || words
+        .windows(2)
+        .any(|pair| ["port", "ports"].contains(&pair[0]) && pair[1].chars().all(|c| c.is_ascii_digit()));
+    if port {
+        rules.push("port");
+    }
+    let path = |token: &&str| {
+        !token.contains("://")
+            && (token.starts_with('/')
+                || token.starts_with("~/")
+                || token.contains('\\')
+                || token.split('/').filter(|part| !part.is_empty()).count() > 1)
+    };
+    if tokens.iter().any(path) {
+        rules.push("path");
+    }
+    // An engine's own id: its family's name, or a word where letters and digits meet across a
+    // « - », a « . » or a « : » (`whisper-large-v3`, `llama3.2:3b`).
+    let id = |token: &&str| {
+        token.chars().any(|c| c.is_ascii_alphabetic())
+            && token.chars().any(|c| c.is_ascii_digit())
+            && token.contains(['-', '.', ':'])
+            && token.chars().all(|c| c.is_ascii_alphanumeric() || "-.:_".contains(c))
+    };
+    if words.iter().any(|word| ["whisper", "ggml", "gguf"].contains(word)) || tokens.iter().any(id) {
+        rules.push("engine_id");
+    }
+    const UNDER_A_MEGABYTE: [&str; 10] = ["o", "B", "ko", "kB", "KB", "Ko", "KiB", "Kio", "octets", "bytes"];
+    if tokens
+        .iter()
+        .any(|token| UNDER_A_MEGABYTE.contains(token) || ["octet", "byte"].contains(token))
+    {
+        rules.push("bytes");
+    }
+    rules
+}
+
+/// The sentences right to keep against a rule of D124, each by its key, with its reason: an action
+/// in progress or an entry that opens a dialog keeps its « … » (V3, GNOME HIG and Apple HIG); a raw
+/// value shown under « Avancé », « Détails » or the developer mode keeps it (V1). Never a pattern.
+const KEPT: [(&str, &str, &str); 28] = [
+    (
+        "ellipsis",
+        r#"menu.minuting[0] "Rédaction du compte rendu…""#,
+        "an action in progress, in the tray's menu",
+    ),
+    (
+        "ellipsis",
+        r#"menu.minuting[0] "Writing summary…""#,
+        "an action in progress, in the tray's menu",
+    ),
+    (
+        "ellipsis",
+        r#"menu.stopping[0] "Arrêt en cours…""#,
+        "an action in progress, in the tray's menu",
+    ),
+    (
+        "ellipsis",
+        r#"menu.stopping[0] "Stopping…""#,
+        "an action in progress, in the tray's menu",
+    ),
+    (
+        "ellipsis",
+        r#"menu.transcribing[0] "Transcribing…""#,
+        "an action in progress, in the tray's menu",
+    ),
+    (
+        "ellipsis",
+        r#"menu.transcribing[0] "Transcription en cours…""#,
+        "an action in progress, in the tray's menu",
+    ),
+    (
+        "ellipsis",
+        r#"window.chip_making[0] "Compte rendu…""#,
+        "a meeting's label while its summary is written",
+    ),
+    (
+        "ellipsis",
+        r#"window.chip_making[0] "Summary…""#,
+        "a meeting's label while its summary is written",
+    ),
+    (
+        "ellipsis",
+        r#"window.chip_transcribing[0] "Transcript…""#,
+        "a meeting's label while it is transcribed",
+    ),
+    (
+        "ellipsis",
+        r#"window.chip_transcribing[0] "Transcription…""#,
+        "a meeting's label while it is transcribed",
+    ),
+    ("ellipsis", r#"window.choose[0] "Choisir…""#, "opens the system's folder chooser"),
+    ("ellipsis", r#"window.choose[0] "Choose…""#, "opens the system's folder chooser"),
+    (
+        "ellipsis",
+        r#"window.keep_other[0] "Autre durée…""#,
+        "an entry that opens the field of a duration",
+    ),
+    (
+        "ellipsis",
+        r#"window.keep_other[0] "Other duration…""#,
+        "an entry that opens the field of a duration",
+    ),
+    (
+        "ellipsis",
+        r#"window.record_starting[0] "Démarrage…""#,
+        "the record button while the recording starts",
+    ),
+    (
+        "ellipsis",
+        r#"window.record_starting[0] "Starting…""#,
+        "the record button while the recording starts",
+    ),
+    (
+        "ellipsis",
+        r#"window.record_stopping[0] "Arrêt…""#,
+        "the record button while the recording stops",
+    ),
+    (
+        "ellipsis",
+        r#"window.record_stopping[0] "Stopping…""#,
+        "the record button while the recording stops",
+    ),
+    ("ellipsis", r#"window.redo[0] "Redo…""#, "opens the dialog of a redo"),
+    ("ellipsis", r#"window.redo[0] "Refaire…""#, "opens the dialog of a redo"),
+    ("ellipsis", r#"window.send_open[0] "Envoyer…""#, "opens the choice of a channel"),
+    ("ellipsis", r#"window.send_open[0] "Send…""#, "opens the choice of a channel"),
+    (
+        "ellipsis",
+        r#"window.send_sending[0] "Envoi vers «\u{a0}{}\u{a0}»…""#,
+        "a sending in progress",
+    ),
+    ("ellipsis", r#"window.send_sending[0] "Sending to “{}”…""#, "a sending in progress"),
+    (
+        "ellipsis",
+        r#"window.speakers_open[0] "Name the speakers…""#,
+        "opens the naming of the speakers",
+    ),
+    (
+        "ellipsis",
+        r#"window.speakers_open[0] "Nommer les intervenants…""#,
+        "opens the naming of the speakers",
+    ),
+    ("ellipsis", r#"window.testing[0] "Test en cours…""#, "a test in progress"),
+    ("ellipsis", r#"window.testing[0] "Testing…""#, "a test in progress"),
+];
+
+/// D124: no em dash, no arrow, no decorative « … », no « modèle » nor "model", no host, port,
+/// path, engine's raw id or size under 1 Mo, in any sentence of either language (`docs/voice.md`,
+/// V1, V3, V6; PDR-0008). What a screen's pull request has still to rewrite is listed, the list
+/// only shrinking; what is right to keep is `KEPT`, one sentence at a time.
+#[test]
+fn no_sentence_holds_ai_typography_the_word_model_or_raw_data() {
+    let mut wrong: std::collections::BTreeMap<&str, Vec<String>> = std::collections::BTreeMap::new();
+    let mut kept_used = Vec::new();
+    for sentence in sentences() {
+        let name = sentence.name();
+        for rule in broken(&sentence.text) {
+            match KEPT.iter().position(|(kept, key, _)| *kept == rule && *key == name) {
+                Some(at) => kept_used.push(at),
+                None => wrong.entry(rule).or_default().push(name.clone()),
+            }
+        }
+    }
+    let stale: Vec<_> = (0..KEPT.len()).filter(|at| !kept_used.contains(at)).map(|at| KEPT[at].1).collect();
+    assert!(
+        stale.is_empty(),
+        "`KEPT` names a sentence that no longer breaks its rule: remove it\n{stale:#?}"
+    );
+    for (_, _, reason) in KEPT {
+        assert!(!reason.is_empty());
+    }
+    for rule in ["dash", "arrow", "ellipsis", "model", "host", "port", "path", "engine_id", "bytes"] {
+        still_wrong(rule, wrong.remove(rule).unwrap_or_default());
+    }
+}
+
+/// A port alone, with no host before it, is told in both languages: after a space and a colon, or
+/// after the word « port » (sam's survivor on #1277, V3: « port :8080 » passed).
+#[test]
+fn a_port_is_told_after_a_space_or_the_word_port_in_both_languages() {
+    for english in [
+        "Kitokey listens on port :8080",
+        "Kitokey listens on port 8080",
+        "Ollama isn’t responding on :11434",
+    ] {
+        assert_eq!(broken(english), ["port"], "{english}");
+    }
+    for french in [
+        "Kitokey écoute sur le port\u{a0}:8080",
+        "Kitokey écoute sur le port 8080",
+        "Ollama ne répond pas sur\u{a0}:11434",
+    ] {
+        assert_eq!(broken(french), ["port"], "{french}");
+    }
+}
+
+/// Each rule of D124 tells its case from the sentences it must leave alone: a time is no port, a
+/// menu's path no file's, Mistral no engine's id, a size in Mo none under 1 Mo.
+#[test]
+fn each_rule_of_d124_tells_its_case_apart() {
+    let breaks = |text: &str| broken(text);
+    assert_eq!(breaks("Votre micro : rien depuis 2 min — enregistrement en cours."), ["dash"]);
+    assert_eq!(breaks("Réglages → Avancé"), ["arrow"]);
+    assert_eq!(breaks("Settings -> Advanced"), ["arrow"]);
+    assert_eq!(breaks("Clients, RH, santé…"), ["ellipsis"]);
+    assert_eq!(breaks("Topic, participants..."), ["ellipsis"]);
+    assert_eq!(breaks("Télécharger le modèle"), ["model"]);
+    assert_eq!(breaks("Choose a model"), ["model"]);
+    assert_eq!(breaks("Ollama est gratuit, sur ollama.com."), ["host"]);
+    assert_eq!(breaks("starting with https://"), ["host"]);
+    assert_eq!(breaks("Kitokey écoute sur 127.0.0.1:43567"), ["host", "port"]);
+    assert_eq!(breaks("Le dossier C:\\Réunions est plein"), ["path"]);
+    assert_eq!(breaks("Placez le fichier dans /srv/reunions"), ["path"]);
+    assert_eq!(breaks("par exemple whisper-large-v3"), ["engine_id"]);
+    assert_eq!(breaks("Téléchargez llama3.2:3b"), ["engine_id"]);
+    assert_eq!(breaks("Télécharger (300 ko)"), ["bytes"]);
+    assert_eq!(breaks("Download (300 kB)"), ["bytes"]);
+    for right in [
+        "Réunion de 10:30",
+        "Rendez-vous à 10\u{a0}h\u{a0}30, port de Brest",
+        "Export: 3 files",
+        "Seul le texte part vers Mistral. Le son reste ici.",
+        "Refaire\u{a0}› Avancé",
+        "Transcrire (300 Mo, une seule fois)",
+        "Download (1.5 GB)",
+        "Compte rendu prêt.",
+        "Point hebdo · 42\u{202f}%",
+    ] {
+        assert_eq!(breaks(right), Vec::<&str>::new(), "{right}");
+    }
+}
+
 #[test]
 fn the_bar_says_a_silence_as_the_notifications_do() {
     // D49: the same gesture as the notification's, in each language; the side's own. D90: a
