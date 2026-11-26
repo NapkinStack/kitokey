@@ -1782,12 +1782,18 @@ fn broken(text: &str) -> Vec<&'static str> {
     {
         rules.push("host");
     }
-    // A port: a colon after a letter or a digit, then three digits or more (a time has two).
+    // A port: a colon after a letter or a digit, then three digits or more (a time has two); a colon
+    // after a space, then digits (« port :8080 »); or the word « port » followed by digits, with or
+    // without its colon (« le port 8080 », "port: 8080").
+    let digits_after = |rest: &str| rest.chars().take_while(char::is_ascii_digit).count();
     let port = text.char_indices().any(|(at, c)| {
+        let before = text[..at].chars().next_back();
         c == ':'
-            && text[..at].chars().next_back().is_some_and(char::is_alphanumeric)
-            && text[at + 1..].chars().take_while(char::is_ascii_digit).count() >= 3
-    });
+            && (before.is_some_and(char::is_alphanumeric) && digits_after(&text[at + 1..]) >= 3
+                || before.is_some_and(char::is_whitespace) && digits_after(&text[at + 1..]) >= 2)
+    }) || words
+        .windows(2)
+        .any(|pair| ["port", "ports"].contains(&pair[0]) && pair[1].chars().all(|c| c.is_ascii_digit()));
     if port {
         rules.push("port");
     }
@@ -1962,6 +1968,26 @@ fn no_sentence_holds_ai_typography_the_word_model_or_raw_data() {
     }
 }
 
+/// A port alone, with no host before it, is told in both languages: after a space and a colon, or
+/// after the word « port » (sam's survivor on #1277, V3: « port :8080 » passed).
+#[test]
+fn a_port_is_told_after_a_space_or_the_word_port_in_both_languages() {
+    for english in [
+        "Kitokey listens on port :8080",
+        "Kitokey listens on port 8080",
+        "Ollama isn’t responding on :11434",
+    ] {
+        assert_eq!(broken(english), ["port"], "{english}");
+    }
+    for french in [
+        "Kitokey écoute sur le port\u{a0}:8080",
+        "Kitokey écoute sur le port 8080",
+        "Ollama ne répond pas sur\u{a0}:11434",
+    ] {
+        assert_eq!(broken(french), ["port"], "{french}");
+    }
+}
+
 /// Each rule of D124 tells its case from the sentences it must leave alone: a time is no port, a
 /// menu's path no file's, Mistral no engine's id, a size in Mo none under 1 Mo.
 #[test]
@@ -1985,6 +2011,8 @@ fn each_rule_of_d124_tells_its_case_apart() {
     assert_eq!(breaks("Download (300 kB)"), ["bytes"]);
     for right in [
         "Réunion de 10:30",
+        "Rendez-vous à 10\u{a0}h\u{a0}30, port de Brest",
+        "Export: 3 files",
         "Seul le texte part vers Mistral. Le son reste ici.",
         "Refaire\u{a0}› Avancé",
         "Transcrire (300 Mo, une seule fois)",
