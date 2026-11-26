@@ -1,33 +1,4 @@
-/* The window: the colours of D11's boards, the system's font, its light or dark theme. */
-:root {
-  color-scheme: light dark;
-  --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
-  --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
-  /* A field's, a list's, a switch's border, 3:1 on each ground (D89); --line divides, and only that. */
-  --edge: #808898;
-  /* A secondary button hovered, then pressed (#1094): a step darker each, the ink still at 4.5:1. */
-  --hover: #E3E7EE; --pressed: #D9DDE5;
-  /* The word a search found (#1078): a pale yellow, as find-in-page marks it (browsers, GNOME, macOS), under the
-     ink; seen on a selected row by its edge, the ink's 2 px underline; in dark the amber is its own edge
-     (#1093, tests/look.rs). */
-  --mark: #FDE68A; --mark-ink: #15171C; --mark-edge: #15171C;
-}
-@media (prefers-color-scheme: dark) {
-  :not([data-theme="light"]):root {
-    --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
-    --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
-    --edge: #737B8C; --mark: #FBBF24; --mark-ink: #1E2129; --mark-edge: #FBBF24; --hover: #313644; --pressed: #3A4050;
-  }
-}
-/* The appearance chosen in Settings (D98): light or dark whatever the system says — the same two
-   palettes; « Système », no attribute, the system's as before. */
-[data-theme="light"]:root { color-scheme: light; }
-[data-theme="dark"]:root {
-  color-scheme: dark;
-  --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
-  --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
-  --edge: #737B8C; --mark: #FBBF24; --mark-ink: #1E2129; --mark-edge: #FBBF24; --hover: #313644; --pressed: #3A4050;
-}
+/* The window: the system's font; its colours, sizes and theme read from tokens.css (D120). */
 * { box-sizing: border-box; }
 ::placeholder { color: var(--soft); opacity: 1; }
 [hidden] { display: none !important; }
