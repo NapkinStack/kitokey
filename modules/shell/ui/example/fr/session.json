@@ -1,0 +1,13 @@
+{
+  "contract": "session-audio/v3",
+  "started": "2026-11-26T10:00:00+01:00",
+  "stopped": "2026-11-26T10:00:49+01:00",
+  "tracks": {
+    "local": {
+      "device": "Kitokey example"
+    },
+    "remote": {
+      "device": "Kitokey example"
+    }
+  }
+}

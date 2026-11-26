@@ -1599,6 +1599,10 @@ pub struct Window {
     /// window; in « Vérifier le son »; and the recording bar's, as its name for a screen reader.
     /// When: no recording runs. At most: one line. Placeholders: none.
     pub record_start: &'static str,
+    /// « Essayer sur un exemple » (D126): the example meeting, heard and written as any meeting.
+    /// Shows: the empty window, as a button beside the one that records. When: no meeting yet, no
+    /// recording runs. At most: about 28 characters. Placeholders: none.
+    pub example_try: &'static str,
     /// Shows: the sidebar, as a button. When: stop recording. At most: about 24 characters.
     /// Placeholders: none.
     pub record_stop: &'static str,
@@ -2382,6 +2386,7 @@ pub fn window(language: Language) -> Window {
             transcript_stopped: "Transcription stopped. You can start it again, with another model if you like.",
             minutes_stopped: "Minutes stopped. You can start them again, with another model if you like.",
             record_start: "Start recording",
+            example_try: "Try it on an example",
             record_stop: "Stop recording",
             agree_eyebrow: "First online summary",
             agree_title: "The text of “{}” is about to leave your computer",
@@ -2909,6 +2914,7 @@ pub fn window(language: Language) -> Window {
             transcript_stopped: "Transcription arrêtée. Vous pouvez la relancer, avec un autre modèle si besoin.",
             minutes_stopped: "Compte rendu arrêté. Vous pouvez le relancer, avec un autre modèle si besoin.",
             record_start: "Démarrer un enregistrement",
+            example_try: "Essayer sur un exemple",
             record_stop: "Arrêter l’enregistrement",
             agree_eyebrow: "Premier compte rendu en ligne",
             agree_title: "Le texte de «\u{a0}{}\u{a0}» va quitter votre ordinateur",

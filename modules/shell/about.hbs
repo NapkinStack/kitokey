@@ -159,5 +159,33 @@ INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
 DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.</pre>
+<p>The example meeting a newcomer tries, two invented voices made with the Piper speech synthesiser, bundled as sound files (<code>ui/example/LICENSE</code>):</p>
+<pre class="licence-text">The example meeting (ui/example/fr, ui/example/en) is an invented meeting of two voices, made by
+scripts/example.py with the Piper speech synthesiser. No real meeting and no real person are in it.
+Its voices are Piper voice models, each trained on a public speech corpus:
+
+French, both voices: fr_FR-mls-medium, speakers 3698 and 1840.
+  Voice model: https://huggingface.co/rhasspy/piper-voices/raw/main/fr/fr_FR/mls/medium/MODEL_CARD
+  Corpus: Multilingual LibriSpeech (MLS), French, by Vineel Pratap, Qiantong Xu, Anuroop Sriram,
+  Gabriel Synnaeve and Ronan Collobert, https://openslr.org/94/
+  Licence: Creative Commons Attribution 4.0 International (CC BY 4.0),
+  https://creativecommons.org/licenses/by/4.0/
+
+English, « Vous »: en_US-joe-medium.
+  Voice model: https://huggingface.co/rhasspy/piper-voices/raw/main/en/en_US/joe/medium/MODEL_CARD
+  Corpus: https://github.com/OHF-Voice/voice-datasets
+  Licence: CC0 1.0 Universal, public domain, https://creativecommons.org/publicdomain/zero/1.0/
+
+English, « Les autres »: en_GB-cori-medium.
+  Voice model: https://huggingface.co/rhasspy/piper-voices/raw/main/en/en_GB/cori/medium/MODEL_CARD
+  Corpus: Hi-Fi Multi-Speaker English TTS (Hi-Fi TTS), by Evelina Bakhturina, Vitaly Lavrukhin,
+  Boris Ginsburg and Yang Zhang, NVIDIA, https://www.openslr.org/109/
+  Licence: Creative Commons Attribution 4.0 International (CC BY 4.0),
+  https://creativecommons.org/licenses/by/4.0/
+
+Changes: the voices speak sentences written for Kitokey; their sound is resampled to 16,000
+samples a second and kept as FLAC. The corpora and voice models are provided as is, without
+warranty of any kind.
+</pre>
 </body>
 </html>
