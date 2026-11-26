@@ -26,8 +26,13 @@ fn no_file_and_an_empty_one_are_every_default() {
     // The reminder is shown unless the user says otherwise; sessions go to a folder named Kitokey.
     assert!(defaults.reminder && defaults.sessions.is_absolute() && defaults.sessions.ends_with("Kitokey"));
     assert_eq!(read(Path::new("/nowhere/settings.toml")), Ok(defaults.clone()));
+    // A file already there is from an install before D126: the transcript alone followed.
+    let before = Settings {
+        after: After::Transcript,
+        ..defaults
+    };
     for nothing in ["", "\n\n", "# only a comment\n"] {
-        assert_eq!(written(nothing), Ok(defaults.clone()), "{nothing:?}");
+        assert_eq!(written(nothing), Ok(before.clone()), "{nothing:?}");
     }
     assert!(file().is_some_and(|path| path.ends_with("kitokey/settings.toml")));
 }
@@ -43,7 +48,10 @@ fn a_file_names_what_it_changes_and_leaves_the_rest() {
     // A key of a later version is left alone: the file is not refused for it.
     assert_eq!(
         written("after_recording = \"minutes\"\n[provider]\nhost = \"x\"\n"),
-        Ok(Settings::default())
+        Ok(Settings {
+            after: After::Transcript,
+            ..Settings::default()
+        })
     );
     // A folder from the user's home, as people write it.
     let home = written(&format!("sessions = \"{}/Réunions/Kitokey\"\n", '~')).unwrap().sessions;
@@ -153,9 +161,9 @@ fn a_file_refused_names_the_setting_and_its_line() {
 
 #[test]
 fn the_transcript_follows_a_recording_with_the_model_the_settings_name() {
-    // Out of the box the transcript is made, with the default model in Kitokey's data folder.
+    // Out of the box the transcript is made, then its minutes (D126), with the default model in Kitokey's data folder.
     let defaults = Settings::default();
-    assert!(defaults.after == After::Transcript && defaults.model.is_absolute());
+    assert!(defaults.after == After::Minutes && defaults.model.is_absolute());
     assert!(
         defaults
             .model
@@ -459,7 +467,8 @@ fn the_logs_level_is_the_usual_one_until_the_user_asks_for_more() {
         ..Settings::default()
     };
     write(&path, &settings).unwrap();
-    assert_eq!(fs::read_to_string(&path).unwrap(), "log = \"debug\"\n");
+    // The first write says what follows a recording too (D126).
+    assert_eq!(fs::read_to_string(&path).unwrap(), "log = \"debug\"\nafter = \"minutes\"\n");
     assert_eq!(read(&path).unwrap().log, Log::Debug);
 }
 
@@ -739,4 +748,31 @@ fn a_microphone_written_blank_is_auto() {
     let path = folder.path().join("settings.toml");
     fs::write(&path, "microphone = \"  \"\n").unwrap();
     assert_eq!(read(&path).unwrap().microphone, None);
+}
+
+#[test]
+fn a_new_install_writes_the_minutes_after_a_recording_and_a_file_already_there_keeps_its_choice() {
+    // A new install: no file yet. Its first meeting gets its summary without a click (D126).
+    let folder = tempfile::tempdir().unwrap();
+    let path = folder.path().join("settings.toml");
+    let mut first = read(&path).unwrap();
+    assert_eq!(first.after, After::Minutes);
+    // Written first for anything else, the choice is written with it: read again, it holds.
+    first.welcomed = true;
+    write(&path, &first).unwrap();
+    assert!(fs::read_to_string(&path).unwrap().contains("after = \"minutes\""));
+    assert_eq!(read(&path).unwrap().after, After::Minutes);
+    // A file written before D126 that names no choice kept the transcript alone: it still does.
+    assert_eq!(written("welcomed = true\n").unwrap().after, After::Transcript);
+    // A choice already written is kept, through a write of another setting.
+    for (said, kept) in [("nothing", After::Nothing), ("transcript", After::Transcript)] {
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("settings.toml");
+        fs::write(&path, format!("after = \"{said}\"\n")).unwrap();
+        let mut settings = read(&path).unwrap();
+        assert_eq!(settings.after, kept);
+        settings.reminder = false;
+        write(&path, &settings).unwrap();
+        assert_eq!(read(&path).unwrap().after, kept, "{said}");
+    }
 }
