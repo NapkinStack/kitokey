@@ -106,6 +106,12 @@ dependencies:
     purpose: Writes the Word document — its heading styles, paragraphs, runs and table (MIT, without its image feature)
     adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
     exit_strategy: docx() and paragraphs() in src/lib.rs; any OOXML writer with styles and tables replaces it.
+  - name: typst, typst-layout, typst-pdf
+    purpose: Lays the meeting out and writes it as a tagged PDF, PDF/UA-1 (Apache-2.0; D108's spike, issue 129)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      pdf() in src/pdf.rs writes one typst source and compiles it; another typesetter that writes PDF/UA
+      from a source — a headless browser's print — replaces it, at the cost of its tags or its size.
 #  - name:
 #    purpose:
 #    adr:
