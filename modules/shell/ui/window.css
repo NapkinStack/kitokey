@@ -764,3 +764,5 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 #model-fetch .brand-mark { margin-right: 8px; vertical-align: -3px; }
 .with-mark { display: flex; align-items: center; gap: 8px; }
 .with-mark select { flex: 1 1 auto; min-width: 0; }
+/* A summary's section with nothing in it (#1234): said, in the soft colour. */
+.minutes .body .empty-section { color: var(--soft); }
