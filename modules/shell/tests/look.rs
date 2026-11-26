@@ -1228,3 +1228,32 @@ fn a_value_outside_the_tokens_is_counted() {
     assert!(!found.iter().any(|one| one.starts_with(".b")), "{found:?}");
     assert_eq!(found.len(), 6, "{found:?}");
 }
+
+/// D120 changes nothing drawn: each of the window's older names is the value it had before `tokens.css`
+/// (main at 7603231), light, then dark — the system's, and Settings' as `themes()` reads the same list.
+const BEFORE: [(&str, &str, &str); 15] = [
+    ("--ground", "#F2F4F7", "#15171C"),
+    ("--surface", "#FFFFFF", "#1E2129"),
+    ("--raised", "#EEF1F5", "#282C37"),
+    ("--line", "#D9DDE5", "#343946"),
+    ("--ink", "#15171C", "#EEF0F4"),
+    ("--soft", "#4C5464", "#AAB1BF"),
+    ("--accent", "#2253CF", "#8AB0FF"),
+    ("--ok", "#16794A", "#63D49C"),
+    ("--red", "#C2352D", "#FF7A72"),
+    ("--edge", "#808898", "#737B8C"),
+    ("--hover", "#E3E7EE", "#313644"),
+    ("--pressed", "#D9DDE5", "#3A4050"),
+    ("--mark", "#FDE68A", "#FBBF24"),
+    ("--mark-ink", "#15171C", "#1E2129"),
+    ("--mark-edge", "#15171C", "#FBBF24"),
+];
+
+#[test]
+fn each_older_name_keeps_the_value_it_had() {
+    let [light, dark] = themes(STYLE);
+    for (name, was_light, was_dark) in BEFORE {
+        assert_eq!(light.get(name), Some(&hex(was_light)), "{name} in the light theme");
+        assert_eq!(dark.get(name), Some(&hex(was_dark)), "{name} in the dark theme");
+    }
+}
