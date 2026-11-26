@@ -23,7 +23,8 @@ deliverables:
       - "Given a meeting's page, when it is drawn, then one bar of actions holds « Partager ▾ », « Agenda (n) » once a date is found, « Refaire ▾ » and « ⋯ », each with its words and its icon — no action of the bar is an icon alone, its accessible name beginning with its visible words (WCAG 2.5.3) —; the focus order is the sidebar, the page's header and its actions, the tabs, the content; held by the e2e and axe-core, in both languages and themes"
       - "Given a meeting with a summary, when « Partager » opens, then it offers its channels — with none, « Ajouter un canal », opening the channel's form in a sheet of the page, not Settings —, « Copier », « Exporter en PDF » and « Exporter en Markdown », which write the file through `exporting/v1` (D108, D109) where the user chooses; a confidential meeting's sends are asked again as PDR-0007 says; a send is said once (#1252); held by the e2e, the file's first bytes read"
       - "Given the redo controls of today — « Refaire avec X », « Revenir à la version précédente (X) » and its explanation, on each card —, when « Refaire ▾ » opens, then it offers « Refaire… », opening a dialog with the engine card (D122), and « Versions », listing the kept ones; going back to a version says it in a toast with « Annuler »; « Refaire avec » never names the engine that already made the version shown; held by the e2e"
-      - "Given a window narrower than 1400 px, when the page is drawn, then the summary and the transcript are two tabs — « Compte rendu », « Transcription », WAI-ARIA's tabs pattern —; at 1400 px and more, side by side; the context, the spoken language, the engines used and the folder live in « Détails de la réunion », folded; « Confidentielle » is a pill of the header, violet with the lock (PDR-0008); the player shows only when its audio plays; a failure is said in one banner above the tabs; at 420 px the player and the tabs are in the first screen; held by the e2e at 420, 1100 and 1920 px"
+      - "Given a summary or a transcript with a kept version (D113), when « Versions » opens, then each version shows with its line of provenance — when it was made, its engine and its model, how long it took, its cost when known (D93, D97) —, and can be seen, made current, or deleted after a confirmation, « Annuler » focused, its button destructive (PDR-0008); the current one cannot be deleted; held by the e2e, the files on disk read after each gesture"
+      - "Given a window narrower than 1400 px, when the page is drawn, then the summary and the transcript are two tabs — « Compte rendu », « Transcription », WAI-ARIA's tabs pattern —; at 1400 px and more, side by side; each card keeps its line of provenance — when, engine and model, how long, cost when known (D93, D97) —; the context, the spoken language and the folder live in « Détails de la réunion », folded; « Confidentielle » is a pill of the header, violet with the lock (PDR-0008); the player shows only when its audio plays; a failure is said in one banner above the tabs; at 420 px the player and the tabs are in the first screen; held by the e2e at 420, 1100 and 1920 px"
       - "Given « Mettre à la corbeille » in « ⋯ », when it is chosen, then a dialog asks « Mettre cette réunion à la corbeille ? », says what goes and that it can be restored, « Annuler » focused, its confirm button destructive (PDR-0008); held by the e2e, Escape keeping the meeting"
   - id: D122
     title: "One engine card, the same in the first run, in Settings and in « Refaire », « Auto » by default"
@@ -31,7 +32,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given the first run, Settings and the « Refaire » dialog, when each offers an engine for transcribing or writing, then each draws D120's engine card — its name in words, where it runs (« Sur cet ordinateur » or « En ligne »), its state (« Prêt », « À télécharger · 874 Mo », « Clé manquante ») —, the engine's id, address and size behind « Détails »; held by the e2e reading one structure in the three places"
-      - "Given a new install, when no engine was chosen, then each job is on « Auto », the card saying which engine « Auto » is; a choice in « Refaire » applies to that meeting only, « Par défaut » marked; the compact bar chooses no engine; held by the e2e and the shell's tests"
+      - "Given a new install, when no engine was chosen, then each job is on « Auto », the card saying which engine « Auto » is; a choice in « Refaire » applies to that meeting only, « Par défaut » marked; for each meeting the engine and its model are chosen apart, for the transcription and for the summary separately (D96), the card's « Détails » offering the model; the compact bar chooses no engine; held by the e2e and the shell's tests"
   - id: D123
     title: "Settings grouped in a few tabs, everything technical folded away, and an « À propos »"
     module: shell
@@ -51,7 +52,7 @@ deliverables:
   - id: D125
     title: "The compact bar simplified"
     module: shell
-    state: ready
+    state: deferred       # the decider's additions of 2026-11-26 (D129, D130) take its place in the week; in Later
     acceptance:
       - "Given the bar at rest, when it is drawn, then it holds the context's field (« De quoi parle l'appel ? Qui est là ? »), record and expand; while it records, the time, the two voices' meters (blue, amber), stop, and one disclosure for the context, « Confidentielle » (the same switch as the page's) and the microphone — no engine, no language; a failure is said in two lines then « Ouvrir », never cut in a word; no focus ring shows until the keyboard is used; held by the e2e, axe-core and its shots, in both languages and themes"
   - id: D126
@@ -77,6 +78,20 @@ deliverables:
     acceptance:
       - "Given the window, when its shortcuts are pressed, then Ctrl+R records or stops, Ctrl+K opens the palette, Ctrl+F searches in the page, Ctrl+, opens Settings, Ctrl+Shift+C copies the summary, Esc goes back, J and K go to the next and previous meeting, « ? » opens the sheet that lists them; each shown in its menu entry and its tooltip; none taken while a field has the focus; held by the e2e, each shortcut pressed"
       - "Given the palette (Ctrl+K), when a word is typed, then it lists the actions that match — Enregistrer, Partager vers…, Refaire, Exporter, a section of Settings — and the meetings D127 finds, moved through by the arrows, Enter acting; it follows WAI-ARIA's combobox pattern; held by the e2e and axe-core"
+  - id: D129
+    title: "The summary can be written in a format the user made: `summarising/v1` expanded to take a format's sections, the built-in six unchanged"
+    module: summary
+    state: ready
+    acceptance:
+      - "Given a format the user made — its name, its sections, each an id and what it holds, the one that holds the actions named —, when `kitokey-summary` is given it, then it writes `minutes/v5` in that format; held by the module's tests on two formats made for them"
+      - "Given `summarising/v1` expanded by its expand step (03-contracts.md), when the six built-in structures or no structure are asked, then they work as before, and a format it cannot read is a wrong argument with nothing written; held by the contract's tests and the comparator (ADR-0005) on its schema"
+  - id: D130
+    title: "Formats are managed: made, duplicated, renamed, changed, deleted — the built-in ones hidden only —, one the default, one chosen in « Refaire »"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given « Écoute et rédaction › Formats » in Settings (D123), when the user manages them, then a format can be created, duplicated, renamed, changed — its sections, each a title and what it holds, one holding the actions — and deleted after a confirmation (PDR-0008); a built-in format can be hidden and shown again, never changed or deleted; one is the default; the formats are kept in the user's settings folder, never sent anywhere; held by the e2e and the shell's tests"
+      - "Given « Refaire… » on a summary (D121), when its dialog opens, then it offers the formats — the default marked —, a choice applying to that meeting; the summary is written in the format chosen through D129's `summarising/v1`; the summary's line of provenance names its format; held by the e2e with the summary's stand-in"
 ---
 
 # Cycle 12 — Kitokey, simple and beautiful
@@ -117,7 +132,13 @@ grey, dotted: the words, rewritten with each screen and checked across them.
 
 **One week, done well and fast** (the decider, 2026-11-26): only the backlog's P1 items are criteria; its P2
 and P3 items are in *Later*. **D127 and D128 are P2**: in the cycle, built only if the time remains once D121 to
-D126 are merged, deferred at the closure otherwise — never stretching the end.
+D126 and D129, D130 are merged, deferred at the closure otherwise — never stretching the end.
+
+**Added by the decider, 2026-11-26** (relayed by the coordinator): the kept versions managed (D121, P1), and the
+formats managed (D129, D130, P1). A format the user makes changes a contract — `summarising/v1` takes only its six
+built-in structures (D111) — so it is two deliverables in two modules, the contract's expand step first, never in
+one pull request (kernel §4). To fit them in the week, **D125 (the compact bar) goes to *Later***, marc taking
+D129 after D124; D127 and D128 stay P2. *(framer, to confirm: what goes out is the decider's to choose.)*
 
 **How the work moves** — D120 first and blocking; then five in parallel; one pull request per screen, within
 **800 lines**, with its screenshots before and after, attested right after its sheet is signed:
@@ -128,7 +149,9 @@ D126 are merged, deferred at the closure otherwise — never stretching the end.
 | 2–6 | **D121** — a meeting's page | lina | the page's part of `window.js`, `window.css`'s layout |
 | 2–6 | **D126** — the first run, the example meeting, the default « rédiger » | ines | the first run's part of `window.js`, `settings.rs`, the clip under `ui/` |
 | 2–6 | **D122** then **D123** — the engine card wired in Settings, the first run and « Refaire »; Settings in tabs | sam | Settings' part of `window.js`, `src/main.rs`'s offer of engines |
-| 2–6 | **D124** — `docs/voice.md`, `src/words.rs`, `tests/words.rs`; then **D125**, the bar | marc | `words.rs`, `voice.md`, the bar's part of `window.js` |
+| 2–4 | **D124** — `docs/voice.md`, `src/words.rs`, `tests/words.rs` | marc | `words.rs`, `voice.md`, `tests/words.rs` |
+| 4–6 | **D129** — `summarising/v1` expanded, the summary module writing a format it is given | marc | `contracts/summarising/`, `modules/summary/` |
+| 4–6 | **D130** — formats managed in Settings and chosen in « Refaire », once D129 is merged | sam, after D123 | Settings' formats, its own file under `ui/` |
 | 6–7 | **D127**, **D128** — only if the time remains | the first stream done | `window.js`'s search, a palette file of its own |
 
 New code of a screen goes in a file of its own under `ui/` where it can — the first run's, the palette's —, to
@@ -136,7 +159,9 @@ keep the streams off each other's lines in `window.js`. The verifiers rotate: no
 and a verifier signs the screen of a stream they do not touch that day.
 
 **The critical path**: D120's tokens and components (two days) → D121, the largest screen (three to four days)
-→ its attest and merge, serial on the shell → the closure on day 7. D120 slipping a day takes it from every
+→ its attest and merge, serial on the shell → the closure on day 7. A second path, as long: D124 → D129's
+contract step → D130 on the shell, whose attest comes after D129 is merged. **The risk of the week** is that
+second path: if D129 is not merged by day 5, D130 goes to *Later* with it, said at the closure. D120 slipping a day takes it from every
 stream; its first pull request — the tokens alone, no visible change — merges first so that the others start.
 The shell's attests run one at a time on the machine: each pull request is attested as soon as it is signed,
 never batched at the end.
@@ -234,13 +259,13 @@ readable.
 
 ## Out of scope
 
-- New features beyond these: summary formats, importing a file, Outlook, speaker names by passage — *Later*.
+- New features beyond these: importing a file, Outlook, speaker names by passage — *Later*.
 - The site: it follows the app's tokens once D120 is merged, in a cycle of its own.
 - Any brand beyond `ui/brands/BRANDS.md` (#1238).
 
 ## Later
 
-- **Formats** (templates) of a summary, in « Refaire » — `ux-ia.md` §5, `benchmark.md` §3, backlog item 24; « format », never « modèle » (PDR-0008).
+- **D125, the compact bar** — deferred to make room for D129 and D130; its criterion stays in the front matter.
 - **Importing an audio or video file**, « Nouveau ▾ » and a file dropped on the window — `benchmark.md` §5, backlog item 23.
 - **Outlook** in « Agenda » — cycle 11's D115 made its link; its trial waits on a colleague.
 - **Names by passage** — #1230's S2 (the contract step of `transcript/v1`) and S3 (a service's speakers).
