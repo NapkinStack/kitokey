@@ -39,7 +39,7 @@ const raw = {
     fr: ["Appel vidéo", "(vous)", "Sarah enregistre un appel vidéo avec Camille, Hugo et Léa. En haut, la petite barre de Kitokey montre le temps écoulé, une trace de niveau pour le micro de Sarah et une pour le son de l’appel."],
     keeps: "proposal D's drawn call (the decider's request, 2026-11-25): generated portraits of people who do not exist; the bar as the app draws it while recording (#1179, « B · Trace »)",
   },
-  // The slides: the clips of c17, filmed from the app at main 93e4f96 (shell e2e, run i-sam-film17c), in their
+  // The slides: the clips of c18, filmed from the app at main 17618c9 (shell e2e, run i-sam-film18c), in their
   // order; the record slide shows the drawn call instead, the decider's request (2026-11-25).
   slides: {
     en: [["record", "mic", "Record", "One click, and you listen instead of taking notes.", "", "Sarah records a video call with Camille, Hugo and Léa. At the top, Kitokey’s small bar shows the elapsed time, a level trace for Sarah’s microphone and one for the call’s audio."],
@@ -54,7 +54,7 @@ const raw = {
       ["dates", "calendar", "Agenda", "Les échéances dans Google Agenda, ou en fichier .ics pour votre agenda.", "", "Le panneau Dates mentionnées. Une échéance est cochée, puis le curseur ouvre Google Agenda."],
       ["send", "send", "Partager", "Partagé d’un geste sur Slack, Discord ou votre webhook.", "", "Le curseur appuie sur Envoyer à #équipe-produit, à côté du symbole de Discord, puis la ligne Envoyé à apparaît."],
       ["confidential", "lock", "Confidentielle", "Un interrupteur, et aucune IA en ligne ne voit la réunion.", "", "Pendant un enregistrement, le curseur active l’interrupteur Confidentielle, et le cadenas s’affiche."]],
-    keeps: "the decider's round 9 (2026-11-25): each clip shows it, filmed from the app (c17), light and dark; #1179 the trace; #1205 the names; D113 the dates, .ics as RFC 5545 (Outlook and Apple Calendar named once D115 tests them); D116 the send, « Send… » then the channel: a gesture; #1208 the padlock, D110 the confidential meeting",
+    keeps: "the decider's round 9 (2026-11-25): each clip shows it, filmed from the app (c18), light and dark; #1179 the trace; #1205 the names; D113 the dates, .ics as RFC 5545 (Outlook and Apple Calendar named once D115 tests them); D116 the send, « Send… » then the channel: a gesture; #1208 the padlock, D110 the confidential meeting",
   },
   channels: {
     en: ["The whole team up to date, in one gesture.", "In one gesture, to a Slack channel, a Discord channel or your webhook. Nothing leaves without your gesture, and never a confidential meeting without your confirmation.", "Works with"],
