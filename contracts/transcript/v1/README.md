@@ -68,7 +68,7 @@ may rewrite a segment's `text` (below). Every line has a `type`.
   segments, with new times, so a given voice is not known by `speaker` and `start`: it is known by
   its track and its stretch of the clock, from `start` to `end`. Once the new transcript is complete,
   a new segment of the same track whose middle falls within a given segment's stretch takes its
-  `voice` and `given`. The shell carries them over, not the producer, and a given segment that no
+  `voice` and `given` — when it falls within two, those of the one given last. The shell carries them over, not the producer, and a given segment that no
   new segment falls within is said to the user, never dropped silently.
 - **What the making cost, in time and money, is said only when known** (D97). `made_in` is the
   producer's own measure of one step that made the whole transcript, from its start to its last
@@ -106,7 +106,7 @@ version for it. [`test.schema.json`](./test.schema.json) says what the line is.
 ## What it never does
 
 - It never rewrites or removes a line while it is made. Once complete, it never removes one, and
-  rewrites one only for a person's correction of its `text` — a better transcript by an engine is
+  rewrites one only for a person's correction of its `text` or a voice a person gave it — a better transcript by an engine is
   another file, made again from the audio.
 - It never names a person: `me` is whoever recorded, `others` is everyone else, however many
   they are.

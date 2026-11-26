@@ -62,6 +62,7 @@ def test_a_given_voice_outlives_a_transcript_made_again():
         "a new segment of the same track whose middle falls within a given segment's stretch takes its `voice` and `given`"
         in said
     )
+    assert "when it falls within two, those of the one given last" in said
     assert "The shell carries them over, not the producer" in said
     assert "a given segment that no new segment falls within is said to the user, never dropped silently" in said
 
@@ -77,3 +78,8 @@ def test_a_voice_the_shell_names_may_be_told_or_given():
     row = next(line for line in SESSION.splitlines() if line.startswith("| `voices`, optional |"))
     assert "No producer tells voices apart yet" not in row
     assert "one `transcript/v1` tells apart or one a person gave there (its `given`)" in flat(row)
+
+
+def test_once_complete_a_line_is_rewritten_only_for_a_persons_text_or_voice():
+    never = flat(TRANSCRIPT.split("## What it never does", 1)[1].split("## ", 1)[0])
+    assert "rewrites one only for a person's correction of its `text` or a voice a person gave it" in never
