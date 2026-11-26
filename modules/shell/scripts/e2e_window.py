@@ -6905,6 +6905,188 @@ def previous_summary_back(now: dt.datetime) -> None:
               gone and (trashed / "minutes-previous.md").is_file(), [meeting.exists(), sorted(p.name for p in trashed.iterdir()) if trashed.exists() else None])
 
 
+def previous_transcript_back(now: dt.datetime) -> None:
+    """CK. D113, criterion 2, the transcript: made again, the one it replaced — the last one only — stays in the
+    meeting's folder as `transcript-previous.jsonl`, which no step reads, in place of going to the trash; the page
+    offers « Revenir à la version précédente » with its time and model, a line saying the same button brings back
+    the one left; pressed, the two swap; the next redo sends the older one to the trash. In French."""
+    print("CK. a transcript made again keeps the one it replaced, the page offering it back with its time and model; going back swaps them (D113)")
+    idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+            " && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)")
+    back = ("const b = document.getElementById('transcript-previous'), h = document.getElementById('transcript-previous-help');"
+            " return b && b.getClientRects().length ? [b.textContent, h ? h.textContent : null] : null")
+    help_said = "La version quittée devient la précédente\u00a0: le même bouton la ramène."
+    meetings = WORK / "previous-transcript"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+    first = ('{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"ggml-tiny-first","language":"fr","context":null}\n'
+             '{"type":"segment","speaker":"me","track":"local","start":0.5,"end":1.5,"text":"La première version."}\n'
+             '{"type":"complete","duration":2.0,"made":"2026-10-18T13:00:00+02:00"}\n')
+    current = meeting / "transcript.jsonl"
+    current.write_text(first)
+    data = WORK / "data-previous-transcript"
+    models = data / "kitokey" / "models"
+    models.mkdir(parents=True)
+    a, b = models / "ggml-tiny-a.bin", models / "ggml-tiny-b.bin"
+    for model in (a, b):
+        model.write_bytes(b"\0" * 16)
+    # No summary follows: the transcript's version alone is judged here; CJ judges the summary's.
+    window = Window(meetings, "fr_FR.UTF-8", f'after = "nothing"\nreminder = false\nmodel = "{a}"\n')
+    window.env.update(XDG_DATA_HOME=str(data))
+    previous = meeting / "transcript-previous.jsonl"
+    asides = lambda: sorted(p.name for p in meeting.iterdir() if p.name.startswith("transcript") and p.name not in ("transcript.jsonl", "transcript-previous.jsonl"))
+    held = lambda path: path.read_text() if path.is_file() else "the file absent"
+    redo = lambda browser, model: browser.execute_script(
+        "window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", meeting.name, str(model))
+    with window as browser:
+        page = lambda: (browser.execute_script("location.hash = '#/'"),
+                        browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}"),
+                        wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .lines") and b.execute_script(idle), 15))
+        page()
+        check("no version replaced yet: nothing offered back (D113)", browser.execute_script(back) is None, browser.execute_script(back))
+        redo(browser, a)
+        made = wait_for(browser, lambda b: "Refait avec ggml-tiny-a." in held(current) and b.execute_script(idle), 15)
+        second = held(current)
+        check("made again: the one replaced stays beside as transcript-previous.jsonl, nothing else set aside (D113)",
+              made and held(previous) == first and asides() == [], [previous.exists(), asides()])
+        page()
+        offered = wait_for(browser, lambda b: b.execute_script(back), 10)
+        got = browser.execute_script(back) or [None, None]
+        check("the page offers « Revenir à la version précédente », with its time and model, and says the same button brings back the one left (D113)",
+              offered and got[0].startswith("Revenir à la version précédente (") and "18 oct." in got[0] and "first" in got[0].lower()
+              and got[1] == help_said, got)
+        # Pressed when it is there; absent, the rows below fail saying so, never raise.
+        if offered:
+            press(browser, "transcript-previous")
+        swapped = offered and wait_for(None, lambda b: held(current) == first and held(previous) == second, 10)
+        shown = wait_for(browser, lambda b: "La première version." in b.execute_script(
+            "return document.querySelector('#meeting .lines')?.textContent ?? ''"), 10)
+        named = wait_for(browser, lambda b: "tiny a" in (b.execute_script(back) or [""])[0].lower(), 10)
+        check("pressed: the two swap, the page shows the one brought back and offers the one left (D113)",
+              swapped and shown and named, [browser.execute_script(back) or "the button absent", asides()])
+        redo(browser, b)
+        again = wait_for(browser, lambda b_: "Refait avec ggml-tiny-b." in held(current) and b_.execute_script(idle), 15)
+        check("the next redo: the one it replaced is the previous one, the older gone from the folder (D113)",
+              again and held(previous) == first and asides() == [], [held(previous)[:80], asides()])
+        # ines' rows of #1070. T7: a person's correction stays with its version, back and then forward.
+        browser.execute_script("return window.__TAURI__.core.invoke('transcript_corrected', {name: arguments[0], track: 'local', start: 0.0,"
+                               " text: 'Corrigé à la main.'})", meeting.name)
+        corrected = wait_for(None, lambda b_: "Corrigé à la main." in held(current), 5)
+        mine = held(current)
+        swaps = []
+        for _ in range(2):
+            page()
+            if wait_for(browser, lambda b_: b_.execute_script(back), 10):
+                press(browser, "transcript-previous")
+            swaps.append(wait_for(None, lambda b_: held(current) == (first if not swaps else mine), 10))
+        check("a correction stays with its version, back and then forward (#1070, T7)",
+              corrected and swaps == [True, True] and held(previous) == first, [corrected, swaps, held(current)[-160:]])
+        # T8: a redo that fails, or is cancelled, leaves both versions as they were, nothing set aside nor trashed.
+        trash = data / "Trash" / "files"
+        binned = lambda: sorted(p.name for p in trash.iterdir()) if trash.exists() else []
+        before = (held(current), held(previous), binned())
+        (WORK / "fail-hearing").touch()
+        try:
+            redo(browser, a)
+            failed = wait_for(browser, lambda b_: b_.execute_script(idle), 15)
+        finally:
+            (WORK / "fail-hearing").unlink(missing_ok=True)
+        after_failure = (held(current), held(previous), binned())
+        (WORK / "hold-hearing").touch()
+        try:
+            redo(browser, a)
+            holding = wait_for(None, lambda b_: (WORK / "held-hearing").exists(), 15)
+            browser.execute_script("return window.__TAURI__.core.invoke('making_cancelled', {name: arguments[0]})", meeting.name)
+            cancelled = wait_for(browser, lambda b_: b_.execute_script(idle), 15)
+        finally:
+            (WORK / "hold-hearing").unlink(missing_ok=True)
+            (WORK / "held-hearing").unlink(missing_ok=True)
+        after_cancel = (held(current), held(previous), binned())
+        check("a redo that fails or is cancelled leaves both versions as they were, nothing set aside, nothing in the trash (#1070, T8)",
+              failed and holding and cancelled and after_failure == before and after_cancel == before and asides() == [],
+              [failed, holding, cancelled, after_failure == before, after_cancel == before, asides()])
+        # T9 starts from versions of its own: what T8 leaves is T8's to judge, never carried into T9 (a failed redo taken as
+        # written, `fail`, would otherwise redden T9 too).
+        current.write_text(second)
+        previous.write_text(first)
+        # T9: a trash that refuses — the older version cannot leave — keeps the one set aside where it is, and says so.
+        trash.mkdir(parents=True, exist_ok=True)
+        notified = WORK / "notified-previous-transcript"
+        monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                   stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+        trash.chmod(0o500)
+        try:
+            time.sleep(0.5)
+            redo(browser, b)
+            redone = wait_for(browser, lambda b_: b_.execute_script(idle) and "Refait avec ggml-tiny-b." in held(current), 15)
+            said = wait_for(None, lambda b_: "Ancienne transcription conservée" in notified.read_text(), 10)
+        finally:
+            trash.chmod(0o700)
+            monitor.terminate()
+        kept_aside = asides()
+        check("a trash that refuses: the older version stays as transcript-previous.jsonl, the one replaced set aside beside it, and it is said (#1070, T9)",
+              redone and said and held(previous) == first and len(kept_aside) == 1 and kept_aside[0] in notified.read_text(),
+              [redone, said, held(previous)[:60], kept_aside])
+        for name in kept_aside:
+            (meeting / name).unlink()
+        # T10 (the coordinator's decision, 2026-11-21): a transcript and the summary made from it are one version.
+        stamp = lambda at, text: ('{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"ggml-' + text + '","language":"fr","context":null}\n'
+                                  '{"type":"segment","speaker":"me","track":"local","start":0.5,"end":1.5,"text":"' + text + '."}\n'
+                                  '{"type":"complete","duration":2.0,"made":"' + at + '"}\n')
+        summary = lambda at, said_: ('---\ncontract: minutes/v4\nmade: ' + at + '\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n'
+                                     '## Points saillants\n\n' + said_ + '\n\n## Actions\n\nAucune.\n\n## Points clés\n\nAucun.\n')
+        minutes_now, minutes_kept = meeting / "minutes.md", meeting / "minutes-previous.md"
+        current.write_text(stamp("2026-10-18T15:00:00+02:00", "deuxieme"))
+        previous.write_text(stamp("2026-10-18T13:00:00+02:00", "premiere"))
+        minutes_now.write_text(summary("2026-10-18T15:05:00+02:00", "Sur la deuxième."))
+        minutes_kept.write_text(summary("2026-10-18T13:05:00+02:00", "Sur la première."))
+        page()
+        if wait_for(browser, lambda b_: b_.execute_script(back), 10):
+            press(browser, "transcript-previous")
+        paired = wait_for(None, lambda b_: "premiere" in held(current) and "Sur la première." in held(minutes_now)
+                          and "deuxieme" in held(previous) and "Sur la deuxième." in held(minutes_kept), 10)
+        check("going back on the transcript brings its summary back with it: the two pairs swap as one version (#1070, T10)",
+              paired, [held(current)[-80:], held(minutes_now)[-120:]])
+        other = ("const o = document.getElementById('minutes-other-version');"
+                 " return o && o.getClientRects().length ? o.textContent : null")
+        minutes_kept.unlink()
+        current.write_text(stamp("2026-10-18T15:00:00+02:00", "deuxieme"))
+        previous.write_text(stamp("2026-10-18T13:00:00+02:00", "premiere"))
+        minutes_now.write_text(summary("2026-10-18T15:05:00+02:00", "Sur la deuxième."))
+        page()
+        alone = browser.execute_script(other) is None
+        if wait_for(browser, lambda b_: b_.execute_script(back), 10):
+            press(browser, "transcript-previous")
+        page()
+        said_other = wait_for(browser, lambda b_: b_.execute_script(other), 10)
+        check("no previous summary: once back, the page says the summary was made on the other version, never as this one's (#1070, T10)",
+              alone and said_other and browser.execute_script(other) == "Compte rendu fait sur l’autre version" and "Sur la deuxième." in held(minutes_now),
+              [alone, browser.execute_script(other)])
+        # Kept, it is the meeting's: in its text's weight, and in the trash with it. Weighed with it and without it — set
+        # outside the folder a moment, then back —: the difference is its size exactly (ines, #1225: « at least the two
+        # transcripts » held whatever was counted, the summaries and session.json covering the gap).
+        weight = lambda: browser.execute_script("return window.__TAURI__.core.invoke('listed')"
+                                                ".then((l) => l.sessions.filter((s) => s.folder.endsWith(arguments[0])).map((s) => s.text))", meeting.name)
+        kept_size = previous.stat().st_size if previous.is_file() else None
+        with_it = weight()
+        outside = WORK / f"{meeting.name}-transcript-previous.jsonl"
+        if previous.is_file():
+            previous.rename(outside)
+        try:
+            without_it = weight()
+        finally:
+            if outside.is_file():
+                outside.rename(previous)
+        check("the previous transcript counts in the meeting's text weight, its size exactly (D113)",
+              kept_size is not None and len(with_it) == 1 and len(without_it) == 1 and with_it[0] - without_it[0] == kept_size,
+              [with_it, without_it, kept_size])
+        browser.execute_script("window.__TAURI__.core.invoke('freed', {names: [arguments[0]], whole: true})", meeting.name)
+        # Its trash is under the data folder this scenario names for its models.
+        trashed = data / "Trash" / "files" / meeting.name
+        gone = wait_for(None, lambda b_: not meeting.exists(), 10)
+        check("the meeting moved to the trash takes its previous transcript with it (D113)",
+              gone and (trashed / "transcript-previous.jsonl").is_file(), [meeting.exists(), sorted(p.name for p in trashed.iterdir()) if trashed.exists() else None])
+
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
     shows one bar across both steps — the transcript, then its summary —, naming the step, never moving back:
@@ -9549,6 +9731,18 @@ def actions_rows(now: dt.datetime) -> None:
         time.sleep(0.5)
         browser.execute_script("document.querySelector('#meeting .minutes').scrollIntoView({block: 'start'})")
         time.sleep(0.3)
+        # Who made each version, said once (#1231): « sur cet ordinateur » never both in the list and after it, and
+        # each list as wide as the name it shows — never as wide as its longest option.
+        makers = browser.execute_script(
+            "const shown = (n) => n.nodeName === 'SELECT' ? (n.options[n.selectedIndex]?.textContent ?? '') : n.nodeType === 3 ? n.textContent"
+            " : [...n.childNodes].map(shown).join('');"
+            "const c = document.createElement('canvas').getContext('2d');"
+            "return [...document.querySelectorAll('#meeting .maker')].filter(p => p.querySelector('select.page-model')).map(p => {"
+            " const s = p.querySelector('select.page-model'), st = getComputedStyle(s);"
+            " c.font = `${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;"
+            " return [shown(p), Math.round(s.getBoundingClientRect().width - c.measureText(s.options[s.selectedIndex]?.textContent ?? '').width)]; })")
+        check("each version's maker said once — « sur cet ordinateur » not repeated after its list — and its list as wide as the name shown (#1231)",
+              len(makers) == 2 and all(said.count("sur cet ordinateur") <= 1 and 0 <= room <= 16 for said, room in makers), makers)
         shot(browser, "d46-actions-rows")
         # In a structure (minutes/v5, D111): the actions are the section their id names — the fourth
         # here, never the second by place —, each section titled as the page names its id.
@@ -15034,7 +15228,7 @@ def main() -> int:
             )
             trash.unlink()
             (WORK / "data" / "Trash-aside").rename(trash)
-            # Refaire… on the transcript: another model of this computer; the transcript there in the trash.
+            # Refaire… on the transcript: another model of this computer; the transcript there kept beside (D113).
             heard = (asked / "transcript.jsonl").read_text()
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
@@ -15046,13 +15240,12 @@ def main() -> int:
                   offered == ["Celui des Réglages\u00a0: Whisper large v3 turbo", "Whisper small"], offered)
             redo_pick(browser, "redo-transcript-panel", "transcription", 1)
             browser.find_element(By.ID, "redo-transcript-do").click()
-            redone = wait_for(browser, lambda b: sorted(trash_files.glob("transcript-before-*.jsonl")), 10)
-            trashed = sorted(trash_files.glob("transcript-before-*.jsonl"))
+            kept = asked / "transcript-previous.jsonl"
+            redone = wait_for(browser, lambda b: kept.is_file() and kept.read_text() == heard, 10)
             check(
-                "the transcript made again with the model picked; the one there in the trash",
+                "the transcript made again with the model picked; the one there kept beside as the previous version (D113)",
                 redone
                 and "Refait avec ggml-small." in (asked / "transcript.jsonl").read_text()
-                and [path.read_text() for path in trashed] == [heard]
                 and not sorted(asked.glob("transcript-before-*")),
                 (asked / "transcript.jsonl").read_text(),
             )
@@ -15080,10 +15273,10 @@ def main() -> int:
                   browser.execute_script(LINES, "#meeting .maker"))
             check("a transcript not made says so on its card in plain words, with a way to try again", unmade and "engine stopped" not in heard_state(browser), heard_state(browser))
             # Tried again as it was asked: made again with the meeting's own model, kept by the Refaire…, not resumed.
-            # Made again — the one there set aside, then in the trash —, never resumed from it.
-            trashed_before = len(sorted(trash_files.glob("transcript-before-*.jsonl")))
+            # Made again — the one there kept beside, the previous one before it in the trash (D113) —, never resumed from it.
+            trashed_before = len(sorted(trash_files.glob("transcript-previous*")))
             press(browser, "transcript-again")
-            tried = wait_for(browser, lambda b: len(sorted(trash_files.glob("transcript-before-*.jsonl"))) == trashed_before + 1, 10)
+            tried = wait_for(browser, lambda b: len(sorted(trash_files.glob("transcript-previous*"))) == trashed_before + 1, 10)
             check("Try again after a Refaire… makes it again with the meeting's own model it kept", tried and "Refait avec ggml-small" in (asked / "transcript.jsonl").read_text(), (asked / "transcript.jsonl").read_text() if (asked / "transcript.jsonl").exists() else "")
             back_ = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 5)
             check("Refaire… is offered again once asked, the panel gone", back_)
@@ -15635,6 +15828,7 @@ def main() -> int:
     redo_says_what_is_wrong(now)
     redo_says_what_follows(now)
     previous_summary_back(now)
+    previous_transcript_back(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)

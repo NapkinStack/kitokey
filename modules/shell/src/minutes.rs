@@ -54,7 +54,7 @@ pub fn minutes_named(folder: &Path, sections: [&str; 3], by_id: &[(&str, &str)])
 }
 
 /// The last minutes a redo replaced, kept beside them under a name no step reads (D113,
-/// `minutes/v4`): what « Revenir à la version précédente » brings back.
+/// `session-audio/v3`): what « Revenir à la version précédente » brings back.
 pub const PREVIOUS: &str = "minutes-previous.md";
 
 /// Those minutes, read as the others are.
