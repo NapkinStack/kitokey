@@ -1,6 +1,6 @@
 ---
 // /<lang>/: the landing (D114, proposal D validated by the decider on 2026-11-25). Every word from
-// src/lib/landing.mjs. The hero's carousel: the drawn call, then five c16 clips, each slide's poster first.
+// src/lib/landing.mjs. The hero's carousel: the drawn call, then five c17 clips, each slide's poster first.
 import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
 import Call from "./Call.astro";
@@ -16,7 +16,7 @@ const [h1a, h1b, lead] = t("hero");
 const [cta, follow] = t("cta");
 const [sLabel, sSlide, sRole, sOf] = t("slider");
 const [callTitle] = t("call");
-// A clip filmed in the app's dark theme too (c16c-dark), when its three files are here: the moon shows it.
+// A clip filmed in the app's dark theme too (c17), when its three files are here: the moon shows it.
 const dark = (key) => ["jpg", "mp4", "webm"].every((ext) => existsSync(join(process.cwd(), "public", "clips", `${key}-${lang}-dark.${ext}`)));
 const [chH, chP, chWith] = t("channels");
 const [pEyebrow, pH, pLead] = t("privacy");
