@@ -1946,8 +1946,19 @@ function pathShown(said, whole) {
   const cut = said.lastIndexOf(" / ");
   const [lead, last] = cut < 0 ? ["", said] : [said.slice(0, cut), said.slice(cut + 3)];
   // The separator before its own name its own, never eaten by the ellipsis: « … / pages ».
-  shown.append(icon("folder"), element("span", "lead", lead), element("span", "sep", cut < 0 ? "" : " / "), element("span", "last", last));
+  const leadShown = element("span", "lead", lead);
+  shown.append(icon("folder"), leadShown, element("span", "sep", cut < 0 ? "" : " / "), element("span", "last", last));
   shown.title = whole;
+  // Cut in its middle to the room it has (#1232), as a path bar does — « / home / … / window » —: the folders after
+  // the first dropped one by one, then all but « … »; nothing hidden past its box (D95's measure), re-cut at each size.
+  const parts = lead.split(" / ");
+  const fit = () => {
+    if (!leadShown.isConnected) return;
+    leadShown.textContent = lead;
+    for (let dropped = 1; leadShown.scrollWidth > leadShown.clientWidth + 1 && dropped <= parts.length; dropped++)
+      leadShown.textContent = dropped >= parts.length - 1 ? "…" : [parts[0], "…", ...parts.slice(dropped + 1)].join(" / ");
+  };
+  new ResizeObserver(() => requestAnimationFrame(fit)).observe(shown);
   return shown;
 }
 

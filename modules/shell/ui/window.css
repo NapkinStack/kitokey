@@ -277,9 +277,10 @@ select:hover, select:focus { border-color: var(--edge); }
 .fields > .field.whole { flex-basis: 100%; }
 .tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); white-space: nowrap; flex: none; }
 .path { flex: 1 1 240px; min-width: 0; display: flex; align-items: center; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: text; }
-/* Its folders before its own cut first (#1232): the name the user chose stays whole. */
-.path .lead { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
-.path .last { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+/* Its folders before its own cut in their middle by the page (#1232, `pathShown`): the name the user chose stays whole. */
+.path .lead { min-width: 0; white-space: pre; }
+/* Its own name whole; a name longer than the line breaks rather than hides (D95). */
+.path .last { flex: 0 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; color: var(--ink); }
 .path svg { flex: none; width: 16px; height: 16px; margin-right: 6px; }
 .path .sep { flex: none; white-space: pre; }
 .path:hover { border-color: var(--edge); color: var(--ink); }
