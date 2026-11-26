@@ -24,9 +24,11 @@ for (const [, before, block] of (await readFile(installSource, "utf8")).matchAll
     return { systems: own.length ? own : named(before), lines: lines.map((l) => l.replace(/\s+#.*$/, "").trim()) };
   }));
 }
-// A tab's commands are, line for line, one block's lines meant for its system or for every system.
+// A tab's commands are, line for line, one block's lines meant for its system or for every system. Debian 13
+// takes Ubuntu's package (README.md, « Install it »).
+const BUILT_AS = { debian: "ubuntu" };
 const given = (os, commands) => blocks.some((block) => {
-  const lines = block.filter((p) => !p.systems.length || p.systems.includes(os)).flatMap((p) => p.lines);
+  const lines = block.filter((p) => !p.systems.length || p.systems.includes(BUILT_AS[os] ?? os)).flatMap((p) => p.lines);
   return lines.join("\n") === commands.join("\n");
 });
 
@@ -85,11 +87,16 @@ test("the waves move for ever but pause on a button, and stand still under reduc
   assert.match(js, /IntersectionObserver/);
 });
 
-test("the clips are c16's alone, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
-  const want = KEYS.flatMap((k) => ["en", "fr"].flatMap((l) => ["jpg", "mp4", "webm"].map((e) => `${k}-${l}-light.${e}`))).sort();
+test("the clips are c16's alone, light for each slide and dark where filmed so, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
+  const set = (theme, keys) => keys.flatMap((k) => ["en", "fr"].flatMap((l) => ["jpg", "mp4", "webm"].map((e) => `${k}-${l}-${theme}.${e}`)));
   const have = (await readdir(join(dist, "clips"))).sort();
-  assert.deepEqual(have, want);
+  const darkKeys = KEYS.filter((k) => have.some((n) => n.startsWith(`${k}-`) && n.includes("-dark.")));
+  assert.deepEqual(have, [...set("light", KEYS), ...set("dark", darkKeys)].sort());
   for (const name of have) assert.ok((await stat(join(dist, "clips", name))).size <= 500 * 1024, `${name} is over 500 KiB`);
+  for (const lang of ["en", "fr"]) {
+    const html = await page(lang);
+    for (const k of KEYS) assert.equal(new RegExp(`data-clip="/clips/${k}-${lang}" data-dark`).test(html), darkKeys.includes(k), `${lang} ${k}: the moon's clip said wrong`);
+  }
 });
 
 test("the root sends a reader to the French landing, English one link away", async () => {
@@ -111,5 +118,20 @@ test("Slack is named in words alone, Discord by its own symbol, unaltered", asyn
     const logos = html.match(/<ul class="ch-logos"[^>]*>([\s\S]*?)<\/ul>/)?.[1] ?? "";
     assert.match(logos, /<li><span>Slack<\/span><\/li>/, `/${lang}/: Slack is not in words alone`);
     assert.match(logos, /<li><img class="os-logo" src="\/img\/brands\/discord-symbol-blurple\.svg"[^>]*><span>Discord<\/span><\/li>/, `/${lang}/: Discord not by its own symbol`);
+  }
+});
+
+test("each hardware card says, in both languages, the figures README.md gives its way of working, and only those", async () => {
+  const readme = await readFile(installSource, "utf8");
+  const section = readme.slice(readme.indexOf("**What a computer needs**"));
+  const way = (title) => section.match(new RegExp(`- \\*\\*${title}\\*\\*:([\\s\\S]*?)(?=\\n- \\*\\*|\\n\\n)`))?.[1] ?? "";
+  const figures = (text) => [...text.matchAll(/\d+(?:[.,]\d+)?/g)].map((m) => m[0].replace(",", ".")).sort();
+  const ways = [way("Everything on the computer"), way("With the service you choose")];
+  assert.ok(ways.every(Boolean), "README.md names no such way");
+  for (const lang of ["en", "fr"]) {
+    landing.hardware[lang].forEach(([, title, , lines], i) => {
+      assert.deepEqual(figures(lines.join(" ")), figures(ways[i]), `${lang}, « ${title} »: its figures are not README.md's`);
+      assert.equal(/vulkan/i.test(lines.join(" ")), /vulkan/i.test(ways[i]), `${lang}, « ${title} »: Vulkan said or not as README.md does`);
+    });
   }
 });
