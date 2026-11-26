@@ -57,8 +57,8 @@ const raw = {
     keeps: "the decider's round 9 (2026-11-25): each clip shows it, filmed from the app (c16c); #1179 the trace; #1205 the names; D113 the dates, .ics as RFC 5545 (Outlook and Apple Calendar named once D115 tests them); D116 the send, « Send… » then the channel: a gesture; #1208 the padlock, D110 the confidential meeting",
   },
   channels: {
-    en: ["The minutes go where your team works.", "In one click, to a Slack channel, a Discord channel or your webhook. Nothing leaves without your gesture, and never a confidential meeting without your confirmation.", "Works with"],
-    fr: ["Le compte rendu part là où l’équipe travaille.", "En un clic, vers un canal Slack, un salon Discord ou votre webhook. Rien ne part sans votre geste, jamais pour une réunion confidentielle sans votre confirmation.", "Fonctionne avec"],
+    en: ["The whole team up to date, in one gesture.", "In one gesture, to a Slack channel, a Discord channel or your webhook. Nothing leaves without your gesture, and never a confidential meeting without your confirmation.", "Works with"],
+    fr: ["Toute l’équipe à jour, d’un geste.", "D’un geste, vers un canal Slack, un salon Discord ou votre webhook. Rien ne part sans votre geste, jamais pour une réunion confidentielle sans votre confirmation.", "Fonctionne avec"],
     keeps: "PDR-0007 and D116, the sends to a channel; D119, a confidential meeting's send asked once more",
   },
   privacy: {
@@ -117,13 +117,13 @@ const raw = {
     keeps: "PDR-0001: free on Linux, paid once on macOS and Windows",
   },
   oses: {
-    en: [[["fedora", "ubuntu"], "Linux", "Available", "Free", "Fedora and Ubuntu.", true],
+    en: [[["fedora", "ubuntu", "debian"], "Linux", "Available", "Free", "Fedora, Ubuntu and Debian 13.", true],
       [["windows"], "Windows", "Coming soon", "One-time purchase", "A free trial, then a single payment. Coming to the Microsoft Store.", false],
       [["apple"], "macOS", "Coming soon", "One-time purchase", "A free trial, then a single payment.", false]],
-    fr: [[["fedora", "ubuntu"], "Linux", "Disponible", "Gratuit", "Fedora et Ubuntu.", true],
+    fr: [[["fedora", "ubuntu", "debian"], "Linux", "Disponible", "Gratuit", "Fedora, Ubuntu et Debian 13.", true],
       [["windows"], "Windows", "Bientôt", "Achat unique", "Un essai gratuit, puis un seul paiement. À venir dans le Microsoft Store.", false],
       [["apple"], "macOS", "Bientôt", "Achat unique", "Un essai gratuit, puis un seul paiement.", false]],
-    keeps: "README.md, « Install it »: Fedora from Copr, Ubuntu 24.04; PDR-0001 and PDR-0005, the Store's unlimited trial; ADR-0017, macOS sold once",
+    keeps: "README.md, « Install it »: Fedora from Copr, Ubuntu 24.04 and Debian 13; PDR-0001 and PDR-0005, the Store's unlimited trial; ADR-0017, macOS sold once",
   },
   install: {
     en: ["Install", "Install Kitokey.", "Pick your system, open a terminal and paste the commands.", "Copy", "System", "Copied", "Select and copy"],
@@ -131,9 +131,9 @@ const raw = {
     keeps: "README.md, « Install it », the commands below",
   },
   channelNotes: {
-    en: { ubuntu: "On Ubuntu 24.04, build the package. It needs <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> and <code>podman</code>. If <code>nstack</code> is then not found, <code>uv tool update-shell</code> puts it on your path. The build takes a while." },
-    fr: { ubuntu: "Sur Ubuntu 24.04, compilez le paquet. Il faut <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> et <code>podman</code>. Si <code>nstack</code> est ensuite introuvable, <code>uv tool update-shell</code> le met dans votre chemin. La construction prend un moment." },
-    keeps: "README.md: « Needs git, uv and podman », and uv tool update-shell when nstack is not found",
+    en: { debian: "On Debian 13, the package built for Ubuntu 24.04 installs and starts. Debian 12 is not supported yet.", ubuntu: "On Ubuntu 24.04, build the package. It needs <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> and <code>podman</code>. If <code>nstack</code> is then not found, <code>uv tool update-shell</code> puts it on your path. The build takes a while." },
+    fr: { debian: "Sur Debian 13, le paquet construit pour Ubuntu 24.04 s’installe et démarre. Debian 12 n’est pas encore pris en charge.", ubuntu: "Sur Ubuntu 24.04, compilez le paquet. Il faut <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> et <code>podman</code>. Si <code>nstack</code> est ensuite introuvable, <code>uv tool update-shell</code> le met dans votre chemin. La construction prend un moment." },
+    keeps: "README.md: « Needs git, uv and podman », and uv tool update-shell when nstack is not found; README.md, « Install it »: the Ubuntu package installs and starts on Debian 13, not on 12 (#1214)",
   },
   needs: {
     en: ["Prerequisites", [["transcript", "Transcription.", "At first start, its model (874 MB) downloads in one click."],
@@ -141,6 +141,17 @@ const raw = {
     fr: ["Prérequis", [["transcript", "La transcription.", "Au premier démarrage, son modèle (874 Mo) se télécharge en un clic."],
       ["summary", "Ollama, pour le compte rendu.", "<a href=\"https://ollama.com/download\">Installez Ollama</a>, qui est gratuit. Kitokey propose ensuite son modèle, Qwen3 8B (environ 5 Go), téléchargé en un clic."]]],
     keeps: "ADR-0003, the 874 MB model; cycle 03, qwen3:8b about 5 GB fetched through Ollama; docs/support.md",
+  },
+  hardware: {
+    en: [["lock", "Everything on your computer", "Confidentiality assured, your data stays with you.",
+      ["16 GB of memory at least, 24 to 32 GB to work in comfort", "A graphics card with Vulkan, a built-in one being enough", "10 GB free for the two models", "About 2 GB free for each hour that records, then 0.2 GB kept an hour"]],
+      ["unlock", "With the service you choose", "No special hardware. The transcript and the minutes are made online.",
+      ["An OpenAI-compatible service, such as Groq", "Often paid, billed by that service, not by Kitokey", "About 2 GB free while an hour records, then 0.2 GB kept"]]],
+    fr: [["lock", "Tout sur votre ordinateur", "Confidentialité assurée, vos données restent chez vous.",
+      ["16 Go de mémoire au moins, 24 à 32 Go pour être à l’aise", "Une carte graphique Vulkan, même intégrée", "10 Go libres pour les deux modèles", "Environ 2 Go libres par heure qui s’enregistre, puis 0,2 Go gardés par heure"]],
+      ["unlock", "Avec le service de votre choix", "Aucun matériel particulier. La transcription et le compte rendu se font en ligne.",
+      ["Un service compatible OpenAI, comme Groq", "Souvent payant, facturé par ce service, pas par Kitokey", "Environ 2 Go libres pendant l’enregistrement d’une heure, puis 0,2 Go gardés"]]],
+    keeps: "README.md, « What a computer needs », measured on 2026-11-25: its two ways; ADR-0013, a transcription service the user names (Groq among them), ADR-0013 and the minutes' services, their cost the user's; the decider's « no special hardware » (2026-11-25)",
   },
   faq: {
     en: ["Frequently asked questions", [
@@ -188,8 +199,9 @@ function typo(v) {
 export const landing = Object.fromEntries(Object.entries(raw).map(([k, w]) => [k, { ...w, fr: typo(w.fr) }]));
 export const repo = REPO;
 // The install's commands, as README.md gives them: Fedora from Copr (D78, published 2026-11-18); Ubuntu built as
-// README.md says, until a repository is published.
+// README.md says, until a repository is published; Debian 13 takes Ubuntu's package (README.md, « Install it »).
 export const channels = [
   ["fedora", "Fedora", "sudo dnf copr enable @napkinstack/kitokey\nsudo dnf install kitokey"],
   ["ubuntu", "Ubuntu 24.04", "git clone https://github.com/NapkinStack/kitokey && cd kitokey\nbash .nstack/install-engine.sh\nKITOKEY_TARGET=ubuntu-24.04 nstack release\nsudo apt install ./dist/install/kitokey_*_amd64.deb"],
+  ["debian", "Debian 13", "git clone https://github.com/NapkinStack/kitokey && cd kitokey\nbash .nstack/install-engine.sh\nKITOKEY_TARGET=ubuntu-24.04 nstack release\nsudo apt install ./dist/install/kitokey_*_amd64.deb"],
 ];
