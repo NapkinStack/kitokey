@@ -71,11 +71,13 @@ MEETINGS = {
 STARTED = "2026-11-26T10:00:00+01:00"
 
 
-def spoken(voice: PiperVoice, speaker: str | None, text: str, pace: float) -> array.array:
-    """One turn, as 16-bit samples at the voice's own rate; `pace` below 1 speaks faster."""
+def spoken(voice: PiperVoice, speaker: str | None, text: str, pace: float, noise: tuple[float, float] | None) -> array.array:
+    """One turn, as 16-bit samples at the voice's own rate; `pace` below 1 speaks faster; `noise`, Piper's
+    noise and noise width, the voice's own when none."""
     config = SynthesisConfig(
         speaker_id=None if speaker is None else voice.config.speaker_id_map[speaker],
         length_scale=pace,
+        **({} if noise is None else {"noise_scale": noise[0], "noise_w_scale": noise[1]}),
     )
     samples = array.array("h")
     for chunk in voice.synthesize(text, syn_config=config):
@@ -110,7 +112,7 @@ def made(voices: Path, language: str, meeting: dict, out: Path) -> None:
     sides = {"local": array.array("h"), "remote": array.array("h")}
     gap = array.array("h", [0]) * int(GAP * rate)
     for side, text in meeting["turns"]:
-        turn = spoken(loaded[side], meeting[side][1], text, meeting["pace"])
+        turn = spoken(loaded[side], meeting[side][1], text, meeting["pace"], meeting.get("noise"))
         other = "remote" if side == "local" else "local"
         sides[side].extend(turn + gap)
         sides[other].extend(array.array("h", [0]) * len(turn) + gap)

@@ -5443,8 +5443,11 @@ def example_tried(now: dt.datetime) -> None:
     meetings.mkdir()
     model = WORK / "example-model.bin"
     model.write_bytes(b"made up")
+    exported = WORK / "example-export"
+    exported.mkdir()
     # After a recording, the transcript alone: the example's minutes follow all the same. Written on this computer.
-    window = Window(meetings, "fr_FR.UTF-8", f'after = "transcript"\nmodel = "{model}"\n'
+    # Each summary exported to a folder chosen: the example's never is.
+    window = Window(meetings, "fr_FR.UTF-8", f'after = "transcript"\nmodel = "{model}"\nexport = "{exported}"\n'
                     'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "qwen3:8b"\n')
     with window as browser:
         # A destination set up, as a person does: the example is sent there all the same never.
@@ -5486,6 +5489,8 @@ def example_tried(now: dt.datetime) -> None:
         time.sleep(1)
         check("sent nowhere, a destination set up (D126)", not calls.exists(),
               calls.read_text() if calls.exists() else "")
+        check("exported nowhere, a folder chosen for each summary: the example is no meeting of the user's (D126)",
+              not any(exported.iterdir()), sorted(path.name for path in exported.iterdir()))
 
 
 def summary_sent(now: dt.datetime) -> None:

@@ -4661,6 +4661,10 @@ fn export_written(shell: &Shell, folder: &Path) {
     if confidential::marked(folder) {
         return;
     }
+    // The example tried is an invented meeting: nothing of it in the user's folder (D126).
+    if shell.examples.lock().unwrap().contains(folder) {
+        return;
+    }
     let language = shell.language();
     let said = words::exported(language);
     let name = meeting_said(folder, language);
