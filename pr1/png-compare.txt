@@ -1,0 +1,108 @@
+FLAG check-sound-call-light.png ae=74.0719 regions=1 tall: 13x29+713+384 
+FLAG check-sound-heard-light.png ae=74.0719 regions=1 tall: 13x29+743+368 
+FLAG cm-dates-offered-light.png ae=23078.9 regions=4 tall: 823x800+277+0 10x231+1090+513 
+line cn-asked-1100-dark.png ae=620.843 172x14+434+0 37x17+122+176 37x17+122+235 
+line cn-asked-1100-light.png ae=707.182 172x14+434+0 37x17+122+176 37x17+122+235 
+line co-waveform-1100-dark.png ae=805.133 179x21+434+18 37x17+122+176 37x17+122+235 37x17+122+295 
+line co-waveform-1100-light.png ae=914.927 179x21+434+18 37x17+122+176 37x17+122+235 37x17+122+295 13x13+480+126 7x8+480+142 7x8+8+172 7x7+521+126 7x7+8+211 
+FLAG co-waveform-420-dark.png ae=213.323 regions=2 tall: 10x602+410+3 
+FLAG co-waveform-420-light.png ae=252.492 regions=2 tall: 10x602+410+3 
+line cp-locked-en-dark.png ae=20.6575 40x19+205+2 9x13+201+26 
+line cp-locked-en-light.png ae=21.9987 40x19+205+2 9x13+201+26 
+line cp-locked-fr-light.png ae=21.9987 40x19+205+2 9x13+201+26 
+line d100-ask-en-1100.png ae=1015.67 125x16+509+21 77x19+427+18 61x17+117+176 61x17+112+235 
+line d100-ask-en-420.png ae=337.094 77x19+139+61 
+line d100-ask-fr-1100.png ae=756.488 174x19+434+18 37x17+122+176 37x17+122+235 
+line d100-ask-fr-420.png ae=232.239 45x19+146+61 
+line d101-saved-1100.png ae=148.465 37x17+122+176 
+FLAG d1076-recording-1100-dark.png ae=546.72 regions=4 tall: 238x29+447+217 
+FLAG d1076-recording-1100-light.png ae=601.821 regions=4 tall: 238x29+447+217 
+FLAG d1076-recording-420-dark.png ae=226.332 regions=1 tall: 172x28+33+347 
+FLAG d1076-recording-420-light.png ae=383.165 regions=3 tall: 165x28+40+347 21x26+248+308 
+FLAG d1114-agreement-1100-dark.png ae=1913.06 regions=8 tall: 183x27+742+92 
+FLAG d1114-agreement-1100-light.png ae=2145.64 regions=8 tall: 183x27+742+92 
+FLAG d1114-agreement-420-dark.png ae=1252.63 regions=1 tall: 243x27+56+153 
+FLAG d1114-agreement-420-light.png ae=1404.75 regions=1 tall: 243x27+56+153 
+FLAG d1116-untranscribed-1100-dark.png ae=854.323 regions=7 tall: 92x35+608+10 
+FLAG d1116-untranscribed-1100-light.png ae=945.545 regions=11 tall: 92x35+608+10 
+line d1116-untranscribed-420-dark.png ae=380.077 53x19+129+61 40x17+179+684 18x17+132+684 15x17+157+684 12x17+110+684 12x15+281+686 
+line d1116-untranscribed-420-light.png ae=425.818 53x19+129+61 40x17+179+684 18x17+132+684 15x17+157+684 12x17+110+684 12x15+281+686 7x7+20+149 
+line d46-actions-rows.png ae=136.217 37x17+122+176 
+line d48-named.png ae=492.446 37x17+118+337 36x17+122+445 34x17+399+9 31x15+106+281 31x15+106+200 
+line d50-announce-dark.png ae=8.0719 15x13+230+5 9x13+226+26 
+line d50-announce-light.png ae=10.0549 15x13+230+5 9x13+226+26 
+line d59-2-small-open-dark.png ae=70.4928 100x19+145+2 9x13+141+26 
+line d59-2-small-open-light.png ae=172.082 104x19+141+2 15x17+98+14 
+line d59-3-small-script-dark.png ae=196.421 105x19+140+2 15x17+98+14 
+line d59-3-small-script-light.png ae=220.199 104x19+141+2 15x17+98+14 
+line d59-4-page-changed-dark.png ae=0.00130719 7x7+744+175 
+line d59-4-page-changed-light.png ae=0.00261438 7x7+753+179 
+FLAG d59-5-page-closed-light.png ae=33.1961 regions=2 tall: 10x484+1090+4 
+line d60-1-small-off-light.png ae=112.622 50x19+195+2 15x17+98+14 14x13+191+26 
+line d60-2-small-on-dark.png ae=11.9059 30x17+215+3 
+line d60-2-small-on-light.png ae=108.978 80x19+165+2 14x13+161+26 
+FLAG d60-5-page-left-light.png ae=309.692 regions=3 tall: 185x38+814+79 
+FLAG d60-6-ollama-empty-light.png ae=468.625 regions=9 tall: 14x35+667+10 
+line d61-1920-dark.png ae=1591.42 123x16+479+21 45x19+430+18 37x17+115+295 37x17+119+462 37x17+119+402 37x17+117+639 37x17+116+865 37x17+119+521 37x17+120+924 37x17+119+176 36x17+120+235 36x17+113+757 36x17+112+580 36x17+116+698 37x13+116+983 
+line d61-1920-light.png ae=1794.25 123x16+479+21 45x19+430+18 37x17+115+295 37x17+119+462 37x17+119+402 37x17+117+639 37x17+116+865 37x17+119+521 37x17+120+924 37x17+119+176 36x17+120+235 36x17+113+757 36x17+112+580 36x17+116+698 37x13+116+983 7x7+8+861 7x7+8+900 
+line d61-420-list-dark.png ae=384.376 37x17+115+280 37x17+119+162 36x17+120+221 37x12+119+388 
+line d61-420-list-light.png ae=431.081 37x17+115+280 37x17+119+162 36x17+120+221 37x12+119+388 
+line d61-420-meeting-dark.png ae=155.591 45x19+142+61 
+line d61-420-meeting-light.png ae=174.494 45x19+142+61 
+line d67-none-dark.png ae=345.54 198x19+146+314 62x17+62+314 15x17+126+314 
+line d67-none-light.png ae=402.307 198x19+146+314 62x17+62+314 15x17+126+314 
+FLAG d67-pane-said.png ae=2272.38 regions=7 tall: 521x174+558+324 1058x78+21+226 521x132+21+324 1100x62+0+86 330x38+202+168 185x38+534+168 179x38+21+168 
+FLAG d67-unread-dark.png ae=19660.4 regions=3 tall: 420x244+0+3 374x136+46+246 378x29+21+371 
+FLAG d67-unread-light.png ae=19553.7 regions=3 tall: 420x396+0+4 
+line d69-full-dark.png ae=511.757 168x19+434+18 37x17+122+176 
+line d69-full-light.png ae=584.29 168x19+434+18 37x17+122+176 
+line d70-named.png ae=161.361 32x17+396+9 31x15+106+200 29x15+104+329 
+line d70-naming.png ae=161.361 32x17+396+9 31x15+106+200 29x15+104+329 
+line d74-gone-en-dark.png ae=22.2131 25x15+220+4 14x13+216+26 
+line d74-gone-en-light.png ae=853.742 262x19+105+223 75x19+170+2 59x13+171+26 15x17+98+14 
+line d74-gone-fr-dark.png ae=22.2131 25x15+220+4 14x13+216+26 
+line d74-gone-fr-light.png ae=19.4092 25x15+220+4 9x13+221+26 
+line d75-en-1100-dark.png ae=1366.68 61x17+112+176 61x17+112+262 61x17+112+348 61x17+112+434 61x17+112+493 61x17+112+552 61x17+112+638 
+line d75-en-1100-light.png ae=1634.62 61x17+112+176 61x17+112+262 61x17+112+348 61x17+112+434 61x17+112+493 61x17+112+552 61x17+112+638 52x20+921+30 
+FLAG d75-en-freed.png ae=1525.8 regions=8 tall: 11x414+261+143 
+line d75-fr-1100-dark.png ae=935.731 37x17+122+176 37x17+122+262 37x17+122+348 37x17+122+434 37x17+122+493 37x17+122+552 37x17+122+638 
+line d75-fr-1100-light.png ae=1049.66 37x17+122+176 37x17+122+262 37x17+122+348 37x17+122+434 37x17+122+493 37x17+122+552 37x17+122+638 
+FLAG d75-fr-freed.png ae=962.769 regions=8 tall: 11x414+261+143 
+line d83-trial-left-en.png ae=1097.16 60x17+113+176 60x17+113+262 60x17+113+348 60x17+113+434 60x17+113+520 60x17+113+605 60x17+113+691 
+line d83-trial-left-fr.png ae=1179.72 43x17+109+176 43x17+109+262 43x17+109+348 43x17+109+434 43x17+109+520 43x17+109+605 43x17+109+691 
+line d83-trial-over-en.png ae=2516.64 142x16+483+21 83x19+399+18 66x17+104+332 66x17+109+418 66x17+103+504 66x17+95+273 66x17+101+675 65x17+108+589 
+line d83-trial-over-fr.png ae=1292.61 137x16+469+21 109x16+29+734 42x19+422+18 35x17+113+504 34x17+113+273 34x17+114+418 34x17+110+675 34x17+109+589 34x17+108+332 7x7+11+82 7x7+8+269 7x7+8+307 
+line d89-list-1920-dark.png ae=381.352 34x17+399+9 31x15+104+490 31x15+106+200 31x15+106+329 31x15+100+571 31x15+106+410 31x15+107+700 
+line d89-list-1920-light.png ae=445.727 34x17+399+9 31x15+104+490 31x15+106+200 31x15+106+329 31x15+100+571 31x15+106+410 31x15+107+700 
+line d89-list-420-dark.png ae=314.888 31x15+104+476 31x15+106+186 31x15+106+315 31x15+100+556 31x15+106+395 31x15+107+686 
+line d89-list-420-light.png ae=366.678 31x15+104+476 31x15+106+186 31x15+106+315 31x15+100+556 31x15+106+395 31x15+107+686 
+line d89-meeting-1920-dark.png ae=381.352 34x17+399+9 31x15+104+490 31x15+106+200 31x15+106+329 31x15+100+571 31x15+106+410 31x15+107+700 
+line d89-meeting-1920-light.png ae=445.727 34x17+399+9 31x15+104+490 31x15+106+200 31x15+106+329 31x15+100+571 31x15+106+410 31x15+107+700 
+line d89-meeting-420-dark.png ae=73.6013 34x17+111+59 
+line d89-meeting-420-light.png ae=85.7386 34x17+111+59 
+FLAG d89-settings-1920-dark.png ae=348.352 regions=7 tall: 10x428+1910+3 
+FLAG d89-settings-1920-light.png ae=398.475 regions=7 tall: 10x428+1910+3 
+line d90-opened-check-en-dark.png ae=23.3595 13x18+394+94 
+line d90-opened-check-en-light.png ae=22.1608 13x18+394+94 
+line d90-opened-check-fr-dark.png ae=23.3595 13x18+394+94 
+line d90-opened-recording-en-dark.png ae=209.987 105x19+140+2 15x17+98+14 14x13+141+26 
+line d90-opened-recording-fr-dark.png ae=149.265 105x19+140+2 
+line d90-opened-recording-fr-light.png ae=116.647 105x19+140+2 
+FLAG d90-silent-options-en-dark.png ae=359.427 regions=6 tall: 440x68+0+92 26x26+401+199 
+FLAG d90-silent-options-en-light.png ae=1308.31 regions=6 tall: 440x68+0+92 26x26+401+199 
+FLAG d90-silent-options-fr-dark.png ae=970.523 regions=6 tall: 440x68+0+92 26x26+401+199 
+line d90-waiting-fr.png ae=6.44706 9x13+226+26 
+FLAG d92-page-bar-en-dark.png ae=1125.06 regions=7 tall: 778x52+301+79 
+FLAG d92-page-bar-fr-light.png ae=951.86 regions=7 tall: 778x52+301+79 113x35+601+10 15x35+590+10 
+line d92-page-bar-still-en-dark.png ae=534.905 110x16+504+20 75x19+422+17 83x19+630+20 60x17+113+176 7x8+8+172 7x7+8+211 
+FLAG d92-page-bar-still-fr-light.png ae=812.706 regions=7 tall: 113x35+601+10 15x35+590+10 
+line d95-models-service-dark.png ae=29.2275 28x15+816+597 
+line d95-models-service-light.png ae=34.0105 28x15+816+597 
+line d95-settings-1920-dark.png ae=1002.28 37x17+115+295 37x17+119+462 37x17+119+402 37x17+117+639 37x17+119+521 37x17+119+176 36x17+120+235 36x17+113+757 36x17+112+580 36x17+116+698 
+line d95-settings-1920-light.png ae=1123.92 37x17+115+295 37x17+119+462 37x17+119+402 37x17+117+639 37x17+119+521 37x17+119+176 36x17+120+235 36x17+113+757 36x17+112+580 36x17+116+698 
+line d95-transcription-service-dark.png ae=199.871 89x20+519+340 
+line d95-transcription-service-light.png ae=202.967 89x20+519+340 
+line d98-settings-dark.png ae=796.876 498x21+376+776 
+line d99-bar-language-en.png ae=22.0392 35x19+140+2 
+line d99-bar-language-fr.png ae=44.0209 60x19+185+2 
+identical 74, text lines only 76, flagged 31
