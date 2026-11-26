@@ -1,10 +1,11 @@
 // D114, the landing (proposal D, validated by the decider on 2026-11-25): /en/ and /fr/ hold every section
 // their nav names, nothing left to measure, the install's commands as README.md gives them, and a carousel, the
-// drawn call then the app filmed (c16), each slide with its poster and its words; the clips c16's alone; the root to French.
+// drawn call then the app filmed (c17), each slide with its poster and its words; the clips c17's alone; the root to French.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import { dist } from "./helpers.mjs";
 import { installSource } from "../site.config.mjs";
 import { channels, landing } from "../src/lib/landing.mjs";
@@ -59,7 +60,7 @@ for (const lang of ["en", "fr"]) {
     }
   });
 
-  test(`/${lang}/: the hero's carousel, the drawn call then five c16 clips in their order, each with its poster and its words`, async () => {
+  test(`/${lang}/: the hero's carousel, the drawn call then five c17 clips in their order, each with its poster and its words`, async () => {
     const html = await page(lang);
     const slides = [...html.matchAll(/<article class="slide"[\s\S]*?<\/article>/g)].map((m) => m[0]);
     assert.equal(slides.length, 6);
@@ -87,15 +88,23 @@ test("the waves move for ever but pause on a button, and stand still under reduc
   assert.match(js, /IntersectionObserver/);
 });
 
-test("the clips are c16's alone, light for each slide and dark where filmed so, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
+// c17's files as encoded from run i-sam-film17c-93e4f96 (main 93e4f96), their sha256 each: another capture's clip,
+// even of the same name, fails here.
+const C17 = Object.fromEntries((await readFile(new URL("./clips-c17.sha256", import.meta.url), "utf8")).trim().split("\n").map((l) => l.split(/\s+/).reverse()));
+
+test("the clips are c17's alone, light and dark for each slide, each in AV1, H.264 and its poster, none over 500 KiB", async () => {
   const set = (theme, keys) => keys.flatMap((k) => ["en", "fr"].flatMap((l) => ["jpg", "mp4", "webm"].map((e) => `${k}-${l}-${theme}.${e}`)));
   const have = (await readdir(join(dist, "clips"))).sort();
-  const darkKeys = KEYS.filter((k) => have.some((n) => n.startsWith(`${k}-`) && n.includes("-dark.")));
-  assert.deepEqual(have, [...set("light", KEYS), ...set("dark", darkKeys)].sort());
-  for (const name of have) assert.ok((await stat(join(dist, "clips", name))).size <= 500 * 1024, `${name} is over 500 KiB`);
+  assert.deepEqual(have, [...set("light", KEYS), ...set("dark", KEYS)].sort());
+  assert.deepEqual(Object.keys(C17).sort(), have);
+  for (const name of have) {
+    const bytes = await readFile(join(dist, "clips", name));
+    assert.ok(bytes.length <= 500 * 1024, `${name} is over 500 KiB`);
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), C17[name], `${name} is not c17's`);
+  }
   for (const lang of ["en", "fr"]) {
     const html = await page(lang);
-    for (const k of KEYS) assert.equal(new RegExp(`data-clip="/clips/${k}-${lang}" data-dark`).test(html), darkKeys.includes(k), `${lang} ${k}: the moon's clip said wrong`);
+    for (const k of KEYS) assert.match(html, new RegExp(`data-clip="/clips/${k}-${lang}" data-dark`), `${lang} ${k}: the moon shows no dark clip`);
   }
 });
 
