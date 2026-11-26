@@ -61,14 +61,20 @@ may rewrite a segment's `text` (below). Every line has a `type`.
   changed but a voice given, below. A reader reads the text as it finds it; `edited` absent is the text as heard.
 - **A voice given, once complete** (#1244). After its `complete` line, and never while it is made again,
   the shell may set one segment's `voice` on the user's word and set its `given` to when: a label of
-  one line as above, one the producer told or a new one, or `null` for a voice the person says is not
-  known. The file replaced whole, as for a correction, its lines in the same order, nothing else
-  changed. A reader reads the voice as it finds it, given or told.
+  one line as above, of the person's own, or `null` for a voice the person says is not known. A
+  person's labels and a producer's never meet: a label a person gives starts with `#`, and a producer
+  never writes one that does — the schema cannot say it, the comparator deciding no condition between
+  two fields. Naming a voice the producer told gives it to each of its segments, a label of the person's
+  own on each with its `given`: a producer's label holds within one transcript only, and a name kept on
+  it would pass to someone else once the transcript is made again. The file replaced whole, as for a
+  correction, its lines in the same order, nothing else changed. A reader reads the voice as it finds
+  it, given or told.
 - **A given voice outlives a transcript made again** (D113). A transcript made again writes new
   segments, with new times, so a given voice is not known by `speaker` and `start`: it is known by
-  its track and its stretch of the clock, from `start` to `end`. Once the new transcript is complete,
-  a new segment of the same track whose middle falls within a given segment's stretch takes its
-  `voice` and `given` — when it falls within two, those of the one given last. The shell carries them over, not the producer, and a given segment that no
+  its track and its stretch of the clock, from `start` to `end`, both ends included. Once the new
+  transcript is complete, a new segment of the same track whose middle falls within a given segment's
+  stretch takes its `voice` and `given` — when it falls within two, those of the one given last, its
+  `given` read as an instant, not as text. The shell carries them over, not the producer, and a given segment that no
   new segment falls within is said to the user, never dropped silently.
 - **What the making cost, in time and money, is said only when known** (D97). `made_in` is the
   producer's own measure of one step that made the whole transcript, from its start to its last
@@ -110,8 +116,9 @@ version for it. [`test.schema.json`](./test.schema.json) says what the line is.
   another file, made again from the audio.
 - It never names a person: `me` is whoever recorded, `others` is everyone else, however many
   they are.
-- It never writes or keeps a voice's embedding, nor any measure of a voice, and never compares
-  voices across meetings: a voice is a label, told within one transcript or given by a person. A
+- It never writes or keeps a voice's embedding, nor any measure taken from a voice's sound — an
+  embedding, a print —, and never compares voices across meetings (a confidence a producer gives a
+  label is not one, and this version carries none): a voice is a label, told within one transcript or given by a person. A
   template kept to recognise a person again is biometric data (GDPR art. 9; EDPB Guidelines 3/2019,
   §80–82); a producer that tells voices apart keeps what it measures in memory, for that run alone.
 - It never promises that the segments of `me` and `others` do not overlap: people speak at

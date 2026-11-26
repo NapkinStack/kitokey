@@ -210,7 +210,7 @@ EXAMPLES = {
                 "type": "segment",
                 "speaker": "others",
                 "track": "remote",
-                "voice": "3",
+                "voice": "#3",
                 "given": "2026-11-26T10:02:00+01:00",
                 "start": 8.0,
                 "end": 9.0,

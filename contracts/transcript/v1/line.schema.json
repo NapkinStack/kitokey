@@ -82,7 +82,7 @@
           "description": "When the user corrected this segment's text, once the transcript was complete (ADR-0014). Absent: as the engine heard it."
         },
         "given": {
-          "description": "When a person gave this segment its voice, once the transcript was complete: RFC 3339 with its offset, as the page says — the page's promise, not this schema's. Absent: the voice is the producer's. It comes with voice, never without.",
+          "description": "When a person gave this segment its voice, once the transcript was complete: RFC 3339 with its offset, as the page says — the page's promise, not this schema's. Absent: the voice is the producer's. It comes with voice, never without; that voice is then a person's label, starting with #, or null — the page's promise too: the comparator cannot decide a condition between two fields.",
           "type": "string",
           "minLength": 1,
           "not": {

@@ -71,7 +71,7 @@ meeting's own names for who spoke (#1205):
 |---|---|
 | `me`, optional | Who is on the `local` track, the person who records — shown where the shell says « Vous » |
 | `others`, optional | Who is on the `remote` track, for a call of two — shown where the shell says « Les autres » |
-| `voices`, optional | For a voice `transcript/v1` tells apart, keyed `<track>/<voice>` — its track, `local` or `remote`, then its label as `transcript/v1` writes it, any one line, the first `/` parting them —: its name. The voice may be one `transcript/v1` tells apart or one a person gave there (its `given`): the shell names either the same way |
+| `voices`, optional | For a voice `transcript/v1` tells apart, keyed `<track>/<voice>` — its track, `local` or `remote`, then its label as `transcript/v1` writes it, any one line, the first `/` parting them —: its name. The voice may be one `transcript/v1` tells apart or one a person gave there (its `given`, a label starting with `#`). A name on a producer's label lasts as long as that transcript: a voice the producer told is named by giving it to its segments first, a label of the person's own, and that label is the one named here, so that the name outlives a transcript made again |
 
 - **A name** is one line, 1 to 60 characters, plain text: shown as text, never read as markup or as a path.
 - **Which name a segment takes**: its voice's name, else its speaker's — `me` for `local`, `others` for `remote` —;

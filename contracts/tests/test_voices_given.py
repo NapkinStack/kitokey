@@ -30,12 +30,17 @@ def test_a_segment_may_say_its_voice_was_given_and_when():
     segment = next(kind for kind in LINE["oneOf"] if kind["properties"]["type"].get("const") == "segment")
     assert "given" in segment["properties"] and "given" not in segment["required"]
     assert segment.get("dependentRequired", {}).get("given") == ["voice"]
-    assert READS.is_valid({**SEGMENT, "voice": "2", "given": "2026-11-26T10:02:00+01:00"})
+    assert READS.is_valid({**SEGMENT, "voice": "#2", "given": "2026-11-26T10:02:00+01:00"})
     assert READS.is_valid({**SEGMENT, "voice": None, "given": "2026-11-26T10:02:00+01:00"})
     assert READS.is_valid({**SEGMENT, "voice": "2"}), "a voice an engine told, given by no one, reads as before"
     for wrong in ("", None, 1763023330, "2026-11-26T10:02:00+01:00\n", "a\rb"):
-        assert not READS.is_valid({**SEGMENT, "voice": "2", "given": wrong}), wrong
+        assert not READS.is_valid({**SEGMENT, "voice": "#2", "given": wrong}), wrong
     assert not READS.is_valid({**SEGMENT, "given": "2026-11-26T10:02:00+01:00"}), "given with no voice"
+    # A person's labels and a producer's never meet (ines, #1251's sheet): a person's starts with `#`, a producer's
+    # never. A condition between two fields the comparator cannot decide (it refused one): the page says it.
+    assert READS.is_valid(
+        {**SEGMENT, "speaker": "me", "track": "local", "voice": "#1", "given": "2026-11-26T10:02:00Z"}
+    )
 
 
 def test_who_spoke_says_a_voice_is_estimated_or_given():
@@ -77,9 +82,40 @@ def test_no_voice_embedding_is_ever_written_or_kept():
 def test_a_voice_the_shell_names_may_be_told_or_given():
     row = next(line for line in SESSION.splitlines() if line.startswith("| `voices`, optional |"))
     assert "No producer tells voices apart yet" not in row
-    assert "one `transcript/v1` tells apart or one a person gave there (its `given`)" in flat(row)
+    assert (
+        "one `transcript/v1` tells apart or one a person gave there (its `given`, a label starting with `#`)"
+        in flat(row)
+    )
 
 
 def test_once_complete_a_line_is_rewritten_only_for_a_persons_text_or_voice():
     never = flat(TRANSCRIPT.split("## What it never does", 1)[1].split("## ", 1)[0])
     assert "rewrites one only for a person's correction of its `text` or a voice a person gave it" in never
+
+
+def test_a_persons_labels_and_a_producers_never_meet():
+    said = bullet(TRANSCRIPT, "- **A voice given, once complete**")
+    assert "a label a person gives starts with `#`, and a producer never writes one that does" in said
+
+
+def test_naming_a_told_voice_gives_it_to_each_of_its_segments():
+    """A producer's label holds within one transcript only: a name kept on `remote/2` would pass to someone
+    else at a redo, silently (ines, G4 of #1251)."""
+    said = bullet(TRANSCRIPT, "- **A voice given, once complete**")
+    assert "Naming a voice the producer told gives it to each of its segments" in said
+    assert "a producer's label holds within one transcript only" in said
+    row = flat(next(line for line in SESSION.splitlines() if line.startswith("| `voices`, optional |")))
+    assert "a voice the producer told is named by giving it to its segments first" in row
+    assert "A name on a producer's label lasts as long as that transcript" in row
+
+
+def test_the_redo_rule_is_exact_at_its_edges():
+    said = bullet(TRANSCRIPT, "- **A given voice outlives a transcript made again**")
+    assert "both ends included" in said
+    assert "`given` read as an instant, not as text" in said
+
+
+def test_a_confidence_on_a_label_is_not_a_measure_of_a_voice():
+    never = flat(TRANSCRIPT.split("## What it never does", 1)[1].split("## ", 1)[0])
+    assert "nor any measure taken from a voice's sound — an embedding, a print" in never
+    assert "a confidence a producer gives a label is not one" in never
