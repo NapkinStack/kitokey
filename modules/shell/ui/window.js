@@ -239,7 +239,7 @@ const BRANDS = { discord: ["discord-symbol.svg"], openrouter: ["openrouter-glyph
 function brandMark(brand, fallback) {
   const files = BRANDS[brand];
   if (!files) return icon(fallback);
-  const mark = element("span", "brand");
+  const mark = element("span", "brand-mark");
   files.forEach((file, index) => {
     const image = element("img", files.length > 1 ? (index ? "on-dark" : "on-light") : "");
     image.src = `brands/${file}`;
