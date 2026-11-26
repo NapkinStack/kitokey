@@ -31,6 +31,7 @@ fn the_example_is_placed_as_a_meeting_of_its_language_dated_when_tried() {
         let it = listed.iter().find(|listed| listed.folder == folder).unwrap();
         assert_eq!(it.state, State::Done);
         assert_eq!(it.started, NOW);
+        assert_eq!(it.title.as_deref(), Some(title), "{language:?}: listed by its title");
         let seconds = sessions::length(&folder).unwrap();
         assert!((30.0..=60.0).contains(&seconds), "{seconds}");
     }

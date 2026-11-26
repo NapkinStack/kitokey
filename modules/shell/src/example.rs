@@ -55,20 +55,21 @@ pub fn place(meetings: &Path, language: Language, now: &str) -> io::Result<PathB
         })
         .find(|folder| !folder.exists())
         .expect("a free name");
-    // Made beside, then named: a meeting the list reads is whole.
-    let draft = meetings.join(format!(".{}.part", folder.file_name().unwrap().to_string_lossy()));
-    let _ = fs::remove_dir_all(&draft);
-    fs::create_dir(&draft)?;
+    // `session.json` last, written beside and renamed: a folder without it is no meeting, so the list
+    // never reads one half made — its title not there yet.
+    fs::create_dir(&folder)?;
+    let mut session = None;
     for (name, bytes) in *files {
-        let bytes = if *name == "session.json" {
-            dated(bytes, now)?
+        if *name == "session.json" {
+            session = Some(dated(bytes, now)?);
         } else {
-            bytes.to_vec()
-        };
-        fs::write(draft.join(name), bytes)?;
+            fs::write(folder.join(name), bytes)?;
+        }
     }
-    fs::write(draft.join("language"), format!("{code}\n"))?;
-    fs::rename(&draft, &folder)?;
+    fs::write(folder.join("language"), format!("{code}\n"))?;
+    let beside = folder.join(".session.json.part");
+    fs::write(&beside, session.expect("a session.json in each example"))?;
+    fs::rename(&beside, folder.join("session.json"))?;
     Ok(folder)
 }
 

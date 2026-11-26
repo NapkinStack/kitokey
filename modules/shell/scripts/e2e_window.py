@@ -5478,8 +5478,11 @@ def example_tried(now: dt.datetime) -> None:
               sorted(path.name for path in folder.iterdir()) if folder.is_dir() else [])
         heard = (WORK / "hearing-args").read_text() if (WORK / "hearing-args").exists() else ""
         check("its own folder heard, by the real step's program", str(folder) in heard, heard)
-        listed = wait_for(browser, lambda b: "Exemple : point sur la version 2" in b.find_element(By.ID, "sidebar").text, 10)
-        check("listed by its title, which says it is an example", listed, browser.find_element(By.ID, "sidebar").text)
+        # Read from the row, as a title is: the sidebar's narrow `.day` clips it from WebDriver's visible text.
+        row_title = ("const r = [...document.querySelectorAll('#groups .session')].find(r => r.getAttribute('href').endsWith('/example-fr'));"
+                     " return r ? r.querySelector('.day').textContent : null")
+        listed = wait_for(browser, lambda b: b.execute_script(row_title) == "Exemple : point sur la version 2", 10)
+        check("listed by its title, which says it is an example", listed, browser.execute_script(row_title))
         time.sleep(1)
         check("sent nowhere, a destination set up (D126)", not calls.exists(),
               calls.read_text() if calls.exists() else "")
