@@ -1822,6 +1822,7 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
     go.textContent = model ? fill(doing, model) : fallback;
     if (version) box.hidden = pick.value === made;
     pick.title = pick.options[pick.selectedIndex]?.textContent ?? "";
+    fitToChoice(pick);
   };
   if (version) box.hidden = true;
   const listed = (offered) => {
@@ -1881,6 +1882,23 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
   pick.addEventListener("change", changed);
   name();
   return [pick, said];
+}
+
+// A list in a sentence as wide as the name it shows, never as its longest option (#1231): a native list takes its
+// longest option's width, « m » then followed by a gap as wide as « Whisper large v3 turbo ». Narrower than its
+// line, the CSS's max-width cuts it with an ellipsis. Measured once on the page, and again once its fonts are in.
+const fitting = document.createElement("canvas").getContext("2d");
+function fitToChoice(pick, frames = 10) {
+  if (!pick.isConnected) {
+    if (frames > 0) requestAnimationFrame(() => fitToChoice(pick, frames - 1));
+    return;
+  }
+  const style = getComputedStyle(pick);
+  fitting.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  const text = pick.options[pick.selectedIndex]?.textContent ?? "";
+  const room = ["paddingLeft", "paddingRight", "borderLeftWidth", "borderRightWidth"].reduce((sum, side) => sum + (parseFloat(style[side]) || 0), 0);
+  pick.style.width = `${Math.ceil(fitting.measureText(text).width + room)}px`;
+  if (document.fonts.status !== "loaded") document.fonts.ready.then(() => fitToChoice(pick, 0));
 }
 
 // The one button beside a version's list that starts its making again with the model chosen (D93).
@@ -2168,7 +2186,8 @@ function minutesCard(read, words, session, transcript, onPage, previous, otherVe
     was.id = "page-minutes-was";
     box.append(was, go);
     // The version's model: the one its line names, made here unless a host says otherwise.
-    const version = { said: by, is: (chosen, offered) => chosen.model === read.model
+    // Its list names the model alone when the line says « sur cet ordinateur » after it (#1231).
+    const version = { said: placed ? modelSaid(read.model) : by, is: (chosen, offered) => chosen.model === read.model
       && (read.provider && read.provider !== "local" ? via(chosen.provider) === read.provider : chosen.provider === offered.ollama_address) };
     const [pick, said] = modelOnPage(onPage, words, "minutes", version, go, words.redo_minutes_do, words.redo_title, box);
     card.append(lineWith(maker, pick), said, box);
