@@ -52,7 +52,7 @@ deliverables:
   - id: D125
     title: "The compact bar simplified"
     module: shell
-    state: deferred       # the decider's additions of 2026-11-26 (D129, D130) take its place in the week; in Later
+    state: ready
     acceptance:
       - "Given the bar at rest, when it is drawn, then it holds the context's field (« De quoi parle l'appel ? Qui est là ? »), record and expand; while it records, the time, the two voices' meters (blue, amber), stop, and one disclosure for the context, « Confidentielle » (the same switch as the page's) and the microphone — no engine, no language; a failure is said in two lines then « Ouvrir », never cut in a word; no focus ring shows until the keyboard is used; held by the e2e, axe-core and its shots, in both languages and themes"
   - id: D126
@@ -131,14 +131,15 @@ flowchart LR
 grey, dotted: the words, rewritten with each screen and checked across them.
 
 **One week, done well and fast** (the decider, 2026-11-26): only the backlog's P1 items are criteria; its P2
-and P3 items are in *Later*. **D127 and D128 are P2**: in the cycle, built only if the time remains once D121 to
-D126 and D129, D130 are merged, deferred at the closure otherwise — never stretching the end.
+and P3 items are in *Later*. **D127, D128 and D130 are P2**: in the cycle, built only if the time remains once
+D120 to D126 and D129 are merged, deferred at the closure otherwise — never stretching the end.
 
 **Added by the decider, 2026-11-26** (relayed by the coordinator): the kept versions managed (D121, P1), and the
 formats managed (D129, D130, P1). A format the user makes changes a contract — `summarising/v1` takes only its six
 built-in structures (D111) — so it is two deliverables in two modules, the contract's expand step first, never in
-one pull request (kernel §4). To fit them in the week, **D125 (the compact bar) goes to *Later***, marc taking
-D129 after D124; D127 and D128 stay P2. *(framer, to confirm: what goes out is the decider's to choose.)*
+one pull request (kernel §4). The decider keeps D125 (the compact bar) in the cycle, P1. To fit the week,
+**D130 slips to P2** — D129, the contract's expand step, stays P1 so that the formats can be built as soon as
+time allows, this cycle or the next —; D127 and D128 stay P2. *(framer, to confirm.)*
 
 **How the work moves** — D120 first and blocking; then five in parallel; one pull request per screen, within
 **800 lines**, with its screenshots before and after, attested right after its sheet is signed:
@@ -148,20 +149,20 @@ D129 after D124; D127 and D128 stay P2. *(framer, to confirm: what goes out is t
 | 1–2 | **D120** — `tokens.css` with the old names as aliases (no visible change), then the button, banner, toast, dialog, option card, progress, engine card; the gallery; the test in report mode | lina | `ui/tokens.css`, `ui/components.css`, `ui/gallery.html`, `tests/look.rs` |
 | 2–6 | **D121** — a meeting's page | lina | the page's part of `window.js`, `window.css`'s layout |
 | 2–6 | **D126** — the first run, the example meeting, the default « rédiger » | ines | the first run's part of `window.js`, `settings.rs`, the clip under `ui/` |
-| 2–6 | **D122** then **D123** — the engine card wired in Settings, the first run and « Refaire »; Settings in tabs | sam | Settings' part of `window.js`, `src/main.rs`'s offer of engines |
+| 2–5 | **D122** then **D123** — the engine card wired in Settings, the first run and « Refaire »; Settings in tabs | sam | Settings' part of `window.js`, `src/main.rs`'s offer of engines |
+| 5–6 | **D125** — the compact bar, its engine choice gone with D122 | sam | the bar's part of `window.js` |
 | 2–4 | **D124** — `docs/voice.md`, `src/words.rs`, `tests/words.rs` | marc | `words.rs`, `voice.md`, `tests/words.rs` |
 | 4–6 | **D129** — `summarising/v1` expanded, the summary module writing a format it is given | marc | `contracts/summarising/`, `modules/summary/` |
-| 4–6 | **D130** — formats managed in Settings and chosen in « Refaire », once D129 is merged | sam, after D123 | Settings' formats, its own file under `ui/` |
-| 6–7 | **D127**, **D128** — only if the time remains | the first stream done | `window.js`'s search, a palette file of its own |
+| 6–7 | **D127**, **D128**, **D130** — only if the time remains, D130 first | the first stream done | `window.js`'s search, a palette file, Settings' formats in a file of its own |
 
 New code of a screen goes in a file of its own under `ui/` where it can — the first run's, the palette's —, to
 keep the streams off each other's lines in `window.js`. The verifiers rotate: no one verifies their own stream,
 and a verifier signs the screen of a stream they do not touch that day.
 
 **The critical path**: D120's tokens and components (two days) → D121, the largest screen (three to four days)
-→ its attest and merge, serial on the shell → the closure on day 7. A second path, as long: D124 → D129's
-contract step → D130 on the shell, whose attest comes after D129 is merged. **The risk of the week** is that
-second path: if D129 is not merged by day 5, D130 goes to *Later* with it, said at the closure. D120 slipping a day takes it from every
+→ its attest and merge, serial on the shell → the closure on day 7. A second path: D122 → D123 → D125 for sam,
+who holds three screens. **The risk of the week**: the shell's attests, serial on one machine, five screens
+asking in the last two days; each is attested as soon as its sheet is signed. D130 waits on D129's merge. D120 slipping a day takes it from every
 stream; its first pull request — the tokens alone, no visible change — merges first so that the others start.
 The shell's attests run one at a time on the machine: each pull request is attested as soon as it is signed,
 never batched at the end.
@@ -265,7 +266,6 @@ readable.
 
 ## Later
 
-- **D125, the compact bar** — deferred to make room for D129 and D130; its criterion stays in the front matter.
 - **Importing an audio or video file**, « Nouveau ▾ » and a file dropped on the window — `benchmark.md` §5, backlog item 23.
 - **Outlook** in « Agenda » — cycle 11's D115 made its link; its trial waits on a colleague.
 - **Names by passage** — #1230's S2 (the contract step of `transcript/v1`) and S3 (a service's speakers).
