@@ -1,9 +1,9 @@
 ---
-goal: "Kitokey is simple and beautiful: one design system in its code, and the screens a newcomer meets — the first run to their first summary, a meeting's page, the engine, Settings, the bar, the search — recomposed on it, in words read without learning Kitokey's own"
+goal: "Kitokey is simple and beautiful: one design system in its code, and the screens a newcomer meets — the first run to their first summary, a meeting's page, the engine, Settings, the bar — recomposed on it, in words read without learning Kitokey's own"
 status: proposed          # proposed | accepted | closed | stopped — the decider accepts
-appetite_weeks: 3         # open: set with the decider (Open questions); 3 is a placeholder, not a proposal
+appetite_weeks: 1         # the decider, 2026-11-26, relayed by the coordinator: one week at most, done well and fast
 start: 2026-12-04         # cycle 11's end; moves to cycle 11's closure when it comes first (framing.md §3)
-end: 2026-12-25           # start + appetite: moves with the appetite the decider sets
+end: 2026-12-11           # start + appetite: the first day the cycle is over — the circuit breaker
 deliverables:
   - id: D120
     title: "Kitokey's design system lives in its code — one source of tokens, its components, a gallery — and a test refuses any value outside it; an export carries it to Claude Design, the code staying the source"
@@ -21,7 +21,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given a meeting's page, when it is drawn, then one bar of actions holds « Partager ▾ », « Agenda (n) » once a date is found, « Refaire ▾ » and « ⋯ », each with its words and its icon — no action of the bar is an icon alone, its accessible name beginning with its visible words (WCAG 2.5.3) —; the focus order is the sidebar, the page's header and its actions, the tabs, the content; held by the e2e and axe-core, in both languages and themes"
-      - "Given a meeting with a summary, when « Partager » opens, then it offers its channels — with none, « Ajouter un canal », opening the channel's form in a sheet of the page, not Settings —, « Copier », « Exporter en PDF » and « Exporter en Markdown », which write the file through `exporting/v1` (D108, D109) where the user chooses; a confidential meeting's sends are asked again as PDR-0007 says; a send that succeeded turns the button into « Envoyé à #canal » for 2 s, then the header keeps it, said once (#1252); held by the e2e, the file's first bytes read"
+      - "Given a meeting with a summary, when « Partager » opens, then it offers its channels — with none, « Ajouter un canal », opening the channel's form in a sheet of the page, not Settings —, « Copier », « Exporter en PDF » and « Exporter en Markdown », which write the file through `exporting/v1` (D108, D109) where the user chooses; a confidential meeting's sends are asked again as PDR-0007 says; a send is said once (#1252); held by the e2e, the file's first bytes read"
       - "Given the redo controls of today — « Refaire avec X », « Revenir à la version précédente (X) » and its explanation, on each card —, when « Refaire ▾ » opens, then it offers « Refaire… », opening a dialog with the engine card (D122), and « Versions », listing the kept ones; going back to a version says it in a toast with « Annuler »; « Refaire avec » never names the engine that already made the version shown; held by the e2e"
       - "Given a window narrower than 1400 px, when the page is drawn, then the summary and the transcript are two tabs — « Compte rendu », « Transcription », WAI-ARIA's tabs pattern —; at 1400 px and more, side by side; the context, the spoken language, the engines used and the folder live in « Détails de la réunion », folded; « Confidentielle » is a pill of the header, violet with the lock (PDR-0008); the player shows only when its audio plays; a failure is said in one banner above the tabs; at 420 px the player and the tabs are in the first screen; held by the e2e at 420, 1100 and 1920 px"
       - "Given « Mettre à la corbeille » in « ⋯ », when it is chosen, then a dialog asks « Mettre cette réunion à la corbeille ? », says what goes and that it can be restored, « Annuler » focused, its confirm button destructive (PDR-0008); held by the e2e, Escape keeping the meeting"
@@ -62,7 +62,6 @@ deliverables:
       - "Given a first run, when it starts, then it is three screens: (1) two option cards, « Sur cet ordinateur » and « En ligne », « Je ne sais pas » choosing « Sur cet ordinateur », the engine's download starting at once in the background; (2) the sound checked inline, the two meters moving, a progress under it saying what is prepared, its size and the time left; (3) « Prêt. Enregistrez votre premier appel », the record button and the shortcut, and « Essayer sur un exemple »; held by the e2e, each screen shot in both languages and themes"
       - "Given a new install, when its settings are first written, then « Après un enregistrement » is « Transcrire, puis rédiger le compte rendu », so that the first meeting has its summary without a click; a settings file that already says another choice keeps it; held by `settings.rs`'s tests"
       - "Given « Essayer sur un exemple », when it is chosen, then a two-voice clip of about 45 s bundled with Kitokey, invented for it, runs through the real transcription and summary and opens as a meeting marked « Exemple », deletable as any; held by the e2e with its engines' stand-ins, its size recorded against D102's package size"
-      - "Given the first meeting's summary, when it is shown the first time, then it says once that it is the first, with one action, « Partager », and never again once closed; held by the e2e and a flag of the settings"
   - id: D127
     title: "Finding a meeting by what was said: a search in the summaries and the transcripts, its passages shown, a result opening the meeting at its line"
     module: shell
@@ -116,14 +115,34 @@ flowchart LR
 **Legend** — blue: first, the others read its tokens and components; arrows: what a deliverable waits on;
 grey, dotted: the words, rewritten with each screen and checked across them.
 
-**How the work moves**: D120's tokens and first components first; then D126, D121 and D122 side by side —
-separate surfaces, one shared component —; D124 with each screen; D127 and D128 last. Screen by screen, each
-pull request within **800 lines**, each with its screenshots before and after. The design system's test starts
-in « report » mode — a count it can only lower — and is strict at the closure.
+**One week, done well and fast** (the decider, 2026-11-26): only the backlog's P1 items are criteria; its P2
+and P3 items are in *Later*. **D127 and D128 are P2**: in the cycle, built only if the time remains once D121 to
+D126 are merged, deferred at the closure otherwise — never stretching the end.
 
-**The backlog of the second pass** (`screens-and-delight.md` §7, 24 items) is in the deliverables below:
-its P1 items are their criteria; its P2 items are listed in each section, done if the appetite allows, else
-deferred at the closure; its P3 items are in *Later*.
+**How the work moves** — D120 first and blocking; then five in parallel; one pull request per screen, within
+**800 lines**, with its screenshots before and after, attested right after its sheet is signed:
+
+| Day | Stream | Who *(framer, proposed)* | Files mostly its own |
+|---|---|---|---|
+| 1–2 | **D120** — `tokens.css` with the old names as aliases (no visible change), then the button, banner, toast, dialog, option card, progress, engine card; the gallery; the test in report mode | lina | `ui/tokens.css`, `ui/components.css`, `ui/gallery.html`, `tests/look.rs` |
+| 2–6 | **D121** — a meeting's page | lina | the page's part of `window.js`, `window.css`'s layout |
+| 2–6 | **D126** — the first run, the example meeting, the default « rédiger » | ines | the first run's part of `window.js`, `settings.rs`, the clip under `ui/` |
+| 2–6 | **D122** then **D123** — the engine card wired in Settings, the first run and « Refaire »; Settings in tabs | sam | Settings' part of `window.js`, `src/main.rs`'s offer of engines |
+| 2–6 | **D124** — `docs/voice.md`, `src/words.rs`, `tests/words.rs`; then **D125**, the bar | marc | `words.rs`, `voice.md`, the bar's part of `window.js` |
+| 6–7 | **D127**, **D128** — only if the time remains | the first stream done | `window.js`'s search, a palette file of its own |
+
+New code of a screen goes in a file of its own under `ui/` where it can — the first run's, the palette's —, to
+keep the streams off each other's lines in `window.js`. The verifiers rotate: no one verifies their own stream,
+and a verifier signs the screen of a stream they do not touch that day.
+
+**The critical path**: D120's tokens and components (two days) → D121, the largest screen (three to four days)
+→ its attest and merge, serial on the shell → the closure on day 7. D120 slipping a day takes it from every
+stream; its first pull request — the tokens alone, no visible change — merges first so that the others start.
+The shell's attests run one at a time on the machine: each pull request is attested as soon as it is signed,
+never batched at the end.
+
+**The backlog of the second pass** (`screens-and-delight.md` §7, 24 items): its P1 items are the criteria
+below; P2 and P3 are in *Later*, D127 and D128 aside.
 
 ## Deliverables
 
@@ -141,10 +160,6 @@ first pull request checks it with a simulator of the three deficiencies and keep
 Order: (1) `tokens.css`, the old names kept as aliases — no visible change, the shots identical; (2) the
 button, the banner, the toast, the dialog, the option card, the progress; (3) the gallery and the export.
 
-*If the appetite allows (P2)*: the empty state with five illustrations in the tokens' colours (list,
-transcript, summary, search, making room) — `screens-and-delight.md` §4; the motion tokens and the
-micro-interactions of starting, stopping, a summary ready and a send — each with a static equivalent under
-reduced motion.
 
 **Claude Design**: `scripts/design-export` writes the folder; publishing it as the « Design System » artifact
 is a gesture (*What needs a person*). The code stays the source; the artifact is never edited.
@@ -155,9 +170,6 @@ is a gesture (*What needs a person*). The code stays the source; the artifact is
 the default view is what one acts on, the rest one click away. The export is `exporting/v1`'s, which the shell
 consumes already (D109): no contract changes. « Ajouter un canal » opens the same form as Settings, in a sheet.
 
-*If the appetite allows (P2)*: empty sections of a summary hidden, an empty « Actions » said in one muted line
-« Aucune action relevée » — this replaces #1234's « Rien de noté » under every empty title —; the speaker's name
-said only when the speaker changes; the first summary's celebration is D126's.
 
 ### D122
 
@@ -166,16 +178,12 @@ summary, each done by a **moteur** (PDR-0008), on this computer or online. « Au
 tells its users to leave it on
 ([Granola](https://docs.granola.ai/help-center/getting-more-from-your-notes/understanding-model-selection-in-granola-chat)).
 
-*If the appetite allows (P2)*: an estimate from the first meeting — each engine's speed measured on reference
-machines, said « environ 3 min (estimation) » until a local measure replaces it (`speeds.rs`).
 
 ### D123
 
 `ux-ia.md` §2, its five tabs; `screens-and-delight.md` §5.4, three depths — the tab, « Avancé », the developer
 mode (D29). D123's first pull request lists every setting of today with its tab.
 
-*If the appetite allows (P2)*: the trial said in a quiet line of the sidebar from three days before its end;
-once over, the record button becomes « Acheter », the one primary action.
 
 ### D124
 
@@ -184,8 +192,6 @@ the voice guide, the tests across them, and the three contradictions, and closes
 passes. Where a message should become UI (`messages.md` §6) — a badge, a progress, a lock pill —, the screen's
 deliverable builds it.
 
-*If the appetite allows (P2)*: no button label over 28 characters in either language, held by a test of
-`tests/words.rs`.
 
 ### D125
 
@@ -219,7 +225,7 @@ readable.
 
 | Deliverable | Who | The literal gesture |
 |---|---|---|
-| The cycle | The decider | Read this file and PDR-0008 from their pull request; say the appetite in weeks; approve the pull request, or say what changes |
+| The cycle | The decider | Read this file and PDR-0008 from their pull request; approve it, or say what changes |
 | D126 | The decider | Read the ADR « a private summary without installing Ollama by hand » from its pull request; say (a) or (b), or what changes |
 | D120 | The decider | Read the gallery's shots from D120's pull request; say « charte ok », or what changes |
 | D120 | An agent | Once D120 is merged: publish `design-system/` as the « Design System » artifact, updated in place at each release, its commit in its README |
@@ -239,14 +245,13 @@ readable.
 - **Outlook** in « Agenda » — cycle 11's D115 made its link; its trial waits on a colleague.
 - **Names by passage** — #1230's S2 (the contract step of `transcript/v1`) and S3 (a service's speakers).
 - **Quiet sounds**, opt-in, for starting, stopping and ready — backlog item 22 (P3).
+- **The P2 items of the backlog** (`screens-and-delight.md` §7): the empty states' illustrations and the micro-interactions (3, 4); empty sections of a summary hidden and the speaker said only when it changes (8) — #1234's « Rien de noté » stays until then —; the first summary's celebration (9); an estimate from the first meeting (11); the trial in the sidebar and « Acheter » when over (13); no button label over 28 characters (16).
 - « Dates mentionnées »'s count following the panel's day (marc, #1249).
 - The first run's aurora (`design-system.md` §5).
 
 ## Open questions
 
-**Blocking:**
-
-- **The appetite**: how many weeks does the decider want to spend? To be set with them; `end` follows it.
+**Blocking:** none — the appetite is one week (the decider, 2026-11-26).
 
 **À décider (by an ADR, before D126 builds the private path):**
 
