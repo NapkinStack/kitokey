@@ -1,9 +1,9 @@
 ---
 goal: "Kitokey is simple and beautiful: one design system in its code, and the screens a newcomer meets — the first run to their first summary, a meeting's page, the engine, Settings, the bar — recomposed on it, in words read without learning Kitokey's own"
-status: proposed          # proposed | accepted | closed | stopped — the decider accepts
+status: accepted          # the decider's approval of this pull request accepts it (#1255)
 appetite_weeks: 1         # the decider, 2026-11-26, relayed by the coordinator: one week at most, done well and fast
-start: 2026-12-04         # cycle 11's end; moves to cycle 11's closure when it comes first (framing.md §3)
-end: 2026-12-11           # start + appetite: the first day the cycle is over — the circuit breaker
+start: 2026-11-26         # cycle 11's early closure (#1257), on the decider's word of 2026-11-26
+end: 2026-12-03           # start + appetite: the first day the cycle is over — the circuit breaker
 deliverables:
   - id: D120
     title: "Kitokey's design system lives in its code — one source of tokens, its components, a gallery — and a test refuses any value outside it; an export carries it to Claude Design, the code staying the source"
