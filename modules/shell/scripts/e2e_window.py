@@ -482,19 +482,27 @@ def redo_offered(browser, panel: str, step: str) -> list[str]:
     return browser.execute_script("return [...document.getElementById(arguments[0]).options].map(o => o.textContent)", f"{panel}-{step}-model")
 
 
+def tokens(theme: str) -> str:
+    """A theme's roles as `ui/tokens.css` sets them: the light ones on `:root`, the dark ones under
+    Settings' dark (the same list as the system's, held by tests/look.rs)."""
+    css = re.sub(r"/\*.*?\*/", "", (Path(__file__).parent.parent / "ui" / "tokens.css").read_text(), flags=re.S)
+    start = css.index("--color-ground") if theme == "light" else css.index(':root[data-theme="dark"] {') + len(':root[data-theme="dark"] {')
+    block = css[start:css.index("}", start)].replace("color-scheme: dark;", "")
+    return " ".join(block.split())
+
+
 def shot_themed(browser, name: str, theme: str) -> None:
-    """A screenshot in its theme: the system's, or, where the desktop shows the other one, the theme
-    chosen on the page as Settings chooses it (D98, `ui/tokens.css`) — a dark one on a light desktop as a
-    light one on a dark desktop (D89) —, then the page's own choice put back."""
+    """A screenshot in its theme: the system's, or, where the desktop shows the other one, the theme's
+    roles put on the page itself — a dark one on a light desktop as a light one on a dark desktop (D89).
+    On the element's own style, as Settings' choice (D98) is not: the page applying that choice again
+    while the screenshot is taken changes nothing."""
     forced = (theme == "dark") != browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
     if forced:
-        was = browser.execute_script("const was = document.documentElement.getAttribute('data-theme'); "
-                                     "document.documentElement.setAttribute('data-theme', arguments[0]); return was", theme)
+        browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
         time.sleep(0.3)
     shot(browser, name)
     if forced:
-        browser.execute_script("if (arguments[0] === null) document.documentElement.removeAttribute('data-theme'); "
-                               "else document.documentElement.setAttribute('data-theme', arguments[0])", was)
+        browser.execute_script("document.documentElement.style.cssText = ''")
 
 
 def stop_from_small(browser) -> None:
