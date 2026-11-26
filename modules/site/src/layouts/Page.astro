@@ -1,14 +1,16 @@
 ---
-// Every page's head (D114): its title and description, hreflang both ways, and — until the decider
-// opens the site — noindex.
+// Every page's frame (D114, proposal D validated by the decider on 2026-11-25): its head — title,
+// description, hreflang both ways, the titles' face preloaded and, until the decider opens the site,
+// noindex —, the sticky nav with the theme's moon and sun and the other language, the background, and the footer.
 import "../styles/site.css";
 import { open } from "../../site.config.mjs";
 import { say } from "../lib/words.mjs";
 
-const { lang, title, description, path } = Astro.props;
+const { lang, title, description, path, kind, nav = [] } = Astro.props;
 const other = lang === "en" ? "fr" : "en";
 const site = Astro.site;
 const url = (l) => new URL(`/${l}/${path}`, site).href;
+const source = "https://github.com/NapkinStack/kitokey";
 ---
 <!doctype html>
 <html lang={lang}>
@@ -18,19 +20,51 @@ const url = (l) => new URL(`/${l}/${path}`, site).href;
     <title>{title}</title>
     <meta name="description" content={description} />
     {!open && <meta name="robots" content="noindex" />}
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#FBFBFD" />
     <link rel="canonical" href={url(lang)} />
     <link rel="alternate" hreflang="en" href={url("en")} />
     <link rel="alternate" hreflang="fr" href={url("fr")} />
     <link rel="alternate" hreflang="x-default" href={new URL("/", site).href} />
+    <link rel="icon" href="/kitokey.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <script src="/theme.js" is:inline></script>
+    <slot name="head" />
   </head>
   <body>
-    <header>
-      <a class="brand" href="/">Kitokey</a>
-      <a href={`/${other}/${path}`} hreflang={other} lang={other}>{say("other", lang)}</a>
+    <div class="mesh" aria-hidden="true"><i class="m1"></i><i class="m2"></i><i class="m3"></i><i class="m4"></i></div>
+    <a class="skip" href="#main">{say("skip", lang)}</a>
+    <header class="site-header">
+      <nav class="wrap nav" aria-label="Kitokey">
+        <a class="brand" href={`/${lang}/`}><img src="/kitokey.svg" width="28" height="28" alt="" />Kitokey</a>
+        {nav.length > 0 && <ul class="nav-links">{nav.map(([id, label]) => <li><a href={`#${id}`}>{label}</a></li>)}</ul>}
+        <button type="button" class="theme-toggle" aria-pressed="false" data-dark={say("theme", lang)[0]} data-light={say("theme", lang)[1]} aria-label={say("theme", lang)[0]} hidden>
+          <svg class="ico i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
+          <svg class="ico i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+        </button>
+        <a class="lang" href={`/${other}/${path}`} hreflang={other} lang={other} title={say("other", lang)}>
+          {other === "en" ? (
+            <svg class="flag" viewBox="0 0 30 20" aria-hidden="true" focusable="false"><rect width="30" height="20" fill="#24357A" /><path d="M0 0 30 20M30 0 0 20" stroke="#fff" stroke-width="4" /><path d="M0 0 30 20M30 0 0 20" stroke="#D2283A" stroke-width="1.6" /><path d="M15 0v20M0 10h30" stroke="#fff" stroke-width="6" /><path d="M15 0v20M0 10h30" stroke="#D2283A" stroke-width="3.4" /></svg>
+          ) : (
+            <svg class="flag" viewBox="0 0 30 20" aria-hidden="true" focusable="false"><rect width="10" height="20" fill="#2B4FA8" /><rect x="10" width="10" height="20" fill="#FFFFFF" /><rect x="20" width="10" height="20" fill="#E1393B" /><rect width="30" height="20" fill="none" stroke="#0003" /></svg>
+          )}
+          <span class="lang-code" aria-hidden="true">{other.toUpperCase()}</span><span class="sr-only">{say("other", lang)}</span>
+        </a>
+      </nav>
     </header>
-    <main><slot /></main>
-    <footer>
-      <a href={`/${lang}/privacy/`}>{say("privacy", lang)}</a>
+    <main id="main" class={kind}><slot /></main>
+    <footer class="site-footer">
+      <div class="wrap foot">
+        <div>
+          <a class="brand" href={`/${lang}/`}><img src="/kitokey.svg" width="24" height="24" alt="" />Kitokey</a>
+          <p>{say("publisher", lang)}</p>
+        </div>
+        <ul>
+          <li><a href={source}>{say("source", lang)}</a></li>
+          <li><a href={`/${lang}/privacy/`}>{say("privacy", lang)}</a></li>
+          <li><a href={`/${other}/${path}`} hreflang={other} lang={other}>{say("other", lang)}</a></li>
+        </ul>
+      </div>
     </footer>
   </body>
 </html>

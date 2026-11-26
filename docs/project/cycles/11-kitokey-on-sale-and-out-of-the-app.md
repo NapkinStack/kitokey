@@ -1,15 +1,17 @@
 ---
 goal: "Kitokey is ready to be sold on the Microsoft Store — a package Microsoft can certify, its listing, policy and screenshots ready — and a meeting leaves the app as the user wants it — a file to edit, a PDF, or a channel — from a summary shaped by its meeting's kind"
-status: accepted          # proposed | accepted | closed | stopped — the decider accepts
+status: closed            # proposed | accepted | closed | stopped — the decider accepts
 accepted_on: 2026-11-19   # « ok cycle 11 des que possible, ou en parallele »; starts at cycle 10's closure (C5)
 appetite_weeks: 2         # the time the decider WANTS to spend, not an estimate
 start: 2026-11-20         # cycle 10's closure, early, on the decider's « on termine le cycle en cours »
 end: 2026-12-04           # start + appetite: the first day the cycle is over — the circuit breaker
+outcome: shipped          # the decider closed it early, 2026-11-26: what is delivered ships, the rest deferred
+ended_on: 2026-11-26
 deliverables:
   - id: D102
     title: "The package for the Microsoft Store carries Kitokey's real identity, updates and licenses through the Store, and passes Microsoft's certification kit"
     module: install
-    state: ready
+    state: deferred       # at the early closure, 2026-11-26: the decider's Partner Center identity, its first criterion, not given; the package's other work merged — the submission next cycle
     acceptance:
       - "Given the identity Partner Center shows once the name is reserved, when CI builds the MSIX, then its `Identity` and `PublisherDisplayName` are Partner Center's, read from `identity.json` with no placeholder left — the build fails on one —, and the package installs, upgrades and is removed in CI as D54 already proves with the test certificate; held by CI's Windows job"
       - "Given the MSIX build, when it is made, then cycle 07's self-updater is off in it — the Store updates the package —, and its trial is the app's own — PDR-0005's rule, held by D83's counter, the Store's trial set to « Unlimited » in Partner Center and the Store selling the licence (the decider, 2026-11-20: « essai (a) ») —; held by a test of the build, each switch read from the built package"
@@ -17,41 +19,41 @@ deliverables:
   - id: D103
     title: "The Store's listing is ready: its screenshots in French and in English made by the e2e, its privacy policy, and the downloads it needs said"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given the window's e2e, when it runs, then it writes four screenshots per language — a meeting's page with its summary and transcript, a word sought in a meeting's transcript, the list filtered by a search, Settings with its models on this computer — at the size Microsoft's page for Store screenshots asks, that page's address and the day it was read written in D103's section before the first pull request, from meetings made for the e2e with nothing of a real one, each a meeting Kitokey's buyers hold, readable at a glance (amended by the decider, 2026-11-21: D103's section); held by a test that checks the files' count and size"
       - "Given `docs/store/listing.md`, when the screenshots are made, then the listing names them in the order the Store shows them; it links a privacy policy, in the repository, written to the voice guide — the microphone and the system's sound recorded, nothing leaving the computer by default, what leaves when the user chooses a service or a channel, and to whom —; it says before purchase what is downloaded and from where — Ollama, which Kitokey never installs, and the default Whisper model with its size —; and every promise of its text is one the product keeps, each line pointing to the deliverable or test that holds it"
   - id: D104
     title: "The shell's e2e can be trusted: a red names a defect, not the machine"
     module: shell
-    state: ready
+    state: deferred       # at the early closure, 2026-11-26: its fixes merged (#1032, #1035); the rate over 30 attests, its second criterion, not recorded
     acceptance:
       - "Given tauri-driver's ports, when two e2e run on the machine, then none takes the other's port (#943); given an exception in `main()`'s inline checks, then it is one FAIL named by its check and the checks after it still run (#957); held by tests of the harness, red on today's main"
       - "Given the e2e of every attest of the cycle, kept one file per attest, when the attests run after this deliverable's last fix are read — at least 30, or all of them up to the cycle's end, their count stated —, then the failure rate of each check on commits where it passed on another run, nothing changed, is under 2 %; the count and the method that counts it are written in the sheet; a flaky check found on the way is named, filed and quarantined with a date (`tests.md`), never skipped"
   - id: D105
     title: "Kitokey's speed is measured on the release package, and held by budgets"
     module: shell
-    state: ready
+    state: deferred       # at the early closure, 2026-11-26: not built: the baseline needs the machine alone, never found free in the week
     acceptance:
       - "Given the release package on Linux, when the baseline runs alone — in a window the coordinator plans with the queues empty, so that it neither measures their load nor takes D104's attests' machine —, then it records the cold start to the window drawn, the memory at rest — the shell's and its web view's proportional set size —, and the time to open a meeting's page with a transcript of an hour, each the median of ten runs, written with the commit and the machine in a file of the repository"
       - "Given the baseline, when the budgets are set, then each is the baseline plus a margin said with its reason, set against RAIL's 100 ms response and Apple's 400 ms launch to first frame, each source cited; the measure runs on the release pull request, alone, and fails it when a budget is exceeded; held by that run red on a change slowed on purpose"
   - id: D106
     title: "The surfaces a buyer sees first pass axe-core's AA rules and a checked list of WCAG 2.2 criteria"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given the list, the bar, a meeting's page and Settings, in both themes and both languages, when the e2e runs axe-core on each, then it reports no violation of its WCAG 2.2 AA rules; the page's bar reaches 3:1 for its parts (#954)"
       - "Given the same surfaces, when the criteria axe-core cannot judge are checked, then a list in D106's section names each — at least 2.4.7 focus visible, 2.4.11 focus not obscured by the sticky header or the sidebar, 2.5.7 the player's seek without dragging, 2.5.8 targets of 24 by 24 CSS pixels or spaced, 2.1.1 every control by keyboard alone —, each held by a check of the e2e"
   - id: D107
     title: "The paid path on macOS is decided: who sells it, how a licence is checked, how it updates"
     module: null
-    state: ready
+    state: accepted
     acceptance:
       - "Given PDR-0001's one-time price after a trial and the free Linux build, when the decision is written, then an ADR compares at least two merchants of record on their fee, their VAT handling and their licence API, a licence key's format and how the app checks it offline, and an updater for a notarised app, each claim sourced; it says what the Mac App Store would change, without deciding it; the decider accepts it or says what changes. No build in this cycle"
   - id: D108
     title: "A meeting's summary and transcript become a file to edit, a PDF or subtitles, from one model of the summary"
     module: export
-    state: ready
+    state: deferred       # at the early closure, 2026-11-26: Markdown, HTML, Word, subtitles and the PDF's faces merged; its delivery not recorded by its holder
     acceptance:
       - "Spike first: given typst as a library (`typst`, `typst-pdf`), when a release build of the program that writes the PDF is measured, then its added size is recorded against D102's package size and a threshold of 15 MB on Linux, and the scripts it renders with the font bundled — Latin with U+00A0 and U+202F, Cyrillic, CJK if the font covers it, emoji — and whether its PDF/UA-1 output exists in that version; under the threshold, typst writes the PDF; over it, the PDF goes to *Later* with the number, recorded in the module's log issue"
       - "Given a meeting's folder with its `minutes` and its transcript, when `export` writes it, then its model reads the summary's sections as an ordered list — `minutes/v4`'s three mapped to it, `minutes/v5`'s named ones as they come (D111) — and writes Markdown — CommonMark with a GFM table and a YAML front matter: title, date, duration, models —, HTML with `lang` set and real headings, DOCX with Word's heading styles, SRT and VTT from the transcript, and a tagged PDF when the spike allows it; what is included — summary, transcript, speakers, times — is the caller's choice; held by the module's tests, each format opened back by a reader (pulldown-cmark, docx-rs, a PDF text extractor, a subtitle parser), the PDF's on a transcript holding each script the spike recorded, and on a v5 summary once v5 is merged"
@@ -59,7 +61,7 @@ deliverables:
   - id: D109
     title: "A meeting's page exports it, copies it, and can send every new summary to a folder"
     module: shell
-    state: ready
+    state: deferred       # at the early closure, 2026-11-26: the copy and the export folder merged; a meeting's own export from its page not built — cycle 12's D121 carries it
     acceptance:
       - "Given a meeting's page, when the user presses « Exporter », then a panel offers the format — those D108 writes —, what is included and the folder — the last ones kept —, writes through D108, says where and offers « Afficher dans le dossier »; held by the e2e, in French and in English, by keyboard alone"
       - "Given a meeting's page, when the user presses « Copier le compte rendu », then the clipboard holds it as rich text and as Markdown together, so that a paste into a document or a chat keeps its headings and lists; the transcript copies with its speakers; held by the e2e reading the clipboard's two types, the harness's ability to read them proved in the deliverable's first pull request"
@@ -67,14 +69,14 @@ deliverables:
   - id: D110
     title: "A summary can be sent to a channel the user set up, never a confidential one"
     module: export
-    state: ready
+    state: accepted
     acceptance:
       - "Given what leaves the computer, when this deliverable starts, then a PDR says, for each destination, on whose word a meeting leaves — a gesture each time, or « each new summary » set once —, that a meeting said confidential never leaves, and where a webhook's address is kept (the system's keyring, as keys are: ADR-0013); the decider accepts it, the day of that word written in the PDR, before any sending is merged"
       - "Given a webhook address the user pasted — a generic one, Discord's or Slack's incoming webhook —, when they send a summary, then an address that is not `https:`, or that points to the local network, is said before anything is sent; the generic one receives a JSON of the title, the summary in Markdown and its actions, and Discord's receives a short message with the summary attached as a Markdown file, within Discord's documented limits (cited), and Slack's receives the title and the summary in mrkdwn, within Slack's documented limits (cited); a refusal or no network is said on the page with what to do; a confidential meeting offers no send; held by the module's tests against a local server and by the e2e"
   - id: D111
     title: "A meeting's summary takes the structure of its kind, chosen on its page"
     module: summary
-    state: ready
+    state: deferred       # at the early closure, 2026-11-26: the contract, the summary and the shell's reading merged; the choice on the page not built — cycle 12's D129 and D130 build on it
     acceptance:
       - "Given `minutes/v4`'s three sections found by their place, when free sections are added, then `minutes/v5` holds a structure's name and its ordered sections — a title, a line saying what goes in it —, added by expand/contract (`.nstack/handbook/03-contracts.md`): the contract's pull request, then summary writing v5, then the shell reading both, v4 still read; held by the contract's tests on both sides"
       - "Given summary, when it writes a summary, then it offers six built-in structures in French and in English — general, one-to-one, stand-up, client call, interview, project review —, each with few sections, a section allowed to say there is nothing rather than invent; held by tests with the e2e's stand-in engine, as `summary` already does: each structure's headings present and in order, and a section left empty saying so. How small local models fill them is a spike: recorded on a played transcript with a named model, each structure's sections filled or said empty, read against a threshold set in D111's section"
@@ -82,7 +84,7 @@ deliverables:
   - id: D112
     title: "Kitokey speaks in one voice, every sentence carrying its guide's comment, the English contracting as its guide says — what is left of cycle 10's D94"
     module: shell
-    state: ready
+    state: deferred       # at the early closure, 2026-11-26: the comments merged (#1026, #1037); the rest of the voice is cycle 12's D124
     acceptance:
       - "Given `src/words.rs`, still the one source of every sentence, when the shell's tests run, then each sentence carries a comment saying where it shows, when, its length limit and its placeholders; each has the same placeholders in French and in English; no straight apostrophe in either; a notification's title holds at most 50 characters and a list's label at most 18; none says a word the guide's lexicon refuses — « fournisseur », « segment », « tu » in French; « provider », « keyring », « minutes » for the summary in English —; the tests that freeze sentences change in the same pull request as them"
       - "Given `src/words.rs`, when the shell's tests run, then no sentence lacks the comment the criterion above asks: `WITHOUT_COMMENT` is 0, held by its ratchet in `tests/words.rs` — 318 on 2026-11-20 at cycle 10's closure"
@@ -91,7 +93,7 @@ deliverables:
   - id: D113
     title: "Redo says what follows and keeps the current version until the new one is whole, says what is wrong in its panel, and the previous version can come back — what is left of cycle 10's D93"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given a meeting's page, when the user presses the control that opens the redo panel, then nothing starts: the only buttons that start a making name it — « Refaire la transcription », « Refaire le compte rendu » —, and a changed context starts nothing by itself either; before it starts, the panel says in one line what will be made, with which model, what follows it — the summary made again after a transcript — and that the current version stays until the new one is whole; Escape or « Annuler » leaves everything as it was; held by the e2e, no played engine started before the button that names it"
       - "Given a transcript or a summary replaced by a redo, when the new one is whole, then the one replaced — the last one only — stays in the meeting's folder under a name no step reads, said in one line of prose on the contract's page, in place of going to the trash; the page offers « Revenir à la version précédente » with that version's time and model; going back swaps the two, a person's corrections kept; the next redo sends the older one to the trash, as today. Cut first when the breaker nears, said at the closure"
@@ -99,7 +101,7 @@ deliverables:
   - id: D114
     title: "kitokey.com, Kitokey's shop window: its privacy policy and a landing in French and in English, closed to the public until the decider validates it"
     module: site
-    state: ready
+    state: deferred       # at the early closure, 2026-11-26: the site built; its opening waits on the decider's Cloudflare gestures and validation
     acceptance:
       - "Given the module `site`, when it is created, then its `MANIFEST.yaml` (`criticality: prototype`, `user_facing: true`), its `AGENTS.md` and ADR-0019 are written, and `astro build` writes static HTML alone — no server code, no adapter. Everything lives under `modules/site/`, with its own `package.json` and lockfile; it imports nothing from another module, and reads one file outside itself, `docs/privacy.md`, whose path is set in a single configuration value; held by the fitness functions (B1) and a test that refuses any path leaving the module (`../`) outside that value. It is portable: `git subtree split --prefix=modules/site` gives a repository that builds alone, the policy's source given as a parameter; the command is written in the module's `AGENTS.md`, and the verifier runs it once and records the build"
       - "Given `docs/privacy.md`, the one source, given a section on the site itself — hosted by Cloudflare Pages, no cookie, no tracker, no script from another domain — when the site is built, then `/en/privacy/` and `/fr/privacy/` hold its English and its French half; held by a test of the build that fails when a page's text differs from its half of the source"
@@ -110,7 +112,7 @@ deliverables:
   - id: D115
     title: "The dates a summary's actions mention, ticked by the user, go to their calendar: an `.ics` file, or Google Calendar's or Outlook's own screen, with no account connected"
     module: shell
-    state: ready
+    state: deferred       # at the early closure, 2026-11-26: the shell's dates and calendar links merged (#1187, #1194), D117's .ics accepted; the trials by a person — the links, GNOME, new Outlook — not answered
     acceptance:
       - "Spike first: given invented meetings in French and in English, recorded on a known day, whose transcripts say « jeudi » on a Thursday, « dans quinze jours », « fin du mois », « demain », a date with no year, an explicit day and month, and an action with no date, when Settings' default local model writes their summary and the shell reads each action's *by when* against the meeting's day, then each proposed date is counted right, « not said » or wrong, apart, and recorded in D115's section with the model, the commit and the meetings; refuted if more than 1 proposed date in 50 is wrong, in which case only dates that name their day and month are proposed. A refuted spike is a delivered one"
       - "Given an action's *by when* and a reference day, when the shell resolves it, then it gives an absolute date only for an explicit date (with or without its year, the next one on or after the reference day), a weekday (the next one strictly after it), « demain », « dans N jours » or « dans N semaines » and their English forms, and « not said » for anything else — a month's end, a season, « bientôt », a weekday said on that very weekday; it never applies a procedural rule (no moving off a weekend or a holiday); the reference day is the meeting's start in local time, as its folder names it, never UTC; held by the shell's unit tests, a meeting started at 23:30 local time and one across a daylight saving change among them"
@@ -121,7 +123,7 @@ deliverables:
   - id: D116
     title: "A summary can be sent to a Notion database the user shared, through a key they created, never a confidential one"
     module: send
-    state: ready
+    state: deferred       # at the early closure, 2026-11-26: the send module's Notion merged (#1172, #1173, #1177); the shell's part and the decider's trial in Notion not done
     acceptance:
       - "Given PDR-0007, when this deliverable starts, then the PDR holds a fourth kind of destination, Notion, reached through an internal integration's key the user creates in their own workspace and pastes — no OAuth, no secret of Kitokey's —, kept in the system's keyring as a webhook's address is (ADR-0013), every other rule of the PDR unchanged: a gesture each time, what leaves said once before the first send, each send recorded, a confidential meeting never sent; the decider accepts the amendment by approving the pull request that proposes it, the forge recording its day, before any sending to Notion is merged"
       - "Given `posting/v1`, when the kind `notion` is added, then the change is additive — v1 extended in place, no consumer broken, held by the project's comparator (`contracts/scripts/compat.py`) against the v1 before —; kitokey-send started with `--kind notion` reads the key and the database on its input only, never among its arguments, and creates one page per send in the database: its title the meeting's, the summary's sections as heading, paragraph and list blocks, each action a `to_do` block left unticked; within Notion's documented limits, cited in the contract with the day they were read — at most 2000 characters in a rich text object's `content`, a longer text split over several, at most 100 per array; at most 100 blocks in a request's `children`; at most two levels of nesting; 500 KB per request —, its `Notion-Version` header pinned to the one version the contract names; a summary that does not fit one page's request is `summary.too_large` and nothing is created; held by send's tests: `tests/bodies.rs` for the blocks and each limit, `tests/server.rs` for the requests against a local server — their paths, their headers, their bodies, one page created and never a second"
@@ -130,20 +132,20 @@ deliverables:
   - id: D117
     title: "`export` writes a calendar file: the `.ics` of the dates a meeting's actions mention, for the shell to offer"
     module: export
-    state: ready
+    state: accepted
     acceptance:
       - "Given ticked items, when the user saves them as an `.ics`, then `export` writes one all-day `VEVENT` per item — `DTSTART;VALUE=DATE`, `DTEND` the next day, `DTSTAMP` in UTC, a `UID` stable for the meeting and the item, `SUMMARY` the action's what and who, `DESCRIPTION` its passage and the meeting's name —, lines ended by CRLF, folded at 75 octets, text escaped as RFC 5545 §3.3.11 says; held by `export`'s tests, the file parsed back by an independent parser and checked against RFC 5545's required properties, a name with commas, semicolons, a newline and non-Latin letters among them. `exporting/v1` gains the format `ics` and an optional field of its input, the dates — an additive change, v1 extended in place and no consumer broken (`.nstack/handbook/03-contracts.md`), held by the project's comparator (`contracts/scripts/compat.py`) passing the new v1 against the one before and by the contract's schema tests, consumed by the shell alone"
   - id: D118
     title: "`send` sends a confidential meeting when the shell says the user confirmed it, and only then"
     module: send
-    state: ready
+    state: accepted
     acceptance:
       - "Given `posting/v1`, when its input gains an optional `confirmed_confidential` (a boolean, false when absent), then the change is additive — v1 extended in place, no consumer broken, held by the project's comparator (`contracts/scripts/compat.py`) against the v1 before and by the contract's schema tests —, merged first in a pull request of `contracts` alone; `meeting.confidential` keeps its code and now means a confidential meeting sent without that confirmation"
       - "Given a session folder holding `confidential`, when kitokey-send runs, then it sends only if its input says `confirmed_confidential: true`, and refuses with `meeting.confidential`, nothing sent, otherwise — judged before the address, as today; a meeting that is not confidential is sent as before whatever the field says; held by send's tests against a local server: refused without the field, refused with false, sent with true, one request and never a second"
   - id: D119
     title: "A confidential meeting's page offers its sends, each asking once more in one plain sentence"
     module: shell
-    state: ready
+    state: accepted
     acceptance:
       - "Given a confidential meeting with a summary, when the user chooses « Envoyer à « <name> » », then the page asks in one sentence, in both languages, that the meeting is confidential and its summary will leave this computer for that destination, with Confirm and Cancel; Cancel sends nothing; Confirm runs kitokey-send with `confirmed_confidential: true` (D118); the question is asked again at every send, never remembered; the switch keeps saying where its summary already went (PDR-0007, point 4, amended 2026-11-24); held by the shell's e2e, by keyboard alone, through the kitokey-send stand-in reading its input"
       - "Given a meeting that is not confidential, when the user sends it, then nothing changes from today; held by the shell's existing e2e, unchanged in meaning"
@@ -740,3 +742,54 @@ D108's DOCX goes with its PDF if the D108–D111 coupling lands late.
 
 ## Closure
 
+**Closed early, 2026-11-26**, on the decider's word that day, relayed by the coordinator: close cycle 11 now,
+so that cycle 12 starts. Outcome **shipped**: what is delivered ships, the rest is deferred with its reason.
+Closed by lina (framer of cycle 12); the states come from the records (`nstack deliver --write-states`).
+
+**Delivered and accepted (8 of 18)** — from their records:
+
+| | Deliverable | Its pull requests |
+|---|---|---|
+| D103 | The Store's listing: screenshots made by the e2e, privacy policy, downloads said | #1073, #1091, #1049 |
+| D106 | The first surfaces pass axe-core's WCAG 2.2 AA rules and a checked list | #1027, #1040 |
+| D107 | The paid path on macOS decided: ADR-0017 | #1017, #1020, #1028 |
+| D110 | A summary sent to a channel the user set up, on their gesture | #1039, #1058, #1063, #1064, #1129, #1159, #1160 |
+| D113 | Redo says what follows and keeps the version it replaces, brought back by one button | #1055, #1060, #1062, #1065, #1225 |
+| D117 | `export` writes the `.ics` of the dates a meeting's actions mention | #1182, #1183 |
+| D118 | `send` sends a confidential meeting only when the shell says the user confirmed it | #1193, #1198 |
+| D119 | A confidential meeting's page offers its sends, each asked once more | #1196 |
+
+**Deferred (10)**, each with its reason in the front matter — read from the merged pull requests; the holders'
+records were not written:
+
+| | Where it stands | Where it goes |
+|---|---|---|
+| D102 | Package work merged; its identity waits on the decider in Partner Center | The next cycle that ships the Store |
+| D104 | Fixes merged; the rate over 30 attests not recorded | The next cycle, its holder recording the rate |
+| D105 | Not built | The next cycle, a window with the machine alone |
+| D108 | Five formats merged; not recorded delivered | Its holder records it, or the next cycle names what is missing |
+| D109 | Copy and export folder merged; a meeting's own export missing | Cycle 12, D121 (« Partager › Exporter ») |
+| D111 | Structures merged; their choice on the page missing | Cycle 12, D129 and D130 (formats) |
+| D112 | Comments merged | Cycle 12, D124 (the voice) |
+| D114 | The site built, closed | The decider's opening (*What needs a person*) |
+| D115 | Built; the trials by a person unanswered | The answers, then a closure reading them |
+| D116 | The send module's Notion merged; the shell's part and the trial missing | The next cycle that builds the shell's part |
+
+**Success criteria moved**: none recorded at this closure.
+
+**Due at this closure, and still open**:
+
+- **The decider's gestures** of *What needs a person*: Partner Center's identity, the price, the submission (D102);
+  the site's Cloudflare project, its validation and its opening (D114); the `.ics` in GNOME Calendar (D115); the
+  Notion trial (D116); cycle 09's minisign key (D56).
+- **A colleague on Windows 11**: #482, #795 (cycle 09's D53, D84), and new Outlook's import of an `.ics` (D115).
+- **Holds** on the deferred deliverables (D102, D104, D105, D108, D109, D111, D112, D114, D115, D116): each holder
+  releases theirs, or records a delivery, before the next cycle plans them.
+- **ADR-0016**'s criterion date, **2026-11-21**, is past without a reading line; `nstack plan` does not name it as
+  due — said here for the decider.
+
+**Documents brought current**: the privacy policy (#1197, D110's sends), the Store's listing (`docs/store/listing.md`,
+D103), ADR-0017, ADR-0018 and ADR-0019, PDR-0007 and its amendments; the site's pages (D114) wait on their
+opening. The front page and the module map were not changed by this cycle.
+
+**Where the next framing starts**: cycle 12, « Kitokey simple et beau » (#1255), starting at this closure.

@@ -15,6 +15,10 @@ export const words = {
   privacy: { en: "Privacy policy", fr: "Politique de confidentialité", keeps: "docs/privacy.md (D103), this site's /privacy/ (D114)" },
   changed: { en: "Last changed:", fr: "Dernière modification :", keeps: "the policy's first line, the day it last changed (docs/privacy.md)" },
   other: { en: "Français", fr: "English", keeps: "the page in the other language (D114)" },
+  theme: { en: ["Switch to the dark theme", "Switch to the light theme"], fr: ["Passer en thème sombre", "Passer en thème clair"], keeps: "public/theme.js, the moon and the sun (the decider's round 9, 2026-11-25)" },
+  skip: { en: "Skip to content", fr: "Aller au contenu", keeps: "each page's main, #main (tests/frame.test.mjs)" },
+  publisher: { en: "Kitokey, by C12C.", fr: "Kitokey, par C12C.", keeps: "the publisher's name, proposal D's footer, validated by the decider on 2026-11-25" },
+  source: { en: "Source code (GPL v3)", fr: "Code source (GPL v3)", keeps: "the repository's LICENSE, the GNU GPL version 3" },
 };
 
 export const say = (key, lang) => words[key][lang];

@@ -8,7 +8,7 @@ Writes the minutes of a transcript.
 
 ```mermaid
 flowchart LR
-    T["transcript.jsonl<br/>context.txt"]:::file --> P["kitokey-summary<br/>a program, no window"]:::mod
+    T["transcript.jsonl<br/>context.txt<br/>speakers.json"]:::file --> P["kitokey-summary<br/>a program, no window"]:::mod
     P -->|"one request"| V["The provider the user configured:<br/>a model on the machine, or online"]:::ext
     V --> P
     P -->|"minutes/v4, whole or not at all"| M["minutes.md"]:::file
@@ -63,6 +63,10 @@ never changed.
 **Attach a context** — `context.txt` in the session's folder, a few lines: who was there, on
 which side — in the room or remote — and who is only talked about. Without it, a person the
 meeting talks about was written as the owner of an action.
+
+**Speakers named** — `speakers.json`, written by the shell when the user names a meeting's two sides
+(#1205): each line of the request says the name beside the transcript's word, `me (Sarah)`, and one
+rule says it is the name to write. Without the file, the request is the one sent before.
 
 On the bench's meeting, four of the engine's transcripts, three answers each from the model of
 the example: told of the errors and given a context, the minutes give the support rota — said

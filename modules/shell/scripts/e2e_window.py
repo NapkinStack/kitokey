@@ -1525,11 +1525,17 @@ def service_named(now: dt.datetime) -> None:
         offered = lambda b, id_: b.execute_script("return [...document.querySelectorAll(arguments[0])].map(o => [o.value, o.textContent])", f"#{id_} option")
         names = [said_ for _, said_ in offered(browser, "transcription-service")]
         check("the services that hear are offered by name, as the minutes' are: OpenRouter, OpenAI", names == ["OpenRouter", "OpenAI"], names)
+        # The service chosen shows its mark beside the list (#1238): OpenRouter's glyph as given — Ink on light —; OpenAI's not
+        # cleared for an app (« Use the logo … with permission »), an icon of the page's.
+        mark = "const f = document.getElementById('transcription-service')?.parentElement; return f ? (f.querySelector('.service-mark img')?.getAttribute('src') ?? (f.querySelector('.service-mark svg') ? 'icon' : null)) : null"
+        chose_router = browser.execute_script(mark)
         # Another choice: what was said of the last goes at once, on the same page.
         browser.execute_script("document.getElementById('transcription-test').click()")
         wait_for(browser, lambda b: b.execute_script(said).startswith(hears), 10)
         choose(browser, "transcription-service", "1")
         check("another service chosen: the last answer goes at once", browser.execute_script(said) == "", browser.execute_script(said))
+        check("the service chosen shows its mark beside its list: OpenRouter's glyph, OpenAI an icon of the page's (#1238)",
+              chose_router == "brands/openrouter-glyph-ink.svg" and browser.execute_script(mark) == "icon", [chose_router, browser.execute_script(mark)])
         choose(browser, "transcription-service", "0")
         # Another service chosen while Tester asks: its button at once, the old answer never said, even drawn anew.
         browser.execute_script("window.answer = null; window.answered = 0; window.__TAURI__.core = window.held; document.getElementById('transcription-test').click()")
@@ -5317,10 +5323,119 @@ def settings_folded(now: dt.datetime) -> None:
 
 
 
+def speakers_named(now: dt.datetime) -> None:
+    """CQ. #1205, session-audio/v3's speakers.json: the two sides of a complete transcript named from its card —
+    « Nommer les intervenants… », two labelled fields, Enter saves —, every line and the copy following at once, kept
+    with the meeting and read again; a field left empty gives the side back « Vous » or « Les autres »; Escape closes
+    it as it was; a folder that cannot be written says so under the fields, what was typed kept. No naming offered
+    before v3, nor while the transcript is not complete. No name is logged."""
+    print("CQ. the speakers of a transcript named on its card, kept with the meeting, the lines following (#1205)")
+    meetings = WORK / "speakers"
+    named_one, older, unfinished = (meetings / name for name in ("2026-11-21_09-00", "2026-11-21_10-00", "2026-11-21_11-00"))
+    for folder, form in ((named_one, "v3"), (older, "v2"), (unfinished, "v3")):
+        session(folder, now - dt.timedelta(days=2), 30, {"local.wav": 1000}, form=form)
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.0,"end":1.0,"text":"On commence par la 2.4."}\n'
+            '{"type":"segment","speaker":"others","track":"remote","voice":null,"start":1.5,"end":3.0,"text":"Les tests passent."}\n'
+            + ('' if folder == unfinished else '{"type":"complete","duration":3.0}\n'))
+    whos = "return [...document.querySelectorAll('#meeting .transcript .lines .who')].map(w => w.textContent)"
+    offered = "return !!document.getElementById('speakers-open')"
+    window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\n')
+    with window as browser:
+        def page(folder):
+            browser.execute_script("location.hash = '#/'")
+            wait_for(browser, lambda b: not b.find_elements(By.ID, "meeting"), 5)
+            browser.execute_script("location.hash = arguments[0]", f"#/meeting/{folder.name}")
+            return wait_for(browser, lambda b: b.execute_script(
+                "const p = document.getElementById('meeting'); return !!p && p.dataset.name === arguments[0]"
+                " && p.querySelectorAll('.transcript .lines li').length > 0", folder.name), 10)
+
+        page(older)
+        check("a meeting before session-audio/v3 offers no naming: its version names no speakers.json",
+              not browser.execute_script(offered), browser.execute_script(offered))
+        page(unfinished)
+        check("a transcript not yet complete offers no naming", not browser.execute_script(offered), browser.execute_script(offered))
+        page(named_one)
+        check("a complete transcript of a v3 meeting: « Nommer les intervenants… » on its card, the sides as the page says them",
+              browser.execute_script(offered) and browser.execute_script(whos) == ["Vous", "Les autres"]
+              and browser.find_element(By.ID, "speakers-open").get_attribute("aria-label") == "Nommer les intervenants…",
+              [browser.execute_script(offered), browser.execute_script(whos)])
+        # By keyboard alone: the button pressed by Enter, the first field focused, its label read with it.
+        browser.execute_script("document.getElementById('speakers-open').focus()")
+        ActionChains(browser).send_keys(Keys.ENTER).perform()
+        opened = wait_for(browser, lambda b: b.find_elements(By.ID, "speakers-panel"), 5)
+        focused = browser.execute_script("return document.activeElement.id")
+        labels = browser.execute_script("return ['speaker-me', 'speaker-others'].map(id => document.getElementById(id).closest('label').textContent)")
+        check("the panel opens with the focus on « Vous »'s field, each field labelled by its side",
+              opened and focused == "speaker-me" and labels == ["Vous — votre micro", "Les autres — le son de l’appel"]
+              and browser.find_element(By.ID, "speakers-open").get_attribute("aria-expanded") == "true", [focused, labels])
+        ActionChains(browser).send_keys("Sarah").perform()
+        # Back to the window while typing (window.js's focus draws the page anew): the panel and what is typed stay.
+        browser.execute_script("window.dispatchEvent(new Event('focus'))")
+        time.sleep(1.5)
+        typed = browser.execute_script("return document.getElementById('speaker-me')?.value ?? null")
+        check("back to the window while naming: the panel stays, what was typed kept", typed == "Sarah", typed)
+        browser.find_element(By.ID, "speaker-me").click()
+        ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+        closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "speakers-panel"), 5)
+        check("Escape closes it as it was: nothing kept, the focus back on the button",
+              closed and not (named_one / "speakers.json").exists() and browser.execute_script(whos) == ["Vous", "Les autres"]
+              and browser.execute_script("return document.activeElement.id") == "speakers-open",
+              [closed, (named_one / "speakers.json").exists(), browser.execute_script("return document.activeElement.id")])
+        press(browser, "speakers-open")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "speaker-me"), 5)
+        browser.find_element(By.ID, "speaker-me").send_keys("  Sarah ")
+        browser.find_element(By.ID, "speaker-others").send_keys("L’équipe produit")
+        browser.find_element(By.ID, "speaker-others").send_keys(Keys.ENTER)
+        kept = wait_for(browser, lambda b: not b.find_elements(By.ID, "speakers-panel"), 5)
+        written = json.loads((named_one / "speakers.json").read_text()) if (named_one / "speakers.json").exists() else None
+        check("Enter saves: speakers.json holds both names, trimmed, as session-audio/v3 says",
+              kept and written == {"me": "Sarah", "others": "L’équipe produit"}, written)
+        check("every line names its side at once", browser.execute_script(whos) == ["Sarah", "L’équipe produit"], browser.execute_script(whos))
+        browser.execute_script("window.copied_for_test = null; Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: async (t) => { window.copied_for_test = t; }}})")
+        press(browser, "copy-transcript")
+        wait_for(browser, lambda b: b.execute_script("return window.copied_for_test"), 5)
+        copied = browser.execute_script("return window.copied_for_test") or ""
+        check("the transcript copied names them too", "Sarah" in copied and "L’équipe produit" in copied and "Vous" not in copied, copied)
+        page(older)
+        page(named_one)
+        check("read again with the meeting: the names stay", browser.execute_script(whos) == ["Sarah", "L’équipe produit"], browser.execute_script(whos))
+        press(browser, "speakers-open")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "speaker-me"), 5)
+        values = browser.execute_script("return [document.getElementById('speaker-me').value, document.getElementById('speaker-others').value]")
+        check("the fields open with the names kept", values == ["Sarah", "L’équipe produit"], values)
+        browser.find_element(By.ID, "speaker-others").clear()
+        press(browser, "speakers-save")
+        wait_for(browser, lambda b: not b.find_elements(By.ID, "speakers-panel"), 5)
+        written = json.loads((named_one / "speakers.json").read_text()) if (named_one / "speakers.json").exists() else None
+        check("a field left empty gives its side back « Les autres »; the other name kept",
+              written == {"me": "Sarah"} and browser.execute_script(whos) == ["Sarah", "Les autres"], [written, browser.execute_script(whos)])
+        # The folder unwritable: said under the fields, what was typed kept, the lines as they were.
+        named_one.chmod(0o555)
+        try:
+            press(browser, "speakers-open")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "speaker-others"), 5)
+            browser.find_element(By.ID, "speaker-others").send_keys("Camille")
+            press(browser, "speakers-save")
+            said_now = "return document.getElementById('speakers-said')?.hidden === false ? document.getElementById('speakers-said').textContent : ''"
+            wait_for(browser, lambda b: b.execute_script(said_now), 5)
+            check("not kept: one sentence says so under the fields, what was typed kept, the lines unchanged",
+                  browser.execute_script(said_now) == "Kitokey n’a pas pu enregistrer ces noms. Réessayez."
+                  and browser.find_element(By.ID, "speaker-others").get_attribute("value") == "Camille"
+                  and browser.execute_script(whos) == ["Sarah", "Les autres"],
+                  [browser.execute_script(said_now), browser.execute_script(whos)])
+        finally:
+            named_one.chmod(0o755)
+    logs = WORK / "state" / "kitokey" / "logs"
+    lines = [line for log in sorted(logs.glob("*.jsonl")) for line in log.read_text().splitlines() if "speakers_named" in line]
+    check("the naming is logged, never a name", lines and not any(name in line for line in lines for name in ("Sarah", "équipe", "Camille")), lines)
+
+
 def summary_sent(now: dt.datetime) -> None:
     """CL. D110, PDR-0007 §2–§6, posting/v1: a meeting's summary sent to a destination set up in Settings, on the
-    user's gesture each time. No « Envoyer… » without a destination, on a confidential meeting, or without a
-    summary. Before a destination's first send the page says what leaves and where — its name, never its address —;
+    user's gesture each time. No « Envoyer… » without a destination or without a summary; a confidential meeting's
+    sends are CN's (D119). Before a destination's first send the page says what leaves and where — its name, never its address —;
     the next goes at once. kitokey-send is started with the meeting's folder and the destination's kind, the address
     and the meeting's name on its input only. Each outcome is said on the page with what to do; the address appears
     nowhere. A send is recorded and listed, kept when the meeting is renamed; marked confidential after, the switch
@@ -5364,7 +5479,7 @@ def summary_sent(now: dt.datetime) -> None:
         press(browser, "destination-open")
         rows = "return document.querySelectorAll('#destinations li').length"
         for kind, name, address in destinations:
-            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            browser.execute_script("document.getElementById(arguments[0]).click()", f"destination-kind-{kind}")
             for field, value in (("destination-name", name), ("destination-address", address)):
                 element = browser.find_element(By.ID, field)
                 element.clear()
@@ -5373,20 +5488,31 @@ def summary_sent(now: dt.datetime) -> None:
             press(browser, "destination-add")
             wait_for(browser, lambda b: b.execute_script(rows) == had + 1, 10)
         check("six destinations set up for this scenario", browser.execute_script(rows) == 6, browser.execute_script(rows))
+        kept_marks = browser.execute_script("return [...document.querySelectorAll('#destinations li')].map(e => e.querySelector('img')?.getAttribute('src') ?? (e.querySelector('svg') ? 'icon' : null))")
+        check("Settings list each destination with its kind's mark: Discord's own, the others an icon of the page's (#1238)",
+              kept_marks == ["brands/discord-symbol.svg", "icon", "icon", "icon", "icon", "icon"], kept_marks)
         calls.unlink(missing_ok=True)
         page(secret_one)
-        check("a confidential meeting offers no send (PDR-0007 §4)", not browser.execute_script(offered), browser.execute_script(offered))
+        check("a confidential meeting offers « Envoyer… » too, each send asked again (PDR-0007 §4 amended, D119; CN)", browser.execute_script(offered), browser.execute_script(offered))
         page(unwritten)
         check("a meeting without its summary offers no send", not browser.execute_script(offered), browser.execute_script(offered))
         page(written)
         check("a summary, destinations set up, not confidential: « Envoyer… » among its actions",
               browser.execute_script(offered) and browser.execute_script(
                   "return !!document.getElementById('send-open').closest('.minutes-actions')"), browser.execute_script(offered))
+        # Several destinations: « Envoyer… » names none of them (#1239, marc) — the panel does; a name only when there is one.
+        several = browser.execute_script("const b = document.getElementById('send-open'); return b ? [b.getAttribute('aria-label'), b.title] : null")
+        check("six destinations: « Envoyer… » keeps its name and tooltip, naming none of them (#1239)", several == ["Envoyer…", "Envoyer…"], several)
         # By keyboard alone: the button reached and pressed by Enter, the panel's first destination focused.
         browser.execute_script("document.getElementById('send-open').focus()")
         ActionChains(browser).send_keys(Keys.ENTER).perform()
         listed = wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#send-panel button.send-to"), 5)
         names = browser.execute_script("return [...document.querySelectorAll('#send-panel button.send-to')].map(b => b.textContent)") if listed else []
+        # Each destination with its kind's mark (#1238): Discord's own, the others an icon of the page's — in the panel and in Settings.
+        marks = "return [...document.querySelectorAll(arguments[0])].map(e => e.querySelector('img')?.getAttribute('src') ?? (e.querySelector('svg') ? 'icon' : null))"
+        check("the panel shows each destination's mark: Discord's own, the others an icon of the page's (#1238)",
+              listed and browser.execute_script(marks, "#send-panel button.send-to") == ["brands/discord-symbol.svg", "icon", "icon", "icon", "icon", "icon"],
+              browser.execute_script(marks, "#send-panel button.send-to") if listed else None)
         check("the panel offers each destination by its name, « Envoyer à « #équipe » », by keyboard alone",
               names[:1] == ["Envoyer à «\xa0#équipe\xa0»"] and len(names) == 6
               and browser.execute_script("return document.activeElement.classList.contains('send-to')"), names)
@@ -5424,8 +5550,17 @@ def summary_sent(now: dt.datetime) -> None:
         check("« Envoyer » is described by the notice: a screen reader says what leaves before it is pressed",
               described[:1] and described[0][0] == "send-notice" and "ne peut pas être repris" in (described[0][1] or ""), described)
         # Selenium's text gives U+00A0 as a space: each read below compares with spaces.
-        said = browser.find_element(By.ID, "send-said").text
-        check("sent: said on the page, the destination by its name", said.replace("\xa0", " ").startswith("Envoyé à « #équipe »"), said)
+        # Said once (#1252): the send listed under the summary is the line the eye reads; the outcome still told to a
+        # screen reader by its status, never shown a second time above that same line.
+        said = browser.execute_script("return document.getElementById('send-said')?.textContent ?? ''")
+        check("sent: told to a screen reader by its status, the destination by its name", said.replace("\xa0", " ").startswith("Envoyé à « #équipe »"), said)
+        # innerText keeps a line clipped for screen readers alone (.unseen): that one is not shown, and is set aside.
+        shown_lines = browser.execute_script(
+            "const card = document.querySelector('#meeting .card.minutes'); if (!card) return null;"
+            "const unseen = [...card.querySelectorAll('.unseen')].map(e => e.textContent);"
+            "return card.innerText.split('\\n').filter(l => { const at = unseen.indexOf(l); if (at < 0) return true; unseen.splice(at, 1); return false; })"
+            ".filter(l => l.replace(/\\u00a0/g, ' ').startsWith('Envoyé à « #équipe »'))")
+        check("sent and listed: the send shown once, its line in the list — never its notice above it too (#1252)", len(shown_lines) == 1, shown_lines)
         made = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
         check("kitokey-send started with the meeting's folder and --kind discord; the address and the name on its input only (posting/v1)",
               len(made) == 1 and made[0]["args"][0].endswith(written.name) and made[0]["args"][1:] == ["--kind", "discord"]
@@ -5480,9 +5615,131 @@ def summary_sent(now: dt.datetime) -> None:
         left = browser.find_element(By.ID, "confidential-left").text
         check("marked confidential after a send: the switch says where the summary already went (PDR-0007 §4)",
               "le compte rendu à « #équipe »" in left.replace("\xa0", " "), left)
-        check("and offers no send any more", wait_for(browser, lambda b: not b.execute_script(offered), 5), browser.execute_script(offered))
+        check("and still offers « Envoyer… », its sends asked again (D119; CN)", wait_for(browser, lambda b: b.execute_script(offered), 5), browser.execute_script(offered))
     logged = [str(f) for f in (WORK / "state").rglob("*") if f.is_file() and secret in f.read_text(errors="ignore")]
     check("the address in no log nor state file of Kitokey (ADR-0007, PDR-0007 §1)", logged == [], logged)
+
+
+def confidential_sent(now: dt.datetime) -> None:
+    """CN. D119, PDR-0007 §4 as amended on 2026-11-24: a confidential meeting's page offers « Envoyer… » too, and each
+    send asks once more, in one sentence, that the meeting is confidential and its summary will leave this computer
+    for that destination, with « Envoyer » and « Annuler ». « Annuler » sends nothing; « Envoyer » starts kitokey-send
+    with `confirmed_confidential: true` on its input (posting/v1, D118); the question comes back at every send, never
+    remembered; the switch still says where the summary went. A meeting that is not confidential is sent as before,
+    no such field on its input. By keyboard alone, in French; the sentence in English too. Addresses are made up."""
+    print("CN. a confidential meeting's summary sent only once the user confirms, asked again every time (D119)")
+    calls = WORK / "send-calls.jsonl"
+    secret = "made-up-secret-c119"
+    offered = "return !!document.getElementById('send-open')"
+    asked = "return document.getElementById('send-confidential')?.textContent ?? null"
+    said_now = "return document.getElementById('send-said')?.textContent ?? ''"
+    made = lambda: [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+    for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
+        meetings = WORK / f"sending-confidential-{short}"
+        secret_one, open_one = meetings / "2026-11-21_09-00", meetings / "2026-11-21_10-00"
+        for folder in (secret_one, open_one):
+            session(folder, now - dt.timedelta(days=2), 30, {"local.wav": 1000})
+            (folder / "transcript.jsonl").write_text(
+                '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+                '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+            (folder / "minutes.md").write_text(
+                "---\ncontract: minutes/v1\nmade: 2026-11-21T10:00:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+                "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
+        (secret_one / "confidential").write_text("")
+        with Window(meetings, language, 'after = "nothing"\n') as browser:
+            def page(folder):
+                browser.execute_script("location.hash = '#/'")
+                browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+                return wait_for(browser, lambda b: b.find_element(By.ID, "meeting").is_displayed()
+                                and b.execute_script("return !!document.querySelector('.card.minutes')"), 10)
+            browser.execute_script("location.hash = '#/settings'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
+            press(browser, "destination-open")
+            browser.execute_script("document.getElementById('destination-kind-discord').click()")
+            for field, value in (("destination-name", "#équipe"), ("destination-address", f"https://discord.example/api/webhooks/1/{secret}")):
+                element = browser.find_element(By.ID, field)
+                element.clear()
+                element.send_keys(value)
+            press(browser, "destination-add")
+            wait_for(browser, lambda b: b.execute_script("return document.querySelectorAll('#destinations li').length") == 1, 10)
+            calls.unlink(missing_ok=True)
+            page(secret_one)
+            shown = wait_for(browser, lambda b: b.execute_script(offered), 10)
+            check(f"{short}: a confidential meeting with a summary offers « Envoyer… » (D119)", shown, browser.execute_script(offered))
+            # One destination: « Envoyer… » says where in its name and tooltip (#1239), its panel as before.
+            where = {"fr": "Envoyer à «\xa0#équipe\xa0»…", "en": "Send to “#équipe”…"}[short]
+            named_send = browser.execute_script("const b = document.getElementById('send-open'); return b ? [b.getAttribute('aria-label'), b.title] : null")
+            check(f"{short}: one destination, « Envoyer… » names it: « {where} » (#1239)", named_send == [where, where], named_send)
+
+            def choose():
+                # By keyboard alone: « Envoyer… » reached and pressed by Enter, the destination by Enter. Absent, it
+                # says so: the rows below fail, never raise.
+                if not browser.execute_script(offered):
+                    return ""
+                browser.execute_script("document.getElementById('send-open').focus()")
+                ActionChains(browser).send_keys(Keys.ENTER).perform()
+                wait_for(browser, lambda b: b.execute_script("return document.activeElement?.classList.contains('send-to')"), 5)
+                ActionChains(browser).send_keys(Keys.ENTER).perform()
+                return wait_for(browser, lambda b: b.execute_script(asked), 5) and browser.execute_script(asked)
+
+            question = choose() or ""
+            if short == "en":
+                check("en: the question, in one sentence: the meeting is confidential, its summary will leave this computer for “#équipe”",
+                      question == "This meeting is confidential: its summary will leave this computer for “#équipe”.", question)
+                ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+                wait_for(browser, lambda b: not b.find_elements(By.ID, "send-panel"), 5)
+                check("en: Escape closes it, nothing sent", not calls.exists(), made())
+                continue
+            check("fr: asked in one sentence: the meeting is confidential, its summary will leave this computer for « #équipe »",
+                  question.replace("\xa0", " ").replace(" ", " ") == "Cette réunion est confidentielle : son compte rendu va quitter cet ordinateur pour « #équipe ».", question)
+            choices = browser.execute_script("const c = document.getElementById('send-confirm'), n = document.getElementById('send-cancel');"
+                                             " return [c?.textContent, n?.textContent, document.activeElement?.id, c?.getAttribute('aria-describedby') ?? '']")
+            check("fr: « Envoyer » and « Annuler »; the focus on « Annuler », the choice that sends nothing; « Envoyer » described by the question",
+                  choices[:3] == ["Envoyer", "Annuler", "send-cancel"] and "send-confidential" in choices[3].split(), choices)
+            # The question drawn, wide and at 420 px, light and dark, for the eye (the sheet's T5).
+            size = browser.get_window_size()
+            for width in (1100, 420):
+                browser.set_window_size(width, 800)
+                time.sleep(0.4)
+                browser.execute_script("document.getElementById('send-confidential')?.scrollIntoView({block: 'center'})")
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"cn-asked-{width}-{theme}", theme)
+            browser.set_window_size(size["width"], size["height"])
+            time.sleep(0.4)
+            browser.execute_script("document.getElementById('send-cancel')?.focus()")
+            ActionChains(browser).send_keys(Keys.ENTER).perform()
+            closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "send-panel"), 5)
+            time.sleep(1)
+            check("fr: « Annuler » by Enter: nothing sent, kitokey-send never started, the focus back on « Envoyer… »",
+                  closed and not calls.exists() and browser.execute_script("return document.activeElement.id") == "send-open",
+                  [made(), browser.execute_script("return document.activeElement.id")])
+            for round_ in (1, 2):
+                again = choose()
+                check(f"fr: send {round_}: the question asked again, never remembered", bool(again), again)
+                # « Envoyer » is before « Annuler »: Shift+Tab, then Enter.
+                ActionChains(browser).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+                on = browser.execute_script("return document.activeElement.id")
+                ActionChains(browser).send_keys(Keys.ENTER).perform()
+                wait_for(browser, lambda b: b.execute_script(said_now) and not b.execute_script(said_now).endswith("…"), 15)
+                said = browser.execute_script(said_now).replace("\xa0", " ")
+                got = made()
+                check(f"fr: send {round_}: confirmed, kitokey-send started once more, `confirmed_confidential: true` on its input, the address there alone",
+                      on == "send-confirm" and len(got) == round_ and json.loads(got[-1]["input"]).get("confirmed_confidential") is True
+                      and all(secret not in arg for arg in got[-1]["args"]) and said.startswith("Envoyé à « #équipe »"), [on, got[-1:] and got[-1]["input"].replace(secret, "…"), said])
+            left = wait_for(browser, lambda b: "#équipe" in (b.execute_script("return document.getElementById('confidential-left')?.textContent ?? ''")), 10)
+            check("fr: the switch says where its summary went (PDR-0007 §4)", left,
+                  browser.execute_script("return document.getElementById('confidential-left')?.textContent ?? null"))
+            # Not confidential: sent as before — no question, no such field on the input.
+            page(open_one)
+            wait_for(browser, lambda b: b.execute_script(offered), 10)
+            press(browser, "send-open")
+            wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#send-panel button.send-to"), 5)
+            browser.execute_script("document.querySelector('#send-panel button.send-to').click()")
+            wait_for(browser, lambda b: b.execute_script(said_now) and not b.execute_script(said_now).endswith("…"), 15)
+            got = made()
+            check("fr: a meeting not confidential: no question, sent at once, no `confirmed_confidential` on its input (D119, criterion 2)",
+                  browser.execute_script(asked) is None and len(got) == 3 and "confirmed_confidential" not in json.loads(got[-1]["input"]),
+                  [browser.execute_script(asked), got[-1:] and got[-1]["input"].replace(secret, "…")])
 
 
 def waveform_drawn(now: dt.datetime) -> None:
@@ -5647,13 +5904,20 @@ def destinations_kept(now: dt.datetime) -> None:
         after = browser.execute_script(folded) if drawn else None
         check("folded at first, no address shown; « Ajouter une destination » unfolds it, the focus in its first field (E5, ARIA APG)",
               before is not None and before[:3] == ["false", "destination-adding", False]
-              and opened and after == ["true", "destination-adding", True, "destination-kind"], (before, after))
+              and opened and after == ["true", "destination-adding", True, "destination-kind-webhook"], (before, after))
+        # The kind a tile each (#1238), as the desktop's choices of a kind are: Discord its own mark, unaltered; Webhook and
+        # Slack an icon of the page's, Slack's mark not cleared for an app (its Brand Terms) — its name in words.
+        tiles = browser.execute_script(
+            "return [...document.querySelectorAll('#destination-adding [role=radiogroup] .tile')].map(t => [t.querySelector('input')?.value,"
+            " t.textContent.trim(), t.querySelector('img')?.getAttribute('src') ?? null, !!t.querySelector('svg')])") if drawn else None
+        check("the kind of a destination three tiles: Webhook and Slack with an icon of the page's, Discord with its own mark (#1238)",
+              tiles == [["webhook", "Webhook", None, True], ["discord", "Discord", "brands/discord-symbol.svg", False], ["slack", "Slack", None, True]], tiles)
         rows = "return [...document.querySelectorAll('#destinations li')].map(li => li.innerText)"
         check("none yet: the card says so", drawn and browser.execute_script(rows) == []
               and "Aucune destination" in browser.find_element(By.ID, "destinations-said").text, browser.execute_script(rows) if drawn else None)
 
         def add(kind, name, address):
-            Select(browser.find_element(By.ID, "destination-kind")).select_by_value(kind)
+            browser.execute_script("document.getElementById(arguments[0]).click()", f"destination-kind-{kind}")
             for field, value in (("destination-name", name), ("destination-address", address)):
                 element = browser.find_element(By.ID, field)
                 element.clear()
@@ -5686,7 +5950,7 @@ def destinations_kept(now: dt.datetime) -> None:
                   and json.loads(judged[1]["input"])["address"] == good, [call["args"] for call in judged])
             # A second destination under a name already kept: said, and refused before any address is judged.
             # Back across 840 px the page is drawn again (#777): the form is filled once that drawing is done.
-            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-kind')"), 10)
+            wait_for(browser, lambda b: b.execute_script("return placesPending.size === 0 && !!document.getElementById('destination-kind-webhook')"), 10)
             add("discord", "#équipe", good.replace("T00", "T01"))
             # Read by script: a destination kept by mistake draws the card again, and a node held would be stale.
             said_now = "return document.getElementById('destination-said')?.textContent ?? null"
@@ -5767,6 +6031,15 @@ def settings_narrow_without_model(now: dt.datetime) -> None:
             check(f"{short}, 420 px, no model on this computer: the choice whole as the list's tooltip, the state said under it (#868)",
                   said[0] == said[1] and said[0] and said[0].endswith(whole) and said[2] and whole.split()[0] in said[2].lower(), said)
             browser.execute_script("document.getElementById('model').scrollIntoView({block: 'center'})")
+            # A short word in its tag stays on one line at 420 px (#1235): « intégré » broke as « intégr / é ».
+            tags = browser.execute_script(
+                "return [...document.querySelectorAll('#settings code.tag')].filter(t => t.offsetParent).map(t => [t.textContent, t.getClientRects().length,"
+                " Math.round(t.getBoundingClientRect().height / (parseFloat(getComputedStyle(t).lineHeight) || 16))])")
+            check(f"{short}, 420 px: each tag one line, never broken inside its word (#1235)", tags and all(rects == 1 and rows == 1 for _, rects, rows in tags), tags)
+            # A model fetched from Hugging Face says so by its mark too (#1238), the host still in its words.
+            hf = browser.execute_script("const b = document.getElementById('model-fetch'); return b ? [b.querySelector('img')?.getAttribute('src') ?? null, b.textContent] : null")
+            check(f"{short}: the model's download shows Hugging Face's mark, its host in its words (#1238)",
+                  hf and hf[0] == "brands/huggingface.svg" and "huggingface.co" in hf[1], hf)
             shot(browser, f"868-settings-420-{short}")
             # « Avancé » as a person reaches it: scrolled to, then clicked where it shows.
             toggle = browser.find_element(By.ID, "general-advanced")
@@ -6565,6 +6838,300 @@ def redo_says_what_follows(now: dt.datetime) -> None:
                 check(f"{short}, {what}: pressed, the transcript alone is made again, no summary written, the one there kept as it was (D113)",
                       heard and done and not writing.exists() and summary() == summary_before, [heard, done, writing.exists(), summary() == summary_before])
 
+
+def previous_summary_back(now: dt.datetime) -> None:
+    """CJ. D113, criterion 2, the summary: made again, the one it replaced — the last one only — stays in the
+    meeting's folder as `minutes-previous.md`, which no step reads, in place of going to the trash; the page
+    offers « Revenir à la version précédente » with its time and model, a line saying the same button brings
+    back the one left; pressed, the two swap; the next redo sends the older one to the trash. In French."""
+    print("CJ. a summary made again keeps the one it replaced, the page offering it back with its time and model; going back swaps them (D113)")
+    idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+            " && m.minutes_waiting.length === 0)")
+    back = ("const b = document.getElementById('minutes-previous'), h = document.getElementById('minutes-previous-help');"
+            " return b && b.getClientRects().length ? [b.textContent, h ? h.textContent : null] : null")
+    help_said = "La version quittée devient la précédente\u00a0: le même bouton la ramène."
+    meetings = WORK / "previous-summary"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+    (meeting / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
+    first = ("---\ncontract: minutes/v1\nmade: 2026-10-18T13:00:00+02:00\nprovider: local\nmodel: qwen3:14b\ncontext: null\n---\n\n"
+             "## 1.\n\nLa première version.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
+    (meeting / "minutes.md").write_text(first)
+    settings = 'after = "nothing"\nreminder = false\nminutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n'
+    previous = meeting / "minutes-previous.md"
+    asides = lambda: sorted(p.name for p in meeting.iterdir() if p.name.startswith("minutes") and p.name not in ("minutes.md", "minutes-previous.md"))
+    with Window(meetings, "fr_FR.UTF-8", settings) as browser:
+        page = lambda: (browser.execute_script("location.hash = '#/'"),
+                        browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}"),
+                        wait_for(browser, lambda b: b.find_elements(By.ID, "minutes-state") and b.execute_script(idle), 15))
+        page()
+        check("no version replaced yet: nothing offered back (D113)", browser.execute_script(back) is None, browser.execute_script(back))
+        browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: null, model: null})", meeting.name)
+        made = wait_for(browser, lambda b: (meeting / "minutes.md").read_text() != first and b.execute_script(idle), 15)
+        second = (meeting / "minutes.md").read_text()
+        check("made again: the one replaced stays beside as minutes-previous.md, nothing else set aside (D113)",
+              made and previous.is_file() and previous.read_text() == first and asides() == [], [previous.exists(), asides()])
+        page()
+        offered = wait_for(browser, lambda b: b.execute_script(back), 10)
+        got = browser.execute_script(back) or [None, None]
+        check("the page offers « Revenir à la version précédente », with its time and model, and says the same button brings back the one left (D113)",
+              offered and got[0].startswith("Revenir à la version précédente (") and "18 oct." in got[0] and "Qwen3 14b" in got[0] and got[1] == help_said, got)
+        # Pressed when it is there; absent, the rows below fail saying so, never raise (s113bred).
+        if offered:
+            press(browser, "minutes-previous")
+        held = lambda path: path.read_text() if path.is_file() else "the file absent"
+        swapped = offered and wait_for(None, lambda b: held(meeting / "minutes.md") == first and held(previous) == second, 10)
+        shown = wait_for(browser, lambda b: "La première version." in b.execute_script(
+            "return document.querySelector('#meeting .minutes .body')?.textContent ?? ''"), 10)
+        named = wait_for(browser, lambda b: (b.execute_script(back) or [""])[0].find("Mistral") > 0, 10)
+        check("pressed: the two swap, the page shows the one brought back and offers the one left (D113)",
+              swapped and shown and named, [browser.execute_script(back) or "the button absent", asides()])
+        browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: null, model: null})", meeting.name)
+        again = wait_for(browser, lambda b: held(meeting / "minutes.md") != first and b.execute_script(idle), 15)
+        check("the next redo: the one it replaced is the previous one, the older gone from the folder (D113)",
+              again and held(previous) == first and asides() == [], [held(previous)[:60], asides()])
+        # ines' pre-read of #1065, the summary's mirrors of #1070's T8 and T9. A redo that fails, or is cancelled, leaves both
+        # versions as they were, nothing set aside, nothing in the trash.
+        trash = WORK / "data" / "Trash" / "files"
+        binned = lambda: sorted(p.name for p in trash.iterdir()) if trash.exists() else []
+        before = (held(meeting / "minutes.md"), held(previous), binned())
+        redo = lambda: browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: arguments[0], provider: null, model: null})", meeting.name)
+        (WORK / "fail-minutes").touch()
+        try:
+            redo()
+            failed = wait_for(browser, lambda b: b.execute_script(idle), 15)
+        finally:
+            (WORK / "fail-minutes").unlink(missing_ok=True)
+        after_failure = (held(meeting / "minutes.md"), held(previous), binned())
+        (WORK / "hold-minutes").touch()
+        try:
+            redo()
+            holding = wait_for(None, lambda b: (WORK / "held-minutes").exists(), 15)
+            browser.execute_script("return window.__TAURI__.core.invoke('making_cancelled', {name: arguments[0]})", meeting.name)
+            cancelled = wait_for(browser, lambda b: b.execute_script(idle), 15)
+        finally:
+            (WORK / "hold-minutes").unlink(missing_ok=True)
+            (WORK / "held-minutes").unlink(missing_ok=True)
+        after_cancel = (held(meeting / "minutes.md"), held(previous), binned())
+        check("a summary's redo that fails or is cancelled leaves both versions as they were, nothing set aside, nothing in the trash (D113)",
+              failed and holding and cancelled and after_failure == before and after_cancel == before and asides() == [],
+              [failed, holding, cancelled, after_failure == before, after_cancel == before, asides()])
+        # A trash that refuses: the older version stays as minutes-previous.md, the one replaced set aside beside it, and it
+        # is said — by its notification, the window away (D92).
+        kept_older = held(previous)
+        trash.mkdir(parents=True, exist_ok=True)
+        notified = WORK / "notified-previous-summary"
+        monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                   stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+        trash.chmod(0o500)
+        try:
+            time.sleep(0.5)
+            away(browser, lambda: (redo(), wait_for(None, lambda b: "n’a pas pu aller à la corbeille" in notified.read_text(), 15)))
+            said_kept = "n’a pas pu aller à la corbeille" in notified.read_text()
+        finally:
+            trash.chmod(0o700)
+            monitor.terminate()
+        aside_now = asides()
+        check("a summary's trash that refuses: the older stays as minutes-previous.md, the one replaced set aside beside it, said (D113)",
+              said_kept and held(previous) == kept_older and len(aside_now) == 1 and aside_now[0] in notified.read_text(),
+              [said_kept, held(previous)[:60], aside_now])
+        for name in aside_now:
+            (meeting / name).unlink()
+        # Kept, it is the meeting's: in its text's weight, and in the trash with it (ines, #1062).
+        text = browser.execute_script("return window.__TAURI__.core.invoke('listed')"
+                                      ".then((l) => l.sessions.filter((s) => s.folder.endsWith(arguments[0])).map((s) => s.text))", meeting.name)
+        sizes = sum(path.stat().st_size for path in (meeting / "minutes.md", previous) if path.is_file())
+        check("the previous version counts in the meeting's text weight (D113)", previous.is_file() and len(text) == 1 and text[0] >= sizes, [text, sizes])
+        browser.execute_script("window.__TAURI__.core.invoke('freed', {names: [arguments[0]], whole: true})", meeting.name)
+        trashed = WORK / "data" / "Trash" / "files" / meeting.name
+        gone = wait_for(None, lambda b: not meeting.exists(), 10)
+        check("the meeting moved to the trash takes its previous version with it (D113)",
+              gone and (trashed / "minutes-previous.md").is_file(), [meeting.exists(), sorted(p.name for p in trashed.iterdir()) if trashed.exists() else None])
+
+
+def previous_transcript_back(now: dt.datetime) -> None:
+    """CK. D113, criterion 2, the transcript: made again, the one it replaced — the last one only — stays in the
+    meeting's folder as `transcript-previous.jsonl`, which no step reads, in place of going to the trash; the page
+    offers « Revenir à la version précédente » with its time and model, a line saying the same button brings back
+    the one left; pressed, the two swap; the next redo sends the older one to the trash. In French."""
+    print("CK. a transcript made again keeps the one it replaced, the page offering it back with its time and model; going back swaps them (D113)")
+    idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+            " && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)")
+    back = ("const b = document.getElementById('transcript-previous'), h = document.getElementById('transcript-previous-help');"
+            " return b && b.getClientRects().length ? [b.textContent, h ? h.textContent : null] : null")
+    help_said = "La version quittée devient la précédente\u00a0: le même bouton la ramène."
+    meetings = WORK / "previous-transcript"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
+    first = ('{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"ggml-tiny-first","language":"fr","context":null}\n'
+             '{"type":"segment","speaker":"me","track":"local","start":0.5,"end":1.5,"text":"La première version."}\n'
+             '{"type":"complete","duration":2.0,"made":"2026-10-18T13:00:00+02:00"}\n')
+    current = meeting / "transcript.jsonl"
+    current.write_text(first)
+    data = WORK / "data-previous-transcript"
+    models = data / "kitokey" / "models"
+    models.mkdir(parents=True)
+    a, b = models / "ggml-tiny-a.bin", models / "ggml-tiny-b.bin"
+    for model in (a, b):
+        model.write_bytes(b"\0" * 16)
+    # No summary follows: the transcript's version alone is judged here; CJ judges the summary's.
+    window = Window(meetings, "fr_FR.UTF-8", f'after = "nothing"\nreminder = false\nmodel = "{a}"\n')
+    window.env.update(XDG_DATA_HOME=str(data))
+    previous = meeting / "transcript-previous.jsonl"
+    asides = lambda: sorted(p.name for p in meeting.iterdir() if p.name.startswith("transcript") and p.name not in ("transcript.jsonl", "transcript-previous.jsonl"))
+    held = lambda path: path.read_text() if path.is_file() else "the file absent"
+    redo = lambda browser, model: browser.execute_script(
+        "window.__TAURI__.core.invoke('transcript_redo', {name: arguments[0], model: arguments[1]})", meeting.name, str(model))
+    with window as browser:
+        page = lambda: (browser.execute_script("location.hash = '#/'"),
+                        browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}"),
+                        wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .lines") and b.execute_script(idle), 15))
+        page()
+        check("no version replaced yet: nothing offered back (D113)", browser.execute_script(back) is None, browser.execute_script(back))
+        redo(browser, a)
+        made = wait_for(browser, lambda b: "Refait avec ggml-tiny-a." in held(current) and b.execute_script(idle), 15)
+        second = held(current)
+        check("made again: the one replaced stays beside as transcript-previous.jsonl, nothing else set aside (D113)",
+              made and held(previous) == first and asides() == [], [previous.exists(), asides()])
+        page()
+        offered = wait_for(browser, lambda b: b.execute_script(back), 10)
+        got = browser.execute_script(back) or [None, None]
+        check("the page offers « Revenir à la version précédente », with its time and model, and says the same button brings back the one left (D113)",
+              offered and got[0].startswith("Revenir à la version précédente (") and "18 oct." in got[0] and "first" in got[0].lower()
+              and got[1] == help_said, got)
+        # Pressed when it is there; absent, the rows below fail saying so, never raise.
+        if offered:
+            press(browser, "transcript-previous")
+        swapped = offered and wait_for(None, lambda b: held(current) == first and held(previous) == second, 10)
+        shown = wait_for(browser, lambda b: "La première version." in b.execute_script(
+            "return document.querySelector('#meeting .lines')?.textContent ?? ''"), 10)
+        named = wait_for(browser, lambda b: "tiny a" in (b.execute_script(back) or [""])[0].lower(), 10)
+        check("pressed: the two swap, the page shows the one brought back and offers the one left (D113)",
+              swapped and shown and named, [browser.execute_script(back) or "the button absent", asides()])
+        redo(browser, b)
+        again = wait_for(browser, lambda b_: "Refait avec ggml-tiny-b." in held(current) and b_.execute_script(idle), 15)
+        check("the next redo: the one it replaced is the previous one, the older gone from the folder (D113)",
+              again and held(previous) == first and asides() == [], [held(previous)[:80], asides()])
+        # ines' rows of #1070. T7: a person's correction stays with its version, back and then forward.
+        browser.execute_script("return window.__TAURI__.core.invoke('transcript_corrected', {name: arguments[0], track: 'local', start: 0.0,"
+                               " text: 'Corrigé à la main.'})", meeting.name)
+        corrected = wait_for(None, lambda b_: "Corrigé à la main." in held(current), 5)
+        mine = held(current)
+        swaps = []
+        for _ in range(2):
+            page()
+            if wait_for(browser, lambda b_: b_.execute_script(back), 10):
+                press(browser, "transcript-previous")
+            swaps.append(wait_for(None, lambda b_: held(current) == (first if not swaps else mine), 10))
+        check("a correction stays with its version, back and then forward (#1070, T7)",
+              corrected and swaps == [True, True] and held(previous) == first, [corrected, swaps, held(current)[-160:]])
+        # T8: a redo that fails, or is cancelled, leaves both versions as they were, nothing set aside nor trashed.
+        trash = data / "Trash" / "files"
+        binned = lambda: sorted(p.name for p in trash.iterdir()) if trash.exists() else []
+        before = (held(current), held(previous), binned())
+        (WORK / "fail-hearing").touch()
+        try:
+            redo(browser, a)
+            failed = wait_for(browser, lambda b_: b_.execute_script(idle), 15)
+        finally:
+            (WORK / "fail-hearing").unlink(missing_ok=True)
+        after_failure = (held(current), held(previous), binned())
+        (WORK / "hold-hearing").touch()
+        try:
+            redo(browser, a)
+            holding = wait_for(None, lambda b_: (WORK / "held-hearing").exists(), 15)
+            browser.execute_script("return window.__TAURI__.core.invoke('making_cancelled', {name: arguments[0]})", meeting.name)
+            cancelled = wait_for(browser, lambda b_: b_.execute_script(idle), 15)
+        finally:
+            (WORK / "hold-hearing").unlink(missing_ok=True)
+            (WORK / "held-hearing").unlink(missing_ok=True)
+        after_cancel = (held(current), held(previous), binned())
+        check("a redo that fails or is cancelled leaves both versions as they were, nothing set aside, nothing in the trash (#1070, T8)",
+              failed and holding and cancelled and after_failure == before and after_cancel == before and asides() == [],
+              [failed, holding, cancelled, after_failure == before, after_cancel == before, asides()])
+        # T9 starts from versions of its own: what T8 leaves is T8's to judge, never carried into T9 (a failed redo taken as
+        # written, `fail`, would otherwise redden T9 too).
+        current.write_text(second)
+        previous.write_text(first)
+        # T9: a trash that refuses — the older version cannot leave — keeps the one set aside where it is, and says so.
+        trash.mkdir(parents=True, exist_ok=True)
+        notified = WORK / "notified-previous-transcript"
+        monitor = subprocess.Popen(["dbus-monitor", "--session", "interface='org.freedesktop.Notifications',member='Notify'"],
+                                   stdout=open(notified, "w"), stderr=subprocess.DEVNULL)
+        trash.chmod(0o500)
+        try:
+            time.sleep(0.5)
+            redo(browser, b)
+            redone = wait_for(browser, lambda b_: b_.execute_script(idle) and "Refait avec ggml-tiny-b." in held(current), 15)
+            said = wait_for(None, lambda b_: "Ancienne transcription conservée" in notified.read_text(), 10)
+        finally:
+            trash.chmod(0o700)
+            monitor.terminate()
+        kept_aside = asides()
+        check("a trash that refuses: the older version stays as transcript-previous.jsonl, the one replaced set aside beside it, and it is said (#1070, T9)",
+              redone and said and held(previous) == first and len(kept_aside) == 1 and kept_aside[0] in notified.read_text(),
+              [redone, said, held(previous)[:60], kept_aside])
+        for name in kept_aside:
+            (meeting / name).unlink()
+        # T10 (the coordinator's decision, 2026-11-21): a transcript and the summary made from it are one version.
+        stamp = lambda at, text: ('{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"ggml-' + text + '","language":"fr","context":null}\n'
+                                  '{"type":"segment","speaker":"me","track":"local","start":0.5,"end":1.5,"text":"' + text + '."}\n'
+                                  '{"type":"complete","duration":2.0,"made":"' + at + '"}\n')
+        summary = lambda at, said_: ('---\ncontract: minutes/v4\nmade: ' + at + '\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n'
+                                     '## Points saillants\n\n' + said_ + '\n\n## Actions\n\nAucune.\n\n## Points clés\n\nAucun.\n')
+        minutes_now, minutes_kept = meeting / "minutes.md", meeting / "minutes-previous.md"
+        current.write_text(stamp("2026-10-18T15:00:00+02:00", "deuxieme"))
+        previous.write_text(stamp("2026-10-18T13:00:00+02:00", "premiere"))
+        minutes_now.write_text(summary("2026-10-18T15:05:00+02:00", "Sur la deuxième."))
+        minutes_kept.write_text(summary("2026-10-18T13:05:00+02:00", "Sur la première."))
+        page()
+        if wait_for(browser, lambda b_: b_.execute_script(back), 10):
+            press(browser, "transcript-previous")
+        paired = wait_for(None, lambda b_: "premiere" in held(current) and "Sur la première." in held(minutes_now)
+                          and "deuxieme" in held(previous) and "Sur la deuxième." in held(minutes_kept), 10)
+        check("going back on the transcript brings its summary back with it: the two pairs swap as one version (#1070, T10)",
+              paired, [held(current)[-80:], held(minutes_now)[-120:]])
+        other = ("const o = document.getElementById('minutes-other-version');"
+                 " return o && o.getClientRects().length ? o.textContent : null")
+        minutes_kept.unlink()
+        current.write_text(stamp("2026-10-18T15:00:00+02:00", "deuxieme"))
+        previous.write_text(stamp("2026-10-18T13:00:00+02:00", "premiere"))
+        minutes_now.write_text(summary("2026-10-18T15:05:00+02:00", "Sur la deuxième."))
+        page()
+        alone = browser.execute_script(other) is None
+        if wait_for(browser, lambda b_: b_.execute_script(back), 10):
+            press(browser, "transcript-previous")
+        page()
+        said_other = wait_for(browser, lambda b_: b_.execute_script(other), 10)
+        check("no previous summary: once back, the page says the summary was made on the other version, never as this one's (#1070, T10)",
+              alone and said_other and browser.execute_script(other) == "Compte rendu fait sur l’autre version" and "Sur la deuxième." in held(minutes_now),
+              [alone, browser.execute_script(other)])
+        # Kept, it is the meeting's: in its text's weight, and in the trash with it. Weighed with it and without it — set
+        # outside the folder a moment, then back —: the difference is its size exactly (ines, #1225: « at least the two
+        # transcripts » held whatever was counted, the summaries and session.json covering the gap).
+        weight = lambda: browser.execute_script("return window.__TAURI__.core.invoke('listed')"
+                                                ".then((l) => l.sessions.filter((s) => s.folder.endsWith(arguments[0])).map((s) => s.text))", meeting.name)
+        kept_size = previous.stat().st_size if previous.is_file() else None
+        with_it = weight()
+        outside = WORK / f"{meeting.name}-transcript-previous.jsonl"
+        if previous.is_file():
+            previous.rename(outside)
+        try:
+            without_it = weight()
+        finally:
+            if outside.is_file():
+                outside.rename(previous)
+        check("the previous transcript counts in the meeting's text weight, its size exactly (D113)",
+              kept_size is not None and len(with_it) == 1 and len(without_it) == 1 and with_it[0] - without_it[0] == kept_size,
+              [with_it, without_it, kept_size])
+        browser.execute_script("window.__TAURI__.core.invoke('freed', {names: [arguments[0]], whole: true})", meeting.name)
+        # Its trash is under the data folder this scenario names for its models.
+        trashed = data / "Trash" / "files" / meeting.name
+        gone = wait_for(None, lambda b_: not meeting.exists(), 10)
+        check("the meeting moved to the trash takes its previous transcript with it (D113)",
+              gone and (trashed / "transcript-previous.jsonl").is_file(), [meeting.exists(), sorted(p.name for p in trashed.iterdir()) if trashed.exists() else None])
 
 def page_one_bar(now: dt.datetime) -> None:
     """BX. D92, criterion 2 without its estimate (the cycle's order of cut): a meeting's page, while it is made,
@@ -8860,6 +9427,16 @@ def renaming(now: dt.datetime) -> None:
               bool(drawn_again) and drawn_again["time"] != "00:00:00" and len(drawn_again["meters"]) == 2 and all(m > 0 for m in drawn_again["meters"])
               and all(b > 1 for b in drawn_again["bars"]),
               drawn_again)
+        # #1204: said confidential while it records, its header says it — the lock and its word first, beside « Enregistrement »;
+        # no longer, gone.
+        chips = "return [...document.querySelectorAll('#meeting .meeting-title .holds .chip')].map(c => [c.classList.contains('locked'), !!c.querySelector('svg.lock'), c.textContent.trim()])"
+        browser.find_element(By.ID, "confidential-switch").click()
+        said = wait_for(browser, lambda b: (b.execute_script(chips) or [[False]])[0][0], 5)
+        check("while it records, said confidential: its header shows the lock and « Confidentielle » first, beside « Enregistrement » (#1204)",
+              said and browser.execute_script(chips)[:2] == [[True, True, "Confidentielle"], [False, False, "Enregistrement"]], browser.execute_script(chips))
+        browser.find_element(By.ID, "confidential-switch").click()
+        gone = wait_for(browser, lambda b: b.execute_script(chips)[0] == [False, False, "Enregistrement"] and not any(c[0] for c in b.execute_script(chips)), 5)
+        check("no longer confidential: the header's lock gone (#1204)", gone and not (recording / "confidential").exists(), browser.execute_script(chips))
         # #1112: the time large in the who-spoke area, as Voice Memos and Granola centre it, the meters under it; nothing
         # left at the legend's right, where the range stands at rest.
         big = ("const t = document.getElementById('page-time'), d = document.querySelector('#meeting .drawing'), h = document.querySelector('#meeting h1'),"
@@ -8986,6 +9563,48 @@ def renaming(now: dt.datetime) -> None:
               [again, live_again, browser.execute_script(alive), browser.execute_script(resting)])
 
 
+def confidential_locked(now: dt.datetime) -> None:
+    """CP. #1204: while a confidential meeting records, the bar shows a lock, named, at 3:1 at least; never at rest."""
+    print("CP. a confidential meeting recording: a lock in the bar's row, named for a screen reader, 3:1 at least, in both themes; "
+          "gone when it is no longer confidential, and at rest (#1204)")
+    lock = ("const l = document.getElementById('small-locked'); if (!l) return null; const r = l.getBoundingClientRect();"
+            " const ground = (e) => { while (e) { const c = getComputedStyle(e).backgroundColor; if (c && !c.endsWith(', 0)') && c !== 'transparent') return c; e = e.parentElement; } return 'rgb(255, 255, 255)'; };"
+            " return {shown: l.getClientRects().length > 0, role: l.getAttribute('role'), label: l.getAttribute('aria-label'), title: l.title,"
+            " drawn: !!l.querySelector('svg'), colour: getComputedStyle(l).color, ground: ground(l),"
+            " inside: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5, size: [Math.round(r.width), Math.round(r.height)],"
+            " row: l.closest('.bar-row') !== null}")
+    rgb = lambda text: [float(n) for n in re.findall(r"[\d.]+", text)[:3]]
+    for language, named in (("fr_FR.UTF-8", "Réunion confidentielle"), ("en_US.UTF-8", "Confidential meeting")):
+        short = language[:2]
+        for theme in ("light", "dark"):
+            taping = WORK / f"locked-{short}-{theme}"
+            taping.mkdir()
+            window = Window(taping, language, 'after = "nothing"\nreminder = false\n', small=True)
+            if theme == "dark":
+                window.env.update(GTK_THEME="Adwaita:dark")
+            with window as browser:
+                check(f"{short}, {theme}: at rest, no lock", not (browser.execute_script(lock) or {}).get("shown"), browser.execute_script(lock))
+                browser.find_element(By.ID, "small-record").click()
+                wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
+                time.sleep(0.5)
+                check(f"{short}, {theme}: recording, not confidential: no lock", not browser.execute_script(lock)["shown"], browser.execute_script(lock))
+                browser.execute_script("document.getElementById('small-confidential').click()")
+                shown = wait_for(browser, lambda b: b.execute_script(lock)["shown"], 3)
+                got = browser.execute_script(lock)
+                ratio = contrast(rgb(got["colour"]), rgb(got["ground"]))
+                check(f"{short}, {theme}: said confidential, a lock in the row, named « {named} » for a screen reader and in its tooltip, inside the bar",
+                      shown and got["role"] == "img" and got["label"] == named and got["title"] == named and got["drawn"] and got["inside"] and got["row"], got)
+                check(f"{short}, {theme}: the lock at 3:1 at least on the bar ({ratio:.2f})", ratio >= 3.0, got)
+                shot_themed(browser, f"cp-locked-{short}-{theme}", theme)
+                browser.execute_script("document.getElementById('small-confidential').click()")
+                check(f"{short}, {theme}: no longer confidential: the lock gone", wait_for(browser, lambda b: not b.execute_script(lock)["shown"], 3), browser.execute_script(lock))
+                browser.execute_script("document.getElementById('small-confidential').click()")
+                wait_for(browser, lambda b: b.execute_script(lock)["shown"], 3)
+                stop_from_small(browser)
+                rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+                check(f"{short}, {theme}: stopped, at rest: no lock", rest and not browser.execute_script(lock)["shown"], browser.execute_script(lock))
+
+
 def dates_mentioned(now: dt.datetime) -> None:
     """CM. « Dates mentionnées » (D115): each action's by when read against the meeting's day; ticked, to Google Calendar."""
     print("CM. « Dates mentionnées »: the dates an action names, in full, its passage beside it, nothing ticked; the day changed, read again; "
@@ -9030,8 +9649,20 @@ def dates_mentioned(now: dt.datetime) -> None:
             browser.set_window_size(1100, 800)
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             shown = wait_for(browser, lambda b: b.execute_script(offered), 10)
-            check(f"{language}: offered under the actions, « {opens} »", shown and browser.find_element(By.ID, "dates-open").text == opens,
-                  browser.execute_script("return document.getElementById('dates-open')?.outerHTML"))
+            # Among the summary's actions, as « Envoyer… » and « Copier » are (#1213, the decider): an icon, a calendar, its
+            # name and tooltip the words, before « Copier » — never a bar of its own under the summary.
+            form = browser.execute_script(
+                "const b = document.getElementById('dates-open'), row = b?.closest('.minutes-actions'), copy = document.getElementById('copy-minutes');"
+                " return b ? {icon: b.classList.contains('icon-button'), row: !!row, before: !!copy && row === copy.parentElement"
+                " && !!(b.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING), text: b.textContent.trim(),"
+                " name: b.getAttribute('aria-label'), tip: b.title, calendar: !!b.querySelector('svg rect') && b.querySelectorAll('svg path').length === 3} : null")
+            # Its count beside the calendar (#1239): how many dates it offers, read at a glance; its name and tooltip say both.
+            counted = {"Dates mentionnées": "2 dates mentionnées", "Dates mentioned": "2 dates mentioned"}[opens]
+            check(f"{language}: offered among the summary's actions, a calendar and its count « 2 », named « {counted} » and its tooltip the same, before « Copier » (#1213, #1239)",
+                  shown and form == {"icon": True, "row": True, "before": True, "text": "2", "name": counted, "tip": counted, "calendar": True}, form)
+            if language.startswith("fr"):
+                browser.execute_script("document.querySelector('#meeting .card.minutes').scrollIntoView({block: 'start'})")
+                shot(browser, "cm-dates-offered-light")
             press(browser, "dates-open")
             wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("items"), 5)
             got = browser.execute_script(panel)
@@ -9125,6 +9756,9 @@ def actions_rows(now: dt.datetime) -> None:
             "const th = [...document.querySelectorAll('#meeting table.actions thead th')];"
             "return [th.map(t => t.textContent), th.every(t => { const r = t.getBoundingClientRect(); return r.width <= 1 && r.height <= 1; })]")
         check("no visible headers: Qui, Quoi, Pour quand their names for assistive technology", heads == [["Qui", "Quoi", "Pour quand"], True], heads)
+        # A section with items says nothing of being empty (#1234): « Rien de noté » only where nothing was made.
+        empties = browser.execute_script("return document.querySelectorAll('#meeting .minutes .body .empty-section').length")
+        check("a summary whose sections all hold items says « Rien de noté » nowhere (#1234)", empties == 0, empties)
         looks = browser.execute_script(
             "const of = (v) => { const p = document.createElement('span'); p.style.color = `var(${v})`; document.querySelector('#meeting').append(p);"
             " const c = getComputedStyle(p).color; p.remove(); return c; };"
@@ -9145,6 +9779,18 @@ def actions_rows(now: dt.datetime) -> None:
         time.sleep(0.5)
         browser.execute_script("document.querySelector('#meeting .minutes').scrollIntoView({block: 'start'})")
         time.sleep(0.3)
+        # Who made each version, said once (#1231): « sur cet ordinateur » never both in the list and after it, and
+        # each list as wide as the name it shows — never as wide as its longest option.
+        makers = browser.execute_script(
+            "const shown = (n) => n.nodeName === 'SELECT' ? (n.options[n.selectedIndex]?.textContent ?? '') : n.nodeType === 3 ? n.textContent"
+            " : [...n.childNodes].map(shown).join('');"
+            "const c = document.createElement('canvas').getContext('2d');"
+            "return [...document.querySelectorAll('#meeting .maker')].filter(p => p.querySelector('select.page-model')).map(p => {"
+            " const s = p.querySelector('select.page-model'), st = getComputedStyle(s);"
+            " c.font = `${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;"
+            " return [shown(p), Math.round(s.getBoundingClientRect().width - c.measureText(s.options[s.selectedIndex]?.textContent ?? '').width)]; })")
+        check("each version's maker said once — « sur cet ordinateur » not repeated after its list — and its list as wide as the name shown (#1231)",
+              len(makers) == 2 and all(said.count("sur cet ordinateur") <= 1 and 0 <= room <= 16 for said, room in makers), makers)
         shot(browser, "d46-actions-rows")
         # In a structure (minutes/v5, D111): the actions are the section their id names — the fourth
         # here, never the second by place —, each section titled as the page names its id.
@@ -10474,6 +11120,8 @@ def two_panes(now: dt.datetime) -> None:
         for width in (1920, 840, 600, 420):
             browser.set_window_size(width, 900)
             drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "app-language") and b.find_element(By.ID, "app-language").is_displayed(), 10)
+            # Measured once the page has drawn at that width — a folder's path is cut to it by the page (#1232).
+            wait_for(browser, lambda b: b.execute_script(SETTINGS_OVERFLOW) == [], 3)
             over = browser.execute_script(SETTINGS_OVERFLOW)
             check(f"Settings, {width} px wide: nothing past its card or the window, each box measured (D95, #782)", drawn and over == [], over)
             # The top of Settings, before anything below is scrolled to.
@@ -11687,9 +12335,24 @@ def confidential_kept(now: dt.datetime) -> None:
         chips = browser.execute_script("return [...document.querySelectorAll('.session .mark.locked')].map(c => [c.getAttribute('aria-label'), c.title, !!c.querySelector('svg')])")
         check("the list shows the meeting with a lock, its word its name and tooltip (D89)", chips == [["Confidentielle", "Confidentielle", True]], chips)
         seen(browser, "d60-4-list-light")
+        # Its audio freed (#1233): its player draws two dotted lanes, yours and the others', and says why under them — no
+        # turn drawn on a sound that is not there, which read as a fault (a block at the start of a long meeting).
+        lanes_read = ("const d = document.querySelector('#meeting .drawn .drawing'); if (!d) return null;"
+                      "return [d.querySelectorAll('rect, .col').length, [...d.querySelectorAll('line')].map(l => [l.getAttribute('class'), getComputedStyle(l).strokeDasharray]),"
+                      " document.getElementById('no-player')?.innerText || '']")
+        lanes = wait_for(browser, lambda b: b.execute_script(lanes_read), 10) and browser.execute_script(lanes_read)
+        check("no audio: its player two dotted lanes, yours and the others', no turn drawn, and why said under them (#1233)",
+              lanes and lanes[0] == 0 and [c for c, _ in lanes[1]] == ["local", "remote"] and all(dash not in ("", "none") for _, dash in lanes[1])
+              and "supprimé" in lanes[2], lanes)
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         # The last meeting, drawn beside the list already: its page may be drawn again under the driver.
         shown = wait_for(browser, lambda b: b.find_elements(By.ID, "confidential-switch"), 10)
+        # Its summary's sections, made with nothing under them (#1234): each says so, never a bare title.
+        sections_read = ("return [...document.querySelectorAll('#meeting .minutes .body h2')].map(h => [h.textContent,"
+                         " h.nextElementSibling && h.nextElementSibling.tagName !== 'H2' ? h.nextElementSibling.textContent : null])")
+        sections = wait_for(browser, lambda b: b.execute_script(sections_read), 10) and browser.execute_script(sections_read)
+        check("a summary's section with nothing under it says « Rien de noté », never its title alone (#1234)",
+              sections and len(sections) == 3 and all(said == "Rien de noté" for _, said in sections), sections)
         check("its page says it, the switch on, nothing said to have left",
               shown and read(browser, lambda b: switch(b, "confidential-switch").is_selected())
               and browser.execute_script(left) == "")
@@ -12524,6 +13187,26 @@ def pages_seen(now: dt.datetime) -> None:
                     check(f"{theme}, {width} px: {page} shown", bool(there))
                     browser.execute_script("document.getElementById('list').scrollTop = 0; scrollTo(0, 0)")
                     time.sleep(0.4)
+                    if page == "settings":
+                        # A folder as the desktop's own choosers show one (#1232): its icon, one line in the body's font, its
+                        # own name whole — the path before it cut with « … » when it does not fit —, the whole path its tooltip.
+                        folder = browser.execute_script(
+                            "const b = document.getElementById('sessions-shown'), last = b.querySelector('.last'), box = b.getBoundingClientRect();"
+                            "const lh = parseFloat(getComputedStyle(b).lineHeight) || 20;"
+                            "return {icon: !!b.querySelector('svg'), mono: getComputedStyle(b).fontFamily.includes('monospace'),"
+                            " lines: Math.round((b.querySelector('.lead')?.getBoundingClientRect().height ?? box.height) / lh),"
+                            " last: last ? [last.textContent, last.getBoundingClientRect().right <= box.right + 0.5, last.scrollWidth <= last.clientWidth] : null,"
+                            " tip: b.title, value: document.getElementById('sessions').value, heard: document.getElementById(b.getAttribute('aria-describedby') ?? '')?.textContent ?? null,"
+                            " hidden: !!document.getElementById(b.getAttribute('aria-describedby') ?? '')?.hidden,"
+                            " none: getComputedStyle(document.getElementById('export-shown')).fontFamily.includes('monospace')}")
+                        check(f"{theme}, {width} px: the meetings' folder an icon and one line in the body's font, its name whole, its path the tooltip (#1232)",
+                              folder["icon"] and not folder["mono"] and folder["lines"] == 1 and folder["last"]
+                              and folder["last"][0] == folder["value"].rstrip("/").rsplit("/", 1)[-1] and folder["last"][1] and folder["last"][2]
+                              and folder["tip"] == folder["value"] and not folder["none"], folder)
+                        # Heard whole (ines, #1232): its name what it shows (WCAG 2.5.3), its description every folder, as people say it.
+                        whole_said = ("/ " if folder["value"].startswith("/") else "") + " / ".join(p for p in folder["value"].split("/") if p)
+                        check(f"{theme}, {width} px: the meetings' folder heard whole by a screen reader, its whole path its description (#1232)",
+                              folder["heard"] == whole_said and folder["hidden"], [folder["heard"], whole_said, folder["hidden"]])
                     shot_themed(browser, f"d89-{page}-{width}-{theme}", theme)
 
 
@@ -12830,7 +13513,7 @@ def store_shots(now: dt.datetime) -> None:
     seen = lambda browser, shot: shown.update({shot: browser.execute_script(
         "const shown = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent);"
         "return {freed: shown('.chip.gone, #no-player').length,"
-        " folder: document.getElementById('sessions-shown')?.textContent ?? null, text: document.body.innerText,"
+        " folder: document.getElementById('sessions-shown-path')?.textContent ?? null, text: document.body.innerText,"
         " lanes: [...document.querySelectorAll('#meeting svg.relief rect')].map(r => [r.getAttribute('class'), +r.getAttribute('x'), +r.getAttribute('width'), +r.getAttribute('y')]),"
         " wave: [...document.querySelectorAll('#meeting .drawing .wave .col')].map(c => [...c.querySelectorAll('i')].map(i => { const r = i.getBoundingClientRect(); return [r.height, r.top, r.bottom]; })),"
         " sought: [document.getElementById('search')?.value ?? '', document.getElementById('find')?.value ?? ''],"
@@ -12914,8 +13597,10 @@ def store_shots(now: dt.datetime) -> None:
                 continue
             lines = [{"type": "header", "contract": "transcript/v1", "engine": "whisper.cpp", "model": "ggml-large-v3-turbo-q8_0",
                       "language": short, "context": None},
-                     *({"type": "segment", "speaker": who, "track": "local" if who == "me" else "remote", "voice": voice,
-                        "start": start, "end": end, "text": text} for who, voice, text, start, end in segments),
+                     # No voice told (#1206): the app tells no voice apart yet — transcription writes « voice »: null —, so
+                     # the Store's screenshots show « Vous » and « Les autres » alone, never « voix 1 ».
+                     *({"type": "segment", "speaker": who, "track": "local" if who == "me" else "remote", "voice": None,
+                        "start": start, "end": end, "text": text} for who, _voice, text, start, end in segments),
                      {"type": "complete", "duration": segments[-1][4] + 3}]
             (folder / "transcript.jsonl").write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
             store_audio(folder, segments)
@@ -13025,6 +13710,9 @@ def store_shots(now: dt.datetime) -> None:
     check("Settings' screenshot says the meetings' folder in the user's home, never the run's own path (D103)",
           len(settings) == 2 and all(folder and not folder.startswith("/") for folder in settings.values()), settings)
     hours = {shot: store_hours(page["text"]) for shot, page in shown.items()}
+    told = {shot: re.findall(r"·\s*(?:voix|voice)\s*\d", page["text"]) for shot, page in shown.items()}
+    check("no screenshot tells a voice apart — « Vous » and « Les autres » alone, as the app draws a real meeting (#1206)",
+          len(told) == 8 and not any(told.values()), {shot: said for shot, said in told.items() if said})
     check("every screenshot dates its meetings (D103)", len(hours) == 8 and all(hours.values()),
           [shot for shot, said in hours.items() if not said])
     check("every meeting and summary the screenshots date is of the working day, 8 h to 19 h (D103)",
@@ -13889,7 +14577,8 @@ def main() -> int:
             )
             # The sessions' folder: typed, made when it is not there, and what the list reads.
             elsewhere = WORK / "elsewhere" / "Kitokey"
-            spoken = browser.find_element(By.ID, "sessions-shown").get_attribute("textContent")
+            # Its name as heard, the whole path (#1232); what is drawn may be cut in its middle.
+            spoken = browser.execute_script("return document.getElementById('sessions-shown-path')?.textContent ?? null")
             # Outside the home folder, from the root: / tmp / … / chosen.
             check("the sessions' folder is shown as people say it", spoken == "/ " + " / ".join(chosen.parts[1:]), spoken)
 
@@ -14467,16 +15156,20 @@ def main() -> int:
                 return sorted(folder.glob("minutes-before-*.md")) if folder.exists() else []
 
             trash_files = WORK / "data" / "Trash" / "files"
-            redone = wait_for(browser, lambda b: aside(trash_files), 10)
+            # The minutes replaced kept beside as the previous version, no longer in the trash (D113). Waited for until
+            # nothing is left set aside: the stand-in writes the same minutes each time, so the previous kept by an
+            # earlier redo already equals them, and the new one is moved there only once the making has ended — after
+            # « minutes_written » (the attest at a6a17c4 read it in between).
+            kept_previous = asked / "minutes-previous.md"
+            redone = wait_for(browser, lambda b: kept_previous.is_file() and kept_previous.read_text() == before and not aside(asked), 10)
             check(
-                "made again with the model chosen, kept for this meeting, Settings unchanged; the minutes there in the trash",
+                "made again with the model chosen, kept for this meeting, Settings unchanged; the minutes there kept as the previous version (D113)",
                 redone
                 and json.loads((asked / "models.json").read_text()).get("minutes", {}).get("model") == "mistral:7b"
                 and (WORK / "summary-args").read_text().split()[-1] == "mistral:7b"
-                and aside(trash_files)[0].read_text() == before
                 and 'minutes_model = "qwen3:14b"' in window.file.read_text()
                 and not aside(asked),
-                ((WORK / "summary-args").read_text(), aside(trash_files), aside(trash_files) and aside(trash_files)[0].read_text()[:60], before[:60], aside(asked)),
+                ((WORK / "summary-args").read_text(), kept_previous.exists() and kept_previous.read_text()[:60], before[:60], aside(asked)),
             )
             # Made again and failing — on this computer, then online through the agreement: the minutes
             # there stay, and the notice says a redo, not a first making.
@@ -14565,7 +15258,8 @@ def main() -> int:
                   plain and "produit de compte rendu" not in state(browser) and "produit de compte rendu" not in said, (state(browser), said[-300:]))
             time.sleep(3)
             left = sorted(p.name for p in asked.glob("minutes*"))
-            check("nothing else is made after, no copy left beside", (asked / "minutes.md").read_text() == before and left == ["minutes.md"], (left, (asked / "minutes.md").read_text()[:80], (WORK / "summary-args").read_text()))
+            # The previous version the redo before kept stays (D113); no copy of the failed one.
+            check("nothing else is made after, no copy left beside", (asked / "minutes.md").read_text() == before and left == ["minutes-previous.md", "minutes.md"], (left, (asked / "minutes.md").read_text()[:80], (WORK / "summary-args").read_text()))
             window.file.write_text(settled)
             # A trash that refuses: the minutes replaced stay beside the new ones, never deleted.
             trash = WORK / "data" / "Trash"
@@ -14614,7 +15308,7 @@ def main() -> int:
             )
             trash.unlink()
             (WORK / "data" / "Trash-aside").rename(trash)
-            # Refaire… on the transcript: another model of this computer; the transcript there in the trash.
+            # Refaire… on the transcript: another model of this computer; the transcript there kept beside (D113).
             heard = (asked / "transcript.jsonl").read_text()
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
@@ -14626,13 +15320,12 @@ def main() -> int:
                   offered == ["Celui des Réglages\u00a0: Whisper large v3 turbo", "Whisper small"], offered)
             redo_pick(browser, "redo-transcript-panel", "transcription", 1)
             browser.find_element(By.ID, "redo-transcript-do").click()
-            redone = wait_for(browser, lambda b: sorted(trash_files.glob("transcript-before-*.jsonl")), 10)
-            trashed = sorted(trash_files.glob("transcript-before-*.jsonl"))
+            kept = asked / "transcript-previous.jsonl"
+            redone = wait_for(browser, lambda b: kept.is_file() and kept.read_text() == heard, 10)
             check(
-                "the transcript made again with the model picked; the one there in the trash",
+                "the transcript made again with the model picked; the one there kept beside as the previous version (D113)",
                 redone
                 and "Refait avec ggml-small." in (asked / "transcript.jsonl").read_text()
-                and [path.read_text() for path in trashed] == [heard]
                 and not sorted(asked.glob("transcript-before-*")),
                 (asked / "transcript.jsonl").read_text(),
             )
@@ -14660,10 +15353,10 @@ def main() -> int:
                   browser.execute_script(LINES, "#meeting .maker"))
             check("a transcript not made says so on its card in plain words, with a way to try again", unmade and "engine stopped" not in heard_state(browser), heard_state(browser))
             # Tried again as it was asked: made again with the meeting's own model, kept by the Refaire…, not resumed.
-            # Made again — the one there set aside, then in the trash —, never resumed from it.
-            trashed_before = len(sorted(trash_files.glob("transcript-before-*.jsonl")))
+            # Made again — the one there kept beside, the previous one before it in the trash (D113) —, never resumed from it.
+            trashed_before = len(sorted(trash_files.glob("transcript-previous*")))
             press(browser, "transcript-again")
-            tried = wait_for(browser, lambda b: len(sorted(trash_files.glob("transcript-before-*.jsonl"))) == trashed_before + 1, 10)
+            tried = wait_for(browser, lambda b: len(sorted(trash_files.glob("transcript-previous*"))) == trashed_before + 1, 10)
             check("Try again after a Refaire… makes it again with the meeting's own model it kept", tried and "Refait avec ggml-small" in (asked / "transcript.jsonl").read_text(), (asked / "transcript.jsonl").read_text() if (asked / "transcript.jsonl").exists() else "")
             back_ = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 5)
             check("Refaire… is offered again once asked, the panel gone", back_)
@@ -15180,6 +15873,7 @@ def main() -> int:
     store_shots(now)
     actions_rows(now)
     dates_mentioned(now)
+    confidential_locked(now)
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
@@ -15193,6 +15887,8 @@ def main() -> int:
     settings_folded(now)
     destinations_kept(now)
     summary_sent(now)
+    confidential_sent(now)
+    speakers_named(now)
     waveform_drawn(now)
     settings_version(now)
     settings_narrow_without_model(now)
@@ -15211,6 +15907,8 @@ def main() -> int:
     keys_first_surfaces(now)
     redo_says_what_is_wrong(now)
     redo_says_what_follows(now)
+    previous_summary_back(now)
+    previous_transcript_back(now)
     page_one_bar(now)
     page_estimate(now)
     recording_found(now)

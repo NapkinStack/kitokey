@@ -90,4 +90,4 @@ An agent speaking to a person uses these words, and explains one the first time 
 | **Seat** | A file whose content is the project's own; an update never writes into it | `README.md`, the decision indexes | "The README is a seat: the update leaves it." |
 | **Skeleton** | The framework's files a project receives and owns — kernel, playbooks, handbook, CI, hooks, forms | `nstack init`, `nstack update` | "The update merged the skeleton's new handbook page." |
 | **Engine** | The versioned tool that creates and updates projects and runs the checks | `nstack`, its version on every judging run | "nstack 0.10.0." |
-| **Answers** | The project's choices recorded at creation, with the framework's version | `.copier-answers.yml` | "checks: forge." |
+| **Answers** | The project's choices recorded at creation, with the framework's version; the decider's settings among them, listed and changed by `nstack config` | `.copier-answers.yml` | "checks: forge." |
