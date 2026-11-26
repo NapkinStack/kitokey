@@ -8,12 +8,17 @@ publish = false
 docx-rs = { version = "0.4.22", default-features = false }
 pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html"] }
 serde_json = "1.0.154"
+typst = "=0.15.1"
+typst-layout = "=0.15.1"
+typst-pdf = "=0.15.1"
 
 [dev-dependencies]
 quick-xml = "0.42.0"
 tempfile = "3"
 aspasia = "0.2.1"
 icalendar = { version = "0.17.17", default-features = false, features = ["parser"] }
+pdf-extract = "0.12.1"
+lopdf = "0.42.0"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 
 [[bin]]
