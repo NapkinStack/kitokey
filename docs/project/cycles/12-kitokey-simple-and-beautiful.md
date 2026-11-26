@@ -11,7 +11,7 @@ deliverables:
     state: ready
     acceptance:
       - "Given `ui/tokens.css`, when the shell is built, then it is the only file that holds a colour, a font size, a radius, a shadow, a duration or a spacing — primitives, roles, and one dark block shared by `prefers-color-scheme` and `[data-theme=dark]` —; held by a test of `tests/look.rs` that fails on any hex, `rgb()`, `hsl()` or `color-mix()` outside it, and on any of those properties not read from a `var(--…)`, the literals `0`, `1px`, `2px`, `100%` and `50%` aside; its count of violations kept in a file it can only lower — a ratchet —, and zero at the cycle's closure"
-      - "Given the roles of PDR-0008, when the tokens are read, then « Vous » is blue and « Les autres » amber, red is the record's and the destructive action's, violet with the lock « Confidentielle », green success only; each pair of text and ground reaches 4.5:1 and each control's edge 3:1 in both themes; held by `tests/look.rs`, its test `red_says_a_recording_and_nothing_else` rewritten to the two roles of red, never dropped"
+      - "Given the roles of PDR-0008, when the tokens are read, then « Vous » is blue and « Les autres » teal in the light theme and golden amber in the dark one, red is the live dot's and the destructive action's, violet with the lock « Confidentielle », green success only; each pair of text and ground reaches 4.5:1 and each control's edge 3:1 in both themes; held by `tests/look.rs`, its test `red_says_a_recording_and_nothing_else` rewritten to the two roles of red, never dropped"
       - "Given `ui/components.css`, which reads roles only, when the window's e2e opens the gallery (`#/gallery`), then every component of D120's section — among them the toast, the banner, the dialog, the option card, the progress and the engine card — shows in each of its states, in French and English, light and dark, captured at 420 and 1100 px; axe-core reports no violation of its WCAG 2.2 AA rules there; the shots are linked from the pull request"
       - "Given the five inline « copié » and « Enregistré » notes of today (`window.js`: the copies of the summary, the transcript and a line, the floating « Enregistré » of Settings), when their action succeeds, then a toast says it (`role=status`, gone after 5 s) and no inline note remains; held by the e2e"
       - "Given `scripts/design-export`, when it runs, then it writes `design-system/` — `README.md` with the principles and the commit it came from, `tokens.json` in the W3C Design Tokens format generated from `tokens.css`, `tokens.css`, a preview per component cut from the gallery —; and a check warns when the published copy's commit is not `HEAD`'s. Designs explored in Claude Design come back as a pull request on `tokens.css` or `components.css`, never as an edit of the export"
@@ -54,13 +54,13 @@ deliverables:
     module: shell
     state: ready
     acceptance:
-      - "Given the bar at rest, when it is drawn, then it holds the context's field (« De quoi parle l'appel ? Qui est là ? »), record and expand; while it records, the time, the two voices' meters (blue, amber), stop, and one disclosure for the context, « Confidentielle » (the same switch as the page's) and the microphone — no engine, no language; a failure is said in two lines then « Ouvrir », never cut in a word; no focus ring shows until the keyboard is used; held by the e2e, axe-core and its shots, in both languages and themes"
+      - "Given the bar at rest, when it is drawn, then it holds the context's field (« De quoi parle l'appel ? Qui est là ? »), record and expand; while it records, the time, the two voices' meters (PDR-0008's), a stop button calm and neutral — red is the live dot's alone —, one lock that shows and turns « Confidentielle » on and off — open or closed, no « Rendre confidentiel » button —, and one disclosure for the context and the microphone — no engine, no language; a failure is said in two lines then « Ouvrir », never cut in a word; no focus ring shows until the keyboard is used; held by the e2e, axe-core and its shots, in both languages and themes"
   - id: D126
     title: "A newcomer reaches their first summary in three screens: a choice, a check while it downloads, « Prêt », and an example meeting to try"
     module: shell
     state: ready
     acceptance:
-      - "Given a first run, when it starts, then it is three screens: (1) two option cards, « Sur cet ordinateur » and « En ligne », « Je ne sais pas » choosing « Sur cet ordinateur », the engine's download starting at once in the background; (2) the sound checked inline, the two meters moving, a progress under it saying what is prepared, its size and the time left; (3) « Prêt. Enregistrez votre premier appel », the record button and the shortcut, and « Essayer sur un exemple »; held by the e2e, each screen shot in both languages and themes"
+      - "Given a first run, when it starts, then it is three screens: (1) two option cards, « Sur cet ordinateur » and « En ligne », « Je ne sais pas » choosing « Sur cet ordinateur », the engine's download starting at once in the background; (2) the sound checked inline, the two meters moving, a progress under it saying what is prepared, its size and the time left, in the words D124 rewrote for the download; (3) « Prêt. Enregistrez votre premier appel », the record button and the shortcut, and « Essayer sur un exemple »; held by the e2e, each screen shot in both languages and themes"
       - "Given a new install, when its settings are first written, then « Après un enregistrement » is « Transcrire, puis rédiger le compte rendu », so that the first meeting has its summary without a click; a settings file that already says another choice keeps it; held by `settings.rs`'s tests"
       - "Given « Essayer sur un exemple », when it is chosen, then a two-voice clip of about 45 s bundled with Kitokey, invented for it, runs through the real transcription and summary and opens as a meeting marked « Exemple », deletable as any; held by the e2e with its engines' stand-ins, its size recorded against D102's package size"
   - id: D127
@@ -92,6 +92,18 @@ deliverables:
     acceptance:
       - "Given « Écoute et rédaction › Formats » in Settings (D123), when the user manages them, then a format can be created, duplicated, renamed, changed — its sections, each a title and what it holds, one holding the actions — and deleted after a confirmation (PDR-0008); a built-in format can be hidden and shown again, never changed or deleted; one is the default; the formats are kept in the user's settings folder, never sent anywhere; held by the e2e and the shell's tests"
       - "Given « Refaire… » on a summary (D121), when its dialog opens, then it offers the formats — the default marked —, a choice applying to that meeting; the summary is written in the format chosen through D129's `summarising/v1`; the summary's line of provenance names its format; held by the e2e with the summary's stand-in"
+  - id: D131
+    title: "Each line of a transcript says who spoke, named by the user: a name given to one line, or to a voice everywhere"
+    module: shell
+    state: ready
+    acceptance:
+      - "Given a meeting's transcript, when the user names the speaker of one line, then that line takes the name, written as `transcript/v1` lets the shell write it (#1251); when they name a voice, every line of that voice takes it (`speakers.json`); a redo keeps both, as the contract's key says; held by the e2e and the shell's tests"
+  - id: D132
+    title: "`send` sends the parts of a summary the user chose: `posting/v1` expanded with an optional list of parts"
+    module: send
+    state: ready
+    acceptance:
+      - "Given `posting/v1` expanded by its expand step (03-contracts.md), when its input names the parts to send — among the title, the summary, the actions, the key points, the dates —, then `kitokey-send` sends those alone, for each kind; without the field it sends as before; never the audio, never the transcript; held by the contract's tests, the comparator (ADR-0005) on its schema, and the module's tests per kind"
 ---
 
 # Cycle 12 — Kitokey, simple and beautiful
@@ -131,7 +143,7 @@ flowchart LR
 grey, dotted: the words, rewritten with each screen and checked across them.
 
 **One week, done well and fast** (the decider, 2026-11-26): only the backlog's P1 items are criteria; its P2
-and P3 items are in *Later*. **D127, D128 and D130 are P2**: in the cycle, built only if the time remains once
+and P3 items are in *Later*. **D127, D128, D130, D131 and D132 are P2**: in the cycle, built only if the time remains once
 D120 to D126 and D129 are merged, deferred at the closure otherwise — never stretching the end.
 
 **Added by the decider, 2026-11-26** (relayed by the coordinator): the kept versions managed (D121, P1), and the
@@ -153,7 +165,7 @@ time allows, this cycle or the next —; D127 and D128 stay P2. *(framer, to con
 | 5–6 | **D125** — the compact bar, its engine choice gone with D122 | sam | the bar's part of `window.js` |
 | 2–4 | **D124** — `docs/voice.md`, `src/words.rs`, `tests/words.rs` | marc | `words.rs`, `voice.md`, `tests/words.rs` |
 | 4–6 | **D129** — `summarising/v1` expanded, the summary module writing a format it is given | marc | `contracts/summarising/`, `modules/summary/` |
-| 6–7 | **D127**, **D128**, **D130** — only if the time remains, D130 first | the first stream done | `window.js`'s search, a palette file, Settings' formats in a file of its own |
+| 6–7 | **D130**, **D131** (after D121), **D132** (before « Partager »'s choice), **D127**, **D128** — only if the time remains, in that order | the first stream done | `window.js`'s search, a palette file, Settings' formats in a file of its own |
 
 New code of a screen goes in a file of its own under `ui/` where it can — the first run's, the palette's —, to
 keep the streams off each other's lines in `window.js`. The verifiers rotate: no one verifies their own stream,
@@ -180,7 +192,7 @@ button's variants; inline notes become the toast; the error lines become the ban
 per page; the radio cards become the option card; the inline trash card becomes the dialog; plus the engine
 card (D122's), the progress (two segments with an estimate and « Annuler »), and the empty state. The values —
 type scale, 4 px grid, radii, elevations — are *(framer, to confirm)* in D120's first pull request with the
-gallery's shots. The blue and amber pair is said colour-blind-safe by the audit without a primary source: D120's
+gallery's shots. The pairs of the two voices — blue with teal in the light theme, blue with golden amber in the dark one — are not checked colour-blind-safe at a primary source: D120's
 first pull request checks it with a simulator of the three deficiencies and keeps the shots.
 
 Order: (1) `tokens.css`, the old names kept as aliases — no visible change, the shots identical; (2) the
@@ -195,6 +207,13 @@ is a gesture (*What needs a person*). The code stays the source; the artifact is
 `ux-ia.md` §3, `screens-and-delight.md` §2 B (record, then summary, then share: three clicks) and §5 (density):
 the default view is what one acts on, the rest one click away. The export is `exporting/v1`'s, which the shell
 consumes already (D109): no contract changes. « Ajouter un canal » opens the same form as Settings, in a sheet.
+The send's notice says what leaves; « l'audio reste ici » is no longer said (the decider, on the mock-up,
+2026-11-26).
+
+*P2, after D132*: in « Partager », the user chooses what is shared — the title, the summary, the actions, the key
+points, the dates —, sees a preview, and the last choice is remembered per channel. Never a link to the
+transcript: a local path tells a recipient nothing, and PDR-0007 sends never the transcript (the coordinator,
+2026-11-26).
 
 
 ### D122
@@ -247,6 +266,18 @@ readable.
 
 `screens-and-delight.md` §4, *Shortcuts* and *Command palette*. The global shortcut, which the desktop grants, stays as it is.
 
+### D131
+
+Entered on 2026-11-26, after the cycle's acceptance, on the decider's word relayed by the coordinator: each
+speaker of the transcript, named by line and everywhere — #1230's S2, its contract step merged (#1251). P2, after
+D121. Telling the voices apart (S3, S4) waits on the spike: *Later*.
+
+### D132
+
+Entered on 2026-11-26 with D131, on the coordinator's arbitration of the decider's mock-up feedback: what
+« Partager » sends, chosen by the user, needs `posting/v1` to take it — its expand step, in `send`, before
+D121's choice in the shell. P2.
+
 ## What needs a person
 
 | Deliverable | Who | The literal gesture |
@@ -268,11 +299,11 @@ readable.
 
 - **Importing an audio or video file**, « Nouveau ▾ » and a file dropped on the window — `benchmark.md` §5, backlog item 23.
 - **Outlook** in « Agenda » — cycle 11's D115 made its link; its trial waits on a colleague.
-- **Names by passage** — #1230's S2 (the contract step of `transcript/v1`) and S3 (a service's speakers).
+- **Voices told apart** — #1230's S3 and S4, waiting on the spike; S2, naming by line, is D131 (P2).
 - **Quiet sounds**, opt-in, for starting, stopping and ready — backlog item 22 (P3).
 - **The P2 items of the backlog** (`screens-and-delight.md` §7): the empty states' illustrations and the micro-interactions (3, 4); empty sections of a summary hidden and the speaker said only when it changes (8) — #1234's « Rien de noté » stays until then —; the first summary's celebration (9); an estimate from the first meeting (11); the trial in the sidebar and « Acheter » when over (13); no button label over 28 characters (16).
 - « Dates mentionnées »'s count following the panel's day (marc, #1249).
-- The first run's aurora (`design-system.md` §5).
+- No aurora and no abstract shape (the decider, on the mock-up, 2026-11-26): an empty state is illustrated by a sober composition drawn from Kitokey's own UI, or not at all.
 
 ## Open questions
 
