@@ -5500,6 +5500,9 @@ def summary_sent(now: dt.datetime) -> None:
         check("a summary, destinations set up, not confidential: « Envoyer… » among its actions",
               browser.execute_script(offered) and browser.execute_script(
                   "return !!document.getElementById('send-open').closest('.minutes-actions')"), browser.execute_script(offered))
+        # Several destinations: « Envoyer… » names none of them (#1239, marc) — the panel does; a name only when there is one.
+        several = browser.execute_script("const b = document.getElementById('send-open'); return b ? [b.getAttribute('aria-label'), b.title] : null")
+        check("six destinations: « Envoyer… » keeps its name and tooltip, naming none of them (#1239)", several == ["Envoyer…", "Envoyer…"], several)
         # By keyboard alone: the button reached and pressed by Enter, the panel's first destination focused.
         browser.execute_script("document.getElementById('send-open').focus()")
         ActionChains(browser).send_keys(Keys.ENTER).perform()
