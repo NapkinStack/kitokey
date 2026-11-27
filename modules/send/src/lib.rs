@@ -350,6 +350,110 @@ pub struct Meeting {
     pub sections: Vec<(String, String)>,
     /// The section that holds the actions: v1–v4's second, v5's named by `actions`.
     pub actions: Option<usize>,
+    /// The section that holds the key points: v1–v4's third, v5's of id `key_points`.
+    pub key_points: Option<usize>,
+    /// What `only` kept of the parts chosen, for the webhook's `key_points` and `dates`; none when the
+    /// input chose none, and the summary is sent whole, as before.
+    pub chosen: Option<(Vec<Part>, Vec<Date>)>,
+}
+
+/// A part of a summary a person may choose to send (`posting/v1`'s `parts`, D132); the title is always sent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Part {
+    /// Every section but the actions and the key points.
+    Summary,
+    Actions,
+    KeyPoints,
+    Dates,
+}
+
+/// A date of `posting/v1`'s `dates`, as exporting/v1's: its passage — the transcript's words — never read.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Date {
+    pub date: String,
+    pub what: String,
+    pub who: Option<String>,
+}
+
+/// The parts an input chose, and the dates with their heading when it gives them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Chosen {
+    pub parts: Vec<Part>,
+    pub dates: Option<(String, Vec<Date>)>,
+}
+
+impl Chosen {
+    /// `parts`, `dates` and `dates_title` read from posting/v1's input: none when `parts` is absent, the
+    /// summary then sent whole; an error, the field it names, when one is not as `input.schema.json` says.
+    pub fn read(input: &Value) -> Result<Option<Chosen>, &'static str> {
+        let line = |value: &Value| {
+            value
+                .as_str()
+                .filter(|text| !text.is_empty() && !text.contains(['\n', '\r']))
+                .map(str::to_string)
+        };
+        let dates = match input.get("dates") {
+            None => None,
+            Some(Value::Array(items)) if !items.is_empty() => Some(items.iter().map(date).collect::<Option<Vec<_>>>().ok_or("« dates »")?),
+            Some(_) => return Err("« dates »"),
+        };
+        let title = match input.get("dates_title") {
+            None => None,
+            Some(value) => Some(line(value).ok_or("« dates_title »")?),
+        };
+        let Some(parts) = input.get("parts") else { return Ok(None) };
+        let mut chosen = Vec::new();
+        for part in parts.as_array().filter(|parts| !parts.is_empty()).ok_or("« parts »")? {
+            let part = match part.as_str() {
+                Some("summary") => Part::Summary,
+                Some("actions") => Part::Actions,
+                Some("key_points") => Part::KeyPoints,
+                Some("dates") => Part::Dates,
+                _ => return Err("« parts »"),
+            };
+            if chosen.contains(&part) {
+                return Err("« parts »");
+            }
+            chosen.push(part);
+        }
+        let dates = match (chosen.contains(&Part::Dates), dates) {
+            (true, Some(dates)) => Some((title.ok_or("« dates_title »")?, dates)),
+            _ => None,
+        };
+        Ok(Some(Chosen { parts: chosen, dates }))
+    }
+}
+
+/// One item of `dates`: `id` and `date` of their shape, `what` on one line, `who` and `passage` too when given.
+fn date(item: &Value) -> Option<Date> {
+    let text = |name: &str| item.get(name).and_then(Value::as_str);
+    let line = |text: &str| !text.is_empty() && !text.contains(['\n', '\r']);
+    let id = text("id")?;
+    let mut chars = id.chars();
+    let id_ok = id.len() <= 64
+        && chars.next().is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    let day = text("date")?;
+    let day_ok = day.len() == 10
+        && day
+            .char_indices()
+            .all(|(at, c)| if at == 4 || at == 7 { c == '-' } else { c.is_ascii_digit() });
+    let what = text("what").filter(|what| line(what))?;
+    let who = match item.get("who") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(who)) if line(who) => Some(who.clone()),
+        Some(_) => return None,
+    };
+    let passage_ok = match item.get("passage") {
+        None | Some(Value::Null) => true,
+        Some(Value::String(passage)) => !passage.is_empty(),
+        Some(_) => false,
+    };
+    (item.is_object() && id_ok && day_ok && passage_ok).then(|| Date {
+        date: day.into(),
+        what: what.into(),
+        who,
+    })
 }
 
 /// Why a meeting is not sent.
@@ -402,6 +506,50 @@ impl Meeting {
             .filter(|item| !item.is_empty())
             .collect()
     }
+
+    /// The meeting with the parts `chosen` alone, its sections in their order, the dates last under their
+    /// heading, each « date — what — who »; a part asked that the meeting does not hold is empty.
+    pub fn only(&self, chosen: &Chosen) -> Meeting {
+        let has = |part| chosen.parts.contains(&part);
+        let mut meeting = Meeting {
+            title: self.title.clone(),
+            ..Meeting::default()
+        };
+        for (at, section) in self.sections.iter().enumerate() {
+            let part = if self.actions == Some(at) {
+                Part::Actions
+            } else if self.key_points == Some(at) {
+                Part::KeyPoints
+            } else {
+                Part::Summary
+            };
+            if !has(part) {
+                continue;
+            }
+            match part {
+                Part::Actions => meeting.actions = Some(meeting.sections.len()),
+                Part::KeyPoints => meeting.key_points = Some(meeting.sections.len()),
+                _ => {}
+            }
+            meeting.sections.push(section.clone());
+        }
+        let dates = match (&chosen.dates, has(Part::Dates)) {
+            (Some((heading, dates)), true) => {
+                let lines: Vec<String> = dates
+                    .iter()
+                    .map(|date| match &date.who {
+                        Some(who) => format!("- {} — {} — {who}", date.date, date.what),
+                        None => format!("- {} — {}", date.date, date.what),
+                    })
+                    .collect();
+                meeting.sections.push((heading.clone(), lines.join("\n")));
+                dates.clone()
+            }
+            _ => Vec::new(),
+        };
+        meeting.chosen = Some((chosen.parts.clone(), dates));
+        meeting
+    }
 }
 
 /// `minutes`: a front matter of `key: value` lines, then sections of second level.
@@ -450,11 +598,14 @@ fn minutes_read(text: &str) -> Meeting {
     for (_, body) in &mut meeting.sections {
         *body = body.trim().to_string();
     }
-    meeting.actions = if contract.as_deref() == Some("minutes/v5") {
-        actions.and_then(|id| ids?.iter().position(|each| *each == id))
+    if contract.as_deref() == Some("minutes/v5") {
+        let at = |id: &str| ids.as_ref()?.iter().position(|each| each == id);
+        meeting.actions = actions.as_deref().and_then(at);
+        meeting.key_points = at("key_points");
     } else {
-        (meeting.sections.len() >= 2).then_some(1)
-    };
+        meeting.actions = (meeting.sections.len() >= 2).then_some(1);
+        meeting.key_points = (meeting.sections.len() >= 3).then_some(2);
+    }
     meeting
 }
 
@@ -499,9 +650,7 @@ pub fn body(kind: Kind, meeting: &Meeting, title: &str, folder_name: &str) -> Op
     match kind {
         Kind::Webhook => Some(Body {
             content_type: "application/json".into(),
-            bytes: json!({"title": title, "summary": summary, "actions": meeting.action_items()})
-                .to_string()
-                .into_bytes(),
+            bytes: webhook(meeting, title, summary).to_string().into_bytes(),
         }),
         Kind::Discord => {
             let file = format!("# {title}\n\n{summary}");
@@ -523,6 +672,28 @@ pub fn body(kind: Kind, meeting: &Meeting, title: &str, folder_name: &str) -> Op
             })
         }
     }
+}
+
+/// A generic webhook's body: the title, the summary, the actions; and, chosen, the key points and the dates.
+fn webhook(meeting: &Meeting, title: &str, summary: String) -> Value {
+    let mut sent = json!({"title": title, "summary": summary, "actions": meeting.action_items()});
+    if let Some((parts, dates)) = &meeting.chosen {
+        if parts.contains(&Part::KeyPoints) {
+            sent["key_points"] = Meeting {
+                actions: meeting.key_points,
+                ..meeting.clone()
+            }
+            .action_items()
+            .into();
+        }
+        if parts.contains(&Part::Dates) {
+            sent["dates"] = dates
+                .iter()
+                .map(|date| json!({"date": date.date, "what": date.what, "who": date.who}))
+                .collect();
+        }
+    }
+    sent
 }
 
 /// The title in bold, then the summary's first lines, cut at a line's end within Discord's bound.

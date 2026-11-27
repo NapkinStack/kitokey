@@ -12,6 +12,7 @@ fn meeting(sections: &[(&str, &str)], actions: Option<usize>) -> Meeting {
         title: Some("Point hebdo".into()),
         sections: sections.iter().map(|(t, b)| (t.to_string(), b.to_string())).collect(),
         actions,
+        ..Meeting::default()
     }
 }
 
