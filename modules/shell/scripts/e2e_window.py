@@ -9375,6 +9375,8 @@ def confidential_locked(now: dt.datetime) -> None:
                 wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
                 # Half a second after the start: a press within it is the same one (D68), and ■ below would be lost.
                 time.sleep(0.6)
+                ringed = browser.execute_script("const a = document.activeElement, s = getComputedStyle(a); return [a.id, s.outlineStyle, s.outlineWidth]")
+                check(f"{short}, {theme}: started by the pointer, ■ focused and not ringed (D125)", ringed[0] == "small-stop" and (ringed[1] == "none" or ringed[2] == "0px"), ringed)
                 made = wait_for(browser, lambda b: list(taping.glob("*/session.json")), 5)
                 folder = next(taping.glob("*/session.json")).parent if made else taping
                 got = browser.execute_script(lock) or {}
@@ -9432,6 +9434,19 @@ def bar_stop_neutral(now: dt.datetime) -> None:
             window.env.update(GTK_THEME="Adwaita:dark")
         with window as browser:
             wait_for(browser, lambda b: b.execute_script("return document.activeElement.id") == "small-record", 10)
+            # Opened, no key pressed yet: ● holds the focus, unringed — the ring shows once the keyboard is used (D125).
+            time.sleep(0.3)
+            ring_open = browser.execute_script(ring)
+            check(f"{theme}: opened, ● focused and not ringed: no key used yet", ring_open[0] == "small-record" and (ring_open[1] == "none" or ring_open[2] == "0px"), ring_open)
+            # Tab, then Shift+Tab back to ●: the keyboard used, the focus ringed.
+            ActionChains(browser).send_keys(Keys.TAB).perform()
+            time.sleep(0.2)
+            ring_tab = browser.execute_script(ring)
+            ActionChains(browser).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+            time.sleep(0.2)
+            ring_back = browser.execute_script(ring)
+            check(f"{theme}: Tab, then Shift+Tab back to ●: each focus ringed",
+                  ring_tab[1] != "none" and ring_tab[2] != "0px" and ring_back[0] == "small-record" and ring_back[1] != "none" and ring_back[2] != "0px", [ring_tab, ring_back])
             check(f"{theme}: at rest, the bar 48 high", wait_for(browser, lambda b: b.execute_script("return innerHeight") == 48, 3), browser.execute_script("return innerHeight"))
             ActionChains(browser).send_keys(Keys.ENTER).perform()
             wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
