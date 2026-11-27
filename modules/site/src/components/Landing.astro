@@ -92,7 +92,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
           ))}
         </div>
         <div class="wstage" id="wstage" role="tabpanel" data-step="1" aria-labelledby="wtab-1">
-          <div class="w-bar cbar" aria-hidden="true">
+          <div class="w-bar cbar sm" aria-hidden="true">
             <span class="rec"></span><span class="tm num" id="wtime">00:00:00</span>
             <span class="mtr"><Fragment set:html={ico("mic")} /><span class="tr" data-meter="me" data-n="10"></span></span>
             <span class="mtr"><Fragment set:html={ico("speaker")} /><span class="tr" data-meter="ot" data-n="10"></span></span>
@@ -136,7 +136,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
         {wTitles.map((title, i) => (
           <article class={i === 1 ? "step priv" : "step"}>
             <div class="stage" aria-hidden="true">
-              {i === 0 && <div class="cbar"><span class="rec"></span><span class="tm num">00:00:12</span><span class="mtr"><Fragment set:html={ico("mic")} /><span class="tr" data-meter="me" data-n="10"></span></span><span class="mtr"><Fragment set:html={ico("speaker")} /><span class="tr" data-meter="ot" data-n="10"></span></span><span class="stop"><i></i></span></div>}
+              {i === 0 && <div class="cbar sm"><span class="rec"></span><span class="tm num">00:00:12</span><span class="mtr"><Fragment set:html={ico("mic")} /><span class="tr" data-meter="me" data-n="10"></span></span><span class="mtr"><Fragment set:html={ico("speaker")} /><span class="tr" data-meter="ot" data-n="10"></span></span><span class="stop"><i></i></span></div>}
               {i === 1 && <><span class="privpill on"><Fragment set:html={ico("lock")} />{t("scene")[4]}<span class="sw"></span></span><div class="pbanner"><Fragment set:html={ico("lock")} /><span>{wk.banner}</span></div></>}
               {i === 2 && <div class="mini"><div class="mini-h">{wk.tabsPage[1]}</div>{wk.lines.slice(0, 2).map(([time, side, said]) => <div class="mini-l"><span class="t">{time}</span><span><b class={side ? "by-ot" : "by-me"}>{wk.lanes[side][0]}</b>{said}</span></div>)}</div>}
               {i === 3 && <div class="mini"><div class="mini-h">{wk.tabsPage[0]}</div><div class="mini-p">{wk.mini[0]}</div>{wk.mini[1].map(([who, what, day]) => <div class="mini-act"><b>{who}</b><span>{what}</span><span class="chip"><Fragment set:html={ico("calendar")} />{day}</span></div>)}</div>}

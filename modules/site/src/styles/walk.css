@@ -8,6 +8,12 @@
 .walk-band h3 { font-family: var(--display); font-weight: 700; font-size: 21px; line-height: 1.25; letter-spacing: -.01em; }
 .walk-band .ico { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .walk-band .chip .ico { width: 13px; height: 13px; }
+/* The compact bar, small, as in the mock-up: it ends before the scene's right column. */
+.cbar.sm { height: 40px; gap: 6px; padding: 0 6px 0 12px; font-size: 13px; }
+.cbar.sm .tm { font-size: 13px; min-width: 56px; }
+.cbar.sm .mtr .tr { width: 26px; height: 12px; }
+.cbar.sm .mtr .ico { width: 13px; height: 13px; }
+.cbar.sm .lockt, .cbar.sm .stop { width: 28px; height: 28px; }
 .by-me { color: var(--track-me); } .by-ot { color: var(--track-others); }
 
 /* The tabs, each a step. */
@@ -20,7 +26,7 @@
 .wtab span.d { font-size: 15px; line-height: 1.45; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .32s var(--ease-out), opacity .32s; }
 .wtab[aria-selected="true"] { background: var(--bg-canvas); box-shadow: var(--e1); outline: 1px solid var(--border-subtle); }
 .wtab[aria-selected="true"] .wn { background: var(--accent); color: var(--on-accent); }
-.wtab[aria-selected="true"] span.d { max-height: 90px; opacity: 1; margin-top: 2px; }
+.wtab[aria-selected="true"] span.d { max-height: 9em; opacity: 1; margin-top: 2px; margin-bottom: 6px; }
 .wtab.priv[aria-selected="true"] .wn { background: var(--private); color: var(--on-accent); }
 .wtab .pg { position: absolute; left: 56px; right: 16px; bottom: 8px; height: 3px; border-radius: 3px; background: var(--bg-sunken); overflow: hidden; opacity: 0; }
 .wtab .pg i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 3px; }
@@ -137,6 +143,10 @@
 [data-step="4"] .w-min > :nth-child(6) { animation-delay: 3.2s; } [data-step="4"] .w-min > :nth-child(7) { animation-delay: 3.35s; }
 [data-step="4"] .w-page .tab.t-min { color: var(--text-primary); border-bottom-color: var(--accent); }
 [data-step="4"] .w-page .tab.t-tr { color: var(--text-secondary); border-bottom-color: transparent; }
+
+/* A step shown at its end (#walk-1 to #walk-4 in the address, for a capture): every sequence finished, nothing moving. */
+.walk.frozen *, .walk.frozen *::before, .walk.frozen *::after { animation-delay: -60s !important; animation-iteration-count: 1 !important; transition-delay: 0s !important; transition-duration: 0s !important; }
+.walk.frozen .w-flow path, .walk.frozen .lockt::after { animation: none !important; }
 
 /* The four static cards: a narrow screen and reduced motion. */
 .flow { display: none; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }

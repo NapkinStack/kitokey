@@ -63,7 +63,7 @@ function element(props = {}) {
   return el;
 }
 
-async function page({ reduced = false } = {}) {
+async function page({ reduced = false, hash = "" } = {}) {
   const source = await readFile(join(dist, "walk.js"), "utf8");
   const tabs = [1, 2, 3, 4].map((n) => element({ id: `wtab-${n}`, querySelector: () => ({ textContent: `t${n}` }) }));
   const pageEl = element();
@@ -77,10 +77,11 @@ async function page({ reduced = false } = {}) {
     IntersectionObserver: class { constructor(fn) { observer = fn; } observe() {} },
     setInterval: (fn) => { timer = fn; return 1; }, clearInterval: () => { timer = null; },
     Date: { now: () => now },
+    location: { hash },
   };
   vm.runInNewContext(source, world);
   const at = (ms) => { while (now < ms) { now += 125; timer?.(); } };
-  return { stage, world, at, show: () => observer([{ isIntersecting: true }]), running: () => timer !== null };
+  return { stage, walk, page: pageEl, world, at, show: () => observer?.([{ isIntersecting: true }]), running: () => timer !== null };
 }
 
 test("the loop waits until the scene is visible, then steps at 3, 3.5, 5 and 6 s and starts again", async () => {
@@ -126,4 +127,24 @@ test("the walkthrough takes no style of the old page by a class they share, but 
   assert.deepEqual(shared.filter((c) => !(c in SHARED)), [], "the walkthrough takes the old page's style by these classes");
   const own = await readFile(new URL("../src/styles/walk.css", import.meta.url), "utf8");
   for (const c of shared.filter((c) => c !== "wrap")) assert.match(own, new RegExp(`\\.walk-band \\.${c}\\b`), `.${c}: ${SHARED[c]}, not set again under .walk-band`);
+});
+
+test("#walk-N shows step N at its end and holds it, for a capture", async () => {
+  for (const n of [1, 2, 3, 4]) {
+    const p = await page({ hash: `#walk-${n}` });
+    p.show();
+    assert.equal(p.stage.dataset.step, String(n));
+    assert.ok(p.walk.classes.has("frozen") && !p.walk.classes.has("auto"), "not held");
+    assert.equal(p.running(), false, "it moves while held");
+    assert.equal(p.page.classes.has("on"), n >= 2, "the page's lock");
+  }
+  const css = await readFile(new URL("../src/styles/walk.css", import.meta.url), "utf8");
+  assert.match(css, /\.walk\.frozen \*[^{]*\{ animation-delay: -60s !important;[^}]*transition-duration: 0s !important; \}/);
+});
+
+test("the scene's bar is the small one, ending before the right column; a tab's sentence has room for its four lines", async () => {
+  for (const lang of ["fr", "en"]) assert.match(await section(lang), /<div class="w-bar cbar sm" aria-hidden="true">/);
+  const css = await readFile(new URL("../src/styles/walk.css", import.meta.url), "utf8");
+  assert.match(css, /\.cbar\.sm \.mtr \.tr \{ width: 26px;/);
+  assert.match(css, /\.wtab\[aria-selected="true"\] span\.d \{ max-height: 9em;/);
 });

@@ -2,7 +2,8 @@
 // confidential 3.5 s, the two voices 5 s, the minutes 6 s), playing only while the scene is visible and the tab shown,
 // held while hovered or focused. A tab shows its step and the loop goes on from there; the arrows, Home and End move
 // between the tabs (WAI-ARIA's tabs pattern). On a narrow screen and under reduced motion the scene is not displayed
-// (walk.css): four static cards stand for it, and nothing here runs.
+// (walk.css): four static cards stand for it, and nothing here runs. #walk-1 to #walk-4 in the address shows that
+// step at its end and holds it, for a capture.
 (() => {
   "use strict";
   const walk = document.getElementById("walk");
@@ -102,6 +103,15 @@
   walk.addEventListener("focusin", () => hold(true));
   walk.addEventListener("focusout", (e) => hold(walk.contains(e.relatedTarget) || walk.matches(":hover")));
 
+  const frozen = /^#walk-([1-4])$/.exec(location.hash);
+  if (frozen) {
+    walk.classList.add("frozen");
+    ph = 1.3; secs = 12;
+    paint();
+    show(Number(frozen[1]));
+    walk.classList.remove("auto");
+    return;
+  }
   paint();
   new IntersectionObserver((entries) => {
     visible = entries[0].isIntersecting;
