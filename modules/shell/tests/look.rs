@@ -1313,7 +1313,7 @@ const ROLES: [&str; 25] = [
 
 /// Each pair a component draws, and its threshold (WCAG 2.2): words 4.5:1 (1.4.3); an edge, a voice's
 /// trace, a recording's dot, the focus ring 3:1 (1.4.11).
-const ROLE_PAIRS: [(&str, &str, f64); 30] = [
+const ROLE_PAIRS: [(&str, &str, f64); 33] = [
     ("--color-text", "--color-canvas", 4.5),
     ("--color-text", "--color-surface", 4.5),
     ("--color-text", "--color-raised", 4.5),
@@ -1327,6 +1327,9 @@ const ROLE_PAIRS: [(&str, &str, f64); 30] = [
     ("--color-text-soft", "--color-raised", 4.5),
     ("--color-text-faint", "--color-surface", 4.5),
     ("--color-text-faint", "--color-raised", 4.5),
+    ("--color-text-faint", "--color-canvas", 4.5),
+    ("--color-text-faint", "--color-sunken", 4.5),
+    ("--color-text-faint", "--color-tint", 4.5),
     ("--color-accent", "--color-surface", 4.5),
     ("--color-accent", "--color-tint", 4.5),
     ("--color-on-accent", "--color-accent", 4.5),
