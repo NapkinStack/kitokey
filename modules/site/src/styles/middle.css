@@ -38,6 +38,33 @@
 .mid .pf .tile, .mid .ft .tile, .mid .case .tile { width: 40px; height: 40px; margin-bottom: 6px; background: var(--bg-tint); box-shadow: none; }
 .mid .pf .tile.priv { background: var(--private-bg); }
 .mid .pf h3, .mid .ft h3 { font-size: 18px; }
+/* The « Fonctions » cards' scenes (planche v4, validated by the decider on 2026-11-27): the final call's line (end.css,
+   .illus), the site's tokens, in both themes. */
+.mid .ft .v { display: block; width: 100%; height: auto; aspect-ratio: 240 / 112; margin-bottom: 10px; background: var(--bg-sunken); border-radius: var(--r-md); }
+.mid .v .doc { fill: var(--bg-surface); stroke: var(--border-subtle); stroke-width: 1.5; filter: drop-shadow(0 6px 14px rgb(30 50 100/.14)); }
+html[data-site="dark"] .mid .v .doc { stroke: var(--border-control); filter: none; }
+.mid .v .faded { opacity: .7; }
+.mid .v .ln { stroke: var(--text-tertiary); stroke-width: 4; stroke-linecap: round; opacity: .55; fill: none; }
+.mid .v .me { stroke: var(--track-me); stroke-width: 4; stroke-linecap: round; fill: none; }
+.mid .v .dots { stroke: var(--border-control); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 0 8; fill: none; }
+.mid .v .ok, .mid .v .accf { fill: var(--accent); }
+.mid .v .check { fill: none; stroke: var(--on-accent); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.mid .v .acc { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; fill: none; }
+.mid .v .handle { stroke-width: 6; }
+.mid .v .lens { fill: none; stroke: var(--accent); stroke-width: 4; }
+.mid .v .onacc, .mid .v .onaccf { fill: var(--on-accent); }
+.mid .v .tint { fill: var(--bg-tint); }
+/* A switch's edge in the control's ink, 3:1 at least against the scene's ground. */
+.mid .v .sw { stroke: var(--border-control); stroke-width: 1.5; }
+.mid .v .mark { fill: var(--mark); opacity: .9; }
+.mid .v .ink { fill: var(--text-tertiary); }
+.mid .v .soft { stroke: var(--border-control); stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.mid .v .w-me { fill: var(--track-me); }
+.mid .v .w-ot { fill: var(--track-others); }
+.mid .v .off { opacity: .35; }
+.mid .v .w-mid { stroke: var(--border-control); stroke-width: 1; opacity: .6; }
+.mid .v text { font: 700 11px system-ui, sans-serif; fill: var(--accent); }
+.mid .v text.onacc { fill: var(--on-accent); }
 .mid .ft h3 .chip { position: absolute; top: 22px; right: 22px; height: 22px; font-size: 12px; font-family: system-ui, -apple-system, "Segoe UI", Cantarell, sans-serif; letter-spacing: 0; }
 .mid .pf p, .mid .ft p { color: var(--text-secondary); font-size: 15px; line-height: 1.5; }
 /* A meeting's page as the app draws it, in the page's language: the Store's own screenshot (D103's store_shots), light

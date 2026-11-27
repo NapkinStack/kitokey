@@ -13,7 +13,7 @@ const sections = async (lang) => [...(await page(lang)).matchAll(/<section class
 const text = (html) => html.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
 // What main holds today, and what is still to come in cycle 12 (D121 PDF, D127 search, D129 and D130 formats).
-const SOON = { fr: ["Exporter en PDF", "Chercher dans ce qui a été dit", "Vos propres formats"], en: ["Export to PDF", "Search what was said", "Your own formats"] };
+const SOON = { fr: ["Exporter en PDF", "Chercher dans ce qui a été dit", "Personnaliser le format de vos comptes rendus"], en: ["Export to PDF", "Search what was said", "Customize your minutes’ format"] };
 
 for (const lang of ["fr", "en"]) {
   test(`/${lang}/: three sections in their order, each a heading of its own`, async () => {
