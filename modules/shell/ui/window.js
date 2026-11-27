@@ -422,19 +422,6 @@ function lockedChip(words) {
   return said;
 }
 
-// « Réunion confidentielle » (D60): the settings' own switch, a lock before its words.
-function confidentialSwitch(words, id) {
-  const row = element("label", "row confidential");
-  const box = element("input");
-  box.type = "checkbox";
-  box.id = id;
-  box.setAttribute("role", "switch");
-  const said = element("span", "said");
-  said.append(element("span", "name", words.confidential_name), element("span", "says", words.confidential_says));
-  row.append(lock(), said, box);
-  return { row, box };
-}
-
 // What had left before the meeting was said confidential, and to which host.
 function leftSaid(words, left) {
   const said = { sound: words.confidential_left_sound, transcript: words.confidential_left_transcript, summary: words.confidential_left_summary };
@@ -5247,6 +5234,10 @@ function showSmall(words) {
   };
   const fits = new ResizeObserver(fit);
   fits.observe(page);
+  // The row's focus ringed once the keyboard is used, never before it nor after the pointer (D125): WebKit rings a
+  // focus the bar gives by script — ● at its opening, ■ after ● — as if a key had been pressed.
+  document.addEventListener("keydown", () => page.classList.add("keyed"), true);
+  document.addEventListener("pointerdown", () => page.classList.remove("keyed"), true);
   const toFull = iconButton("maximize-2", words.small_full, "small-full");
   toFull.addEventListener("click", () => full());
   const handle = element("span", "handle");
@@ -5278,7 +5269,8 @@ function showSmall(words) {
   start.append(element("span", "record-dot"));
   named(start, words.record_start);
   start.addEventListener("click", () => asking(start, words.record_starting, true, words.record_start));
-  const stop = element("button", "danger");
+  // ■ neutral (D125, Round 4): the sunken ground and the text's colour; red is the live dot's alone.
+  const stop = element("button", "stop");
   stop.type = "button";
   stop.id = "small-stop";
   stop.append(element("span", "stop-square"));
@@ -5339,7 +5331,10 @@ function showSmall(words) {
   hide.addEventListener("click", () => invoke("bar_hide"));
   const row = element("div", "bar-row");
   const space = element("span", "bar-space");
-  row.append(handle, nextField, time, space, start, stop, more, toFull, hide);
+  // A line before ■ while it records (Round 4): drawn, never read.
+  const separator = element("span", "bar-separator");
+  separator.setAttribute("aria-hidden", "true");
+  row.append(handle, nextField, time, space, start, separator, stop, more, toFull, hide);
   // No title bar (D90, board 8): the bar is moved by its handle, or its row anywhere but a control.
   row.addEventListener("mousedown", (event) => {
     if (event.button === 0 && !event.target.closest("button, input, textarea, select")) invoke("bar_drag");
@@ -5574,15 +5569,16 @@ function showSmall(words) {
   );
   meters.hidden = true;
   time.after(meters);
-  // Said confidential (#1204, D60): a lock in the row while it records, named for a screen reader and in its tooltip,
-  // as a row's mark in the list — the bar has no room for its word, the switch under « Plus d’options » says it whole.
-  const locked = element("span", "bar-locked");
-  locked.id = "small-locked";
-  locked.setAttribute("role", "img");
-  locked.setAttribute("aria-label", words.confidential_name);
-  locked.title = words.confidential_name;
-  locked.append(lock());
+  // Said confidential (D60, #1204, D125): one lock in the row while it records, a toggle button — pressed, nothing
+  // of the meeting leaves this computer. Its name stays the same; its state is aria-pressed's, and its drawn lock's.
+  const locked = iconButton("lock-open", words.confidential_name, "small-lock");
+  locked.classList.add("bar-lock");
   locked.hidden = true;
+  const pressLock = (on) => {
+    locked.setAttribute("aria-pressed", String(on));
+    locked.firstChild.replaceWith(icon(on ? "lock" : "lock-open"));
+  };
+  pressLock(false);
   meters.after(locked);
   const note = element("p", "says", words.small_note);
   note.id = "small-note";
@@ -5625,10 +5621,8 @@ function showSmall(words) {
   field.area.setAttribute("aria-label", words.context_label);
   const opened = element("div", "small-context");
   opened.append(field.area, field.count);
-  // Said confidential (D60), under the microphone in the options; kept as it is turned, once the
-  // meeting's folder holds its session.
-  const secret = confidentialSwitch(words, "small-confidential");
-  const mark = { wanted: null, refused: 0 };
+  // Kept as the lock is pressed, once the meeting's folder holds its session.
+  const mark = { on: false, wanted: null, refused: 0 };
   const marked = async () => {
     if (meeting.name === null || mark.wanted === null) return;
     const wanted = mark.wanted;
@@ -5636,22 +5630,24 @@ function showSmall(words) {
       await invoke("confidential_set", { name: meeting.name, on: wanted });
       if (mark.wanted === wanted) mark.wanted = null;
       smallSaid("mark", null);
-      secret.row.classList.toggle("on", secret.box.checked);
+      pressLock(mark.on);
     } catch {
-      // Said, its lock off: on with nothing kept would promise what is not so. Asked again every
+      // Said, the lock not pressed: pressed with nothing kept would promise what is not so. Asked again every
       // five seconds, not every tick: each try is a line in the log.
       mark.refused = Date.now();
-      secret.row.classList.remove("on");
+      pressLock(false);
       smallSaid("mark", words.confidential_not_saved);
     }
   };
-  secret.box.addEventListener("change", () => {
-    mark.wanted = secret.box.checked;
+  // Pressed, it turns from what it shows: a refused « on » shows off, and a press then asks for on again.
+  locked.addEventListener("click", () => {
+    mark.on = locked.getAttribute("aria-pressed") !== "true";
+    mark.wanted = mark.on;
     mark.refused = 0;
-    secret.row.classList.toggle("on", secret.box.checked);
+    pressLock(mark.on);
     marked();
   });
-  live.append(opened, micNext, secret.row, note);
+  live.append(opened, micNext, note);
   live.hidden = true;
   // At rest, the meeting last stopped and its stage (D92): one line under the row, cut by an ellipsis
   // where it is longer than the bar, the whole of it its tooltip; « Ouvrir » beside it once it is made,
@@ -5765,7 +5761,8 @@ function showSmall(words) {
       stop.disabled = false;
       named(stop, words.record_stop);
       start.hidden = nextField.hidden = recording;
-      stop.hidden = time.hidden = meters.hidden = space.hidden = !recording;
+      // At rest, no lock: the next recording says its own — hidden with ■, in the same paint.
+      stop.hidden = time.hidden = meters.hidden = space.hidden = locked.hidden = separator.hidden = !recording;
       // At rest, what the shell keeps for the next recording; taken by this one, recording (D91).
       if (!recording) nextText.value = (await invoke("next_context").catch(() => ({ text: "" }))).text;
       paintNext();
@@ -5781,14 +5778,12 @@ function showSmall(words) {
       // Each recording its own context: nothing of the one before.
       Object.assign(meeting, { name: null, saved: null, typed: null, refused: null });
       mark.wanted = null;
-      secret.box.checked = false;
-      secret.row.classList.remove("on");
+      mark.on = false;
+      pressLock(false);
       field.area.value = "";
       field.painted();
       rest.hidden = recording;
       live.hidden = !recording;
-      // At rest, no lock: the next recording says its own.
-      if (!recording) locked.hidden = true;
       // A recording starts its traces from empty, never from the last one's last two seconds.
       if (recording) for (const id of ["level-me", "level-others"]) drawLevel(document.getElementById(id), levelShown(undefined, 0, 0, false, TRACE), 0);
       // The microphone in each state's options: recording, after the context, as board 6 has it.
@@ -5861,14 +5856,12 @@ function showSmall(words) {
       }
     }
     keep();
-    // What the folder says, unless a turn of the switch is still to be kept.
-    if (mark.wanted === null && now.meeting !== null && secret.box.checked !== now.confidential) {
-      secret.box.checked = now.confidential;
-      secret.row.classList.toggle("on", now.confidential);
+    // What the folder says, unless a press of the lock is still to be kept.
+    if (mark.wanted === null && now.meeting !== null && mark.on !== now.confidential) {
+      mark.on = now.confidential;
+      pressLock(mark.on);
     }
     if (Date.now() - mark.refused >= 5000) marked();
-    // The lock as the switch stands: the folder's word, or a turn not yet kept.
-    locked.hidden = !(recording && secret.box.checked);
   };
   setInterval(tick, 100);
   setInterval(() => recording === false && paintKeys(), 1500);
