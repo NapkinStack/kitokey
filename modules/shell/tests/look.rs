@@ -1506,14 +1506,19 @@ fn a_chip_says_its_tone_and_its_words_read_on_it() {
         }
     }
     assert_eq!(below, Vec::<String>::new());
-    assert_eq!(
-        given(COMPONENTS, ".chip.success", "background").as_deref(),
-        Some("var(--color-success-ground)")
-    );
-    assert_eq!(
-        given(COMPONENTS, ".chip.warning", "background").as_deref(),
-        Some("var(--color-warning-ground)")
-    );
+    // Each tone its own words and ground: a tone that reads well in another's colour says the wrong thing (sam's
+    // mutant L5 on #1312, the warning in --color-text-faint).
+    for (tone, words, ground) in [
+        ("neutral", "--color-text-soft", "--color-sunken"),
+        ("accent", "--color-accent", "--color-tint"),
+        ("success", "--color-success", "--color-success-ground"),
+        ("private", "--color-private", "--color-private-ground"),
+        ("warning", "--color-warning", "--color-warning-ground"),
+    ] {
+        let chip = format!(".chip.{tone}");
+        assert_eq!(given(COMPONENTS, &chip, "color"), Some(format!("var({words})")), "{chip}");
+        assert_eq!(given(COMPONENTS, &chip, "background"), Some(format!("var({ground})")), "{chip}");
+    }
     // The older chips are not the design system's: no rule of components.css names `.chip` alone.
     assert!(
         bodies_of(COMPONENTS, ".chip").is_empty(),
@@ -1537,6 +1542,8 @@ fn an_icon_is_drawn_at_its_stroke_a_press_sinks_a_card_is_edged() {
         });
     assert_eq!(banner.as_deref(), Some("1.75"));
     assert_eq!(given(COMPONENTS, ".button:active", "transform").as_deref(), Some("translateY(1px)"));
+    // A disabled button does not sink: it cannot be pressed (sam's mutant L6 on #1312).
+    assert_eq!(given(COMPONENTS, ".button[disabled]:active", "transform").as_deref(), Some("none"));
     assert!(
         given(COMPONENTS, ".engine-card", "border").is_some_and(|border| border.starts_with("1.5px solid")),
         "{:?}",
