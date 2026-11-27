@@ -9474,6 +9474,20 @@ def bar_stop_neutral(now: dt.datetime) -> None:
             check(f"{theme}: ■ under the pointer, the hover's ground", under[0] == under[1], under)
             shot_themed(browser, f"cw-bar-recording-{theme}", theme)
             stop_from_small(browser)
+            # A key first, then ● by the pointer: the pointer takes the keyboard's ring away — ■, focused by the bar, unringed
+            # (ines, #1308: the case the pointer's listener is for).
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
+            time.sleep(0.6)
+            ActionChains(browser).send_keys(Keys.TAB).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+            time.sleep(0.2)
+            keyed = browser.execute_script(ring)
+            ActionChains(browser).move_to_element(browser.find_element(By.ID, "small-record")).click().perform()
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+            time.sleep(0.6)
+            ring_after = browser.execute_script(ring)
+            check(f"{theme}: a key first, then ● by the pointer: ■ focused and not ringed",
+                  keyed[1] != "none" and ring_after[0] == "small-stop" and (ring_after[1] == "none" or ring_after[2] == "0px"), [keyed, ring_after])
+            stop_from_small(browser)
 
 
 def dates_mentioned(now: dt.datetime) -> None:
