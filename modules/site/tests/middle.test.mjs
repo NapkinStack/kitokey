@@ -88,7 +88,7 @@ const SHARED = { wrap: "the page's container", ico: "a pictogram's box", tile: "
 test("the middle takes no style of the old page by a class they share, but the ones named", async () => {
   const source = await readFile(new URL("../src/components/Landing.astro", import.meta.url), "utf8");
   const start = source.indexOf('<section class="mid"');
-  const part = source.slice(start, source.indexOf('<section class="section" id={systemsId}'));
+  const part = source.slice(start, source.indexOf('<section class="end'));
   const classes = new Set([...part.matchAll(/class=\{?["`]([^"`]+)["`]/g)].flatMap((m) => m[1].replace(/\$\{[^}]*\}/g, "").split(/\s+/)).filter(Boolean));
   for (const name of ["ico", "tile", "priv", "lock"]) classes.add(name);
   const css = (await readFile(new URL("../src/styles/site.css", import.meta.url), "utf8")).replace(/\/\*[\s\S]*?\*\//g, "");

@@ -4,16 +4,17 @@
 // bar, the minutes) over the two voices' spectrogram (public/hero.js); the real capture comes after D121.
 import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
-import { channels, landing as w, repo } from "../lib/landing.mjs";
+import { channels, landing as w } from "../lib/landing.mjs";
 import { ico } from "../lib/icons.mjs";
 import "../styles/walk.css";
 import "../styles/middle.css";
-// Each system by its owner's own mark, unaltered (BRANDS.md); Apple's white one on the dark theme.
-const MARKS = { linux: "tux.svg", windows: "windows-logo-2021.svg", apple: "apple-logo-black.svg" };
+import "../styles/end.css";
 
 const { lang } = Astro.props;
 const t = (key) => w[key][lang];
-const [howId, privacyId, whoId, systemsId, faqId, installId] = t("nav").map(([id]) => id);
+const [howId, privacyId, whoId, priceId, faqId] = t("nav").map(([id]) => id);
+const installId = lang === "fr" ? "installer" : "install";
+const needId = lang === "fr" ? "besoins" : "needs";
 const wk = t("walk");
 const sv = t("sovereign");
 const wh = t("who");
@@ -23,13 +24,11 @@ const wTitles = wk.tabs.map(([title]) => title);
 const [h1a, h1b, lead] = t("hero");
 const [buyLine, storeSoon, linuxFree, macSoon] = t("buy");
 const [sceneAlt, callTitle, you, when, confidential, mTitle, mMeta, mProv, mHigh, mText, mActs, acts] = t("scene");
-const [cta, follow] = t("cta");
-const [sEyebrow, sH, sLead, sNote] = t("systems");
 const [gEyebrow, gH, gLead, copy, osLabel, copied, failed] = t("install");
-const [needsH, needs] = t("needs");
-const [faqH, faq] = t("faq");
+const pr = t("price");
+const [faqKicker, faqH, faq] = t("faq");
+const [finalH, finalP] = t("final");
 const notes = t("channelNotes");
-const needsId = lang === "fr" ? "prerequis" : "prerequisites";
 const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ </span>${c.replace(/&/g, "&amp;").replace(/</g, "&lt;")}`).join("\n");
 ---
 <Page lang={lang} title={t("title")} description={t("description")} path="" nav={t("nav")}>
@@ -46,7 +45,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
         <div class="buy">
           <p class="buy-line">{buyLine}</p>
           <div class="cta">
-            <a class="store-soon" href={`#${systemsId}`}>{storeSoon}</a>
+            <a class="store-soon" href={`#${priceId}`}>{storeSoon}</a>
             <a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a>
           </div>
         </div>
@@ -195,22 +194,39 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
     </div>
   </section>
 
-  <section class="section" id={systemsId} aria-labelledby={`${systemsId}-h`}>
+  <section class="end end-band" id={priceId} aria-labelledby={`${priceId}-h`}>
     <div class="wrap">
-      <div class="section-head reveal"><p class="eyebrow">{sEyebrow}</p><h2 id={`${systemsId}-h`}>{sH}</h2><p class="lead">{sLead}</p></div>
-      <div class="systems">
-        {t("oses").map(([logos, name, state, price, text, now]) => (
-          <article class="card os reveal">
-            <span class="os-logos">{logos.map((logo) => <img class={`os-logo os-${logo}`} src={`/img/brands/${MARKS[logo]}`} alt="" />)}{logos.includes("apple") && <img class="os-logo os-apple-dark" src="/img/brands/apple-logo-white.svg" alt="" />}</span>
-            <h3>{name}</h3>
-            <p class="os-state"><span class={now ? "ok" : "soon"}>{state}</span></p>
-            <p class="os-price">{price}</p>
-            <p>{text}</p>
-            {now && <a class="btn" href={`#${installId}`}>{gEyebrow}</a>}
-          </article>
-        ))}
+      <div class="sh rise"><p class="kicker">{pr.kicker}</p><h2 id={`${priceId}-h`}>{pr.h}</h2></div>
+      <div class="price rise">
+        <article class="pcard main">
+          <div class="pc-top"><div class="oslogos"><span class="lg win"><img src="/img/brands/windows-logo-2021.svg" alt="Windows" width="30" height="30" /></span><span class="lg apl"><img class="on-light" src="/img/brands/apple-logo-black.svg" alt="macOS" width="26" height="32" /><img class="on-dark" src="/img/brands/apple-logo-white.svg" alt="macOS" width="26" height="32" /><span class="chip chip-warning">{pr.soon}</span></span></div></div>
+          <h3 class="sr-only">{pr.main[0]}</h3>
+          <div class="pblock"><div class="amount"><b class="num">{pr.main[1]}</b><span>{pr.main[2]}</span></div><p class="pnote">{pr.main[3]}</p></div>
+          <div class="strip" role="group" aria-label={pr.main[4]}>{pr.main[5].map(([big, small]) => <span><b class="num">{big}</b>{small}</span>)}</div>
+          <div class="incl"><p class="incl-h">{pr.main[6]}</p><ul class="checks">{pr.main[7].map((item) => <li><Fragment set:html={ico("check")} />{item}</li>)}</ul></div>
+          <p class="mac">{pr.main[8]}</p>
+          <div class="row-b"><span class="store-soon is-soon">{pr.main[9]}</span></div>
+        </article>
+        <article class="pcard linux">
+          <div class="pc-top"><div class="oslogos"><span class="lg tux-l"><img src="/img/brands/tux.svg" alt="" width="34" height="40" /></span></div></div>
+          <h3 class="sr-only">{pr.linux[0]}</h3>
+          <div class="pblock"><div class="amount"><b>{pr.linux[1]}</b></div><p class="pnote">{pr.linux[2]}</p></div>
+          <div class="strip" role="group" aria-label={pr.linux[3]}>{pr.linux[4].map(([big, small]) => <span><b>{big}</b>{small}</span>)}</div>
+          <div class="incl"><p class="incl-h">{pr.linux[5]}</p><ul class="checks">{pr.linux[6].map((item) => <li><Fragment set:html={ico("check")} />{item}</li>)}</ul></div>
+          <div class="row-b"><a class="install-l" href={`#${installId}`}><Fragment set:html={ico("download")} />{pr.linux[7]}</a></div>
+        </article>
       </div>
-      <p class="note">{sNote}</p>
+      <p class="nosub"><Fragment set:html={ico("check")} /><span><b>{pr.nosub[0]}</b>{pr.nosub[1]}</span></p>
+    </div>
+  </section>
+
+  <section class="end end-need" id={needId} aria-labelledby={`${needId}-h`}>
+    <div class="wrap">
+      <h2 id={`${needId}-h`} class="sr-only">{t("need")[0]}</h2>
+      <details class="need">
+        <summary><span class="tile" set:html={ico("chip")} /><span><b>{t("need")[0]}</b><span class="s">{t("need")[1]}</span></span><Fragment set:html={ico("chev", "ico chev")} /></summary>
+        <div class="need-body">{t("hardware").map(([, h, sub, lines]) => <div><h3>{h}</h3><p>{sub}</p><ul>{lines.map((x) => <li>{x}</li>)}</ul></div>)}</div>
+      </details>
     </div>
   </section>
 
@@ -230,29 +246,33 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
         </>)}
         <p class="sr-only" id="copy-status" aria-live="polite"></p>
       </div>
-      <h3 class="needs-h" id={needsId}>{needsH}</h3>
-      <ul class="needs" role="list">
-        {needs.map(([icon, a, b]) => <li class="reveal"><Fragment set:html={ico(icon)} /><div><strong>{a}</strong><span set:html={b} /></div></li>)}
-      </ul>
-      <div class="hw">
-        {t("hardware").map(([icon, h, sub, lines]) => <div class="card hw-card reveal"><span class="tile" set:html={ico(icon)} /><h4>{h}</h4><p>{sub}</p><ul>{lines.map((x) => <li>{x}</li>)}</ul></div>)}
-      </div>
     </div>
   </section>
 
-  <section class="section" id={faqId} aria-labelledby={`${faqId}-h`}>
-    <div class="wrap">
-      <div class="section-head"><h2 id={`${faqId}-h`}>{faqH}</h2></div>
-      <div class="faq">
-        {faq.map(([q, a]) => <details class="reveal"><summary>{q}</summary><p set:html={a.replace("#prerequisites", `#${needsId}`)} /></details>)}
-      </div>
+  <section class="end" id={faqId} aria-labelledby={`${faqId}-h`}>
+    <div class="wrap faq-grid">
+      <div class="sh"><p class="kicker">{faqKicker}</p><h2 id={`${faqId}-h`}>{faqH}</h2></div>
+      <div class="faq">{faq.map(([q, answer], i) => <details open={i === 0}><summary>{q}<Fragment set:html={ico("chev", "ico chev")} /></summary><div class="a">{answer.map((p) => <p>{p}</p>)}</div></details>)}</div>
     </div>
   </section>
 
-  <section class="final" aria-labelledby="final-h">
+  <section class="end end-band final" aria-labelledby="final-h">
     <div class="wrap">
-      <h2 id="final-h" class="reveal">{t("final")}</h2>
-      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/tags`}>{follow}</a></div>
+      <svg class="illus" viewBox="0 0 320 128" aria-hidden="true">
+        <rect class="doc" x="12" y="44" width="184" height="40" rx="20" />
+        <circle class="i-rec" cx="34" cy="64" r="6" />
+        <path class="i-me" d="M52 58q8-7 16 0t16 0 16 0 16 0 16 0" />
+        <path class="i-ot" d="M52 71q8 7 16 0t16 0 16 0 16 0 16 0" />
+        <rect class="i-stop" x="160" y="52" width="24" height="24" rx="7" /><rect class="i-sq" x="167" y="59" width="10" height="10" rx="2" />
+        <line class="i-dots" x1="206" y1="64" x2="226" y2="64" />
+        <rect class="doc" x="236" y="24" width="72" height="84" rx="12" />
+        <line class="ln" x1="252" y1="46" x2="292" y2="46" /><line class="ln" x1="252" y1="60" x2="284" y2="60" /><line class="ln" x1="252" y1="74" x2="292" y2="74" />
+        <line class="i-me-l" x1="252" y1="90" x2="266" y2="90" /><line class="i-ot-l" x1="274" y1="90" x2="288" y2="90" />
+        <circle class="i-ok" cx="304" cy="26" r="12" /><path class="i-check" d="M298.5 26.5l3.8 3.8 7.2-7.6" />
+      </svg>
+      <h2 id="final-h">{finalH}</h2>
+      <p>{finalP}</p>
+      <div class="cta"><a class="store-soon" href={`#${priceId}`}>{storeSoon}</a><a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a></div>
     </div>
   </section>
 </Page>

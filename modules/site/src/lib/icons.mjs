@@ -16,6 +16,8 @@ export const ICONS = {
   code: '<path d="m9 7-5 5 5 5M15 7l5 5-5 5"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
   speaker: '<path d="M4 9.5h4l5-4v13l-5-4H4z"/><path d="M16.5 9a4 4 0 0 1 0 6"/>',
+  chip: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2.5V6M15 2.5V6M9 18v3.5M15 18v3.5M2.5 9H6M2.5 15H6M18 9h3.5M18 15h3.5"/>',
+  chev: '<path d="m6 9 6 6 6-6"/>',
   laptop: '<rect x="4.5" y="5" width="15" height="10" rx="1.5"/><path d="M2.5 19h19"/>',
   cloud: '<path d="M7 18.5a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 9z"/><path d="M12 12v5M9.8 14.2 12 12l2.2 2.2"/>',
   file: '<path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',

@@ -115,6 +115,16 @@ html[data-site="dark"] .callwin { outline: 1px solid rgb(255 255 255/.1); }
 .act-row .chip { height: 22px; font-size: 12px; padding: 0 8px; gap: 4px; }
 .act-row .chip .ico, .chip .ico { width: 13px; height: 13px; }
 
+/* ---- The footer ---- */
+.foot { border-top: 1px solid var(--border-subtle); padding: 40px 0 56px; }
+.foot .wrap { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; }
+.foot .brand { display: inline-flex; align-items: center; gap: var(--sp-2); font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--text-primary); text-decoration: none; min-height: 44px; }
+.foot nav { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-left: auto; }
+.foot nav a { color: var(--text-secondary); text-decoration: none; font-size: 15px; padding: 12px 0; }
+.foot nav a:hover { color: var(--text-primary); text-decoration: underline; }
+.foot .pub { color: var(--text-tertiary); font-size: 14px; }
+.foot .credit { font-size: 12px; color: var(--text-tertiary); flex-basis: 100%; }
+
 /* ---- Narrow screens ---- */
 @media (max-width: 1040px) {
   .hero .wrap { grid-template-columns: 1fr; gap: 48px; }

@@ -16,6 +16,8 @@ export const words = {
   changed: { en: "Last changed:", fr: "Dernière modification :", keeps: "the policy's first line, the day it last changed (docs/privacy.md)" },
   other: { en: "Français", fr: "English", keeps: "the page in the other language (D114)" },
   theme: { en: ["Switch to the dark theme", "Switch to the light theme"], fr: ["Passer en thème sombre", "Passer en thème clair"], keeps: "public/theme.js, the moon and the sun (the decider's round 9, 2026-11-25)" },
+  credit: { en: "Tux: Larry Ewing (lewing@isc.tamu.edu) and The GIMP.", fr: "Tux : Larry Ewing (lewing@isc.tamu.edu) et The GIMP.", keeps: "Tux's own terms, its author credited where it is shown (BRANDS.md, Wikimedia Commons)" },
+  footer: { en: "Footer", fr: "Pied de page", keeps: "the footer's links (site v7)" },
   sections: { en: "Sections", fr: "Sections", keeps: "the header's links to the page's sections (site v7)" },
   skip: { en: "Skip to content", fr: "Aller au contenu", keeps: "each page's main, #main (tests/frame.test.mjs)" },
   publisher: { en: "Kitokey, by C12C.", fr: "Kitokey, par C12C.", keeps: "the publisher's name, proposal D's footer, validated by the decider on 2026-11-25" },
