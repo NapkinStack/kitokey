@@ -14162,7 +14162,7 @@ def formats_redone(now: dt.datetime) -> None:
         browser.execute_script("location.hash = '#/'")
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
         named = wait_for(browser, lambda b: b.execute_script("return document.getElementById('minutes-format')?.textContent")
-                         == "Format\u00a0«\u00a0Point client\u00a0»", 10)
+                         == "Format «\u00a0Point client\u00a0»", 10)
         check("the summary written in it names its format on its line",
               named, browser.execute_script("return document.getElementById('minutes-format')?.textContent"))
         shot(browser, "cz-minutes-format")
