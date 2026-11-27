@@ -91,7 +91,8 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .lasts .length + .weighs::before { content: " · "; }
 /* D121: the name keeps 280 px at least; where the bar does not fit beside it, the bar goes under it, never squeezing it. */
 .meeting-head .meeting-title { flex: 1 1 280px; min-width: 0; }
-.meeting-head .meeting-top { flex: none; }
+/* The bar no wider than the page: its actions go to a second line rather than out of sight (420 px, « Agenda » shown). */
+.meeting-head .meeting-top { flex: 0 1 auto; max-width: 100%; }
 .meeting-title h1 { margin: 0; font-size: 18px; font-weight: 650; overflow-wrap: anywhere; }
 .meeting-title h1 .rename { display: block; max-width: 100%; margin: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; overflow-wrap: anywhere; cursor: text; }
 .meeting-title h1 .rename:hover { background: var(--raised); box-shadow: 0 0 0 4px var(--raised); }
