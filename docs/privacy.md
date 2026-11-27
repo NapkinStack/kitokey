@@ -1,4 +1,4 @@
-# Kitokey — privacy policy / politique de confidentialité
+# Kitokey: privacy policy / politique de confidentialité
 
 Last changed / dernière modification: 2026-11-25. Publisher / éditeur: c12c (NapkinStack).
 [English](#english) · [Français](#français)
@@ -13,7 +13,7 @@ flowchart LR
     classDef out fill:#7c2d12,color:#fff
 ```
 
-**Legend** — green: your computer · red: outside it, reached only on your choice.
+**Legend.** Green: your computer · red: outside it, reached only on your choice.
 
 ## English
 
@@ -29,11 +29,11 @@ server of ours, and it sends nothing anywhere unless you chose to.
 | Your settings | Your user's configuration folder |
 | The key of a service, if you gave one | Your system's keyring, under `com.napkinstack.Kitokey`: never in a file |
 | The webhook address of a channel you set up to send summaries to | The same keyring, under the same name: never in a file, never shown again in full |
-| Which summary you sent, to which channel's name, and when — never its address | `sends.json`, beside your settings |
-| Each new summary, if you turned on « Export every summary » — never a confidential meeting's | The folder you chose: if a service syncs or shares it, it goes where that folder goes |
+| Which summary you sent, to which channel's name, and when, never its address | `sends.json`, beside your settings |
+| Each new summary, if you turned on « Export every summary », never a confidential meeting's | The folder you chose: if a service syncs or shares it, it goes where that folder goes |
 | Downloaded speech models | Your user's data folder |
-| Logs: steps, durations, hosts, models and failures — never a word of a meeting, nor a key | Your user's state folder (on Windows, the application's data) |
-| What the window's web engine keeps for itself: its cache and its own storage — no meeting, no setting | On Linux, `~/.local/share/com.napkinstack.Kitokey` |
+| Logs: steps, durations, hosts, models and failures, never a word of a meeting nor a key | Your user's state folder (on Windows, the application's data) |
+| What the window's web engine keeps for itself: its cache and its own storage, with no meeting and no setting | On Linux, `~/.local/share/com.napkinstack.Kitokey` |
 
 Nothing is recorded until you start a recording. Telling the other participants that you are
 recording is yours to do: Kitokey shows them nothing. It reminds you, and you may turn the
@@ -52,7 +52,7 @@ only when you do one of these:
 | Download a speech model (a click) | A request for that file | `huggingface.co` |
 | Read the list of models again (a click) | A request for that file | `raw.githubusercontent.com` |
 | Download a model through Ollama (a click) | Ollama's own request | Ollama, a program of its own, from its registry |
-| Send a summary to a channel (« Send… » on a meeting's page, then its name; before a first send to it, and every time for a confidential meeting, « Send » once more) | The meeting's title, its summary and its actions — never the sound, never the transcript | The webhook address you pasted for that channel in Settings: Slack, Discord, or another webhook |
+| Send a summary to a channel (« Send… » on a meeting's page, then its name; before a first send to it, and every time for a confidential meeting, « Send » once more) | The meeting's title, its summary and its actions, never the sound, never the transcript | The webhook address you pasted for that channel in Settings: Slack, Discord, or another webhook |
 | Add a date to Google Calendar (« Dates mentioned », a date ticked, then « Open in Google Calendar ») | The action's words and who, its date, the passage and the meeting's name, in the link | `calendar.google.com`, in your browser, under Google's own policy; never for a confidential meeting |
 
 On Windows, Kitokey asks the Microsoft Store whether you bought it, each time you start a
@@ -115,11 +115,11 @@ Changes to this policy are in this file's history.
 | Vos réglages | Le dossier de configuration de votre utilisateur |
 | La clé d'un service, si vous en avez donné une | Le trousseau de votre système, sous `com.napkinstack.Kitokey` : jamais dans un fichier |
 | L'adresse de webhook d'un canal où vous envoyez des comptes rendus | Le même trousseau, sous le même nom : jamais dans un fichier, jamais réaffichée en entier |
-| Quel compte rendu vous avez envoyé, vers quel nom de canal, et quand — jamais son adresse | `sends.json`, à côté de vos réglages |
-| Chaque nouveau compte rendu, si vous avez activé « Exporter chaque compte rendu » — jamais celui d'une réunion confidentielle | Le dossier que vous avez choisi : si un service le synchronise ou le partage, il va là où va ce dossier |
+| Quel compte rendu vous avez envoyé, vers quel nom de canal, et quand, jamais son adresse | `sends.json`, à côté de vos réglages |
+| Chaque nouveau compte rendu, si vous avez activé « Exporter chaque compte rendu », jamais celui d'une réunion confidentielle | Le dossier que vous avez choisi : si un service le synchronise ou le partage, il va là où va ce dossier |
 | Les modèles de parole téléchargés | Le dossier de données de votre utilisateur |
-| Les journaux : étapes, durées, hôtes, modèles et échecs — jamais un mot d'une réunion, ni une clé | Le dossier d'état de votre utilisateur (sous Windows, les données de l'application) |
-| Ce que le moteur web de la fenêtre garde pour lui : son cache et son propre stockage — aucune réunion, aucun réglage | Sous Linux, `~/.local/share/com.napkinstack.Kitokey` |
+| Les journaux : étapes, durées, hôtes, modèles et échecs, jamais un mot d'une réunion ni une clé | Le dossier d'état de votre utilisateur (sous Windows, les données de l'application) |
+| Ce que le moteur web de la fenêtre garde pour lui : son cache et son propre stockage, sans réunion ni réglage | Sous Linux, `~/.local/share/com.napkinstack.Kitokey` |
 
 Rien n'est enregistré tant que vous ne lancez pas un enregistrement. Prévenir les autres
 participants que vous enregistrez vous revient : Kitokey ne leur montre rien. Il vous le
@@ -138,7 +138,7 @@ part que si vous faites l'un de ces choix :
 | Télécharger un modèle de parole (un clic) | La demande de ce fichier | `huggingface.co` |
 | Relire la liste des modèles (un clic) | La demande de ce fichier | `raw.githubusercontent.com` |
 | Télécharger un modèle par Ollama (un clic) | La demande d'Ollama elle-même | Ollama, un programme à part, depuis son registre |
-| Envoyer un compte rendu vers un canal (« Envoyer… » sur la page d'une réunion, puis son nom ; avant un premier envoi vers lui, et à chaque fois pour une réunion confidentielle, « Envoyer » une fois de plus) | Le titre de la réunion, son compte rendu et ses actions — jamais le son, jamais la transcription | L'adresse de webhook collée pour ce canal dans les Réglages : Slack, Discord ou un autre webhook |
+| Envoyer un compte rendu vers un canal (« Envoyer… » sur la page d'une réunion, puis son nom ; avant un premier envoi vers lui, et à chaque fois pour une réunion confidentielle, « Envoyer » une fois de plus) | Le titre de la réunion, son compte rendu et ses actions, jamais le son, jamais la transcription | L'adresse de webhook collée pour ce canal dans les Réglages : Slack, Discord ou un autre webhook |
 | Ajouter une date à Google Agenda (« Dates mentionnées », une date cochée, puis « Ouvrir dans Google Agenda ») | Les mots de l'action et le « qui », sa date, le passage et le nom de la réunion, dans le lien | `calendar.google.com`, dans votre navigateur, sous la politique de Google ; jamais pour une réunion confidentielle |
 
 Sous Windows, Kitokey demande au Microsoft Store si vous l'avez acheté, à chaque enregistrement
