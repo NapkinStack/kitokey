@@ -570,6 +570,8 @@ function confidentialCard(session, confidential, words) {
 // A session's folder name: what the window calls it, and the only date it says when its start
 // cannot be read.
 const nameOf = (session) => session.folder.split(/[\\/]/).pop();
+// A sentence the shell told, begun with its capital where the page says it alone (« le fichier… » → « Le fichier… »).
+const sentenceOf = (told) => told.charAt(0).toUpperCase() + told.slice(1);
 
 // An hour as each language writes it (#1075): US English « 2:30 PM », with no zero before the hour; French « 09:30 ».
 const hours = (words) => ({ hour: words.locale === "en" ? "numeric" : "2-digit", minute: "2-digit" });
@@ -3371,8 +3373,36 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   actions.id = "meeting-actions";
   meetingBar = actions;
   const press = (id) => () => document.getElementById(id)?.click();
-  const share = moreActions([["share-send", words.send_open, press("send-open")], ["share-copy", words.copy_minutes, press("copy-minutes")]], words,
+  // What an export became, said once in place (#1252): the file's name, or why it could not be written.
+  const shared = element("p", "note");
+  shared.id = "share-said";
+  shared.setAttribute("role", "status");
+  // « Partager »'s exports (D121): the summary alone, as a PDF or Markdown, where the user chooses in the system's
+  // dialog, written by `kitokey-export` (exporting/v1). Nothing when the dialog is closed.
+  const exportTo = (format) => async () => {
+    shared.textContent = "";
+    const to = await window.__TAURI__.core.invoke("export_file_chosen", { name, format }).catch(() => null);
+    if (!to) return;
+    try {
+      await window.__TAURI__.core.invoke("meeting_export", { name, format, to });
+      shared.textContent = fill(words.export_done, to.split(/[\\/]/).pop());
+    } catch (why) {
+      shared.textContent = sentenceOf(String(why));
+    }
+  };
+  const share = moreActions([["share-send", words.send_open, press("send-open")], ["share-copy", words.copy_minutes, press("copy-minutes")],
+    ["share-pdf", words.export_pdf, exportTo("pdf")], ["share-md", words.export_md, exportTo("md")]], words,
     { id: "share-open", menuId: "share-menu", glyph: "share-2", label: words.meeting_share, name: words.meeting_share, chevron: true });
+  // A confidential meeting is shared explicitly, and the menu says how (PDR-0007, amended 2026-11-24): its line heard
+  // as the menu's description, never a menu item.
+  if (session.confidential) {
+    const menu = share.querySelector(".menu");
+    const note = element("p", "menu-note", words.share_confidential);
+    note.id = "share-confidential";
+    note.setAttribute("role", "none");
+    menu.prepend(note);
+    menu.setAttribute("aria-describedby", note.id);
+  }
   const redo = actionButton("rotate-ccw", words.meeting_redo, "redo-open");
   redo.addEventListener("click", press("redo-minutes"));
   // A meeting refused the trash (being recorded or made): said in place, nothing moved.
@@ -3404,7 +3434,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   }
   rarer.push(["trash-meeting", words.trash_meeting, () => trashAsked(session, transcript, minutes, words, refused), true]);
   actions.append(share, redo, moreActions(rarer, words));
-  top.append(refused);
+  top.append(refused, shared);
   // The way back is the pane's, under 840 px alone (D61).
   top.append(actions);
   // The meeting's header (D89, board 4): a bar of 56 px, its name, how long and how heavy beside

@@ -57,6 +57,9 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .menu-separator { height: 1px; margin: var(--sp-1) 0; background: var(--color-divider); }
 /* A meeting refused the trash (D100): said under its bar, nothing when nothing is said. */
 #trash-said:empty { display: none; }
+/* An export said in place (D121), nothing when nothing is said; a confidential meeting's line atop « Partager »'s menu. */
+#share-said:empty { display: none; }
+.menu-note { margin: 0 0 var(--sp-1); padding: var(--sp-2) var(--sp-3); max-width: 36ch; white-space: normal; font-size: var(--fs-small); color: var(--color-private); }
 /* D121: the meeting's bar of actions, each its words beside its icon; « Agenda »'s count after its words. */
 .bar-action .count { font-variant-numeric: tabular-nums; color: var(--color-text-soft); }
 .back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }

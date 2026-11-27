@@ -7422,7 +7422,7 @@ def meeting_exported(now: dt.datetime) -> None:
             " asked === 'export_file_chosen' ? Promise.resolve(arguments[0]) : real.invoke(asked, ...rest)};"
             " window.restore = () => { window.__TAURI__.core = real; };")
     for language, theme, words in (
-        ("fr_FR.UTF-8", "light", {"pdf": "Exporter en PDF", "md": "Exporter en Markdown", "done": "Exporté : « {} ».",
+        ("fr_FR.UTF-8", "light", {"pdf": "Exporter en PDF", "md": "Exporter en Markdown", "done": "Exporté\u00a0: «\u00a0{}\u00a0».",
                                   "failed": "Le fichier n’a pas pu être écrit", "note": "Confidentielle"}),
         ("en_US.UTF-8", "dark", {"pdf": "Export to PDF", "md": "Export to Markdown", "done": "Exported: “{}”.",
                                  "failed": "The file couldn’t be written", "note": "Confidential"}),
