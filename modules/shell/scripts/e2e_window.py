@@ -76,6 +76,8 @@ if [ "$1" != --test ]; then
   printf '%s' "$context" > "$here/summary-context"
   echo '{"event": "sending", "host": "h", "model": "m", "characters": 1}'
   named=""; [ -n "$STANDIN" ] && named="provider: $provider\\n"
+  # A format given (D130): minutes/v5 in it, as the real one writes them — its file's structure and sections.
+  [ "$6" = --format ] && { python3 -c "$FIFTH" "$1" "$7" "$5"; echo '{"event": "written", "file": "x"}'; exit 0; }
   printf -- "---\\ncontract: minutes/v1\\n${named}model: %s\\ncontext: %s\\n---\\n\\n## A\\n\\n## B\\n\\n## C\\n" "$5" "$context" > "$1/minutes.md"
   echo '{"event": "written", "file": "x"}'
   exit 0
@@ -187,6 +189,15 @@ HEARING.chmod(0o755)
 os.environ["CONTEXT"] = (
     "import json, pathlib, sys; f = pathlib.Path(sys.argv[1], 'context.txt'); "
     "t = f.read_text().strip() if f.exists() else ''; print(json.dumps(t or None, ensure_ascii=False))"
+)
+# minutes/v5 in the format a file of `--format` holds (D130): its structure, its sections, a title each.
+os.environ["FIFTH"] = (
+    "import json, pathlib, sys; f = json.loads(pathlib.Path(sys.argv[2]).read_text()); "
+    "front = ['contract: minutes/v5', 'made: 2026-11-27T10:00:00+01:00', 'provider: \"local\"', 'model: ' + json.dumps(sys.argv[3]),"
+    " 'context: null', 'structure: ' + f['structure'], 'sections: ' + json.dumps(f['sections'], ensure_ascii=False)]"
+    " + (['actions: ' + f['actions']] if 'actions' in f else []); "
+    "body = ''.join(f'## {s[\"id\"]}\\n\\n- x\\n\\n' for s in f['sections']); "
+    "pathlib.Path(sys.argv[1], 'minutes.md').write_text('---\\n' + '\\n'.join(front) + '\\n---\\n\\n' + body)"
 )
 # The host of a provider's address, and a request sent to a stand-in service, for the two above.
 os.environ["HOST"] = "import sys, urllib.parse; print(urllib.parse.urlsplit(sys.argv[1]).hostname)"
@@ -14098,6 +14109,71 @@ def engine_cards_drawn(now: dt.datetime) -> None:
     tags.shutdown()
 
 
+def formats_redone(now: dt.datetime) -> None:
+    """CW. D130: Refaire… offers the formats — the six built in by their names, a person's own after them,
+    the default marked and chosen —; the summary is written in the one chosen, through summarising/v1's
+    `--structure` or `--format`, and its line names it. The summary is the stand-in's."""
+    print("CW. Refaire… offers the formats, the default marked; the summary written in the one chosen names it (D130)")
+    meetings = WORK / "formats-redone"
+    meeting = meetings / "2026-11-27_09-00"
+    session(meeting, now - dt.timedelta(days=1), 10, {"local.wav": 1000})
+    (meeting / "transcript.jsonl").write_text(
+        '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+        '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+    (meeting / "minutes.md").write_text(
+        "---\ncontract: minutes/v1\nmade: 2026-11-27T10:00:00+01:00\nprovider: local\nmodel: m\ncontext: null\n---\n\n"
+        "## 1.\n\nLe point.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
+    kept = ('reminder = false\nminutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "m"\nformat_default = "point_client"\n'
+            'formats_hidden = ["interview"]\n\n[[formats]]\nstructure = "point_client"\nname = "Point client"\nactions = 1\n'
+            'sections = [{ title = "Contexte", about = "Où en est le client" }, { title = "Suites", about = "Qui fait quoi, pour quand" }]\n')
+    window = Window(meetings, "fr_FR.UTF-8", kept)
+    args = WORK / "summary-args"
+    offered = ("const p = document.getElementById('redo-format');"
+               " return p ? [...p.options].map((o) => [o.value, o.textContent, o.selected]) : []")
+    redone = lambda browser, value: (
+        press(browser, "redo-minutes"),
+        wait_for(browser, lambda b: len(b.execute_script(offered)) == 6, 5),
+        Select(browser.find_element(By.ID, "redo-format")).select_by_value(value) if value else None,
+        args.unlink(missing_ok=True),
+        press(browser, "redo-do"),
+        wait_for(None, lambda b: args.exists(), 15),
+        wait_for(browser, lambda b: b.execute_script(idle), 15))
+    idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
+            " && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)")
+    with window as browser:
+        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+        press(browser, "redo-minutes")
+        listed = wait_for(browser, lambda b: len(b.execute_script(offered)) == 6, 5) and browser.execute_script(offered)
+        check("Refaire… offers the built-in formats by their names, interview hidden, the person's own after; its default marked and chosen",
+              listed == [["general", "Général", False], ["one_to_one", "Point individuel", False], ["stand_up", "Point d’équipe", False],
+                         ["client_call", "Appel client", False], ["project_review", "Revue de projet", False],
+                         ["point_client", "Point client (par défaut)", True]], listed)
+        shot(browser, "cw-redo-formats")
+        press(browser, "redo-panel-cancel")
+        redone(browser, None)
+        given = args.read_text().split()
+        file = window.file.parent / "formats" / "point_client.json"
+        written = json.loads(file.read_text()) if file.exists() else None
+        check("the default, a person's own: kitokey-summary given --format and its file, summarising/v1's format",
+              given[-2:] == ["--format", str(file)] and written == {"structure": "point_client", "sections": [
+                  {"id": "contexte", "about": "Où en est le client"}, {"id": "suites", "about": "Qui fait quoi, pour quand"}], "actions": "suites"},
+              (given, written))
+        browser.execute_script("location.hash = '#/'")
+        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        named = wait_for(browser, lambda b: b.execute_script("return document.getElementById('minutes-format')?.textContent")
+                         == "Format\u00a0«\u00a0Point client\u00a0»", 10)
+        check("the summary written in it names its format on its line",
+              named, browser.execute_script("return document.getElementById('minutes-format')?.textContent"))
+        shot(browser, "cw-minutes-format")
+        redone(browser, "stand_up")
+        given = args.read_text().split()
+        check("another built-in chosen: --structure and its name, for that making", given[-2:] == ["--structure", "stand_up"], given)
+        redone(browser, "general")
+        given = args.read_text().split()
+        check("Général chosen: no structure, as before (minutes/v4)", "--structure" not in given and "--format" not in given, given)
+
+
 def bar_offers_no_engine_nor_language(now: dt.datetime) -> None:
     """CV. D125: the compact bar offers no engine and no language — at rest and while it records, its
     options hold the context and the microphone under one disclosure, never « Avancé »'s models (D91,
@@ -15963,6 +16039,7 @@ def main() -> int:
     bar_window(now)
     bar_opened(now)
     bar_offers_no_engine_nor_language(now)
+    formats_redone(now)
     engine_cards_drawn(now)
     bar_after_stop(now)
     summaries_to_a_folder(now)
