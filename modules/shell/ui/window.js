@@ -5765,7 +5765,8 @@ function showSmall(words) {
       stop.disabled = false;
       named(stop, words.record_stop);
       start.hidden = nextField.hidden = recording;
-      stop.hidden = time.hidden = meters.hidden = space.hidden = !recording;
+      // At rest, no lock: the next recording says its own — hidden with ■, in the same paint.
+      stop.hidden = time.hidden = meters.hidden = space.hidden = locked.hidden = separator.hidden = !recording;
       // At rest, what the shell keeps for the next recording; taken by this one, recording (D91).
       if (!recording) nextText.value = (await invoke("next_context").catch(() => ({ text: "" }))).text;
       paintNext();
@@ -5787,8 +5788,6 @@ function showSmall(words) {
       field.painted();
       rest.hidden = recording;
       live.hidden = !recording;
-      // At rest, no lock: the next recording says its own.
-      locked.hidden = separator.hidden = !recording;
       // A recording starts its traces from empty, never from the last one's last two seconds.
       if (recording) for (const id of ["level-me", "level-others"]) drawLevel(document.getElementById(id), levelShown(undefined, 0, 0, false, TRACE), 0);
       // The microphone in each state's options: recording, after the context, as board 6 has it.

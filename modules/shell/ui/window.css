@@ -359,7 +359,8 @@ body.small-window .frame { display: none; }
 /* Said confidential while it records (#1204, D125): one lock, a toggle; pressed, in the meeting's green, as
    « Confidentielle »'s chip (3:1 on the surface at least, tests/look.rs). */
 #small .bar-row .icon-button { width: 32px; min-height: 32px; }
-#small .bar-lock { margin-left: var(--sp-2); }
+/* The row's buttons keep their 32 px: the meters give way where the row is full. */
+#small .bar-row button { flex: none; }
 #small .bar-lock[aria-pressed="true"] { color: var(--ok); }
 #small .bar-lock .lock { color: inherit; }
 #small .bar-separator { flex: none; width: 1px; height: 20px; margin: 0 var(--sp-1); background: var(--color-divider); }
