@@ -1,0 +1,71 @@
+/* Site v7 (validated by the decider on 2026-11-26): what stays and what leaves, who it is for, what is ready after
+   the call. Ported from the mock-up to the site's tokens and html[data-site]; every rule under .mid, so the old
+   page's classes (.tile, .note) never reach these sections. */
+.mid { padding: 104px 0; }
+.mid-band { background: color-mix(in srgb, var(--bg-surface) 62%, transparent); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.mid .sh { max-width: 720px; margin-bottom: 48px; }
+.mid .kicker { font-size: 14px; margin: 0 0 var(--sp-3); font-weight: 700; color: var(--accent); letter-spacing: .01em; }
+.mid h2 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 3.1vw, 42px); line-height: 1.1; letter-spacing: -.02em; }
+.mid .sh p { font-size: 18px; color: var(--text-secondary); margin: var(--sp-4) 0 0; }
+.mid h3 { font-family: var(--display); font-weight: 700; font-size: 21px; line-height: 1.25; letter-spacing: -.01em; margin: 0; }
+.mid p { margin: 0; }
+.mid .ico { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.mid .tile { width: 44px; height: 44px; border-radius: var(--r-md); display: grid; place-items: center; background: var(--bg-surface); color: var(--accent); flex: none; box-shadow: var(--e1); }
+.mid .tile.priv { color: var(--private); background: var(--private-bg); }
+.mid .tile .ico { width: 20px; height: 20px; }
+
+/* What stays, what leaves. */
+.mid .io { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; }
+.mid .box { border-radius: var(--r-xl); padding: 28px; outline: 1px solid var(--border-subtle); background: var(--bg-surface); box-shadow: var(--e1); }
+.mid .box.here { background: var(--bg-tint); outline-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+.mid .box-h { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.mid .box:not(.here) .tile { background: var(--bg-sunken); color: var(--text-secondary); box-shadow: none; }
+.mid .box-h p { color: var(--text-secondary); font-size: 15px; margin-top: 2px; }
+.mid .items { display: grid; gap: 10px; }
+.mid .item { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; align-items: center; background: var(--bg-surface); border-radius: var(--r-md); padding: 14px 16px; outline: 1px solid var(--border-subtle); }
+.mid .box:not(.here) .item { background: var(--bg-canvas); }
+.mid .item > .ico { color: var(--text-secondary); }
+.mid .item b { font-weight: 600; }
+.mid .item .d { grid-column: 2; font-size: 14px; color: var(--text-secondary); line-height: 1.45; }
+.mid .item .r { grid-row: 1 / span 2; grid-column: 3; display: grid; }
+.mid .here-i { color: var(--text-tertiary); }
+.mid .sw2 { display: block; width: 36px; height: 22px; border-radius: var(--r-pill); border: 1.5px solid var(--border-control); position: relative; }
+.mid .sw2::after { content: ""; position: absolute; top: 3px; left: 3px; width: 13px; height: 13px; border-radius: 50%; background: var(--border-control); }
+.mid .proof, .mid .feats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+.mid .proof { margin-top: 20px; }
+.mid .pf, .mid .ft { background: var(--bg-surface); border-radius: var(--r-lg); padding: 22px; box-shadow: var(--e1); outline: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 8px; position: relative; }
+.mid .pf .tile, .mid .ft .tile, .mid .case .tile { width: 40px; height: 40px; margin-bottom: 6px; background: var(--bg-tint); box-shadow: none; }
+.mid .pf .tile.priv { background: var(--private-bg); }
+.mid .pf h3, .mid .ft h3 { font-size: 18px; }
+.mid .ft h3 .chip { position: absolute; top: 22px; right: 22px; height: 22px; font-size: 12px; font-family: system-ui, -apple-system, "Segoe UI", Cantarell, sans-serif; letter-spacing: 0; }
+.mid .pf p, .mid .ft p { color: var(--text-secondary); font-size: 15px; line-height: 1.5; }
+.mid .io-link { margin-top: 18px; font-size: 15px; }
+/* The real capture of a meeting's page, once D121 is filmed: a labelled place until then. */
+.mid .shot-ph { margin-top: 20px; border: 1.5px dashed var(--border-control); border-radius: var(--r-xl); min-height: 140px; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--text-tertiary); font-size: 14px; background: color-mix(in srgb, var(--bg-surface) 50%, transparent); }
+.mid .shot-ph b { display: block; color: var(--text-secondary); font-size: 15px; margin-bottom: 4px; }
+
+/* Who it is for. */
+.mid .cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.mid .case { background: var(--bg-surface); border-radius: var(--r-lg); padding: 24px; box-shadow: var(--e1); outline: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 10px; }
+.mid .case .who-l { font-size: 14px; color: var(--text-tertiary); font-weight: 600; }
+.mid .case p { color: var(--text-secondary); font-size: 15.5px; }
+.mid .lrow { margin-top: auto; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--bg-tint); position: relative; font-size: 14px; }
+.mid .lrow::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 3px; background: var(--accent); }
+.mid .lrow b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.mid .lrow span { font-size: 13px; color: var(--text-tertiary); grid-column: 1; }
+.mid .lrow .sig { grid-row: 1 / span 2; grid-column: 2; align-self: center; display: flex; gap: 6px; color: var(--text-tertiary); }
+.mid .lrow .sig .ico { width: 16px; height: 16px; }
+.mid .lrow .sig .lock { color: var(--private); }
+
+
+@media (max-width: 1180px) { .mid .proof, .mid .feats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1040px) { .mid .io, .mid .cases { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .mid { padding: 72px 0; }
+  .mid .sh { margin-bottom: 32px; }
+  .mid .sh p { font-size: 16.5px; }
+  .mid .proof, .mid .feats { grid-template-columns: 1fr; }
+  .mid .pf, .mid .ft { padding: 18px; }
+  .mid .box { padding: 20px 16px; border-radius: var(--r-lg); }
+  .mid .item { padding: 12px; gap: 4px 12px; }
+}

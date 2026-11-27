@@ -10,6 +10,8 @@ pub mod correction;
 pub mod dates;
 pub mod desktop;
 pub mod destinations;
+pub mod engines;
+pub mod example;
 pub mod exporting;
 pub mod flac;
 pub mod keys;

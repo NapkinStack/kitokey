@@ -1,0 +1,9 @@
+The example meeting (ui/example/fr, ui/example/en) is an invented meeting of two voices, made by
+scripts/example.py. No real meeting and no real person are in it.
+
+Synthetic voices generated with ElevenLabs (eleven-multilingual-v2) through OpenRouter, on
+2026-11-27, speed 0.95. French: the voices « lily » (« Vous ») and « eric » (Hugo). English:
+« will » (« Vous ») and « matilda » (Jess).
+
+Changes: the service's speech is resampled to 24,000 samples a second, laid out on two tracks and
+kept as FLAC.

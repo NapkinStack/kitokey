@@ -46,10 +46,6 @@ provides: []
 # CI compares it with the contracts this module's files read: one read and not declared
 # fails (B1), one declared and never read is reported (B4), one nobody provides fails (B6).
 consumes:
-  # The landing promises the export's formats (Markdown, HTML, Word, subtitles): exporting/v1's (D114).
-  - contract: exporting
-    version: v1
-    module: export
 #  - contract: identity-api
 #    version: v1
 #    module: identity
@@ -85,6 +81,12 @@ dependencies:
     purpose: Opens each built page in the machine's Chromium, in the tests only (no browser downloaded)
     adr: docs/adr/0019-kitokey-com-a-static-site-built-by-astro-served-by-cloudflare-pages.md
     exit_strategy: tests/own-domain.test.mjs; puppeteer-core or Chrome's DevTools protocol replaces it.
+  - name: axe-core
+    purpose: >-
+      Judges each landing by WCAG 2.2 A and AA, in the tests only (MPL-2.0); 4.14.0, its axe.min.js
+      pinned by its SHA-256 in tests/axe.test.mjs
+    adr: docs/adr/0019-kitokey-com-a-static-site-built-by-astro-served-by-cloudflare-pages.md
+    exit_strategy: tests/axe.test.mjs; Lighthouse's accessibility audit or pa11y replaces it.
 #  - name:
 #    purpose:
 #    adr:
