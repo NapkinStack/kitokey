@@ -7689,19 +7689,26 @@ def meeting_actions_bar(now: dt.datetime) -> None:
 
 
 def meeting_trashed(now: dt.datetime) -> None:
-    """BT. D100: a meeting moved to the trash from its own page — beside the button that opens its folder,
-    a question in place, « Annuler » focused first, what it holds and that the system's trash restores it;
-    confirmed, the folder goes to the system's trash as « Faire de la place » sends it, the page closes onto
-    the list, the focus on the next meeting or, with none, on the list; Escape or « Annuler » change nothing;
-    refused while the meeting is recorded, said why; in French and in English."""
-    print("BT. a meeting to the trash from its page: asked in place, « Annuler » first, the system's trash, the list next — French and English (D100)")
+    """BT. D100, D121: a meeting moved to the trash from its own page — « Plus », then « Mettre à la corbeille », asked
+    in a dialog (MA holds its words, « Annuler » focused and Escape); confirmed, the folder goes to the system's trash
+    as « Faire de la place » sends it, the page closes onto the list, the focus on the next meeting or, with none, on
+    the list; « Annuler » changes nothing; refused while the meeting is recorded, said why; in French and in English."""
+    print("BT. a meeting to the trash from its page: « Plus », asked in a dialog, the system's trash, the list next — French and English (D100, D121)")
     focused = "const a = document.activeElement; return !a || a === document.body ? 'body' : a.id || (a.tagName.toLowerCase() + ':' + (a.getAttribute('href') || ''))"
-    asked = "const q = document.getElementById('trash-ask'); return q && q.getClientRects().length ? q.innerText : null"
+    asked = "return document.querySelector('dialog[open]') ? document.querySelector('dialog[open] h2')?.textContent ?? '' : null"
     trashed = WORK / "data" / "Trash" / "files"
 
     def keys(browser, *pressed) -> None:
         ActionChains(browser).send_keys(*pressed).perform()
         time.sleep(0.3)
+
+    def ask_to_trash(browser) -> bool:
+        """« Plus », then its last entry, « Mettre à la corbeille »: the dialog open."""
+        browser.execute_script("document.getElementById('more-open').focus()")
+        keys(browser, Keys.ENTER)
+        wait_for(browser, lambda b: b.execute_script("return !document.getElementById('more-menu').hidden"), 3)
+        keys(browser, Keys.END, Keys.ENTER)
+        return wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
 
     def made(folder: Path, started: dt.datetime) -> None:
         session(folder, started, 20, {"local.wav": 2000})
@@ -7713,10 +7720,8 @@ def meeting_trashed(now: dt.datetime) -> None:
             "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
 
     for language, (short, said) in {
-        "fr_FR.UTF-8": ("fr", {"name": "Mettre à la corbeille", "ask": "Mettre cette réunion à la corbeille ?", "holds": ["audio", "transcription", "compte rendu"],
-                               "restore": "corbeille", "cancel": "Annuler"}),
-        "en_US.UTF-8": ("en", {"name": "Move to trash", "ask": "Move this meeting to the trash?", "holds": ["audio", "transcript", "summary"],
-                               "restore": "trash", "cancel": "Cancel"}),
+        "fr_FR.UTF-8": ("fr", {"ask": "Mettre cette réunion à la corbeille ?", "cancel": "Annuler", "confirm": "Mettre à la corbeille"}),
+        "en_US.UTF-8": ("en", {"ask": "Move this meeting to the trash?", "cancel": "Cancel", "confirm": "Move to trash"}),
     }.items():
         meetings = WORK / f"trashing-{short}"
         older, newer = meetings / f"2026-10-2{1 if short == 'fr' else 3}_09-00", meetings / f"2026-10-2{2 if short == 'fr' else 4}_09-00"
@@ -7726,74 +7731,31 @@ def meeting_trashed(now: dt.datetime) -> None:
         with window as browser:
             browser.set_window_size(1100, 800)
             browser.execute_script(f"location.hash = '#/meeting/{newer.name}'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "open-folder"), 10)
-            # Beside the button that opens its folder: an icon, its name said and as its tooltip.
-            got = browser.execute_script("const t = document.getElementById('trash-meeting'), o = document.getElementById('open-folder');"
-                                         " return t && [t.getAttribute('aria-label'), t.title, o.nextElementSibling === t, t.querySelectorAll('svg').length, t.innerText.trim()]")
-            check(f"{short}: beside « open its folder », « {said['name']} » — an icon, its name said and as its tooltip (D100)",
-                  got == [said["name"], said["name"], True, 1, ""], got)
-            if got is None:
-                continue
-            # Asked in place, « Annuler » focused first; what it holds; the system's trash restores it.
-            browser.execute_script("document.getElementById('trash-meeting').focus()")
-            keys(browser, Keys.ENTER)
-            shown = wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
-            text = browser.execute_script(asked) or ""
-            check(f"{short}: pressed, it asks in place « {said['ask']} », says what it holds and that the trash restores it, « {said['cancel']} » focused (D100)",
-                  shown and said["ask"] in text and all(part in text.lower() for part in said["holds"]) and said["restore"] in text.lower()
-                  and browser.execute_script(focused) == "trash-cancel"
-                  and browser.find_element(By.ID, "trash-cancel").text == said["cancel"], [text, browser.execute_script(focused)])
-            # In its own card, under the page's head, as wide as the context's card; its sentences and buttons
-            # inside with the card's margin; each button on one line — at full width and at 420 px (#893, T7).
-            fits = ("const q = document.getElementById('trash-ask'), h = document.querySelector('.meeting-head'), c = document.getElementById('context');"
-                    " const r = (e) => e.getBoundingClientRect(); const a = r(q);"
-                    " const out = [...q.querySelectorAll('p:not(:empty), button')].filter((e) => { const b = r(e); return b.left < a.left + 12 || b.right > a.right - 12; })"
-                    ".map((e) => e.id || e.textContent.trim().slice(0, 20));"
-                    # Each button's words counted by their lines, not by its height: two lines of a small text fit in 44 px.
-                    " const lines = (b) => { const t = document.createRange(); t.selectNodeContents(b); return new Set([...t.getClientRects()].map((x) => Math.round(x.top))).size; };"
-                    " const wrapped = [...q.querySelectorAll('button')].filter((b) => lines(b) > 1).map((b) => b.id);"
-                    " return {under: a.top >= r(h).bottom - 0.5, wide: Math.abs(a.left - r(c).left) <= 1 && Math.abs(a.right - r(c).right) <= 1, out, wrapped}")
-            for size in ((1100, 800), (420, 800)):
-                browser.set_window_size(*size)
-                time.sleep(0.4)
-                got = browser.execute_script(fits)
-                shot(browser, f"d100-ask-{short}-{size[0]}")
-                check(f"{short}, {size[0]} px: the question under the page's head, as wide as its cards, its sentences and buttons inside with the card's margin, each button on one line (D100)",
-                      got == {"under": True, "wide": True, "out": [], "wrapped": []}, got)
-            browser.set_window_size(1100, 800)
-            time.sleep(0.4)
-            browser.execute_script("document.getElementById('trash-cancel').focus()")
-            # Escape, then « Annuler »: nothing changed, the focus back on the button.
-            keys(browser, Keys.ESCAPE)
-            gone = wait_for(browser, lambda b: b.execute_script(asked) is None, 3)
-            check(f"{short}: Escape leaves everything as it was, the focus back on « {said['name']} » (D100)",
-                  gone and newer.is_dir() and browser.execute_script(focused) == "trash-meeting", browser.execute_script(focused))
-            keys(browser, Keys.ENTER)
-            wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
+            wait_for(browser, lambda b: b.find_elements(By.ID, "more-open"), 10)
+            # « Annuler »: nothing changed, the focus back on « Plus ».
+            opened = ask_to_trash(browser)
+            title = browser.execute_script(asked)
             keys(browser, Keys.ENTER)
             gone = wait_for(browser, lambda b: b.execute_script(asked) is None, 3)
-            check(f"{short}: « {said['cancel']} » leaves everything as it was, the focus back on « {said['name']} » (D100)",
-                  gone and newer.is_dir() and browser.execute_script(focused) == "trash-meeting", browser.execute_script(focused))
+            check(f"{short}: « Plus » then « Mettre à la corbeille » asks « {said['ask']} »; « {said['cancel']} » leaves everything as it was, the focus back on « Plus » (D100, D121)",
+                  opened and title.replace("\u202f", " ") == said["ask"] and gone and newer.is_dir() and browser.execute_script(focused) == "more-open",
+                  [title, browser.execute_script(focused)])
             # Confirmed: to the system's trash, never deleted; the list next, the focus on the next meeting.
-            keys(browser, Keys.ENTER)
-            wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
+            ask_to_trash(browser)
             keys(browser, Keys.TAB)
-            on = browser.execute_script(focused)
+            on = browser.execute_script("return document.activeElement?.textContent.trim()")
             keys(browser, Keys.ENTER)
             moved = wait_for(None, lambda _: not newer.exists() and (trashed / newer.name).is_dir(), 10)
             listed = wait_for(browser, lambda b: b.execute_script("return location.hash") in ("", "#/")
                               and b.execute_script(focused) == f"a:#/meeting/{older.name}", 5)
             check(f"{short}: confirmed, the meeting is in the system's trash, whole; the list next, the focus on the next meeting (D100)",
-                  on == "trash-confirm" and moved and listed and (trashed / newer.name / "minutes.md").is_file(),
+                  on == said["confirm"] and moved and listed and (trashed / newer.name / "minutes.md").is_file(),
                   [on, moved, browser.execute_script("return location.hash"), browser.execute_script(focused)])
             # The last one: the focus on the list itself.
             browser.execute_script(f"location.hash = '#/meeting/{older.name}'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "trash-meeting"), 10)
-            browser.execute_script("document.getElementById('trash-meeting').focus()")
-            keys(browser, Keys.ENTER)
-            wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
-            browser.execute_script("document.getElementById('trash-confirm').focus()")
-            keys(browser, Keys.ENTER)
+            wait_for(browser, lambda b: b.find_elements(By.ID, "more-open"), 10)
+            ask_to_trash(browser)
+            keys(browser, Keys.TAB, Keys.ENTER)
             moved = wait_for(None, lambda _: not older.exists(), 10)
             listed = wait_for(browser, lambda b: b.execute_script(focused) == "list", 5)
             check(f"{short}: the last meeting confirmed: in the trash, the focus on the list itself (D100)", moved and listed, browser.execute_script(focused))
@@ -7803,21 +7765,14 @@ def meeting_trashed(now: dt.datetime) -> None:
             live = next((p for p in meetings.iterdir() if p.is_dir()), None)
             if recording and live is not None:
                 browser.execute_script(f"location.hash = '#/meeting/{live.name}'")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "trash-meeting"), 10)
-                browser.execute_script("document.getElementById('trash-meeting').focus()")
-                keys(browser, Keys.ENTER)
-                wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
-                browser.execute_script("document.getElementById('trash-confirm').focus()")
-                keys(browser, Keys.ENTER)
+                wait_for(browser, lambda b: b.find_elements(By.ID, "more-open"), 10)
+                ask_to_trash(browser)
+                keys(browser, Keys.TAB, Keys.ENTER)
                 why = wait_for(browser, lambda b: (b.execute_script("return document.getElementById('trash-said')?.innerText || ''") or "") != "", 5)
                 check(f"{short}: while it is recorded, refused, said why, nothing moved (D100)", why and live.is_dir(),
                       [browser.execute_script("return document.getElementById('trash-said')?.innerText || ''"), live.is_dir()])
             else:
                 check(f"{short}: a recording started, to be refused (D100)", False, recording)
-            # Stopped, as it was started: the next scenario starts at rest.
-            browser.execute_script("window.__TAURI__.core.invoke('record')")
-            time.sleep(2)
-
 
 def focus_kept(now: dt.datetime) -> None:
     """BS. D101: a choice changed on a meeting's page or in Settings, by the keyboard or the mouse, keeps the
