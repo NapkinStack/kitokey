@@ -349,12 +349,26 @@ def check(what: str, held: bool, got: object = "") -> None:
         FAILED.append(what)
 
 
+# The machine's own folders, never in a window's words: its screenshots are published (#1297's first evidence showed a
+# HOME). The home this e2e started from, and any person's folder, as a path is written and as the window says one.
+STARTED_HOME = Path.home()
+PRIVATE = sorted({str(STARTED_HOME), "/ " + " / ".join(STARTED_HOME.parts[1:]), "/home/", "/ home /", "/Users/", "/ Users /"})
+
+
+def nothing_private(browser, name: str) -> None:
+    """Before a screenshot: the window's words hold no folder of the machine's."""
+    text = browser.execute_script("return document.body.innerText")
+    found = [private for private in PRIVATE if private in text]
+    check(f"{name}: no folder of the machine's in the window's words", not found, found)
+
+
 def shot(browser, name: str) -> None:
     """The page as it is, saved where KITOKEY_SCREENSHOTS says: for an eye against D11's boards. One
     whose name says its theme is measured: a light one light, a dark one dark (D89), its mean
-    lightness read by ImageMagick, 0 black to 1 white."""
+    lightness read by ImageMagick, 0 black to 1 white. Never one showing a folder of the machine's."""
     folder = os.environ.get("KITOKEY_SCREENSHOTS")
     if folder:
+        nothing_private(browser, name)
         Path(folder).mkdir(parents=True, exist_ok=True)
         browser.save_screenshot(str(Path(folder) / f"{name}.png"))
         theme = next((theme for theme in ("light", "dark") if theme in name.split("-")), None)
@@ -715,7 +729,9 @@ class Window:
         greeted = "welcomed = true\n" if welcomed else ""
         self.args = list(args)
         self.file.write_text(f'sessions = "{sessions}"\n{opened}{greeted}{more}')
-        self.env = dict(os.environ, XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
+        # Its home this run's folder: every folder of the scenarios is said from it (« Dossier personnel / … »), never
+        # from the machine's root (#1297).
+        self.env = dict(os.environ, HOME=str(WORK), XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
         # An Ollama and a keyring of the scenario's, never the user's own.
         self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_EXPORT=str(EXPORTER), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER), KITOKEY_BROWSER=str(BROWSER))
 
@@ -12320,7 +12336,7 @@ def nothing_silent(now: dt.datetime) -> None:
             browser.execute_script("window.dispatchEvent(new Event('focus'))")
             said = wait_for(browser, lambda b: shown(b, "empty-again"), 10)
             check("the meetings' folder unread: said, no recording offered as if it were empty, a way to try again",
-                  said and text(browser, "none") == f"Impossible de lire les réunions de {meetings}."
+                  said and text(browser, "none") == "Impossible de lire les réunions de Dossier personnel / silence."
                   and text(browser, "none-do").startswith("Vérifiez que le disque")
                   and text(browser, "empty-again") == "Réessayer" and not shown(browser, "empty-record"), text(browser, "none"))
             browser.set_window_size(420, 400)
@@ -12544,6 +12560,8 @@ def nothing_silent(now: dt.datetime) -> None:
         browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: shown(b, "none"), 5)
         check("no meeting: what to do first, never only a path", said and text(browser, "none-do").startswith("Pour commencer, cliquez sur Démarrer un enregistrement") and shown(browser, "empty-record"))
+        check("no meeting: its folder said from the home, in French (#1304)",
+              text(browser, "empty-folder") == "Les réunions sont enregistrées dans Dossier personnel / silence-none.", text(browser, "empty-folder"))
         browser.execute_script("document.getElementById('empty').scrollIntoView()")
         for theme in ("light", "dark"):
             shot_themed(browser, f"d67-none-{theme}", theme)
@@ -12952,7 +12970,7 @@ def pages_seen(now: dt.datetime) -> None:
                               and folder["last"][0] == folder["value"].rstrip("/").rsplit("/", 1)[-1] and folder["last"][1] and folder["last"][2]
                               and folder["tip"] == folder["value"] and not folder["none"], folder)
                         # Heard whole (ines, #1232): its name what it shows (WCAG 2.5.3), its description every folder, as people say it.
-                        whole_said = ("/ " if folder["value"].startswith("/") else "") + " / ".join(p for p in folder["value"].split("/") if p)
+                        whole_said = ("/ " if folder["value"].startswith("/") else "") + " / ".join(p for p in folder["value"].replace("~", "Dossier personnel", 1).split("/") if p)
                         check(f"{theme}, {width} px: the meetings' folder heard whole by a screen reader, its whole path its description (#1232)",
                               folder["heard"] == whole_said and folder["hidden"], [folder["heard"], whole_said, folder["hidden"]])
                     shot_themed(browser, f"d89-{page}-{width}-{theme}", theme)
@@ -13380,6 +13398,7 @@ def store_shots(now: dt.datetime) -> None:
                     wait_for(browser, lambda b: b.execute_script("return document.querySelectorAll('#meeting .drawing .wave .col').length") > 0, 60)
                 browser.execute_script("document.activeElement.blur(); scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
                 time.sleep(0.6)
+                nothing_private(browser, f"{short}/{shot_name}")
                 browser.save_screenshot(str(store / short / f"{shot_name}.png"))
                 browser.execute_script("document.documentElement.style.overflow = ''")
                 seen(browser, f"{short}/{shot_name}.png")
@@ -13409,6 +13428,7 @@ def store_shots(now: dt.datetime) -> None:
                 "scrollTo(0, fits ?? aim);"
                 "document.documentElement.style.overflow = 'hidden'")
             time.sleep(0.4)
+            nothing_private(browser, f"{short}/4-settings")
             browser.save_screenshot(str(store / short / "4-settings.png"))
             seen(browser, f"{short}/4-settings.png")
             browser.execute_script("document.documentElement.style.overflow = ''")
@@ -13439,6 +13459,7 @@ def store_shots(now: dt.datetime) -> None:
                 " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow'))),"
                 " first: document.querySelector('#groups .session')?.getAttribute('href') ?? null, name: arguments[0]}",
                 f"#/meeting/{recording.name}")
+            nothing_private(browser, f"{short}/2-recording")
             browser.save_screenshot(str(store / short / "2-recording.png"))
             seen(browser, f"{short}/2-recording.png")
             browser.execute_script("document.documentElement.style.overflow = ''")
@@ -14508,8 +14529,8 @@ def main() -> int:
             elsewhere = WORK / "elsewhere" / "Kitokey"
             # Its name as heard, the whole path (#1232); what is drawn may be cut in its middle.
             spoken = browser.execute_script("return document.getElementById('sessions-shown-path')?.textContent ?? null")
-            # Outside the home folder, from the root: / tmp / … / chosen.
-            check("the sessions' folder is shown as people say it", spoken == "/ " + " / ".join(chosen.parts[1:]), spoken)
+            # In the home folder, from it: its word, then the folder.
+            check("the sessions' folder is shown as people say it", spoken == "Dossier personnel / chosen", spoken)
 
             def folder_field():
                 # A click on the folder as said makes it a path to type.
@@ -14518,7 +14539,8 @@ def main() -> int:
 
             typed = lambda field, text: (browser.execute_script("arguments[0].select()", field), field.send_keys(text, Keys.ENTER))  # noqa: E731
             folder = folder_field()
-            check("a click makes it the path, to type", folder.get_attribute("value") == str(chosen), folder.get_attribute("value"))
+            # The path to type said from the home, « ~ » then the folder, as the shell reads it back (`settings::from_home`, #1232, #1304).
+            check("a click makes it the path, to type, from the home", folder.get_attribute("value") == "~" + "/" + chosen.relative_to(WORK).as_posix(), folder.get_attribute("value"))
             changed(lambda: typed(folder, str(elsewhere)))
             text = window.file.read_text()
             check("a folder typed is made, and in the settings file", elsewhere.is_dir() and f'sessions = "{elsewhere}"' in text, text)
@@ -14527,8 +14549,10 @@ def main() -> int:
             said = not_saved()
             check("a folder that is not a whole path is said, and nothing changes", said.startswith("Non enregistré") and window.file.read_text() == text, said)
             browser.execute_script("location.hash = '#/'")
-            listed = wait_for(browser, lambda b: str(elsewhere) in b.find_element(By.ID, "empty-folder").text, 5)
-            check("the list reads the folder chosen", listed, browser.find_element(By.ID, "empty-folder").text)
+            # Said from the home, as Settings says it (#1304): never the machine's path.
+            listed = wait_for(browser, lambda b: b.find_element(By.ID, "empty-folder").text
+                              == "Les réunions sont enregistrées dans Dossier personnel / elsewhere / Kitokey.", 5)
+            check("the list reads the folder chosen, said from the home", listed, browser.find_element(By.ID, "empty-folder").text)
             browser.find_element(By.ID, "settings-link").click()
             wait_for(browser, lambda b: b.find_elements(By.ID, "reminder"))
             # This computer's Ollama saved, and not answering (here, nothing listens on its port): said
@@ -15516,7 +15540,18 @@ def main() -> int:
         empty.mkdir()
         with Window(empty, "en_GB.UTF-8") as browser:
             said = [browser.find_element(By.ID, i).text for i in ("none", "empty-folder")]
-            check("an empty folder is said, with its path on a line of its own (#775)", said == ["No meeting yet.", f"Meetings are saved in {empty}."], said)
+            check("an empty folder is said, from the home, on a line of its own (#775, #1304)", said == ["No meeting yet.", "Meetings are saved in Home folder / empty."], said)
+            # Unreadable, said in English from the home too (#1304), then read again once given back.
+            empty.chmod(0)
+            try:
+                browser.execute_script("window.dispatchEvent(new Event('focus'))")
+                none = lambda b: b.find_element(By.ID, "none").text  # noqa: E731
+                unread = wait_for(browser, lambda b: none(b) == "Can’t read the meetings in Home folder / empty.", 10)
+                check("an unreadable folder is said, in English, from the home (#1304)", unread, none(browser))
+            finally:
+                empty.chmod(0o755)
+            browser.execute_script("window.dispatchEvent(new Event('focus'))")
+            wait_for(browser, lambda b: b.find_element(By.ID, "none").text == "No meeting yet.", 10)
             check("the sidebar is named in English", browser.find_element(By.ID, "sidebar").get_attribute("aria-label") == "Meetings")
             lang = browser.execute_script("return document.documentElement.lang")
             check("the page says it is in English", lang == "en", lang)
