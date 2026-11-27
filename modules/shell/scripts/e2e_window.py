@@ -2210,6 +2210,15 @@ def first_run_screens(now: dt.datetime) -> None:
                       frame["width"] == 760 and frame["shadow"] and frame["halos"] == [True, True] and frame["steps"] is not None
                       and frame["steps"][0] == "img" and (lang != "fr" or frame["steps"][1] == "Étape 1 sur 3")
                       and frame["steps"][2:] == [3, [True, False, False]], frame)
+                if lang == "fr":
+                    # The halos as v5 dims them, 0.25 in light and 0.12 in dark: a token of each theme, as its colours are.
+                    halo = {}
+                    for theme in ("light", "dark"):
+                        browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
+                        halo[theme] = browser.execute_script("const w = document.getElementById('welcome'); return ['::before', '::after'].map((p) => getComputedStyle(w, p).opacity)")
+                    browser.execute_script("document.documentElement.style.cssText = ''")
+                    check("(1) the halos dimmed as v5 dims them, 0.25 in light and 0.12 in dark, each theme its token",
+                          halo == {"light": ["0.25", "0.25"], "dark": ["0.12", "0.12"]}, halo)
                 placed = "return [...document.querySelectorAll('#welcome .engine-card')].map((c) => { const r = c.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.left)]; })"
                 at = browser.execute_script(placed)
                 check(f"{lang}: (1) at the window's {browser.execute_script('return innerWidth')} px, the three cards on one line, as v5 sets them",
