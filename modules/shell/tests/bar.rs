@@ -147,7 +147,10 @@ fn the_bar_is_440_by_48_its_controls_32() {
             "#small .record { display: inline-grid; place-items: center; width: 32px; min-height: 32px;",
             "#small .record { display: inline-grid; place-items: center; width: 32px; min-height: 36px;",
         ),
-        ("height: 48px; padding: 0 var(--sp-2) 0 var(--sp-4);", "height: 52px; padding: 0 var(--sp-2) 0 var(--sp-4);"),
+        (
+            "height: 48px; padding: 0 var(--sp-2) 0 var(--sp-4);",
+            "height: 52px; padding: 0 var(--sp-2) 0 var(--sp-4);",
+        ),
         (
             "#small .stop { display: inline-grid; place-items: center; width: 32px; min-height: 32px;",
             "#small .stop { display: inline-grid; place-items: center; width: 28px; min-height: 32px;",
