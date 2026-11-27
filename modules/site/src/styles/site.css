@@ -109,38 +109,11 @@ p { text-wrap: pretty; }
 .card p { color: var(--soft); }
 .card .kicker { color: var(--accent); margin-top: .4rem; }
 
-.channels { padding: clamp(3rem, 2rem + 3vw, 5rem) 0 0; }
-.ch-card { display: grid; gap: 1.8rem; align-items: center; padding: clamp(1.6rem, 1.2rem + 2vw, 2.8rem); }
-.ch-text h2 { font-size: clamp(1.7rem, 1.2rem + 2vw, 2.6rem); font-weight: 780; margin-top: .9rem; }
-.ch-text p { color: var(--soft); margin-top: .8rem; max-width: 36rem; }
-.ch-logos { list-style: none; margin: .7rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 1.6rem; }
-.ch-logos li { display: inline-flex; align-items: center; gap: .6rem; font-weight: 650; font-size: 1.05rem; color: var(--ink); }
-.ch-logos .os-logo, .ch-hook { width: 2.2rem; height: 2.2rem; }
-.ch-logos img.os-logo { width: auto; height: 1.7rem; } /* a brand's own file keeps its proportions */
-.ch-hook { color: var(--soft); }
-@media (min-width: 900px) { .ch-card { grid-template-columns: 1.4fr 1fr; } }
 
-/* The privacy band: full-bleed and dark. */
-.band { background: #0B0E17; color: #F2F4F8; margin-top: clamp(5rem, 4rem + 6vw, 9rem); padding: clamp(5rem, 4rem + 5vw, 8rem) 0; }
-.band .eyebrow, .band a { color: #8AB0FF; }
-.band .lead, .band .note { color: #B7BFCE; }
-.padlock { display: inline-grid; place-items: center; width: 5rem; height: 5rem; border-radius: 50%; background: rgba(99, 212, 156, .14); color: #63D49C; margin: 0 auto 1.2rem; }
-.promises, .needs { list-style: none; padding: 0; margin: 0; display: grid; gap: 1.6rem; }
-.promises li, .needs li { display: flex; gap: .9rem; align-items: flex-start; }
-.promises .ico { color: #63D49C; width: 1.8rem; height: 1.8rem; }
-.promises strong { display: block; font-family: var(--titles); font-size: 1.25rem; letter-spacing: -.02em; margin-bottom: .2rem; }
-.promises span { color: #B7BFCE; }
-.privacy-grid { display: grid; gap: 2.5rem; align-items: center; }
-.privacy-grid > * { min-width: 0; }
-@media (min-width: 900px) { .privacy-grid { grid-template-columns: 1fr 1fr; gap: 4rem; } }
+.needs { list-style: none; padding: 0; margin: 0; display: grid; gap: 1.6rem; }
+.needs li { display: flex; gap: .9rem; align-items: flex-start; }
 .note { margin: 1.4rem auto 0; max-width: 50rem; text-align: center; color: var(--soft); }
-.band .proof { max-width: 52rem; margin-top: 2.5rem; font-size: .95rem; }
 
-.uses { display: grid; gap: 16px; }
-.use.u-3 { background: linear-gradient(160deg, var(--tint), var(--surface) 70%); }
-@media (min-width: 760px) { .uses { grid-template-columns: repeat(6, 1fr); } .use, .uses .use.u-after { grid-column: span 3; } }
-@media (min-width: 1100px) { .use { grid-column: span 2; } .use.u-3, .use.u-4 { grid-column: span 3; } }
-@media (min-width: 1100px) { .uses .use.u-after { grid-column: span 2; } }
 
 .systems { display: grid; gap: 16px; }
 @media (min-width: 860px) { .systems { grid-template-columns: repeat(3, 1fr); } }
@@ -226,7 +199,6 @@ html[data-site="dark"] {
 }
 html[data-site="dark"] .os-state .ok { color: #9BE8C0; background: #10301F; }
 html[data-site="dark"] .soon { color: #FFD58A; background: #2A2110; }
-html[data-site="dark"] .band { background: #11141D; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
