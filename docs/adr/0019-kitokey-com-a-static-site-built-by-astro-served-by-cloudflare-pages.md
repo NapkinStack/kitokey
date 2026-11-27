@@ -97,6 +97,8 @@ The versions are pinned in the module's lockfile at its first pull request; on 2
 
 ## Success criterion
 
+Read at 11-kitokey-on-sale-and-out-of-the-app's closure, 2026-11-27: missed — the site is built and D114's checks are green (#1294), but it is not opened: kitokey.com does not resolve (checked 2026-11-27). What fails is the opening, the decider's gestures in Cloudflare that cycle 11's closure lists under *What needs a person*; the date, **2026-12-04**, still stands.
+
 > We will consider this was the right call if **the site is opened on kitokey.com with every check of D114 green
 > and no request to another domain** before **2026-12-04**.
 

@@ -50,11 +50,9 @@ trial_over 17.1
 trial_left 3.8
 # Added from main's last green full run, at f5699a8 (2026-11-22, e2e-history 20261122T070805): the scenarios
 # written after 9eae465, which counted as the median — focus_swept, ~11 min, among them.
-advanced_latest_answer 6.4
 appearance_chosen 4.6
 axe_first_surfaces 14.9
 bar_after_stop 40.4
-bar_language 15.2
 ends_on_sigterm 7.0
 focus_kept 40.2
 focus_swept 691.3

@@ -53,6 +53,9 @@ webhook's address is a secret — whoever holds it posts to the channel —, so 
 | `name` | The meeting's name, for a meeting whose minutes hold no title: its `title.txt`, or the shell's name for it. `--check` ignores it |
 | `key` | For `notion` alone, and always with it: the integration's key, as the person pasted it — a secret, as an address is. The other kinds ignore it |
 | `confirmed_confidential` | `true` once the person confirmed, for this send, sending a meeting said confidential; absent means `false`. Without it, a confidential meeting is refused; a meeting that is not confidential is sent whatever it says (D118, PDR-0007 point 4). `--check` ignores it |
+| `parts` | Optional: the parts of the summary the person chose to send, each once, in any order — `summary`, `actions`, `key_points`, `dates` (*The parts chosen*, below). The title is always sent and is never a part. Absent, the summary is sent whole, as before (D132) |
+| `dates` | Optional: the meeting's dates, shaped as [`exporting/v1`](../../exporting/v1/README.md)'s `dates` — an array of one item at least, each `id`, `date`, `what`, and `who` and `passage` when there are any. Sent only when `parts` names `dates`; **a date's `passage` is never sent**, since it is words of the transcript |
+| `dates_title` | The dates' heading, in the person's language, as `exporting/v1`'s input carries the words a file shows. Required when `parts` names `dates` and `dates` is given; otherwise ignored |
 
 ## Which addresses it refuses
 
@@ -99,6 +102,19 @@ a string. **Never the audio, never the transcript**, and nothing of the front ma
 
 A summary that does not fit within the bounds is not cut to fit: `failed`, `summary.too_large`, and
 nothing is sent. Discord's `content` is the one place cut, by design: the file carries the whole.
+
+### The parts chosen
+
+With `parts`, each kind receives the title and the parts named, and nothing else. **`actions`** is the
+actions' section (as above); **`key_points`**, the third section of v1 to v4, the section of id
+`key_points` in v5 (`general` alone holds one); **`summary`**, every other section; **`dates`**, a section
+of its own after them, headed `dates_title`, one item « date — what — who » for each date, « date —
+what » when no one is named. The sections keep the minutes' order, whatever the order of `parts`. A part
+the meeting does not hold, or `dates` asked and not given, is empty: nothing is sent for it.
+
+A generic webhook still receives `title`, `summary` — the chosen parts as Markdown — and `actions`, empty
+when they were not chosen; and, when chosen, `key_points`, the items of their section each without its
+bullet, and `dates`, each `date`, `what`, `who` (`null` when no one is named) — never `id` or `passage`.
 
 **Once**: one POST, never sent again by the program — not on a failure, not on a `429`. Whether to
 send again is the person's gesture.

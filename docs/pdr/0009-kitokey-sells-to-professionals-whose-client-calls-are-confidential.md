@@ -61,6 +61,9 @@ with its URL).
    EN « Every client call gets its minutes. Nothing leaves your computer. » Four pillars: on your computer,
    invisible in the call, minutes to hand over, paid once.
 3. **The price**: **69 € once**, the same on macOS and Windows, after a free trial (within PDR-0001's range).
+   Amended by the decider on 2026-11-27: **69 $ once** where the price is said in English, the site's English
+   pages and the Store's dollar markets; 69 € stays the euro markets' price. The Store sets each market's price
+   from Partner Center (D102).
 4. **The call to action before the macOS and Windows release**: the Microsoft Store's page as soon as it exists;
    no mailing list of ours (PDR-0001).
 5. **On macOS, the meetings stay readable after the trial**, as on Windows (PDR-0005): recording stops, nothing
