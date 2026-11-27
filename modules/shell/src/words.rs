@@ -629,6 +629,20 @@ pub struct Window {
     /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) of the
     /// menu of rarer actions. At most: no limit. Placeholders: none.
     pub more_actions: &'static str,
+    /// D121, a meeting's bar of actions: each its words beside its icon. « Partager »: the summary's sends, its copy
+    /// and its files. Shows: a meeting's page, the bar of actions, a button. When: always. At most: about 12
+    /// characters. Placeholders: none.
+    pub meeting_share: &'static str,
+    /// The dates the summary's actions name, its count beside it. Shows: a meeting's page, the bar of actions, a
+    /// button. When: a date is found in the summary's actions. At most: about 12 characters. Placeholders: none.
+    pub meeting_dates: &'static str,
+    /// The engines that make the meeting again, and its versions. Shows: a meeting's page, the bar of actions, a
+    /// button. When: always. At most: about 12 characters. Placeholders: none.
+    pub meeting_redo: &'static str,
+    /// The rarer actions: renaming, opening the folder, the trash; its name for a screen reader `more_actions`, which
+    /// begins with it. Shows: a meeting's page, the bar of actions, a menu button. When: always. At most: about 8
+    /// characters. Placeholders: none.
+    pub meeting_more: &'static str,
     /// Shows: the window, as a format. When: a setting's name before its value: "{}:". At most: no
     /// limit. Placeholders: {} a setting's name.
     pub labelled: &'static str,
@@ -2138,6 +2152,10 @@ pub fn window(language: Language) -> Window {
             gallery_title: "Components",
             gallery_parts: ["Buttons", "Banners", "Dialogs", "Engines"],
             more_actions: "More actions",
+            meeting_share: "Share",
+            meeting_dates: "Calendar",
+            meeting_redo: "Redo",
+            meeting_more: "More",
             labelled: "{}:",
             minutes_title: "Summary",
             transcript_title: "Transcript",
@@ -2679,6 +2697,10 @@ pub fn window(language: Language) -> Window {
             gallery_title: "Composants",
             gallery_parts: ["Boutons", "Bandeaux", "Dialogues", "Moteurs"],
             more_actions: "Plus d’actions",
+            meeting_share: "Partager",
+            meeting_dates: "Agenda",
+            meeting_redo: "Refaire",
+            meeting_more: "Plus",
             labelled: "{}\u{a0}:",
             minutes_title: "Compte rendu",
             transcript_title: "Transcription",

@@ -52,6 +52,13 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 5; min-width: 220px; padding: 4px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 0.16); }
 .menu-item { display: flex; align-items: center; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; white-space: nowrap; cursor: pointer; }
 .menu-item:hover, .menu-item:focus { background: var(--raised); }
+/* D121: a deletion last in its menu, after a line, in the destructive role's colour (PDR-0008). */
+.menu-item.destructive { color: var(--color-destructive); }
+.menu-separator { height: 1px; margin: var(--sp-1) 0; background: var(--color-divider); }
+/* A meeting refused the trash (D100): said under its bar, nothing when nothing is said. */
+#trash-said:empty { display: none; }
+/* D121: the meeting's bar of actions, each its words beside its icon; « Agenda »'s count after its words. */
+.bar-action .count { font-variant-numeric: tabular-nums; color: var(--color-text-soft); }
 .back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }
 /* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
 .open, .search { min-height: 32px; border-radius: 8px; border: 1px solid; color: var(--ink); font: inherit; font-size: 14px; }
@@ -721,11 +728,6 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .check-actions .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .check-actions .open:disabled { border-style: dashed; border-color: var(--edge); color: var(--soft); cursor: default; }
 .check-note { margin-top: 12px; margin-bottom: 16px; font-size: 12.5px; color: var(--soft); }
-/* A meeting to the trash, asked in place under its page's actions (D100). */
-.trash-ask { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding: 14px 18px; }
-.trash-ask .trash-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-.trash-ask .trash-choices button { white-space: nowrap; }
-.trash-ask .note:empty { display: none; }
 /* « Dates mentionnées » with its count (#1239): the calendar and the number in one pill, the row's height. */
 .icon-button.counted { width: auto; grid-auto-flow: column; gap: 4px; padding: 0 8px; }
 .icon-button .count { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
