@@ -14430,7 +14430,8 @@ def main() -> int:
                   (closed, toggle.get_attribute("aria-expanded")))
             # « Plus »: a menu button, its words and its icon (D121) — Enter opens it on its first item, Escape closes it, the focus back on it.
             more = browser.find_element(By.ID, "more-open")
-            labelled = [more.get_attribute(a) for a in ("aria-label", "title", "aria-haspopup", "aria-expanded")]
+            # Its words shown, it needs no tooltip (D121): the attribute itself read, Selenium's `title` being the property, "" when none.
+            labelled = browser.execute_script("return ['aria-label', 'title', 'aria-haspopup', 'aria-expanded'].map((a) => arguments[0].getAttribute(a))", more)
             browser.execute_script("arguments[0].focus()", more)
             ActionChains(browser).send_keys(Keys.ENTER).perform()
             menu = wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
