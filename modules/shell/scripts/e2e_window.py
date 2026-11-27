@@ -7751,6 +7751,12 @@ def meeting_actions_bar(now: dt.datetime) -> None:
             # Each accessible name begins with its visible words, the count in it too (WCAG 2.5.3).
             check(f"{short}: each name begins with its visible words, the count in it (WCAG 2.5.3)",
                   bool(got) and all(b["name"].startswith(b["words"]) and b["count"] in b["name"] for b in got), [b["name"] for b in got])
+            # At the window's own width, its four actions too (« Agenda » among them): the bar on the name's line, at its
+            # right, as main() checks it (D89) — going under the name only where it does not fit (the audit of #1301).
+            beside = browser.execute_script(
+                "const h = document.querySelector('#meeting h1'), o = document.getElementById('meeting-actions');"
+                " return [innerWidth, Math.abs(h.getBoundingClientRect().top - o.getBoundingClientRect().top) < 24 && o.getBoundingClientRect().left > h.getBoundingClientRect().right]")
+            check(f"{short}: at the window's 1100 px, its four actions on the name's line, at its right (D89, D121)", beside[1] is True, beside)
             # A button that opens a menu of choices says so (v5): « Partager » a chevron after its words; « Refaire » opens
             # none yet, « Plus » is its own icon: neither has one (the coordinator's audit of #1301).
             chevrons = browser.execute_script(
