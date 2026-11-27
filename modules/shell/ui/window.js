@@ -6433,7 +6433,8 @@ async function draw(mine, again) {
     // never takes the answers from under the user.
     if (welcome.dataset.shown === location.hash) return;
     welcome.dataset.shown = location.hash;
-    return showWelcome(location.hash === "#/welcome/again", words);
+    // The first start, its own screens (D126, ui/first-run.js); « Refaire la configuration », the assistant.
+    return location.hash === "#/welcome/again" ? showWelcome(true, words) : showFirstRun(words);
   }
   welcome.replaceChildren();
   delete welcome.dataset.shown;

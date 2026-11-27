@@ -2133,6 +2133,184 @@ def first_read_said(browser, ids, expected, got) -> None:
     later = [browser.find_element(By.ID, i).text for i in ids]
     print(f"  #965  first read {got}, a second later {later}; the page just after the first read: {now}")
 
+def first_run_screens(now: dt.datetime) -> None:
+    """CV. D126, the first run's screen (1) (criterion 1 as #1280 amended it, mock-up v5's screen 1), in French and
+    in English, shot in both themes: three cards by kind of engine, no list of models — « Auto », marked « Par défaut »,
+    checked and saying what it resolves to, « Sur cet ordinateur », « Service en ligne », each with its facts; the
+    download of what « Auto » needs starts at once, before any click, but only what downloads without an install —
+    Whisper's model; Ollama absent, « Auto » to write says it is to install and nothing is pulled; « Je choisirai plus
+    tard » keeps « Auto », nothing written for who writes, and ends on screen (3), the empty window said ready (CU).
+    Screen (2), the sound checked while it downloads, comes in the next pull request. The first start's own checks,
+    scenario Y's until D126 (their names kept): the full window opens on it, with --window or without, no sidebar
+    beside it, welcomed written as soon as it is shown, the small window kept as the one reopened, never shown again
+    once welcomed, nothing of its answers written when it is left midway."""
+    print("CV. the first run: three engine cards, Auto's download at once, « Je choisirai plus tard » ends ready (D126)")
+    served, model = WORK / "served-first", os.urandom(300_000)
+    served.mkdir()
+    (served / "model.bin").write_bytes(model)
+    asked = []
+
+    class Slow(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(served), **kwargs)
+
+        def log_message(self, *_):
+            asked.append(self.path)
+
+        def copyfile(self, source, sink):
+            while chunk := source.read(30_000):
+                sink.write(chunk)
+                sink.flush()
+                time.sleep(0.3)
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Slow)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    published = f"http://127.0.0.1:{server.server_address[1]}/model.bin {len(model)} {hashlib.sha256(model).hexdigest()}"
+    cards = ("const f = document.querySelector('#welcome fieldset.engine-cards[data-job=write]'); return f && f.offsetParent ? "
+             "[...f.querySelectorAll('.engine-card')].map((c) => [c.dataset.engine, c.querySelector('input').checked,"
+             " c.querySelector('.default')?.textContent ?? null, c.querySelector('.facts')?.textContent.trim() ?? '',"
+             " c.querySelector('.where')?.textContent.trim() ?? '']) : null")
+    title = "const h = document.querySelector('#welcome h1'); return h && h.offsetParent ? h.textContent.trim() : null"
+    welcome = "return !document.getElementById('welcome').hidden && document.getElementById('welcome').innerText || ''"
+    logs = WORK / "state" / "kitokey" / "logs"
+    pulls = lambda: sum(f.read_text().count('"message":"shell.model_pull_failed"') for f in logs.glob("shell.*.jsonl"))
+
+    def started(name: str, locale: str, args: list[str]) -> "Window":
+        meetings = WORK / f"first-screens-{name}"
+        meetings.mkdir()
+        window = Window(meetings, locale, small=True, welcomed=False, args=args)
+        window.env.update(XDG_DATA_HOME=str(WORK / f"data-first-screens-{name}"), KITOKEY_SPEECH=str(WORK / "nowhere"),
+                          KITOKEY_MODEL_PUBLISHED=published)
+        return window
+
+    try:
+        # The words of mock-up v5's screen 1, in French; the English ones are the same key's (words.rs).
+        for locale, lang, words in (("fr_FR.UTF-8", "fr", "Deux questions, et c’est prêt."), ("en_US.UTF-8", "en", None)):
+            asked.clear()
+            window = started(lang, locale, [])
+            pulled_before = pulls()
+            with window as browser:
+                drawn = wait_for(browser, lambda b: b.execute_script(cards) is not None, 10)
+                got = browser.execute_script(cards)
+                # Where a screen reader starts: the screen's heading, focused when it is drawn (lina's reading of #1307).
+                focused = browser.execute_script("const a = document.activeElement; return [a.id, a.tagName, a.textContent.trim()]")
+                check(f"{lang}: (1) drawn, the focus on its heading", focused[0] == "welcome-heading" and focused[1] == "H1", focused)
+                if lang == "fr":
+                    check("started without --window, not welcomed, no meeting: the full window opens on the assistant",
+                          drawn and not browser.find_elements(By.ID, "small-record"), browser.execute_script(welcome))
+                    check("no sidebar of the meetings while it is answered", not browser.find_element(By.ID, "sidebar").is_displayed())
+                    marked = wait_for(browser, lambda b: "welcomed = true" in window.file.read_text(), 5)
+                    check("welcomed is written as soon as it is shown, nothing else", marked and "minutes_provider" not in window.file.read_text(), window.file.read_text())
+                check(f"{lang}: (1) three cards by kind of engine, « Auto » first, marked as the default and checked, no list of models",
+                      drawn and [c[0] for c in got] == ["auto", "local", "online"] and got[0][1] and got[0][2]
+                      and (lang != "fr" or got[0][2] == "Par défaut")
+                      and not any(c[1] for c in got[1:]) and not browser.find_elements(By.CSS_SELECTOR, "#welcome select"), got)
+                check(f"{lang}: (1) each card with its facts, « Auto » saying what it resolves to, not only where it runs",
+                      drawn and all(c[3] for c in got) and got[0][4] not in ("", got[1][4]), got)
+                shown = browser.execute_script(title)
+                check(f"{lang}: (1) its title, mock-up v5's", shown and (words is None or shown == words), shown)
+                fetching = wait_for(browser, lambda b: "/model.bin" in asked, 5)
+                check(f"{lang}: (1) the download of what « Auto » needs starts at once, before any click", fetching, asked)
+                if lang == "fr":
+                    # Ollama silent (the scenario's address answers nothing): « Auto » to write cannot be downloaded, only installed.
+                    auto = browser.execute_script("return document.querySelector('#welcome .engine-card[data-engine=auto]')?.dataset.state ?? null")
+                    time.sleep(2)
+                    check("(1) Ollama absent: « Auto » says it is to install, and nothing impossible is started — no model pulled",
+                          auto == "install" and pulls() == pulled_before, (auto, pulls() - pulled_before))
+                # Mock-up v5's screen 1 (the coordinator's audit of #1307): its card 760 px wide on a window that has room,
+                # with its step indicator and its shadow, the page's two halos behind it; the three cards on one line;
+                # no card saying twice where it runs; « Continuer » its chevron after its words.
+                frame = browser.execute_script(
+                    "const w = document.getElementById('welcome'), c = document.getElementById('first-choice'), s = document.getElementById('first-steps');"
+                    " return {width: Math.round(c.getBoundingClientRect().width), shadow: getComputedStyle(c).boxShadow !== 'none',"
+                    " halos: ['::before', '::after'].map((p) => getComputedStyle(w, p).content !== 'none' && getComputedStyle(w, p).content !== 'normal'),"
+                    " steps: s ? [s.getAttribute('role'), s.getAttribute('aria-label'), s.children.length, [...s.children].map((i) => i.classList.contains('on'))] : null}")
+                check(f"{lang}: (1) as v5 draws it: the card 760 px wide, its shadow, the two halos behind it, its steps « 1 of 3 »",
+                      frame["width"] == 760 and frame["shadow"] and frame["halos"] == [True, True] and frame["steps"] is not None
+                      and frame["steps"][0] == "img" and (lang != "fr" or frame["steps"][1] == "Étape 1 sur 3")
+                      and frame["steps"][2:] == [3, [True, False, False]], frame)
+                if lang == "fr":
+                    # The halos as v5 dims them, 0.25 in light and 0.12 in dark: a token of each theme, as its colours are.
+                    halo = {}
+                    for theme in ("light", "dark"):
+                        browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
+                        halo[theme] = browser.execute_script("const w = document.getElementById('welcome'); return ['::before', '::after'].map((p) => getComputedStyle(w, p).opacity)")
+                    browser.execute_script("document.documentElement.style.cssText = ''")
+                    # Each step's mark at 3:1 at least on the card, as WCAG 2.2 SC 1.4.11 asks of what a graphic says (lina, #1307):
+                    # v5's inactive marks, --bg-sunken on the card, are at 1.1:1.
+                    marks, rgb = {}, lambda text: [float(n) for n in re.findall(r"[\d.]+", text)[:3]]
+                    for theme in ("light", "dark"):
+                        browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
+                        read = browser.execute_script("const c = document.getElementById('first-choice'); return [getComputedStyle(c).backgroundColor,"
+                                                      " [...document.querySelectorAll('#first-steps > i')].map((i) => getComputedStyle(i).backgroundColor)]")
+                        marks[theme] = [round(contrast(rgb(m), rgb(read[0])), 2) for m in read[1]]
+                    browser.execute_script("document.documentElement.style.cssText = ''")
+                    check("(1) each step's mark, done or to come, at 3:1 at least on the card, light and dark (WCAG 2.2 SC 1.4.11)",
+                          all(len(v) == 3 and min(v) >= 3.0 for v in marks.values()), marks)
+                    check("(1) the halos dimmed as v5 dims them, 0.25 in light and 0.12 in dark, each theme its token",
+                          halo == {"light": ["0.25", "0.25"], "dark": ["0.12", "0.12"]}, halo)
+                placed = "return [...document.querySelectorAll('#welcome .engine-card')].map((c) => { const r = c.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.left)]; })"
+                at = browser.execute_script(placed)
+                check(f"{lang}: (1) at the window's {browser.execute_script('return innerWidth')} px, the three cards on one line, as v5 sets them",
+                      len(at) == 3 and len({top for top, _ in at}) == 1, at)
+                twice = browser.execute_script("return [...document.querySelectorAll('#welcome .engine-card')].map((c) => [c.querySelector('.name').textContent, c.querySelector('.where')?.textContent ?? null])")
+                check(f"{lang}: (1) no card says twice where it runs: its line of place never its name again",
+                      len(twice) == 3 and all(name != where for name, where in twice), twice)
+                # Each card's lines packed under its name, as v5 stacks them: never spread over the tallest card's height.
+                spread = browser.execute_script(
+                    "return [...document.querySelectorAll('#welcome .engine-card')].map((c) => { const lines = [...c.querySelectorAll('label > .name, label > .where, label > .state, label > .facts, details > summary')].map((e) => e.getBoundingClientRect());"
+                    " return Math.round(Math.max(...lines.slice(1).map((r, i) => r.top - lines[i].bottom))); })")
+                check(f"{lang}: (1) each card's lines packed under its name, 8 px apart at most, whatever the other cards' height",
+                      len(spread) == 3 and all(gap <= 8 for gap in spread), spread)
+                go = browser.execute_script("const b = document.getElementById('first-next'); return [b.textContent.trim(), !!b.lastElementChild?.matches('svg.glyph[aria-hidden=true]')]")
+                check(f"{lang}: (1) « Continuer » its chevron after its words, hidden from a screen reader (v5)",
+                      go[1] and go[0] in ("Continuer", "Continue"), go)
+                violations = axe_violations(browser)
+                check(f"{lang}: (1) no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d126-choice-{lang}-{theme}", theme)
+                # A narrow window: one card a line, nothing wider than the window, shot in both themes.
+                wide = browser.get_window_size()
+                browser.set_window_size(420, 860)
+                time.sleep(0.5)
+                at = browser.execute_script(placed)
+                fits = browser.execute_script("const e = document.documentElement; return [innerWidth, e.scrollWidth <= e.clientWidth]")
+                check(f"{lang}: (1) at the window's {fits[0]} px, one card a line, nothing wider than the window",
+                      fits[0] <= 420 and fits[1] and len(at) == 3 and len({left for _, left in at}) == 1 and len({top for top, _ in at}) == 3, (fits, at))
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d126-choice-{lang}-small-{theme}", theme)
+                browser.set_window_size(wide["width"], wide["height"])
+                time.sleep(0.5)
+                press(browser, "first-later")
+                ready = wait_for(browser, lambda b: b.find_element(By.ID, "none").is_displayed()
+                                 and b.find_element(By.ID, "none").text in ("Prêt. Enregistrez votre premier appel.", "Ready. Record your first call."), 10)
+                text = window.file.read_text()
+                check(f"{lang}: (1) « Je choisirai plus tard » keeps « Auto »: nothing written for who writes, then screen (3), the empty window said ready (CU)",
+                      ready and "minutes_provider" not in text and "minutes_model" not in text, (browser.find_element(By.ID, "none").text, text))
+                if lang == "fr":
+                    check("the window left is not changed: the small one stays the one reopened (D35)", "window =" not in text, text)
+            if lang == "fr":
+                # Started again, welcomed: no first run.
+                window.args = ["--window"]
+                with window as browser:
+                    time.sleep(1)
+                    check("welcomed, it never comes back at a start", browser.execute_script(welcome) == "" and browser.find_elements(By.ID, "small-record"))
+
+        # From the applications' menu, not welcomed: the first run all the same; left midway, its choice is not kept.
+        window = started("menu", "fr_FR.UTF-8", ["--window"])
+        with window as browser:
+            drawn = wait_for(browser, lambda b: b.execute_script(cards) is not None, 10)
+            check("started with --window, not welcomed, no meeting: the full window opens on the assistant",
+                  drawn and not browser.find_elements(By.ID, "small-record") and len(browser.window_handles) == 1,
+                  (browser.window_handles, browser.execute_script(welcome)))
+            wait_for(browser, lambda b: "welcomed = true" in window.file.read_text(), 5)
+            before = window.file.read_text()
+            browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=online] input').click()")
+        check("left midway, nothing of its answers is written", window.file.read_text() == before, window.file.read_text())
+    finally:
+        server.shutdown()
+
+
 def first_run_ready(now: dt.datetime) -> None:
     """CU. D126, the first run's third screen (mock-up 1c): once the assistant is answered, the window's empty
     pane says « Prêt. Enregistrez votre premier appel. » and what Kitokey does in one sentence, beside the
@@ -2163,9 +2341,9 @@ def first_run_ready(now: dt.datetime) -> None:
         window = Window(meetings, language, small=True, welcomed=False, args=())
         window.env.update(XDG_DATA_HOME=str(WORK / f"data-ready-{short}"), KITOKEY_SPEECH=str(WORK / "nowhere"))
         with window as browser:
-            asked = wait_for(browser, lambda b: b.find_elements(By.ID, "welcome-skip") and b.find_element(By.ID, "welcome-skip").is_displayed(), 10)
+            asked = wait_for(browser, lambda b: b.find_elements(By.ID, "first-later") and b.find_element(By.ID, "first-later").is_displayed(), 10)
             check(f"{short}: not welcomed, the first run opens on its first question", asked)
-            press(browser, "welcome-skip")
+            press(browser, "first-later")
             shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
             check(f"{short}: answered, the first run ends on its third screen: ready, what Kitokey does, « Enregistrer », the example; one primary action in the window",
                   shown, browser.execute_script(pane))
@@ -2206,8 +2384,8 @@ def first_run_ready(now: dt.datetime) -> None:
             window = asking_less_motion(Window(still, language, small=True, welcomed=False, args=()))
             window.env.update(XDG_DATA_HOME=str(WORK / f"data-ready-{short}-still"), KITOKEY_SPEECH=str(WORK / "nowhere"))
             with window as browser:
-                wait_for(browser, lambda b: b.find_elements(By.ID, "welcome-skip") and b.find_element(By.ID, "welcome-skip").is_displayed(), 10)
-                press(browser, "welcome-skip")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "first-later") and b.find_element(By.ID, "first-later").is_displayed(), 10)
+                press(browser, "first-later")
                 shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
                 check(f"{short}, less motion asked: the same third screen", shown and browser.execute_script(LESS_MOTION),
                       (browser.execute_script(pane), browser.execute_script(LESS_MOTION)))
@@ -2224,11 +2402,27 @@ def first_run_ready(now: dt.datetime) -> None:
                 said = browser.execute_script(pane)
                 check(f"{short}: started again, welcomed: the empty pane is the ordinary one, « Record » not said ready",
                       drawn and said[0] != texts[0] and said[2] != texts[2], said)
+    # « Service en ligne », then « Continuer »: Settings, at the services, where its key is asked; back from them, the
+    # first run ends on screen (3) all the same (lina's reading of #1307).
+    online = WORK / "ready-online"
+    online.mkdir()
+    window = Window(online, "fr_FR.UTF-8", small=True, welcomed=False, args=())
+    window.env.update(XDG_DATA_HOME=str(WORK / "data-ready-online"), KITOKEY_SPEECH=str(WORK / "nowhere"))
+    with window as browser:
+        wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#welcome .engine-card[data-engine=online] input"), 10)
+        browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=online] input').click()")
+        press(browser, "first-next")
+        at_settings = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/settings", 10)
+        browser.execute_script("location.hash = '#/'")
+        ready = wait_for(browser, lambda b: (b.execute_script(pane) or [None])[0] == "Prêt. Enregistrez votre premier appel.", 10)
+        check("« Service en ligne », then « Continuer »: Settings, at the services; back from them, screen (3) says ready",
+              at_settings and ready, [browser.execute_script("return location.hash"), browser.execute_script(pane)])
 
 
 def first_run(now: dt.datetime) -> None:
-    """Y. The first start (D58): the full window opens on one question, then the setting said plainly."""
-    print("Y. the first start: one question, the setting said plainly, private by default (D58)")
+    """Y. « Refaire la configuration » (D58): one question, then the setting said plainly. The first start's own
+    assistant until D126; the first run's own checks are scenario CV's since (their names kept)."""
+    print("Y. « Refaire la configuration »: one question, the setting said plainly, private by default (D58)")
     welcome = "return !document.getElementById('welcome').hidden && document.getElementById('welcome').innerText || ''"
     focused = "return [document.activeElement.tagName, document.activeElement.name || document.activeElement.id, document.activeElement.value || ''].join(':')"
     picked = "return [...document.querySelectorAll('#welcome input[type=radio]:checked')].map(i => i.value).join(',')"
@@ -2238,8 +2432,8 @@ def first_run(now: dt.datetime) -> None:
     def started(name: str, language: str = "fr_FR.UTF-8", dark: bool = False, ollama: str = "http://127.0.0.1:9") -> "Window":
         meetings = WORK / f"welcome-{name}"
         meetings.mkdir()
-        # No `window` line: the small one is the one left, as at a real first start (D35).
-        window = Window(meetings, language, ollama=ollama, small=True, welcomed=False, args=())
+        # Welcomed, the full window opened: the assistant is « Refaire la configuration »'s (D126 took the first start).
+        window = Window(meetings, language, ollama=ollama)
         window.env.update(XDG_DATA_HOME=str(WORK / f"data-welcome-{name}"), KITOKEY_SPEECH=str(WORK / "nowhere"))
         # The dark theme asked of GTK, whatever the desktop shows; the light one cannot be asked
         # of a dark desktop without changing the user's setting — its colours are put on the page
@@ -2253,24 +2447,22 @@ def first_run(now: dt.datetime) -> None:
         shot_themed(browser, name, "light" if "light" in name.split("-") else "dark")
 
     def until_question(browser) -> bool:
+        browser.execute_script("if (location.hash !== '#/welcome/again') location.hash = '#/welcome/again'")
         return wait_for(browser, lambda b: "Vos réunions abordent-elles" in b.execute_script(welcome) or "Do your meetings" in b.execute_script(welcome), 10)
 
     # 1. Skipped: everything on this computer, the meetings opened.
     window = started("skip")
     with window as browser:
-        shown = until_question(browser)
-        check("started without --window, not welcomed, no meeting: the full window opens on the assistant",
-              shown and not browser.find_elements(By.ID, "small-record"), browser.execute_script(welcome))
+        until_question(browser)
         said = browser.execute_script(welcome)
         check("one question, its three answers in plain words, its sentence typeset as French has it",
               "Configurons Kitokey en une question." in said and "Vos réunions abordent-elles des sujets confidentiels ?" in said
-              and all(a in said for a in ("Oui, souvent", "Rarement ou jamais", "Je ne sais pas", "Passer (tout sur cet ordinateur)", "Suivant")), said)
+              and all(a in said for a in ("Oui, souvent", "Rarement ou jamais", "Je ne sais pas", "Annuler", "Suivant")), said)
         check("nothing is chosen for the user", browser.execute_script(picked) == "", browser.execute_script(picked))
         check("each answer is a radio of one group, named by the question",
               browser.execute_script("const g = document.querySelector('#welcome [role=radiogroup]'); return !!g && !!g.getAttribute('aria-labelledby') && g.querySelectorAll('input[type=radio][name=private]').length === 3"))
         check("no sidebar of the meetings while it is answered", not browser.find_element(By.ID, "sidebar").is_displayed())
-        marked = wait_for(browser, lambda b: "welcomed = true" in window.file.read_text(), 5)
-        check("welcomed is written as soon as it is shown, nothing else", marked and "minutes_provider" not in window.file.read_text(), window.file.read_text())
+        before = window.file.read_text()
         browser.set_window_size(420, 400)
         time.sleep(0.5)
         wide = browser.execute_script("return document.documentElement.scrollWidth <= document.documentElement.clientWidth")
@@ -2281,29 +2473,20 @@ def first_run(now: dt.datetime) -> None:
         card = browser.execute_script("const c = document.querySelector('#welcome .welcome'), s = getComputedStyle(c); return [c.getBoundingClientRect().width / document.documentElement.clientWidth, parseFloat(s.paddingLeft)]")
         check("at the window's opening size the card takes two thirds of it, its margin 20 px at most", 0.6 <= card[0] <= 0.7 and card[1] <= 20, card)
         seen(browser, "d58-1-question-light")
-        # Passer, by the keyboard: Tab from the question reaches it after the answers.
+        # Annuler, by the keyboard: Tab from the question reaches it after the answers.
         keys(browser, Keys.TAB)
         first = browser.execute_script(focused)
         keys(browser, Keys.TAB)
         skip = browser.execute_script(focused)
-        check("Tab reaches the answers, then Passer", first.startswith("INPUT:private") and skip == "BUTTON:welcome-skip:", (first, skip))
+        check("Tab reaches the answers, then Annuler", first.startswith("INPUT:private") and skip == "BUTTON:welcome-skip:", (first, skip))
         # Drawn once the window has the system's focus: waited for, the desktop being in use (#510).
         # Asked for, then waited for: another window of the desktop may hold the system's focus.
         browser.switch_to.window(browser.current_window_handle)
         ring = wait_for(browser, lambda b: b.execute_script("const s = getComputedStyle(document.activeElement); return s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0"), 10)
         check("the focus is seen", ring)
         keys(browser, Keys.ENTER)
-        listed = wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed() and b.find_element(By.ID, "sidebar").is_displayed(), 10)
-        text = window.file.read_text()
-        check("Passer: the minutes by Ollama on this computer, the meetings opened",
-              listed and 'minutes_provider = "http://127.0.0.1:9/v1"' in text and 'minutes_model = "qwen3:8b"' in text, text)
-        check("the window left is not changed: the small one stays the one reopened (D35)", "window =" not in text, text)
-        check("nothing is fetched on Passer", not (WORK / "data-welcome-skip" / "kitokey" / "models").exists())
-    # Started again, welcomed: no assistant.
-    window.args = ["--window"]
-    with window as browser:
-        time.sleep(1)
-        check("welcomed, it never comes back at a start", browser.execute_script(welcome) == "" and browser.find_elements(By.ID, "small-record"))
+        back = wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 10)
+        check("Annuler, by the keyboard: back to Settings, nothing written", back and window.file.read_text() == before, window.file.read_text())
 
     # 2. Private, by the keyboard: the summary, then Plus tard.
     window = started("private")
@@ -2487,7 +2670,7 @@ def first_run(now: dt.datetime) -> None:
         dark = browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
         check("the system's dark theme is the page's", dark and browser.execute_script("return getComputedStyle(document.body).backgroundColor") == GROUND["dark"])
         said = browser.execute_script(welcome)
-        check("in English", "Do your meetings cover confidential topics?" in said and "Skip (keep everything on this computer)" in said, said)
+        check("in English", "Do your meetings cover confidential topics?" in said and "Cancel" in said, said)
         seen(browser, "d58-1-question-dark")
         press(browser, "welcome-next")
         wait_for(browser, lambda b: "Private mode" in b.execute_script(summary), 5)
@@ -2515,16 +2698,10 @@ def first_run(now: dt.datetime) -> None:
     # At the window's smallest size: the view 420 px at most, nothing wider than it.
     wide = lambda b: b.execute_script("const e = document.documentElement; return window.innerWidth <= 420 && e.scrollWidth <= e.clientWidth")
 
-    # 5. From the applications' menu, not welcomed: the assistant all the same; left midway, its
-    # answers are not kept — only that it was shown.
+    # 5. Left midway, its answers are not kept.
     window = started("menu")
-    window.args = ["--window"]
     with window as browser:
-        shown = until_question(browser)
-        check("started with --window, not welcomed, no meeting: the full window opens on the assistant",
-              shown and not browser.find_elements(By.ID, "small-record") and len(browser.window_handles) == 1,
-              (browser.window_handles, browser.execute_script(welcome)))
-        wait_for(browser, lambda b: "welcomed = true" in window.file.read_text(), 5)
+        until_question(browser)
         before = window.file.read_text()
         browser.set_window_size(420, 400)
         browser.execute_script("document.querySelector('#welcome input[value=rarely]').click()")
@@ -15913,6 +16090,7 @@ def main() -> int:
     ollama_pulled(now)
     first_run(now)
     first_run_ready(now)
+    first_run_screens(now)
     context_written(now)
     confidential_kept(now)
     meeting_language(now)

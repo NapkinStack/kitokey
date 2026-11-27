@@ -515,6 +515,21 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .welcome-actions .link { align-self: center; color: var(--soft); }
 .welcome-actions .primary { margin-left: auto; }
 .welcome-top .link { color: var(--soft); }
+/* D126, the first run's screen (1) as mock-up v5 draws it: its card 760 px wide, its shadow, its steps, the page's
+   two halos behind it; the engine cards three on a line, one a line in a narrow window. The assistant above unchanged. */
+#welcome:has(> .first-run) { position: relative; overflow: hidden; }
+#welcome:has(> .first-run)::before, #welcome:has(> .first-run)::after { content: ""; position: absolute; width: 50vmax; height: 40vmax; border-radius: 50%; filter: blur(80px); opacity: var(--halo-opacity); pointer-events: none; }
+#welcome:has(> .first-run)::before { background: var(--blue-200); left: -10vmax; top: -12vmax; }
+#welcome:has(> .first-run)::after { background: var(--violet-300); right: -12vmax; bottom: -14vmax; }
+#first-choice { position: relative; z-index: 1; width: min(760px, 100%); padding: var(--sp-8); border-radius: var(--r-xl); box-shadow: var(--e3); }
+#first-choice .engine-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Three on a line, the shorter ones as tall as the tallest: their lines stay packed at their top, as v5 stacks them. */
+#first-choice .engine-card { align-content: start; }
+@media (max-width: 720px) { #first-choice .engine-cards { grid-template-columns: 1fr; } #first-choice { padding: var(--sp-5); } }
+.first-steps { display: flex; gap: var(--sp-1); }
+/* Its marks to come in the edge role, not v5's sunken: 3.7:1 on the card in both themes (WCAG 2.2 SC 1.4.11; lina, #1307). */
+.first-steps i { width: 24px; height: 6px; border-radius: var(--r-pill); background: var(--color-edge); }
+.first-steps i.on { background: var(--color-accent); }
 .welcome-mode { padding: 14px 16px; border-radius: 12px; background: color-mix(in srgb, var(--ok) 12%, var(--surface)); display: flex; flex-direction: column; gap: 2px; }
 .welcome-mode.connected { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .welcome-mode h1 { font-size: 19px; }
