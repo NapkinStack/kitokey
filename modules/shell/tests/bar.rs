@@ -1,5 +1,5 @@
-//! The recording bar's sizes (D90, the decider's boards of 2026-11-08): 440 CSS px wide, one row
-//! of 44, its controls 28 — D89's rule for the bar —, on the 4 px grid.
+//! The recording bar's sizes (D90, the decider's boards of 2026-11-08; D125, his Round 4 of 2026-11-26):
+//! 440 CSS px wide, one row of 48, its controls 32, on the 4 px grid.
 
 const STYLE: &str = include_str!("../ui/window.css");
 const SHELL: &str = include_str!("../src/main.rs");
@@ -27,9 +27,9 @@ fn px(body: &str, name: &str) -> Option<f64> {
 }
 
 /// The bar's controls: its icon buttons, ● and ■.
-const CONTROLS: [&str; 3] = ["#small .bar-row .icon-button", "#small .record", "#small .danger"];
+const CONTROLS: [&str; 3] = ["#small .bar-row .icon-button", "#small .record", "#small .stop"];
 
-/// Every property that sizes a box: each one a control's rule sets must say 28 (#742).
+/// Every property that sizes a box: each one a control's rule sets must say 32 (#742).
 const SIZES: [&str; 6] = ["height", "min-height", "max-height", "width", "min-width", "max-width"];
 
 /// Whether a selector reaches one of the bar's controls: under `#small`, its last part a button,
@@ -41,16 +41,16 @@ fn reaches_a_control(selector: &str) -> bool {
     let element = parts.next().unwrap_or("");
     selector.starts_with("#small ")
         && !selector.contains(".next-context")
-        && (element == "button" || parts.any(|class| ["icon-button", "record", "danger"].contains(&class)))
+        && (element == "button" || parts.any(|class| ["icon-button", "record", "stop"].contains(&class)))
 }
 
-/// Each of the bar's controls not 28 px square, and its row not 44 px high.
+/// Each of the bar's controls not 32 px square, and its row not 48 px high.
 fn off_size(style: &str) -> Vec<String> {
     let all = rules(style);
     let mut off = Vec::new();
     for control in CONTROLS {
         match all.iter().find(|(selector, _)| selector == control) {
-            Some((_, body)) if px(body, "min-height") == Some(28.0) && px(body, "width") == Some(28.0) => {}
+            Some((_, body)) if px(body, "min-height") == Some(32.0) && px(body, "width") == Some(32.0) => {}
             Some((_, body)) => off.push(format!("{control}: {body}")),
             None => off.push(format!("{control}: no rule")),
         }
@@ -61,13 +61,13 @@ fn off_size(style: &str) -> Vec<String> {
         let said = format!("{selectors}: ");
         if !off.iter().any(|one| one.starts_with(&said))
             && selectors.split(',').map(str::trim).any(reaches_a_control)
-            && SIZES.iter().any(|size| px(body, size).is_some_and(|set| set != 28.0))
+            && SIZES.iter().any(|size| px(body, size).is_some_and(|set| set != 32.0))
         {
             off.push(format!("{selectors}: {body}"));
         }
     }
     let row = all.iter().find(|(selector, _)| selector == "#small .bar-row");
-    if row.and_then(|(_, body)| px(body, "height")) != Some(44.0) {
+    if row.and_then(|(_, body)| px(body, "height")) != Some(48.0) {
         off.push(format!("#small .bar-row: {row:?}"));
     }
     // Any other control's height the bar sets, on the grid.
@@ -101,8 +101,8 @@ fn body(shell: &str, name: &str) -> String {
 /// What the shell does to the bar's window that is not what D90 drew.
 fn shell_off(shell: &str) -> Vec<String> {
     let mut off = Vec::new();
-    if !shell.contains("const BAR: (f64, f64) = (440.0, 44.0);") {
-        off.push("the bar's window is not made 440 × 44".to_string());
+    if !shell.contains("const BAR: (f64, f64) = (440.0, 48.0);") {
+        off.push("the bar's window is not made 440 × 48".to_string());
     }
     let small = body(shell, "show_small");
     // Its size the constant's, never a number beside it.
@@ -124,7 +124,7 @@ fn shell_off(shell: &str) -> Vec<String> {
 }
 
 #[test]
-fn the_bar_is_440_by_44_its_controls_28() {
+fn the_bar_is_440_by_48_its_controls_32() {
     assert_eq!(shell_off(SHELL), Vec::<String>::new());
     // The title bar commented or turned on, a width beside BAR, the bar not bounded, not moved:
     // each refused (#742).
@@ -141,16 +141,20 @@ fn the_bar_is_440_by_44_its_controls_28() {
         assert_eq!(shell_off(&mutated).len(), 1, "{new}");
     }
     assert_eq!(off_size(STYLE), Vec::<String>::new());
-    // A control at the window's 32, a row grown, a height off the grid: each refused.
+    // A control at 36, a row grown, a height off the grid: each refused.
     for (old, new) in [
         (
-            "#small .record { display: inline-grid; place-items: center; width: 28px; min-height: 28px;",
-            "#small .record { display: inline-grid; place-items: center; width: 28px; min-height: 32px;",
+            "#small .record { display: inline-grid; place-items: center; width: 32px; min-height: 32px;",
+            "#small .record { display: inline-grid; place-items: center; width: 32px; min-height: 36px;",
         ),
-        ("height: 44px; padding: 0 8px 0 12px;", "height: 48px; padding: 0 8px 0 12px;"),
+        ("height: 48px; padding: 0 var(--sp-2) 0 var(--sp-4);", "height: 52px; padding: 0 var(--sp-2) 0 var(--sp-4);"),
         (
-            "#small .bar-row .icon-button { width: 28px; min-height: 28px; }",
-            "#small .bar-row .icon-button { width: 32px; min-height: 28px; }",
+            "#small .stop { display: inline-grid; place-items: center; width: 32px; min-height: 32px;",
+            "#small .stop { display: inline-grid; place-items: center; width: 28px; min-height: 32px;",
+        ),
+        (
+            "#small .bar-row .icon-button { width: 32px; min-height: 32px; }",
+            "#small .bar-row .icon-button { width: 36px; min-height: 32px; }",
         ),
     ] {
         let mutated = STYLE.replacen(old, new, 1);
@@ -160,14 +164,14 @@ fn the_bar_is_440_by_44_its_controls_28() {
     assert_eq!(off_size(&format!("{STYLE}\n#small .small-said {{ min-height: 30px; }}")).len(), 1);
     // ● given a height beside its min-height, a later rule growing the icon buttons (#742).
     let mutated = STYLE.replacen(
-        "width: 28px; min-height: 28px; padding: 0; border: 2px",
-        "width: 28px; min-height: 28px; height: 40px; padding: 0; border: 2px",
+        "width: 32px; min-height: 32px; padding: 0; border: 2px",
+        "width: 32px; min-height: 32px; height: 40px; padding: 0; border: 2px",
         1,
     );
     assert_ne!(mutated, STYLE);
     assert_eq!(off_size(&mutated).len(), 1, "height: 40px on ●");
     assert_eq!(
-        off_size(&format!("{STYLE}\n#small .bar-row button.icon-button {{ min-height: 32px }}")).len(),
+        off_size(&format!("{STYLE}\n#small .bar-row button.icon-button {{ min-height: 36px }}")).len(),
         1
     );
     assert_eq!(off_size(&format!("{STYLE}\n#small .record:hover {{ height: 40px }}")).len(), 1);
