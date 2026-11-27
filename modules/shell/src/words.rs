@@ -508,7 +508,8 @@ pub struct Window {
     /// At most: no limit. Placeholders: none.
     pub none: &'static str,
     /// Shows: the empty pane, a discreet line under its action (#775). When: no meeting in the folder.
-    /// At most: no limit, a path wraps. Placeholders: `{}`, the folder's whole path.
+    /// At most: no limit, a path wraps. Placeholders: `{}`, the folder's whole path as people say it, from their
+    /// home (« Dossier personnel / Kitokey ») or from the root (#1232).
     pub none_folder: &'static str,
     /// The sidebar's search (D61): what its field says, and none of the meetings holding what is typed.
     /// No meeting yet: what to do.
@@ -516,7 +517,7 @@ pub struct Window {
     /// start. At most: no limit. Placeholders: none.
     pub none_do: &'static str,
     /// Shows: the window with no meeting, as an error. When: the meetings folder cannot be read.
-    /// At most: no limit. Placeholders: {} folder.
+    /// At most: no limit. Placeholders: {} the folder, as `none_folder` says it.
     pub list_unread: &'static str,
     /// Shows: the window with no meeting, as a help line. When: under that error: what to do.
     /// At most: no limit. Placeholders: none.

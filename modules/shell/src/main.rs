@@ -1020,7 +1020,8 @@ fn left(app: &AppHandle, window: settings::Window) {
 #[derive(serde::Serialize)]
 struct Listing {
     words: words::Window,
-    folder: PathBuf,
+    /// The folder as people write it, from their home (`~/…`): the window says it, never the machine's root (#1232).
+    folder: String,
     sessions: Vec<Listed>,
     /// For each session, in the same order, who spoke over it — here, then remote — when its
     /// transcript reads. No row draws it since D89's compact rows: taken out on its own.
@@ -1092,7 +1093,7 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
         drop(kept);
         Listing {
             words: words::window(shell.language()),
-            folder: shell.settings().sessions.clone(),
+            folder: from_home_said(&shell.settings().sessions),
             sessions,
             shapes,
             recording: shell.recording_on(),
