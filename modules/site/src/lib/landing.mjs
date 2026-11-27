@@ -117,10 +117,10 @@ const raw = {
     keeps: "PDR-0001: free on Linux, paid once on macOS and Windows",
   },
   oses: {
-    en: [[["fedora", "ubuntu", "debian"], "Linux", "Available", "Free", "Fedora, Ubuntu and Debian 13.", true],
+    en: [[["linux"], "Linux", "Available", "Free", "Fedora, Ubuntu and Debian 13.", true],
       [["windows"], "Windows", "Coming soon", "One-time purchase", "A free trial, then a single payment. Coming to the Microsoft Store.", false],
       [["apple"], "macOS", "Coming soon", "One-time purchase", "A free trial, then a single payment.", false]],
-    fr: [[["fedora", "ubuntu", "debian"], "Linux", "Disponible", "Gratuit", "Fedora, Ubuntu et Debian 13.", true],
+    fr: [[["linux"], "Linux", "Disponible", "Gratuit", "Fedora, Ubuntu et Debian 13.", true],
       [["windows"], "Windows", "Bientôt", "Achat unique", "Un essai gratuit, puis un seul paiement. À venir dans le Microsoft Store.", false],
       [["apple"], "macOS", "Bientôt", "Achat unique", "Un essai gratuit, puis un seul paiement.", false]],
     keeps: "README.md, « Install it »: Fedora from Copr, Ubuntu 24.04 and Debian 13; PDR-0001 and PDR-0005, the Store's unlimited trial; ADR-0017, macOS sold once",

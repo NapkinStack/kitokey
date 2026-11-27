@@ -8,13 +8,34 @@
   font-weight: 500 800;
   font-display: swap;
 }
+/* The tokens. Copied, never read, from the app's palette (the shell's tokens.css, D120, at 7f747b7):
+   the site is its own module. From its roles, in both themes: --bg-canvas (ground), --bg-surface (surface),
+   --bg-hover, --bg-pressed, --border-subtle (divider), --border-control (edge), --text-primary (text),
+   --text-secondary (text-soft), --accent, --success, --record (live), --mark. The others (raised, sunken,
+   tint, tertiary text, the accent hovered, a warning, the confidential violet, the others' voice, the
+   shadows, the radii) are the v7 mock-up's, validated by the decider on 2026-11-26, until the app's
+   palette holds them. */
 :root {
   color-scheme: light;
-  --bg: #FBFBFD; --surface: #FFFFFF; --tint: #EEF2FB; --line: #E3E6EC; --control: #7D8699;
-  --ink: #111318; --soft: #50576A; --accent: #2253CF; --accent-hover: #1A44AD; --on-accent: #FFFFFF;
-  --titles: "Bricolage Grotesque", system-ui, sans-serif;
-  --radius: 28px;
-  --ease: cubic-bezier(.2, .8, .2, 1);
+  --bg-canvas: #F2F4F7; --bg-surface: #FFFFFF; --bg-sunken: #F0F2F7; --bg-raised: #FFFFFF;
+  --bg-hover: #E3E7EE; --bg-pressed: #D9DDE5; --bg-tint: #EEF2FB;
+  --border-subtle: #D9DDE5; --border-control: #808898;
+  --text-primary: #15171C; --text-secondary: #4C5464; --text-tertiary: #6B7385;
+  --accent: #2253CF; --accent-hover: #1A44AD; --on-accent: #FFFFFF;
+  --success: #16794A; --warning: #8A5300; --warning-bg: #FFF4DC;
+  --record: #C2352D; --private: #6E56CF; --private-bg: #F3F0FF;
+  --track-me: var(--accent); --track-others: #0F766E; --focus: #2253CF;
+  --mark: #FDE68A;
+  --e1: 0 1px 2px rgb(17 19 24/.05), 0 4px 12px -8px rgb(30 50 100/.12);
+  --e2: 0 1px 2px rgb(20 30 55/.06), 0 10px 24px -12px rgb(30 50 100/.18);
+  --e3: 0 1px 2px rgb(0 0 0/.08), 0 24px 56px -20px rgb(30 50 100/.30);
+  --r-xs: 4px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 24px; --r-pill: 999px;
+  --display: "Bricolage Grotesque", system-ui, sans-serif;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  /* The page's older names, each an alias of its token, until each rule reads the token (site v7). */
+  --bg: var(--bg-canvas); --surface: var(--bg-surface); --tint: var(--bg-tint); --line: var(--border-subtle);
+  --control: var(--border-control); --ink: var(--text-primary); --soft: var(--text-secondary);
+  --titles: var(--display); --radius: 28px; --ease: var(--ease-out);
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 4.5rem; overflow-x: clip; -webkit-text-size-adjust: 100%; }
@@ -228,6 +249,9 @@ p { text-wrap: pretty; }
 @media (min-width: 860px) { .systems { grid-template-columns: repeat(3, 1fr); } }
 .os-logos { display: inline-flex; gap: .5rem; }
 .os-logo { width: 2.6rem; height: 2.6rem; color: var(--ink); }
+.os-logos img.os-logo { width: auto; height: 2.6rem; } /* a brand's own file keeps its proportions */
+.os-apple-dark, html[data-site="dark"] .os-apple { display: none; }
+html[data-site="dark"] .os-apple-dark { display: block; }
 .os-state .ok { display: inline-block; font-size: .78rem; font-weight: 700; color: #0F5C37; background: #DDF5E8; border-radius: 999px; padding: .15rem .6rem; }
 .card .os-price { font-family: var(--titles); font-size: clamp(1.9rem, 1.5rem + 1.4vw, 2.6rem); font-weight: 800; letter-spacing: -.035em; line-height: 1.05; color: var(--ink); }
 .os .btn { align-self: flex-start; margin-top: auto; }
@@ -240,7 +264,6 @@ p { text-wrap: pretty; }
 .code-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .6rem; font-size: .9rem; }
 .os-tabs { display: flex; flex-wrap: wrap; gap: .4rem; }
 .os-tab { display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; padding: .3rem .85rem .3rem .45rem; border-radius: 999px; border: 1px solid #333B4D; background: transparent; color: #DDE2EC; font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer; }
-.os-tab .os-logo { width: 1.5rem; height: 1.5rem; }
 .os-tab[aria-pressed="true"] { background: #262C3A; border-color: #4A5468; color: #FFFFFF; }
 .copy { background: #262C3A; color: #F2F4F8; border: 0; border-radius: 999px; min-height: 44px; padding: .3rem .95rem; font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer; }
 .copy:hover { background: #333B4D; }
@@ -296,8 +319,17 @@ p { text-wrap: pretty; }
 html[data-site="dark"] .theme-toggle .i-sun { display: block; }
 html[data-site="dark"] {
   color-scheme: dark;
-  --bg: #0A0B0F; --surface: #15181F; --tint: #1A1E28; --line: #272B35; --control: #8E97AA;
-  --ink: #F2F4F8; --soft: #A9B0BF; --accent: #8AB0FF; --accent-hover: #B0C9FF; --on-accent: #0A0B0F;
+  --bg-canvas: #15171C; --bg-surface: #1E2129; --bg-sunken: #12141A; --bg-raised: #1E222B;
+  --bg-hover: #313644; --bg-pressed: #3A4050; --bg-tint: #1B2540;
+  --border-subtle: #343946; --border-control: #737B8C;
+  --text-primary: #EEF0F4; --text-secondary: #AAB1BF; --text-tertiary: #8A92A3;
+  --accent: #8AB0FF; --accent-hover: #A9C4FF; --on-accent: #0B1530;
+  --success: #63D49C; --warning: #F5B54A; --warning-bg: #2A2214;
+  --record: #FF7A72; --private: #B9A6FF; --private-bg: #221D38;
+  --track-others: #F2C14E; --focus: #8AB0FF; --mark: #FBBF24;
+  --e1: 0 1px 2px rgb(0 0 0/.12), 0 4px 12px -8px rgb(0 0 0/.3), inset 0 0 0 1px rgb(255 255 255/.06);
+  --e2: 0 1px 2px rgb(0 0 0/.15), 0 10px 24px -12px rgb(0 0 0/.45), inset 0 0 0 1px rgb(255 255 255/.06);
+  --e3: 0 1px 2px rgb(0 0 0/.2), 0 24px 56px -20px rgb(0 0 0/.75), inset 0 0 0 1px rgb(255 255 255/.06);
 }
 html[data-site="dark"] .mesh i { filter: blur(90px) brightness(.45) saturate(1.3); }
 html[data-site="dark"] .mesh::after { mix-blend-mode: screen; opacity: .04; }
