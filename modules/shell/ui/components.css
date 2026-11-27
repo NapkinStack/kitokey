@@ -29,7 +29,8 @@
    words, an action at its end. Never red: red is a recording's or a deletion's. Always with its tone: the
    settings' strip (#770) is `.banner` alone, window.css's, until its screen comes over (D123). */
 :is(.banner.info, .banner.private, .banner.warning) {
-  display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4);
+  display: flex; flex-wrap: nowrap; justify-content: flex-start; align-items: flex-start; gap: var(--sp-3);
+  margin: 0; padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-md); background: var(--color-tint); color: var(--color-text); font: var(--fs-body) var(--font-text);
 }
 :is(.banner.info, .banner.private, .banner.warning) > svg { width: 16px; height: 16px; flex: none; margin-top: 2px; fill: none; stroke: var(--color-accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -66,8 +67,8 @@
 .engine-card label { display: grid; grid-template-columns: auto 1fr auto; gap: var(--sp-1) var(--sp-2); align-items: baseline; cursor: pointer; }
 .engine-card input { margin: 0; accent-color: var(--color-accent); }
 .engine-card .name { font-weight: 600; }
-.engine-card .where, .engine-card .facts { grid-column: 2 / -1; color: var(--color-text-soft); font-size: var(--fs-small); }
-.engine-card .state { font-size: var(--fs-small); color: var(--color-text-soft); }
+.engine-card .where, .engine-card .state, .engine-card .facts { grid-column: 2 / -1; color: var(--color-text-soft); font-size: var(--fs-small); }
+.engine-card .state { font-weight: 600; }
 .engine-card[data-state="ready"] .state { color: var(--color-success); }
 .engine-card .default { font-size: var(--fs-caption); color: var(--color-accent); }
 .engine-card details { font-size: var(--fs-small); color: var(--color-text-soft); }
