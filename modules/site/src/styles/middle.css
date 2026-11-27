@@ -57,11 +57,6 @@
 .mid .lrow .sig .ico { width: 16px; height: 16px; }
 .mid .lrow .sig .lock { color: var(--private); }
 
-/* Rising into place as each group enters (public/site.js adds .in); still under reduced motion and on #still. */
-html.js-reveal .mid .rise > * { opacity: 0; transform: translateY(12px); transition: opacity .4s var(--ease-out), transform .4s var(--ease-out); }
-html.js-reveal .mid .rise > :nth-child(2) { transition-delay: 60ms; }
-html.js-reveal .mid .rise > :nth-child(n+3) { transition-delay: 120ms; }
-html.js-reveal .mid .rise.in > * { opacity: 1; transform: none; }
 
 @media (max-width: 1180px) { .mid .proof, .mid .feats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1040px) { .mid .io, .mid .cases { grid-template-columns: 1fr; } }

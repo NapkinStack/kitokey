@@ -1,7 +1,8 @@
-/* kitokey.com — the frame every page shares (proposal D, validated by the decider on 2026-11-25). Static,
-   self-hosted, nothing from another domain. Titles: Bricolage Grotesque (SIL OFL, public/fonts/OFL-Bricolage.txt);
-   text: the system's font. The site is light: the decider's choice. Motion: transform and opacity only, and
-   none under prefers-reduced-motion. */
+/* kitokey.com, what every page shares (site v7, validated by the decider on 2026-11-26): the tokens, light and
+   dark, the base, the policy's page and the install's commands. Static, self-hosted, nothing from another domain.
+   Titles: Bricolage Grotesque (SIL OFL, public/fonts/OFL-Bricolage.txt); text: the system's font. Motion:
+   transform and opacity only, and none under prefers-reduced-motion. The sections' own: hero.css, walk.css,
+   middle.css, end.css. */
 @font-face {
   font-family: "Bricolage Grotesque";
   src: url("/fonts/bricolage-latin.woff2") format("woff2");
@@ -35,15 +36,11 @@
   --d-base: 200ms; --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
   --display: "Bricolage Grotesque", system-ui, sans-serif;
   --ease-out: cubic-bezier(.2, .8, .2, 1);
-  /* The page's older names, each an alias of its token, until each rule reads the token (site v7). */
-  --bg: var(--bg-canvas); --surface: var(--bg-surface); --tint: var(--bg-tint); --line: var(--border-subtle);
-  --control: var(--border-control); --ink: var(--text-primary); --soft: var(--text-secondary);
-  --titles: var(--display); --radius: 28px; --ease: var(--ease-out);
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 4.5rem; overflow-x: clip; -webkit-text-size-adjust: 100%; }
 body {
-  margin: 0; background: var(--bg); color: var(--ink); overflow-x: clip;
+  margin: 0; background: var(--bg-canvas); color: var(--text-primary); overflow-x: clip;
   font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -51,7 +48,7 @@ img, video { display: block; max-width: 100%; height: auto; }
 a { color: var(--accent); text-underline-offset: .18em; }
 a:hover { color: var(--accent-hover); }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
-h1, h2, h3 { font-family: var(--titles); letter-spacing: -.025em; line-height: 1.06; margin: 0; text-wrap: balance; }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -.025em; line-height: 1.06; margin: 0; text-wrap: balance; }
 p { text-wrap: pretty; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .skip { position: absolute; left: 16px; top: -100px; z-index: 100; background: var(--accent); color: var(--on-accent); padding: .6rem 1rem; border-radius: 999px; }
@@ -63,20 +60,14 @@ p { text-wrap: pretty; }
 .prose { max-width: 50rem; padding-top: clamp(2.5rem, 1.5rem + 4vw, 5rem); padding-bottom: clamp(3rem, 2rem + 4vw, 6rem); }
 .prose h1 { font-size: clamp(2.4rem, 1.5rem + 3.6vw, 4rem); font-weight: 800; letter-spacing: -.04em; }
 .prose h2 { font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); font-weight: 740; margin: 2.6rem 0 .8rem; }
-.prose .changed { color: var(--soft); margin: 1rem 0 2rem; }
-.prose table { border-collapse: collapse; width: 100%; background: var(--surface); border-radius: 12px; overflow: hidden; outline: 1px solid var(--line); }
-.prose th, .prose td { border-bottom: 1px solid var(--line); padding: .7rem .8rem; text-align: left; vertical-align: top; }
-.prose th { background: var(--tint); font-weight: 650; }
+.prose .changed { color: var(--text-secondary); margin: 1rem 0 2rem; }
+.prose table { border-collapse: collapse; width: 100%; background: var(--bg-surface); border-radius: 12px; overflow: hidden; outline: 1px solid var(--border-subtle); }
+.prose th, .prose td { border-bottom: 1px solid var(--border-subtle); padding: .7rem .8rem; text-align: left; vertical-align: top; }
+.prose th { background: var(--bg-tint); font-weight: 650; }
 .prose code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: .92em; overflow-wrap: anywhere; }
 @media (max-width: 699px) { .prose table { display: block; overflow-x: auto; } }
 
 /* ---- The landing's install section, until a page of its own (site v7) ---- */
-.eyebrow { font-weight: 650; font-size: .95rem; color: var(--accent); letter-spacing: .01em; margin: 0 0 .9rem; }
-.lead { font-size: clamp(1.1rem, 1rem + .5vw, 1.35rem); color: var(--soft); max-width: 40rem; margin: 0; }
-.section { padding: clamp(5rem, 4rem + 6vw, 9rem) 0 0; }
-.section-head { max-width: 50rem; margin: 0 auto clamp(2.5rem, 2rem + 2vw, 4rem); text-align: center; }
-.section-head h2 { font-size: clamp(2.2rem, 1.4rem + 3.6vw, 4.4rem); font-weight: 760; }
-.section-head .lead { margin: 1.1rem auto 0; }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .ico { width: 1.5rem; height: 1.5rem; flex: none; }
 
@@ -97,22 +88,11 @@ p { text-wrap: pretty; }
 .os-note code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; color: #E6EAF2; }
 @media (max-width: 420px) { .code pre { font-size: .8rem; } }
 
-/* Motion: blocks rise into place as they enter (public/site.js adds .in). */
-@media (prefers-reduced-motion: no-preference) {
-  html.js-reveal .reveal { opacity: 0; transform: translateY(20px); transition: opacity .5s ease-out, transform .5s cubic-bezier(.22, .61, .36, 1); }
-  html.js-reveal .reveal.in { opacity: 1; transform: none; }
-  html.js-reveal .reveal:nth-child(2) { transition-delay: 80ms; }
-  html.js-reveal .reveal:nth-child(3) { transition-delay: 160ms; }
-  html.js-reveal .reveal:nth-child(4) { transition-delay: 240ms; }
-}
 @keyframes glide { from { transform: translateY(22px); } }
 
 /* ---- The dark theme (the decider's round 9): html[data-site] sets it;
    public/theme.js follows the system until the visitor picks the moon or the sun. ---- */
-.theme-toggle { display: inline-grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--soft); cursor: pointer; }
-.theme-toggle:hover { color: var(--ink); background: var(--tint); }
 .theme-toggle[hidden] { display: none; }
-.theme-toggle .ico { width: 1.3rem; height: 1.3rem; }
 .theme-toggle .i-sun, html[data-site="dark"] .theme-toggle .i-moon { display: none; }
 html[data-site="dark"] .theme-toggle .i-sun { display: block; }
 html[data-site="dark"] {
