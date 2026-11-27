@@ -483,12 +483,13 @@ def redo_offered(browser, panel: str, step: str) -> list[str]:
 
 
 def tokens(theme: str) -> str:
-    """A theme's roles as `ui/tokens.css` sets them: the light ones on `:root`, the dark ones under
-    Settings' dark (the same list as the system's, held by tests/look.rs)."""
+    """A theme's roles as `ui/tokens.css` sets them: the light ones in its `:root` blocks — the design
+    system's and the window's older names (#1298) —, the dark ones under Settings' dark (the same list
+    as the system's, held by tests/look.rs). Without the blocks' color-scheme: `shot_themed` says it."""
     css = re.sub(r"/\*.*?\*/", "", (Path(__file__).parent.parent / "ui" / "tokens.css").read_text(), flags=re.S)
-    start = css.index("--color-ground") if theme == "light" else css.index(':root[data-theme="dark"] {') + len(':root[data-theme="dark"] {')
-    block = css[start:css.index("}", start)].replace("color-scheme: dark;", "")
-    return " ".join(block.split())
+    opening = ":root {" if theme == "light" else ':root[data-theme="dark"] {'
+    blocks = [part.split("}", 1)[0] for part in css.split(opening)[1:]]
+    return " ".join(re.sub(r"color-scheme:[^;]*;", "", " ".join(blocks)).split())
 
 
 def shot_themed(browser, name: str, theme: str) -> None:
