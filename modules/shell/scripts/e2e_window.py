@@ -6649,6 +6649,10 @@ GALLERY = {
     "button": ("primary", "secondary", "ghost", "icon", "destructive", "hover", "pressed", "focus", "disabled"),
     "banner": ("info", "private", "warning"),
     "dialog": ("confirm", "destructive"),
+    "chip": ("neutral", "accent", "success", "private", "warning"),
+    "option-card": ("rest", "checked", "focus"),
+    "progress": ("running",),
+    "toast": ("copied", "saved"),
 }
 
 
@@ -6714,11 +6718,38 @@ def gallery_shown(now: dt.datetime) -> None:
             opened = wait_for(browser, lambda b: b.execute_script("return !!document.querySelector('dialog[open]')"), 5)
             focused = browser.execute_script("const e = document.activeElement; return [e.dataset.role, e.closest('dialog') !== null]")
             check(f"{short}, {theme}: the dialog opened modal, its cancel focused (PDR-0008)", opened and focused == ["cancel", True], (opened, focused))
+            # WAI-ARIA APG's modal dialog: Tab and Shift+Tab go round its controls, never onto the dialog itself nor
+            # out of it (ines, on main after #1298: one Tab stopped on the <dialog>).
+            inside = ("const e = document.activeElement, d = document.querySelector('dialog[open]');"
+                      " return [e.tagName, e.dataset.role ?? e.className, !!d && d.contains(e) && e !== d]")
+            went = []
+            for back in (False,) * 3 + (True,) * 3:
+                keys = ActionChains(browser)
+                (keys.key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT) if back else keys.send_keys(Keys.TAB)).perform()
+                went.append(browser.execute_script(inside))
+            check(f"{short}, {theme}: Tab and Shift+Tab stay on the dialog's buttons, round and round (APG)",
+                  all(tag == "BUTTON" and held for tag, _, held in went), went)
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
             closed = wait_for(browser, lambda b: b.execute_script("return !document.querySelector('dialog[open]')"), 5)
             check(f"{short}, {theme}: Escape closes it, the focus back on what opened it",
                   closed and browser.execute_script("return document.activeElement.id") == "gallery-dialog-open",
                   (closed, browser.execute_script("return document.activeElement.id")))
+            # D120 2b. A toast says itself to a screen reader (`role=status`); a progress's bars are progress bars, each
+            # named and at its value; an option card a native radio in its label, one chosen; the engine card's
+            # « Par défaut » and its state are chips.
+            parts = browser.execute_script(
+                "const g = document.getElementById('gallery');"
+                "return [[...g.querySelectorAll('.toast')].map((t) => t.getAttribute('role')),"
+                " [...g.querySelectorAll('.progress [role=progressbar]')].map((b) => [!!b.getAttribute('aria-label'), b.getAttribute('aria-valuenow')]),"
+                " [...g.querySelectorAll('.option-card')].map((c) => [!!c.closest('label') || c.tagName === 'LABEL', c.querySelector('input[type=radio]')?.checked ?? null]),"
+                " [...g.querySelectorAll('.engine-card .default, .engine-card .state')].map((e) => e.classList.contains('chip'))]")
+            toasts, bars, options, chips = parts
+            check(f"{short}, {theme}: each toast a status (D120 2b)", toasts and set(toasts) == {"status"}, toasts)
+            check(f"{short}, {theme}: each progress bar named, at its value", len(bars) >= 2
+                  and all(named and now is not None for named, now in bars), bars)
+            check(f"{short}, {theme}: each option card a radio in its label, one chosen", len(options) >= 3
+                  and all(label for label, _ in options) and [chosen for _, chosen in options].count(True) == 1, options)
+            check(f"{short}, {theme}: the engine card's « Par défaut » and its state are chips", chips and all(chips), chips)
             found = axe_violations(browser)
             check(f"{short}, {theme}: no violation of axe's WCAG 2.2 A and AA rules (D120)", found == [], found)
             for width in (420, 1100):

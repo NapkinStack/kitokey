@@ -1283,7 +1283,7 @@ fn each_older_name_keeps_the_value_it_had() {
 }
 
 /// D120's roles (PDR-0008; the v5 mock-up the decider accepted on 2026-11-26), each in both themes.
-const ROLES: [&str; 25] = [
+const ROLES: [&str; 26] = [
     "--color-canvas",
     "--color-surface",
     "--color-sunken",
@@ -1302,6 +1302,7 @@ const ROLES: [&str; 25] = [
     "--color-success",
     "--color-warning",
     "--color-warning-ground",
+    "--color-success-ground",
     "--color-record",
     "--color-destructive",
     "--color-on-destructive",
@@ -1313,7 +1314,7 @@ const ROLES: [&str; 25] = [
 
 /// Each pair a component draws, and its threshold (WCAG 2.2): words 4.5:1 (1.4.3); an edge, a voice's
 /// trace, a recording's dot, the focus ring 3:1 (1.4.11).
-const ROLE_PAIRS: [(&str, &str, f64); 33] = [
+const ROLE_PAIRS: [(&str, &str, f64); 35] = [
     ("--color-text", "--color-canvas", 4.5),
     ("--color-text", "--color-surface", 4.5),
     ("--color-text", "--color-raised", 4.5),
@@ -1336,6 +1337,9 @@ const ROLE_PAIRS: [(&str, &str, f64); 33] = [
     ("--color-on-accent", "--color-accent-hover", 4.5),
     ("--color-on-destructive", "--color-destructive", 4.5),
     ("--color-success", "--color-surface", 4.5),
+    // A chip's words on its ground (D120 2b): success on its own, the neutral one's soft text on the sunken ground.
+    ("--color-success", "--color-success-ground", 4.5),
+    ("--color-text-soft", "--color-sunken", 4.5),
     ("--color-warning", "--color-warning-ground", 4.5),
     ("--color-private", "--color-private-ground", 4.5),
     ("--color-private", "--color-surface", 4.5),
@@ -1406,7 +1410,7 @@ fn read_outside_the_roles(style: &str) -> Vec<String> {
 
 #[test]
 fn a_component_reads_roles_and_scales_alone() {
-    for drawn in [".button", ".banner", ".dialog", ".engine-card"] {
+    for drawn in [".button", ".banner", ".dialog", ".engine-card", ".chip", ".option-card", ".progress", ".toast"] {
         assert!(
             rules(COMPONENTS).iter().any(|(selector, _)| selector.starts_with(drawn)),
             "{drawn} is not drawn"
@@ -1433,4 +1437,100 @@ fn a_components_red_is_a_recording_or_a_deletion() {
         }
     }
     assert_eq!(found, Vec::<String>::new());
+}
+
+/// The rules whose selector list names `one`, an `:is(…)` read as the list it holds: each body, in order.
+fn bodies_of(style: &str, one: &str) -> Vec<String> {
+    rules(style)
+        .into_iter()
+        .filter(|(selectors, _)| {
+            selectors
+                .replace(":is(", "")
+                .replace(')', "")
+                .split(',')
+                .any(|part| part.trim() == one)
+        })
+        .map(|(_, body)| body)
+        .collect()
+}
+
+/// What the last of those rules gives `name`.
+fn given(style: &str, one: &str, name: &str) -> Option<String> {
+    bodies_of(style, one)
+        .iter()
+        .filter_map(|body| {
+            body.split(';')
+                .filter_map(|part| part.split_once(':'))
+                .rfind(|(key, _)| key.trim() == name)
+                .map(|(_, value)| value.trim().to_string())
+        })
+        .next_back()
+}
+
+/// D120 2b: a chip in five tones — neutral, accent, success, private, warning —, its words on its own ground,
+/// 4.5:1 in both themes (WCAG 2.2, 1.4.3): v5's success on a 14 % tint was 4.46:1 in the light theme, so its
+/// ground is a primitive, the same in every place it is laid. The window's older chips (`.chip.live`, `.gone`…)
+/// keep window.css's: a tone is what makes a chip the design system's.
+#[test]
+fn a_chip_says_its_tone_and_its_words_read_on_it() {
+    let themes = themes(STYLE);
+    let mut below = Vec::new();
+    for tone in ["neutral", "accent", "success", "private", "warning"] {
+        let chip = format!(".chip.{tone}");
+        let text = given(COMPONENTS, &chip, "color").unwrap_or_else(|| panic!("{chip}: no colour"));
+        let ground = given(COMPONENTS, &chip, "background").unwrap_or_else(|| panic!("{chip}: no ground"));
+        for (index, theme) in themes.iter().enumerate() {
+            let (Some(a), Some(b)) = (value(&text, theme), value(&ground, theme)) else {
+                below.push(format!("theme {index}, {chip}: {text} on {ground} cannot be read"));
+                continue;
+            };
+            let ratio = contrast(a, b);
+            if ratio < 4.5 {
+                below.push(format!("theme {index}, {chip}: {ratio:.2}"));
+            }
+        }
+    }
+    assert_eq!(below, Vec::<String>::new());
+    assert_eq!(given(COMPONENTS, ".chip.success", "background").as_deref(), Some("var(--color-success-ground)"));
+    assert_eq!(given(COMPONENTS, ".chip.warning", "background").as_deref(), Some("var(--color-warning-ground)"));
+    // The older chips are not the design system's: no rule of components.css names `.chip` alone.
+    assert!(bodies_of(COMPONENTS, ".chip").is_empty(), "components.css restyles the window's older chips");
+}
+
+/// D120 2b, after v5's `.ico`: a button's icon and a banner's drawn at a 1.75 stroke; window.css's `.glyph` stays at 2
+/// until each screen comes over. A button pressed sinks by a pixel; an engine card's edge is 1.5 px.
+#[test]
+fn an_icon_is_drawn_at_its_stroke_a_press_sinks_a_card_is_edged() {
+    assert_eq!(given(COMPONENTS, ".button svg", "stroke-width").as_deref(), Some("1.75"));
+    let banner = rules(COMPONENTS)
+        .into_iter()
+        .filter(|(selector, _)| selector.contains(".banner.info") && selector.ends_with("> svg"))
+        .find_map(|(_, body)| {
+            body.split(';')
+                .filter_map(|part| part.split_once(':'))
+                .rfind(|(key, _)| key.trim() == "stroke-width")
+                .map(|(_, value)| value.trim().to_string())
+        });
+    assert_eq!(banner.as_deref(), Some("1.75"));
+    assert_eq!(given(COMPONENTS, ".button:active", "transform").as_deref(), Some("translateY(1px)"));
+    assert!(
+        given(COMPONENTS, ".engine-card", "border").is_some_and(|border| border.starts_with("1.5px solid")),
+        "{:?}",
+        given(COMPONENTS, ".engine-card", "border")
+    );
+}
+
+/// D120 2b: a dialog pops in (`--d-slow`) and a toast (`--d-base`), both scaling from .98 with the ease out, and
+/// neither moves for who asked the system for less motion (WCAG 2.2, 2.3.3). No spring: nothing overshoots.
+#[test]
+fn a_dialog_and_a_toast_pop_and_not_for_who_asked_for_less_motion() {
+    let style = without_css_comments(COMPONENTS);
+    assert_eq!(given(COMPONENTS, ".dialog", "animation").as_deref(), Some("pop var(--d-slow) var(--ease-out)"));
+    assert_eq!(given(COMPONENTS, ".toast", "animation").as_deref(), Some("pop var(--d-base) var(--ease-out)"));
+    assert!(style.contains("@keyframes pop { from { transform: scale(.98); opacity: 0; } }"), "the pop");
+    assert!(
+        style.contains("@media (prefers-reduced-motion: reduce) { .dialog, .toast { animation: none; } }"),
+        "less motion"
+    );
+    assert!(!STYLE.contains("--ease-spring"), "a spring overshoots");
 }
