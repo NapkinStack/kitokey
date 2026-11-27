@@ -7696,20 +7696,126 @@ def page_estimate(now: dt.datetime) -> None:
             (WORK / "fail-minutes").unlink(missing_ok=True)
 
 
+def meeting_actions_bar(now: dt.datetime) -> None:
+    """MA. D121, criteria 1 and 6: a meeting's page holds one bar of actions — « Partager », « Agenda (n) » once a date
+    is found, « Refaire » and « Plus » —, each its words and its icon, its accessible name beginning with its words
+    (WCAG 2.5.3), before the cards in the focus order; « Plus » a menu button (WAI-ARIA APG), its last entry « Mettre
+    à la corbeille », which asks in a dialog (D120's), « Annuler » focused, its confirm button destructive (PDR-0008),
+    Escape keeping the meeting and the focus back on « Plus »; axe on the page, the menu and the dialog open; in
+    French light and in English dark."""
+    print("MA. a meeting's page: one bar of actions in words, « Plus » a menu, « Mettre à la corbeille » asked in a dialog (D121)")
+    focused = "const a = document.activeElement; return !a || a === document.body ? 'body' : a.id || a.tagName.toLowerCase()"
+    bar = ("const b = document.getElementById('meeting-actions'); if (!b) return null;"
+           " return [...b.querySelectorAll(':scope > button, :scope > .more > button')].filter((e) => !e.hidden).map((e) => ({id: e.id,"
+           " words: e.querySelector('.label')?.textContent.trim() ?? '', count: e.querySelector('.count')?.textContent.trim() ?? '',"
+           " name: e.getAttribute('aria-label') ?? e.textContent.trim(), icon: !!e.querySelector('svg'), popup: e.getAttribute('aria-haspopup'),"
+           " expanded: e.getAttribute('aria-expanded')}))")
+    menu = ("const m = document.getElementById('more-menu'); if (!m || m.hidden || !m.getClientRects().length) return null;"
+            " return {role: m.getAttribute('role'), items: [...m.querySelectorAll('[role=menuitem]')].map((i) => [i.id, i.textContent.trim(), i.classList.contains('destructive')])}")
+    dialog = ("const d = document.querySelector('dialog[open]'); if (!d) return null;"
+              " return {title: d.querySelector('h2')?.textContent ?? '', says: d.querySelector('p')?.textContent ?? '', modal: d.matches(':modal'),"
+              " confirm: [...d.querySelectorAll('button')].map((b) => [b.textContent.trim(), b.classList.contains('destructive')])}")
+    meetings = WORK / "actions-bar"
+    dated, plain = meetings / "2026-11-24_23-30", meetings / "2026-11-23_10-00"
+    for folder, started, actions in ((dated, now - dt.timedelta(days=1), "- Envoyer le devis — Inès — jeudi [00:04]\n- Rappeler Jiří — Marc — 12 décembre [00:10]\n"),
+                                     (plain, now - dt.timedelta(days=2), "- Réserver la salle — Paul — bientôt\n")):
+        session(folder, started, 20, {"local.wav": 1000})
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":4.0,"end":7.0,"text":"Inès, tu envoies le devis jeudi ?"}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":10.0,"end":13.0,"text":"Marc rappelle Jiří le 12 décembre."}\n'
+            '{"type":"complete","duration":20.0}\n')
+        (folder / "minutes.md").write_text(
+            "---\ncontract: minutes/v3\nmade: 2026-11-24T23:55:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            f"## 1.\n\nLe devis part.\n\n## 2.\n\n{actions}\n## 3.\n\n- Rien\n")
+    for language, theme, said in (
+        ("fr_FR.UTF-8", "light", {"share": "Partager", "dates": "Agenda", "redo": "Refaire", "more": "Plus", "folder": "Ouvrir le dossier",
+                                  "trash": "Mettre à la corbeille", "ask": "Mettre cette réunion à la corbeille ?", "holds": ["audio", "transcription", "compte rendu"],
+                                  "restore": "restaurer", "cancel": "Annuler"}),
+        ("en_US.UTF-8", "dark", {"share": "Share", "dates": "Calendar", "redo": "Redo", "more": "More", "folder": "Open folder",
+                                 "trash": "Move to trash", "ask": "Move this meeting to the trash?", "holds": ["audio", "transcript", "summary"],
+                                 "restore": "restore", "cancel": "Cancel"}),
+    ):
+        short = language[:2]
+        window = Window(meetings, language, "reminder = false\n")
+        window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+        with window as browser:
+            browser.set_window_size(1100, 800)
+            browser.execute_script(f"location.hash = '#/meeting/{dated.name}'")
+            drawn = wait_for(browser, lambda b: b.execute_script(bar), 10)
+            got = browser.execute_script(bar) or []
+            # The four, in their order, each its words and its icon; the dates' count beside « Agenda ».
+            check(f"{short}: one bar, « {said['share']} », « {said['dates']} 2 », « {said['redo']} », « {said['more']} », each its words and its icon (D121)",
+                  drawn and [(b["id"], b["words"], b["count"], b["icon"]) for b in got]
+                  == [("share-open", said["share"], "", True), ("dates-open", said["dates"], "2", True), ("redo-open", said["redo"], "", True), ("more-open", said["more"], "", True)], got)
+            # Each accessible name begins with its visible words, the count in it too (WCAG 2.5.3).
+            check(f"{short}: each name begins with its visible words, the count in it (WCAG 2.5.3)",
+                  bool(got) and all(b["name"].startswith(b["words"]) and b["count"] in b["name"] for b in got), [b["name"] for b in got])
+            # Before the cards in the focus order, and no positive tabindex anywhere.
+            order = browser.execute_script(
+                "const b = document.getElementById('meeting-actions'), c = document.querySelector('#meeting .card');"
+                " return [!!b && !!c && !!(b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING),"
+                " [...document.querySelectorAll('[tabindex]')].filter((e) => e.tabIndex > 0).length]")
+            check(f"{short}: the bar before the cards in the focus order, no positive tabindex (D121)", order == [True, 0], order)
+            # « Plus »: a menu button; Enter opens its menu, the focus on its first entry; « Mettre à la corbeille » last, destructive.
+            browser.execute_script("document.getElementById('more-open')?.focus()")
+            ActionChains(browser).send_keys(Keys.ENTER).perform()
+            opened = wait_for(browser, lambda b: b.execute_script(menu), 3)
+            items = browser.execute_script(menu) or {}
+            more = next((b for b in browser.execute_script(bar) or [] if b["id"] == "more-open"), {})
+            check(f"{short}: « {said['more']} » a menu button, opened by Enter, its entries « {said['folder']} »… then « {said['trash']} » last, destructive (WAI-ARIA APG, D121)",
+                  opened and more.get("popup") == "menu" and more.get("expanded") == "true" and items.get("role") == "menu"
+                  and [said["folder"], said["trash"]] == [i[1] for i in items.get("items", []) if i[1] in (said["folder"], said["trash"])]
+                  and items["items"][-1][1:] == [said["trash"], True] and browser.execute_script(focused) == items["items"][0][0], [more, items, browser.execute_script(focused)])
+            found = axe_violations(browser)
+            check(f"{short}, {theme}: the menu open, no violation of axe's WCAG 2.2 A and AA rules (D121)", found == [], found)
+            # Escape closes it, the focus back on « Plus ».
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            closed = wait_for(browser, lambda b: b.execute_script(menu) is None and b.execute_script(focused) == "more-open", 3)
+            check(f"{short}: Escape closes the menu, the focus back on « {said['more']} »", closed, browser.execute_script(focused))
+            # « Mettre à la corbeille »: a modal dialog asks, says what goes and that it can be restored, « Annuler » focused, its confirm destructive.
+            ActionChains(browser).send_keys(Keys.ENTER).perform()
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            ActionChains(browser).send_keys(Keys.END, Keys.ENTER).perform()
+            asked = wait_for(browser, lambda b: b.execute_script(dialog), 3)
+            got = browser.execute_script(dialog) or {}
+            check(f"{short}: « {said['trash']} » asks in a modal dialog « {said['ask']} », says what goes and that it comes back, « {said['cancel']} » focused, its confirm destructive (PDR-0008, D121)",
+                  asked and got.get("modal") and got.get("title", "").replace("\u202f", " ") == said["ask"] and all(w in got.get("says", "").lower() for w in said["holds"])
+                  and said["restore"] in got.get("says", "").lower() and browser.execute_script("return document.activeElement?.textContent.trim()") == said["cancel"]
+                  and [said["trash"], True] in got.get("confirm", []), [got, browser.execute_script("return document.activeElement?.textContent.trim()")])
+            found = axe_violations(browser)
+            check(f"{short}, {theme}: the dialog open, no violation of axe's WCAG 2.2 A and AA rules (D121)", found == [], found)
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            kept = wait_for(browser, lambda b: b.execute_script(dialog) is None and b.execute_script(focused) == "more-open", 3)
+            check(f"{short}: Escape keeps the meeting, the focus back on « {said['more']} » (D121)", kept and dated.is_dir(), browser.execute_script(focused))
+            # A meeting with no date found: no « Agenda » in the bar.
+            browser.execute_script(f"location.hash = '#/meeting/{plain.name}'")
+            redrawn = wait_for(browser, lambda b: [e["id"] for e in b.execute_script(bar) or []] == ["share-open", "redo-open", "more-open"], 10)
+            check(f"{short}: no date found, no « {said['dates']} » in the bar (D121)", redrawn, browser.execute_script(bar))
+
+
+
 def meeting_trashed(now: dt.datetime) -> None:
-    """BT. D100: a meeting moved to the trash from its own page — beside the button that opens its folder,
-    a question in place, « Annuler » focused first, what it holds and that the system's trash restores it;
-    confirmed, the folder goes to the system's trash as « Faire de la place » sends it, the page closes onto
-    the list, the focus on the next meeting or, with none, on the list; Escape or « Annuler » change nothing;
-    refused while the meeting is recorded, said why; in French and in English."""
-    print("BT. a meeting to the trash from its page: asked in place, « Annuler » first, the system's trash, the list next — French and English (D100)")
+    """BT. D100, D121: a meeting moved to the trash from its own page — « Plus », then « Mettre à la corbeille », asked
+    in a dialog (MA holds its words, « Annuler » focused and Escape); confirmed, the folder goes to the system's trash
+    as « Faire de la place » sends it, the page closes onto the list, the focus on the next meeting or, with none, on
+    the list; « Annuler » changes nothing; refused while the meeting is recorded, said why; in French and in English."""
+    print("BT. a meeting to the trash from its page: « Plus », asked in a dialog, the system's trash, the list next — French and English (D100, D121)")
     focused = "const a = document.activeElement; return !a || a === document.body ? 'body' : a.id || (a.tagName.toLowerCase() + ':' + (a.getAttribute('href') || ''))"
-    asked = "const q = document.getElementById('trash-ask'); return q && q.getClientRects().length ? q.innerText : null"
+    asked = "return document.querySelector('dialog[open]') ? document.querySelector('dialog[open] h2')?.textContent ?? '' : null"
     trashed = WORK / "data" / "Trash" / "files"
 
     def keys(browser, *pressed) -> None:
         ActionChains(browser).send_keys(*pressed).perform()
         time.sleep(0.3)
+
+    def ask_to_trash(browser) -> bool:
+        """« Plus », then its last entry, « Mettre à la corbeille »: the dialog open."""
+        browser.execute_script("document.getElementById('more-open').focus()")
+        keys(browser, Keys.ENTER)
+        wait_for(browser, lambda b: b.execute_script("return !document.getElementById('more-menu').hidden"), 3)
+        keys(browser, Keys.END, Keys.ENTER)
+        return wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
 
     def made(folder: Path, started: dt.datetime) -> None:
         session(folder, started, 20, {"local.wav": 2000})
@@ -7721,10 +7827,8 @@ def meeting_trashed(now: dt.datetime) -> None:
             "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
 
     for language, (short, said) in {
-        "fr_FR.UTF-8": ("fr", {"name": "Mettre à la corbeille", "ask": "Mettre cette réunion à la corbeille ?", "holds": ["audio", "transcription", "compte rendu"],
-                               "restore": "corbeille", "cancel": "Annuler"}),
-        "en_US.UTF-8": ("en", {"name": "Move to trash", "ask": "Move this meeting to the trash?", "holds": ["audio", "transcript", "summary"],
-                               "restore": "trash", "cancel": "Cancel"}),
+        "fr_FR.UTF-8": ("fr", {"ask": "Mettre cette réunion à la corbeille ?", "cancel": "Annuler", "confirm": "Mettre à la corbeille"}),
+        "en_US.UTF-8": ("en", {"ask": "Move this meeting to the trash?", "cancel": "Cancel", "confirm": "Move to trash"}),
     }.items():
         meetings = WORK / f"trashing-{short}"
         older, newer = meetings / f"2026-10-2{1 if short == 'fr' else 3}_09-00", meetings / f"2026-10-2{2 if short == 'fr' else 4}_09-00"
@@ -7734,74 +7838,31 @@ def meeting_trashed(now: dt.datetime) -> None:
         with window as browser:
             browser.set_window_size(1100, 800)
             browser.execute_script(f"location.hash = '#/meeting/{newer.name}'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "open-folder"), 10)
-            # Beside the button that opens its folder: an icon, its name said and as its tooltip.
-            got = browser.execute_script("const t = document.getElementById('trash-meeting'), o = document.getElementById('open-folder');"
-                                         " return t && [t.getAttribute('aria-label'), t.title, o.nextElementSibling === t, t.querySelectorAll('svg').length, t.innerText.trim()]")
-            check(f"{short}: beside « open its folder », « {said['name']} » — an icon, its name said and as its tooltip (D100)",
-                  got == [said["name"], said["name"], True, 1, ""], got)
-            if got is None:
-                continue
-            # Asked in place, « Annuler » focused first; what it holds; the system's trash restores it.
-            browser.execute_script("document.getElementById('trash-meeting').focus()")
-            keys(browser, Keys.ENTER)
-            shown = wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
-            text = browser.execute_script(asked) or ""
-            check(f"{short}: pressed, it asks in place « {said['ask']} », says what it holds and that the trash restores it, « {said['cancel']} » focused (D100)",
-                  shown and said["ask"] in text and all(part in text.lower() for part in said["holds"]) and said["restore"] in text.lower()
-                  and browser.execute_script(focused) == "trash-cancel"
-                  and browser.find_element(By.ID, "trash-cancel").text == said["cancel"], [text, browser.execute_script(focused)])
-            # In its own card, under the page's head, as wide as the context's card; its sentences and buttons
-            # inside with the card's margin; each button on one line — at full width and at 420 px (#893, T7).
-            fits = ("const q = document.getElementById('trash-ask'), h = document.querySelector('.meeting-head'), c = document.getElementById('context');"
-                    " const r = (e) => e.getBoundingClientRect(); const a = r(q);"
-                    " const out = [...q.querySelectorAll('p:not(:empty), button')].filter((e) => { const b = r(e); return b.left < a.left + 12 || b.right > a.right - 12; })"
-                    ".map((e) => e.id || e.textContent.trim().slice(0, 20));"
-                    # Each button's words counted by their lines, not by its height: two lines of a small text fit in 44 px.
-                    " const lines = (b) => { const t = document.createRange(); t.selectNodeContents(b); return new Set([...t.getClientRects()].map((x) => Math.round(x.top))).size; };"
-                    " const wrapped = [...q.querySelectorAll('button')].filter((b) => lines(b) > 1).map((b) => b.id);"
-                    " return {under: a.top >= r(h).bottom - 0.5, wide: Math.abs(a.left - r(c).left) <= 1 && Math.abs(a.right - r(c).right) <= 1, out, wrapped}")
-            for size in ((1100, 800), (420, 800)):
-                browser.set_window_size(*size)
-                time.sleep(0.4)
-                got = browser.execute_script(fits)
-                shot(browser, f"d100-ask-{short}-{size[0]}")
-                check(f"{short}, {size[0]} px: the question under the page's head, as wide as its cards, its sentences and buttons inside with the card's margin, each button on one line (D100)",
-                      got == {"under": True, "wide": True, "out": [], "wrapped": []}, got)
-            browser.set_window_size(1100, 800)
-            time.sleep(0.4)
-            browser.execute_script("document.getElementById('trash-cancel').focus()")
-            # Escape, then « Annuler »: nothing changed, the focus back on the button.
-            keys(browser, Keys.ESCAPE)
-            gone = wait_for(browser, lambda b: b.execute_script(asked) is None, 3)
-            check(f"{short}: Escape leaves everything as it was, the focus back on « {said['name']} » (D100)",
-                  gone and newer.is_dir() and browser.execute_script(focused) == "trash-meeting", browser.execute_script(focused))
-            keys(browser, Keys.ENTER)
-            wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
+            wait_for(browser, lambda b: b.find_elements(By.ID, "more-open"), 10)
+            # « Annuler »: nothing changed, the focus back on « Plus ».
+            opened = ask_to_trash(browser)
+            title = browser.execute_script(asked)
             keys(browser, Keys.ENTER)
             gone = wait_for(browser, lambda b: b.execute_script(asked) is None, 3)
-            check(f"{short}: « {said['cancel']} » leaves everything as it was, the focus back on « {said['name']} » (D100)",
-                  gone and newer.is_dir() and browser.execute_script(focused) == "trash-meeting", browser.execute_script(focused))
+            check(f"{short}: « Plus » then « Mettre à la corbeille » asks « {said['ask']} »; « {said['cancel']} » leaves everything as it was, the focus back on « Plus » (D100, D121)",
+                  opened and title.replace("\u202f", " ") == said["ask"] and gone and newer.is_dir() and browser.execute_script(focused) == "more-open",
+                  [title, browser.execute_script(focused)])
             # Confirmed: to the system's trash, never deleted; the list next, the focus on the next meeting.
-            keys(browser, Keys.ENTER)
-            wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
+            ask_to_trash(browser)
             keys(browser, Keys.TAB)
-            on = browser.execute_script(focused)
+            on = browser.execute_script("return document.activeElement?.textContent.trim()")
             keys(browser, Keys.ENTER)
             moved = wait_for(None, lambda _: not newer.exists() and (trashed / newer.name).is_dir(), 10)
             listed = wait_for(browser, lambda b: b.execute_script("return location.hash") in ("", "#/")
                               and b.execute_script(focused) == f"a:#/meeting/{older.name}", 5)
             check(f"{short}: confirmed, the meeting is in the system's trash, whole; the list next, the focus on the next meeting (D100)",
-                  on == "trash-confirm" and moved and listed and (trashed / newer.name / "minutes.md").is_file(),
+                  on == said["confirm"] and moved and listed and (trashed / newer.name / "minutes.md").is_file(),
                   [on, moved, browser.execute_script("return location.hash"), browser.execute_script(focused)])
             # The last one: the focus on the list itself.
             browser.execute_script(f"location.hash = '#/meeting/{older.name}'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "trash-meeting"), 10)
-            browser.execute_script("document.getElementById('trash-meeting').focus()")
-            keys(browser, Keys.ENTER)
-            wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
-            browser.execute_script("document.getElementById('trash-confirm').focus()")
-            keys(browser, Keys.ENTER)
+            wait_for(browser, lambda b: b.find_elements(By.ID, "more-open"), 10)
+            ask_to_trash(browser)
+            keys(browser, Keys.TAB, Keys.ENTER)
             moved = wait_for(None, lambda _: not older.exists(), 10)
             listed = wait_for(browser, lambda b: b.execute_script(focused) == "list", 5)
             check(f"{short}: the last meeting confirmed: in the trash, the focus on the list itself (D100)", moved and listed, browser.execute_script(focused))
@@ -7811,21 +7872,14 @@ def meeting_trashed(now: dt.datetime) -> None:
             live = next((p for p in meetings.iterdir() if p.is_dir()), None)
             if recording and live is not None:
                 browser.execute_script(f"location.hash = '#/meeting/{live.name}'")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "trash-meeting"), 10)
-                browser.execute_script("document.getElementById('trash-meeting').focus()")
-                keys(browser, Keys.ENTER)
-                wait_for(browser, lambda b: b.execute_script(asked) is not None, 3)
-                browser.execute_script("document.getElementById('trash-confirm').focus()")
-                keys(browser, Keys.ENTER)
+                wait_for(browser, lambda b: b.find_elements(By.ID, "more-open"), 10)
+                ask_to_trash(browser)
+                keys(browser, Keys.TAB, Keys.ENTER)
                 why = wait_for(browser, lambda b: (b.execute_script("return document.getElementById('trash-said')?.innerText || ''") or "") != "", 5)
                 check(f"{short}: while it is recorded, refused, said why, nothing moved (D100)", why and live.is_dir(),
                       [browser.execute_script("return document.getElementById('trash-said')?.innerText || ''"), live.is_dir()])
             else:
                 check(f"{short}: a recording started, to be refused (D100)", False, recording)
-            # Stopped, as it was started: the next scenario starts at rest.
-            browser.execute_script("window.__TAURI__.core.invoke('record')")
-            time.sleep(2)
-
 
 def focus_kept(now: dt.datetime) -> None:
     """BS. D101: a choice changed on a meeting's page or in Settings, by the keyboard or the mouse, keeps the
@@ -9897,17 +9951,18 @@ def dates_mentioned(now: dt.datetime) -> None:
             browser.set_window_size(1100, 800)
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             shown = wait_for(browser, lambda b: b.execute_script(offered), 10)
-            # Among the summary's actions, as « Envoyer… » and « Copier » are (#1213, the decider): an icon, a calendar, its
-            # name and tooltip the words, before « Copier » — never a bar of its own under the summary.
+            # In the meeting's bar of actions (D121, after #1213 and #1239): « Agenda », a calendar and its count « 2 », before
+            # « Refaire »; its name begins with its words and says the count (WCAG 2.5.3), its tooltip the count.
             form = browser.execute_script(
-                "const b = document.getElementById('dates-open'), row = b?.closest('.minutes-actions'), copy = document.getElementById('copy-minutes');"
-                " return b ? {icon: b.classList.contains('icon-button'), row: !!row, before: !!copy && row === copy.parentElement"
-                " && !!(b.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING), text: b.textContent.trim(),"
+                "const b = document.getElementById('dates-open'), bar = b?.closest('#meeting-actions'), redo = document.getElementById('redo-open');"
+                " return b ? {bar: !!bar, before: !!redo && !!(b.compareDocumentPosition(redo) & Node.DOCUMENT_POSITION_FOLLOWING),"
+                " words: b.querySelector('.label')?.textContent ?? '', count: b.querySelector('.count')?.textContent ?? '',"
                 " name: b.getAttribute('aria-label'), tip: b.title, calendar: !!b.querySelector('svg rect') && b.querySelectorAll('svg path').length === 3} : null")
-            # Its count beside the calendar (#1239): how many dates it offers, read at a glance; its name and tooltip say both.
             counted = {"Dates mentionnées": "2 dates mentionnées", "Dates mentioned": "2 dates mentioned"}[opens]
-            check(f"{language}: offered among the summary's actions, a calendar and its count « 2 », named « {counted} » and its tooltip the same, before « Copier » (#1213, #1239)",
-                  shown and form == {"icon": True, "row": True, "before": True, "text": "2", "name": counted, "tip": counted, "calendar": True}, form)
+            label = {"Dates mentionnées": "Agenda", "Dates mentioned": "Calendar"}[opens]
+            named = f"{label} 2, {opens.lower()}"
+            check(f"{language}: in the bar of actions, « {label} 2 », a calendar and its count, before « Refaire », named « {named} », its tooltip « {counted} » (D121, #1239, WCAG 2.5.3)",
+                  shown and form == {"bar": True, "before": True, "words": label, "count": "2", "name": named, "tip": counted, "calendar": True}, form)
             if language.startswith("fr"):
                 browser.execute_script("document.querySelector('#meeting .card.minutes').scrollIntoView({block: 'start'})")
                 shot(browser, "cm-dates-offered-light")
@@ -12902,25 +12957,25 @@ def nothing_silent(now: dt.datetime) -> None:
                 "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('minutes_again', { name: 'gone' }).then(() => done(''), (why) => done(String(why)));")
             check(f"the raw text only in developer mode ({'on' if raw else 'off'})", ("gone is no session" in told) == raw, told)
             if raw:
-                # « More actions » with both items (D89): Enter opens it on the first, ↑ on the last, expanded while open.
-                wait_for(browser, lambda b: b.find_elements(By.ID, "more-actions"), 10)
+                # « More » with its items (D89, D121): Enter opens it on the first, ↑ on the last (the trash, D121), expanded while open.
+                wait_for(browser, lambda b: b.find_elements(By.ID, "more-open"), 10)
                 opened_on = []
                 for key in (Keys.ENTER, Keys.ARROW_UP):
-                    browser.execute_script("document.getElementById('more-actions').focus()")
+                    browser.execute_script("document.getElementById('more-open').focus()")
                     ActionChains(browser).send_keys(key).perform()
                     wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
-                    opened_on.append(browser.execute_script("return [document.activeElement.id, document.getElementById('more-actions').getAttribute('aria-expanded')]"))
+                    opened_on.append(browser.execute_script("return [document.activeElement.id, document.getElementById('more-open').getAttribute('aria-expanded')]"))
                     ActionChains(browser).send_keys(Keys.ESCAPE).perform()
                     wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
-                check("in developer mode, « More actions » opens on its first by Enter, on its last by ↑, expanded while open (D89)",
-                      opened_on == [["rename-item", "true"], ["copy-diagnostic", "true"]], opened_on)
-                browser.execute_script("document.getElementById('more-actions').focus()")
+                check("in developer mode, « More » opens on its first by Enter, on its last by ↑, expanded while open (D89, D121)",
+                      opened_on == [["rename-item", "true"], ["trash-meeting", "true"]], opened_on)
+                browser.execute_script("document.getElementById('more-open').focus()")
                 ActionChains(browser).send_keys(Keys.ENTER).perform()
                 wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
                 ActionChains(browser).send_keys(Keys.TAB).perform()
                 left_ = wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
-                check("Tab leaves « More actions » closed, not expanded (D89)",
-                      left_ and browser.execute_script("return document.getElementById('more-actions').getAttribute('aria-expanded')") == "false")
+                check("Tab leaves « More » closed, not expanded (D89)",
+                      left_ and browser.execute_script("return document.getElementById('more-open').getAttribute('aria-expanded')") == "false")
                 described = browser.execute_script("const b = document.getElementById('confidential-switch'); return document.getElementById(b.getAttribute('aria-describedby'))?.textContent")
                 check("in English, the switch's description: « Nothing leaves this computer » (D89)", described == "Nothing leaves this computer", described)
     # What the page reads and cannot: said where the eye is, in the user's language; asked by no gesture
@@ -14732,12 +14787,12 @@ def main() -> int:
             search.send_keys("voix")
             none = [p.text for p in browser.find_elements(By.CSS_SELECTOR, ".transcript .none") if p.is_displayed()]
             check("a search looks at what was said, not at who or when", none == ["Aucun résultat."], none)
-            check("the folder can be opened from the meeting", browser.find_element(By.ID, "open-folder").get_attribute("aria-label") == "Ouvrir le dossier")
+            check("the folder can be opened from the meeting, in « Plus » (D121)", browser.execute_script("return document.getElementById('open-folder')?.textContent") == "Ouvrir le dossier")
             # D89: the meeting's header — its title at 18 px, its actions on its right; each card's actions icons, each with its tooltip and its name.
             head = browser.execute_script(
-                "const h = document.querySelector('#meeting h1'), o = document.getElementById('open-folder');"
+                "const h = document.querySelector('#meeting h1'), o = document.getElementById('meeting-actions');"
                 " return [parseFloat(getComputedStyle(h).fontSize), Math.abs(h.getBoundingClientRect().top - o.getBoundingClientRect().top) < 24 && o.getBoundingClientRect().left > h.getBoundingClientRect().right]")
-            check("the meeting's title is 18 px, « Ouvrir le dossier » on the same line, at its right (D89)", head == [18, True], head)
+            check("the meeting's title is 18 px, its bar of actions on the same line, at its right (D89, D121)", head == [18, True], head)
             bar = browser.execute_script(
                 "const b = document.querySelector('#meeting .meeting-head'), h = document.querySelector('#meeting h1'), l = document.querySelector('#meeting .lasts'), s = getComputedStyle(b);"
                 " const t = document.createElement('i'); t.style.color = 'var(--line)'; document.body.append(t); const line = getComputedStyle(t).color; t.remove();"
@@ -14751,12 +14806,12 @@ def main() -> int:
                 " return [r.parentElement === f.parentElement, Math.abs((a.top + a.bottom) - (b.top + b.bottom)) < 4 && b.left >= a.right]")
             check("the transcript's Refaire… beside its search, at its right (D89, board 4)", beside == [True, True], beside)
             actions = browser.execute_script(
-                "return ['open-folder', 'copy-minutes', 'redo-minutes', 'redo-transcript'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim(), e.getAttribute('aria-label'), e.title,"
+                "return ['copy-minutes', 'redo-minutes', 'redo-transcript'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim(), e.getAttribute('aria-label'), e.title,"
                 " e.classList.contains('icon-button') && e.querySelectorAll('svg.glyph').length === 1])")
             searched = browser.execute_script("return !!document.getElementById('search').previousElementSibling?.matches('svg.glyph')")
             check("the transcript's search holds its icon, as the sidebar's (D89)", searched)
             check("each secondary action of the meeting: an icon button, its tooltip and its name (D89)", actions == [
-                ["open-folder", "", "Ouvrir le dossier", "Ouvrir le dossier", True], ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu", True],
+                ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu", True],
                 ["redo-minutes", "", "Refaire…", "Refaire…", True], ["redo-transcript", "", "Refaire…", "Refaire…", True]], actions)
             # D89, board 4: the meeting's settings in one row of 32 px controls; the context opened from it.
             row = browser.execute_script(
@@ -14784,8 +14839,8 @@ def main() -> int:
             check("the context closed in its row, opened by it, the focus in its field (D89)",
                   closed and opened and toggle.get_attribute("aria-expanded") == "true" and browser.execute_script("return document.activeElement.id") == "context-text",
                   (closed, toggle.get_attribute("aria-expanded")))
-            # « Plus d’actions »: a menu button — Enter opens it on its first item, Escape closes it, the focus back on it.
-            more = browser.find_element(By.ID, "more-actions")
+            # « Plus »: a menu button, its words and its icon (D121) — Enter opens it on its first item, Escape closes it, the focus back on it.
+            more = browser.find_element(By.ID, "more-open")
             labelled = [more.get_attribute(a) for a in ("aria-label", "title", "aria-haspopup", "aria-expanded")]
             browser.execute_script("arguments[0].focus()", more)
             ActionChains(browser).send_keys(Keys.ENTER).perform()
@@ -14795,9 +14850,9 @@ def main() -> int:
             first = browser.execute_script("return [document.activeElement.getAttribute('role'), document.activeElement.textContent, document.getElementById('more-menu').getAttribute('role')]")
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
             back = wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
-            check("« Plus d’actions »: a menu of the rarer actions, opened by Enter on its first, Escape closes it, the focus back on its button (D89)",
-                  labelled == ["Plus d’actions", "Plus d’actions", "menu", "false"] and menu and items == ["Renommer cette réunion"]
-                  and first == ["menuitem", "Renommer cette réunion", "menu"] and back and browser.execute_script("return document.activeElement.id") == "more-actions"
+            check("« Plus »: a menu of the rarer actions, named « Plus d’actions », opened by Enter on its first, Escape closes it, the focus back on its button (D89, D121)",
+                  labelled == ["Plus d’actions", None, "menu", "false"] and menu and items == ["Renommer cette réunion", "Ouvrir le dossier", "Mettre à la corbeille"]
+                  and first == ["menuitem", "Renommer cette réunion", "menu"] and back and browser.execute_script("return document.activeElement.id") == "more-open"
                   and more.get_attribute("aria-expanded") == "false" and expanded == "true", (labelled, items, first, expanded))
             more.click()
             wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
@@ -16297,6 +16352,7 @@ def main() -> int:
     appearance_chosen(now)
     focus_kept(now)
     focus_swept(now)
+    meeting_actions_bar(now)
     meeting_trashed(now)
     sound_checked(now)
     ends_on_sigterm(now)
