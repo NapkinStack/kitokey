@@ -21,6 +21,7 @@ test("each landing, light and dark, has no WCAG 2.2 A or AA violation axe finds"
   const source = await readFile(AXE, "utf8");
   const { server, origin } = await serve();
   let browser;
+  const found = [];
   try {
     browser = await chromium.launch({ executablePath, args: ["--no-sandbox"] });
     for (const lang of ["fr", "en"]) {
@@ -31,8 +32,8 @@ test("each landing, light and dark, has no WCAG 2.2 A or AA violation axe finds"
         await page.addScriptTag({ content: source });
         const result = await page.evaluate((tags) => axe.run(document, { runOnly: { type: "tag", values: tags }, resultTypes: ["violations"] })
           .then((r) => ({ passes: r.passes.length, violations: r.violations.map((v) => [v.id, v.impact, v.nodes.slice(0, 3).map((n) => n.target.join(" "))]) })), TAGS);
-        assert.ok(result.passes > 0, `/${lang}/ ${colorScheme}: axe judged no rule`);
-        assert.deepEqual(result.violations, [], `/${lang}/ ${colorScheme}`);
+        if (!result.passes) found.push([`/${lang}/ ${colorScheme}`, "axe judged no rule"]);
+        for (const violation of result.violations) found.push([`/${lang}/ ${colorScheme}`, ...violation]);
         await page.close();
       }
     }
@@ -40,4 +41,6 @@ test("each landing, light and dark, has no WCAG 2.2 A or AA violation axe finds"
     await browser?.close();
     server.close();
   }
+  // Every page and theme judged before the verdict, so one run says all that is wrong.
+  assert.deepEqual(found, []);
 });

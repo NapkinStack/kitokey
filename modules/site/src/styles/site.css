@@ -15,13 +15,14 @@
    --text-secondary (text-soft), --accent, --success, --record (live), --mark. The others (raised, sunken,
    tint, tertiary text, the accent hovered, a warning, the confidential violet, the others' voice, the
    shadows, the radii) are the v7 mock-up's, validated by the decider on 2026-11-26, until the app's
-   palette holds them. */
+   palette holds them; the light tertiary text darkened from #6B7385 to #5F6777, 4.5:1 on every light
+   ground (axe on #1294). */
 :root {
   color-scheme: light;
   --bg-canvas: #F2F4F7; --bg-surface: #FFFFFF; --bg-sunken: #F0F2F7; --bg-raised: #FFFFFF;
   --bg-hover: #E3E7EE; --bg-pressed: #D9DDE5; --bg-tint: #EEF2FB;
   --border-subtle: #D9DDE5; --border-control: #808898;
-  --text-primary: #15171C; --text-secondary: #4C5464; --text-tertiary: #6B7385;
+  --text-primary: #15171C; --text-secondary: #4C5464; --text-tertiary: #5F6777;
   --accent: #2253CF; --accent-hover: #1A44AD; --on-accent: #FFFFFF;
   --success: #16794A; --warning: #8A5300; --warning-bg: #FFF4DC;
   --record: #C2352D; --private: #6E56CF; --private-bg: #F3F0FF;
