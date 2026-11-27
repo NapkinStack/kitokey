@@ -16,6 +16,8 @@
   const meters = [...stage.querySelectorAll(".w-bar [data-meter]")];
   const tiles = [...stage.querySelectorAll(".w-call .ct")];
   const page = stage.querySelector(".w-page");
+  // The panel's own text, for a screen reader: the selected step's sentence (the scene's layers are hidden from it).
+  const said = stage.querySelector(".w-said");
   const STEPS = [3000, 3500, 5000, 6000];
   const N = 44;
   let step = 1, held = false, visible = false, elapsed = 0, secs = 0, lt = 0, ph = 0, tick = 0, started = false;
@@ -64,6 +66,7 @@
     if (stage.dataset.step === String(n)) { delete stage.dataset.step; void stage.offsetWidth; }
     stage.dataset.step = String(n);
     stage.setAttribute("aria-labelledby", tabs[n - 1].id);
+    said.textContent = tabs[n - 1].querySelector(".d").textContent;
     page.classList.toggle("on", n >= 2);
     tabs.forEach((tab, i) => {
       tab.setAttribute("aria-selected", String(i + 1 === n));

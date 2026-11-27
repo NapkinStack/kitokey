@@ -65,9 +65,11 @@ function element(props = {}) {
 
 async function page({ reduced = false, hash = "" } = {}) {
   const source = await readFile(join(dist, "walk.js"), "utf8");
-  const tabs = [1, 2, 3, 4].map((n) => element({ id: `wtab-${n}`, querySelector: () => ({ textContent: `t${n}` }) }));
+  const tabs = [1, 2, 3, 4].map((n) => element({ id: `wtab-${n}`, querySelector: (q) => ({ textContent: q === ".d" ? `step ${n} said` : `t${n}` }) }));
+  for (const tab of tabs) tab.click = () => tab.listeners.click();
   const pageEl = element();
-  const stage = element({ querySelectorAll: () => [], querySelector: () => pageEl });
+  const said = element();
+  const stage = element({ querySelectorAll: () => [], querySelector: (q) => (q === ".w-said" ? said : pageEl) });
   stage.dataset.step = "1";
   const walk = element({ querySelectorAll: () => tabs });
   let now = 0, observer = null, timer = null;
@@ -81,7 +83,7 @@ async function page({ reduced = false, hash = "" } = {}) {
   };
   vm.runInNewContext(source, world);
   const at = (ms) => { while (now < ms) { now += 125; timer?.(); } };
-  return { stage, walk, page: pageEl, world, at, show: () => observer?.([{ isIntersecting: true }]), running: () => timer !== null };
+  return { stage, walk, tabs, said, page: pageEl, world, at, show: () => observer?.([{ isIntersecting: true }]), running: () => timer !== null };
 }
 
 test("the loop waits until the scene is visible, then steps at 3, 3.5, 5 and 6 s and starts again", async () => {
@@ -113,7 +115,7 @@ test("under reduced motion, or with the tab hidden, the loop does not run", asyn
 
 // As for the hero (#1290): the walkthrough shares no class with the old page's rules but these, each set again under
 // .walk-band in walk.css.
-const SHARED = { wrap: "the page's container", ico: "a pictogram's box", kicker: "the line over the title" };
+const SHARED = { wrap: "the page's container", ico: "a pictogram's box", kicker: "the line over the title", "sr-only": "the panel's text, read and not seen" };
 
 test("the walkthrough takes no style of the old page by a class they share, but the ones named", async () => {
   const source = await readFile(new URL("../src/components/Landing.astro", import.meta.url), "utf8");
@@ -126,7 +128,7 @@ test("the walkthrough takes no style of the old page by a class they share, but 
   const shared = [...classes].filter((c) => styled.has(c));
   assert.deepEqual(shared.filter((c) => !(c in SHARED)), [], "the walkthrough takes the old page's style by these classes");
   const own = await readFile(new URL("../src/styles/walk.css", import.meta.url), "utf8");
-  for (const c of shared.filter((c) => c !== "wrap")) assert.match(own, new RegExp(`\\.walk-band \\.${c}\\b`), `.${c}: ${SHARED[c]}, not set again under .walk-band`);
+  for (const c of shared.filter((c) => c !== "wrap" && c !== "sr-only")) assert.match(own, new RegExp(`\\.walk-band \\.${c}\\b`), `.${c}: ${SHARED[c]}, not set again under .walk-band`);
 });
 
 test("#walk-N shows step N at its end and holds it, for a capture", async () => {
@@ -147,4 +149,50 @@ test("the scene's bar is the small one, ending before the right column; a tab's 
   const css = await readFile(new URL("../src/styles/walk.css", import.meta.url), "utf8");
   assert.match(css, /\.cbar\.sm \.mtr \.tr \{ width: 26px;/);
   assert.match(css, /\.wtab\[aria-selected="true"\] span\.d \{ max-height: 9em;/);
+});
+
+test("the panel says the selected step's sentence to a screen reader, its layers hidden", async () => {
+  for (const lang of ["fr", "en"]) {
+    assert.ok((await section(lang)).includes(`aria-labelledby="wtab-1"><p class="sr-only w-said">${landing.walk[lang].tabs[0][1]}</p>`), lang);
+  }
+  const p = await page();
+  p.show();
+  assert.equal(p.said.textContent, "step 1 said");
+  p.at(3125);
+  assert.equal(p.said.textContent, "step 2 said");
+});
+
+test("the keyboard: End selects the last tab, the arrows wrap, each moving the roving tabindex", async () => {
+  const p = await page();
+  p.show();
+  const key = (i, k) => p.tabs[i].listeners.keydown({ key: k, preventDefault() {} });
+  const tabindex = () => p.tabs.map((t) => t.tabIndex);
+  key(0, "End");
+  assert.equal(p.stage.dataset.step, "4");
+  assert.deepEqual(tabindex(), [-1, -1, -1, 0]);
+  key(3, "ArrowRight");
+  assert.equal(p.stage.dataset.step, "1");
+  assert.deepEqual(tabindex(), [0, -1, -1, -1]);
+  key(0, "ArrowLeft");
+  assert.equal(p.stage.dataset.step, "4");
+  key(3, "Home");
+  assert.equal(p.stage.dataset.step, "1");
+  assert.equal(p.tabs[0].attrs["aria-selected"], "true");
+});
+
+test("hovered or focused, the step holds; it goes on once the pointer and the focus have left", async () => {
+  const p = await page();
+  p.show();
+  p.walk.listeners.mouseenter();
+  p.at(8000);
+  assert.equal(p.stage.dataset.step, "1", "it moved while hovered");
+  p.walk.listeners.mouseleave();
+  p.at(8000 + 3125);
+  assert.equal(p.stage.dataset.step, "2", "it did not go on after the pointer left");
+  p.walk.listeners.focusin();
+  p.at(20000);
+  assert.equal(p.stage.dataset.step, "2", "it moved while focused");
+  p.walk.listeners.focusout({ relatedTarget: null });
+  p.at(20000 + 3625);
+  assert.equal(p.stage.dataset.step, "3", "it did not go on after the focus left");
 });

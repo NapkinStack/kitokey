@@ -92,6 +92,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
           ))}
         </div>
         <div class="wstage" id="wstage" role="tabpanel" data-step="1" aria-labelledby="wtab-1">
+          <p class="sr-only w-said">{wk.tabs[0][1]}</p>
           <div class="w-bar cbar sm" aria-hidden="true">
             <span class="rec"></span><span class="tm num" id="wtime">00:00:00</span>
             <span class="mtr"><Fragment set:html={ico("mic")} /><span class="tr" data-meter="me" data-n="10"></span></span>

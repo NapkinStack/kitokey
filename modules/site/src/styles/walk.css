@@ -37,7 +37,7 @@
 
 /* The stage and its layers. */
 .wstage { position: relative; height: 480px; border-radius: var(--r-xl); background: var(--bg-sunken); outline: 1px solid var(--border-subtle); overflow: hidden; }
-.wstage > * { position: absolute; }
+.wstage > :not(.sr-only) { position: absolute; }
 .w-bar { left: 32px; top: 34px; }
 .w-cloud { left: 32px; top: 34px; width: 268px; display: grid; gap: 2px; padding: 12px 14px; background: var(--bg-surface); border-radius: var(--r-md); outline: 1px solid var(--border-subtle); font-size: 13px; }
 .w-cloud span { color: var(--text-tertiary); }
