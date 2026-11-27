@@ -2819,10 +2819,12 @@ def meeting_language(now: dt.datetime) -> None:
         kept = sentence(browser)
         check("refused again: its own refusal said in place of the first, still after a redraw", "refused 2" in kept and "refused 1" not in kept, kept)
         browser.execute_script("window.restore()")
-        browser.execute_script("location.hash = '#/'")
-        wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
-        browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
+        # Left, then come back to (#1306): the list's address, then the meeting's again in the same tick, as a run under load
+        # can go — the list's drawing overtaken by the page's before it reads its listing. The page's own drawing waited for.
+        browser.execute_script("document.getElementById('meeting-language').dataset.before = ''")
+        browser.execute_script(f"location.hash = '#/'; setTimeout(() => {{ location.hash = '#/meeting/{heard.name}'; }}, 0)")
+        wait_for(browser, lambda b: b.execute_script(
+            "const p = document.getElementById('meeting-language'); return document.body.dataset.at === 'page' && !!p && !('before' in p.dataset)"), 10)
         check("the page left and come back to: the refusal no longer said", sentence(browser) == "", sentence(browser))
         # Saved: the very language just refused, chosen again — the list put back must not keep it
         # from being heard as a change (#843).
