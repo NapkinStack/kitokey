@@ -80,11 +80,6 @@ struct Shell {
     /// The context typed in the bar before the start, kept for the next recording until the user
     /// clears it, in `next_file` too (D91): taken by the meeting begun, whichever gesture starts it.
     next_context: Mutex<String>,
-    /// The models chosen in the bar at rest for the next recording (D91): its own once it starts.
-    next_models: Mutex<meeting_models::Models>,
-    /// The language chosen in the bar at rest for the next meeting (D99), in `next_language_file`
-    /// too: its own once it starts, then none.
-    next_language: Mutex<Option<String>>,
     /// The menu's entry that starts and stops, relabelled as the recording goes.
     toggle: MenuItem<Wry>,
     /// The user asked to quit while a recording ran: it is stopped first, then Kitokey leaves.
@@ -418,12 +413,9 @@ fn main() {
             next_context_kept,
             language_set,
             speakers_named,
-            bar_language,
-            next_language_kept,
             meeting_models_shown,
             meeting_models_chosen,
             models_offered,
-            next_models_kept,
             transcript_redo_own,
             previous_back,
             title_saved,
@@ -556,8 +548,6 @@ fn main() {
                 recording: Mutex::new(None),
                 recorded: Mutex::new(None),
                 next_context: Mutex::new(next_file().map(|file| context::read_next(&file)).unwrap_or_default()),
-                next_models: Mutex::new(next_models_file().map(|file| meeting_models::read_next(&file)).unwrap_or_default()),
-                next_language: Mutex::new(next_language_file().and_then(|file| spoken::read_next(&file))),
                 toggle,
                 leaving: Mutex::new(false),
                 pressed: Mutex::new(None),
@@ -1972,61 +1962,6 @@ fn language_set(shell: State<'_, Shell>, name: String, language: Option<String>)
     Ok(())
 }
 
-/// The meeting's language as the bar's options offer it (D99): the one recording's own, or at rest
-/// the next meeting's, with what the meeting's page offers beside it (D65).
-#[derive(serde::Serialize)]
-struct BarLanguage {
-    language: Option<String>,
-    languages: Vec<(&'static str, &'static str)>,
-    meeting_language: Option<String>,
-    apple: bool,
-    system_language: &'static str,
-}
-
-#[tauri::command]
-fn bar_language(shell: State<'_, Shell>, name: Option<String>) -> Result<BarLanguage, Told> {
-    let language = match &name {
-        Some(name) => spoken::read(&session_folder(&shell, name)?),
-        None => shell.next_language.lock().unwrap().clone(),
-    };
-    Ok(BarLanguage {
-        language,
-        languages: spoken::OFFERED.to_vec(),
-        meeting_language: shell.settings().meeting_language,
-        apple: shell.settings().engine == Engine::SpeechAnalyzer,
-        system_language: shell.system.code(),
-    })
-}
-
-/// Where the language chosen at rest for the next meeting is, beside the settings (D99).
-fn next_language_file() -> Option<PathBuf> {
-    settings::file().map(|file| file.with_file_name("next-language.txt"))
-}
-
-/// The bar's language at rest chosen (D99): kept for the next meeting, none being the settings'.
-/// Refused while a recording runs — that one's own is its meeting's —, and for a text that is not a
-/// code of ISO 639-1, what is kept staying as it is.
-#[tauri::command]
-fn next_language_kept(shell: State<'_, Shell>, language: Option<String>) -> Result<(), Told> {
-    let mut next = shell.next_language.lock().unwrap();
-    if shell.recording.lock().unwrap().is_some() {
-        return Err(shell.told(Failure::Busy, "a recording runs: its own language is its meeting's"));
-    }
-    let language = language.filter(|code| !code.trim().is_empty());
-    let file = next_language_file().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for settings"))?;
-    spoken::keep_next(&file, language.as_deref()).map_err(|error| {
-        let failure = if error.kind() == std::io::ErrorKind::InvalidInput {
-            Failure::Unexpected
-        } else {
-            Failure::MeetingFile
-        };
-        shell.told(failure, error)
-    })?;
-    *next = language.as_deref().and_then(spoken::code);
-    tracing::info!(language = next.as_deref().unwrap_or("none"), "shell.next_language_kept");
-    Ok(())
-}
-
 /// What a meeting chose for itself (D91), and the steps whose choice is gone: Settings' choice
 /// makes them, and the page says so.
 #[derive(serde::Serialize)]
@@ -2100,11 +2035,8 @@ fn models_offered_now(shell: &Shell, name: Option<String>) -> Result<ModelsOffer
                 confidential::marked(&folder),
             )
         }
-        None => {
-            let chosen = shell.next_models.lock().unwrap().clone();
-            let listed = settings::whisper_models(&models_folder(), &settings);
-            (chosen.clone(), meeting_models::applied(&settings, &chosen, &listed).gone, false)
-        }
+        // The next recording: Settings' choice alone — the bar chooses no engine (D122, D125).
+        None => (meeting_models::Models::default(), Vec::new(), false),
     };
     let file_name = |path: &Path| path.file_name().map(|name| name.to_string_lossy().into_owned());
     let base = ollama();
@@ -2163,29 +2095,6 @@ fn models_offered_now(shell: &Shell, name: Option<String>) -> Result<ModelsOffer
         unused,
         unreadable,
     })
-}
-
-/// The models chosen in the bar at rest, for the next recording (D91): taken by it once its folder
-/// holds its session, then none. A part the contract refuses is refused; refused while a recording
-/// runs — that one's own are written to it.
-#[tauri::command]
-fn next_models_kept(shell: State<'_, Shell>, chosen: meeting_models::Models) -> Result<(), Told> {
-    let mut next = shell.next_models.lock().unwrap();
-    if shell.recording.lock().unwrap().is_some() {
-        return Err(shell.told(Failure::Busy, "a recording runs: its own models are its meeting's"));
-    }
-    if !meeting_models::allowed(&chosen) {
-        return Err(shell.told(Failure::Unexpected, "a part the contract session-audio/v3 refuses"));
-    }
-    let file = next_models_file().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for settings"))?;
-    meeting_models::keep_next(&file, &chosen).map_err(|error| shell.told(Failure::MeetingFile, error))?;
-    *next = chosen;
-    tracing::info!(
-        transcription = next.transcription.is_some(),
-        minutes = next.minutes.is_some(),
-        "shell.next_models_kept"
-    );
-    Ok(())
 }
 
 /// The models a meeting is made with from now on, chosen in « Avancé » (D91): written whole, a
@@ -2426,11 +2335,6 @@ fn found(app: &AppHandle) {
     small_recording(app, true);
     let (app, said) = (app.clone(), found.said);
     std::thread::spawn(move || listen(&app, &said, None, true));
-}
-
-/// Where the models chosen at rest for the next recording are, beside it: kept the same way (D91).
-fn next_models_file() -> Option<PathBuf> {
-    settings::file().map(|file| file.with_file_name("next-models.json"))
 }
 
 /// The bar's field at rest written (D91): kept for the next recording, under D59's 400 characters.
@@ -4901,28 +4805,6 @@ fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>, found: b
                     }
                 }
                 Err(error) => tracing::error!(kind = ?error.kind(), "shell.context_not_taken"),
-            }
-            drop(next);
-            // The models chosen at rest, the meeting's own the same way; then none for the next.
-            let mut next = shell.next_models.lock().unwrap();
-            match meeting_models::taken(folder, &mut next) {
-                Ok(()) => {
-                    if let Some(Err(error)) = next_models_file().map(|file| meeting_models::keep_next(&file, &next)) {
-                        tracing::error!(kind = ?error.kind(), "shell.models_not_cleared");
-                    }
-                }
-                Err(error) => tracing::error!(kind = ?error.kind(), "shell.models_not_taken"),
-            }
-            drop(next);
-            // The language chosen at rest, the meeting's own the same way (D99); then none for the next.
-            let mut next = shell.next_language.lock().unwrap();
-            match spoken::taken(folder, &mut next) {
-                Ok(()) => {
-                    if let Some(Err(error)) = next_language_file().map(|file| spoken::keep_next(&file, None)) {
-                        tracing::error!(kind = ?error.kind(), "shell.language_not_cleared");
-                    }
-                }
-                Err(error) => tracing::error!(kind = ?error.kind(), "shell.language_not_taken"),
             }
             drop(next);
             // Kept beside the settings while it runs: a Kitokey started again finds it (#773).

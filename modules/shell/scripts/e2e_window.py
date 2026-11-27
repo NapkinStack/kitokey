@@ -13827,7 +13827,12 @@ def bar_offers_no_engine_nor_language(now: dt.datetime) -> None:
     opened = lambda b: b.execute_script("const o = document.getElementById('small-options'); return o !== null && !o.hidden")
     meetings = WORK / "bar-no-engine"
     meetings.mkdir()
-    with Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True) as browser:
+    window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True)
+    # A choice for the next meeting kept by a Kitokey before D125, beside the settings as it kept them:
+    # never read again, so never applied to a recording without being shown (lina's point on #1299).
+    (window.file.parent / "next-models.json").write_text(json.dumps({"minutes": {"provider": "http://127.0.0.1:9/v1", "model": "stale:1b"}}))
+    (window.file.parent / "next-language.txt").write_text("de\n")
+    with window as browser:
         wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
         browser.execute_script("document.getElementById('small-more').click()")
         wait_for(browser, opened, 3)
@@ -13842,6 +13847,10 @@ def bar_offers_no_engine_nor_language(now: dt.datetime) -> None:
         time.sleep(1)
         live = browser.execute_script(chooses)
         check("recording, the bar's options choose no engine and no language", live == [], live)
+        made = [folder for folder in meetings.iterdir() if (folder / "session.json").is_file()]
+        check("a choice kept for the next meeting before D125 is not taken by the recording: no models.json, no language",
+              len(made) == 1 and not (made[0] / "models.json").exists() and not (made[0] / "language").exists(),
+              [(folder.name, sorted(p.name for p in folder.iterdir())) for folder in made])
         stop_from_small(browser)
 
 
