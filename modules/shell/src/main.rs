@@ -30,7 +30,7 @@ use kitokey_shell::microphone;
 use kitokey_shell::{
     autostart,
     confidential::{self, Left, Wait, What},
-    context, correction, dates, desktop, engines, exporting, keys,
+    context, correction, dates, desktop, engines, example, exporting, keys,
     licence::{self, Licence},
     log,
     meeting::{self, Read, Transcript},
@@ -154,6 +154,8 @@ struct Shell {
     /// The sessions whose transcripts wait for the one being made, or for the model — in
     /// the order they were asked, each once; made again as a *Refaire…* asked (D25, D59).
     waiting: Mutex<VecDeque<(PathBuf, Option<Again>, Cancel)>>,
+    /// The examples tried (D126): their minutes follow their transcript, whatever Settings say.
+    examples: Mutex<std::collections::HashSet<PathBuf>>,
     /// The model making the transcript, and since when: said on the meeting's page (D25).
     hearing_by: Mutex<Option<(String, Instant)>>,
     /// Why a meeting's last transcript was not made, until one is begun (D25).
@@ -431,6 +433,7 @@ fn main() {
             transcript_redo,
             transcript_corrected,
             transcript_asked,
+            example_tried,
             transcript_again,
             opened,
             open_folder,
@@ -584,6 +587,7 @@ fn main() {
                 minutes_tried: Mutex::new(HashMap::new()),
                 asked_again: Mutex::new(HashMap::new()),
                 waiting: Mutex::new(VecDeque::new()),
+                examples: Mutex::default(),
                 hearing_by: Mutex::new(None),
                 transcripts_failed: Mutex::new(HashMap::new()),
                 transcripts_made: Mutex::new(HashMap::new()),
@@ -1408,6 +1412,30 @@ fn transcript_asked(app: AppHandle, shell: State<'_, Shell>, name: String) -> Re
     }
     transcribe(&app, folder, Cancel::default());
     Ok(())
+}
+
+/// « Essayer sur un exemple » (D126): the example of the window's language, placed as a meeting
+/// started now, then heard and written as any meeting — its minutes whatever Settings say follows a
+/// recording, by whoever writes them; sent nowhere. Its name, for the window to open its page.
+#[tauri::command]
+fn example_tried(app: AppHandle, shell: State<'_, Shell>) -> Result<Tried, Told> {
+    let now = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+    let folder = example::place(&shell.settings().sessions, shell.language(), &now)
+        .map_err(|why| shell.told(Failure::MeetingFile, format!("the example could not be placed: {why}")))?;
+    let name = folder
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    tracing::info!(session = %name, "shell.example_tried");
+    shell.examples.lock().unwrap().insert(folder.clone());
+    transcribe(&app, folder, Cancel::default());
+    Ok(Tried { name })
+}
+
+/// The example tried: its meeting's name, its folder's.
+#[derive(serde::Serialize)]
+struct Tried {
+    name: String,
 }
 
 /// The meetings that cannot be freed now: the one being recorded, the one being transcribed.
@@ -4645,6 +4673,10 @@ fn export_written(shell: &Shell, folder: &Path) {
     if confidential::marked(folder) {
         return;
     }
+    // The example tried is an invented meeting: nothing of it in the user's folder (D126).
+    if shell.examples.lock().unwrap().contains(folder) {
+        return;
+    }
     let language = shell.language();
     let said = words::exported(language);
     let name = meeting_said(folder, language);
@@ -5358,7 +5390,8 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
     *shell.transcript_token.lock().unwrap() = Some(cancel.clone());
     hearing(&shell, &folder, &hearer);
     // Its summary follows, as the settings say now: the page's one bar has two parts (D92).
-    *shell.hearing_then.lock().unwrap() = settings.after == settings::After::Minutes;
+    let example = shell.examples.lock().unwrap().contains(&folder);
+    *shell.hearing_then.lock().unwrap() = example || settings.after == settings::After::Minutes;
     transcribing(app, true);
     let heard_folder = folder;
     let app = app.clone();
@@ -5369,7 +5402,7 @@ fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
         // the two steps before the transcript is said ended (D92).
         let follows = matches!(made, Made::Written(_))
             && !cancel.cancelled()
-            && shell.reread().is_ok_and(|settings| settings.after == settings::After::Minutes);
+            && (example || shell.reread().is_ok_and(|settings| settings.after == settings::After::Minutes));
         if follows {
             shell.between.lock().unwrap().insert(heard_folder.clone());
         }

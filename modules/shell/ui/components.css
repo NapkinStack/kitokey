@@ -29,7 +29,8 @@
    words, an action at its end. Never red: red is a recording's or a deletion's. Always with its tone: the
    settings' strip (#770) is `.banner` alone, window.css's, until its screen comes over (D123). */
 :is(.banner.info, .banner.private, .banner.warning) {
-  display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4);
+  display: flex; flex-wrap: nowrap; justify-content: flex-start; align-items: flex-start; gap: var(--sp-3);
+  margin: 0; padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-md); background: var(--color-tint); color: var(--color-text); font: var(--fs-body) var(--font-text);
 }
 :is(.banner.info, .banner.private, .banner.warning) > svg { width: 16px; height: 16px; flex: none; margin-top: 2px; fill: none; stroke: var(--color-accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

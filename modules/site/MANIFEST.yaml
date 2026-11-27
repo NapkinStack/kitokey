@@ -81,6 +81,12 @@ dependencies:
     purpose: Opens each built page in the machine's Chromium, in the tests only (no browser downloaded)
     adr: docs/adr/0019-kitokey-com-a-static-site-built-by-astro-served-by-cloudflare-pages.md
     exit_strategy: tests/own-domain.test.mjs; puppeteer-core or Chrome's DevTools protocol replaces it.
+  - name: axe-core
+    purpose: >-
+      Judges each landing by WCAG 2.2 A and AA, in the tests only (MPL-2.0); 4.14.0, its axe.min.js
+      pinned by its SHA-256 in tests/axe.test.mjs
+    adr: docs/adr/0019-kitokey-com-a-static-site-built-by-astro-served-by-cloudflare-pages.md
+    exit_strategy: tests/axe.test.mjs; Lighthouse's accessibility audit or pa11y replaces it.
 #  - name:
 #    purpose:
 #    adr:
