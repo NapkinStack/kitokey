@@ -43,14 +43,26 @@ fn the_light_theme_put_on_a_page_sets_every_name_the_dark_one_sets_with_its_ligh
     assert!(!said.contains("\"raised\""), "tokens() raised: {said}");
     let names = |theme: &str| -> Vec<String> {
         let part = said.split(&format!("\"{theme}\": {{\"names\": [")).nth(1).unwrap_or("");
-        part.split(']').next().unwrap_or("").split(", ").map(|n| n.trim_matches('"').to_string()).filter(|n| !n.is_empty()).collect()
+        part.split(']')
+            .next()
+            .unwrap_or("")
+            .split(", ")
+            .map(|n| n.trim_matches('"').to_string())
+            .filter(|n| !n.is_empty())
+            .collect()
     };
     let (light, dark) = (names("light"), names("dark"));
     assert!(dark.len() > 40, "the dark theme's names were not read: {said}");
     let missing: Vec<&String> = dark.iter().filter(|name| !light.contains(name)).collect();
-    assert!(missing.is_empty(), "names the dark theme sets and the light one does not: {missing:?}");
+    assert!(
+        missing.is_empty(),
+        "names the dark theme sets and the light one does not: {missing:?}"
+    );
     // The light values, the design system's and an older name's, as `ui/tokens.css` writes them.
-    assert!(said.contains("\"--color-canvas\": \"var(--slate-25)\""), "--color-canvas is not light: {said}");
+    assert!(
+        said.contains("\"--color-canvas\": \"var(--slate-25)\""),
+        "--color-canvas is not light: {said}"
+    );
     assert!(said.contains("\"--ground\": \"var(--gray-25)\""), "--ground is not light: {said}");
     // The theme's scheme is shot_themed's to say, not the block's.
     assert!(!said.contains("\"scheme\": true"), "a color-scheme is left in a block: {said}");
