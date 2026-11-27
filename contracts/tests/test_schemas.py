@@ -875,6 +875,57 @@ EXAMPLES["posting/v1/payload.schema.json"] = (
         {"title": "t", "summary": "", "actions": [3]},
     ],
 )
+# posting/v1's `parts` (D132), added in place: optional, the parts a person chose — the title always sent, never
+# one of them —, with `dates` shaped as exporting/v1's and `dates_title`, their heading in the person's language.
+_DATE = {"id": "a1", "date": "2026-11-27", "what": "Envoyer le devis", "who": "Léa", "passage": "Léa : vendredi."}
+EXAMPLES["posting/v1/input.schema.json"][0].extend(
+    [
+        {**_SEND, "parts": ["summary"]},
+        {**_SEND, "parts": ["actions", "key_points", "summary", "dates"]},
+        {
+            **_SEND,
+            "parts": ["dates"],
+            "dates": [_DATE, {"id": "a3", "date": "2026-12-01", "what": "Relire", "who": None}],
+        },
+        {**_SEND, "parts": ["dates"], "dates": [_DATE], "dates_title": "Dates"},
+        {**_SEND, "dates_title": "Échéances"},
+    ]
+)
+EXAMPLES["posting/v1/input.schema.json"][1].extend(
+    [
+        {**_SEND, "parts": []},
+        {**_SEND, "parts": "summary"},
+        {**_SEND, "parts": ["title"]},
+        {**_SEND, "parts": ["transcript"]},
+        {**_SEND, "parts": ["summary", "summary"]},
+        {**_SEND, "dates": []},
+        {**_SEND, "dates": [{**_DATE, "date": "27/11/2026"}]},
+        {**_SEND, "dates": [{"date": "2026-11-27", "what": "x"}]},
+        {**_SEND, "dates": [{"id": "a1", "date": "2026-11-27", "who": "Léa"}]},
+        {**_SEND, "dates": [{**_DATE, "what": "deux\nlignes"}]},
+        {**_SEND, "dates_title": ""},
+        {**_SEND, "dates_title": "deux\nlignes"},
+    ]
+)
+# The webhook's `key_points` and `dates` (D132): sent when they are chosen, a receiver ignoring them as before.
+EXAMPLES["posting/v1/payload.schema.json"][0].extend(
+    [
+        {"title": "t", "summary": "", "actions": [], "key_points": ["Budget : 12 k€"]},
+        {"title": "t", "summary": "", "actions": [], "key_points": [], "dates": []},
+        {"title": "t", "summary": "", "actions": [], "dates": [{"date": "2026-11-27", "what": "x", "who": None}]},
+        {"title": "t", "summary": "", "actions": [], "dates": [{"date": "2026-11-27", "what": "x", "who": "Léa"}]},
+    ]
+)
+EXAMPLES["posting/v1/payload.schema.json"][1].extend(
+    [
+        {"title": "t", "summary": "", "actions": [], "key_points": [""]},
+        {"title": "t", "summary": "", "actions": [], "key_points": "one"},
+        {"title": "t", "summary": "", "actions": [], "dates": [{"what": "x", "who": None}]},
+        {"title": "t", "summary": "", "actions": [], "dates": [{"date": "2026-11-27", "what": "x"}]},
+        {"title": "t", "summary": "", "actions": [], "dates": [{"date": "2026-11-27", "what": "", "who": None}]},
+        {"title": "t", "summary": "", "actions": [], "dates": [{"date": "1 déc.", "what": "x", "who": None}]},
+    ]
+)
 
 # summarising/v1's `--format` (D129): a format a person made, read from a file — the bounds of minutes/v5's
 # front matter; never one of the six structures' names, which keep their own sections.

@@ -19,7 +19,9 @@ function engineCard(job, group, { engine, value, name, at, state, said, facts, m
   radio.checked = checked;
   label.append(radio, element("span", "name", name));
   if (mark) label.append(element("span", "default", mark));
-  label.append(element("span", "where", said.where ?? (at === "online" ? said.online : said.here)));
+  // Where it runs, unless the card's name already says it (« Sur cet ordinateur », the coordinator's audit of #1307).
+  const where = said.where ?? (at === "online" ? said.online : said.here);
+  if (where !== name) label.append(element("span", "where", where));
   label.append(element("span", "state", said.state));
   if (facts) label.append(element("span", "facts", facts));
   const more = element("details");
