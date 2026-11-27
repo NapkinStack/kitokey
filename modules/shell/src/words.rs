@@ -1357,6 +1357,31 @@ pub struct Window {
     /// (D126, mock-up v5). Shows: the first run, its top right, as marks. When: Kitokey's first
     /// start. At most: about 20 characters. Placeholders: {} the screen's number.
     pub first_step: &'static str,
+    /// The first run's second screen, its title (D126, mock-up v5's screen 1b). Shows: the first run,
+    /// as its heading. When: after the first screen. At most: about 50 characters. Placeholders: none.
+    pub first_sound_title: &'static str,
+    /// Under it: what to do so that the two meters move (D126). Shows: the first run, under its
+    /// heading. When: after the first screen. At most: one line. Placeholders: none.
+    pub first_sound_lead: &'static str,
+    /// What is prepared meanwhile: the engine that hears, downloading (D126). Shows: the first run's
+    /// second screen, above its progress. When: it downloads. At most: about 40 characters.
+    /// Placeholders: none.
+    pub first_getting: &'static str,
+    /// How far it came, before its speed is known (D126). Shows: under the progress. When: it
+    /// downloads. At most: about 25 characters. Placeholders: {} the size come, {} the whole size.
+    pub first_got: &'static str,
+    /// How far it came and how long is left (D126). Shows: under the progress. When: it downloads.
+    /// At most: about 40 characters. Placeholders: {} the size come, {} the whole size, {} the time left.
+    pub first_got_left: &'static str,
+    /// That it comes once, and is checked (D126). Shows: under the progress. When: it downloads.
+    /// At most: one line. Placeholders: none.
+    pub first_once: &'static str,
+    /// Back to the first screen (D126). Shows: the first run's second screen, as a button. When:
+    /// always there. At most: 12 characters. Placeholders: none.
+    pub first_back: &'static str,
+    /// The sound heard, on to the last screen (D126). Shows: the first run's second screen, as its
+    /// primary button. When: always there. At most: 16 characters. Placeholders: none.
+    pub first_works: &'static str,
     /// Shows: the recording bar and Redo…, as a help line. When: per-meeting choice does not change
     /// Settings. At most: no limit. Placeholders: none.
     pub models_own_note: &'static str,
@@ -2401,6 +2426,14 @@ pub fn window(language: Language) -> Window {
             first_later: "I’ll choose later",
             first_next: "Continue",
             first_step: "Step {} of 3",
+            first_sound_title: "Let’s check the sound while everything gets ready.",
+            first_sound_lead: "Say a few words. Both meters should move.",
+            first_getting: "Downloading the listening engine",
+            first_got: "{} of {}",
+            first_got_left: "{} of {} · about {}",
+            first_once: "Only once. Checked when it arrives.",
+            first_back: "Back",
+            first_works: "It works",
             models_own_note: "For this meeting only; Settings stay the same.",
             models_not_kept: "Choice not saved: {}",
             models_not_read: "Couldn’t load the models: {}",
@@ -2953,6 +2986,14 @@ pub fn window(language: Language) -> Window {
             first_later: "Je choisirai plus tard",
             first_next: "Continuer",
             first_step: "Étape {} sur 3",
+            first_sound_title: "On vérifie le son pendant que tout se prépare.",
+            first_sound_lead: "Parlez un peu. Les deux jauges doivent bouger.",
+            first_getting: "Téléchargement du moteur d’écoute",
+            first_got: "{} sur {}",
+            first_got_left: "{} sur {} · environ {}",
+            first_once: "Une seule fois. Vérifié à l’arrivée.",
+            first_back: "Retour",
+            first_works: "Ça marche",
             models_own_note: "Pour cette réunion uniquement\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Choix non enregistré\u{a0}: {}",
             models_not_read: "Impossible de lire les modèles\u{a0}: {}",
