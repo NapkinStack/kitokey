@@ -188,3 +188,74 @@ fn the_file_given_to_kitokey_summary_is_summarising_v1_s_format() {
         serde_json::json!({ "structure": "notes", "sections": [{ "id": "section_1", "about": "x" }, { "id": "autre", "about": "y" }] })
     );
 }
+
+#[test]
+fn the_formats_are_kept_in_the_settings_file_and_read_back_as_they_were() {
+    let folder = tempfile::tempdir().unwrap();
+    let path = folder.path().join("settings.toml");
+    let mut settings = kitokey_shell::settings::Settings::default();
+    assert_eq!(settings.formats, Formats::default());
+    let made = settings.formats.made("Point client hebdo", weekly(), Some(2)).unwrap();
+    settings.formats.made("Notes", vec![section("Notes", "Tout")], None).unwrap();
+    settings.formats.default_to(&made).unwrap();
+    settings.formats.hide("interview", true).unwrap();
+    kitokey_shell::settings::write(&path, &settings).unwrap();
+    assert_eq!(kitokey_shell::settings::read(&path).unwrap().formats, settings.formats);
+    // Deleted, it is gone from the file.
+    settings.formats.deleted(&made).unwrap();
+    kitokey_shell::settings::write(&path, &settings).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(!text.contains("point_client_hebdo"), "{text}");
+    assert_eq!(kitokey_shell::settings::read(&path).unwrap().formats, settings.formats);
+}
+
+#[test]
+fn a_format_written_by_hand_outside_its_bounds_is_left_aside_the_rest_read() {
+    let folder = tempfile::tempdir().unwrap();
+    let path = folder.path().join("settings.toml");
+    std::fs::write(
+        &path,
+        r#"format_default = "interview"
+formats_hidden = ["interview", "one_to_one", "made_up"]
+
+[[formats]]
+structure = "point"
+name = "Point"
+actions = 0
+sections = [{ title = "Suites", about = "Qui, quoi, quand" }]
+
+[[formats]]
+structure = "point"
+name = "Le même"
+sections = [{ title = "A", about = "x" }]
+
+[[formats]]
+structure = "general"
+name = "Pris"
+sections = [{ title = "A", about = "x" }]
+
+[[formats]]
+structure = "Capitales"
+name = "Capitales"
+sections = [{ title = "A", about = "x" }]
+
+[[formats]]
+structure = "vide"
+name = "Vide"
+sections = []
+
+[[formats]]
+structure = "actions"
+name = "Actions"
+actions = 4
+sections = [{ title = "A", about = "x" }]
+"#,
+    )
+    .unwrap();
+    let formats = kitokey_shell::settings::read(&path).unwrap().formats;
+    assert_eq!(formats.own.iter().map(|f| f.structure.as_str()).collect::<Vec<_>>(), ["point"]);
+    assert_eq!(formats.own[0].actions, Some(0));
+    // Only a built-in is hidden; the default, never: the one written is hidden, so `general` is.
+    assert_eq!(formats.hidden, ["interview", "one_to_one"]);
+    assert_eq!(formats.default, "general");
+}

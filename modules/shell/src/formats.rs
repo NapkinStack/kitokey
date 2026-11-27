@@ -11,7 +11,7 @@ pub const BUILT_IN: [&str; 6] = ["general", "one_to_one", "stand_up", "client_ca
 
 /// One section of a person's format: its title, as they read it in the editor, and what goes in
 /// it, as they ask it of the model. Its id in the minutes is drawn from its title.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 pub struct Section {
     pub title: String,
     pub about: String,
@@ -19,12 +19,13 @@ pub struct Section {
 
 /// A format a person made. Its structure is drawn from its first name and kept: renamed, the
 /// minutes already written in it still name it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 pub struct Format {
     pub structure: String,
     pub name: String,
     pub sections: Vec<Section>,
     /// The place of the section holding the actions; none, the format has none.
+    #[serde(default)]
     pub actions: Option<usize>,
 }
 
@@ -73,6 +74,37 @@ impl Default for Formats {
 }
 
 impl Formats {
+    /// The formats as the settings' file holds them: each kept as it would have been made, once by
+    /// its structure and its name; one written by hand otherwise is left aside. Only a built-in one
+    /// is hidden, and the default is one offered — `general`, or the first, otherwise.
+    pub fn kept(own: Vec<Format>, hidden: Vec<String>, default: Option<String>) -> Self {
+        let mut formats = Self::default();
+        for format in own {
+            let structure_free = id_of(&format.structure).as_deref() == Some(format.structure.as_str())
+                && !BUILT_IN.contains(&format.structure.as_str())
+                && formats.own(&format.structure).is_none();
+            if let (true, Ok(name), Ok(())) = (
+                structure_free,
+                formats.free_name(&format.name, None),
+                checked(&format.sections, format.actions),
+            ) {
+                formats.own.push(Format { name, ..format });
+            }
+        }
+        for built in hidden {
+            if BUILT_IN.contains(&built.as_str()) && !formats.hidden.contains(&built) {
+                formats.hidden.push(built);
+            }
+        }
+        let shown = formats.shown();
+        formats.default = match default {
+            Some(default) if shown.contains(&default.as_str()) => default,
+            _ if shown.contains(&BUILT_IN[0]) => BUILT_IN[0].into(),
+            _ => shown.first().copied().unwrap_or(BUILT_IN[0]).into(),
+        };
+        formats
+    }
+
     /// The structures offered, in their order: the built-in ones not hidden, then the person's.
     pub fn shown(&self) -> Vec<&str> {
         BUILT_IN
