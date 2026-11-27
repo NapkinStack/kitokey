@@ -1,146 +1,242 @@
 ---
-// /<lang>/: the landing (D114, proposal D validated by the decider on 2026-11-25). Every word from
-// src/lib/landing.mjs. The hero's carousel: the drawn call, then five c18 clips, each slide's poster first.
+// /<lang>/: the landing (D114; site v7 validated by the decider on 2026-11-26, rebuilt section by section).
+// Every word from src/lib/landing.mjs. The hero: the promise, the price, and a drawn scene (the call, Kitokey's
+// bar, the minutes) over the two voices' spectrogram (public/hero.js); the real capture comes after D121.
 import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
-import Call from "./Call.astro";
-import { channels, landing as w, repo } from "../lib/landing.mjs";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { brand, ico } from "../lib/icons.mjs";
+import { channels, landing as w } from "../lib/landing.mjs";
+import { ico } from "../lib/icons.mjs";
+import "../styles/walk.css";
+import "../styles/middle.css";
+import "../styles/end.css";
 
 const { lang } = Astro.props;
 const t = (key) => w[key][lang];
-const [privacyId, usesId, systemsId, faqId, installId] = t("nav").map(([id]) => id);
+const [howId, privacyId, whoId, priceId, faqId] = t("nav").map(([id]) => id);
+const installId = lang === "fr" ? "installer" : "install";
+const needId = lang === "fr" ? "besoins" : "needs";
+const wk = t("walk");
+const sv = t("sovereign");
+const wh = t("who");
+const rd = t("ready");
+const readyId = lang === "fr" ? "fonctions" : "features";
+const wTitles = wk.tabs.map(([title]) => title);
 const [h1a, h1b, lead] = t("hero");
-const [cta, follow] = t("cta");
-const [sLabel, sSlide, sRole, sOf] = t("slider");
-const [callTitle] = t("call");
-// A clip filmed in the app's dark theme too (c18), when its three files are here: the moon shows it.
-const dark = (key) => ["jpg", "mp4", "webm"].every((ext) => existsSync(join(process.cwd(), "public", "clips", `${key}-${lang}-dark.${ext}`)));
-const [chH, chP, chWith] = t("channels");
-const [pEyebrow, pH, pLead] = t("privacy");
-const [localTitle, localAlt] = t("local");
-const [uEyebrow, uH, uLead] = t("uses");
-const [sEyebrow, sH, sLead, sNote] = t("systems");
+const [buyLine, storeSoon, linuxFree, macSoon] = t("buy");
+const [sceneAlt, callTitle, you, when, confidential, mTitle, mMeta, mProv, mHigh, mText, mActs, acts] = t("scene");
 const [gEyebrow, gH, gLead, copy, osLabel, copied, failed] = t("install");
-const [needsH, needs] = t("needs");
-const [faqH, faq] = t("faq");
+const pr = t("price");
+const [faqKicker, faqH, faq] = t("faq");
+const [finalH, finalP] = t("final");
 const notes = t("channelNotes");
-const needsId = lang === "fr" ? "prerequis" : "prerequisites";
 const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ </span>${c.replace(/&/g, "&amp;").replace(/</g, "&lt;")}`).join("\n");
 ---
 <Page lang={lang} title={t("title")} description={t("description")} path="" nav={t("nav")}>
   <script slot="head" src="/site.js" defer is:inline></script>
-  <script slot="head" src="/slider.js" defer is:inline></script>
-  <script slot="head" src="/waves.js" defer is:inline></script>
+  <script slot="head" src="/hero.js" defer is:inline></script>
+  <script slot="head" src="/walk.js" defer is:inline></script>
   <Icons />
   <section class="hero" aria-labelledby="h1">
-    <div class="wrap hero-copy">
-      <h1 id="h1"><span>{h1a}</span> <span class="second">{h1b}</span></h1>
-      <p class="lead">{lead}</p>
-      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/tags`}>{follow}</a></div>
-    </div>
+    <canvas class="voices" aria-hidden="true"></canvas>
     <div class="wrap">
-      <section class="slider" aria-roledescription={sRole} aria-label={sLabel}>
-        <div class="slides" tabindex="0">
-          {t("slides").map(([key, icon, kicker, h, p, alt], i, all) => (
-            <article class="slide" id={`slide-${i}`} data-clip={key === "record" ? undefined : `/clips/${key}-${lang}`} data-dark={key !== "record" && dark(key) ? "" : undefined} aria-roledescription={sSlide} aria-label={`${i + 1} ${sOf} ${all.length}, ${kicker}`}>
-              {key === "record" ? (
-                <div class="slide-media window">
-                  <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">{callTitle}</span></div>
-                  <Call lang={lang} />
-                </div>
-              ) : (
-                <div class="slide-media window">
-                  <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">Kitokey</span></div>
-                  <img class="still" src={`/clips/${key}-${lang}-light.jpg`} width="1280" height="720" alt={alt} loading="lazy" decoding="async" />
-                </div>
-              )}
-              <div class="slide-card"><span class="tile" set:html={ico(icon)} /><p class="kicker">{kicker}</p><h2>{h}</h2>{p && <p>{p}</p>}</div>
-            </article>
+      <div class="pitch">
+        <h1 id="h1"><span class="l">{h1a}</span> <span class="l soft">{h1b}</span></h1>
+        <p class="lead">{lead}</p>
+        <div class="buy">
+          <p class="buy-line">{buyLine}</p>
+          <div class="cta">
+            <a class="store-soon" href={`#${priceId}`}>{storeSoon}</a>
+            <a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a>
+          </div>
+        </div>
+        <p class="cta-note">{macSoon}</p>
+        <p class="assure">{t("assure").map((said) => <span><Fragment set:html={ico("check")} />{said}</span>)}</p>
+      </div>
+      <div class="scene" role="img" aria-label={sceneAlt}>
+        <div class="cbar" aria-hidden="true">
+          <span class="rec"></span><span class="tm num">00:31:08</span>
+          <span class="mtr"><Fragment set:html={ico("mic")} /><span class="tr" data-meter="me" data-n="30"></span></span>
+          <span class="mtr"><Fragment set:html={ico("speaker")} /><span class="tr" data-meter="ot" data-n="30"></span></span>
+          <span class="lockt on" set:html={ico("lock")} />
+          <span class="sep"></span><span class="stop"><i></i></span>
+        </div>
+        <div class="callwin" aria-hidden="true">
+          <div class="cb">{callTitle}</div>
+          <div class="cg">
+            {[["camille", "Camille"], ["hugo", "Hugo"], ["lea", "Léa"], ["vous", you]].map(([img, name], i) => (
+              <div class={i === 0 ? "ct sp" : "ct"}><img src={`/img/call-${img}.webp`} alt="" width="960" height="540" /><span>{name}</span></div>
+            ))}
+          </div>
+        </div>
+        <article class="mcard" aria-hidden="true">
+          <div class="mc-top"><span class="num">{when}</span><span class="chip chip-private"><Fragment set:html={ico("lock")} />{confidential}</span></div>
+          <div class="mc-title">{mTitle}</div>
+          <div class="mc-meta">{mMeta}</div>
+          <div class="prov">{mProv}</div>
+          <p class="mh">{mHigh}</p>
+          <p>{mText}</p>
+          <p class="mh">{mActs}</p>
+          {acts.map(([who, what, day]) => <div class="act-row"><span class="who">{who}</span><span>{what}</span><span class="chip"><Fragment set:html={ico("calendar")} />{day}</span></div>)}
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="walk-band" id={howId} aria-labelledby={`${howId}-h`}>
+    <div class="wrap">
+      <div class="sh"><p class="kicker">{wk.kicker}</p><h2 id={`${howId}-h`}>{wk.h}</h2></div>
+      <div class="walk" id="walk">
+        <div class="wsteps" role="tablist" aria-label={wk.steps}>
+          {wk.tabs.map(([title, said], i) => (
+            <button type="button" class={i === 1 ? "wtab priv" : "wtab"} role="tab" id={`wtab-${i + 1}`} aria-selected={i === 0 ? "true" : "false"} aria-controls="wstage" tabindex={i === 0 ? "0" : "-1"}><span class="wn">{i + 1}</span><b>{title}</b><span class="d">{said}</span><span class="pg"><i></i></span></button>
           ))}
         </div>
-      </section>
-    </div>
-  </section>
-
-  <section class="channels" aria-labelledby="ch-h">
-    <div class="wrap">
-      <div class="card ch-card reveal">
-        <div class="ch-text"><span class="tile" set:html={ico("send")} /><h2 id="ch-h">{chH}</h2><p>{chP}</p></div>
-        <div class="ch-with"><p class="kicker">{chWith}</p>
-          <ul class="ch-logos" role="list">
-            <li><span>Slack</span></li>
-            <li><img class="os-logo" src="/img/brands/discord-symbol-blurple.svg" width="127" height="96" alt="" /><span>Discord</span></li>
-            <li><Fragment set:html={ico("webhook", "ico ch-hook")} /><span>Webhook</span></li>
-          </ul>
+        <div class="wstage" id="wstage" role="tabpanel" data-step="1" aria-labelledby="wtab-1">
+          <p class="sr-only w-said">{wk.tabs[0][1]}</p>
+          <div class="w-bar cbar sm" aria-hidden="true">
+            <span class="rec"></span><span class="tm num" id="wtime">00:00:00</span>
+            <span class="mtr"><Fragment set:html={ico("mic")} /><span class="tr" data-meter="me" data-n="10"></span></span>
+            <span class="mtr"><Fragment set:html={ico("speaker")} /><span class="tr" data-meter="ot" data-n="10"></span></span>
+            <span class="lockt"><Fragment set:html={ico("unlock", "ico i-off")} /><Fragment set:html={ico("lock", "ico i-on")} /></span>
+            <span class="stop"><i></i></span>
+          </div>
+          <span class="w-lockchip chip chip-private" aria-hidden="true"><Fragment set:html={ico("lock")} />{wk.lockOn}</span>
+          <div class="w-cloud" aria-hidden="true"><b>{wk.cloud[0]}</b><span>{wk.cloud[1]}</span></div>
+          {wk.lanes.map(([who, from], i) => <div class={`w-lane ${i ? "ot" : "me"}`} aria-hidden="true"><div class="lh"><Fragment set:html={ico(i ? "speaker" : "mic")} />{who} <small>{from}</small></div><div class="lane" data-lane={i ? "ot" : "me"}></div></div>)}
+          <svg class="w-flow" aria-hidden="true"><path class="f-me" d="M300 194 C320 194 322 210 340 214" /><path class="f-ot" d="M300 312 C320 312 322 236 340 232" /></svg>
+          <p class="w-note" aria-hidden="true"><Fragment set:html={ico("check")} />{wk.note}</p>
+          <div class="w-ban2" aria-hidden="true"><Fragment set:html={ico("lock")} /><span>{wk.banner}</span></div>
+          <div class="w-call" aria-hidden="true">
+            <div class="callwin"><div class="cb">{t("scene")[1]}</div><div class="cg">
+              {[["Camille", "ot", "c"], ["Hugo", "ot", "h"], ["Léa", "ot", "l"], [t("scene")[2], "me", "s"]].map(([name, who, letter]) => (
+                <div class="ct" data-who={who}><span>{name}</span><div class={`av av-${letter}`}>{letter.toUpperCase()}</div></div>
+              ))}
+            </div></div>
+          </div>
+          <article class="w-page" aria-hidden="true">
+            <div class="hdr"><span class="num">{t("scene")[3]}</span><span class="chip chip-private"><Fragment set:html={ico("lock")} />{t("scene")[4]}</span></div>
+            <div class="ttl">{t("scene")[5]}</div>
+            <div class="meta">{wk.meta}</div>
+            <div class="acts"><span class="share">{wk.share}</span><span class="sp"></span><span class="privpill"><Fragment set:html={ico("lock")} />{t("scene")[4]}<span class="sw"></span></span></div>
+            <div class="tabs"><span class="tab t-min">{wk.tabsPage[0]}</span><span class="tab t-tr">{wk.tabsPage[1]}</span></div>
+            <div class="w-body">
+              <div class="w-tr">{wk.lines.map(([time, side, said]) => <div class="w-trl"><span class="t">{time}</span><span><b class={side ? "by-ot" : "by-me"}>{wk.lanes[side][0]}</b>{said}</span></div>)}</div>
+              <div class="w-min">
+                <div class="w-prog"><div class="lb"><b>{wk.writing[0]}</b><small>{wk.writing[1]}</small></div><div class="bar"><i></i></div></div>
+                <div class="prov reveal-in">{t("scene")[7]}</div>
+                <p class="mh reveal-in">{t("scene")[8]}</p>
+                <p class="reveal-in">{wk.text}</p>
+                <p class="mh reveal-in">{t("scene")[10]}</p>
+                {t("scene")[11].slice(0, 2).map(([who, what, day]) => <div class="act-row reveal-in"><span class="who">{who}</span><span>{what}</span><span class="chip"><Fragment set:html={ico("calendar")} />{day}</span></div>)}
+              </div>
+            </div>
+          </article>
         </div>
       </div>
-    </div>
-  </section>
-
-  <section class="band" id={privacyId} aria-labelledby={`${privacyId}-h`}>
-    <div class="wrap">
-      <div class="section-head reveal">
-        <p class="eyebrow">{pEyebrow}</p>
-        <span class="padlock" set:html={ico("lock", "ico ico-xl")} />
-        <h2 id={`${privacyId}-h`}>{pH}</h2>
-        <p class="lead">{pLead}</p>
-      </div>
-      <div class="privacy-grid">
-        <ul class="promises" role="list">
-          {t("promises").map(([icon, a, b]) => <li class="reveal"><Fragment set:html={ico(icon)} /><div><strong>{a}</strong><span set:html={b} /></div></li>)}
-        </ul>
-        <figure class="reveal window">
-          <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">Kitokey<span class="wt-more"> · {localTitle}</span></span></div>
-          <picture>
-            <source media="(max-width: 699px)" srcset={`/img/local-m-${lang}.webp`} width="356" height="216" />
-            <img src={`/img/local-${lang}.webp`} width="620" height="370" alt={localAlt} loading="lazy" decoding="async" />
-          </picture>
-        </figure>
-      </div>
-      <p class="note proof">{t("proof")}</p>
-    </div>
-  </section>
-
-  <section class="section" id={usesId} aria-labelledby={`${usesId}-h`}>
-    <div class="wrap">
-      <div class="section-head reveal"><p class="eyebrow">{uEyebrow}</p><h2 id={`${usesId}-h`}>{uH}</h2><p class="lead">{uLead}</p></div>
-      <div class="uses">
-        {t("cases").map((c, i) => c.length === 4
-          ? <article class={`card use u-${i} reveal`}><span class="tile" set:html={ico(c[0])} /><p class="kicker">{c[1]}</p><h3>{c[2]}</h3><p>{c[3]}</p></article>
-          : <article class="card use u-after reveal"><span class="tile" set:html={ico(c[0])} /><h3>{c[1]}</h3><p>{c[2]}</p></article>)}
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id={systemsId} aria-labelledby={`${systemsId}-h`}>
-    <div class="wrap">
-      <div class="section-head reveal"><p class="eyebrow">{sEyebrow}</p><h2 id={`${systemsId}-h`}>{sH}</h2><p class="lead">{sLead}</p></div>
-      <div class="systems">
-        {t("oses").map(([logos, name, state, price, text, now]) => (
-          <article class="card os reveal">
-            <span class="os-logos" set:html={logos.map(brand).join("")} />
-            <h3>{name}</h3>
-            <p class="os-state"><span class={now ? "ok" : "soon"}>{state}</span></p>
-            <p class="os-price">{price}</p>
-            <p>{text}</p>
-            {now && <a class="btn" href={`#${installId}`}>{gEyebrow}</a>}
+      <div class="flow">
+        {wTitles.map((title, i) => (
+          <article class={i === 1 ? "step priv" : "step"}>
+            <div class="stage" aria-hidden="true">
+              {i === 0 && <div class="cbar sm"><span class="rec"></span><span class="tm num">00:00:12</span><span class="mtr"><Fragment set:html={ico("mic")} /><span class="tr" data-meter="me" data-n="10"></span></span><span class="mtr"><Fragment set:html={ico("speaker")} /><span class="tr" data-meter="ot" data-n="10"></span></span><span class="stop"><i></i></span></div>}
+              {i === 1 && <><span class="privpill on"><Fragment set:html={ico("lock")} />{t("scene")[4]}<span class="sw"></span></span><div class="pbanner"><Fragment set:html={ico("lock")} /><span>{wk.banner}</span></div></>}
+              {i === 2 && <div class="mini"><div class="mini-h">{wk.tabsPage[1]}</div>{wk.lines.slice(0, 2).map(([time, side, said]) => <div class="mini-l"><span class="t">{time}</span><span><b class={side ? "by-ot" : "by-me"}>{wk.lanes[side][0]}</b>{said}</span></div>)}</div>}
+              {i === 3 && <div class="mini"><div class="mini-h">{wk.tabsPage[0]}</div><div class="mini-p">{wk.mini[0]}</div>{wk.mini[1].map(([who, what, day]) => <div class="mini-act"><b>{who}</b><span>{what}</span><span class="chip"><Fragment set:html={ico("calendar")} />{day}</span></div>)}</div>}
+            </div>
+            <p class="n">{i + 1}</p>
+            <h3>{i === 1 && <Fragment set:html={ico("lock")} />}{title}</h3>
+            <p>{wk.cards[i]}</p>
           </article>
         ))}
       </div>
-      <p class="note">{sNote}</p>
     </div>
   </section>
 
-  <section class="section" id={installId} aria-labelledby="get-h">
+  <section class="mid" id={privacyId} aria-labelledby={`${privacyId}-h`}>
+    <div class="wrap">
+      <div class="sh rise"><p class="kicker">{sv.kicker}</p><h2 id={`${privacyId}-h`}>{sv.h}</h2><p>{sv.lead}</p></div>
+      <div class="io rise">
+        <div class="box here">
+          <div class="box-h"><span class="tile" set:html={ico("laptop")} /><div><h3>{sv.here[0]}</h3><p>{sv.here[1]}</p></div></div>
+          <div class="items">{sv.stays.map(([icon, what, said]) => <div class="item"><Fragment set:html={ico(icon)} /><b>{what}</b><span class="d">{said}</span><span class="r here-i" role="img" aria-label={sv.here[2]} set:html={ico("laptop")} /></div>)}</div>
+        </div>
+        <div class="box">
+          <div class="box-h"><span class="tile" set:html={ico("cloud")} /><div><h3>{sv.leaves[0]}</h3><p>{sv.leaves[1]}</p></div></div>
+          <div class="items">{sv.chosen.map(([icon, what, said]) => <div class="item"><Fragment set:html={ico(icon)} /><b>{what}</b><span class="d">{said}</span><span class="r"><span class="sw2" role="img" aria-label={sv.leaves[2]}></span></span></div>)}</div>
+        </div>
+      </div>
+      <div class="proof rise">{sv.proof.map(([icon, title, said], i) => <article class="pf"><span class={i === 0 ? "tile priv" : "tile"} set:html={ico(icon)} /><h3>{title}</h3><p>{said}</p></article>)}</div>
+      <p class="io-link"><a href={`/${lang}/privacy/`}>{sv.policy}</a></p>
+      <div class="shot-ph" role="note"><div><b>{sv.shot[0]}</b>{sv.shot[1]}</div></div>
+    </div>
+  </section>
+
+  <section class="mid mid-band" id={whoId} aria-labelledby={`${whoId}-h`}>
+    <div class="wrap">
+      <div class="sh rise"><p class="kicker">{wh.kicker}</p><h2 id={`${whoId}-h`}>{wh.h}</h2></div>
+      <div class="cases rise">
+        {wh.cases.map(([icon, people, title, said, [meeting, when, locked]]) => (
+          <article class="case">
+            <span class="tile" set:html={ico(icon)} />
+            <p class="who-l">{people}</p>
+            <h3>{title}</h3>
+            <p>{said}</p>
+            <div class="lrow" aria-hidden="true"><b>{meeting}</b><span class="num">{when}</span><span class="sig">{locked && <Fragment set:html={ico("lock", "ico lock")} />}<Fragment set:html={ico("file")} /></span></div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="mid" id={readyId} aria-labelledby={`${readyId}-h`}>
+    <div class="wrap">
+      <div class="sh rise"><p class="kicker">{rd.kicker}</p><h2 id={`${readyId}-h`}>{rd.h}</h2><p>{rd.lead}</p></div>
+      <div class="feats rise">{rd.feats.map(([icon, title, said, soon]) => <article class="ft"><span class="tile" set:html={ico(icon)} /><h3>{title}{soon && <span class="chip">{rd.soon}</span>}</h3><p>{said}</p></article>)}</div>
+    </div>
+  </section>
+
+  <section class="end end-band" id={priceId} aria-labelledby={`${priceId}-h`}>
+    <div class="wrap">
+      <div class="sh rise"><p class="kicker">{pr.kicker}</p><h2 id={`${priceId}-h`}>{pr.h}</h2></div>
+      <div class="price rise">
+        <article class="pcard main">
+          <div class="pc-top"><div class="oslogos"><span class="lg win"><img src="/img/brands/windows-logo-2021.svg" alt="Windows" width="30" height="30" /></span><span class="lg apl"><img class="on-light" src="/img/brands/apple-logo-black.svg" alt="macOS" width="26" height="32" /><img class="on-dark" src="/img/brands/apple-logo-white.svg" alt="macOS" width="26" height="32" /><span class="chip chip-warning">{pr.soon}</span></span></div></div>
+          <h3 class="sr-only">{pr.main[0]}</h3>
+          <div class="pblock"><div class="amount"><b class="num">{pr.main[1]}</b><span>{pr.main[2]}</span></div><p class="pnote">{pr.main[3]}</p></div>
+          <div class="strip" role="group" aria-label={pr.main[4]}>{pr.main[5].map(([big, small]) => <span><b class="num">{big}</b>{small}</span>)}</div>
+          <div class="incl"><p class="incl-h">{pr.main[6]}</p><ul class="checks">{pr.main[7].map((item) => <li><Fragment set:html={ico("check")} />{item}</li>)}</ul></div>
+          <p class="mac">{pr.main[8]}</p>
+          <div class="row-b"><span class="store-soon is-soon">{pr.main[9]}</span></div>
+        </article>
+        <article class="pcard linux">
+          <div class="pc-top"><div class="oslogos"><span class="lg tux-l"><img src="/img/brands/tux.svg" alt="" width="34" height="40" /></span></div></div>
+          <h3 class="sr-only">{pr.linux[0]}</h3>
+          <div class="pblock"><div class="amount"><b>{pr.linux[1]}</b></div><p class="pnote">{pr.linux[2]}</p></div>
+          <div class="strip" role="group" aria-label={pr.linux[3]}>{pr.linux[4].map(([big, small]) => <span><b>{big}</b>{small}</span>)}</div>
+          <div class="incl"><p class="incl-h">{pr.linux[5]}</p><ul class="checks">{pr.linux[6].map((item) => <li><Fragment set:html={ico("check")} />{item}</li>)}</ul></div>
+          <div class="row-b"><a class="install-l" href={`#${installId}`}><Fragment set:html={ico("download")} />{pr.linux[7]}</a></div>
+        </article>
+      </div>
+      <p class="nosub"><Fragment set:html={ico("check")} /><span><b>{pr.nosub[0]}</b>{pr.nosub[1]}</span></p>
+    </div>
+  </section>
+
+  <section class="end end-need" id={needId} aria-labelledby={`${needId}-h`}>
+    <div class="wrap">
+      <h2 id={`${needId}-h`} class="sr-only">{t("need")[0]}</h2>
+      <details class="need">
+        <summary><span class="tile" set:html={ico("chip")} /><span><b>{t("need")[0]}</b><span class="s">{t("need")[1]}</span></span><Fragment set:html={ico("chev", "ico chev")} /></summary>
+        <div class="need-body">{t("hardware").map(([, h, sub, lines]) => <div><h3>{h}</h3><p>{sub}</p><ul>{lines.map((x) => <li>{x}</li>)}</ul></div>)}</div>
+      </details>
+    </div>
+  </section>
+
+  <section class="end" id={installId} aria-labelledby="get-h">
     <div class="wrap get">
-      <div class="section-head reveal"><p class="eyebrow">{gEyebrow}</p><h2 id="get-h">{gH}</h2><p class="lead">{gLead}</p></div>
-      <div class="code reveal" data-copied={copied} data-failed={failed}>
+      <div class="sh"><p class="kicker">{gEyebrow}</p><h2 id="get-h">{gH}</h2><p class="sub">{gLead}</p></div>
+      <div class="code" data-copied={copied} data-failed={failed}>
         <div class="code-bar">
           <div class="os-tabs" role="group" aria-label={osLabel}>
-            {channels.map(([os, name], i) => <button type="button" class="os-tab" data-os={os} aria-pressed={i === 0 ? "true" : "false"}><Fragment set:html={brand(os)} /><span>{name}</span></button>)}
+            {channels.map(([os, name], i) => <button type="button" class="os-tab" data-os={os} aria-pressed={i === 0 ? "true" : "false"}><span>{name}</span></button>)}
           </div>
           <button class="copy" type="button" aria-describedby="copy-status" hidden>{copy}</button>
         </div>
@@ -150,29 +246,33 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
         </>)}
         <p class="sr-only" id="copy-status" aria-live="polite"></p>
       </div>
-      <h3 class="needs-h" id={needsId}>{needsH}</h3>
-      <ul class="needs" role="list">
-        {needs.map(([icon, a, b]) => <li class="reveal"><Fragment set:html={ico(icon)} /><div><strong>{a}</strong><span set:html={b} /></div></li>)}
-      </ul>
-      <div class="hw">
-        {t("hardware").map(([icon, h, sub, lines]) => <div class="card hw-card reveal"><span class="tile" set:html={ico(icon)} /><h4>{h}</h4><p>{sub}</p><ul>{lines.map((x) => <li>{x}</li>)}</ul></div>)}
-      </div>
     </div>
   </section>
 
-  <section class="section" id={faqId} aria-labelledby={`${faqId}-h`}>
-    <div class="wrap">
-      <div class="section-head"><h2 id={`${faqId}-h`}>{faqH}</h2></div>
-      <div class="faq">
-        {faq.map(([q, a]) => <details class="reveal"><summary>{q}</summary><p set:html={a.replace("#prerequisites", `#${needsId}`)} /></details>)}
-      </div>
+  <section class="end" id={faqId} aria-labelledby={`${faqId}-h`}>
+    <div class="wrap faq-grid">
+      <div class="sh"><p class="kicker">{faqKicker}</p><h2 id={`${faqId}-h`}>{faqH}</h2></div>
+      <div class="faq">{faq.map(([q, answer], i) => <details open={i === 0}><summary>{q}<Fragment set:html={ico("chev", "ico chev")} /></summary><div class="a">{answer.map((p) => <p>{p}</p>)}</div></details>)}</div>
     </div>
   </section>
 
-  <section class="final" aria-labelledby="final-h">
+  <section class="end end-band final" aria-labelledby="final-h">
     <div class="wrap">
-      <h2 id="final-h" class="reveal">{t("final")}</h2>
-      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/tags`}>{follow}</a></div>
+      <svg class="illus" viewBox="0 0 320 128" aria-hidden="true">
+        <rect class="doc" x="12" y="44" width="184" height="40" rx="20" />
+        <circle class="i-rec" cx="34" cy="64" r="6" />
+        <path class="i-me" d="M52 58q8-7 16 0t16 0 16 0 16 0 16 0" />
+        <path class="i-ot" d="M52 71q8 7 16 0t16 0 16 0 16 0 16 0" />
+        <rect class="i-stop" x="160" y="52" width="24" height="24" rx="7" /><rect class="i-sq" x="167" y="59" width="10" height="10" rx="2" />
+        <line class="i-dots" x1="206" y1="64" x2="226" y2="64" />
+        <rect class="doc" x="236" y="24" width="72" height="84" rx="12" />
+        <line class="ln" x1="252" y1="46" x2="292" y2="46" /><line class="ln" x1="252" y1="60" x2="284" y2="60" /><line class="ln" x1="252" y1="74" x2="292" y2="74" />
+        <line class="i-me-l" x1="252" y1="90" x2="266" y2="90" /><line class="i-ot-l" x1="274" y1="90" x2="288" y2="90" />
+        <circle class="i-ok" cx="304" cy="26" r="12" /><path class="i-check" d="M298.5 26.5l3.8 3.8 7.2-7.6" />
+      </svg>
+      <h2 id="final-h">{finalH}</h2>
+      <p>{finalP}</p>
+      <div class="cta"><a class="store-soon" href={`#${priceId}`}>{storeSoon}</a><a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a></div>
     </div>
   </section>
 </Page>

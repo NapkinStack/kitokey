@@ -1,6 +1,6 @@
-// kitokey.com's landing (D114, proposal D). Progressive only: the page is whole without this file.
+// kitokey.com's landing (D114, site v7). Progressive only: the page is whole without this file.
 // 1. The install's tabs: the pressed one shows its commands. 2. The copy button. 3. Blocks rise into place as
-// they enter, unless motion is reduced.
+// they enter, unless motion is reduced, or #still is in the address (a capture whose clock does not run them).
 (() => {
   "use strict";
   const tabs = [...document.querySelectorAll(".os-tab")];
@@ -31,11 +31,11 @@
     });
   }
 
-  if (!matchMedia("(prefers-reduced-motion: reduce)").matches && "IntersectionObserver" in window) {
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches && location.hash !== "#still" && "IntersectionObserver" in window) {
     document.documentElement.classList.add("js-reveal");
     const io = new IntersectionObserver((entries) => {
       for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
     }, { rootMargin: "0px 0px -8% 0px" });
-    document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+    document.querySelectorAll(".rise").forEach((el) => io.observe(el));
   }
 })();
