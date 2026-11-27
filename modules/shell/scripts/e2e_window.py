@@ -2226,6 +2226,12 @@ def first_run_screens(now: dt.datetime) -> None:
                 twice = browser.execute_script("return [...document.querySelectorAll('#welcome .engine-card')].map((c) => [c.querySelector('.name').textContent, c.querySelector('.where')?.textContent ?? null])")
                 check(f"{lang}: (1) no card says twice where it runs: its line of place never its name again",
                       len(twice) == 3 and all(name != where for name, where in twice), twice)
+                # Each card's lines packed under its name, as v5 stacks them: never spread over the tallest card's height.
+                spread = browser.execute_script(
+                    "return [...document.querySelectorAll('#welcome .engine-card')].map((c) => { const lines = [...c.querySelectorAll('label > .name, label > .where, label > .state, label > .facts, details > summary')].map((e) => e.getBoundingClientRect());"
+                    " return Math.round(Math.max(...lines.slice(1).map((r, i) => r.top - lines[i].bottom))); })")
+                check(f"{lang}: (1) each card's lines packed under its name, 8 px apart at most, whatever the other cards' height",
+                      len(spread) == 3 and all(gap <= 8 for gap in spread), spread)
                 go = browser.execute_script("const b = document.getElementById('first-next'); return [b.textContent.trim(), !!b.lastElementChild?.matches('svg.glyph[aria-hidden=true]')]")
                 check(f"{lang}: (1) « Continuer » its chevron after its words, hidden from a screen reader (v5)",
                       go[1] and go[0] in ("Continuer", "Continue"), go)
