@@ -1055,10 +1055,8 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   document.getElementById("empty-folder").textContent = unreadable ? "" : fill(words.none_folder, folder);
   document.getElementById("empty-folder").hidden = unreadable;
   document.getElementById("none-do").textContent = unreadable ? words.list_unread_do : ready ? words.ready_says : words.none_do;
+  // Its style stays the pane's: the sidebar's « Démarrer un enregistrement » is the window's one primary action.
   document.getElementById("empty-record").textContent = ready ? words.ready_record : words.record_start;
-  // Ready, recording is the screen's one primary action (mock-up 1c); otherwise the pane's ordinary button.
-  document.getElementById("empty-record").classList.toggle("primary", ready);
-  document.getElementById("empty-record").classList.toggle("open", !ready);
   document.getElementById("empty-record").hidden = recording || unreadable;
   // The example a newcomer tries (D126); its voices' licence is in the package's notices.
   document.getElementById("empty-example").textContent = words.example_try;

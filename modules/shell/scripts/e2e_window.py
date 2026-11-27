@@ -2119,21 +2119,23 @@ def first_read_said(browser, ids, expected, got) -> None:
 def first_run_ready(now: dt.datetime) -> None:
     """CU. D126, the first run's third screen (mock-up 1c): once the assistant is answered, the window's empty
     pane says « Prêt. Enregistrez votre premier appel. » and what Kitokey does in one sentence, beside the
-    shortcut, « Enregistrer » first and « Essayer sur un exemple » — its sidebar there, so that nothing is a
+    shortcut, « Enregistrer » and « Essayer sur un exemple », the sidebar's record button the window's one primary
+    action — its sidebar there, so that nothing is a
     dead end. Each gesture does what it says: the example opens its meeting, « Enregistrer » records. Started
     again later, the empty pane says what it said before. In both languages and themes, axe clean. Its
     illustration comes with the other two screens (D126, next pull request)."""
     print("CU. the first run ends on « Prêt. Enregistrez votre premier appel. », record or try the example (D126)")
     pane = ("return document.getElementById('empty').hidden ? null : [document.getElementById('none').textContent,"
             " document.getElementById('none-do').textContent, document.getElementById('empty-record').textContent,"
-            " document.getElementById('empty-example').textContent, document.getElementById('empty-record').classList.contains('primary')]")
+            " document.getElementById('empty-example').textContent,"
+            " [...document.querySelectorAll('#sidebar .primary, #empty .primary')].filter((b) => b.offsetParent).length]")
     for language, texts, example_opens in (
         ("fr_FR.UTF-8", ["Prêt. Enregistrez votre premier appel.",
                          "Kitokey écoute votre micro et le son de l’appel, puis écrit le compte rendu.",
-                         "Enregistrer", "Essayer sur un exemple", True], True),
+                         "Enregistrer", "Essayer sur un exemple", 1], True),
         ("en_US.UTF-8", ["Ready. Record your first call.",
                          "Kitokey listens to your microphone and the call’s sound, then writes the summary.",
-                         "Record", "Try it on an example", True], False),
+                         "Record", "Try it on an example", 1], False),
     ):
         short = language[:2]
         meetings = WORK / f"ready-{short}"
@@ -2145,7 +2147,7 @@ def first_run_ready(now: dt.datetime) -> None:
             check(f"{short}: not welcomed, the first run opens on its first question", asked)
             press(browser, "welcome-skip")
             shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
-            check(f"{short}: answered, the first run ends on its third screen: ready, what Kitokey does, « Enregistrer » first, the example",
+            check(f"{short}: answered, the first run ends on its third screen: ready, what Kitokey does, « Enregistrer », the example; one primary action in the window",
                   shown, browser.execute_script(pane))
             check(f"{short}: the third screen keeps the sidebar: nothing is a dead end",
                   browser.find_element(By.ID, "sidebar").is_displayed() and browser.find_element(By.ID, "settings-link").is_displayed())
