@@ -2119,8 +2119,9 @@ def first_read_said(browser, ids, expected, got) -> None:
 def first_run_screens(now: dt.datetime) -> None:
     """CV. D126, the first run's screens (1) and (2) (criterion 1 as #1280 amended it, mock-up v6). (1) Three cards by
     kind of engine, no list of models: « Auto », marked « Par défaut » and checked, « Sur cet ordinateur », « Service en
-    ligne »; the download of what « Auto » needs starts at once, before any click; « Je choisirai plus tard » keeps
-    « Auto » — nothing written for who writes. (2) The sound checked inline, its two meters, a progress of what is
+    ligne »; the download of what « Auto » needs starts at once, before any click, but only what downloads without an
+    install — Whisper's model; Ollama absent, « Auto » to write says it is to install and nothing is pulled;
+    « Je choisirai plus tard » keeps « Auto » — nothing written for who writes. (2) The sound checked inline, its two meters, a progress of what is
     prepared with its size; « Ça marche » ends on screen (3), the empty window said ready (CU)."""
     print("CV. the first run: three engine cards, Auto's download at once, the sound checked while it comes (D126)")
     served, model = WORK / "served-first", os.urandom(300_000)
@@ -2152,6 +2153,9 @@ def first_run_screens(now: dt.datetime) -> None:
     cards = ("const f = document.querySelector('#welcome fieldset.engine-cards[data-job=write]'); return f ? "
              "[...f.querySelectorAll('.engine-card')].map((c) => [c.dataset.engine, c.querySelector('input').checked,"
              " c.querySelector('.default')?.textContent ?? null]) : null")
+    logs = WORK / "state" / "kitokey" / "logs"
+    pulls = lambda: sum(f.read_text().count('"message":"shell.model_pull_failed"') for f in logs.glob("shell.*.jsonl"))
+    pulled_before = pulls()
     try:
         with window as browser:
             drawn = wait_for(browser, lambda b: b.execute_script(cards) is not None, 10)
@@ -2161,6 +2165,11 @@ def first_run_screens(now: dt.datetime) -> None:
                   and not any(c[1] for c in got[1:]) and not browser.find_elements(By.CSS_SELECTOR, "#welcome select"), got)
             fetching = wait_for(browser, lambda b: "/model.bin" in asked, 5)
             check("(1) the download of what « Auto » needs starts at once, before any click", fetching, asked)
+            # Ollama silent (the scenario's address answers nothing): « Auto » to write cannot be downloaded, only installed.
+            auto = browser.execute_script("return document.querySelector('#welcome .engine-card[data-engine=auto]')?.dataset.state ?? null")
+            time.sleep(2)
+            check("(1) Ollama absent: « Auto » says it is to install, and nothing impossible is started — no model pulled",
+                  auto == "install" and pulls() == pulled_before, (auto, pulls() - pulled_before))
             press(browser, "first-later")
             sound = wait_for(browser, lambda b: b.find_elements(By.ID, "first-sound") and b.find_element(By.ID, "first-sound").is_displayed(), 10)
             text = window.file.read_text()
