@@ -2338,8 +2338,8 @@ def first_run(now: dt.datetime) -> None:
     def started(name: str, language: str = "fr_FR.UTF-8", dark: bool = False, ollama: str = "http://127.0.0.1:9") -> "Window":
         meetings = WORK / f"welcome-{name}"
         meetings.mkdir()
-        # Welcomed, the window opened: the assistant is « Refaire la configuration »'s (D126 took the first start).
-        window = Window(meetings, language, ollama=ollama, small=True)
+        # Welcomed, the full window opened: the assistant is « Refaire la configuration »'s (D126 took the first start).
+        window = Window(meetings, language, ollama=ollama)
         window.env.update(XDG_DATA_HOME=str(WORK / f"data-welcome-{name}"), KITOKEY_SPEECH=str(WORK / "nowhere"))
         # The dark theme asked of GTK, whatever the desktop shows; the light one cannot be asked
         # of a dark desktop without changing the user's setting — its colours are put on the page
