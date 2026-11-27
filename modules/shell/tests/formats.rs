@@ -240,6 +240,11 @@ name = "Capitales"
 sections = [{ title = "A", about = "x" }]
 
 [[formats]]
+structure = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+name = "Quarante et un"
+sections = [{ title = "A", about = "x" }]
+
+[[formats]]
 structure = "vide"
 name = "Vide"
 sections = []
