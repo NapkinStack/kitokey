@@ -14539,7 +14539,8 @@ def main() -> int:
 
             typed = lambda field, text: (browser.execute_script("arguments[0].select()", field), field.send_keys(text, Keys.ENTER))  # noqa: E731
             folder = folder_field()
-            check("a click makes it the path, to type", folder.get_attribute("value") == str(chosen), folder.get_attribute("value"))
+            # The path to type said from the home, « ~ » then the folder, as the shell reads it back (`settings::from_home`, #1232, #1304).
+            check("a click makes it the path, to type, from the home", folder.get_attribute("value") == "~" + "/" + chosen.relative_to(WORK).as_posix(), folder.get_attribute("value"))
             changed(lambda: typed(folder, str(elsewhere)))
             text = window.file.read_text()
             check("a folder typed is made, and in the settings file", elsewhere.is_dir() and f'sessions = "{elsewhere}"' in text, text)
