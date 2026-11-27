@@ -6340,16 +6340,20 @@ def gallery_shown(now: dt.datetime) -> None:
             check(f"{short}, {theme}: the engine card's « Par défaut » and its state are chips", chips and all(chips), chips)
             # A card's radio reached by an arrow, as a keyboard sends it: its card ringed, the focus seen (WCAG 2.4.7,
             # #1313). WebKitGTK does not match `:focus-visible` there.
+            # Where the focus is in its group (its radio's place), whether it is checked, and its card's outline.
             ringed = ("const a = document.activeElement, c = a.closest('.engine-card, .option-card'); if (!c) return null;"
-                      " const o = getComputedStyle(c); return [a.value, a.checked, o.outlineStyle, parseFloat(o.outlineWidth)]")
+                      " const g = [...a.closest('.engine-cards, .option-cards').querySelectorAll('input[type=radio]')];"
+                      " const o = getComputedStyle(c); return [g.indexOf(a), a.checked, o.outlineStyle, parseFloat(o.outlineWidth)]")
             arrowed = []
             for group in ("#gallery .option-cards input:checked", "#gallery .engine-cards input:checked"):
                 browser.execute_script("document.querySelector(arguments[0]).focus()", group)
+                before = browser.execute_script(ringed)
                 sent = real_keys("ff53")
-                arrowed.append([sent, browser.execute_script(ringed)])
+                arrowed.append([sent, before, browser.execute_script(ringed)])
                 real_keys("ff51")
             check(f"{short}, {theme}: a card's radio reached by → shows its card's ring, 2 px at least (WCAG 2.4.7, #1313)",
-                  all(sent and got and got[1] and got[2] == "solid" and got[3] >= 2 for sent, got in arrowed), arrowed)
+                  all(sent and before and got and got[0] != before[0] and got[1] and got[2] == "solid" and got[3] >= 2
+                      for sent, before, got in arrowed), arrowed)
             found = axe_violations(browser)
             check(f"{short}, {theme}: no violation of axe's WCAG 2.2 A and AA rules (D120)", found == [], found)
             for width in (420, 1100):
