@@ -5921,8 +5921,9 @@ def bar_after_stop(now: dt.datetime) -> None:
     """BV. D92, criterion 1: a recording stopped from the bar, the bar at rest names its meeting and its
     stage — the transcript, then the summary, then ready with « Ouvrir » to its page —, in a polite live
     region that says each stage once; until its page is opened or another recording starts. A step that
-    fails is said there in one line, its cause as the page says it, with « Ouvrir »; so is a summary written but
-    not to the export folder (D109). By the keyboard alone, in French and in English, light then dark."""
+    fails is said there in two lines, its first sentence whole, the rest its tooltip, then « Ouvrir » (D125); so is
+    a summary written but not to the export folder (D109). By the keyboard alone, in French and in English,
+    light then dark; axe on the failure said."""
     print("BV. after the stop, the bar names the meeting and its stage, ready with Ouvrir; a failure said with its cause (D92)")
     focused = "return document.activeElement ? document.activeElement.id : ''"
     said = "const s = document.getElementById('small-last-said'); return s && s.getClientRects().length ? s.textContent : ''"
@@ -6046,14 +6047,23 @@ def bar_after_stop(now: dt.datetime) -> None:
                 gates[0].unlink()
                 ended = wait_for(browser, lambda b: b.execute_script("return window.__TAURI__.core.invoke('makings').then(m => m.failed['2026-10-18_12-00'] !== undefined)"), 15)
                 failed = stop() and wait_for(browser, lambda b: b.execute_script(said) == meeting + not_made and b.execute_script(shown), 15)
-                # One line, cut where the bar ends: the whole of it its tooltip, and what the live region says.
-                line = browser.execute_script("const s = document.getElementById('small-last-said'), l = document.getElementById('small-last');"
-                                              " return [s.getClientRects().length, Math.round(l.getBoundingClientRect().height), s.title,"
-                                              " document.getElementById('small-last-live').textContent]")
-                check(f"{short}: its summary failing, the bar says so in one line, the page's cause its tooltip and its live region's, « Ouvrir » beside it (D92)",
-                      ended and failed and line[0] == 1 and line[1] <= 20 and line[2] == line[3] == meeting + not_made,
+                # Two lines (D125), never one cut in its first words: the meeting and the cause's first sentence whole inside
+                # them, the whole of it its tooltip and its live region's; then « Ouvrir », after the words, inside the bar;
+                # the window as tall as it shows.
+                line = browser.execute_script(
+                    "const s = document.getElementById('small-last-said'), o = document.getElementById('small-last-open');"
+                    " const r = s.getBoundingClientRect(), b = o.getBoundingClientRect(), high = parseFloat(getComputedStyle(s).lineHeight);"
+                    " const t = s.firstChild, end = t.textContent.indexOf('.') + 1, first = document.createRange(); first.setStart(t, 0); first.setEnd(t, end);"
+                    " const f = [...first.getClientRects()];"
+                    " return {lines: Math.round(r.height / high), first: t.textContent.slice(0, end), whole: f.length > 0 && f.every((x) => x.bottom <= r.bottom + 0.5 && x.right <= r.right + 0.5),"
+                    " title: s.title, live: document.getElementById('small-last-live').textContent,"
+                    " after: b.left >= r.right - 0.5 && b.right <= innerWidth + 0.5, fits: Math.abs(innerHeight - Math.ceil(document.getElementById('small').getBoundingClientRect().height)) <= 1}")
+                check(f"{short}: its summary failing, the bar says so in two lines, the meeting and the cause's first sentence whole, the whole of it its tooltip and its live region's, then « Ouvrir » (D92, D125)",
+                      ended and failed and line["lines"] == 2 and line["whole"] and line["title"] == line["live"] == meeting + not_made and line["after"] and line["fits"],
                       [ended, browser.execute_script(said), browser.execute_script(shown), line])
                 shot_themed(browser, f"d92-bar-failed-{short}-{theme}", theme)
+                found = axe_violations(browser)
+                check(f"{short}: the failure said in the bar, axe's WCAG 2.2 A and AA rules: no violation (D125)", found == [], found)
                 # D109: a summary written, but not to the export folder that refuses it: said here too, as its page says it.
                 refused = {"fr": "Impossible d’écrire le compte rendu dans le dossier d’export. Choisissez un autre dossier dans les Réglages.",
                            "en": "Kitokey could not write the summary to the export folder. Choose another folder in Settings."}[short]
