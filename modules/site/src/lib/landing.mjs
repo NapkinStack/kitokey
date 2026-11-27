@@ -103,7 +103,7 @@ const raw = {
       leaves: ["Ne sort que si vous le choisissez", "Rien de ceci n’est activé au départ.", "Désactivé"],
       chosen: [["file", "Un service en ligne, si vous le choisissez", "Avec votre clé, pour aller plus vite. Il reçoit le texte pour rédiger, ou le son pour transcrire, selon ce que vous lui confiez."], ["share", "Un compte rendu que vous envoyez", "Vers Slack ou Discord, d’un geste, quand vous le décidez."]],
       proof: [["lock", "Confidentielle, vraiment", "Une réunion confidentielle n’est jamais confiée à un moteur en ligne."], ["download", "Téléchargé une fois", "Les moteurs se téléchargent une fois, au premier usage."], ["code", "Vérifiable", "Le code source est public, sous GPL v3. Chacun peut lire ce que fait Kitokey."], ["eyeoff", "Ni cookie ni traceur", "Ce site ne vous suit pas, et Kitokey non plus."]],
-      shot: "La page d’une réunion dans Kitokey : son compte rendu, ses actions et sa transcription, sous la barre Partager, Refaire et Plus.",
+      shot: "La page d’une réunion dans Kitokey : la revue produit de la semaine, sa forme d’onde à deux voix, son compte rendu, ses actions datées et sa transcription.",
     },
     en: {
       kicker: "Privacy", h: "You stay in control.", lead: "No Kitokey server, no account. What stays on your computer, and what leaves it only if you decide so.",
@@ -112,7 +112,7 @@ const raw = {
       leaves: ["Leaves only if you choose", "None of this is on at first.", "Off"],
       chosen: [["file", "An online service, if you choose one", "With your key, to go faster. It receives the text to write, or the sound to transcribe, as you entrust it."], ["share", "Minutes you send", "To Slack or Discord, in one gesture, when you decide."]],
       proof: [["lock", "Confidential, really", "A confidential meeting is never given to an online engine."], ["download", "Downloaded once", "The engines are downloaded once, on first use."], ["code", "Checkable", "The source code is public, under GPL v3. Anyone can read what Kitokey does."], ["eyeoff", "No cookie, no tracker", "This site does not follow you, and neither does Kitokey."]],
-      shot: "A meeting’s page in Kitokey: its summary, its actions and its transcript, under the bar with Share, Redo and More.",
+      shot: "A meeting’s page in Kitokey: the weekly product review, its two voices’ waveform, its summary, its dated actions and its transcript.",
     },
     keeps: "PDR-0001 and PDR-0003, no server and no account, no telemetry; session-audio, two tracks (modules/capture); the transcription engine (D40) and the summary's « Auto », on this computer by default (D122); D96 and D110, an online service only with the user's key and choice; D116, a send on a gesture; D60 and D118, a confidential meeting never online; registry/models.json, the engines downloaded once; LICENSE, GPL v3; _headers, no third-party request on the site. The capture is a placeholder until D121 is filmed",
   },

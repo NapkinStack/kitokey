@@ -40,12 +40,11 @@
 .mid .pf h3, .mid .ft h3 { font-size: 18px; }
 .mid .ft h3 .chip { position: absolute; top: 22px; right: 22px; height: 22px; font-size: 12px; font-family: system-ui, -apple-system, "Segoe UI", Cantarell, sans-serif; letter-spacing: 0; }
 .mid .pf p, .mid .ft p { color: var(--text-secondary); font-size: 15px; line-height: 1.5; }
-/* A meeting's page, as the app draws it (D121's first part, #1301), the system's theme or the visitor's: the other
-   image is display: none and lazy, so a browser never fetches it. To be filmed again after D121's layout. */
+/* A meeting's page as the app draws it, in the page's language: the Store's own screenshot (D103's store_shots), light
+   in both themes, framed and lifted on the dark ground. To be filmed again after D121's layout. */
 .mid .shot-f { margin: 20px 0 0; }
 .mid .shot { display: block; width: 100%; height: auto; border-radius: var(--r-xl); box-shadow: var(--e2); outline: 1px solid var(--border-subtle); }
-.mid .shot.on-dark, html[data-site="dark"] .mid .shot.on-light { display: none; }
-html[data-site="dark"] .mid .shot.on-dark { display: block; }
+html[data-site="dark"] .mid .shot { outline: 1px solid var(--border-control); box-shadow: 0 24px 60px -24px rgb(0 0 0 / .7); }
 
 /* Who it is for. */
 .mid .cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }

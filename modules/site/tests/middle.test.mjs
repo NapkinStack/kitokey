@@ -31,11 +31,11 @@ for (const lang of ["fr", "en"]) {
     assert.ok(sovereign.includes(landing.sovereign[lang].leaves[1]), "what leaves is not said off at first");
   });
 
-  test(`/${lang}/: the app's own page in the section, light and dark, described by its alt; the policy left to the footer`, async () => {
+  test(`/${lang}/: the app's own page in the section, in its language, described by its alt; the policy left to the footer`, async () => {
     const [sovereign] = await sections(lang);
     assert.doesNotMatch(sovereign, new RegExp(`href="/${lang}/privacy/"`));
-    const alts = [...sovereign.matchAll(/<img class="shot on-(?:light|dark)"[^>]*alt="([^"]*)"/g)].map(([, alt]) => alt);
-    assert.deepEqual(alts, [landing.sovereign[lang].shot, landing.sovereign[lang].shot]);
+    const alts = [...sovereign.matchAll(/<img class="shot"[^>]*alt="([^"]*)"/g)].map(([, alt]) => alt);
+    assert.deepEqual(alts, [landing.sovereign[lang].shot]);
   });
 
   test(`/${lang}/: three cases, each with its people, its pictogram and a made-up meeting hidden from a screen reader`, async () => {

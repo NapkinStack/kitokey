@@ -168,7 +168,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
         </div>
       </div>
       <div class="proof rise">{sv.proof.map(([icon, title, said], i) => <article class="pf"><span class={i === 0 ? "tile priv" : "tile"} set:html={ico(icon)} /><h3>{title}</h3><p>{said}</p></article>)}</div>
-      <figure class="shot-f">{["light", "dark"].map((theme) => <img class={`shot on-${theme}`} src={`/img/app/meeting-${theme}.webp`} alt={sv.shot} width="1920" height="1080" loading="lazy" decoding="async" />)}</figure>
+      <figure class="shot-f"><img class="shot" src={`/img/app/meeting-${lang}.webp`} alt={sv.shot} width="1920" height="1080" loading="lazy" decoding="async" /></figure>
     </div>
   </section>
 

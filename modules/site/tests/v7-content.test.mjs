@@ -42,21 +42,18 @@ test("the hero's note begins with v7's sparkles", async () => {
   }
 });
 
-test("the app's page stands where its placeholder was: light and dark, lazy, sized, one alt", async () => {
+test("the app's page stands where its placeholder was: the Store's screenshot in the page's language, lazy, sized, described", async () => {
   for (const lang of ["fr", "en"]) {
     const html = await page(lang);
     assert.doesNotMatch(html, /class="shot-ph"/);
-    const shots = [...html.matchAll(/<img class="shot (on-light|on-dark)"[^>]*>/g)].map(([tag, theme]) => ({ tag, theme,
-      src: tag.match(/src="([^"]+)"/)?.[1], alt: tag.match(/alt="([^"]*)"/)?.[1], lazy: /loading="lazy"/.test(tag),
-      sized: /width="\d+"/.test(tag) && /height="\d+"/.test(tag) }));
-    assert.deepEqual(shots.map((s) => s.theme), ["on-light", "on-dark"], `/${lang}/`);
-    for (const shot of shots) {
-      assert.match(shot.src, /^\/img\/app\/meeting-(light|dark)\.webp$/);
-      assert.ok(existsSync(join(dist, shot.src)), `${shot.src} not built`);
-      assert.ok(shot.lazy && shot.sized, `/${lang}/: ${shot.tag}`);
-      assert.ok(shot.alt && shot.alt.length > 20, `/${lang}/: alt « ${shot.alt} »`);
-    }
-    assert.equal(shots[0].alt, shots[1].alt);
+    const shots = [...html.matchAll(/<img class="shot"[^>]*>/g)].map(([tag]) => ({ tag, src: tag.match(/src="([^"]+)"/)?.[1], alt: tag.match(/alt="([^"]*)"/)?.[1] }));
+    assert.equal(shots.length, 1, `/${lang}/`);
+    const [shot] = shots;
+    assert.equal(shot.src, `/img/app/meeting-${lang}.webp`);
+    assert.ok(existsSync(join(dist, shot.src)), `${shot.src} not built`);
+    assert.match(shot.tag, /loading="lazy"/);
+    assert.match(shot.tag, /width="1920" height="1080"/);
+    assert.ok(shot.alt && shot.alt.length > 20, `/${lang}/: alt « ${shot.alt} »`);
   }
 });
 
