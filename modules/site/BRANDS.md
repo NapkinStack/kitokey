@@ -1,11 +1,13 @@
-# Brands on kitokey.com — the files in public/img/brands/
+# Brands on kitokey.com: the files in public/img/brands/
 
-Each file here is a brand's own, unaltered, under the terms its owner states. Read on 2026-11-26.
+Each file is its owner's own, unaltered. Read on 2026-11-26.
 
-| File | Brand | Source | Terms, verbatim | sha256 |
-|---|---|---|---|---|
-| `discord-symbol-blurple.svg` | Discord, its symbol in Blurple | [discord.com/branding](https://discord.com/branding), « Symbol » download | « Please do not edit, change, distort, recolor, or reconfigure the Discord logo. » · « Feel free to use our logo in color, black or white. » · use them « to inform people that you are a Discord user and/or that you have a Discord server » | `d06eaa51e78a9984ebbd3fbc82f0245ac2ecb5bf0150f537204397c1da5c7bd8` |
+| File | Source | sha256 |
+|---|---|---|
+| `discord-symbol-blurple.svg` | [discord.com/branding](https://discord.com/branding), « Symbol » download | `d06eaa51e78a9984ebbd3fbc82f0245ac2ecb5bf0150f537204397c1da5c7bd8` |
+| `tux.svg` | https://upload.wikimedia.org/wikipedia/commons/3/35/Tux.svg | `cd503ad510e16ff2869f959cf57b892bb2175a6874ff696b495bd94fd7db9743` |
+| `windows-logo-2021.svg` | https://upload.wikimedia.org/wikipedia/commons/8/87/Windows_logo_-_2021.svg | `0f6b74d8d8ede1ec0e454b3c6fcdfba65fbe989af9a49ad4ff0c498f4dc3afbb` |
+| `apple-logo-black.svg` | https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg | `9d00ea77a3240f291356c36261c5f45d7fa456f29c97a2f060caf0ed4b9c3231` |
+| `apple-logo-white.svg` | https://upload.wikimedia.org/wikipedia/commons/3/31/Apple_logo_white.svg | `45321f5f3f9e1acac993347b855af8021526c5f7e929b9c15b7d6cd033cd9626` |
 
-**Not here, by their terms** (the decider, 2026-11-26): Slack — « Don't distribute or otherwise make available
-our logos, marks or assets. » ([Slack Brand Terms](https://slack.com/terms-of-service/slack-brand)) — and Google
-Calendar, whose kit is for an organisation's internal communications. Both are named in words.
+Slack and Google Calendar are named in words.

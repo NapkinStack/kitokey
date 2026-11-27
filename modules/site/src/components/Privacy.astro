@@ -12,7 +12,7 @@ const html = await half(source, lang);
 const day = changed(source);
 const shown = new Intl.DateTimeFormat(lang === "en" ? "en-GB" : "fr-FR", { dateStyle: "long", timeZone: "UTC" }).format(new Date(day));
 ---
-<Page lang={lang} title={`Kitokey — ${say("privacy", lang)}`} description={say("local", lang)} path="privacy/" kind="wrap prose">
+<Page lang={lang} title={`${say("privacy", lang)} · Kitokey`} description={say("local", lang)} path="privacy/" kind="wrap prose">
   <h1>{say("privacy", lang)}</h1>
   <p class="changed">{say("changed", lang)} <time datetime={day}>{shown}</time></p>
   <article class="policy"><Fragment set:html={html} /></article>
